@@ -1,0 +1,39 @@
+node_modules/
+build/
+*.log
+.env*
+
+# Storage directory (user data)
+storage/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.cache/

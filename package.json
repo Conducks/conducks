@@ -1,0 +1,31 @@
+{
+	"name": "conducks",
+	"version": "0.1.0",
+	"description": "keep agent orgianzed and memory always refresh by consolidating their docs in a organized manner",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"conducks": "./build/index.js"
+	},
+	"files": [
+		"build"
+	],
+	"scripts": {
+		"build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+		"prepare": "npm run build",
+		"watch": "tsc --watch",
+		"inspector": "npx @modelcontextprotocol/inspector build/index.js"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.22.0",
+		"@toon-format/cli": "^1.0.0",
+		"@toon-format/toon": "^1.0.0",
+		"chokidar": "^4.0.3",
+		"fs-extra": "^11.3.2"
+	},
+	"devDependencies": {
+		"@types/fs-extra": "^11.0.4",
+		"@types/node": "^20.11.24",
+		"typescript": "^5.3.3"
+	}
+}

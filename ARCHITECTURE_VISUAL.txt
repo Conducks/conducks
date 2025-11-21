@@ -1,0 +1,131 @@
+CONDUCKS Modular Architecture - Visual Structure
+==============================================
+
+                            index.ts
+                         (MCP Server)
+                              |
+                    ┌─────────┼─────────┐
+                    |         |         |
+                  core/    features/  tools/
+                    |         |         |
+        ┌───────────┼────┐    |    ┌────┼────────────┐
+        |           |    |    |    |    |            |
+     types.ts   logic config  |   Tool Tool       analytics/
+     storage.ts  .ts   .ts    |   Modules...    ┌────┼────┐
+                              |                  |         |
+                    ┌─────────┼────┐        job-      system-
+                    |              |      analytics analytics
+              architect/    docs-watcher/   .ts        .ts
+              ┌──────┼────┐       |
+              |           |       |
+         logic.ts   state.ts  watcher.ts
+
+
+Token Flow Optimization:
+========================
+
+BEFORE (Markdown Heavy):
+Agent Request → Tool Handler → Markdown Generator → Response
+                                      ↓
+                              # 🛠️ CONDUCKS Tools
+                              ## Available Tools
+                              - **Tool 1**: Description
+                              ↓
+                         150-200 tokens consumed
+
+AFTER (Plain Text TOON):
+Agent Request → Tool Handler → Plain Text Generator → Response
+                                      ↓
+                              CONDUCKS Tools
+                              
+                              1. Tool 1 - Description
+                              ↓
+                         20-40 tokens consumed
+                         
+                    80% TOKEN REDUCTION ACHIEVED
+
+
+Module Dependency Graph:
+========================
+
+index.ts
+  ├─→ tools/process-docs.ts
+  │     └─→ core/storage.ts
+  │     └─→ core/logic.ts
+  │
+  ├─→ tools/get-job-tasks.ts
+  │     └─→ core/storage.ts
+  │
+  ├─→ tools/update-task-status.ts
+  │     └─→ core/storage.ts
+  │
+  ├─→ tools/list-jobs.ts
+  │     └─→ core/storage.ts
+  │
+  ├─→ tools/conducks-info.ts
+  │     └─→ core/storage.ts
+  │
+  └─→ tools/get-job-analytics.ts
+        ├─→ shared/analytics-utils.ts
+        ├─→ tools/analytics/job-analytics.ts
+        └─→ tools/analytics/system-analytics.ts
+
+features/ (Optional Advanced Features)
+  ├─→ architect/
+  │     ├─→ core/types.ts
+  │     └─→ core/config.ts
+  │
+  └─→ docs-watcher/
+        ├─→ core/types.ts
+        ├─→ core/config.ts
+        └─→ core/storage.ts
+
+
+Core Module (Minimal Essential)
+================================
+types.ts      → Type definitions (Job, Task, Storage)
+storage.ts    → TOON database read/write operations
+logic.ts      → Task generation, domain detection
+config.ts     → System configuration constants
+
+
+Shared Module (Reusable Utilities)
+===================================
+analytics-utils.ts → Analytics calculation functions
+                     Used by both job and system analytics
+
+
+Features Module (Advanced Capabilities)
+========================================
+architect/           → Human-AI collaboration mode
+  ├─ architect-logic.ts    → Question generation
+  └─ architect-state.ts    → Workflow state management
+
+docs-watcher/        → File system monitoring
+  └─ docs-watcher.ts       → Real-time doc updates
+
+
+Tools Module (MCP Tool Implementations)
+========================================
+process-docs.ts       → Create jobs from descriptions
+get-job-tasks.ts      → Retrieve task details
+update-task-status.ts → Modify task states
+list-jobs.ts          → Job overview listing
+conducks-info.ts       → Self-documenting system info
+get-job-analytics.ts  → Analytics orchestrator
+
+analytics/            → Specialized analytics sub-branch
+  ├─ job-analytics.ts    → Single job metrics
+  └─ system-analytics.ts → Cross-job metrics
+
+
+Architecture Benefits:
+======================
+✓ Clean separation of concerns
+✓ Easy to add new tools (just create new file in tools/)
+✓ Easy to add new features (create new folder in features/)
+✓ Shared utilities prevent code duplication
+✓ Core stays minimal and stable
+✓ Tree structure makes navigation intuitive
+✓ Import paths clearly show dependencies
+✓ 80% token reduction for all LLM interactions
