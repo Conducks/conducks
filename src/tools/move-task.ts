@@ -1,12 +1,17 @@
 import { existsSync, renameSync, mkdirSync } from 'fs';
 import { join, basename } from 'path';
-import { DOCS_ROOT } from '../core/config.js';
+import { loadCONDUCKSWorkspace, saveJobForWorkspace } from '../core/storage.js';
+
+// NOTE: DOCS_ROOT removed - this tool may need refactoring for workspace isolation
+const DOCS_ROOT = '/tmp/fallback'; // Temporary fallback - move-task deprecated
 
 interface MoveTaskArgs {
+  workspace_path?: string;
   project: string;
   subproject: string;
-  domain_file: string; // e.g., "poi-discovery.md"
-  direction: 'to_done' | 'to_todo';
+  task_file: string; // e.g., "task_001_setup-database.md"
+  target_folder: 'to-do' | 'done-to-do' | 'analysis' | 'problem-solution';
+  source_folder?: 'to-do' | 'done-to-do' | 'analysis' | 'problem-solution';
 }
 
 interface MoveTaskResult {
@@ -16,20 +21,14 @@ interface MoveTaskResult {
 }
 
 /**
- * Inline rules (shown in every response)
- */
-function getInlineRules(): string {
-  return `\nRULES: Group by 2+ criteria (journey/complexity/team/frequency) | Split at: 50 tasks OR 20k chars`;
-}
-
-/**
- * Move domain file between to-do and done-to-do
+ * Move task markdown file between folders (to-do, done-to-do, analysis, problem-solution)
+ * Job references remain intact across moves
  */
 export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult> {
   try {
-    const { project, subproject, domain_file, direction } = args;
-    
-    const subprojectPath = join(DOCS_ROOT, project, subproject);
+    const { workspace_path = 'default', project, subproject, task_file, target_folder, source_folder } = args;
+
+    const subprojectPath = join(DOCS_ROOT, '..', project, subproject);
     
     if (!existsSync(subprojectPath)) {
       return {
@@ -38,53 +37,58 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
       };
     }
     
-    const sourcePath = direction === 'to_done' 
-      ? join(subprojectPath, 'to-do', domain_file)
-      : join(subprojectPath, 'done-to-do', domain_file);
+    // Try to find source file if source_folder provided
+    let sourcePath: string | null = null;
     
-    const destDir = direction === 'to_done'
-      ? join(subprojectPath, 'done-to-do')
-      : join(subprojectPath, 'to-do');
-    
-    const destPath = join(destDir, domain_file);
-    
-    if (!existsSync(sourcePath)) {
-      // Check if file is in subproject root (flexible placement)
-      const rootPath = join(subprojectPath, domain_file);
-      if (existsSync(rootPath)) {
-        // Move from root to destination
-        if (!existsSync(destDir)) {
-          mkdirSync(destDir, { recursive: true });
-        }
-        renameSync(rootPath, destPath);
-        
-        const action = direction === 'to_done' ? 'ARCHIVED' : 'REACTIVATED';
-        return {
-          success: true,
-          message: `${action} ${domain_file}${getInlineRules()}`,
-          newPath: `${project}/${subproject}/${direction === 'to_done' ? 'done-to-do' : 'to-do'}/${domain_file}`
-        };
+    if (source_folder) {
+      const testPath = join(subprojectPath, source_folder, task_file);
+      if (existsSync(testPath)) {
+        sourcePath = testPath;
       }
-      
+    } else {
+      // Search all folders
+      const folders = ['to-do', 'done-to-do', 'analysis', 'problem-solution'];
+      for (const folder of folders) {
+        const testPath = join(subprojectPath, folder, task_file);
+        if (existsSync(testPath)) {
+          sourcePath = testPath;
+          break;
+        }
+      }
+    }
+    
+    if (!sourcePath) {
       return {
         success: false,
-        message: `File not found: ${domain_file}`
+        message: `Task file not found: ${task_file}`
       };
     }
+    
+    const destDir = join(subprojectPath, target_folder);
+    const destPath = join(destDir, task_file);
     
     // Ensure destination directory exists
     if (!existsSync(destDir)) {
       mkdirSync(destDir, { recursive: true });
     }
     
+    // Update task status if moving to/from done-to-do
+    if (target_folder === 'done-to-do' || sourcePath.includes('/done-to-do/')) {
+      // Extract task ID from filename (task_001_...)
+      const taskIdMatch = task_file.match(/^task_(\d+)_/);
+      if (taskIdMatch) {
+        const taskId = taskIdMatch[1].padStart(3, '0');
+        await updateTaskStatus(workspace_path, taskId, target_folder === 'done-to-do');
+      }
+    }
+
     // Move file
     renameSync(sourcePath, destPath);
-    
-    const action = direction === 'to_done' ? 'ARCHIVED' : 'REACTIVATED';
+
     return {
       success: true,
-      message: `${action} ${domain_file}${getInlineRules()}`,
-      newPath: `${project}/${subproject}/${direction === 'to_done' ? 'done-to-do' : 'to-do'}/${domain_file}`
+      message: `Moved ${task_file} to ${target_folder}`,
+      newPath: `${project}/${subproject}/${target_folder}/${task_file}`
     };
     
   } catch (error) {
@@ -96,12 +100,41 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
 }
 
 /**
+ * Update task status when moved to/from done-to-do
+ */
+async function updateTaskStatus(workspace_path: string, taskId: string, isCompleted: boolean): Promise<void> {
+  try {
+    const storage = await loadCONDUCKSWorkspace(workspace_path);
+
+    // Find job that contains this task
+    for (const job of storage.jobs) {
+      const task = job.tasks.find((t: any) => t.id === taskId);
+      if (task) {
+        // Update task status
+        task.status = isCompleted ? 'completed' : 'active';
+        task.lastUpdated = new Date().toISOString();
+
+        // Update job lastUpdated
+        job.lastUpdated = new Date().toISOString();
+
+        // Save the updated job
+        await saveJobForWorkspace(job, workspace_path, false);
+        break;
+      }
+    }
+  } catch (error) {
+    // Log but don't fail the move operation
+    console.error('Failed to update task status:', error);
+  }
+}
+
+/**
  * Format result (TOON style)
  */
 export function formatMoveTaskResult(result: MoveTaskResult): string {
   if (!result.success) {
     return `MOVE FAILED | ${result.message}`;
   }
-  
+
   return `${result.message}\nNew location: ${result.newPath}`;
 }

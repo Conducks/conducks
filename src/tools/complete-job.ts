@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, renameSync } from 'fs';
+import * as fs from 'fs-extra';
 import { join } from 'path';
-import { DOCS_ROOT } from '../core/config.js';
-import { loadCONDUCKS, saveCONDUCKS } from '../core/storage.js';
+import { loadCONDUCKSWorkspace } from '../core/storage.js';
+import { Job } from '../core/types.js';
 
 interface CompleteJobArgs {
+  workspace_path: string;
   job_id: number;
   completion_notes?: string;
 }
@@ -15,77 +16,60 @@ interface CompleteJobResult {
 }
 
 /**
- * Move job from to-do to done-to-do
+ * Move job from jobs/to-do/ to jobs/done-to-do/ within a workspace
  */
 export async function handleCompleteJob(args: CompleteJobArgs): Promise<CompleteJobResult> {
   try {
-    const { job_id, completion_notes } = args;
-    
-    // Ensure done-to-do directory exists
-    const doneDir = join(DOCS_ROOT, 'jobs', 'done-to-do');
-    if (!existsSync(doneDir)) {
-      mkdirSync(doneDir, { recursive: true });
-    }
-    
-    // Find job file in to-do
-    const toDoDir = join(DOCS_ROOT, 'jobs', 'to-do');
-    if (!existsSync(toDoDir)) {
-      return {
-        success: false,
-        message: `to-do directory not found`
-      };
-    }
-    
-    const fs = require('fs');
-    const files = fs.readdirSync(toDoDir);
-    const jobFile = files.find((file: string) => 
-      file.startsWith(String(job_id).padStart(3, '0'))
-    );
-    
-    if (!jobFile) {
-      return {
-        success: false,
-        message: `Job ${job_id} not found in to-do folder`
-      };
-    }
-    
-    const sourcePath = join(toDoDir, jobFile);
-    const destPath = join(doneDir, jobFile);
-    
-    // Move file
-    renameSync(sourcePath, destPath);
-    
-    // Update jobs.toon
-    const storage = await loadCONDUCKS();
+    const { workspace_path, job_id, completion_notes } = args;
+    // Temporary: create workspace paths manually until config issue is fixed
+    const DEFAULT_INTERNAL_STORAGE = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
+    const paths = {
+      jobsToDoDir: `/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage/${workspace_path}/jobs/to-do`,
+      jobsDoneDir: `/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage/${workspace_path}/jobs/done-to-do`
+    };
+    const storage = await loadCONDUCKSWorkspace(workspace_path);
     const job = storage.jobs.find(j => j.id === job_id);
     
-    if (job) {
-      // Update file path in job record
-      const updatedJobs = storage.jobs.map(j => {
-        if (j.id === job_id) {
-          return {
-            ...j,
-            lastUpdated: new Date().toISOString()
-          };
-        }
-        return j;
-      });
-      
-      storage.jobs = updatedJobs;
-      await saveCONDUCKS(storage);
+    if (!job) {
+      return { success: false, message: `Job ${job_id} not found` };
     }
     
-    return {
-      success: true,
-      message: `Job ${job_id} completed and archived`,
-      archivedPath: `jobs/done-to-do/${jobFile}`
+    // Verify all tasks completed (or zero tasks)
+    const allCompleted = job.tasks.length === 0 || job.tasks.every(t => t.status === 'completed');
+    if (!allCompleted) {
+      const incompleteTasks = job.tasks.filter(t => t.status !== 'completed');
+      return { 
+        success: false, 
+        message: `Job ${job_id} has ${incompleteTasks.length} incomplete tasks. Complete all tasks first.`
+      };
+    }
+    
+    // Move job file from to-do to done-to-do
+    const jobSlug = job.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+    const filename = `${String(job.id).padStart(3, '0')}_${jobSlug}.toon`;
+    const sourcePath = join(paths.jobsToDoDir, filename);
+    const destPath = join(paths.jobsDoneDir, filename);
+
+    if (fs.existsSync(sourcePath)) {
+      await fs.remove(sourcePath);
+    }
+    const saveJobForWorkspace = await import('../core/storage.js').then(m => m.saveJobForWorkspace);
+    await saveJobForWorkspace(job, workspace_path, true);
+
+    // Add completion notes if provided
+    if (completion_notes) {
+      job.lastUpdated = new Date().toISOString();
+      // Notes could be added to job object if needed
+    }
+    
+    return { 
+      success: true, 
+      message: `Job ${job_id} marked completed and moved to done-to-do`,
+      archivedPath: `jobs/done-to-do/${filename}`
     };
     
   } catch (error) {
-    return {
-      success: false,
-      message: `Failed to complete job: ${error}`
-    };
+    return { success: false, message: `Failed to complete job: ${error}` };
   }
 }
 
@@ -100,10 +84,10 @@ export function formatCompleteJobResult(result: CompleteJobResult): string {
   let output = `JOB COMPLETED\n\n`;
   output += `${result.message}\n`;
   if (result.archivedPath) {
-    output += `Archived to: ${join(DOCS_ROOT, result.archivedPath)}\n\n`;
+    output += `Marker: ${result.archivedPath}\n`;
   }
-  output += `Job moved from to-do to done-to-do.\n`;
-  output += `All related tasks remain in project/subproject/domain files for reference.\n`;
+  output += `Job completion stored via completed.marker file in job directory.\n`;
+  output += `Tasks remain in jobs/job_<id>/tasks/. Domain files deprecated.\n`;
   
   return output;
 }

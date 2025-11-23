@@ -133,5 +133,5 @@ ${createProgressBar(analytics.overallCompletionRate)} Overall Completion
 Quick Actions
 Run list_jobs() to see all current jobs
 Use get_job_tasks({ job_id: X }) to drill down into specific jobs
-Try conducks_info({ topic: tools }) for help with available tools`;
+Use smart_info({ context: 'system' }) for system overview`;
 }

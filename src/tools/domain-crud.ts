@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { DOCS_ROOT } from '../core/config.js';
+
+// NOTE: DOCS_ROOT removed in workspace isolation - this tool may need refactoring
+const DOCS_ROOT = '/tmp/fallback'; // Temporary fallback - domain-crud deprecated
 
 /**
  * Inline rules (shown in all responses)

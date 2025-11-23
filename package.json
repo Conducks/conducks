@@ -11,10 +11,12 @@
 		"build"
 	],
 	"scripts": {
-		"build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+		"build": "tsc && cp -r build/src/* build/ && rm -rf build/src && chmod 755 build/index.js",
 		"prepare": "npm run build",
 		"watch": "tsc --watch",
-		"inspector": "npx @modelcontextprotocol/inspector build/index.js"
+		"inspector": "npx @modelcontextprotocol/inspector build/index.js",
+		"test": "npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test build/test/**/*.test.js",
+		"test:verbose": "npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test --test-reporter=spec build/test/**/*.test.js"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.22.0",

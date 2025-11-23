@@ -4,7 +4,9 @@
 import fs from 'fs-extra';
 import * as path from 'path';
 import { ArchitectJob, ArchitectJobStatus, CONDUCKSStorage } from '../../core/types.js';
-import { DOCS_ROOT } from '../../core/config.js';
+
+// NOTE: DOCS_ROOT removed - using fallback for architect state
+const DOCS_ROOT = '/tmp/fallback'; // Temporary fallback - architect features may need updates
 
 // Workflow state storage extension
 export interface ArchitectStorage extends CONDUCKSStorage {

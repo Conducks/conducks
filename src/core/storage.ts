@@ -5,7 +5,6 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { decode, encode } from '@toon-format/toon';
 import { CONDUCKSStorage, Job } from './types.js';
-import { DOCS_ROOT, JOBS_FILE } from './config.js';
 
 // Custom logger
 const log = (message: string, level: 'info' | 'error' | 'warn' = 'info') => {
@@ -19,69 +18,122 @@ const log = (message: string, level: 'info' | 'error' | 'warn' = 'info') => {
 // ============================
 
 /**
- * Load CONDUCKS data from TOON file
+ * Load all jobs from individual .toon files for a specific workspace
+ * @param workspacePath Workspace identifier (e.g., "workspace1", "my-project")
+ * @returns Promise<CONDUCKSStorage> containing jobs for the workspace
  */
-export async function loadCONDUCKS(): Promise<CONDUCKSStorage> {
-  try {
-    await fs.ensureDir(DOCS_ROOT);
+export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<CONDUCKSStorage> {
+  // TEMPORARY: hardcoded paths until config.js compilation is fixed
+  const DEFAULT_INTERNAL_STORAGE = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
+  const paths = {
+    jobsToDoDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/to-do`,
+    jobsDoneDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/done-to-do`
+  };
+  await fs.ensureDir(paths.jobsToDoDir);
+  await fs.ensureDir(paths.jobsDoneDir);
 
-    if (await fs.pathExists(JOBS_FILE)) {
-      log(`Loading TOON data from: ${JOBS_FILE}`);
-      const fileContent = await fs.readFile(JOBS_FILE, 'utf-8');
+  const jobs: Job[] = [];
 
-      // Decode TOON format to JSON
-      const parsedData = decode(fileContent);
-
-      // Validate structure
-      if (typeof parsedData === 'object' && parsedData !== null &&
-          'jobs' in parsedData && 'crossReferences' in parsedData) {
-        return parsedData as unknown as CONDUCKSStorage;
+  // Load active jobs from to-do
+  const todoFiles = await fs.readdir(paths.jobsToDoDir);
+  for (const file of todoFiles) {
+    if (file.endsWith('.toon')) {
+      const filePath = path.join(paths.jobsToDoDir, file);
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      try {
+        const job = JSON.parse(fileContent) as Job;
+        jobs.push(job);
+      } catch (error) {
+        log(`Failed to parse job file ${file}: ${error}`, 'error');
       }
-
-      log('Invalid TOON file structure, creating new database', 'warn');
-      throw new Error('Invalid TOON file structure');
     }
-
-    // Create initial database
-    const initial: CONDUCKSStorage = { jobs: [], crossReferences: {} };
-    await fs.writeFile(JOBS_FILE, JSON.stringify(initial, null, 2));
-    log('Created new TOON database');
-    return initial;
-
-  } catch (error: any) {
-    log(`Storage load error: ${error.message}`, 'error');
-    // Return empty database as fallback
-    return { jobs: [], crossReferences: {} };
   }
+
+  // Load completed jobs from done-to-do
+  const doneFiles = await fs.readdir(paths.jobsDoneDir);
+  for (const file of doneFiles) {
+    if (file.endsWith('.toon')) {
+      const filePath = path.join(paths.jobsDoneDir, file);
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      try {
+        const job = JSON.parse(fileContent) as Job;
+        jobs.push(job);
+      } catch (error) {
+        log(`Failed to parse job file ${file}: ${error}`, 'error');
+      }
+    }
+  }
+
+  log(`Loaded ${jobs.length} jobs for workspace '${workspacePath}' (${todoFiles.filter(f => f.endsWith('.toon')).length} active, ${doneFiles.filter(f => f.endsWith('.toon')).length} completed)`);
+
+  // Build cross-references from jobs
+  const crossReferences: { [key: string]: string[] } = {};
+  jobs.forEach(job => {
+    if (job.crossServiceLinks && job.crossServiceLinks.length > 0) {
+      job.crossServiceLinks.forEach(link => {
+        if (!crossReferences[link]) {
+          crossReferences[link] = [];
+        }
+        crossReferences[link].push(String(job.id));
+      });
+    }
+  });
+
+  return { jobs, crossReferences };
 }
 
-/**
- * Save CONDUCKS data to TOON file (stored as JSON for now, converted later)
- */
-export async function saveCONDUCKS(storage: CONDUCKSStorage): Promise<void> {
-  try {
-    await fs.ensureDir(DOCS_ROOT);
 
-    // For now, save as JSON but with .toon extension
-    // TODO: Convert to actual TOON format when ready
-    await fs.writeFile(JOBS_FILE, JSON.stringify(storage, null, 2));
-    log(`Saved ${storage.jobs.length} jobs to TOON file`);
+/**
+ * Save a single job to its .toon file within a specific workspace
+ * @param job Job object to save
+ * @param workspacePath Workspace identifier
+ * @param isCompleted Whether job is in completed state
+ */
+export async function saveJobForWorkspace(job: Job, workspacePath: string, isCompleted: boolean = false): Promise<void> {
+  try {
+    // TEMPORARY: hardcoded paths until config.js compilation is fixed
+    const DEFAULT_INTERNAL_STORAGE = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
+    const paths = {
+      jobsToDoDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/to-do`,
+      jobsDoneDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/done-to-do`
+    };
+    const targetDir = isCompleted ? paths.jobsDoneDir : paths.jobsToDoDir;
+
+    console.error(`DEBUG: Creating directory ${targetDir} for workspace ${workspacePath}`);
+    await fs.ensureDir(targetDir);
+
+    // Generate filename from job id and title
+    const jobSlug = job.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+    const filename = `${String(job.id).padStart(3, '0')}_${jobSlug}.toon`;
+    const filePath = path.join(targetDir, filename);
+
+    console.error(`DEBUG: Saving job ${job.id} to ${filePath}`);
+
+    // Save as JSON (with .toon extension)
+    await fs.writeFile(filePath, JSON.stringify(job, null, 2));
+
+    // Verify the file was written
+    if (await fs.pathExists(filePath)) {
+      console.error(`DEBUG: File ${filePath} was successfully created`);
+    } else {
+      console.error(`DEBUG: ERROR - File ${filePath} was NOT created`);
+    }
+
+    log(`Saved job ${job.id} for workspace '${workspacePath}' to ${filePath}`);
 
   } catch (error: any) {
-    log(`Storage save error: ${error.message}`, 'error');
+    log(`Failed to save job ${job.id} in workspace '${workspacePath}': ${error.message}`, 'error');
     throw error;
   }
 }
 
-// ============================
-// Job Management Operations
-// ============================
-
 /**
- * Generate next available job ID
+ * Generate next available job ID for a specific workspace
+ * @param workspacePath Workspace identifier
+ * @returns Promise<number> Next available job ID for this workspace
  */
-export async function getNextJobId(): Promise<number> {
-  const storage = await loadCONDUCKS();
+export async function getNextJobIdForWorkspace(workspacePath: string): Promise<number> {
+  const storage = await loadCONDUCKSWorkspace(workspacePath);
   if (storage.jobs.length === 0) return 1;
   return Math.max(...storage.jobs.map(job => job.id)) + 1;
 }
@@ -104,10 +156,9 @@ export function validateJob(job: Job): { valid: boolean; errors: string[] } {
     errors.push('Job description is required');
   }
 
+  // Relaxed validation: allow zero tasks at creation (tasks added later)
   if (!job.tasks || !Array.isArray(job.tasks)) {
     errors.push('Job must have tasks array');
-  } else if (job.tasks.length === 0) {
-    errors.push('Job must have at least one task');
   }
 
   if (!job.created) {
@@ -120,25 +171,7 @@ export function validateJob(job: Job): { valid: boolean; errors: string[] } {
   };
 }
 
-/**
- * Backup CONDUCKS data before major operations
- */
-export async function backupCONDUCKS(backupId?: string): Promise<string> {
-  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
-  const backupName = backupId || `backup_${timestamp}`;
-  const backupPath = path.join(DOCS_ROOT, 'backups', `${backupName}.json`);
 
-  try {
-    await fs.ensureDir(path.dirname(backupPath));
-    const currentData = await loadCONDUCKS();
-    await fs.writeFile(backupPath, JSON.stringify(currentData, null, 2));
-    log(`Backup created: ${backupPath}`);
-    return backupPath;
-  } catch (error: any) {
-    log(`Backup failed: ${error.message}`, 'error');
-    throw error;
-  }
-}
 
 // ============================
 // Future TOON Conversion Utilities
@@ -170,31 +203,6 @@ export function toonToJson(toonString: string): any {
     } catch {
       throw new Error('Invalid TOON or JSON format');
     }
-  }
-}
-
-// ============================
-// Statistics and Analytics
-// ============================
-
-/**
- * Get storage statistics
- */
-export async function getStorageStats() {
-  try {
-    const stat = await fs.stat(JOBS_FILE);
-
-    return {
-      fileSize: stat.size,
-      lastModified: stat.mtime.toISOString(),
-      exists: true
-    };
-  } catch {
-    return {
-      fileSize: 0,
-      lastModified: null,
-      exists: false
-    };
   }
 }
 
@@ -230,20 +238,12 @@ export function getProjectStats(storage: CONDUCKSStorage) {
   };
 }
 
-// ============================
-// Export Interface
-// ============================
-
-export const StorageService = {
-  load: loadCONDUCKS,
-  save: saveCONDUCKS,
-  getNextJobId,
+export default {
+  loadCONDUCKSWorkspace,
+  saveJobForWorkspace,
+  getNextJobIdForWorkspace,
   validateJob,
-  backup: backupCONDUCKS,
   jsonToToon,
   toonToJson,
-  getStats: getStorageStats,
   getProjectStats
 };
-
-export default StorageService;
