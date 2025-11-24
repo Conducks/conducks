@@ -89,8 +89,8 @@ export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTask
 
     // Create markdown file in ProjectX/w1/to-do/ (for now keep global for migration compatibility)
     const subproject = args.subproject || 'w1';
-    const DEFAULT_INTERNAL_STORAGE = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
-    const projectRoot = join(DEFAULT_INTERNAL_STORAGE, workspacePath, 'ProjectX');
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
+    const projectRoot = join(storageRoot, workspacePath, 'ProjectX');
     const todoDir = join(projectRoot, subproject, 'to-do');
 
     if (!existsSync(todoDir)) {

@@ -23,11 +23,11 @@ const log = (message: string, level: 'info' | 'error' | 'warn' = 'info') => {
  * @returns Promise<CONDUCKSStorage> containing jobs for the workspace
  */
 export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<CONDUCKSStorage> {
-  // TEMPORARY: hardcoded paths until config.js compilation is fixed
-  const DEFAULT_INTERNAL_STORAGE = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
+  // Use environment variable or default to relative storage
+  const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.join(process.cwd(), 'storage');
   const paths = {
-    jobsToDoDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/to-do`,
-    jobsDoneDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/done-to-do`
+    jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
+    jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')
   };
   await fs.ensureDir(paths.jobsToDoDir);
   await fs.ensureDir(paths.jobsDoneDir);
@@ -91,11 +91,11 @@ export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<COND
  */
 export async function saveJobForWorkspace(job: Job, workspacePath: string, isCompleted: boolean = false): Promise<void> {
   try {
-    // TEMPORARY: hardcoded paths until config.js compilation is fixed
-    const DEFAULT_INTERNAL_STORAGE = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
+    // Use environment variable or default to relative storage
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.join(process.cwd(), 'storage');
     const paths = {
-      jobsToDoDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/to-do`,
-      jobsDoneDir: `${DEFAULT_INTERNAL_STORAGE}/${workspacePath}/jobs/done-to-do`
+      jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
+      jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')
     };
     const targetDir = isCompleted ? paths.jobsDoneDir : paths.jobsToDoDir;
 

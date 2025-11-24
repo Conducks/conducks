@@ -40,7 +40,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: "create_job",
-    description: "Create a new job with complete metadata for a specific workspace. This creates exactly ONE job - no automatic splitting occurs.",
+    description: "Initialize a new job with metadata. **Does not create tasks.** Use `create_task` subsequently to add actionable items. This creates exactly ONE job - no automatic splitting occurs.",
     inputSchema: {
       type: "object",
       properties: {
@@ -60,7 +60,7 @@ const TOOLS = [
   },
   {
     name: "complete_job",
-    description: "Mark job as completed and archive it in a specific workspace.",
+    description: "Mark a job as completed, move it to the archive, and record completion notes. **Use when all tasks are done.**",
     inputSchema: {
       type: "object",
       properties: {
@@ -73,7 +73,7 @@ const TOOLS = [
   },
   {
     name: "delete_job",
-    description: "Delete job and ALL associated task files permanently from a specific workspace.",
+    description: "Permanently delete a job and ALL its task files. **WARNING: IRREVERSIBLE.** Use with caution.",
     inputSchema: {
       type: "object",
       properties: {
@@ -86,7 +86,7 @@ const TOOLS = [
   },
   {
     name: "create_task",
-    description: "Create a new task markdown file for an existing job in a workspace-specific subproject.",
+    description: "Create a new task file linked to a job. **Required for tracking work.**",
     inputSchema: {
       type: "object",
       properties: {
@@ -106,7 +106,7 @@ const TOOLS = [
   },
   {
     name: "move_task",
-    description: "Move task between workflow folders within a workspace.",
+    description: "Transition a task between workflow stages (e.g., `to-do` -> `analysis` -> `done-to-do`).",
     inputSchema: {
       type: "object",
       properties: {
@@ -155,7 +155,7 @@ const TOOLS = [
   },
   {
     name: "smart_info",
-    description: "Get context-aware information about workspaces, system, project, subproject, or job.",
+    description: "Retrieve detailed context about the system, workspace, or specific jobs. **Use this first** to explore the project structure or debug issues.",
     inputSchema: {
       type: "object",
       properties: {
@@ -170,7 +170,7 @@ const TOOLS = [
   },
   {
     name: "initialize_project_structure",
-    description: "Initialize CONDUCKS project structure for a workspace.",
+    description: "Initialize the CONDUCKS folder structure. **Run this ONCE** at the start of a new project.",
     inputSchema: {
       type: "object",
       properties: {
@@ -184,7 +184,7 @@ const TOOLS = [
   },
   {
     name: "architecture_audit",
-    description: "Audit repository structure for fragmentation and optimization opportunities.",
+    description: "Audit repository structure for fragmentation and optimization opportunities. Returns a file tree analysis.",
     inputSchema: {
       type: "object",
       properties: {
@@ -192,6 +192,87 @@ const TOOLS = [
         depth: { type: "number" }
       },
       required: ["workspace_path"]
+    }
+  },
+  {
+    name: "edit_task",
+    description: "Modify an existing task's attributes. Supported updates: `status`, `team`, `complexity`, `description`.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string" },
+        subproject: { type: "string" },
+        domain_file: { type: "string" },
+        task_id: { type: "number" },
+        updates: {
+          type: "object",
+          properties: {
+            status: { type: "string" },
+            team: { type: "string" },
+            complexity: { type: "string" },
+            description: { type: "string" }
+          }
+        }
+      },
+      required: ["project", "subproject", "domain_file", "task_id", "updates"]
+    }
+  },
+  {
+    name: "replace_lines",
+    description: "Replace a specific range of lines in a domain file. **IMPORTANT: Line numbers are 1-based.**",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string" },
+        subproject: { type: "string" },
+        domain_file: { type: "string" },
+        start_line: { type: "number" },
+        end_line: { type: "number" },
+        replacement_text: { type: "string" }
+      },
+      required: ["project", "subproject", "domain_file", "start_line", "end_line", "replacement_text"]
+    }
+  },
+  {
+    name: "rewrite_domain",
+    description: "Rewrite an entire domain file with new content. **WARNING: This overwrites the entire file.**",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string" },
+        subproject: { type: "string" },
+        domain_file: { type: "string" },
+        new_content: { type: "string" }
+      },
+      required: ["project", "subproject", "domain_file", "new_content"]
+    }
+  },
+  {
+    name: "append_task",
+    description: "Append a new task to the end of a domain file.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string" },
+        subproject: { type: "string" },
+        domain_file: { type: "string" },
+        task_content: { type: "string" }
+      },
+      required: ["project", "subproject", "domain_file", "task_content"]
+    }
+  },
+  {
+    name: "remove_task",
+    description: "Remove a task from a domain file.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string" },
+        subproject: { type: "string" },
+        domain_file: { type: "string" },
+        task_id: { type: "number" }
+      },
+      required: ["project", "subproject", "domain_file", "task_id"]
     }
   }
 ];
@@ -251,7 +332,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const auditResult = await handleArchitectureAudit(args as any);
         return { content: [{ type: "text", text: formatArchitectureAuditResult(auditResult) }] };
 
-      // Domain CRUD tools would go here
+      case "edit_task":
+        const editResult = await handleEditTask(args as any);
+        return { content: [{ type: "text", text: formatEditTaskResult(editResult) }] };
+
+      case "replace_lines":
+        const replaceResult = await handleReplaceLines(args as any);
+        return { content: [{ type: "text", text: formatReplaceLinesResult(replaceResult) }] };
+
+      case "rewrite_domain":
+        const rewriteResult = await handleRewriteDomain(args as any);
+        return { content: [{ type: "text", text: formatRewriteDomainResult(rewriteResult) }] };
+
+      case "append_task":
+        const appendResult = await handleAppendTask(args as any);
+        return { content: [{ type: "text", text: formatAppendTaskResult(appendResult) }] };
+
+      case "remove_task":
+        const removeResult = await handleRemoveTask(args as any);
+        return { content: [{ type: "text", text: formatRemoveTaskResult(removeResult) }] };
 
       default:
         throw new Error(`Unknown tool: ${name}`);

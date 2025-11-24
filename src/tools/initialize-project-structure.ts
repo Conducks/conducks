@@ -186,7 +186,7 @@ export async function handleInitializeProjectStructure(args: {
   const errors: string[] = [];
   const createdFolders: string[] = [];
   const createdRulesFiles: string[] = [];
-  
+
   try {
     // Security: reject absolute paths
     if (isAbsolute(workspace_path)) {
@@ -196,17 +196,17 @@ export async function handleInitializeProjectStructure(args: {
     if (workspace_path.includes('..')) {
       throw new Error('Upward path traversal (..) is not allowed. Provide only "." or a direct child folder name.');
     }
-    
+
     // Resolve relative path from current working directory
     const resolvedPath = resolve(process.cwd(), workspace_path);
     // Detect project structure with ascent logic
     const structure = detectProjectStructure(resolvedPath);
-    
+
     // Override project name if provided
     if (project_name) {
       structure.projectName = project_name;
     }
-    
+
     // If multiple git subprojects detected and user has not chosen auto_select or provided include_subprojects, return selection prompt
     if (structure.subprojects.length > 1 && !auto_select && (!include_subprojects || include_subprojects.length === 0)) {
       return {
@@ -224,7 +224,7 @@ export async function handleInitializeProjectStructure(args: {
     }
 
     // Create project root in storage root
-    const storageRoot = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
     const projectPath = join(storageRoot, structure.projectName);
     if (!existsSync(projectPath)) {
       mkdirSync(projectPath, { recursive: true });
@@ -232,7 +232,7 @@ export async function handleInitializeProjectStructure(args: {
     }
     // NOTE: No per-project to-do/done-to-do folders in new model.
     // Tasks will reside under jobs/job_<id>/tasks/ as individual markdown files.
-    
+
     return {
       success: true,
       projectStructure: structure,
@@ -240,7 +240,7 @@ export async function handleInitializeProjectStructure(args: {
       createdRulesFiles,
       errors: errors.length > 0 ? errors : undefined
     };
-    
+
   } catch (error) {
     errors.push(`Failed to initialize project structure: ${error}`);
     return {
@@ -267,7 +267,7 @@ export function formatInitResult(result: InitResult): string {
   if (!result.success) {
     return `INIT FAILED | ${result.errors?.join(' | ')}`;
   }
-  
+
   const rules = generateInlineRules();
   // Determine detection mode
   const rootHasGit = result.projectStructure.rootHasGit;
@@ -307,17 +307,17 @@ export function formatInitResult(result: InitResult): string {
     output += `2. Or formalize as multi-repo; move each to separate top-level clone and use tooling (e.g. nx, turborepo, polyrepo orchestration).\n`;
     output += `3. Establish a root CONTRIBUTING.md and CODEOWNERS to clarify boundaries.\n\n`;
   }
-  
+
   output += `CREATED (${result.createdFolders.length} folders)\n`;
   for (const folder of result.createdFolders) {
     output += `${folder}\n`;
   }
-  
+
   output += `\nORGANIZATION RULES\n`;
   output += `${rules}\n\n`;
-  
+
   output += `NEXT: create_job → create_task (per job) → complete_job when all tasks done\n`;
   output += `Jobs now own tasks directly (jobs/job_<id>/tasks/) | Domain files deprecated`;
-  
+
   return output;
 }

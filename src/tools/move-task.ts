@@ -28,18 +28,19 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
   try {
     const { workspace_path = 'default', project, subproject, task_file, target_folder, source_folder } = args;
 
-    const subprojectPath = join(DOCS_ROOT, '..', project, subproject);
-    
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
+    const subprojectPath = join(storageRoot, workspace_path, project, subproject);
+
     if (!existsSync(subprojectPath)) {
       return {
         success: false,
         message: `Subproject path not found: ${project}/${subproject}`
       };
     }
-    
+
     // Try to find source file if source_folder provided
     let sourcePath: string | null = null;
-    
+
     if (source_folder) {
       const testPath = join(subprojectPath, source_folder, task_file);
       if (existsSync(testPath)) {
@@ -56,22 +57,22 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
         }
       }
     }
-    
+
     if (!sourcePath) {
       return {
         success: false,
         message: `Task file not found: ${task_file}`
       };
     }
-    
+
     const destDir = join(subprojectPath, target_folder);
     const destPath = join(destDir, task_file);
-    
+
     // Ensure destination directory exists
     if (!existsSync(destDir)) {
       mkdirSync(destDir, { recursive: true });
     }
-    
+
     // Update task status if moving to/from done-to-do
     if (target_folder === 'done-to-do' || sourcePath.includes('/done-to-do/')) {
       // Extract task ID from filename (task_001_...)
@@ -90,7 +91,7 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
       message: `Moved ${task_file} to ${target_folder}`,
       newPath: `${project}/${subproject}/${target_folder}/${task_file}`
     };
-    
+
   } catch (error) {
     return {
       success: false,

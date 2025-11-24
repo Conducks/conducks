@@ -50,7 +50,7 @@ export async function handleDeleteJob(args: DeleteJobArgs): Promise<DeleteJobRes
     const jobSlug = job.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
     const filename = `${String(job_id).padStart(3, '0')}_${jobSlug}.toon`;
     // Construct path to workspace's jobs/to-do directory
-    const storageRoot = '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/storage';
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.join(process.cwd(), 'storage');
     const jobFilePath = path.join(storageRoot, workspace_path, 'jobs', 'to-do', filename);
 
     try {

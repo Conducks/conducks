@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
-// NOTE: DOCS_ROOT removed in workspace isolation - this tool may need refactoring
-const DOCS_ROOT = '/tmp/fallback'; // Temporary fallback - domain-crud deprecated
+// Use environment variable or default to relative storage
+const getStorageRoot = () => process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
 
 /**
  * Inline rules (shown in all responses)
@@ -17,9 +17,10 @@ function getInlineRules(): string {
  * use a single-level folder (e.g., <storage>/application).
  */
 function resolvePreferredBase(project: string, subproject: string): string {
+  const storageRoot = getStorageRoot();
   const base = (!subproject || subproject.trim() === '' || subproject === project)
-    ? join(DOCS_ROOT, project)
-    : join(DOCS_ROOT, project, subproject);
+    ? join(storageRoot, project)
+    : join(storageRoot, project, subproject);
   console.error(`[CONDUCKS DEBUG] resolvePreferredBase project=${project} subproject=${subproject} -> ${base}`);
   return base;
 }
@@ -29,8 +30,9 @@ function resolvePreferredBase(project: string, subproject: string): string {
  * legacy nested (project/subproject) and flattened (project-only) layouts.
  */
 function getCandidatePaths(project: string, subproject: string, domainFile: string): string[] {
-  const nestedBase = join(DOCS_ROOT, project, subproject);
-  const flatBase = join(DOCS_ROOT, project);
+  const storageRoot = getStorageRoot();
+  const nestedBase = join(storageRoot, project, subproject);
+  const flatBase = join(storageRoot, project);
 
   const bases = Array.from(new Set([nestedBase, flatBase]));
 
@@ -110,27 +112,27 @@ interface EditTaskResult {
 export async function handleEditTask(args: EditTaskArgs): Promise<EditTaskResult> {
   try {
     const { project, subproject, domain_file, task_id, updates } = args;
-    
+
     const filePath = findDomainFile(project, subproject, domain_file);
     if (!filePath) {
       return { success: false, message: `Domain file not found: ${domain_file}` };
     }
-    
+
     let content = readFileSync(filePath, 'utf-8');
     const taskRegex = new RegExp(`(Task ${task_id}:[^\n]*\n(?:Status:[^\n]*\n|Team:[^\n]*\n|Complexity:[^\n]*\n|Job:[^\n]*\n|Depends:[^\n]*\n)*Desc:[^\n]*\n)`, 'g');
-    
+
     if (!taskRegex.test(content)) {
       return { success: false, message: `Task ${task_id} not found in ${domain_file}` };
     }
-    
+
     // Reset regex
     const taskMatch = content.match(new RegExp(`Task ${task_id}:[^\n]*\n((?:Status:|Team:|Complexity:|Job:|Depends:|Desc:)[^\n]*\n)*`));
     if (!taskMatch) {
       return { success: false, message: `Task ${task_id} parsing failed` };
     }
-    
+
     let taskBlock = taskMatch[0];
-    
+
     // Update fields
     if (updates.status) {
       taskBlock = taskBlock.replace(/Status:[^\n]*\n/, `Status: ${updates.status} | `);
@@ -147,10 +149,10 @@ export async function handleEditTask(args: EditTaskArgs): Promise<EditTaskResult
     if (updates.description) {
       taskBlock = taskBlock.replace(/Desc:[^\n]*/, `Desc: ${updates.description}`);
     }
-    
+
     content = content.replace(taskMatch[0], taskBlock);
     writeFileSync(filePath, content, 'utf-8');
-    
+
     return {
       success: true,
       message: `UPDATED Task ${task_id} in ${domain_file}${getInlineRules()}`
@@ -179,30 +181,30 @@ interface ReplaceLinesResult {
 export async function handleReplaceLines(args: ReplaceLinesArgs): Promise<ReplaceLinesResult> {
   try {
     const { project, subproject, domain_file, start_line, end_line, replacement_text } = args;
-    
+
     const filePath = findDomainFile(project, subproject, domain_file);
     if (!filePath) {
       return { success: false, message: `Domain file not found: ${domain_file}` };
     }
-    
+
     const content = readFileSync(filePath, 'utf-8');
     const lines = content.split('\n');
-    
+
     // Validate line numbers
     if (start_line < 1 || end_line > lines.length || start_line > end_line) {
-      return { 
-        success: false, 
-        message: `Invalid line range: ${start_line}-${end_line} (file has ${lines.length} lines)` 
+      return {
+        success: false,
+        message: `Invalid line range: ${start_line}-${end_line} (file has ${lines.length} lines)`
       };
     }
-    
+
     // Replace lines (convert to 0-indexed)
     const before = lines.slice(0, start_line - 1);
     const after = lines.slice(end_line);
     const newLines = [...before, replacement_text, ...after];
-    
+
     writeFileSync(filePath, newLines.join('\n'), 'utf-8');
-    
+
     return {
       success: true,
       message: `REPLACED lines ${start_line}-${end_line} in ${domain_file}${getInlineRules()}`
@@ -236,7 +238,7 @@ interface RewriteDomainResult {
 export async function handleRewriteDomain(args: RewriteDomainArgs): Promise<RewriteDomainResult> {
   try {
     const { project, subproject, domain_file, new_content } = args;
-    
+
     const filePath = findDomainFile(project, subproject, domain_file);
     if (!filePath) {
       return {
@@ -247,21 +249,21 @@ export async function handleRewriteDomain(args: RewriteDomainArgs): Promise<Rewr
         health_status: 'unknown'
       };
     }
-    
+
     writeFileSync(filePath, new_content, 'utf-8');
-    
+
     // Calculate health metrics
     const charCount = new_content.length;
     const taskMatches = new_content.match(/Task \d+:/g);
     const taskCount = taskMatches ? taskMatches.length : 0;
-    
+
     let healthStatus = 'Healthy';
     if (taskCount >= 50 || charCount >= 20000) {
       healthStatus = 'Split Recommended';
     } else if (taskCount >= 40 || charCount >= 15000) {
       healthStatus = 'Warning';
     }
-    
+
     return {
       success: true,
       message: `REWROTE ${domain_file}${getInlineRules()}`,
@@ -298,16 +300,16 @@ interface AppendTaskResult {
 export async function handleAppendTask(args: AppendTaskArgs): Promise<AppendTaskResult> {
   try {
     const { project, subproject, domain_file, task_content } = args;
-    
+
     // Ensure the domain file exists (auto-create if missing)
     const filePath = ensureDomainFile(project, subproject, domain_file);
-    
+
     let content = readFileSync(filePath, 'utf-8');
-    
+
     // Append to TASKS section
     const tasksRegex = /(TASKS[^\n]*\n)([\s\S]*?)(?=\n[A-Z]+\n|$)/;
     const match = content.match(tasksRegex);
-    
+
     if (match) {
       const updatedTasks = `${match[1]}${match[2]}\n${task_content}\n`;
       content = content.replace(tasksRegex, updatedTasks);
@@ -315,12 +317,12 @@ export async function handleAppendTask(args: AppendTaskArgs): Promise<AppendTask
       // No TASKS section, append at end
       content += `\n\nTASKS\n\n${task_content}\n`;
     }
-    
+
     writeFileSync(filePath, content, 'utf-8');
-    
+
     const taskMatches = content.match(/Task \d+:/g);
     const newTaskCount = taskMatches ? taskMatches.length : 0;
-    
+
     return {
       success: true,
       message: `APPENDED task to ${domain_file} | Total: ${newTaskCount}${getInlineRules()}`,
@@ -349,27 +351,27 @@ interface RemoveTaskResult {
 export async function handleRemoveTask(args: RemoveTaskArgs): Promise<RemoveTaskResult> {
   try {
     const { project, subproject, domain_file, task_id } = args;
-    
+
     const filePath = findDomainFile(project, subproject, domain_file);
     if (!filePath) {
       return { success: false, message: `Domain file not found: ${domain_file}`, remaining_tasks: 0 };
     }
-    
+
     let content = readFileSync(filePath, 'utf-8');
-    
+
     // Remove task block
     const taskRegex = new RegExp(`Task ${task_id}:[^\n]*\n(?:Status:[^\n]*\n|Team:[^\n]*\n|Complexity:[^\n]*\n|Job:[^\n]*\n|Depends:[^\n]*\n|Desc:[^\n]*\n)*\n?`, 'g');
-    
+
     if (!taskRegex.test(content)) {
       return { success: false, message: `Task ${task_id} not found`, remaining_tasks: 0 };
     }
-    
+
     content = content.replace(taskRegex, '');
     writeFileSync(filePath, content, 'utf-8');
-    
+
     const taskMatches = content.match(/Task \d+:/g);
     const remainingTasks = taskMatches ? taskMatches.length : 0;
-    
+
     return {
       success: true,
       message: `REMOVED Task ${task_id} from ${domain_file} | Remaining: ${remainingTasks}${getInlineRules()}`,
