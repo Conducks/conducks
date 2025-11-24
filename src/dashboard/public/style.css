@@ -1,0 +1,41 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background: #f5f5f5;
+}
+
+h1, h2 {
+  color: #333;
+}
+
+#calls-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+#calls-table th, #calls-table td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+#calls-table th {
+  background: #e0e0e0;
+}
+
+#tree-root {
+  list-style: none;
+  padding-left: 20px;
+}
+
+#tree-root li {
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+#preview-section {
+  background: white;
+  padding: 15px;
+  border: 1px solid #ccc;
+  max-height: 400px;
+  overflow-y: auto;
+}

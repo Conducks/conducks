@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CONDUCKS Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>CONDUCKS MCP Dashboard</h1>
+  <section id="calls-section">
+    <h2>Tool Calls Log</h2>
+    <table id="calls-table">
+      <thead><tr><th>Time</th><th>Tool</th><th>Args</th><th>Success</th><th>Message</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+  <section id="storage-section">
+    <h2>Storage Tree</h2>
+    <ul id="tree-root"></ul>
+  </section>
+  <section id="preview-section" style="display:none;">
+    <h2>File Preview</h2>
+    <div id="file-content"></div>
+    <button id="close-preview">Close</button>
+  </section>
+  <script src="app.js"></script>
+</body>
+</html>

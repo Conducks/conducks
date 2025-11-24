@@ -10,6 +10,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 // Tool imports
+import { logToolCall } from "./dashboard/logger.js";
 import { handleCreateJob, formatCreateJobResult } from "./tools/create-job.js";
 import { handleCompleteJob, formatCompleteJobResult } from "./tools/complete-job.js";
 import { handleDeleteJob, formatDeleteJobResult } from "./tools/delete-job.js";
@@ -288,69 +289,117 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
-      case "create_job":
+      case "create_job": {
         const jobResult = await handleCreateJob(args as any);
-        return { content: [{ type: "text", text: formatCreateJobResult(jobResult) }] };
+        const response = { content: [{ type: "text", text: formatCreateJobResult(jobResult) }] };
+        logToolCall("create_job", args, response);
+        return response;
+      }
 
-      case "complete_job":
+      case "complete_job": {
         const completeResult = await handleCompleteJob(args as any);
-        return { content: [{ type: "text", text: formatCompleteJobResult(completeResult) }] };
+        const response = { content: [{ type: "text", text: formatCompleteJobResult(completeResult) }] };
+        logToolCall("complete_job", args, response);
+        return response;
+      }
 
-      case "delete_job":
+      case "delete_job": {
         const deleteResult = await handleDeleteJob(args as any);
-        return { content: [{ type: "text", text: formatDeleteJobResult(deleteResult) }] };
+        const response = { content: [{ type: "text", text: formatDeleteJobResult(deleteResult) }] };
+        logToolCall("delete_job", args, response);
+        return response;
+      }
 
-      case "create_task":
+      case "create_task": {
         const taskResult = await handleCreateTask(args as any);
-        return { content: [{ type: "text", text: formatCreateTaskResult(taskResult) }] };
+        const response = { content: [{ type: "text", text: formatCreateTaskResult(taskResult) }] };
+        logToolCall("create_task", args, response);
+        return response;
+      }
 
-      case "move_task":
+      case "move_task": {
         const moveResult = await handleMoveTask(args as any);
-        return { content: [{ type: "text", text: formatMoveTaskResult(moveResult) }] };
+        const response = { content: [{ type: "text", text: formatMoveTaskResult(moveResult) }] };
+        logToolCall("move_task", args, response);
+        return response;
+      }
 
-      case "list_active_jobs":
+      case "list_active_jobs": {
         const activeResult = await handleListActiveJobs(args as any);
-        return { content: [{ type: "text", text: activeResult.content[0].text }] };
+        const response = { content: [{ type: "text", text: activeResult.content[0].text }] };
+        logToolCall("list_active_jobs", args, response);
+        return response;
+      }
 
-      case "list_completed_jobs":
+      case "list_completed_jobs": {
         const completedResult = await handleListCompletedJobs();
-        return { content: [{ type: "text", text: completedResult.content[0].text }] };
+        const response = { content: [{ type: "text", text: completedResult.content[0].text }] };
+        logToolCall("list_completed_jobs", {}, response);
+        return response;
+      }
 
-      case "list_jobs_enhanced":
+      case "list_jobs_enhanced": {
         const enhancedResult = await handleListJobsEnhanced(args as any);
-        return { content: [{ type: "text", text: enhancedResult.content[0].text }] };
+        const response = { content: [{ type: "text", text: enhancedResult.content[0].text }] };
+        logToolCall("list_jobs_enhanced", args, response);
+        return response;
+      }
 
-      case "smart_info":
+      case "smart_info": {
         const infoResult = await handleSmartInfo(args as any);
-        return { content: [{ type: "text", text: formatSmartInfoResult(infoResult) }] };
+        const response = { content: [{ type: "text", text: formatSmartInfoResult(infoResult) }] };
+        logToolCall("smart_info", args, response);
+        return response;
+      }
 
-      case "initialize_project_structure":
+      case "initialize_project_structure": {
         const initResult = await handleInitializeProjectStructure(args as any);
-        return { content: [{ type: "text", text: formatInitResult(initResult) }] };
+        const response = { content: [{ type: "text", text: formatInitResult(initResult) }] };
+        logToolCall("initialize_project_structure", args, response);
+        return response;
+      }
 
-      case "architecture_audit":
+      case "architecture_audit": {
         const auditResult = await handleArchitectureAudit(args as any);
-        return { content: [{ type: "text", text: formatArchitectureAuditResult(auditResult) }] };
+        const response = { content: [{ type: "text", text: formatArchitectureAuditResult(auditResult) }] };
+        logToolCall("architecture_audit", args, response);
+        return response;
+      }
 
-      case "edit_task":
+      case "edit_task": {
         const editResult = await handleEditTask(args as any);
-        return { content: [{ type: "text", text: formatEditTaskResult(editResult) }] };
+        const response = { content: [{ type: "text", text: formatEditTaskResult(editResult) }] };
+        logToolCall("edit_task", args, response);
+        return response;
+      }
 
-      case "replace_lines":
+      case "replace_lines": {
         const replaceResult = await handleReplaceLines(args as any);
-        return { content: [{ type: "text", text: formatReplaceLinesResult(replaceResult) }] };
+        const response = { content: [{ type: "text", text: formatReplaceLinesResult(replaceResult) }] };
+        logToolCall("replace_lines", args, response);
+        return response;
+      }
 
-      case "rewrite_domain":
+      case "rewrite_domain": {
         const rewriteResult = await handleRewriteDomain(args as any);
-        return { content: [{ type: "text", text: formatRewriteDomainResult(rewriteResult) }] };
+        const response = { content: [{ type: "text", text: formatRewriteDomainResult(rewriteResult) }] };
+        logToolCall("rewrite_domain", args, response);
+        return response;
+      }
 
-      case "append_task":
+      case "append_task": {
         const appendResult = await handleAppendTask(args as any);
-        return { content: [{ type: "text", text: formatAppendTaskResult(appendResult) }] };
+        const response = { content: [{ type: "text", text: formatAppendTaskResult(appendResult) }] };
+        logToolCall("append_task", args, response);
+        return response;
+      }
 
-      case "remove_task":
+      case "remove_task": {
         const removeResult = await handleRemoveTask(args as any);
-        return { content: [{ type: "text", text: formatRemoveTaskResult(removeResult) }] };
+        const response = { content: [{ type: "text", text: formatRemoveTaskResult(removeResult) }] };
+        logToolCall("remove_task", args, response);
+        return response;
+      }
 
       default:
         throw new Error(`Unknown tool: ${name}`);
