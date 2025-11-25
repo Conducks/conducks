@@ -1,28 +1,127 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <title>CONDUCKS Dashboard</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CONDUCKS</title>
+  <link rel="stylesheet" href="global.css" />
 </head>
+
 <body>
-  <h1>CONDUCKS MCP Dashboard</h1>
-  <section id="calls-section">
-    <h2>Tool Calls Log</h2>
-    <table id="calls-table">
-      <thead><tr><th>Time</th><th>Tool</th><th>Args</th><th>Success</th><th>Message</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </section>
-  <section id="storage-section">
-    <h2>Storage Tree</h2>
-    <ul id="tree-root"></ul>
-  </section>
-  <section id="preview-section" style="display:none;">
-    <h2>File Preview</h2>
-    <div id="file-content"></div>
-    <button id="close-preview">Close</button>
-  </section>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="app-sidebar pro-sidebar">
+      <div class="sidebar-header pro-header">
+        <img src="logo.png" alt="CONDUCKS" class="pro-logo" />
+        <div class="sidebar-title pro-title">CONDUCKS</div>
+      </div>
+      <nav class="sidebar-nav pro-nav">
+        <div class="nav-item active" data-section="overview">
+          <span class="nav-icon">📊</span>
+          <span>Overview</span>
+        </div>
+        <div class="nav-item" data-section="jobs">
+          <span class="nav-icon">💼</span>
+          <span>Jobs</span>
+        </div>
+        <div class="nav-item" data-section="structure">
+          <span class="nav-icon">📁</span>
+          <span>Files</span>
+        </div>
+      </nav>
+      <div class="sidebar-footer pro-footer">
+        <div class="workspace-info">
+          <div id="workspace-title">Loading...</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="app-main pro-main">
+      <header class="app-header pro-app-header">
+        <div class="breadcrumb pro-breadcrumb">
+          <span class="breadcrumb-item pro-breadcrumb-item">CONDUCKS</span>
+          <span class="breadcrumb-separator pro-breadcrumb-separator">/</span>
+          <span class="breadcrumb-item pro-breadcrumb-item" id="current-section">Overview</span>
+        </div>
+        <div class="header-actions pro-header-actions">
+          <!-- Space for future actions -->
+        </div>
+      </header>
+      <main class="app-content pro-content">
+        <!-- Overview Section -->
+        <div id="overview" class="content-section active pro-section">
+          <div class="page-header pro-page-header">
+            <h1>System Overview</h1>
+          </div>
+          <div id="overview-stats" class="content-grid pro-grid">
+            <!-- Example stat cards -->
+            <div class="stat-card pro-card">
+              <div class="stat-title">Active Jobs</div>
+              <div class="stat-value" id="stat-active-jobs">--</div>
+            </div>
+            <div class="stat-card pro-card">
+              <div class="stat-title">Completed Jobs</div>
+              <div class="stat-value" id="stat-completed-jobs">--</div>
+            </div>
+            <div class="stat-card pro-card">
+              <div class="stat-title">System Health</div>
+              <div class="stat-value" id="stat-system-health">--</div>
+            </div>
+          </div>
+        </div>
+        <!-- Jobs Section -->
+        <div id="jobs" class="content-section pro-section">
+          <div class="page-header pro-page-header">
+            <h1>Jobs Management</h1>
+            <button class="btn btn-secondary btn-new pro-btn">+ New Job</button>
+          </div>
+          <div id="jobs-container" class="content-grid pro-grid">
+            <!-- Jobs will be loaded here as cards -->
+          </div>
+        </div>
+        <!-- Project Structure Section -->
+        <div id="structure" class="content-section pro-section">
+          <div class="page-header pro-page-header">
+            <h1>Project Files</h1>
+          </div>
+          <div class="content-grid pro-grid">
+            <div class="file-browser pro-file-browser">
+              <div id="structure-tree">
+                <!-- Tree will be loaded here -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- File Preview Section -->
+        <div id="preview" class="content-section pro-section">
+          <div class="page-header pro-page-header">
+            <div class="page-header-content pro-page-header-content">
+              <div class="file-info pro-file-info">
+                <div class="file-icon pro-file-icon">📄</div>
+                <div class="file-details pro-file-details">
+                  <h1 id="preview-title">File Preview</h1>
+                  <div class="file-path" id="preview-path"></div>
+                </div>
+              </div>
+              <div class="preview-actions pro-preview-actions">
+                <button class="btn btn-secondary pro-btn" onclick="app.switchSection('structure')">Back to
+                  Files</button>
+              </div>
+            </div>
+          </div>
+          <div id="file-preview" class="content-grid pro-grid">
+            <div class="markdown-preview pro-markdown-preview">
+              <p>Select a markdown file from the file browser to preview it here.</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
+
 </html>

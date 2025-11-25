@@ -18,7 +18,8 @@
 		"test": "npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test build/test/**/*.test.js",
 		"test:verbose": "npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test --test-reporter=spec build/test/**/*.test.js",
 		"type-check": "tsc --noEmit",
-		"dashboard": "ts-node src/dashboard/server.ts"
+		"dashboard": "ts-node src/dashboard/server.ts",
+		"start:desktop": "electron electron-main.cjs"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.22.0",
@@ -31,12 +32,13 @@
 		"marked": "^5.1.2"
 	},
 	"devDependencies": {
-		"@types/fs-extra": "^11.0.4",
-		"@types/node": "^20.11.24",
-		"typescript": "^5.3.3",
-		"@types/express": "^4.17.21",
 		"@types/cors": "^2.8.17",
+		"@types/express": "^4.17.21",
+		"@types/fs-extra": "^11.0.4",
 		"@types/marked": "^5.0.2",
-		"ts-node": "^10.9.2"
+		"@types/node": "^20.11.24",
+		"electron": "^39.2.3",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.3.3"
 	}
 }

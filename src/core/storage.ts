@@ -3,6 +3,7 @@
 
 import fs from 'fs-extra';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { decode, encode } from '@toon-format/toon';
 import { CONDUCKSStorage, Job } from './types.js';
 
@@ -23,8 +24,8 @@ const log = (message: string, level: 'info' | 'error' | 'warn' = 'info') => {
  * @returns Promise<CONDUCKSStorage> containing jobs for the workspace
  */
 export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<CONDUCKSStorage> {
-  // Use environment variable or default to relative storage
-  const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.join(process.cwd(), 'storage');
+  // Use environment variable or default to absolute storage relative to conducks root
+  const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'storage');
   const paths = {
     jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
     jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')
@@ -91,8 +92,8 @@ export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<COND
  */
 export async function saveJobForWorkspace(job: Job, workspacePath: string, isCompleted: boolean = false): Promise<void> {
   try {
-    // Use environment variable or default to relative storage
-    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.join(process.cwd(), 'storage');
+    // Use environment variable or default to absolute storage relative to conducks root
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'storage');
     const paths = {
       jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
       jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')

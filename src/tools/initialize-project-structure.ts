@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, writeFileSync } from 'fs';
-import { join, basename, resolve, isAbsolute } from 'path';
+import { join, basename, resolve, isAbsolute, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 // NOTE: DOCS_ROOT removed in workspace isolation - using workspace paths instead
 
@@ -224,7 +225,8 @@ export async function handleInitializeProjectStructure(args: {
     }
 
     // Create project root in storage root
-    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
+    const defaultStorage = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'storage');
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || defaultStorage;
     const projectPath = join(storageRoot, structure.projectName);
     if (!existsSync(projectPath)) {
       mkdirSync(projectPath, { recursive: true });
