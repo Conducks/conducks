@@ -232,6 +232,21 @@ export async function handleInitializeProjectStructure(args: {
       mkdirSync(projectPath, { recursive: true });
       createdFolders.push(structure.projectName);
     }
+
+    // Create global jobs folder structure at storage root (not per-workspace)
+    const jobsToDoPath = join(storageRoot, 'jobs', 'to-do');
+    const jobsDonePath = join(storageRoot, 'jobs', 'done-to-do');
+
+    if (!existsSync(jobsToDoPath)) {
+      mkdirSync(jobsToDoPath, { recursive: true });
+      createdFolders.push('jobs/to-do');
+    }
+
+    if (!existsSync(jobsDonePath)) {
+      mkdirSync(jobsDonePath, { recursive: true });
+      createdFolders.push('jobs/done-to-do');
+    }
+
     // NOTE: No per-project to-do/done-to-do folders in new model.
     // Tasks will reside under jobs/job_<id>/tasks/ as individual markdown files.
 

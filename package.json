@@ -11,7 +11,7 @@
 		"build"
 	],
 	"scripts": {
-		"build": "tsc && cp -r build/src/* build/ && rm -rf build/src && chmod 755 build/index.js",
+		"build": "tsc && cp -r build/src/* build/ && rm -rf build/src && chmod 755 build/index.js && cp -r src/dashboard/public build/dashboard/",
 		"prepare": "npm run build",
 		"watch": "tsc --watch",
 		"inspector": "npx @modelcontextprotocol/inspector build/index.js",

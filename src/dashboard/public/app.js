@@ -98,120 +98,138 @@ document.addEventListener('DOMContentLoaded', function () {
 		async loadOverview() {
 			if (!this.currentWorkspace) return;
 
-			// Load jobs stats
-			const jobsResponse = await fetch(`/api/jobs/${this.currentWorkspace}`);
-			const jobs = await jobsResponse.json();
+			try {
+				// Load jobs stats
+				const jobsResponse = await fetch(`/api/jobs/${this.currentWorkspace}`);
+				const jobs = await jobsResponse.json();
 
-			const totalJobs = jobs.length;
-			const activeJobs = jobs.filter((job) => job.location === 'to-do').length;
-			const completedJobs = jobs.filter(
-				(job) => job.location === 'done-to-do'
-			).length;
-			const totalTasks = jobs.reduce((sum, job) => sum + job.tasks.length, 0);
-			const completedTasks = jobs.reduce(
-				(sum, job) =>
-					sum + job.tasks.filter((task) => task.status === 'completed').length,
-				0
-			);
+				const totalJobs = jobs.length;
+				const activeJobs = jobs.filter((job) => job.location === 'to-do').length;
+				const completedJobs = jobs.filter(
+					(job) => job.location === 'done-to-do'
+				).length;
+				const totalTasks = jobs.reduce((sum, job) => sum + job.tasks.length, 0);
+				const completedTasks = jobs.reduce(
+					(sum, job) =>
+						sum + job.tasks.filter((task) => task.status === 'completed').length,
+					0
+				);
 
-			document.getElementById('overview-stats').innerHTML = `
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-number">${totalJobs}</div>
-                        <div class="stat-label">Total Jobs</div>
+				document.getElementById('overview-stats').innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">${totalJobs}</div>
+                            <div class="stat-label">Total Jobs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${activeJobs}</div>
+                            <div class="stat-label">Active Jobs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${completedJobs}</div>
+                            <div class="stat-label">Completed Jobs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${totalTasks}</div>
+                            <div class="stat-label">Total Tasks</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${completedTasks}</div>
+                            <div class="stat-label">Completed Tasks</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${totalTasks > 0
+						? Math.round((completedTasks / totalTasks) * 100)
+						: 0
+					}%</div>
+                            <div class="stat-label">Completion Rate</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${activeJobs}</div>
-                        <div class="stat-label">Active Jobs</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${completedJobs}</div>
-                        <div class="stat-label">Completed Jobs</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${totalTasks}</div>
-                        <div class="stat-label">Total Tasks</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${completedTasks}</div>
-                        <div class="stat-label">Completed Tasks</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">${totalTasks > 0
-					? Math.round((completedTasks / totalTasks) * 100)
-					: 0
-				}%</div>
-                        <div class="stat-label">Completion Rate</div>
-                    </div>
-                </div>
 
-                <div class="card">
-                    <h3>Recent Jobs</h3>
-                    <div id="recent-jobs">
-                        ${jobs
-					.slice(0, 5)
-					.map(
-						(job) => `
-                            <div class="job-item" onclick="app.showJobDetails(${job.id
-							})">
-                                <strong>#${job.id} - ${job.title}</strong>
-                                <div class="flex-between">
-                                    <span class="status-${job.location === 'to-do'
-								? 'active'
-								: 'completed'
-							}">
-                                        ${job.location === 'to-do'
-								? 'Active'
-								: 'Completed'
-							}
-                                    </span>
-                                    <span>${job.tasks.length} tasks</span>
+                    <div class="card">
+                        <h3>Recent Jobs</h3>
+                        <div id="recent-jobs">
+                            ${jobs
+						.slice(0, 5)
+						.map(
+							(job) => `
+                                <div class="job-item" onclick="app.showJobDetails(${job.id
+								})">
+                                    <strong>#${job.id} - ${job.title}</strong>
+                                    <div class="flex-between">
+                                        <span class="status-indicator status-${job.location === 'to-do'
+									? 'active'
+									: 'completed'
+								}">
+                                            ${job.location === 'to-do'
+									? 'Active'
+									: 'Completed'
+								}
+                                        </span>
+                                        <span>${job.tasks.length} tasks</span>
+                                    </div>
                                 </div>
-                            </div>
-                        `
-					)
-					.join('')}
+                            `
+						)
+						.join('')}
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+			} catch (error) {
+				console.error('Failed to load overview:', error);
+				document.getElementById('overview-stats').innerHTML = '<p>Failed to load overview data.</p>';
+			}
 		},
 
 		async loadJobs() {
 			if (!this.currentWorkspace) return;
 
-			const response = await fetch(`/api/jobs/${this.currentWorkspace}`);
-			const jobs = await response.json();
-
 			const jobsContainer = document.getElementById('jobs-container');
-			jobsContainer.innerHTML = '';
 
-			if (jobs.length === 0) {
-				jobsContainer.innerHTML = '<p>No jobs found in this workspace.</p>';
-				return;
+			try {
+				// Show loading state
+				jobsContainer.innerHTML = `
+				<div class="skeleton skeleton-card"></div>
+				<div class="skeleton skeleton-card"></div>
+				<div class="skeleton skeleton-card"></div>
+			`;
+
+				const response = await fetch(`/api/jobs/${this.currentWorkspace}`);
+				const jobs = await response.json();
+
+				jobsContainer.innerHTML = '';
+
+				if (jobs.length === 0) {
+					jobsContainer.innerHTML = '<p>No jobs found in this workspace.</p>';
+					return;
+				}
+
+				jobs.forEach((job) => {
+					const jobElement = document.createElement('div');
+					jobElement.className = 'job-item';
+					jobElement.onclick = () => this.showJobDetails(job.id);
+
+					const status = job.location === 'to-do' ? 'Active' : 'Completed';
+					const statusClass = job.location === 'to-do' ? 'active' : 'completed';
+
+					jobElement.innerHTML = `
+                        <div class="flex-between">
+                            <h3>#${job.id} - ${job.title}</h3>
+                            <div class="status-indicator status-${statusClass}">${status}</div>
+                        </div>
+                        <p>${job.description}</p>
+                        <div class="flex">
+                            <span class="tag">${job.domain || 'general'}</span>
+                            <span>${job.tasks.length} tasks</span>
+                        </div>
+                    `;
+
+					jobsContainer.appendChild(jobElement);
+				});
+			} catch (error) {
+				console.error('Failed to load jobs:', error);
+				jobsContainer.innerHTML = '<p>Failed to load jobs.</p>';
 			}
-
-			jobs.forEach((job) => {
-				const jobElement = document.createElement('div');
-				jobElement.className = 'job-item';
-				jobElement.onclick = () => this.showJobDetails(job.id);
-
-				const status = job.location === 'to-do' ? 'Active' : 'Completed';
-				const statusClass = job.location === 'to-do' ? 'active' : 'completed';
-
-				jobElement.innerHTML = `
-                    <div class="flex-between">
-                        <h3>#${job.id} - ${job.title}</h3>
-                        <div class="status-indicator status-${statusClass.toLowerCase()}">${status}</div>
-                    </div>
-                    <p>${job.description}</p>
-                    <div class="flex">
-                        <span class="tag">${job.domain}</span>
-                        <span>${job.tasks.length} tasks</span>
-                    </div>
-                `;
-
-				jobsContainer.appendChild(jobElement);
-			});
 		},
 
 		async showJobDetails(jobId) {
@@ -295,17 +313,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
 				if (node.type === 'file') {
 					element.onclick = () => this.showFilePreview(node.path);
-					if (node.ext === 'md') {
-						element.innerHTML = `<span>📄 ${node.name}</span>`;
-					} else {
-						element.innerHTML = `<span>📄 ${node.name}</span>`;
-					}
+					const fileIcon = node.ext === 'md' ? getIcon('fileText', 16) : getIcon('file', 16);
+					element.innerHTML = `${fileIcon} <span>${node.name}</span>`;
 				} else {
+					const folderIcon = getIcon('folder', 16);
 					element.innerHTML = `
-                        <span>📁 ${node.name}</span>
+                        ${folderIcon} <span>${node.name}</span>
                         <div class="tree-children" style="display: none;"></div>
                     `;
-					element.onclick = () => {
+					element.onclick = (e) => {
+						e.stopPropagation();
 						const children = element.querySelector('.tree-children');
 						children.style.display =
 							children.style.display === 'none' ? 'block' : 'none';

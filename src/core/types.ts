@@ -23,10 +23,18 @@ export interface Job {
   title: string;
   domain: string;
   description: string;
-  tasks: SubTask[];
-  crossServiceLinks: string[];
+  priority?: 'low' | 'medium' | 'high'; // Added priority field
+  objectives?: string[];
+  dependencies?: string[];
+  tags?: string[];
+  risk_assessment?: string;
+  estimated_effort?: string;
+  tasks: SubTask[]; // Assuming Task here refers to SubTask or a new base Task type
+  crossServiceLinks?: string[];
   created: string;
   lastUpdated: string;
+  location?: 'to-do' | 'done-to-do';
+  completionNotes?: string;
 }
 
 export interface CONDUCKSStorage {

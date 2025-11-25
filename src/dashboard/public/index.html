@@ -4,115 +4,125 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CONDUCKS</title>
+  <meta name="description"
+    content="CONDUCKS MCP Dashboard - Intelligent job and task management system for AI agents and developers" />
+  <meta property="og:title" content="CONDUCKS Dashboard" />
+  <meta property="og:description"
+    content="Hierarchical job and task management with real-time tracking and analytics" />
+  <meta property="og:type" content="website" />
+  <title>CONDUCKS Dashboard</title>
   <link rel="stylesheet" href="global.css" />
 </head>
 
 <body>
   <div class="app-layout">
     <!-- Sidebar -->
-    <aside class="app-sidebar pro-sidebar">
-      <div class="sidebar-header pro-header">
-        <img src="logo.png" alt="CONDUCKS" class="pro-logo" />
-        <div class="sidebar-title pro-title">CONDUCKS</div>
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="pro-logo"></div>
+        <div class="sidebar-title">CONDUCKS</div>
       </div>
-      <nav class="sidebar-nav pro-nav">
+      <nav class="sidebar-nav">
         <div class="nav-item active" data-section="overview">
-          <span class="nav-icon">📊</span>
+          <span class="nav-icon" id="icon-overview"></span>
           <span>Overview</span>
         </div>
         <div class="nav-item" data-section="jobs">
-          <span class="nav-icon">💼</span>
+          <span class="nav-icon" id="icon-jobs"></span>
           <span>Jobs</span>
         </div>
         <div class="nav-item" data-section="structure">
-          <span class="nav-icon">📁</span>
+          <span class="nav-icon" id="icon-files"></span>
           <span>Files</span>
         </div>
       </nav>
-      <div class="sidebar-footer pro-footer">
+      <div class="sidebar-footer">
         <div class="workspace-info">
-          <div id="workspace-title">Loading...</div>
+          <div id="workspace-title">Loading workspace...</div>
         </div>
       </div>
     </aside>
 
     <!-- Main Content -->
-    <div class="app-main pro-main">
-      <header class="app-header pro-app-header">
-        <div class="breadcrumb pro-breadcrumb">
-          <span class="breadcrumb-item pro-breadcrumb-item">CONDUCKS</span>
-          <span class="breadcrumb-separator pro-breadcrumb-separator">/</span>
-          <span class="breadcrumb-item pro-breadcrumb-item" id="current-section">Overview</span>
+    <div class="app-main">
+      <header class="app-header">
+        <div class="breadcrumb">
+          <span class="breadcrumb-item">CONDUCKS</span>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-item" id="current-section">Overview</span>
         </div>
-        <div class="header-actions pro-header-actions">
+        <div class="header-actions">
           <!-- Space for future actions -->
         </div>
       </header>
-      <main class="app-content pro-content">
+
+      <main class="app-content">
         <!-- Overview Section -->
-        <div id="overview" class="content-section active pro-section">
-          <div class="page-header pro-page-header">
+        <div id="overview" class="content-section active">
+          <div class="page-header">
             <h1>System Overview</h1>
           </div>
-          <div id="overview-stats" class="content-grid pro-grid">
-            <!-- Example stat cards -->
-            <div class="stat-card pro-card">
-              <div class="stat-title">Active Jobs</div>
-              <div class="stat-value" id="stat-active-jobs">--</div>
-            </div>
-            <div class="stat-card pro-card">
-              <div class="stat-title">Completed Jobs</div>
-              <div class="stat-value" id="stat-completed-jobs">--</div>
-            </div>
-            <div class="stat-card pro-card">
-              <div class="stat-title">System Health</div>
-              <div class="stat-value" id="stat-system-health">--</div>
-            </div>
+          <div id="overview-stats" class="content-grid">
+            <!-- Stats will be loaded here -->
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
           </div>
         </div>
+
         <!-- Jobs Section -->
-        <div id="jobs" class="content-section pro-section">
-          <div class="page-header pro-page-header">
+        <div id="jobs" class="content-section">
+          <div class="page-header">
             <h1>Jobs Management</h1>
-            <button class="btn btn-secondary btn-new pro-btn">+ New Job</button>
+            <button class="btn btn-new">
+              <span id="icon-plus"></span>
+              <span>New Job</span>
+            </button>
           </div>
-          <div id="jobs-container" class="content-grid pro-grid">
-            <!-- Jobs will be loaded here as cards -->
+          <div id="jobs-container" class="content-grid">
+            <!-- Jobs will be loaded here -->
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
           </div>
         </div>
+
         <!-- Project Structure Section -->
-        <div id="structure" class="content-section pro-section">
-          <div class="page-header pro-page-header">
+        <div id="structure" class="content-section">
+          <div class="page-header">
             <h1>Project Files</h1>
           </div>
-          <div class="content-grid pro-grid">
-            <div class="file-browser pro-file-browser">
+          <div class="content-grid">
+            <div class="file-browser">
               <div id="structure-tree">
                 <!-- Tree will be loaded here -->
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
               </div>
             </div>
           </div>
         </div>
+
         <!-- File Preview Section -->
-        <div id="preview" class="content-section pro-section">
-          <div class="page-header pro-page-header">
-            <div class="page-header-content pro-page-header-content">
-              <div class="file-info pro-file-info">
-                <div class="file-icon pro-file-icon">📄</div>
-                <div class="file-details pro-file-details">
+        <div id="preview" class="content-section">
+          <div class="page-header">
+            <div class="page-header-content">
+              <div class="file-info">
+                <div class="file-icon" id="icon-file-preview"></div>
+                <div class="file-details">
                   <h1 id="preview-title">File Preview</h1>
                   <div class="file-path" id="preview-path"></div>
                 </div>
               </div>
-              <div class="preview-actions pro-preview-actions">
-                <button class="btn btn-secondary pro-btn" onclick="app.switchSection('structure')">Back to
-                  Files</button>
+              <div class="preview-actions">
+                <button class="btn btn-secondary" onclick="app.switchSection('structure')">
+                  Back to Files
+                </button>
               </div>
             </div>
           </div>
-          <div id="file-preview" class="content-grid pro-grid">
-            <div class="markdown-preview pro-markdown-preview">
+          <div id="file-preview" class="content-grid">
+            <div class="markdown-preview">
               <p>Select a markdown file from the file browser to preview it here.</p>
             </div>
           </div>
@@ -121,7 +131,19 @@
     </div>
   </div>
 
+  <script src="icons.js"></script>
   <script src="app.js"></script>
+  <script>
+    // Initialize icons after DOM is loaded
+    document.addEventListener('DOMContentLoaded', function () {
+      // Navigation icons
+      document.getElementById('icon-overview').innerHTML = getIcon('dashboard', 20);
+      document.getElementById('icon-jobs').innerHTML = getIcon('briefcase', 20);
+      document.getElementById('icon-files').innerHTML = getIcon('folder', 20);
+      document.getElementById('icon-plus').innerHTML = getIcon('plus', 20);
+      document.getElementById('icon-file-preview').innerHTML = getIcon('fileText', 24);
+    });
+  </script>
 </body>
 
 </html>

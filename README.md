@@ -34,7 +34,7 @@ CONDUCKS transforms development workspaces into structured, hierarchical project
 
 ### 💾 **Robust Storage System**
 
-- **TOON Files**: Efficient JSON-based storage in jobs/to-do/ and jobs/done-to-do/
+- **TOON Files**: Efficient TOON-based storage in jobs/to-do/ and jobs/done-to-do/
 - **Human-Readable IDs**: Jobs numbered as #1, #2, #3 for easy reference
 - **Cross-References**: Automatic tracking of service relationships and dependencies
 - **Backup & Recovery**: Built-in versioning and data integrity checks

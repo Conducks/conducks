@@ -30,10 +30,10 @@ function startDashboardServer() {
 	// Start Express dashboard server in background
 	dashboardProcess = spawn(
 		'node',
-		[path.join(__dirname, 'src/dashboard/server.js')],
+		[path.join(__dirname, 'build/dashboard/server.js')],
 		{
-			stdio: 'ignore',
-			detached: true,
+			stdio: 'inherit',
+			detached: false,
 		}
 	);
 }

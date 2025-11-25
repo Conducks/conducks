@@ -1,5 +1,5 @@
 // CONDUCKS Storage Layer
-// Handles TOON file operations, JSON parsing, and data persistence
+// Handles TOON file operations, TOON parsing, and data persistence
 
 import fs from 'fs-extra';
 import * as path from 'path';
@@ -24,8 +24,8 @@ const log = (message: string, level: 'info' | 'error' | 'warn' = 'info') => {
  * @returns Promise<CONDUCKSStorage> containing jobs for the workspace
  */
 export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<CONDUCKSStorage> {
-  // Use environment variable or default to absolute storage relative to conducks root
-  const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'storage');
+    // Use environment variable or default to absolute storage relative to conducks root
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'storage');
   const paths = {
     jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
     jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')
@@ -42,7 +42,7 @@ export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<COND
       const filePath = path.join(paths.jobsToDoDir, file);
       const fileContent = await fs.readFile(filePath, 'utf-8');
       try {
-        const job = JSON.parse(fileContent) as Job;
+        const job = toonToJson(fileContent) as Job;
         jobs.push(job);
       } catch (error) {
         log(`Failed to parse job file ${file}: ${error}`, 'error');
@@ -57,7 +57,7 @@ export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<COND
       const filePath = path.join(paths.jobsDoneDir, file);
       const fileContent = await fs.readFile(filePath, 'utf-8');
       try {
-        const job = JSON.parse(fileContent) as Job;
+        const job = toonToJson(fileContent) as Job;
         jobs.push(job);
       } catch (error) {
         log(`Failed to parse job file ${file}: ${error}`, 'error');
@@ -93,7 +93,7 @@ export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<COND
 export async function saveJobForWorkspace(job: Job, workspacePath: string, isCompleted: boolean = false): Promise<void> {
   try {
     // Use environment variable or default to absolute storage relative to conducks root
-    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'storage');
+    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'storage');
     const paths = {
       jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
       jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')
@@ -110,8 +110,8 @@ export async function saveJobForWorkspace(job: Job, workspacePath: string, isCom
 
     console.error(`DEBUG: Saving job ${job.id} to ${filePath}`);
 
-    // Save as JSON (with .toon extension)
-    await fs.writeFile(filePath, JSON.stringify(job, null, 2));
+    // Save as TOON format
+    await fs.writeFile(filePath, jsonToToon(job));
 
     // Verify the file was written
     if (await fs.pathExists(filePath)) {

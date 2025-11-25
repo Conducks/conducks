@@ -207,7 +207,12 @@ describe('CONDUCKS Workflow Tests', () => {
 
       // Verify all tasks are in job
       const jobFile = fs.readdirSync(JOBS_TODO).find(f => f.startsWith('001_'));
-      const jobContent = JSON.parse(fs.readFileSync(path.join(JOBS_TODO, jobFile!), 'utf-8'));
+      const jobFileContent = fs.readFileSync(path.join(JOBS_TODO, jobFile!), 'utf-8');
+
+      // Import toonToJson for proper TOON parsing
+      // @ts-ignore
+      const { toonToJson } = await import('../core/storage.js');
+      const jobContent = toonToJson(jobFileContent);
 
       assert.strictEqual(jobContent.tasks.length, 3, 'Job should have 3 tasks');
       console.log(`✓ Job now has ${jobContent.tasks.length} tasks`);
