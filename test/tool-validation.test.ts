@@ -210,22 +210,22 @@ describe('CONDUCKS Tool Validation Tests', () => {
 
     describe('Tool 7: move_task', () => {
         it('should move task and verify file location changed', async () => {
-            // Single-repo: tasks directly under workspace, no subproject
+            // Task was created with default ProjectX/w1 structure
             const result = await handleMoveTask({
                 workspace_path: WORKSPACE_NAME,
-                project: WORKSPACE_NAME,
+                project: 'ProjectX',
+                subproject: 'w1',
                 task_file: 'task_001_validation-task-1.md',
                 target_folder: 'done-to-do',
                 source_folder: 'to-do'
-                // No subproject for single-repo
             });
 
             // Validate result
             assert.ok(result.success, 'Task move should succeed');
 
-            // Validate file system state - single-repo paths
-            const oldPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'to-do/task_001_validation-task-1.md');
-            const newPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'done-to-do/task_001_validation-task-1.md');
+            // Validate file system state - task is in ProjectX/w1
+            const oldPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'ProjectX/w1/to-do/task_001_validation-task-1.md');
+            const newPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'ProjectX/w1/done-to-do/task_001_validation-task-1.md');
 
             assert.ok(!await fs.pathExists(oldPath), 'Task should be removed from to-do');
             assert.ok(await fs.pathExists(newPath), 'Task should exist in done-to-do');

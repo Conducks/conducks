@@ -1,0 +1,567 @@
+
+> conducks@0.1.0 test
+> npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test build/test/**/*.test.js
+
+
+> conducks@0.1.0 build
+> tsc && cp -r build/src/* build/ && rm -rf build/src && chmod 755 build/index.js && cp -r src/dashboard/public build/dashboard/
+
+
+╔═══════════════════════════════════════════════════════╗
+║       CONDUCKS Workflow Integration Tests            ║
+╚═══════════════════════════════════════════════════════╝
+
+Test Storage: /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage
+
+=== Setting up validation test workspace ===
+Validation workspace created at: /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation
+Failed to scan workspace for git: Error: ENOENT: no such file or directory, scandir '/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/validation-workspace'
+✓ Project structure created and validated
+▶ CONDUCKS Tool Validation Tests
+  ▶ Tool 1: initialize_project_structure
+    ✔ should create project structure and verify folders exist (25.039542ms)
+  ✔ Tool 1: initialize_project_structure (26.878167ms)
+[2025-11-25T21:32:50.554Z] CONDUCKS INFO: Loaded 0 jobs for workspace 'validation-workspace' (0 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do for workspace validation-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do/001_test-job-alpha.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do/001_test-job-alpha.toon was successfully created
+[2025-11-25T21:32:50.572Z] CONDUCKS INFO: Saved job 1 for workspace 'validation-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do/001_test-job-alpha.toon
+✓ Job created and file validated
+  ▶ Tool 2: create_job
+    ✔ should create job and verify .toon file exists with correct content (31.974542ms)
+  ✔ Tool 2: create_job (32.389667ms)
+[2025-11-25T21:32:50.602Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do for workspace validation-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do/001_test-job-alpha.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do/001_test-job-alpha.toon was successfully created
+[2025-11-25T21:32:50.621Z] CONDUCKS INFO: Saved job 1 for workspace 'validation-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/jobs/to-do/001_test-job-alpha.toon
+✓ Task created and file validated
+  ▶ Tool 3: create_task
+    ✔ should create task and verify markdown file exists (56.237833ms)
+  ✔ Tool 3: create_task (56.771709ms)
+[2025-11-25T21:32:50.657Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+✓ Active jobs listed and validated
+  ▶ Tool 4: list_active_jobs
+    ✔ should list active jobs and verify job appears (23.775375ms)
+  ✔ Tool 4: list_active_jobs (24.378375ms)
+[2025-11-25T21:32:50.685Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+[2025-11-25T21:32:50.698Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+✓ Enhanced job details retrieved and validated
+  ▶ Tool 5: list_jobs_enhanced
+    ✔ should get enhanced job details and verify task count (37.539667ms)
+  ✔ Tool 5: list_jobs_enhanced (39.066375ms)
+[2025-11-25T21:32:50.729Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+✓ System info retrieved and validated
+  ▶ Tool 6: smart_info
+    ✔ should provide system-level info and verify content (29.6545ms)
+  ✔ Tool 6: smart_info (29.959625ms)
+  ▶ Tool 7: move_task
+    ✖ should move task and verify file location changed (3.018ms)
+  ✖ Tool 7: move_task (3.787125ms)
+[2025-11-25T21:32:50.748Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+  ▶ Tool 8: complete_job
+    ✖ should complete job and verify moved to archive (14.071458ms)
+  ✖ Tool 8: complete_job (14.463333ms)
+[2025-11-25T21:32:50.764Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+  ▶ Tool 9: list_completed_jobs
+    ✖ should list completed jobs and verify job appears (16.432958ms)
+  ✖ Tool 9: list_completed_jobs (16.982458ms)
+[2025-11-25T21:32:50.781Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'validation-workspace' (1 active, 0 completed)
+✓ Job deleted and removal validated
+  ▶ Tool 10: delete_job
+    ✔ should delete job and verify file removed (33.375375ms)
+  ✔ Tool 10: delete_job (33.663875ms)
+[CONDUCKS DEBUG] candidatePaths for validation-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/test-domain.md
+✓ Task edited and changes validated
+[CONDUCKS DEBUG] candidatePaths for validation-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/test-domain.md
+  ▶ Tool 11: edit_task
+    ✔ should edit task attributes and verify changes (36.578792ms)
+  ✔ Tool 11: edit_task (36.90375ms)
+✓ Lines replaced and content validated
+[CONDUCKS DEBUG] candidatePaths for validation-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/test-domain.md
+  ▶ Tool 12: replace_lines
+    ✔ should replace lines and verify content (13.579917ms)
+  ✔ Tool 12: replace_lines (13.787666ms)
+✓ Domain rewritten and content validated
+  ▶ Tool 13: rewrite_domain
+    ✔ should rewrite domain file and verify new content (17.483292ms)
+[CONDUCKS DEBUG] candidatePaths for validation-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/test-domain.md
+[CONDUCKS DEBUG] using existing domain file at /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/test-domain.md
+  ✔ Tool 13: rewrite_domain (18.021209ms)
+✓ Task appended and content validated
+[CONDUCKS DEBUG] candidatePaths for validation-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace-validation/storage/validation-workspace/test-domain.md
+  ▶ Tool 14: append_task
+    ✔ should append task and verify added to file (31.941541ms)
+  ✔ Tool 14: append_task (33.293ms)
+✓ Task removed and deletion validated
+✓ Architecture audit completed and validated
+
+=== VALIDATION SUMMARY ===
+✅ All 16 MCP tools validated successfully
+✅ File system state verified for each operation
+✅ TOON format storage confirmed working
+✅ JSON fallback mechanism verified
+=========================
+
+
+=== Cleaning up validation test workspace ===
+Validation workspace cleaned
+  ▶ Tool 15: remove_task
+    ✔ should remove task and verify deleted from file (15.659292ms)
+  ✔ Tool 15: remove_task (15.8885ms)
+  ▶ Tool 16: architecture_audit
+    ✔ should audit repository structure and verify output (4.1165ms)
+  ✔ Tool 16: architecture_audit (4.30025ms)
+  ▶ Comprehensive Validation Summary
+    ✔ should verify all tools executed successfully (0.603542ms)
+  ✔ Comprehensive Validation Summary (2.097625ms)
+✖ CONDUCKS Tool Validation Tests (478.28525ms)
+
+╔═══════════════════════════════════════════════════════╗
+║       CONDUCKS Workflow Integration Tests            ║
+╚═══════════════════════════════════════════════════════╝
+
+Test Storage: /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage
+
+=== Setting up test workspace ===
+Test workspace created at: /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace
+
+--- Test: Initialize project structure ---
+Result: {
+  "success": true,
+  "projectStructure": {
+    "projectName": "TestProject",
+    "projectRoot": "/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS",
+    "subprojects": [
+      ".github",
+      "DOCS",
+      "conducks",
+      "website"
+    ],
+    "rootHasGit": true,
+    "nestedGitDirs": [
+      ".github",
+      "DOCS",
+      "conducks",
+      "website"
+    ],
+    "gitRoot": "/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks"
+  },
+  "createdFolders": [
+    "TestProject",
+    "jobs/to-do",
+    "jobs/done-to-do"
+  ],
+  "createdRulesFiles": []
+}
+✓ Initialization complete
+
+--- Test: Create single job ---
+▶ CONDUCKS Workflow Tests
+  ▶ 1. Initialization Flow
+    ✔ should initialize project structure (7.583958ms)
+  ✔ 1. Initialization Flow (8.879625ms)
+[2025-11-25T21:32:50.600Z] CONDUCKS INFO: Loaded 0 jobs for workspace 'test-workspace' (0 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:50.625Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+Result: {
+  "success": true,
+  "jobs": [
+    {
+      "id": 1,
+      "name": "Implement User Authentication",
+      "filePath": "jobs/to-do/001_implement-user-authentication.toon"
+    }
+  ],
+  "message": "Created job. Tasks can be added separately using create_task."
+}
+✓ Job created successfully
+
+--- Test: Create job with full metadata ---
+  ▶ 2. Job Creation Flow
+    ✔ should create a single job (70.123292ms)
+[2025-11-25T21:32:50.666Z] CONDUCKS INFO: Loaded 1 jobs for workspace 'test-workspace' (1 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 2 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/002_build-e-commerce-platform.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/002_build-e-commerce-platform.toon was successfully created
+[2025-11-25T21:32:50.676Z] CONDUCKS INFO: Saved job 2 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/002_build-e-commerce-platform.toon
+Result: {
+  "success": true,
+  "jobs": [
+    {
+      "id": 2,
+      "name": "Build E-commerce Platform",
+      "filePath": "jobs/to-do/002_build-e-commerce-platform.toon"
+    }
+  ],
+  "message": "Created job. Tasks can be added separately using create_task."
+}
+✓ Created job with metadata: Build E-commerce Platform
+
+--- Test: Create task ---
+    ✔ should create job with detailed metadata (47.904333ms)
+  ✔ 2. Job Creation Flow (118.68725ms)
+[2025-11-25T21:32:50.697Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:50.709Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+Result: {
+  "success": true,
+  "message": "Created task 001 for job 1",
+  "task": {
+    "id": "001",
+    "title": "Implement JWT token generation",
+    "filePath": "storage/test-workspace/ProjectX/w1/to-do/task_001_implement-jwt-token-generation.md"
+  }
+}
+✓ Task created: Implement JWT token generation
+
+--- Test: Create multiple tasks ---
+  ▶ 3. Task Creation Flow
+    ✔ should create task for existing job (42.330084ms)
+[2025-11-25T21:32:50.744Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:50.748Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+✓ Created task: Implement refresh token rotation
+[2025-11-25T21:32:50.767Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:50.778Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+✓ Created task: Add role-based access control
+✓ Job now has 3 tasks
+
+--- Test: Move task to completed ---
+    ✔ should create multiple tasks for same job (64.136958ms)
+  ✔ 3. Task Creation Flow (107.402792ms)
+[2025-11-25T21:32:50.828Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:50.845Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+Result: {
+  "success": true,
+  "message": "Moved task_001_implement-jwt-token-generation.md to done-to-do",
+  "newPath": "ProjectX/w1/done-to-do/task_001_implement-jwt-token-generation.md"
+}
+✓ Task moved to done-to-do
+
+--- Test: Move task to analysis ---
+✓ Task moved to analysis
+
+--- Test: List active jobs ---
+  ▶ 4. Task Movement Flow
+    ✔ should move task to done-to-do folder (62.932834ms)
+    ✔ should move task to analysis folder (3.897292ms)
+  ✔ 4. Task Movement Flow (70.488875ms)
+[2025-11-25T21:32:50.915Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+Active jobs response received
+✓ Active jobs listed
+
+--- Test: Get enhanced job details ---
+  ▶ 5. Job Listing Flow
+    ✔ should list active jobs (60.650709ms)
+[2025-11-25T21:32:51.036Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+[2025-11-25T21:32:51.049Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+Job details received
+✓ Job details retrieved
+
+--- Test: Smart info (system) ---
+    ✔ should get enhanced job details (133.316083ms)
+  ✔ 5. Job Listing Flow (194.339583ms)
+[2025-11-25T21:32:51.109Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'default' (2 active, 0 completed)
+System info received
+✓ System info retrieved
+
+--- Test: Smart info (job) ---
+  ▶ 6. Smart Info Flow
+    ✔ should provide system-level info (69.215875ms)
+[2025-11-25T21:32:51.164Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'default' (2 active, 0 completed)
+✓ Job info retrieved
+
+--- Test: Cannot complete job with active tasks ---
+    ✔ should provide job-level info (46.816375ms)
+  ✔ 6. Smart Info Flow (116.512333ms)
+[2025-11-25T21:32:51.177Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+[2025-11-25T21:32:51.181Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:51.183Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+[2025-11-25T21:32:51.223Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:51.233Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/001_implement-user-authentication.toon
+[2025-11-25T21:32:51.241Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (2 active, 0 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do for workspace test-workspace
+DEBUG: Saving job 1 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do/001_implement-user-authentication.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do/001_implement-user-authentication.toon was successfully created
+[2025-11-25T21:32:51.250Z] CONDUCKS INFO: Saved job 1 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do/001_implement-user-authentication.toon
+Result: {
+  "success": false,
+  "message": "Job 1 has 2 incomplete tasks. Complete all tasks first."
+}
+✓ Job completion validation works
+
+--- Test: Complete job with all tasks done ---
+  ▶ 7. Job Completion Flow
+    ✔ should not complete job with incomplete tasks (10.94925ms)
+Result: {
+  "success": true,
+  "message": "Job 1 marked completed and moved to done-to-do",
+  "archivedPath": "jobs/done-to-do/001_implement-user-authentication.toon"
+}
+✓ Job completed and archived successfully
+
+--- Test: List completed jobs ---
+    ✔ should complete job after all tasks are done (73.728125ms)
+[2025-11-25T21:32:51.260Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (1 active, 1 completed)
+Completed jobs response received
+✓ Completed jobs listed
+
+--- Test: Reject invalid job_id ---
+    ✔ should list completed jobs (10.179667ms)
+  ✔ 7. Job Completion Flow (95.303292ms)
+[2025-11-25T21:32:51.274Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'test-workspace' (1 active, 1 completed)
+✓ Invalid job_id rejected
+
+--- Test: Handle missing fields ---
+  ▶ 8. Edge Cases & Validation
+    ✔ should reject task creation for non-existent job (13.031583ms)
+[2025-11-25T21:32:51.280Z] CONDUCKS INFO: Loaded 2 jobs for workspace 'undefined' (1 active, 1 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace undefined
+DEBUG: Saving job 3 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/003_missing-description.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/003_missing-description.toon was successfully created
+[2025-11-25T21:32:51.287Z] CONDUCKS INFO: Saved job 3 for workspace 'undefined' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/003_missing-description.toon
+✓ Missing required fields rejected
+
+--- Test: Full workflow end-to-end ---
+    ✔ should handle missing required fields (14.338125ms)
+  ✔ 8. Edge Cases & Validation (28.061042ms)
+[2025-11-25T21:32:51.303Z] CONDUCKS INFO: Loaded 3 jobs for workspace 'test-workspace' (2 active, 1 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 4 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon was successfully created
+[2025-11-25T21:32:51.307Z] CONDUCKS INFO: Saved job 4 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+  1. Created job #4
+[2025-11-25T21:32:51.331Z] CONDUCKS INFO: Loaded 4 jobs for workspace 'test-workspace' (3 active, 1 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+[2025-11-25T21:32:51.332Z] CONDUCKS INFO: Loaded 4 jobs for workspace 'test-workspace' (3 active, 1 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 4 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+DEBUG: Saving job 4 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon was successfully created
+[2025-11-25T21:32:51.341Z] CONDUCKS INFO: Saved job 4 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon was successfully created
+[2025-11-25T21:32:51.342Z] CONDUCKS INFO: Saved job 4 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+  2. Created 2 tasks
+[2025-11-25T21:32:51.350Z] CONDUCKS INFO: Loaded 4 jobs for workspace 'test-workspace' (3 active, 1 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 4 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon was successfully created
+[2025-11-25T21:32:51.360Z] CONDUCKS INFO: Saved job 4 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+[2025-11-25T21:32:51.370Z] CONDUCKS INFO: Loaded 4 jobs for workspace 'test-workspace' (3 active, 1 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do for workspace test-workspace
+DEBUG: Saving job 4 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon was successfully created
+[2025-11-25T21:32:51.377Z] CONDUCKS INFO: Saved job 4 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/004_build-api-gateway.toon
+  3. Completed all tasks
+[2025-11-25T21:32:51.395Z] CONDUCKS INFO: Loaded 4 jobs for workspace 'test-workspace' (3 active, 1 completed)
+DEBUG: Creating directory /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do for workspace test-workspace
+DEBUG: Saving job 4 to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do/004_build-api-gateway.toon
+DEBUG: File /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do/004_build-api-gateway.toon was successfully created
+[2025-11-25T21:32:51.417Z] CONDUCKS INFO: Saved job 4 for workspace 'test-workspace' to /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/done-to-do/004_build-api-gateway.toon
+  4. Job completed
+[2025-11-25T21:32:51.423Z] CONDUCKS INFO: Loaded 4 jobs for workspace 'default' (2 active, 2 completed)
+✓ Full workflow completed successfully
+
+--- Test: Reject deletion without confirmation ---
+  ▶ 9. Full Workflow End-to-End
+    ✔ should execute complete job lifecycle (134.704209ms)
+  ✔ 9. Full Workflow End-to-End (135.088292ms)
+✓ Deletion rejected without confirmation
+
+--- Test: Delete job ---
+  ▶ 10. Job Deletion Flow
+    ✔ should reject deletion without confirmation (10.361375ms)
+[2025-11-25T21:32:51.446Z] CONDUCKS INFO: Loaded 4 jobs for workspace 'test-workspace' (2 active, 2 completed)
+Result: {
+  "success": true,
+  "message": "JOB 2 DELETED SUCCESSFULLY\n\nDeleted Job: Build E-commerce Platform\nDeleted 0 task files\n\n⚠️  This action cannot be undone.",
+  "deleted_files": {
+    "job_metadata": "/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/jobs/to-do/002_build-e-commerce-platform.toon",
+    "task_files": []
+  }
+}
+✓ Job deleted successfully
+
+--- Test: Delete non-existent job ---
+    ✔ should delete job with confirmation (15.649125ms)
+[2025-11-25T21:32:51.458Z] CONDUCKS INFO: Loaded 3 jobs for workspace 'test-workspace' (1 active, 2 completed)
+✓ Non-existent job handled correctly
+
+--- Test: Edit task attributes ---
+    ✔ should handle deleting non-existent job (6.549ms)
+  ✔ 10. Job Deletion Flow (33.213ms)
+[CONDUCKS DEBUG] candidatePaths for test-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/test-domain.md
+DEBUG: Updated file content: Task 001: Sample Task
+Status: completed | Team: frontend
+Complexity: high
+Desc: Initial description
+
+✓ Task attributes edited successfully
+
+--- Test: Replace lines ---
+[CONDUCKS DEBUG] candidatePaths for test-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/test-domain.md
+✓ Lines replaced successfully
+
+--- Test: Rewrite domain file ---
+[CONDUCKS DEBUG] candidatePaths for test-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/test-domain.md
+  ▶ 11. Domain CRUD Operations
+    ✔ should edit task attributes (25.705125ms)
+    ✔ should replace lines in domain file (1.723458ms)
+✓ Domain file rewritten successfully
+
+--- Test: Append task ---
+[CONDUCKS DEBUG] candidatePaths for test-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/test-domain.md
+[CONDUCKS DEBUG] using existing domain file at /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/test-domain.md
+    ✔ should rewrite entire domain file (7.780375ms)
+✓ Task appended successfully
+
+--- Test: Remove task ---
+[CONDUCKS DEBUG] candidatePaths for test-workspace/main/test-domain.md:
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/main/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/done-to-do/test-domain.md
+ - /Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test-workspace/storage/test-workspace/test-domain.md
+    ✔ should append task to domain file (6.004208ms)
+✓ Task removed successfully
+
+--- Test: Architecture audit ---
+    ✔ should remove task from domain file (10.850083ms)
+  ✔ 11. Domain CRUD Operations (52.684459ms)
+✓ Architecture audit completed
+
+=== Cleaning up test workspace ===
+Test workspace cleaned
+  ▶ 12. Architecture Analysis
+    ✔ should audit repository structure (27.747542ms)
+  ✔ 12. Architecture Analysis (29.178084ms)
+✔ CONDUCKS Workflow Tests (1078.642875ms)
+ℹ tests 43
+ℹ suites 31
+ℹ pass 40
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1739.622875
+
+✖ failing tests:
+
+test at build/test/tool-validation.test.js:176:9
+✖ should move task and verify file location changed (3.018ms)
+  AssertionError [ERR_ASSERTION]: Task move should succeed
+      at TestContext.<anonymous> (file:///Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test/tool-validation.test.js:187:20)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1466:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '=='
+  }
+
+test at build/test/tool-validation.test.js:197:9
+✖ should complete job and verify moved to archive (14.071458ms)
+  AssertionError [ERR_ASSERTION]: Job completion should succeed
+      at TestContext.<anonymous> (file:///Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test/tool-validation.test.js:204:20)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1466:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '=='
+  }
+
+test at build/test/tool-validation.test.js:216:9
+✖ should list completed jobs and verify job appears (16.432958ms)
+  AssertionError [ERR_ASSERTION]: Should show completed job
+      at TestContext.<anonymous> (file:///Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/test/tool-validation.test.js:221:20)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1466:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '=='
+  }

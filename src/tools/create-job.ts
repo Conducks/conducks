@@ -54,6 +54,11 @@ export async function handleCreateJob(args: CreateJobArgs): Promise<CreateJobRes
       title: args.name,
       domain: args.domain || (args.dependencies && args.dependencies.length > 0 ? args.dependencies[0] : 'general'),
       description: args.description,
+      priority: args.priority, // Add priority field
+      objectives: args.objectives, // Add objectives
+      tags: args.tags, // Add tags
+      risk_assessment: args.risk_assessment, // Add risk assessment
+      estimated_effort: args.estimated_effort, // Add estimated effort
       tasks: [],
       crossServiceLinks: args.dependencies || [],
       created: new Date().toISOString(),
@@ -90,19 +95,19 @@ export function formatCreateJobResult(result: CreateJobResult): string {
   if (!result.success) {
     return `JOB CREATION FAILED\n\n${result.message}`;
   }
-  
+
   let output = `JOB(S) CREATED\n\n`;
-  
+
   for (const job of result.jobs) {
     output += `Job ${String(job.id).padStart(3, '0')}: ${job.name}\n`;
     output += `File: ${job.filePath}\n\n`;
   }
-  
+
   output += `${result.message}\n\n`;
   output += `Next steps:\n`;
   output += `1. Use create_task to add task files\n`;
   output += `2. Use list_jobs_enhanced for overview\n`;
   output += `3. Use complete_job when all tasks are completed\n`;
-  
+
   return output;
 }

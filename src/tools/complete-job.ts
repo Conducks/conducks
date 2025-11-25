@@ -23,9 +23,10 @@ export async function handleCompleteJob(args: CompleteJobArgs): Promise<Complete
     const { workspace_path, job_id, completion_notes } = args;
     // Use environment variable or default to relative storage
     const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
+    // Jobs are ALWAYS at storage root (global), not per-workspace
     const paths = {
-      jobsToDoDir: join(storageRoot, workspace_path, 'jobs/to-do'),
-      jobsDoneDir: join(storageRoot, workspace_path, 'jobs/done-to-do')
+      jobsToDoDir: join(storageRoot, 'jobs/to-do'),
+      jobsDoneDir: join(storageRoot, 'jobs/done-to-do')
     };
     const storage = await loadCONDUCKSWorkspace(workspace_path);
     const job = storage.jobs.find(j => j.id === job_id);

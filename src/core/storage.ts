@@ -24,11 +24,13 @@ const log = (message: string, level: 'info' | 'error' | 'warn' = 'info') => {
  * @returns Promise<CONDUCKSStorage> containing jobs for the workspace
  */
 export async function loadCONDUCKSWorkspace(workspacePath: string): Promise<CONDUCKSStorage> {
-    // Use environment variable or default to absolute storage relative to conducks root
-    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'storage');
+  // Use environment variable or default to absolute storage relative to conducks root
+  const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'storage');
+
+  // Jobs are ALWAYS at storage root (global), not per-workspace
   const paths = {
-    jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
-    jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')
+    jobsToDoDir: path.join(storageRoot, 'jobs/to-do'),
+    jobsDoneDir: path.join(storageRoot, 'jobs/done-to-do')
   };
   await fs.ensureDir(paths.jobsToDoDir);
   await fs.ensureDir(paths.jobsDoneDir);
@@ -94,11 +96,10 @@ export async function saveJobForWorkspace(job: Job, workspacePath: string, isCom
   try {
     // Use environment variable or default to absolute storage relative to conducks root
     const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'storage');
-    const paths = {
-      jobsToDoDir: path.join(storageRoot, workspacePath, 'jobs/to-do'),
-      jobsDoneDir: path.join(storageRoot, workspacePath, 'jobs/done-to-do')
-    };
-    const targetDir = isCompleted ? paths.jobsDoneDir : paths.jobsToDoDir;
+
+    // Jobs are ALWAYS at storage root (global), not per-workspace
+    const folder = isCompleted ? 'done-to-do' : 'to-do';
+    const targetDir = path.join(storageRoot, 'jobs', folder);
 
     console.error(`DEBUG: Creating directory ${targetDir} for workspace ${workspacePath}`);
     await fs.ensureDir(targetDir);
@@ -183,7 +184,16 @@ export function validateJob(job: Job): { valid: boolean; errors: string[] } {
  */
 export function jsonToToon(data: any): string {
   try {
-    return encode(data);
+    const toonOutput = encode(data);
+    // Validate the TOON output by attempting to decode it
+    try {
+      decode(toonOutput);
+      return toonOutput;
+    } catch (decodeError: any) {
+      // TOON encoding produced invalid output, fall back to JSON
+      log(`TOON encode/decode validation failed: ${decodeError.message}, falling back to JSON`, 'warn');
+      return JSON.stringify(data, null, 2);
+    }
   } catch (error: any) {
     log(`TOON encoding failed: ${error.message}`, 'error');
     return JSON.stringify(data, null, 2); // Fallback to JSON

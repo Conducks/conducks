@@ -170,7 +170,7 @@ interface ReplaceLinesArgs {
   domain_file: string;
   start_line: number;
   end_line: number;
-  replacement_text: string;
+  new_content: string;
 }
 
 interface ReplaceLinesResult {
@@ -180,7 +180,7 @@ interface ReplaceLinesResult {
 
 export async function handleReplaceLines(args: ReplaceLinesArgs): Promise<ReplaceLinesResult> {
   try {
-    const { project, subproject, domain_file, start_line, end_line, replacement_text } = args;
+    const { project, subproject, domain_file, start_line, end_line, new_content } = args;
 
     const filePath = findDomainFile(project, subproject, domain_file);
     if (!filePath) {
@@ -201,7 +201,7 @@ export async function handleReplaceLines(args: ReplaceLinesArgs): Promise<Replac
     // Replace lines (convert to 0-indexed)
     const before = lines.slice(0, start_line - 1);
     const after = lines.slice(end_line);
-    const newLines = [...before, replacement_text, ...after];
+    const newLines = [...before, new_content, ...after];
 
     writeFileSync(filePath, newLines.join('\n'), 'utf-8');
 

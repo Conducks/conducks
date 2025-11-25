@@ -103,11 +103,12 @@ describe('CONDUCKS Workflow Tests', () => {
       assert.strictEqual(result.jobs.length, 1, 'Should create exactly one job');
       assert.strictEqual(result.jobs[0].id, 1, 'First job should have id 1');
 
-      // Verify file exists
-      const jobFiles = fs.readdirSync(JOBS_TODO);
-      assert.ok(jobFiles.some(f => f.startsWith('001_')), 'Job file should exist');
+      // Verify job file exists at global jobs folder
+      const jobFiles = fs.readdirSync(path.join(STORAGE_ROOT, 'jobs/to-do'));
+      const jobFile = jobFiles.find(f => f.startsWith('001_') && f.endsWith('.toon'));
+      assert.ok(jobFile, 'Job file should exist');
 
-      console.log('✓ Single job created:', result.jobs[0].name);
+      console.log('✓ Job created successfully');
     });
 
     it('should create job with detailed metadata', async () => {
@@ -206,8 +207,8 @@ describe('CONDUCKS Workflow Tests', () => {
       }
 
       // Verify all tasks are in job
-      const jobFile = fs.readdirSync(JOBS_TODO).find(f => f.startsWith('001_'));
-      const jobFileContent = fs.readFileSync(path.join(JOBS_TODO, jobFile!), 'utf-8');
+      const jobFile = fs.readdirSync(path.join(STORAGE_ROOT, 'jobs/to-do')).find(f => f.startsWith('001_'));
+      const jobFileContent = fs.readFileSync(path.join(STORAGE_ROOT, 'jobs/to-do', jobFile!), 'utf-8');
 
       // Import toonToJson for proper TOON parsing
       // @ts-ignore
@@ -387,11 +388,17 @@ describe('CONDUCKS Workflow Tests', () => {
 
       assert.ok(result.success, 'Job completion should succeed');
 
-      // Verify job moved to done
-      const doneFiles = fs.readdirSync(JOBS_DONE);
-      assert.ok(doneFiles.some(f => f.startsWith('001_')), 'Job file should be in done-to-do');
+      // Verify job moved to done-to-do at global jobs folder
+      const doneFiles = fs.readdirSync(path.join(STORAGE_ROOT, 'jobs/done-to-do'));
+      const completedJob = doneFiles.find(f => f.startsWith('001_'));
+      assert.ok(completedJob, 'Completed job should be in done-to-do');
 
-      console.log('✓ Job completed and archived');
+      // Verify job no longer in to-do
+      const todoFiles = fs.readdirSync(path.join(STORAGE_ROOT, 'jobs/to-do'));
+      const activeJob = todoFiles.find(f => f.startsWith('001_'));
+      assert.ok(!activeJob, 'Job should not be in to-do anymore');
+
+      console.log('✓ Job completed and archived successfully');
     });
 
     it('should list completed jobs', async () => {
@@ -529,7 +536,7 @@ describe('CONDUCKS Workflow Tests', () => {
     });
 
     it('should delete job with confirmation', async () => {
-      console.log('\n--- Test: Delete job with confirmation ---');
+      console.log('\n--- Test: Delete job ---');
 
       // @ts-ignore
       const { handleDeleteJob } = await import('../tools/delete-job.js');
@@ -540,11 +547,14 @@ describe('CONDUCKS Workflow Tests', () => {
         confirm_deletion: true
       });
 
-      assert.ok(result.success, 'Deletion should succeed with confirmation');
+      console.log('Result:', JSON.stringify(result, null, 2));
 
-      // Verify job file is removed
-      const jobFiles = fs.readdirSync(JOBS_TODO);
-      assert.ok(!jobFiles.some(f => f.startsWith('002_')), 'Job file should be deleted');
+      assert.ok(result.success, 'Job deletion should succeed');
+
+      // Verify job file is deleted from global jobs folder
+      const jobFiles = fs.readdirSync(path.join(STORAGE_ROOT, 'jobs/to-do'));
+      const deletedJob = jobFiles.find(f => f.startsWith('002_'));
+      assert.ok(!deletedJob, 'Job file should be deleted');
 
       console.log('✓ Job deleted successfully');
     });

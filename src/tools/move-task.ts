@@ -29,7 +29,10 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
     const { workspace_path = 'default', project, subproject, task_file, target_folder, source_folder } = args;
 
     const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
-    const subprojectPath = join(storageRoot, workspace_path, project, subproject);
+    // Support both multi-service (with project/subproject) and single-repo (workspace root only)
+    const subprojectPath = (project && subproject)
+      ? join(storageRoot, workspace_path, project, subproject)
+      : join(storageRoot, workspace_path);
 
     if (!existsSync(subprojectPath)) {
       return {

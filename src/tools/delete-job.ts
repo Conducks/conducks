@@ -46,19 +46,27 @@ export async function handleDeleteJob(args: DeleteJobArgs): Promise<DeleteJobRes
       task_files: []
     };
 
-    // Delete job metadata file (.toon file in workspace)
+    // Delete job metadata file (.toon file in global jobs folder)
     const jobSlug = job.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
     const filename = `${String(job_id).padStart(3, '0')}_${jobSlug}.toon`;
-    // Construct path to workspace's jobs/to-do directory
+    // Jobs are ALWAYS at storage root (global), not per-workspace
     const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || path.join(process.cwd(), 'storage');
-    const jobFilePath = path.join(storageRoot, workspace_path, 'jobs', 'to-do', filename);
 
-    try {
-      await fs.access(jobFilePath);
-      await fs.rm(jobFilePath);
-      deletedFiles.job_metadata = jobFilePath;
-    } catch (error) {
-      // File doesn't exist, skip it
+    // Check both to-do and done-to-do folders
+    const possiblePaths = [
+      path.join(storageRoot, 'jobs', 'to-do', filename),
+      path.join(storageRoot, 'jobs', 'done-to-do', filename)
+    ];
+
+    for (const jobFilePath of possiblePaths) {
+      try {
+        await fs.access(jobFilePath);
+        await fs.rm(jobFilePath);
+        deletedFiles.job_metadata = jobFilePath;
+        break;
+      } catch (error) {
+        // File doesn't exist in this folder, try next
+      }
     }
 
 
