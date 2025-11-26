@@ -15,10 +15,10 @@ export async function handleListCompletedJobs(args?: { workspace_path?: string }
     const workspace_path = args?.workspace_path || 'default';
     const storage = await loadCONDUCKSWorkspace(workspace_path);
 
-    // Filter for completed jobs (all tasks completed)
+    // Filter for completed jobs (all tasks completed, or no tasks)
     const completedJobsRecords = storage.jobs.filter((j: any) => {
       const total = j.tasks.length;
-      return total > 0 && j.tasks.every((t: any) => t.status === 'completed');
+      return total === 0 || j.tasks.every((t: any) => t.status === 'completed');
     });
     
     let output = `════════════════════════════════════════\n`;

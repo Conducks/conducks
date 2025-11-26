@@ -17,11 +17,11 @@ process.env.CONDUCKS_STORAGE_ROOT = STORAGE_ROOT;
 
 // Import handlers
 // @ts-ignore
-import { handleCreateJob } from '../src/tools/create-job.js';
+import { handleCreateJob } from '../tools/create-job.js';
 // @ts-ignore
-import { handleCreateTask } from '../src/tools/create-task.js';
+import { handleCreateTask } from '../tools/create-task.js';
 // @ts-ignore
-import { handleMoveTask } from '../src/tools/move-task.js';
+import { handleMoveTask } from '../tools/move-task.js';
 
 describe('CONDUCKS Dynamic Project Paths', () => {
 

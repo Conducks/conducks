@@ -189,9 +189,13 @@ export async function handleRemoveTask(args: RemoveTaskArgs): Promise<RemoveTask
     const content = readFileSync(domainPath, 'utf-8');
     const lines = content.split('\n');
 
-    // Find the task header
-    const taskHeader = `# Task ${String(args.task_id).padStart(3, '0')}:`;
-    const startIndex = lines.findIndex(line => line.trim().startsWith(taskHeader));
+    // Find the task header (try both # and ## formats)
+    const taskHeader1 = `# Task ${String(args.task_id).padStart(3, '0')}:`;
+    const taskHeader2 = `## Task ${String(args.task_id).padStart(3, '0')}:`;
+    let startIndex = lines.findIndex(line => line.trim().startsWith(taskHeader1));
+    if (startIndex === -1) {
+      startIndex = lines.findIndex(line => line.trim().startsWith(taskHeader2));
+    }
 
     if (startIndex === -1) {
       return { success: false, message: `Task ${args.task_id} not found` };
