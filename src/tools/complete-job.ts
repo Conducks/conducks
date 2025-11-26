@@ -88,7 +88,7 @@ export function formatCompleteJobResult(result: CompleteJobResult): string {
     output += `Marker: ${result.archivedPath}\n`;
   }
   output += `Job completion stored via completed.marker file in job directory.\n`;
-  output += `Tasks remain in jobs/job_<id>/tasks/. Domain files deprecated.\n`;
+
 
   return output;
 }

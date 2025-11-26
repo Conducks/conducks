@@ -14,9 +14,8 @@ const SERVER_ROOT = typeof __dirname !== 'undefined'
   : path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const DEFAULT_INTERNAL_STORAGE = path.join(SERVER_ROOT, 'storage');
 
-/*
-// COMMENTED OUT TEMPORARILY - TypeScript compilation issue
-function getWorkspacePaths(workspacePath: string, createPath: boolean = false) {
+
+function getWorkspacePaths(workspacePath: string, project: string = 'ProjectX', createPath: boolean = false) {
   // Security: validate workspace path
   if (!workspacePath || typeof workspacePath !== 'string') {
     throw new Error('Invalid workspace path');
@@ -24,11 +23,11 @@ function getWorkspacePaths(workspacePath: string, createPath: boolean = false) {
 
   // Security: reject dangerous characters and paths
   if (workspacePath.includes('..') || workspacePath.includes('/') || workspacePath.includes('\\') ||
-      workspacePath.includes('$') || workspacePath.includes('`')) {
+    workspacePath.includes('$') || workspacePath.includes('`')) {
     throw new Error('Invalid workspace path: security violation');
   }
 
-  const storageRoot = path.resolve(process.env.CONDUCKS_STORAGE_DIR || DEFAULT_INTERNAL_STORAGE);
+  const storageRoot = path.resolve(process.env.CONDUCKS_STORAGE_ROOT || DEFAULT_INTERNAL_STORAGE);
   const workspaceDir = path.join(storageRoot, workspacePath);
 
   return {
@@ -36,15 +35,15 @@ function getWorkspacePaths(workspacePath: string, createPath: boolean = false) {
     jobsRoot: createPath ? path.join(workspacePath, 'jobs') : path.join(workspaceDir, 'jobs'),
     jobsToDoDir: createPath ? path.join(workspacePath, 'jobs', 'to-do') : path.join(workspaceDir, 'jobs', 'to-do'),
     jobsDoneDir: createPath ? path.join(workspacePath, 'jobs', 'done-to-do') : path.join(workspaceDir, 'jobs', 'done-to-do'),
-    tasksRoot: createPath ? path.join(workspacePath, 'ProjectX') : path.join(workspaceDir, 'ProjectX'),
-    getSubprojectDir: (subproject: string, folder: 'to-do' | 'done-to-do' = 'to-do') =>
+    tasksRoot: createPath ? path.join(workspacePath, project) : path.join(workspaceDir, project),
+    getSubprojectDir: (subproject: string, folder: string = 'to-do') =>
       createPath ?
-        path.join(workspacePath, 'ProjectX', subproject, folder) :
-        path.join(workspaceDir, 'ProjectX', subproject, folder)
+        path.join(workspacePath, project, subproject, folder) :
+        path.join(workspaceDir, project, subproject, folder)
   };
 }
 export { getWorkspacePaths };
-*/
+
 
 // Note: Legacy global paths removed. All operations now use workspace-specific paths.
 // Migration to workspace isolation complete.

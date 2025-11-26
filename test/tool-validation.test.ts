@@ -33,6 +33,8 @@ import { handleDeleteJob } from '../tools/delete-job.js';
 // @ts-ignore
 import { handleCreateTask } from '../tools/create-task.js';
 // @ts-ignore
+import { handleBatchCreateTasks } from '../tools/batch-create-tasks.js';
+// @ts-ignore
 import { handleMoveTask } from '../tools/move-task.js';
 // @ts-ignore
 import { handleListActiveJobs } from '../tools/list-active-jobs.js';
@@ -40,8 +42,7 @@ import { handleListActiveJobs } from '../tools/list-active-jobs.js';
 import { handleListCompletedJobs } from '../tools/list-completed-jobs.js';
 // @ts-ignore
 import { handleListJobsEnhanced } from '../tools/list-jobs-enhanced.js';
-// @ts-ignore
-import { handleSmartInfo } from '../tools/smart-info.js';
+
 // @ts-ignore
 import { handleInitializeProjectStructure } from '../tools/initialize-project-structure.js';
 // @ts-ignore
@@ -88,6 +89,62 @@ describe('CONDUCKS Tool Validation Tests', () => {
             await fs.ensureDir(path.join(workspacePath, '.git'));
 
             console.log('✓ Project structure created and validated');
+        });
+
+        it('should respect CONDUCKS_WORKSPACE_ROOT environment variable', async () => {
+            // Create a test workspace outside the default location
+            const customWorkspaceRoot = path.join(TEST_ROOT, 'custom-workspaces');
+            const customWorkspace = path.join(customWorkspaceRoot, 'test-app');
+            await fs.ensureDir(customWorkspace);
+
+            // Create a .git directory to simulate a single-repo project
+            await fs.ensureDir(path.join(customWorkspace, '.git'));
+
+            // Set the environment variable
+            const originalWorkspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT;
+            process.env.CONDUCKS_WORKSPACE_ROOT = customWorkspaceRoot;
+
+            try {
+                // Initialize with relative path
+                const result = await handleInitializeProjectStructure({
+                    workspace_path: 'test-app',
+                    auto_select: true
+                });
+
+                // Validate result
+                assert.ok(result.success, 'Initialization should succeed');
+                assert.ok(result.projectStructure.rootHasGit, 'Should detect root .git');
+                assert.strictEqual(result.projectStructure.projectName, 'test-app', 'Project name should match');
+                assert.strictEqual(result.projectStructure.subprojects.length, 1, 'Should have one subproject');
+                assert.strictEqual(result.projectStructure.subprojects[0], 'test-app', 'Subproject should be test-app');
+
+                console.log('✓ CONDUCKS_WORKSPACE_ROOT environment variable respected');
+            } finally {
+                // Restore original value
+                if (originalWorkspaceRoot) {
+                    process.env.CONDUCKS_WORKSPACE_ROOT = originalWorkspaceRoot;
+                } else {
+                    delete process.env.CONDUCKS_WORKSPACE_ROOT;
+                }
+            }
+        });
+
+        it('should return system status if already initialized', async () => {
+            // Call initialize again on the same workspace
+            const result = await handleInitializeProjectStructure({
+                workspace_path: WORKSPACE_NAME,
+                project_name: 'ValidationProject',
+                auto_select: true
+            });
+
+            // Validate result
+            assert.ok(result.success, 'Second initialization should succeed');
+            assert.ok(result.alreadyInitialized, 'Should report already initialized');
+            assert.ok(result.systemStatus, 'Should return system status');
+            assert.strictEqual(typeof result.systemStatus.activeJobs, 'number', 'Should have active jobs count');
+            assert.strictEqual(typeof result.systemStatus.completedJobs, 'number', 'Should have completed jobs count');
+
+            console.log('✓ Idempotency and status reporting validated');
         });
     });
 
@@ -158,7 +215,47 @@ describe('CONDUCKS Tool Validation Tests', () => {
         });
     });
 
-    describe('Tool 4: list_active_jobs', () => {
+    describe('Tool 4: batch_create_tasks', () => {
+        it('should create multiple tasks and verify files exist', async () => {
+            const result = await handleBatchCreateTasks({
+                workspace_path: WORKSPACE_NAME,
+                job_id: 1,
+                tasks: [
+                    {
+                        title: 'Batch Task 1',
+                        description: 'First batch task',
+                        priority: 'medium',
+                        complexity: 'simple',
+                        team: 'platform'
+                    },
+                    {
+                        title: 'Batch Task 2',
+                        description: 'Second batch task',
+                        priority: 'low',
+                        complexity: 'simple',
+                        team: 'platform'
+                    }
+                ]
+            });
+
+            // Validate result
+            assert.ok(result.success, 'Batch task creation should succeed');
+            assert.strictEqual(result.tasks.length, 2, 'Should create 2 tasks');
+
+            // Validate file system state
+            for (const task of result.tasks) {
+                const taskFile = path.join(TEST_ROOT, task.filePath);
+                assert.ok(await fs.pathExists(taskFile), `Task file ${task.filePath} should exist`);
+
+                const content = await fs.readFile(taskFile, 'utf-8');
+                assert.ok(content.includes('**Job Reference:** 1'), 'Should reference parent job');
+            }
+
+            console.log('✓ Batch tasks created and validated');
+        });
+    });
+
+    describe('Tool 5: list_active_jobs', () => {
         it('should list active jobs and verify job appears', async () => {
             const result = await handleListActiveJobs({ workspace_path: WORKSPACE_NAME });
 
@@ -172,7 +269,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
         });
     });
 
-    describe('Tool 5: list_jobs_enhanced', () => {
+    describe('Tool 6: list_jobs_enhanced', () => {
         it('should get enhanced job details and verify task count', async () => {
             const result = await handleListJobsEnhanced({
                 workspace_path: WORKSPACE_NAME,
@@ -189,24 +286,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
         });
     });
 
-    describe('Tool 6: smart_info', () => {
-        it('should provide system-level info and verify content', async () => {
-            const result = await handleSmartInfo({
-                workspace_path: WORKSPACE_NAME,
-                context: 'system'
-            });
 
-            // Validate result
-            assert.strictEqual(result.context, 'system', 'Should have system context');
-            assert.ok(result.content && typeof result.content === 'string', 'Should have string content');
-            assert.ok(
-                result.content.includes('Active Jobs') || result.content.includes('CONDUCKS SYSTEM'),
-                'Should contain system info'
-            );
-
-            console.log('✓ System info retrieved and validated');
-        });
-    });
 
     describe('Tool 7: move_task', () => {
         it('should move task and verify file location changed', async () => {
@@ -293,7 +373,8 @@ describe('CONDUCKS Tool Validation Tests', () => {
     describe('Tool 11: edit_task', () => {
         it('should edit task attributes and verify changes', async () => {
             // Create a domain file for testing
-            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'main/test-domain.md');
+            // NOTE: handleEditTask uses getWorkspacePaths which defaults to 'ProjectX' project folder
+            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'ProjectX/main/test-domain.md');
             await fs.ensureDir(path.dirname(domainPath));
             const initialContent = `Task 001: Sample Task
 Status: active
@@ -329,7 +410,7 @@ Desc: Initial description
 
     describe('Tool 12: replace_lines', () => {
         it('should replace lines and verify content', async () => {
-            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'main/test-domain.md');
+            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'ProjectX/main/test-domain.md');
 
             const result = await handleReplaceLines({
                 project: WORKSPACE_NAME,
@@ -372,7 +453,7 @@ Desc: Initial description
             assert.ok(result.success, 'Domain rewrite should succeed');
 
             // Validate file content
-            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'main/test-domain.md');
+            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'ProjectX/main/test-domain.md');
             const content = await fs.readFile(domainPath, 'utf-8');
             assert.ok(content.includes('Rewritten Domain'), 'File should be rewritten');
             assert.ok(content.includes('New Task'), 'New content should be present');
@@ -397,7 +478,7 @@ Desc: Initial description
             assert.ok(result.success, 'Task append should succeed');
 
             // Validate file content
-            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'main/test-domain.md');
+            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'ProjectX/main/test-domain.md');
             const content = await fs.readFile(domainPath, 'utf-8');
             assert.ok(content.includes('Task 002'), 'New task should be appended');
             assert.ok(content.includes('Appended Task'), 'Task content should be present');
@@ -419,7 +500,7 @@ Desc: Initial description
             assert.ok(result.success, 'Task removal should succeed');
 
             // Validate file content
-            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'main/test-domain.md');
+            const domainPath = path.join(STORAGE_ROOT, WORKSPACE_NAME, 'ProjectX/main/test-domain.md');
             const content = await fs.readFile(domainPath, 'utf-8');
             assert.ok(!content.includes('Task 002'), 'Task should be removed');
 
@@ -444,6 +525,7 @@ Desc: Initial description
 
     describe('Comprehensive Validation Summary', () => {
         it('should verify all tools executed successfully', async () => {
+            console.log('\n=== VALIDATION SUMMARY ===');
             console.log('\n=== VALIDATION SUMMARY ===');
             console.log('✅ All 16 MCP tools validated successfully');
             console.log('✅ File system state verified for each operation');

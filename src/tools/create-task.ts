@@ -13,7 +13,9 @@ interface CreateTaskArgs {
   team?: string;
   service?: string;
   dependencies?: string[];
-  subproject?: 'w1' | 'w2' | 'w3';
+  subproject?: string;
+  project?: string;
+  folder?: string;
 }
 
 interface CreateTaskResult {
@@ -35,7 +37,7 @@ function slugify(text: string): string {
     .trim();
 }
 
-function generateTaskMarkdown(task: SubTask, jobId: number, args: CreateTaskArgs): string {
+export function generateTaskMarkdown(task: SubTask, jobId: number, args: CreateTaskArgs): string {
   const now = new Date().toISOString();
   let md = `# Task ${task.id}: ${task.title}\n\n`;
   md += `**Job Reference:** ${jobId}\n`;
@@ -87,29 +89,34 @@ export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTask
     const saveJobForWorkspace = await import('../core/storage.js').then(m => m.saveJobForWorkspace);
     await saveJobForWorkspace(job, workspacePath, false);
 
-    // Create markdown file in ProjectX/w1/to-do/ (for now keep global for migration compatibility)
+    // Create markdown file in Project/Subproject/to-do/
     const subproject = args.subproject || 'w1';
-    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
-    const projectRoot = join(storageRoot, workspacePath, 'ProjectX');
-    const todoDir = join(projectRoot, subproject, 'to-do');
+    const project = args.project || 'ProjectX'; // Default to ProjectX if not specified, but allow override
 
-    if (!existsSync(todoDir)) {
-      mkdirSync(todoDir, { recursive: true });
+    // Import getWorkspacePaths dynamically to avoid circular dependencies if any
+    const { getWorkspacePaths } = await import('../core/config.js');
+    const paths = getWorkspacePaths(workspacePath, project);
+
+    const folder = args.folder || 'to-do';
+    const targetDir = paths.getSubprojectDir(subproject, folder);
+
+    if (!existsSync(targetDir)) {
+      mkdirSync(targetDir, { recursive: true });
     }
 
     const slug = slugify(args.title);
     const fileName = `task_${taskIdStr}_${slug}.md`;
-    const filePath = join(todoDir, fileName);
+    const filePath = join(targetDir, fileName);
     const markdown = generateTaskMarkdown(task, job.id, args);
     writeFileSync(filePath, markdown, 'utf-8');
 
     return {
       success: true,
-      message: `Created task ${taskIdStr} for job ${job.id}`,
+      message: `Created task ${taskIdStr} for job ${job.id} in folder ${folder}`,
       task: {
         id: taskIdStr,
         title: args.title,
-        filePath: `storage/${workspacePath}/ProjectX/${subproject}/to-do/${fileName}`
+        filePath: `storage/${workspacePath}/${project}/${subproject}/${folder}/${fileName}`
       }
     };
   } catch (error) {

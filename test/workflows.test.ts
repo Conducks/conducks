@@ -24,23 +24,23 @@ process.env.CONDUCKS_STORAGE_ROOT = STORAGE_ROOT;
 
 // Import handlers AFTER setting environment (use source files for TypeScript compilation, built files at runtime)
 // @ts-ignore - Build structure flattens src/tools to tools
-import { handleInitializeProjectStructure } from '../tools/initialize-project-structure.js';
+import { handleInitializeProjectStructure } from '../src/tools/initialize-project-structure.js';
 // @ts-ignore
-import { handleCreateJob } from '../tools/create-job.js';
+import { handleCreateJob } from '../src/tools/create-job.js';
 // @ts-ignore
-import { handleCreateTask } from '../tools/create-task.js';
+import { handleCreateTask } from '../src/tools/create-task.js';
 // @ts-ignore
-import { handleMoveTask } from '../tools/move-task.js';
+import { handleMoveTask } from '../src/tools/move-task.js';
 // @ts-ignore
-import { handleCompleteJob } from '../tools/complete-job.js';
+import { handleCompleteJob } from '../src/tools/complete-job.js';
 // @ts-ignore
-import { handleListActiveJobs } from '../tools/list-active-jobs.js';
+import { handleListActiveJobs } from '../src/tools/list-active-jobs.js';
 // @ts-ignore
-import { handleListCompletedJobs } from '../tools/list-completed-jobs.js';
+import { handleListCompletedJobs } from '../src/tools/list-completed-jobs.js';
 // @ts-ignore
-import { handleListJobsEnhanced } from '../tools/list-jobs-enhanced.js';
+import { handleListJobsEnhanced } from '../src/tools/list-jobs-enhanced.js';
 // @ts-ignore
-import { handleSmartInfo } from '../tools/smart-info.js';
+import { handleSmartInfo } from '../src/tools/smart-info.js';
 
 describe('CONDUCKS Workflow Tests', () => {
 
@@ -212,7 +212,7 @@ describe('CONDUCKS Workflow Tests', () => {
 
       // Import toonToJson for proper TOON parsing
       // @ts-ignore
-      const { toonToJson } = await import('../core/storage.js');
+      const { toonToJson } = await import('../src/core/storage.js');
       const jobContent = toonToJson(jobFileContent);
 
       assert.strictEqual(jobContent.tasks.length, 3, 'Job should have 3 tasks');
@@ -521,7 +521,7 @@ describe('CONDUCKS Workflow Tests', () => {
       console.log('\n--- Test: Reject deletion without confirmation ---');
 
       // @ts-ignore
-      const { handleDeleteJob } = await import('../tools/delete-job.js');
+      const { handleDeleteJob } = await import('../src/tools/delete-job.js');
 
       const result = await handleDeleteJob({
         workspace_path: 'test-workspace',
@@ -539,7 +539,7 @@ describe('CONDUCKS Workflow Tests', () => {
       console.log('\n--- Test: Delete job ---');
 
       // @ts-ignore
-      const { handleDeleteJob } = await import('../tools/delete-job.js');
+      const { handleDeleteJob } = await import('../src/tools/delete-job.js');
 
       const result = await handleDeleteJob({
         workspace_path: 'test-workspace',
@@ -563,7 +563,7 @@ describe('CONDUCKS Workflow Tests', () => {
       console.log('\n--- Test: Delete non-existent job ---');
 
       // @ts-ignore
-      const { handleDeleteJob } = await import('../tools/delete-job.js');
+      const { handleDeleteJob } = await import('../src/tools/delete-job.js');
 
       const result = await handleDeleteJob({
         workspace_path: 'test-workspace',
@@ -584,7 +584,7 @@ describe('CONDUCKS Workflow Tests', () => {
       console.log('\n--- Test: Edit task attributes ---');
 
       // @ts-ignore
-      const { handleEditTask } = await import('../tools/domain-crud.js');
+      const { handleEditTask } = await import('../src/tools/domain-crud.js');
 
       // First create a domain file for testing (TOON format)
       const domainPath = path.join(STORAGE_ROOT, 'test-workspace/main/test-domain.md');
@@ -601,7 +601,7 @@ Desc: Initial description
         project: 'test-workspace',
         subproject: 'main',
         domain_file: 'test-domain.md',
-        task_id: '001',
+        task_id: 1,
         updates: {
           status: 'completed',
           team: 'frontend',
@@ -624,7 +624,7 @@ Desc: Initial description
       console.log('\n--- Test: Replace lines ---');
 
       // @ts-ignore
-      const { handleReplaceLines } = await import('../tools/domain-crud.js');
+      const { handleReplaceLines } = await import('../src/tools/domain-crud.js');
 
       const domainPath = path.join(STORAGE_ROOT, 'test-workspace/main/test-domain.md');
 
@@ -634,7 +634,7 @@ Desc: Initial description
         domain_file: 'test-domain.md',
         start_line: 4,
         end_line: 4,
-        new_content: '- **Status:** archived'
+        replacement_text: '- **Status:** archived'
       });
 
       assert.ok(result.success, 'Line replacement should succeed');
@@ -646,7 +646,7 @@ Desc: Initial description
       console.log('\n--- Test: Rewrite domain file ---');
 
       // @ts-ignore
-      const { handleRewriteDomain } = await import('../tools/domain-crud.js');
+      const { handleRewriteDomain } = await import('../src/tools/domain-crud.js');
 
       const newContent = `# Rewritten Domain
 
@@ -675,7 +675,7 @@ Desc: Initial description
       console.log('\n--- Test: Append task ---');
 
       // @ts-ignore
-      const { handleAppendTask } = await import('../tools/domain-crud.js');
+      const { handleAppendTask } = await import('../src/tools/domain-crud.js');
 
       const result = await handleAppendTask({
         project: 'test-workspace',
@@ -700,13 +700,13 @@ Desc: Initial description
       console.log('\n--- Test: Remove task ---');
 
       // @ts-ignore
-      const { handleRemoveTask } = await import('../tools/domain-crud.js');
+      const { handleRemoveTask } = await import('../src/tools/domain-crud.js');
 
       const result = await handleRemoveTask({
         project: 'test-workspace',
         subproject: 'main',
         domain_file: 'test-domain.md',
-        task_id: '002'
+        task_id: 2
       });
 
       assert.ok(result.success, 'Task removal should succeed');
@@ -725,7 +725,7 @@ Desc: Initial description
       console.log('\n--- Test: Architecture audit ---');
 
       // @ts-ignore
-      const { handleArchitectureAudit } = await import('../tools/architecture-audit.js');
+      const { handleArchitectureAudit } = await import('../src/tools/architecture-audit.js');
 
       const result = await handleArchitectureAudit({
         workspace_path: '.'

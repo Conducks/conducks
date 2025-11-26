@@ -222,6 +222,51 @@ npm run inspector
 **Best for:** Testing tools interactively  
 **Opens on:** http://localhost:6274 with MCP Inspector interface
 
+## 🔧 Configuration
+
+### Environment Variables
+
+CONDUCKS supports the following environment variables for customization:
+
+- **`CONDUCKS_WORKSPACE_ROOT`**: Base directory for resolving workspace paths (default: `process.cwd()`)
+  - Use this when your MCP server runs from a different directory than your workspaces
+  - Example: `export CONDUCKS_WORKSPACE_ROOT=/Users/you/projects`
+  
+- **`CONDUCKS_STORAGE_ROOT`**: Custom storage location (default: `./storage`)
+  - Override the default storage directory location
+  - Example: `export CONDUCKS_STORAGE_ROOT=/var/conducks/storage`
+
+- **`CONDUCKS_DASHBOARD_PORT`**: Dashboard server port (default: `2812`)
+  - Change the port for the web dashboard
+  - Example: `export CONDUCKS_DASHBOARD_PORT=3000`
+
+### Setting Environment Variables
+
+**For MCP Server (Claude Desktop):**
+
+```json
+{
+  "mcpServers": {
+    "conducks": {
+      "command": "node",
+      "args": ["/path/to/conducks/build/index.js"],
+      "env": {
+        "CONDUCKS_WORKSPACE_ROOT": "/Users/you/projects",
+        "CONDUCKS_STORAGE_ROOT": "/Users/you/.conducks/storage"
+      }
+    }
+  }
+}
+```
+
+**For Command Line:**
+
+```bash
+export CONDUCKS_WORKSPACE_ROOT=/Users/you/projects
+export CONDUCKS_STORAGE_ROOT=/Users/you/.conducks/storage
+node build/index.js
+```
+
 ## Installation
 
 To use with Claude Desktop, add the server config:

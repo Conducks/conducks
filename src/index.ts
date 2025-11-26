@@ -1,8 +1,3 @@
-#!/usr/bin/env node
-/**
- * CONDUCKS MCP Server - Intelligent Documentation Organizer
- * Hierarchical Jobs->Tasks system with numbered IDs for easy human reference
- */
 
 // MCP SDK imports
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -15,11 +10,11 @@ import { handleCreateJob, formatCreateJobResult } from "./tools/create-job.js";
 import { handleCompleteJob, formatCompleteJobResult } from "./tools/complete-job.js";
 import { handleDeleteJob, formatDeleteJobResult } from "./tools/delete-job.js";
 import { handleCreateTask, formatCreateTaskResult } from "./tools/create-task.js";
+import { handleBatchCreateTasks, formatBatchCreateTasksResult } from "./tools/batch-create-tasks.js";
 import { handleMoveTask, formatMoveTaskResult } from "./tools/move-task.js";
 import { handleListActiveJobs } from "./tools/list-active-jobs.js";
 import { handleListCompletedJobs } from "./tools/list-completed-jobs.js";
 import { handleListJobsEnhanced } from "./tools/list-jobs-enhanced.js";
-import { handleSmartInfo, formatSmartInfoResult } from "./tools/smart-info.js";
 import { handleInitializeProjectStructure, formatInitResult } from "./tools/initialize-project-structure.js";
 import { handleArchitectureAudit, formatArchitectureAuditResult } from "./tools/architecture-audit.js";
 import { handleEditTask, formatEditTaskResult, handleReplaceLines, formatReplaceLinesResult, handleRewriteDomain, formatRewriteDomainResult, handleAppendTask, formatAppendTaskResult, handleRemoveTask, formatRemoveTaskResult } from "./tools/domain-crud.js";
@@ -41,7 +36,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: "create_job",
-    description: "Initialize a new job with metadata. **Does not create tasks.** Use `create_task` subsequently to add actionable items. This creates exactly ONE job - no automatic splitting occurs.",
+    description: "Step 2: Create a new job container (metadata only). **MUST run initialize_project_structure first.** This creates the job ID and folder, but NO tasks. Use `create_task` or `batch_create_tasks` next.",
     inputSchema: {
       type: "object",
       properties: {
@@ -87,7 +82,7 @@ const TOOLS = [
   },
   {
     name: "create_task",
-    description: "Create a new task file linked to a job. **Required for tracking work.**",
+    description: "Step 3a: Add a SINGLE task to an existing job. **Required for tracking work.** Use `batch_create_tasks` for bulk creation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -100,9 +95,40 @@ const TOOLS = [
         team: { type: "string", description: "Team responsible" },
         service: { type: "string", description: "Service name" },
         dependencies: { type: "array", items: { type: "string" }, description: "Task dependencies" },
-        subproject: { type: "string", enum: ["w1", "w2", "w3"], description: "Subproject (defaults to w1)" }
+        subproject: { type: "string", enum: ["w1", "w2", "w3"], description: "Subproject (defaults to w1)" },
+        folder: { type: "string", description: "Folder for task file (e.g., 'to-do', 'analysis', 'problem-solution'; defaults to 'to-do')" }
       },
       required: ["workspace_path", "job_id", "title", "description"]
+    }
+  },
+  {
+    name: "batch_create_tasks",
+    description: "Step 3b: Add MULTIPLE tasks to an existing job at once. Efficient for initial job population.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        workspace_path: { type: "string", description: "Workspace identifier" },
+        job_id: { type: "number", description: "Parent job ID" },
+        tasks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              priority: { type: "string", enum: ["high", "medium", "low", "critical"] },
+              complexity: { type: "string", enum: ["simple", "medium", "complex"] },
+              team: { type: "string" },
+              service: { type: "string" },
+              dependencies: { type: "array", items: { type: "string" } },
+              subproject: { type: "string" },
+              folder: { type: "string" }
+            },
+            required: ["title", "description"]
+          }
+        }
+      },
+      required: ["workspace_path", "job_id", "tasks"]
     }
   },
   {
@@ -155,27 +181,12 @@ const TOOLS = [
     }
   },
   {
-    name: "smart_info",
-    description: "Retrieve detailed context about the system, workspace, or specific jobs. **Use this first** to explore the project structure or debug issues.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        workspace_path: { type: "string", description: "Workspace identifier" },
-        context: { type: "string", enum: ["workspace", "system", "project", "subproject", "job"] },
-        project_name: { type: "string" },
-        subproject_name: { type: "string" },
-        job_id: { type: "number" }
-      },
-      required: ["workspace_path"]
-    }
-  },
-  {
     name: "initialize_project_structure",
-    description: "Initialize the CONDUCKS folder structure. **Run this ONCE** at the start of a new project.",
+    description: "**STEP 1 (REQUIRED):** Initialize workspace and get system status. **MUST BE RUN BEFORE ANY OTHER TOOL.** Safe to call anytime to check status.",
     inputSchema: {
       type: "object",
       properties: {
-        workspace_path: { type: "string", description: "Relative workspace path" },
+        workspace_path: { type: "string", description: "Workspace path (absolute like '/Users/you/project' or relative like '.' or 'my-project')" },
         project_name: { type: "string" },
         auto_select: { type: "boolean" },
         include_subprojects: { type: "array", items: { type: "string" } }
@@ -317,6 +328,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return response;
       }
 
+      case "batch_create_tasks": {
+        const batchResult = await handleBatchCreateTasks(args as any);
+        const response = { content: [{ type: "text", text: formatBatchCreateTasksResult(batchResult) }] };
+        logToolCall("batch_create_tasks", args, response);
+        return response;
+      }
+
       case "move_task": {
         const moveResult = await handleMoveTask(args as any);
         const response = { content: [{ type: "text", text: formatMoveTaskResult(moveResult) }] };
@@ -342,13 +360,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const enhancedResult = await handleListJobsEnhanced(args as any);
         const response = { content: [{ type: "text", text: enhancedResult.content[0].text }] };
         logToolCall("list_jobs_enhanced", args, response);
-        return response;
-      }
-
-      case "smart_info": {
-        const infoResult = await handleSmartInfo(args as any);
-        const response = { content: [{ type: "text", text: formatSmartInfoResult(infoResult) }] };
-        logToolCall("smart_info", args, response);
         return response;
       }
 

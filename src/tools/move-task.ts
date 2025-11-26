@@ -2,8 +2,7 @@ import { existsSync, renameSync, mkdirSync } from 'fs';
 import { join, basename } from 'path';
 import { loadCONDUCKSWorkspace, saveJobForWorkspace } from '../core/storage.js';
 
-// NOTE: DOCS_ROOT removed - this tool may need refactoring for workspace isolation
-const DOCS_ROOT = '/tmp/fallback'; // Temporary fallback - move-task deprecated
+// NOTE: Tool updated to support dynamic workspace paths
 
 interface MoveTaskArgs {
   workspace_path?: string;
@@ -28,16 +27,21 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
   try {
     const { workspace_path = 'default', project, subproject, task_file, target_folder, source_folder } = args;
 
-    const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
+    // Import getWorkspacePaths dynamically
+    const { getWorkspacePaths } = await import('../core/config.js');
+    // Use provided project name or default to ProjectX if missing (for backward compatibility)
+    const projectName = project || 'ProjectX';
+    const paths = getWorkspacePaths(workspace_path, projectName);
+
     // Support both multi-service (with project/subproject) and single-repo (workspace root only)
     const subprojectPath = (project && subproject)
-      ? join(storageRoot, workspace_path, project, subproject)
-      : join(storageRoot, workspace_path);
+      ? paths.getSubprojectDir(subproject, 'to-do').replace('/to-do', '') // Get base subproject dir
+      : paths.tasksRoot; // Fallback to project root if subproject missing
 
     if (!existsSync(subprojectPath)) {
       return {
         success: false,
-        message: `Subproject path not found: ${project}/${subproject}`
+        message: `Subproject path not found: ${projectName}/${subproject}`
       };
     }
 

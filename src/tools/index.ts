@@ -16,7 +16,7 @@ export { handleInitializeProjectStructure, formatInitResult } from './initialize
 export { handleArchitectureAudit, formatArchitectureAuditResult } from './architecture-audit.js';
 
 // Information tools
-export { handleSmartInfo, formatSmartInfoResult } from './smart-info.js';
+
 export { handleListJobsEnhanced } from './list-jobs-enhanced.js';
 export { handleListActiveJobs } from './list-active-jobs.js';
 export { handleListCompletedJobs } from './list-completed-jobs.js';

@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join, basename, resolve, isAbsolute, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { loadCONDUCKSWorkspace } from '../core/storage.js';
 
 // NOTE: DOCS_ROOT removed in workspace isolation - using workspace paths instead
 
@@ -35,6 +36,11 @@ interface InitResult {
   createdFolders: string[];
   createdRulesFiles: string[];
   errors?: string[];
+  alreadyInitialized?: boolean;
+  systemStatus?: {
+    activeJobs: number;
+    completedJobs: number;
+  };
 }
 
 /**
@@ -189,17 +195,21 @@ export async function handleInitializeProjectStructure(args: {
   const createdRulesFiles: string[] = [];
 
   try {
-    // Security: reject absolute paths
-    if (isAbsolute(workspace_path)) {
-      throw new Error('Absolute paths are not allowed for security reasons. Use relative paths like "." or "../project-name".');
-    }
-    // Security: reject upward traversal attempts
-    if (workspace_path.includes('..')) {
-      throw new Error('Upward path traversal (..) is not allowed. Provide only "." or a direct child folder name.');
-    }
+    // Resolve workspace path: use absolute paths directly, resolve relative paths from workspace root
+    let resolvedPath: string;
 
-    // Resolve relative path from current working directory
-    const resolvedPath = resolve(process.cwd(), workspace_path);
+    if (isAbsolute(workspace_path)) {
+      // Use absolute path directly
+      resolvedPath = workspace_path;
+    } else {
+      // Security: reject upward traversal attempts for relative paths
+      if (workspace_path.includes('..')) {
+        throw new Error('Upward path traversal (..) is not allowed in relative paths. Use "." or a direct child folder name, or provide an absolute path.');
+      }
+      // Resolve relative path from workspace root (configurable via env var)
+      const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      resolvedPath = resolve(workspaceRoot, workspace_path);
+    }
     // Detect project structure with ascent logic
     const structure = detectProjectStructure(resolvedPath);
 
@@ -228,14 +238,48 @@ export async function handleInitializeProjectStructure(args: {
     const defaultStorage = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'storage');
     const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || defaultStorage;
     const projectPath = join(storageRoot, structure.projectName);
-    if (!existsSync(projectPath)) {
-      mkdirSync(projectPath, { recursive: true });
-      createdFolders.push(structure.projectName);
-    }
 
     // Create global jobs folder structure at storage root (not per-workspace)
     const jobsToDoPath = join(storageRoot, 'jobs', 'to-do');
     const jobsDonePath = join(storageRoot, 'jobs', 'done-to-do');
+
+    // Check if already initialized
+    const alreadyInitialized = existsSync(jobsToDoPath) && existsSync(jobsDonePath);
+
+    if (alreadyInitialized) {
+      // Return current status instead of re-initializing
+      try {
+        const storage = await loadCONDUCKSWorkspace(workspace_path);
+        const activeJobs = storage.jobs.filter(j => {
+          const total = j.tasks.length;
+          const completed = j.tasks.filter((t: any) => t.status === 'completed').length;
+          return completed < total || total === 0;
+        }).length;
+        const completedJobs = storage.jobs.filter(j =>
+          j.tasks.length > 0 && j.tasks.every((t: any) => t.status === 'completed')
+        ).length;
+
+        return {
+          success: true,
+          projectStructure: structure,
+          createdFolders: [],
+          createdRulesFiles: [],
+          alreadyInitialized: true,
+          systemStatus: {
+            activeJobs,
+            completedJobs
+          }
+        };
+      } catch (error) {
+        // If we can't load workspace, continue with initialization
+        console.error('Failed to load workspace status:', error);
+      }
+    }
+
+    if (!existsSync(projectPath)) {
+      mkdirSync(projectPath, { recursive: true });
+      createdFolders.push(structure.projectName);
+    }
 
     if (!existsSync(jobsToDoPath)) {
       mkdirSync(jobsToDoPath, { recursive: true });
@@ -283,6 +327,42 @@ export async function handleInitializeProjectStructure(args: {
 export function formatInitResult(result: InitResult): string {
   if (!result.success) {
     return `INIT FAILED | ${result.errors?.join(' | ')}`;
+  }
+
+  // If already initialized, show current status
+  if (result.alreadyInitialized && result.systemStatus) {
+    const rules = generateInlineRules();
+    const rootHasGit = result.projectStructure.rootHasGit;
+    let detectionMode: string;
+    if (rootHasGit && result.projectStructure.subprojects.length === 1 && result.projectStructure.subprojects[0] === result.projectStructure.projectName) {
+      detectionMode = 'single-project (root .git)';
+    } else if (rootHasGit && result.projectStructure.subprojects.length > 1) {
+      detectionMode = 'multi-project (nested .git repos)';
+    } else if (!rootHasGit && result.projectStructure.subprojects.length > 1) {
+      detectionMode = 'multi-project (no root .git, nested repos)';
+    } else {
+      detectionMode = 'heuristic (no .git)';
+    }
+
+    let output = `CONDUCKS SYSTEM STATUS\n\n`;
+    output += `Root: ${basename(result.projectStructure.projectRoot)} | Mode: ${detectionMode}\n`;
+    output += `Project: ${result.projectStructure.projectName} | Subprojects: ${result.projectStructure.subprojects.join(', ')}\n\n`;
+    output += `CURRENT STATE\n`;
+    output += `Active Jobs: ${result.systemStatus.activeJobs}\n`;
+    output += `Completed Jobs: ${result.systemStatus.completedJobs}\n\n`;
+    output += `TOOLS\n`;
+    output += `create_job: Create new job\n`;
+    output += `create_task: Add task to job\n`;
+    output += `list_active_jobs: View active jobs\n`;
+    output += `list_completed_jobs: View completed jobs\n`;
+    output += `complete_job: Mark job as done\n\n`;
+    output += `WORKFLOW\n`;
+    output += `1. create_job\n`;
+    output += `2. create_task (repeat)\n`;
+    output += `3. complete_job when all tasks done\n\n`;
+    output += `ORGANIZATION RULES\n`;
+    output += `${rules}`;
+    return output;
   }
 
   const rules = generateInlineRules();
@@ -333,8 +413,7 @@ export function formatInitResult(result: InitResult): string {
   output += `\nORGANIZATION RULES\n`;
   output += `${rules}\n\n`;
 
-  output += `NEXT: create_job → create_task (per job) → complete_job when all tasks done\n`;
-  output += `Jobs now own tasks directly (jobs/job_<id>/tasks/) | Domain files deprecated`;
+  output += `NEXT: create_job (optionally with tasks) → create_task (append single) or batch_create_tasks (append multiple) → complete_job when all tasks done`;
 
   return output;
 }
