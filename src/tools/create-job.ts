@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { loadCONDUCKSWorkspace, saveJobForWorkspace, getNextJobIdForWorkspace } from '../core/storage.js';
+import { validateWorkspaceIdentifier } from '../core/config.js';
 import { Job } from '../core/types.js';
 
 interface CreateJobArgs {
-  workspace_path: string;
+  workspace_id: string;
   name: string;
   description: string;
   domain?: string;
@@ -43,10 +44,13 @@ function slugify(text: string): string {
  */
 export async function handleCreateJob(args: CreateJobArgs): Promise<CreateJobResult> {
   try {
-    const { workspace_path, name, description, domain, dependencies } = args;
+    // Validate workspace identifier
+    validateWorkspaceIdentifier(args.workspace_id);
+
+    const { workspace_id, name, description, domain, dependencies } = args;
 
     // Create single job - no automatic splitting
-    const jobId = await getNextJobIdForWorkspace(workspace_path);
+    const jobId = await getNextJobIdForWorkspace(workspace_id);
     const slug = slugify(name);
 
     const job: Job = {
@@ -65,7 +69,7 @@ export async function handleCreateJob(args: CreateJobArgs): Promise<CreateJobRes
       lastUpdated: new Date().toISOString()
     };
 
-    await saveJobForWorkspace(job, workspace_path, false);
+    await saveJobForWorkspace(job, workspace_id, false);
 
     const filename = `${String(jobId).padStart(3, '0')}_${slug}.toon`;
 

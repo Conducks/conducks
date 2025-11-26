@@ -1,4 +1,5 @@
 import { loadCONDUCKSWorkspace } from '../core/storage.js';
+import { validateWorkspaceIdentifier } from '../core/config.js';
 
 /**
  * Inline rules
@@ -10,10 +11,14 @@ function getInlineRules(): string {
 /**
  * List completed jobs - Shows only jobs where all tasks are completed
  */
-export async function handleListCompletedJobs(args?: { workspace_path?: string }) {
+export async function handleListCompletedJobs(args?: { workspace_id?: string }) {
   try {
-    const workspace_path = args?.workspace_path || 'default';
-    const storage = await loadCONDUCKSWorkspace(workspace_path);
+    // Validate workspace identifier if provided
+    if (args?.workspace_id) {
+      validateWorkspaceIdentifier(args.workspace_id);
+    }
+    const workspace_id = args?.workspace_id || 'default';
+    const storage = await loadCONDUCKSWorkspace(workspace_id);
 
     // Filter for completed jobs (all tasks completed, or no tasks)
     const completedJobsRecords = storage.jobs.filter((j: any) => {

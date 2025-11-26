@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, writeFileSy
 import { join, basename, resolve, isAbsolute, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadCONDUCKSWorkspace } from '../core/storage.js';
+import { mcpLogger } from '../dashboard/logger.js';
 
 // NOTE: DOCS_ROOT removed in workspace isolation - using workspace paths instead
 
@@ -194,32 +195,90 @@ export async function handleInitializeProjectStructure(args: {
   const createdFolders: string[] = [];
   const createdRulesFiles: string[] = [];
 
+  mcpLogger.logOperation('TOOL_START', {
+    tool: 'initialize_project_structure',
+    args: { workspace_path, project_name, auto_select, include_subprojects }
+  });
+
   try {
+    mcpLogger.logOperation('PATH_VALIDATION', {
+      input_path: workspace_path,
+      path_type: isAbsolute(workspace_path) ? 'absolute' : 'relative'
+    });
+
     // Resolve workspace path: use absolute paths directly, resolve relative paths from workspace root
     let resolvedPath: string;
 
     if (isAbsolute(workspace_path)) {
       // Use absolute path directly
       resolvedPath = workspace_path;
+      mcpLogger.logPathResolution('absolute_path', workspace_path, resolvedPath);
     } else {
       // Security: reject upward traversal attempts for relative paths
+      mcpLogger.logValidation('workspace_path', workspace_path, !workspace_path.includes('..'), {
+        check: 'upward_traversal_prevention',
+        rule: 'No .. in relative paths'
+      });
+
       if (workspace_path.includes('..')) {
         throw new Error('Upward path traversal (..) is not allowed in relative paths. Use "." or a direct child folder name, or provide an absolute path.');
       }
+
       // Resolve relative path from workspace root (configurable via env var)
       const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
       resolvedPath = resolve(workspaceRoot, workspace_path);
+
+      mcpLogger.logPathResolution('relative_path_resolution', workspace_path, resolvedPath, {
+        workspace_root: workspaceRoot,
+        resolved_from: process.cwd()
+      });
     }
+    mcpLogger.logOperation('DETECTING_PROJECT_STRUCTURE', {
+      resolved_path: resolvedPath,
+      path_exists: existsSync(resolvedPath)
+    });
+
     // Detect project structure with ascent logic
     const structure = detectProjectStructure(resolvedPath);
 
+    mcpLogger.logStructureDetection('initialize_project_structure', resolvedPath, {
+      subprojects: structure.subprojects,
+      rootHasGit: structure.rootHasGit,
+      gitRoot: structure.gitRoot || undefined
+    });
+
+    mcpLogger.logOperation('PROJECT_STRUCTURE_DETECTED', {
+      detected_subprojects: structure.subprojects,
+      nested_git_repos: structure.nestedGitDirs,
+      detection_mode: structure.rootHasGit ?
+        (structure.nestedGitDirs.length > 0 ? 'multi-git' : 'single-git') :
+        (structure.nestedGitDirs.length > 0 ? 'multi-no-root-git' : 'heuristic')
+    });
+
     // Override project name if provided
     if (project_name) {
+      mcpLogger.logOperation('PROJECT_NAME_OVERRIDE', {
+        original: structure.projectName,
+        override: project_name
+      });
       structure.projectName = project_name;
     }
 
+    mcpLogger.logOperation('SUBPROJECT_FILTERING_DECISION', {
+      subprojects_count: structure.subprojects.length,
+      auto_select: !!auto_select,
+      include_subprojects_provided: !!include_subprojects,
+      include_subprojects_list: include_subprojects,
+      needs_user_selection: structure.subprojects.length > 1 && !auto_select && (!include_subprojects || include_subprojects.length === 0)
+    });
+
     // If multiple git subprojects detected and user has not chosen auto_select or provided include_subprojects, return selection prompt
     if (structure.subprojects.length > 1 && !auto_select && (!include_subprojects || include_subprojects.length === 0)) {
+      mcpLogger.logOperation('USER_SELECTION_REQUIRED', {
+        reason: 'multiple_detected_subprojects',
+        detected: structure.subprojects,
+        suggestion: 'Use auto_select:true OR include_subprojects:[names]'
+      });
       return {
         success: true,
         projectStructure: structure,
@@ -231,7 +290,16 @@ export async function handleInitializeProjectStructure(args: {
 
     // Apply include_subprojects filter if provided
     if (include_subprojects && include_subprojects.length > 0) {
+      const originalSubprojects = [...structure.subprojects];
       structure.subprojects = structure.subprojects.filter(s => include_subprojects.includes(s));
+
+      mcpLogger.logOperation('SUBPROJECT_FILTER_APPLIED', {
+        original_subprojects: originalSubprojects,
+        filter_criteria: include_subprojects,
+        filtered_subprojects: structure.subprojects,
+        matched: structure.subprojects.length,
+        filtered_out: originalSubprojects.filter(s => !include_subprojects.includes(s))
+      });
     }
 
     // Create project root in storage root

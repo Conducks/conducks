@@ -40,7 +40,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        workspace_path: { type: "string", description: "Workspace identifier (e.g., 'workspace1', 'my-project')" },
+        workspace_id: { type: "string", description: "Workspace identifier name (e.g., 'workspace1', 'my-project') - no paths allowed" },
         name: { type: "string", description: "Job name (concise, descriptive)" },
         description: { type: "string", description: "Detailed objective describing complete success criteria" },
         domain: { type: "string", description: "Technical domain (e.g., 'authentication', 'database')" },
@@ -51,7 +51,7 @@ const TOOLS = [
         tags: { type: "array", items: { type: "string" }, description: "Categorization tags" },
         risk_assessment: { type: "string", description: "Known risks and mitigation strategies" }
       },
-      required: ["workspace_path", "name", "description"]
+      required: ["workspace_id", "name", "description"]
     }
   },
   {
@@ -186,10 +186,10 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        workspace_path: { type: "string", description: "Workspace path (absolute like '/Users/you/project' or relative like '.' or 'my-project')" },
-        project_name: { type: "string" },
-        auto_select: { type: "boolean" },
-        include_subprojects: { type: "array", items: { type: "string" } }
+        workspace_path: { type: "string", description: "Full absolute filesystem path to workspace root (REQUIRED for accurate structure detection). Example: '/Users/username/my-project' or '/home/user/project'" },
+        project_name: { type: "string", description: "Optional: Override detected project name" },
+        auto_select: { type: "boolean", description: "Optional: Automatically include all detected subprojects" },
+        include_subprojects: { type: "array", items: { type: "string" }, description: "Optional: Filter to only include these specific subproject names if auto_select=false" }
       },
       required: ["workspace_path"]
     }

@@ -56,7 +56,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const createJobResult = await handleCreateJob({
-      workspace_path: TEST_WORKSPACE,
+      workspace_id: TEST_WORKSPACE,
       name: 'Test Job',
       description: 'A test job for validation',
       domain: 'testing',
@@ -97,7 +97,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const createTaskResult = await handleCreateTask({
-      workspace_path: TEST_WORKSPACE,
+      workspace_id: TEST_WORKSPACE,
       job_id: 1,
       title: 'Test Task',
       description: 'A test task for validation',
@@ -151,7 +151,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const listActiveResult = await handleListActiveJobs({
-      workspace_path: TEST_WORKSPACE
+      workspace_id: TEST_WORKSPACE
     });
 
     if (listActiveResult && listActiveResult.content[0].text.includes('ACTIVE JOBS')) {
@@ -171,7 +171,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const listCompletedResult = await handleListCompletedJobs({
-      workspace_path: TEST_WORKSPACE
+      workspace_id: TEST_WORKSPACE
     });
 
     if (listCompletedResult && listCompletedResult.content[0].text.includes('COMPLETED JOBS')) {
@@ -191,7 +191,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const listEnhancedResult = await handleListJobsEnhanced({
-      workspace_path: TEST_WORKSPACE
+      workspace_id: TEST_WORKSPACE
     });
 
     if (listEnhancedResult && listEnhancedResult.content[0].text.includes('JOBS OVERVIEW')) {
@@ -211,7 +211,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const completeJobResult = await handleCompleteJob({
-      workspace_path: TEST_WORKSPACE,
+      workspace_id: TEST_WORKSPACE,
       job_id: 1,
       completion_notes: 'Test completion'
     });
@@ -233,7 +233,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const deleteJobResult = await handleDeleteJob({
-      workspace_path: TEST_WORKSPACE,
+      workspace_id: TEST_WORKSPACE,
       job_id: 1,
       confirm_deletion: true
     });

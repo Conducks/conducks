@@ -1,7 +1,8 @@
 import { loadCONDUCKSWorkspace } from '../core/storage.js';
+import { validateWorkspaceIdentifier } from '../core/config.js';
 
 interface ListActiveJobsArgs {
-  workspace_path: string;
+  workspace_id: string;
 }
 
 /**
@@ -18,8 +19,11 @@ function getInlineRules(): string {
  */
 export async function handleListActiveJobs(args: ListActiveJobsArgs) {
   try {
-    const { workspace_path } = args;
-    const storage = await loadCONDUCKSWorkspace(workspace_path);
+    // Validate workspace identifier
+    validateWorkspaceIdentifier(args.workspace_id);
+
+    const { workspace_id } = args;
+    const storage = await loadCONDUCKSWorkspace(workspace_id);
     
     // Filter for active jobs (not all tasks completed)
     const activeJobsRecords = storage.jobs.filter(j => {

@@ -72,7 +72,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
     describe('Tool 1: initialize_project_structure', () => {
         it('should create project structure and verify folders exist', async () => {
             const result = await handleInitializeProjectStructure({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 project_name: 'ValidationProject',
                 auto_select: true
             });
@@ -107,7 +107,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
             try {
                 // Initialize with relative path
                 const result = await handleInitializeProjectStructure({
-                    workspace_path: 'test-app',
+                    workspace_id: 'test-app',
                     auto_select: true
                 });
 
@@ -132,7 +132,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
         it('should return system status if already initialized', async () => {
             // Call initialize again on the same workspace
             const result = await handleInitializeProjectStructure({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 project_name: 'ValidationProject',
                 auto_select: true
             });
@@ -151,7 +151,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
     describe('Tool 2: create_job', () => {
         it('should create job and verify .toon file exists with correct content', async () => {
             const result = await handleCreateJob({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 name: 'Test Job Alpha',
                 description: 'A comprehensive test job',
                 domain: 'testing',
@@ -186,7 +186,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
         it('should create task and verify markdown file exists', async () => {
             // Single-repo workspace - no subproject parameter needed
             const result = await handleCreateTask({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 job_id: 1,
                 title: 'Validation Task 1',
                 description: 'Test task for validation',
@@ -218,7 +218,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
     describe('Tool 4: batch_create_tasks', () => {
         it('should create multiple tasks and verify files exist', async () => {
             const result = await handleBatchCreateTasks({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 job_id: 1,
                 tasks: [
                     {
@@ -257,7 +257,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
 
     describe('Tool 5: list_active_jobs', () => {
         it('should list active jobs and verify job appears', async () => {
-            const result = await handleListActiveJobs({ workspace_path: WORKSPACE_NAME });
+            const result = await handleListActiveJobs({ workspace_id: WORKSPACE_NAME });
 
             // Validate result
             const text = result.content[0].text;
@@ -272,7 +272,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
     describe('Tool 6: list_jobs_enhanced', () => {
         it('should get enhanced job details and verify task count', async () => {
             const result = await handleListJobsEnhanced({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 job_id: 1
             });
 
@@ -292,7 +292,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
         it('should move task and verify file location changed', async () => {
             // Task was created with default ProjectX/w1 structure
             const result = await handleMoveTask({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 project: 'ProjectX',
                 subproject: 'w1',
                 task_file: 'task_001_validation-task-1.md',
@@ -318,14 +318,14 @@ describe('CONDUCKS Tool Validation Tests', () => {
         it('should complete job and verify moved to archive', async () => {
             // Create a job with no tasks to test completion
             const simpleJob = await handleCreateJob({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 name: 'Simple Test Job',
                 description: 'Job with no tasks for completion testing'
             });
             const simpleJobId = simpleJob.jobs[0].id;
 
             const result = await handleCompleteJob({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 job_id: simpleJobId,
                 completion_notes: 'Validation complete'
             });
@@ -348,7 +348,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
 
     describe('Tool 9: list_completed_jobs', () => {
         it('should list completed jobs and verify job appears', async () => {
-            const result = await handleListCompletedJobs({ workspace_path: WORKSPACE_NAME });
+            const result = await handleListCompletedJobs({ workspace_id: WORKSPACE_NAME });
 
             // Validate result
             const text = result.content[0].text;
@@ -366,7 +366,7 @@ describe('CONDUCKS Tool Validation Tests', () => {
     describe('Tool 10: delete_job', () => {
         it('should delete job and verify file removed', async () => {
             const result = await handleDeleteJob({
-                workspace_path: WORKSPACE_NAME,
+                workspace_id: WORKSPACE_NAME,
                 job_id: 1,
                 confirm_deletion: true
             });
@@ -523,7 +523,7 @@ Desc: Initial description
     describe('Tool 16: architecture_audit', () => {
         it('should audit repository structure and verify output', async () => {
             const result = await handleArchitectureAudit({
-                workspace_path: WORKSPACE_NAME
+                workspace_id: WORKSPACE_NAME
             });
 
             // Validate result

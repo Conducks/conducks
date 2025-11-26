@@ -1,9 +1,10 @@
 import fs from 'fs/promises';
 import * as path from 'path';
 import { loadCONDUCKSWorkspace } from '../core/storage.js';
+import { validateWorkspaceIdentifier } from '../core/config.js';
 
 interface DeleteJobArgs {
-  workspace_path: string;
+  workspace_id: string;
   job_id: number;
   confirm_deletion: boolean;
 }
@@ -22,7 +23,10 @@ interface DeleteJobResult {
  */
 export async function handleDeleteJob(args: DeleteJobArgs): Promise<DeleteJobResult> {
   try {
-    const { workspace_path, job_id, confirm_deletion } = args;
+    // Validate workspace identifier
+    validateWorkspaceIdentifier(args.workspace_id);
+
+    const { workspace_id, job_id, confirm_deletion } = args;
 
     if (!confirm_deletion) {
       return {
@@ -31,7 +35,7 @@ export async function handleDeleteJob(args: DeleteJobArgs): Promise<DeleteJobRes
       };
     }
 
-    const storage = await loadCONDUCKSWorkspace(workspace_path);
+    const storage = await loadCONDUCKSWorkspace(workspace_id);
     const job = storage.jobs.find((j: any) => j.id === job_id);
 
     if (!job) {

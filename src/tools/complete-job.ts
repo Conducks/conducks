@@ -1,12 +1,13 @@
 import * as fs from 'fs-extra';
 import { join } from 'path';
 import { loadCONDUCKSWorkspace } from '../core/storage.js';
+import { validateWorkspaceIdentifier } from '../core/config.js';
 import { Job } from '../core/types.js';
 
 interface CompleteJobArgs {
-  workspace_path: string;
+  workspace_id: string;
   job_id: number;
-  completion_notes?: string;
+  completion_notes: string;
 }
 
 interface CompleteJobResult {
@@ -20,7 +21,10 @@ interface CompleteJobResult {
  */
 export async function handleCompleteJob(args: CompleteJobArgs): Promise<CompleteJobResult> {
   try {
-    const { workspace_path, job_id, completion_notes } = args;
+    // Validate workspace identifier
+    validateWorkspaceIdentifier(args.workspace_id);
+
+    const { workspace_id, job_id, completion_notes } = args;
     // Use environment variable or default to relative storage
     const storageRoot = process.env.CONDUCKS_STORAGE_ROOT || join(process.cwd(), 'storage');
     // Jobs are ALWAYS at storage root (global), not per-workspace
@@ -28,7 +32,7 @@ export async function handleCompleteJob(args: CompleteJobArgs): Promise<Complete
       jobsToDoDir: join(storageRoot, 'jobs/to-do'),
       jobsDoneDir: join(storageRoot, 'jobs/done-to-do')
     };
-    const storage = await loadCONDUCKSWorkspace(workspace_path);
+    const storage = await loadCONDUCKSWorkspace(workspace_id);
     const job = storage.jobs.find(j => j.id === job_id);
 
     if (!job) {
@@ -55,7 +59,7 @@ export async function handleCompleteJob(args: CompleteJobArgs): Promise<Complete
       await fs.remove(sourcePath);
     }
     const saveJobForWorkspace = await import('../core/storage.js').then(m => m.saveJobForWorkspace);
-    await saveJobForWorkspace(job, workspace_path, true);
+    await saveJobForWorkspace(job, workspace_id, true);
 
     // Add completion notes if provided
     if (completion_notes) {

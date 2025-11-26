@@ -2,9 +2,10 @@ import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import * as path from 'path';
 import { SubTask } from '../core/types.js';
+import { validateWorkspaceIdentifier } from '../core/config.js';
 
 interface CreateTaskArgs {
-  workspace_path?: string;
+  workspace_id?: string;
   job_id: number;
   title: string;
   description: string;
@@ -55,7 +56,12 @@ export function generateTaskMarkdown(task: SubTask, jobId: number, args: CreateT
 
 export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTaskResult> {
   try {
-    const workspacePath = args.workspace_path || 'docs-organization';
+    // Validate workspace identifier if provided
+    if (args.workspace_id) {
+      validateWorkspaceIdentifier(args.workspace_id);
+    }
+
+    const workspacePath = args.workspace_id || 'docs-organization';
     const storage = await import('../core/storage.js').then(m => m.loadCONDUCKSWorkspace(workspacePath));
     const job = storage.jobs.find(j => j.id === args.job_id);
     if (!job) {

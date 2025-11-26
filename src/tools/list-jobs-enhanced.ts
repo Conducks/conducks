@@ -9,17 +9,23 @@ function getInlineRules(): string {
   return `\nRULES: Group by 2+ criteria (journey/complexity/team/frequency) | Split at: 50 tasks OR 20k chars`;
 }
 
+import { validateWorkspaceIdentifier } from '../core/config.js';
+
 /**
  * Enhanced list_jobs - Shows jobs with all tasks in TOON style
  */
-export async function handleListJobsEnhanced(args?: { workspace_path: string; job_id?: number }) {
+export async function handleListJobsEnhanced(args?: { workspace_id: string; job_id?: number }) {
   try {
-    const workspace_path = args?.workspace_path || 'default';
-    const storage = await loadCONDUCKSWorkspace(workspace_path);
+    // Validate workspace identifier if provided
+    if (args?.workspace_id) {
+      validateWorkspaceIdentifier(args.workspace_id);
+    }
+    const workspace_id = args?.workspace_id || 'default';
+    const storage = await loadCONDUCKSWorkspace(workspace_id);
 
     // If job_id provided, show detailed single job view
     if (args?.job_id) {
-      return handleGetJobDetailed(workspace_path, args.job_id);
+      return handleGetJobDetailed(workspace_id, args.job_id);
     }
     // Derive active vs completed directly from job/task completion status
     const activeJobsRecords = storage.jobs.filter((j: any) => {
@@ -82,9 +88,9 @@ export async function handleListJobsEnhanced(args?: { workspace_path: string; jo
 /**
  * Get detailed job view with all tasks
  */
-async function handleGetJobDetailed(workspace_path: string, jobId: number) {
+async function handleGetJobDetailed(workspace_id: string, jobId: number) {
   try {
-    const storage = await loadCONDUCKSWorkspace(workspace_path);
+    const storage = await loadCONDUCKSWorkspace(workspace_id);
     const job = storage.jobs.find((j: any) => j.id === jobId);
     if (!job) {
       return { content: [{ type: "text", text: `JOB NOT FOUND | Job ${jobId}` }] };

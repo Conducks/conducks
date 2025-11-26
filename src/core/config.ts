@@ -14,6 +14,38 @@ const SERVER_ROOT = typeof __dirname !== 'undefined'
   : path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const DEFAULT_INTERNAL_STORAGE = path.join(SERVER_ROOT, 'storage');
 
+/**
+ * Validates workspace identifier for security and format
+ * @param identifier Workspace identifier string
+ * @returns true if valid, throws Error if invalid
+ */
+export function validateWorkspaceIdentifier(identifier: string): boolean {
+  if (!identifier || typeof identifier !== 'string') {
+    throw new Error('Workspace identifier must be a non-empty string');
+  }
+
+  if (identifier.trim() !== identifier) {
+    throw new Error('Workspace identifier must not have leading/trailing whitespace');
+  }
+
+  if (identifier.length === 0 || identifier.length > 100) {
+    throw new Error('Workspace identifier must be between 1-100 characters');
+  }
+
+  // Reject dangerous characters and path separators
+  const dangerousChars = /[\/\\$`\.\.\s]/;
+  if (dangerousChars.test(identifier)) {
+    throw new Error('Workspace identifier must not contain path separators (/ \\) or special characters ($ ` .. spaces)');
+  }
+
+  // Allow only alphanumeric, hyphens, and underscores
+  const validChars = /^[a-zA-Z0-9_-]+$/;
+  if (!validChars.test(identifier)) {
+    throw new Error('Workspace identifier must contain only letters, numbers, hyphens, and underscores');
+  }
+
+  return true;
+}
 
 function getWorkspacePaths(workspacePath: string, project: string = 'ProjectX', createPath: boolean = false) {
   // Security: validate workspace path
