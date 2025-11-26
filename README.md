@@ -54,10 +54,10 @@ conducks.initialize_project_structure({ workspace_path: "." })
 ```
 
 This creates:
-- `conducks/storage/` - Storage directory
+
+- `storage/` - Storage directory for jobs and metadata
 - `jobs/to-do/` - Active jobs
 - `jobs/done-to-do/` - Completed jobs
-- `README.md` - Project overview
 
 ### 2. Create Your First Job
 
@@ -65,33 +65,52 @@ Define a high-level objective:
 
 ```bash
 conducks.create_job({
+  workspace_path: "my-project",
   name: "Implement User Authentication",
   description: "Add secure JWT-based user login and registration",
-  priority: "high"
+  priority: "high",
+  domain: "authentication"
 })
 ```
 
-This creates Job #1 with metadata file `jobs/to-do/001_implement-user-authentication.toon`.
+This creates Job 1 with metadata file `jobs/to-do/001_implement-user-authentication.toon`.
 
 ### 3. Break Down into Tasks
 
 Add specific work items to your job:
 
 ```bash
+# Single task creation
 conducks.create_task({
+  workspace_path: "my-project",
   job_id: 1,
   title: "Setup authentication service",
   description: "Create Express middleware for JWT validation",
-  team: "backend",
-  complexity: "medium"
+  priority: "high",
+  complexity: "medium",
+  team: "backend"
 })
 
-conducks.create_task({
+# Batch task creation
+conducks.batch_create_tasks({
+  workspace_path: "my-project",
   job_id: 1,
-  title: "Design user database schema",
-  description: "Users table with credentials and roles",
-  team: "backend",
-  complexity: "simple"
+  tasks: [
+    {
+      title: "Design database schema",
+      description: "Users table with credentials and roles",
+      priority: "medium",
+      complexity: "simple",
+      team: "backend"
+    },
+    {
+      title: "Create login frontend",
+      description: "React components for user login",
+      priority: "high",
+      complexity: "medium",
+      team: "frontend"
+    }
+  ]
 })
 ```
 
@@ -101,13 +120,13 @@ Get insights into your work:
 
 ```bash
 # Overview of all active jobs
-conducks.list_active_jobs()
+conducks.list_active_jobs({ workspace_path: "my-project" })
 
-# Detailed view of specific job
-conducks.list_jobs_enhanced({ job_id: 1 })
+# Detailed view of specific job with tasks
+conducks.list_jobs_enhanced({ workspace_path: "my-project", job_id: 1 })
 
-# System-wide context and analytics
-conducks.smart_info({ context: "system" })
+# View completed jobs
+conducks.list_completed_jobs({ workspace_path: "my-project" })
 ```
 
 ### 5. Track Completion
@@ -115,16 +134,21 @@ conducks.smart_info({ context: "system" })
 Move completed tasks and finish jobs:
 
 ```bash
-# Mark task complete (moves to done-to-do folder)
+# Mark task complete (moves between folders)
 conducks.move_task({
-  project: "my-project",
+  workspace_path: "my-project",
   subproject: "w1",
-  task_file: "task_002_design-user-database-schema.md",
-  target_folder: "done-to-do"
+  task_file: "task_001_setup-authentication-service.md",
+  target_folder: "done-to-do",
+  source_folder: "to-do"
 })
 
-# Complete entire job
-conducks.complete_job({ job_id: 1 })
+# Complete entire job (moves job to done-to-do)
+conducks.complete_job({
+  workspace_path: "my-project",
+  job_id: 1,
+  completion_notes: "All authentication features implemented and tested"
+})
 ```
 
 ## 📖 How It Works
@@ -133,94 +157,66 @@ conducks.complete_job({ job_id: 1 })
 
 1. **Initialize**: Set up CONDUCKS in any development workspace
 2. **Create Jobs**: Define high-level project objectives with human-readable names
-3. **Break Down**: Add specific tasks with team assignments and complexity ratings
-4. **Track Progress**: Move tasks through folders (to-do → analysis → done-to-do)
+3. **Break Down**: Add specific tasks (single or batch) with team assignments and complexity ratings
+4. **Track Progress**: Move tasks through folders (to-do → analysis → problem-solution → done-to-do)
 5. **Complete Jobs**: Archive finished work with completion notes
 
 ### Key Concepts
 
-- **Jobs**: High-level objectives stored as `.toon` metadata files
-- **Tasks**: Specific work items stored as markdown files in project folders
-- **Subprojects**: Organized by `w1/`, `w2/`, `w3/` for parallel work streams
+- **Jobs**: High-level objectives stored as `.toon` metadata files in `storage/jobs/`
+- **Tasks**: Specific work items stored as markdown files in workspace folders
+- **Subprojects**: Organized by `ProjectX/w1/`, `ProjectX/w2/`, etc. for parallel work streams
 - **Status Tracking**: Four folders track task lifecycle (to-do, analysis, problem-solution, done-to-do)
 
 ### Example Project Structure
 
 ```
 my-project/
-├── conducks/
-│   └── storage/          # System metadata
-├── jobs/
-│   ├── to-do/           # Active jobs (#1, #2, #3...)
-│   └── done-to-do/      # Completed jobs
-├── ProjectX/
-│   ├── w1/              # Subproject 1
-│   │   ├── to-do/       # Active tasks
-│   │   ├── analysis/    # Tasks under analysis
-│   │   ├── problem-solution/ # Problem/solution docs
-│   │   └── done-to-do/  # Completed tasks
-│   └── w2/              # Subproject 2
-└── README.md           # Auto-generated project overview
+├── storage/
+│   ├── jobs/
+│   │   ├── to-do/           # Active jobs (#1, #2, #3...)
+│   │   └── done-to-do/      # Completed jobs
+│   └── ProjectX/
+│       ├── w1/              # Subproject 1
+│       │   ├── to-do/       # Active tasks
+│       │   ├── analysis/    # Tasks under analysis
+│       │   ├── problem-solution/ # Problem/solution docs
+│       │   └── done-to-do/  # Completed tasks
+│       └── w2/              # Subproject 2
+└── README.md               # Auto-generated project overview
 ```
 
 ### Available Tools
 
-CONDUCKS provides 19 MCP tools across 4 categories:
+CONDUCKS provides 16 MCP tools across 4 categories:
 
 #### Job Management (6 tools)
+
+- `initialize_project_structure` - Set up workspace
+- `create_job` - Define new objectives
 - `list_active_jobs` - Overview of current work
 - `list_completed_jobs` - Archive of finished work
 - `list_jobs_enhanced` - Detailed job inspection
-- `create_job` - Define new objectives
 - `complete_job` - Archive completed work
-- `smart_info` - Context-aware information
 
-#### Task Management (2 tools)
-- `create_task` - Add work items to jobs
-- `move_task` - Change task organization
+#### Task Management (3 tools)
+
+- `create_task` - Add single task to job
+- `batch_create_tasks` - Add multiple tasks to job
+- `move_task` - Move tasks between folders
 
 #### Domain CRUD (5 tools)
-- `edit_task` - Update task properties
-- `replace_lines` - Precise content editing
+
+- `edit_task` - Update task properties in domain files
+- `replace_lines` - Precise content editing in files
 - `rewrite_domain` - Complete file rewrites
-- `append_task` - Add new tasks
-- `remove_task` - Delete tasks
+- `append_task` - Add new tasks to domain files
+- `remove_task` - Delete tasks from domain files
 
-#### Project Structure (2 tools)
-- `initialize_project_structure` - Workspace setup
+#### Analytics & Architecture (2 tools)
+
 - `architecture_audit` - Repository structure analysis
-
-For complete documentation see [DOCS/TOOL_REFERENCE.md](../DOCS/TOOL_REFERENCE.md).
-
-## 🚀 Starting CONDUCKS
-
-CONDUCKS can be started 3 ways depending on your needs:
-
-### Method 1: Quick Start (Production)
-```bash
-cd conducks
-npm install && npm run build
-node build/index.js
-```
-**Best for:** Production use, minimal setup
-
-### Method 2: Development Mode (Auto-rebuild)
-```bash
-cd conducks
-npm install
-npm run watch
-```
-**Best for:** Development, automatically rebuilds on changes  
-**Opens on:** http://localhost:3000
-
-### Method 3: MCP Inspector (Testing)
-```bash
-cd conducks
-npm install && npm run build
-npm run inspector
-```
-**Best for:** Testing tools interactively  
-**Opens on:** http://localhost:6274 with MCP Inspector interface
+- `analytics` - Job and system analytics (via analytics module)
 
 ## 🔧 Configuration
 
@@ -228,17 +224,14 @@ npm run inspector
 
 CONDUCKS supports the following environment variables for customization:
 
-- **`CONDUCKS_WORKSPACE_ROOT`**: Base directory for resolving workspace paths (default: `process.cwd()`)
+- **`CONDUCKS_WORKSPACE_ROOT`**: Base directory for resolving workspace paths (default: current directory)
+
   - Use this when your MCP server runs from a different directory than your workspaces
   - Example: `export CONDUCKS_WORKSPACE_ROOT=/Users/you/projects`
-  
+
 - **`CONDUCKS_STORAGE_ROOT`**: Custom storage location (default: `./storage`)
   - Override the default storage directory location
   - Example: `export CONDUCKS_STORAGE_ROOT=/var/conducks/storage`
-
-- **`CONDUCKS_DASHBOARD_PORT`**: Dashboard server port (default: `2812`)
-  - Change the port for the web dashboard
-  - Example: `export CONDUCKS_DASHBOARD_PORT=3000`
 
 ### Setting Environment Variables
 
@@ -246,30 +239,27 @@ CONDUCKS supports the following environment variables for customization:
 
 ```json
 {
-  "mcpServers": {
-    "conducks": {
-      "command": "node",
-      "args": ["/path/to/conducks/build/index.js"],
-      "env": {
-        "CONDUCKS_WORKSPACE_ROOT": "/Users/you/projects",
-        "CONDUCKS_STORAGE_ROOT": "/Users/you/.conducks/storage"
-      }
-    }
-  }
+	"mcpServers": {
+		"conducks": {
+			"command": "node",
+			"args": ["/path/to/conducks/build/index.js"],
+			"env": {
+				"CONDUCKS_WORKSPACE_ROOT": "/Users/you/projects",
+				"CONDUCKS_STORAGE_ROOT": "/Users/you/.conducks/storage"
+			}
+		}
+	}
 }
 ```
 
-**For Command Line:**
+## Installation & Setup
 
-```bash
-export CONDUCKS_WORKSPACE_ROOT=/Users/you/projects
-export CONDUCKS_STORAGE_ROOT=/Users/you/.conducks/storage
-node build/index.js
-```
+### Prerequisites
 
-## Installation
+- Node.js 18+
+- npm
 
-To use with Claude Desktop, add the server config:
+### For Claude Desktop
 
 On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
@@ -284,12 +274,97 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 }
 ```
 
+### Development Setup
+
+```bash
+git clone https://github.com/your-repo/conducks
+cd conducks
+npm install
+npm run build
+npm test  # Run comprehensive test suite
+```
+
 ### Debugging
 
-Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which is available as a package script:
+Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
 
 ```bash
 npm run inspector
 ```
 
 The Inspector will provide a URL to access debugging tools in your browser.
+
+## 🏗️ Architecture
+
+### Core Architecture
+
+CONDUCKS follows a modular architecture optimized for AI agent interactions:
+
+```
+conducks/
+├── src/
+│   ├── index.ts          # MCP Server & Tool Registry
+│   ├── core/
+│   │   ├── storage.ts    # TOON file read/write operations
+│   │   ├── logic.ts      # Job/task generation logic
+│   │   ├── types.ts      # Type definitions
+│   │   └── config.ts     # System configuration
+│   ├── tools/            # MCP Tool Implementations (16 tools)
+│   │   ├── create-job.ts
+│   │   ├── create-task.ts
+│   │   ├── batch-create-tasks.ts
+│   │   ├── move-task.ts
+│   │   ├── complete-job.ts
+│   │   ├── list-active-jobs.ts
+│   │   ├── list-completed-jobs.ts
+│   │   ├── list-jobs-enhanced.ts
+│   │   ├── domain-crud.ts      # CRUD operations
+│   │   ├── initialize-project-structure.ts
+│   │   ├── architecture-audit.ts
+│   │   ├── analytics/
+│   │   │   ├── job-analytics.ts
+│   │   │   └── system-analytics.ts
+│   │   └── index.ts
+│   ├── features/         # Advanced Features
+│   │   ├── architect/    # Human-AI collaboration
+│   │   └── docs-watcher/ # File monitoring
+│   ├── shared/           # Shared utilities
+│   │   └── analytics-utils.ts
+│   └── dashboard/        # Web dashboard
+├── storage/              # Default storage location
+└── test/                 # Comprehensive test suite
+```
+
+### Key Design Principles
+
+- **Token Efficiency**: Plain text responses instead of markdown (80% token reduction)
+- **Modular Tools**: Each tool is a separate module for easy maintenance
+- **Workspace Isolation**: Each workspace maintains its own storage
+- **TOON Storage**: Efficient serialization format for metadata
+- **Human-Readable IDs**: Numeric job/task IDs for easy reference
+
+### Storage Format
+
+Jobs are stored as TOON files in the workspace storage directory:
+
+```json
+{
+	"id": 1,
+	"title": "Implement User Authentication",
+	"description": "Add secure JWT-based user login",
+	"domain": "authentication",
+	"priority": "high",
+	"created": "2025-01-15T10:30:00Z",
+	"tasks": [
+		{
+			"id": "001",
+			"title": "Setup auth service",
+			"status": "active",
+			"priority": "high",
+			"team": "backend"
+		}
+	]
+}
+```
+
+Tasks are stored as markdown files with full context and metadata.

@@ -8,14 +8,14 @@ CONDUCKS Modular Architecture - Visual Structure
                     |         |         |
                   core/    features/  tools/
                     |         |         |
-        ┌───────────┼────┐    |    ┌────┼────────────┐
-        |           |    |    |    |    |            |
-     types.ts   logic config  |   Tool Tool       analytics/
-     storage.ts  .ts   .ts    |   Modules...    ┌────┼────┐
-                              |                  |         |
-                    ┌─────────┼────┐        job-      system-
-                    |              |      analytics analytics
-              architect/    docs-watcher/   .ts        .ts
+        ┌───────────┼────┐    |    ┌────┼─────────────────────┐
+        |           |    |    |    |    |                     |
+     types.ts   logic config  |   Tool Tool           analytics/
+     storage.ts  .ts   .ts    |   Modules...     ┌─────┼─────┐
+                                  |               |     |     |
+                    ┌─────────┼────┐        job-    system-
+                    |              |    analytics analytics
+              architect/    docs-watcher/   .ts     .ts
               ┌──────┼────┐       |
               |           |       |
          logic.ts   state.ts  watcher.ts
@@ -37,95 +37,124 @@ AFTER (Plain Text TOON):
 Agent Request → Tool Handler → Plain Text Generator → Response
                                       ↓
                               CONDUCKS Tools
-                              
-                              1. Tool 1 - Description
+
+                              1. Tool Name - Description
                               ↓
                          20-40 tokens consumed
-                         
+
                     80% TOKEN REDUCTION ACHIEVED
 
 
-Module Dependency Graph:
-========================
-
-index.ts
-  ├─→ tools/process-docs.ts
-  │     └─→ core/storage.ts
-  │     └─→ core/logic.ts
-  │
-  ├─→ tools/get-job-tasks.ts
-  │     └─→ core/storage.ts
-  │
-  ├─→ tools/update-task-status.ts
-  │     └─→ core/storage.ts
-  │
-  ├─→ tools/list-jobs.ts
-  │     └─→ core/storage.ts
-  │
-  ├─→ tools/conducks-info.ts
-  │     └─→ core/storage.ts
-  │
-  └─→ tools/get-job-analytics.ts
-        ├─→ shared/analytics-utils.ts
-        ├─→ tools/analytics/job-analytics.ts
-        └─→ tools/analytics/system-analytics.ts
-
-features/ (Optional Advanced Features)
-  ├─→ architect/
-  │     ├─→ core/types.ts
-  │     └─→ core/config.ts
-  │
-  └─→ docs-watcher/
-        ├─→ core/types.ts
-        ├─→ core/config.ts
-        └─→ core/storage.ts
-
-
-Core Module (Minimal Essential)
+Updated Module Dependency Graph:
 ================================
-types.ts      → Type definitions (Job, Task, Storage)
-storage.ts    → TOON database read/write operations
-logic.ts      → Task generation, domain detection
-config.ts     → System configuration constants
+
+index.ts (MCP Server Entry Point)
+  ├─→ tools/index.ts (Tool Registry)
+  │     └─→ All individual tools
+  ├─→ core/storage.ts (TOON database operations)
+  ├─→ core/types.ts (Type definitions)
+  ├─→ core/config.ts (System configuration)
+  └─→ core/logic.ts (Business logic)
+
+tools/ Module (16 MCP Tools)
+====================================
+├── initialize-project-structure.ts
+│     └─→ core/config.ts, core/storage.ts
+├── create-job.ts
+│     └─→ core/storage.ts, core/logic.ts
+├── create-task.ts
+│     └─→ core/storage.ts, core/config.ts
+├── batch-create-tasks.ts
+│     └─→ core/storage.ts, core/config.ts
+├── move-task.ts
+│     └─→ core/storage.ts, core/config.ts
+├── complete-job.ts
+│     └─→ core/storage.ts, core/logic.ts
+├── list-active-jobs.ts
+│     └─→ core/storage.ts
+├── list-completed-jobs.ts
+│     └─→ core/storage.ts
+├── list-jobs-enhanced.ts
+│     └─→ core/storage.ts
+├── domain-crud.ts (5 tools: edit_task, replace_lines, etc.)
+│     └─→ core/config.ts
+├── architecture-audit.ts
+│     └─→ core/storage.ts
+├── analytics/
+│   ├── index.ts
+│   ├── job-analytics.ts
+│   │     └─→ shared/analytics-utils.ts
+│   └── system-analytics.ts
+│         └─→ shared/analytics-utils.ts
+└── index.ts (Tool exports)
+
+features/ Module (Advanced Features)
+=========================================
+├── architect/
+│   ├── architect-logic.ts
+│   │     ├─→ core/types.ts
+│   │     └─→ core/config.ts
+│   └── architect-state.ts
+│         ├─→ core/types.ts
+│         └─→ core/config.ts
+└── docs-watcher/
+    └── docs-watcher.ts
+          ├─→ core/types.ts
+          └─→ core/storage.ts
+
+shared/ Module (Utilities)
+==========================
+└── analytics-utils.ts
+    (Used by analytics/ tools)
+
+dashboard/ Module (Web Interface)
+=================================
+├── server.ts (Express server)
+├── public/ (Static assets)
+│   ├── index.html
+│   ├── app.js
+│   ├── global.css
+│   └── icons.js
+└── logger.ts (Dashboard logging)
 
 
-Shared Module (Reusable Utilities)
-===================================
-analytics-utils.ts → Analytics calculation functions
-                     Used by both job and system analytics
+Core Module (Essential Components)
+======================================
+types.ts      → Job, Task, Storage interfaces + enums
+storage.ts    → TOON file read/write, job loading/saving
+logic.ts      → Job generation, task logic, domain detection
+config.ts     → Workspace paths, environment config, constants
 
+config.ts functions:
+  - getWorkspacePaths() → Resolves paths for workspace/project
+  - Environment variable handling
+  - Path security validation
+  - Storage root configuration
 
-Features Module (Advanced Capabilities)
-========================================
-architect/           → Human-AI collaboration mode
-  ├─ architect-logic.ts    → Question generation
-  └─ architect-state.ts    → Workflow state management
+storage.ts key operations:
+  - loadCONDUCKSWorkspace() → Load entire workspace
+  - saveJobForWorkspace() → Save job with backup to done-to-do
+  -scanWorkspaceForJobs() → Legacy function (minimally used)
+  - TOON format serialization/deserialization
 
-docs-watcher/        → File system monitoring
-  └─ docs-watcher.ts       → Real-time doc updates
+logic.ts key operations:
+  - Generate job IDs (sequential numbering)
+  - Task ID generation within jobs
+  - Job status calculations
+  - Complexity analysis
 
-
-Tools Module (MCP Tool Implementations)
-========================================
-process-docs.ts       → Create jobs from descriptions
-get-job-tasks.ts      → Retrieve task details
-update-task-status.ts → Modify task states
-list-jobs.ts          → Job overview listing
-conducks-info.ts       → Self-documenting system info
-get-job-analytics.ts  → Analytics orchestrator
-
-analytics/            → Specialized analytics sub-branch
-  ├─ job-analytics.ts    → Single job metrics
-  └─ system-analytics.ts → Cross-job metrics
-
-
-Architecture Benefits:
-======================
-✓ Clean separation of concerns
-✓ Easy to add new tools (just create new file in tools/)
-✓ Easy to add new features (create new folder in features/)
+Advanced Architecture Benefits:
+================================
+✓ 16 modular tools for easy maintenance and testing
+✓ Workspace isolation for multi-project support
+✓ Plain text responses for token efficiency
+✓ TOON storage for human-readable metadata
+✓ Type-safe interfaces throughout
+✓ Environment-based configuration
+✓ Feature modularity (architect, docs-watcher)
 ✓ Shared utilities prevent code duplication
-✓ Core stays minimal and stable
-✓ Tree structure makes navigation intuitive
-✓ Import paths clearly show dependencies
-✓ 80% token reduction for all LLM interactions
+✓ Comprehensive test coverage
+✓ Domain CRUD operations for advanced editing
+✓ Analytics integration for insights
+✓ Dashboard for web interface
+✓ 80% LLM token reduction achieved
