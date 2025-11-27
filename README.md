@@ -2,11 +2,21 @@
 
 # CONDUCKS MCP Server
 
-**Intelligent Job & Task Management System**
+**Flexible Dual-Mode Project & Task Management System**
 
-_Hierarchical Jobs→Tasks system with numbered IDs for easy human reference_
+_Hierarchical Jobs→Tasks with adaptive Single-Project & Multi-Project architectures_
 
-CONDUCKS transforms development workspaces into structured, hierarchical project management systems. Create Jobs (high-level objectives), break them into Tasks (specific work items), and track progress across teams and domains. Built for AI agents and human developers working together.
+CONDUCKS transforms development workspaces into intelligent project management systems that adapt to your organizational needs. Support both **simple single-project workflows** and **complex multi-team architectures** with dynamic subproject detection. Built for the full spectrum of development scenarios - from solo developers to enterprise teams.
+
+**✨ Key Differentiators:**
+- 🏗️ **Adaptive Architecture**: Automatic detection of single vs multi-project structures
+- 📄 **Living Documentation**: Tasks grow from TODOs to comprehensive project artifacts
+- 🔄 **Evolutionary Updates**: Append, edit, or completely rewrite task content as work progresses
+- 📁 **Smart Path Resolution**: Prevents double-directory issues and maintains clean organization
+- 🎯 **Flexible Task Creation**: Optional subprojects for simple projects, enforced for complex ones
+
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/conducks/conducks)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ## 🌟 Features
 
@@ -39,25 +49,204 @@ CONDUCKS transforms development workspaces into structured, hierarchical project
 - **Cross-References**: Automatic tracking of service relationships and dependencies
 - **Backup & Recovery**: Built-in versioning and data integrity checks
 
+## 🏗️ **Dual-Mode Architecture Support**
+
+CONDUCKS intelligently adapts between **Single-Project** and **Multi-Project** architectures based on your needs:
+
+### 📦 **Single-Project Mode**
+For simple projects, monoliths, or individual developers:
+
+**Structure:**
+```
+my-simple-app/
+├── storage/
+│   ├── jobs/to-do/        # Active job metadata
+│   └── to-do/             # Tasks directly in workspace root
+│       ├── analysis/      # Task analysis docs
+│       └── done-to-do/    # Completed tasks
+src/
+package.json
+```
+
+**Task Creation:**
+```typescript
+// No subproject needed - tasks go directly in workspace
+conducks.create_task({
+  workspace_path: "my-simple-app",
+  job_id: 1,
+  title: "Setup database connection",
+  // subproject: undefined (optional)
+})
+```
+
+### 🏢 **Multi-Project Mode**
+For complex applications with multiple components/teams:
+
+**Structure:**
+```
+enterprise-system/
+├── storage/
+│   ├── jobs/to-do/        # Active job metadata
+│   └── my-enterprise/     # Named workspace
+│       ├── frontend/      # Subproject 1
+│       │   ├── to-do/     # FE tasks
+│       │   └── done-to-do/
+│       ├── backend/       # Subproject 2
+│       │   ├── to-do/     # BE tasks
+│       │   └── analysis/
+│       └── mobile/        # Subproject 3
+src/frontend/
+src/backend/
+```
+
+**Task Creation:**
+```typescript
+// Explicit subproject for component isolation
+conducks.create_task({
+  workspace_path: "enterprise-system",
+  job_id: 1,
+  title: "Implement API endpoints",
+  subproject: "backend"  // Required for multi-project
+})
+```
+
+### 🎯 **Automatic Mode Detection**
+
+- **With subproject**: Creates `workspace/subproject/to-do/` structure
+- **Without subproject**: Creates `workspace/to-do/` flat structure
+- **Mixed usage**: Both modes coexist in the same system
+- **Path safety**: Prevents double-directory conflicts automatically
+
 ## 🚀 Quick Start
 
-### 1. Setup CONDUCKS for Your Project
-
-Initialize CONDUCKS in your development workspace:
+### For Simple Projects (Single-Project Mode)
 
 ```bash
-# Navigate to any project directory
-cd my-project
+cd my-simple-app
+conducks.initialize_project_structure({ workspace_path: "my-simple-app" })
 
-# Initialize CONDUCKS structure
-conducks.initialize_project_structure({ workspace_path: "." })
+conducks.create_job({
+  workspace_path: "my-simple-app",
+  name: "Build MVP Features",
+  description: "Core functionality for product launch"
+})
+
+# Tasks created directly in workspace root
+conducks.create_task({
+  workspace_path: "my-simple-app",
+  job_id: 1,
+  title: "Implement user registration",
+  description: "Basic signup flow"
+})
 ```
+
+### For Complex Applications (Multi-Project Mode)
+
+```bash
+cd enterprise-system
+conducks.initialize_project_structure({ workspace_path: "enterprise-system" })
+
+conducks.batch_create_tasks({
+  workspace_path: "enterprise-system",
+  job_id: 1,
+  tasks: [
+    {
+      title: "Setup React components",
+      subproject: "frontend"
+    },
+    {
+      title: "Design API schema",
+      subproject: "backend"
+    },
+    {
+      title: "Create mobile wireframes",
+      subproject: "mobile"
+    }
+  ]
+})
+```
+
+### Advanced Task Documentation
+
+CONDUCKS supports rich, evolving task documentation:
+
+```typescript
+// Complete task rewrite with comprehensive details
+conducks.rewrite_domain({
+  project: "enterprise-system",
+  subproject: "backend",
+  folder: "to-do",
+  domain_file: "task_001_design-api-schema.md",
+  new_content: `# Task 001: Design API Schema (UPDATED)
+
+**Job Reference:** 1
+**Status:** active
+**Priority:** high
+
+## CURRENT IMPLEMENTATION
+- REST API using Express.js
+- OpenAPI 3.0 specification
+- JWT authentication middleware
+
+## ENDPOINTS DESIGN
+### Authentication
+- POST /auth/login
+- POST /auth/register
+- POST /auth/refresh
+
+### Resources
+- GET/POST/PUT/DELETE /users
+- GET/POST/PUT/DELETE /projects
+
+## DATABASE SCHEMA
+\`\`\`sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE,
+  password_hash VARCHAR(255),
+  created_at TIMESTAMP
+);
+\`\`\`
+
+## NOTES
+Ready for implementation phase.`
+})
+
+// Append additional findings
+conducks.append_task({
+  project: "enterprise-system",
+  subproject: "backend",
+  domain_file: "task_001_design-api-schema.md",
+  task_content: "\n## ADDITIONAL CONSIDERATIONS\n\n### Performance Requirements\n- Response time < 200ms\n- Support 10k concurrent users\n\n### Security Measures\n- Rate limiting: 100 req/min\n- Input validation with Joi\n- SQL injection prevention\n\n**Risk Assessment:** Low - Standard implementation patterns."
+})
+```
+
+### File Size & Performance
+
+- **Task files**: Up to 10MB supported
+- **Concurrent operations**: Optimized for team collaboration
+- **Search performance**: Full-text searchable across all task content
+- **Version control friendly**: Works seamlessly with Git workflows
 
 This creates:
 
-- `storage/` - Storage directory for jobs and metadata
-- `jobs/to-do/` - Active jobs
+- `storage/` - Storage directory for jobs and metadata (single or multi-project)
+- `jobs/to-do/` - Active jobs for both modes
 - `jobs/done-to-do/` - Completed jobs
+
+### 2. Flexible Job Creation
+
+Create jobs that work with any project structure:
+
+```bash
+conducks.create_job({
+  workspace_path: "my-workspace",  # Single or multi-project
+  name: "Implement User Authentication",
+  description: "JWT-based secure login system",
+  priority: "high",
+  domain: "security"
+})
+```
 
 ### 2. Create Your First Job
 
