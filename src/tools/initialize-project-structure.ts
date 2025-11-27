@@ -52,31 +52,8 @@ function detectProjectStructure(startPath: string): ProjectStructure {
   const gitRoot = findGitRoot(startPath);
   const rootHasGit = gitRoot !== null;
 
-  // Resolve multi-repo root: ascend while parent has >=2 child git directories
-  let current = startPath;
-  const maxAscend = 3; // safety cap
-  for (let i = 0; i < maxAscend; i++) {
-    const parent = join(current, '..');
-    const parentResolved = resolve(current, '..');
-    if (parentResolved === current) break; // reached filesystem root
-    let childGitDirs: string[] = [];
-    try {
-      const entries = readdirSync(parentResolved);
-      for (const e of entries) {
-        const full = join(parentResolved, e);
-        try {
-          const st = statSync(full);
-          if (st.isDirectory() && existsSync(join(full, '.git'))) {
-            childGitDirs.push(e);
-          }
-        } catch { /* ignore */ }
-      }
-    } catch { /* cannot read parent */ }
-    if (childGitDirs.length >= 2) {
-      current = parentResolved;
-      break; // parent is multi-repo root
-    }
-  }
+  // Do not ascend to parent - stay within the provided workspace path
+  let current = resolve(startPath);
 
   const projectName = basename(current);
   const subprojects: string[] = [];
@@ -114,7 +91,8 @@ function detectProjectStructure(startPath: string): ProjectStructure {
 
   if (rootHasGit && nestedGitDirs.length === 0) {
     // Single project
-    subprojects.push(projectName);
+    // Single project - subprojects list remains empty to indicate root-level tasks
+    // subprojects.push(projectName); // REMOVED: Do not force subproject for single repo
   } else if (nestedGitDirs.length > 0) {
     // Multi project based on nested git repos
     subprojects.push(...nestedGitDirs);
@@ -143,7 +121,9 @@ function detectProjectStructure(startPath: string): ProjectStructure {
     } catch (e) {
       console.error(`Fallback heuristic failed: ${e}`);
     }
-    if (subprojects.length === 0) {
+    if (subprojects.length === 0 && !rootHasGit) {
+      // Only push project name if it's NOT a git root (heuristic fallback)
+      // If it IS a git root, we want empty subprojects to signal single-repo mode
       subprojects.push(projectName);
     }
   }
@@ -359,8 +339,30 @@ export async function handleInitializeProjectStructure(args: {
       createdFolders.push('jobs/done-to-do');
     }
 
-    // NOTE: No per-project to-do/done-to-do folders in new model.
-    // Tasks will reside under jobs/job_<id>/tasks/ as individual markdown files.
+    // NOTE: Create folder structure for each detected subproject
+    // For each subproject, create: to-do, done-to-do, analysis, problem-solution folders
+    const folders = ['to-do', 'done-to-do', 'analysis', 'problem-solution'];
+
+    if (structure.subprojects.length === 0) {
+      // Single repo mode: create folders directly in project root
+      for (const folder of folders) {
+        const folderPath = join(projectPath, folder);
+        if (!existsSync(folderPath)) {
+          mkdirSync(folderPath, { recursive: true });
+          createdFolders.push(folder);
+        }
+      }
+    } else {
+      for (const subproject of structure.subprojects) {
+        for (const folder of folders) {
+          const subprojectFolderPath = join(projectPath, subproject, folder);
+          if (!existsSync(subprojectFolderPath)) {
+            mkdirSync(subprojectFolderPath, { recursive: true });
+            createdFolders.push(`${subproject}/${folder}`);
+          }
+        }
+      }
+    }
 
     return {
       success: true,
@@ -394,94 +396,95 @@ export async function handleInitializeProjectStructure(args: {
  */
 export function formatInitResult(result: InitResult): string {
   if (!result.success) {
-    return `INIT FAILED | ${result.errors?.join(' | ')}`;
+    return `init_failed: "${result.errors?.join(' | ')}"`;
   }
 
   // If already initialized, show current status
   if (result.alreadyInitialized && result.systemStatus) {
-    const rules = generateInlineRules();
-    const rootHasGit = result.projectStructure.rootHasGit;
-    let detectionMode: string;
-    if (rootHasGit && result.projectStructure.subprojects.length === 1 && result.projectStructure.subprojects[0] === result.projectStructure.projectName) {
-      detectionMode = 'single-project (root .git)';
-    } else if (rootHasGit && result.projectStructure.subprojects.length > 1) {
-      detectionMode = 'multi-project (nested .git repos)';
-    } else if (!rootHasGit && result.projectStructure.subprojects.length > 1) {
-      detectionMode = 'multi-project (no root .git, nested repos)';
+    const isSingleRepo = result.projectStructure.rootHasGit && result.projectStructure.subprojects.length === 1 && result.projectStructure.subprojects[0] === result.projectStructure.projectName;
+    const isMultiService = !result.projectStructure.rootHasGit && result.projectStructure.nestedGitDirs.length > 0;
+
+    let output = `system_status:\n`;
+    output += `  project: "${result.projectStructure.projectName}"\n`;
+    output += `  subprojects[${result.projectStructure.subprojects.length}]: ${result.projectStructure.subprojects.join(', ')}\n`;
+    output += `  jobs_active: ${result.systemStatus.activeJobs}\n`;
+    output += `  jobs_completed: ${result.systemStatus.completedJobs}\n`;
+    output += `  initialized: true\n`;
+    output += `  workspace_type: ${isSingleRepo ? 'single_repo' : isMultiService ? 'multi_service' : 'heuristic'}\n`;
+    output += `next_steps:\n`;
+
+    if (isSingleRepo) {
+      output += `  workflow_guide: "Before creating jobs, ask user about goals, objectives, and tasks"\n`;
+      output += `  create_job: "Create job AFTER gathering user requirements"\n`;
+      output += `  create_task: "Create task in workspace (no subproject parameter)"`;
+    } else if (isMultiService) {
+      const subs = result.projectStructure.subprojects.join(', ');
+      output += `  detected_subprojects: "${subs}"\n`;
+      output += `  workflow_guide: "Before creating jobs, ask user about goals, objectives, and tasks"\n`;
+      output += `  create_job: "Create job AFTER gathering user requirements"\n`;
+      output += `  create_task: "Create task with subproject: ${subs}"`;
     } else {
-      detectionMode = 'heuristic (no .git)';
+      output += `  workflow_guide: "Before creating jobs, ask user about goals, objectives, and tasks"\n`;
+      output += `  create_job: "Create job AFTER gathering user requirements"`;
     }
 
-    let output = `CONDUCKS SYSTEM STATUS\n\n`;
-    output += `Root: ${basename(result.projectStructure.projectRoot)} | Mode: ${detectionMode}\n`;
-    output += `Project: ${result.projectStructure.projectName} | Subprojects: ${result.projectStructure.subprojects.join(', ')}\n\n`;
-    output += `CURRENT STATE\n`;
-    output += `Active Jobs: ${result.systemStatus.activeJobs}\n`;
-    output += `Completed Jobs: ${result.systemStatus.completedJobs}\n\n`;
-    output += `TOOLS\n`;
-    output += `create_job: Create new job\n`;
-    output += `create_task: Add task to job\n`;
-    output += `list_active_jobs: View active jobs\n`;
-    output += `list_completed_jobs: View completed jobs\n`;
-    output += `complete_job: Mark job as done\n\n`;
-    output += `WORKFLOW\n`;
-    output += `1. create_job\n`;
-    output += `2. create_task (repeat)\n`;
-    output += `3. complete_job when all tasks done\n\n`;
-    output += `ORGANIZATION RULES\n`;
-    output += `${rules}`;
+    output += `\nagent_instructions:\n`;
+    output += `  - "ASK user about job goals before calling create_job"\n`;
+    output += `  - "ASK user about tasks before calling batch_create_tasks"\n`;
+    output += `  - "OFFER to analyze codebase after creating tasks"`;
+
     return output;
   }
 
-  const rules = generateInlineRules();
-  // Determine detection mode
-  const rootHasGit = result.projectStructure.rootHasGit;
-  let detectionMode: string;
-  if (rootHasGit && result.projectStructure.subprojects.length === 1 && result.projectStructure.subprojects[0] === result.projectStructure.projectName) {
-    detectionMode = 'single-project (root .git)';
-  } else if (rootHasGit && result.projectStructure.subprojects.length > 1) {
-    detectionMode = 'multi-project (nested .git repos)';
-  } else if (!rootHasGit && result.projectStructure.subprojects.length > 1) {
-    detectionMode = 'multi-project (no root .git, nested repos)';
+  const isSingleRepo = result.projectStructure.rootHasGit && result.projectStructure.subprojects.length === 0;
+  const isMultiService = !result.projectStructure.rootHasGit && result.projectStructure.nestedGitDirs.length > 0;
+
+  let output = `structure_initialized:\n`;
+  output += `  project: "${result.projectStructure.projectName}"\n`;
+  output += `  subprojects[${result.projectStructure.subprojects.length}]: ${result.projectStructure.subprojects.join(', ')}\n`;
+  output += `  workspace_type: ${isSingleRepo ? 'single_repo' : isMultiService ? 'multi_service' : 'heuristic'}\n`;
+
+  if (result.createdFolders.length > 0) {
+    output += `  folders_created[${result.createdFolders.length}]:\n`;
+    for (const folder of result.createdFolders) {
+      output += `    - ${folder}\n`;
+    }
+  }
+
+  // Provide workflow guidance based on structure
+  output += `workflow_guide:\n`;
+
+  if (isSingleRepo) {
+    output += `  "Single repository workspace - tasks created directly in workspace"\n`;
+    output += `  "Before creating jobs, ask user about goals, objectives, and tasks"\n`;
+    output += `  create_job: "Create job AFTER gathering user requirements"\n`;
+    output += `  create_task: "Create task (no subproject needed)"`;
+  } else if (isMultiService) {
+    const allSubs = result.projectStructure.subprojects.join(', ');
+    output += `  "Multi-service workspace - tasks created in subprojects"\n`;
+    output += `  detected_subprojects: "${allSubs}"\n`;
+    output += `  "Before creating jobs, ask user about goals, objectives, and tasks"\n`;
+    output += `  create_job: "Create job AFTER gathering user requirements"\n`;
+    output += `  create_task: "Create task with subproject: ${allSubs}"`;
   } else {
-    detectionMode = 'heuristic (no .git)';
+    output += `  "Standard workspace structure detected"\n`;
+    output += `  "Before creating jobs, ask user about goals, objectives, and tasks"\n`;
+    output += `  create_job: "Create job AFTER gathering user requirements"`;
   }
 
-  let output = `PROJECT INITIALIZED\n\n`;
-  output += `Root: ${basename(result.projectStructure.projectRoot)} | Mode: ${detectionMode}\n`;
-  output += `Project: ${result.projectStructure.projectName} | Subprojects: ${result.projectStructure.subprojects.join(', ')}\n\n`;
+  output += `\nagent_instructions:\n`;
+  output += `  - "ASK user about job goals before calling create_job"\n`;
+  output += `  - "ASK user about tasks before calling batch_create_tasks"\n`;
+  output += `  - "OFFER to analyze codebase after creating tasks"`;
 
-  // Architecture warnings & suggestions
+  // Add warnings if any
   const nestedGit = result.projectStructure.nestedGitDirs;
+  const rootHasGit = result.projectStructure.rootHasGit;
   if (rootHasGit && nestedGit.length > 0) {
-    output += `ARCHITECTURE WARNING\n`;
-    output += `Nested repositories detected inside a git root: ${nestedGit.join(', ')}\n`;
-    output += `This pattern increases fragmentation, duplicate tooling, and hidden coupling.\n`;
-    output += `REMEDIATION OPTIONS:\n`;
-    output += `1. Monorepo: Convert nested repos to packages/workspaces (npm/yarn/pnpm or language-specific tooling).\n`;
-    output += `2. Submodules (if intentional): Document purpose; otherwise remove stray .git directories.\n`;
-    output += `3. Merge Histories: Use 'git remote add' + 'git subtree add' or 'filter-repo' to consolidate history.\n`;
-    output += `4. Boundary Docs: Create architecture.md describing bounded contexts to prevent accidental bleed.\n`;
-    output += `ACTION SUGGESTION: Begin by auditing build configs & dependency overlap across nested repos.\n\n`;
+    output += `\n  warning: "nested_git_repos_detected - consider monorepo or formal multi-repo structure"`;
   } else if (!rootHasGit && nestedGit.length > 0) {
-    output += `ARCHITECTURE WARNING\n`;
-    output += `Workspace has no root VCS but inner git repositories: ${nestedGit.join(', ')}\n`;
-    output += `Risk: No unified versioning, fragmented change tracking, harder CI/CD.\n`;
-    output += `REMEDIATION OPTIONS:\n`;
-    output += `1. Initialize root git and treat nested repos as modules (remove inner .git).\n`;
-    output += `2. Or formalize as multi-repo; move each to separate top-level clone and use tooling (e.g. nx, turborepo, polyrepo orchestration).\n`;
-    output += `3. Establish a root CONTRIBUTING.md and CODEOWNERS to clarify boundaries.\n\n`;
+    output += `\n  info: "multi_repo_workspace - use subproject parameter for task creation"`;
   }
-
-  output += `CREATED (${result.createdFolders.length} folders)\n`;
-  for (const folder of result.createdFolders) {
-    output += `${folder}\n`;
-  }
-
-  output += `\nORGANIZATION RULES\n`;
-  output += `${rules}\n\n`;
-
-  output += `NEXT: create_job (optionally with tasks) → create_task (append single) or batch_create_tasks (append multiple) → complete_job when all tasks done`;
 
   return output;
 }

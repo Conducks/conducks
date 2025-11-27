@@ -47,8 +47,23 @@ export async function handleBatchCreateTasks(args: BatchCreateTasksArgs): Promis
     const existingIds = job.tasks.map(t => parseInt(t.id, 10)).filter(n => !isNaN(n));
     let nextId = existingIds.length === 0 ? 1 : Math.max(...existingIds) + 1;
 
-    const subproject = args.subproject || 'w1';
-    const project = 'ProjectX'; // TODO: get from args or job
+    // Support both single-project and multi-project modes
+    let subproject: string | undefined = args.subproject;
+
+    // Extract subproject from first task if not specified at top level
+    if (!subproject && args.tasks.length > 0) {
+      const firstTaskSubproject = (args.tasks[0] as any).subproject;
+      if (firstTaskSubproject) {
+        subproject = firstTaskSubproject;
+        // Remove subproject from individual tasks for clean processing
+        args.tasks.forEach(task => {
+          if ((task as any).subproject) delete (task as any).subproject;
+        });
+      }
+    }
+
+    // For single-project mode, subproject is optional (defaults to workspace root)
+    const project = ''; // No hardcoded project - use workspace root
 
     // Import getWorkspacePaths and handleCreateTask
     const { getWorkspacePaths } = await import('../core/config.js');
@@ -78,9 +93,18 @@ export async function handleBatchCreateTasks(args: BatchCreateTasksArgs): Promis
       job.tasks.push(task);
       job.lastUpdated = new Date().toISOString();
 
-      // Create markdown file
+      // Create markdown file - support both single and multi-project modes
       const folder = taskData.folder || 'to-do';
-      const todoDir = paths.getSubprojectDir(subproject, folder);
+      let todoDir: string;
+
+      if (subproject) {
+        // Multi-project mode: use subproject directory
+        const actualSubprojectPath = (subproject === workspacePath) ? '' : subproject;
+        todoDir = paths.getSubprojectDir(actualSubprojectPath, folder);
+      } else {
+        // Single-project mode: put tasks directly in workspace root
+        todoDir = join(paths.tasksRoot, folder);
+      }
 
       if (!existsSync(todoDir)) {
         mkdirSync(todoDir, { recursive: true });
@@ -97,10 +121,12 @@ export async function handleBatchCreateTasks(args: BatchCreateTasksArgs): Promis
       } as any); // TODO: proper interface
       writeFileSync(filePath, markdown, 'utf-8');
 
+      // Prevent double-directory issue when subproject name matches workspace name
+      const actualSubprojectPath = (subproject === workspacePath) ? '' : subproject;
       createdTasks.push({
         id: taskIdStr,
         title: taskData.title,
-        filePath: `storage/${workspacePath}/${project}/${subproject}/${folder}/${fileName}`
+        filePath: `storage/${workspacePath}/${actualSubprojectPath ? actualSubprojectPath + '/' : ''}${folder}/${fileName}`
       });
 
       nextId++;
@@ -121,6 +147,15 @@ export async function handleBatchCreateTasks(args: BatchCreateTasksArgs): Promis
 }
 
 export function formatBatchCreateTasksResult(result: BatchCreateTasksResult): string {
-  if (!result.success) return `BATCH TASK CREATION FAILED\n\n${result.message}`;
-  return `BATCH TASK CREATION\n\nCreated ${result.tasks?.length} tasks:\n${result.tasks?.map(t => `- ${t.id}: ${t.title}\n  File: ${t.filePath}`).join('\n')}\n\nNext: edit tasks or add more tasks.`;
+  if (!result.success) return `batch_task_creation_failed: "${result.message}"`;
+
+  let output = `tasks_created[${result.tasks?.length}]:\n`;
+  result.tasks?.forEach(task => {
+    output += `  - id: ${task.id}\n`;
+    output += `    title: "${task.title}"\n`;
+    output += `    file: ${task.filePath}\n`;
+  });
+  output += `next_action: "edit tasks or add more tasks"`;
+
+  return output;
 }

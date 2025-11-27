@@ -47,7 +47,7 @@ export function validateWorkspaceIdentifier(identifier: string): boolean {
   return true;
 }
 
-function getWorkspacePaths(workspacePath: string, project: string = 'ProjectX', createPath: boolean = false) {
+function getWorkspacePaths(workspacePath: string, project: string, createPath: boolean = false) {
   // Security: validate workspace path
   if (!workspacePath || typeof workspacePath !== 'string') {
     throw new Error('Invalid workspace path');
@@ -68,10 +68,10 @@ function getWorkspacePaths(workspacePath: string, project: string = 'ProjectX', 
     jobsToDoDir: createPath ? path.join(workspacePath, 'jobs', 'to-do') : path.join(workspaceDir, 'jobs', 'to-do'),
     jobsDoneDir: createPath ? path.join(workspacePath, 'jobs', 'done-to-do') : path.join(workspaceDir, 'jobs', 'done-to-do'),
     tasksRoot: createPath ? path.join(workspacePath, project) : path.join(workspaceDir, project),
-    getSubprojectDir: (subproject: string, folder: string = 'to-do') =>
+    getSubprojectDir: (subproject: string | undefined, folder: string = 'to-do') =>
       createPath ?
-        path.join(workspacePath, project, subproject, folder) :
-        path.join(workspaceDir, project, subproject, folder)
+        path.join(workspacePath, project, subproject || '', folder) :
+        path.join(workspaceDir, project, subproject || '', folder)
   };
 }
 export { getWorkspacePaths };

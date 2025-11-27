@@ -36,7 +36,7 @@ function setupTestWorkspace() {
   mkdirSync(workspacePath, { recursive: true });
   mkdirSync(join(workspacePath, 'jobs', 'to-do'), { recursive: true });
   mkdirSync(join(workspacePath, 'jobs', 'done-to-do'), { recursive: true });
-  mkdirSync(join(workspacePath, 'ProjectX', 'w1', 'to-do'), { recursive: true });
+  mkdirSync(join(workspacePath, 'w1', 'to-do'), { recursive: true });
 }
 
 // Test suite
@@ -56,7 +56,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const createJobResult = await handleCreateJob({
-      workspace_id: TEST_WORKSPACE,
+      workspace_path: TEST_WORKSPACE,
       name: 'Test Job',
       description: 'A test job for validation',
       domain: 'testing',
@@ -97,7 +97,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const createTaskResult = await handleCreateTask({
-      workspace_id: TEST_WORKSPACE,
+      workspace_path: TEST_WORKSPACE,
       job_id: 1,
       title: 'Test Task',
       description: 'A test task for validation',
@@ -123,8 +123,9 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const editTaskResult = await handleEditTask({
-      project: 'test-project',
+      project: TEST_WORKSPACE,
       subproject: 'w1',
+      folder: 'to-do',
       domain_file: 'test-domain',
       task_id: 1,
       updates: {
@@ -151,7 +152,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const listActiveResult = await handleListActiveJobs({
-      workspace_id: TEST_WORKSPACE
+      workspace_path: TEST_WORKSPACE
     });
 
     if (listActiveResult && listActiveResult.content[0].text.includes('ACTIVE JOBS')) {
@@ -171,7 +172,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const listCompletedResult = await handleListCompletedJobs({
-      workspace_id: TEST_WORKSPACE
+      workspace_path: TEST_WORKSPACE
     });
 
     if (listCompletedResult && listCompletedResult.content[0].text.includes('COMPLETED JOBS')) {
@@ -191,7 +192,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const listEnhancedResult = await handleListJobsEnhanced({
-      workspace_id: TEST_WORKSPACE
+      workspace_path: TEST_WORKSPACE
     });
 
     if (listEnhancedResult && listEnhancedResult.content[0].text.includes('JOBS OVERVIEW')) {
@@ -211,7 +212,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const completeJobResult = await handleCompleteJob({
-      workspace_id: TEST_WORKSPACE,
+      workspace_path: TEST_WORKSPACE,
       job_id: 1,
       completion_notes: 'Test completion'
     });
@@ -233,7 +234,7 @@ async function runJobManagementTests() {
   testResults.total++;
   try {
     const deleteJobResult = await handleDeleteJob({
-      workspace_id: TEST_WORKSPACE,
+      workspace_path: TEST_WORKSPACE,
       job_id: 1,
       confirm_deletion: true
     });

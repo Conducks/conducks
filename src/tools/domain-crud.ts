@@ -6,6 +6,7 @@ import { join } from 'path';
 interface EditTaskArgs {
   project: string;
   subproject: string;
+  folder: string; // 'to-do', 'done-to-do', 'analysis', 'problem-solution'
   domain_file: string;
   task_id: number;
   updates: {
@@ -27,19 +28,23 @@ export async function handleEditTask(args: EditTaskArgs): Promise<EditTaskResult
     const { join } = await import('path');
     const { getWorkspacePaths } = await import('../core/config.js');
 
-    const paths = getWorkspacePaths(args.project);
-    const domainPath = join(paths.tasksRoot, args.subproject, args.domain_file);
+    const paths = getWorkspacePaths(args.project, ''); // Use empty project to avoid double-directory
+    const domainDir = paths.getSubprojectDir(args.subproject, args.folder);
+    const domainPath = join(domainDir, args.domain_file);
 
     let content = readFileSync(domainPath, 'utf-8');
 
-    // Update specific fields
+    // Update specific fields (handle both **bold** and regular formats for backward compatibility)
     if (args.updates.status) {
+      content = content.replace(/\*\*Status:\*\* [^\n]*/, `**Status:** ${args.updates.status}`);
       content = content.replace(/Status: [^\n]*/, `Status: ${args.updates.status}`);
     }
     if (args.updates.team) {
+      content = content.replace(/\*\*Team:\*\* [^\n]*/, `**Team:** ${args.updates.team}`);
       content = content.replace(/Team: [^\n]*/, `Team: ${args.updates.team}`);
     }
     if (args.updates.complexity) {
+      content = content.replace(/\*\*Complexity:\*\* [^\n]*/, `**Complexity:** ${args.updates.complexity}`);
       content = content.replace(/Complexity: [^\n]*/, `Complexity: ${args.updates.complexity}`);
     }
     if (args.updates.description) {
@@ -54,12 +59,14 @@ export async function handleEditTask(args: EditTaskArgs): Promise<EditTaskResult
 }
 
 export function formatEditTaskResult(result: EditTaskResult): string {
-  return result.success ? `Task edited successfully` : `Failed to edit task: ${result.message}`;
+  if (!result.success) return `task_edit_failed: "${result.message}"`;
+  return `task_updated:\n  message: "${result.message}"`;
 }
 
 interface ReplaceLinesArgs {
   project: string;
   subproject: string;
+  folder: string; // 'to-do', 'done-to-do', 'analysis', 'problem-solution'
   domain_file: string;
   start_line: number;
   end_line: number;
@@ -77,8 +84,9 @@ export async function handleReplaceLines(args: ReplaceLinesArgs): Promise<Replac
     const { join } = await import('path');
     const { getWorkspacePaths } = await import('../core/config.js');
 
-    const paths = getWorkspacePaths(args.project);
-    const domainPath = join(paths.tasksRoot, args.subproject, args.domain_file);
+    const paths = getWorkspacePaths(args.project, ''); // Use empty project to avoid double-directory
+    const domainDir = paths.getSubprojectDir(args.subproject, args.folder);
+    const domainPath = join(domainDir, args.domain_file);
 
     const content = readFileSync(domainPath, 'utf-8');
     const lines = content.split('\n');
@@ -95,12 +103,14 @@ export async function handleReplaceLines(args: ReplaceLinesArgs): Promise<Replac
 }
 
 export function formatReplaceLinesResult(result: ReplaceLinesResult): string {
-  return result.success ? `Lines replaced successfully` : `Failed to replace lines: ${result.message}`;
+  if (!result.success) return `lines_replace_failed: "${result.message}"`;
+  return `lines_replaced:\n  message: "${result.message}"`;
 }
 
 interface RewriteDomainArgs {
   project: string;
   subproject: string;
+  folder: string; // 'to-do', 'done-to-do', 'analysis', 'problem-solution'
   domain_file: string;
   new_content: string;
 }
@@ -116,8 +126,9 @@ export async function handleRewriteDomain(args: RewriteDomainArgs): Promise<Rewr
     const { join } = await import('path');
     const { getWorkspacePaths } = await import('../core/config.js');
 
-    const paths = getWorkspacePaths(args.project);
-    const domainPath = join(paths.tasksRoot, args.subproject, args.domain_file);
+    const paths = getWorkspacePaths(args.project, ''); // Use empty project to avoid double-directory
+    const domainDir = paths.getSubprojectDir(args.subproject, args.folder);
+    const domainPath = join(domainDir, args.domain_file);
 
     writeFileSync(domainPath, args.new_content, 'utf-8');
     return { success: true, message: 'Domain file rewritten' };
@@ -127,12 +138,14 @@ export async function handleRewriteDomain(args: RewriteDomainArgs): Promise<Rewr
 }
 
 export function formatRewriteDomainResult(result: RewriteDomainResult): string {
-  return result.success ? `Domain rewritten successfully` : `Failed to rewrite domain: ${result.message}`;
+  if (!result.success) return `domain_rewrite_failed: "${result.message}"`;
+  return `domain_rewritten:\n  message: "${result.message}"`;
 }
 
 interface AppendTaskArgs {
   project: string;
   subproject: string;
+  folder: string; // 'to-do', 'done-to-do', 'analysis', 'problem-solution'
   domain_file: string;
   task_content: string;
 }
@@ -148,8 +161,9 @@ export async function handleAppendTask(args: AppendTaskArgs): Promise<AppendTask
     const { join } = await import('path');
     const { getWorkspacePaths } = await import('../core/config.js');
 
-    const paths = getWorkspacePaths(args.project);
-    const domainPath = join(paths.tasksRoot, args.subproject, args.domain_file);
+    const paths = getWorkspacePaths(args.project, ''); // Use empty project to avoid double-directory
+    const domainDir = paths.getSubprojectDir(args.subproject, args.folder);
+    const domainPath = join(domainDir, args.domain_file);
 
     const content = readFileSync(domainPath, 'utf-8');
     const newContent = content + '\n' + args.task_content;
@@ -162,12 +176,14 @@ export async function handleAppendTask(args: AppendTaskArgs): Promise<AppendTask
 }
 
 export function formatAppendTaskResult(result: AppendTaskResult): string {
-  return result.success ? `Task appended successfully` : `Failed to append task: ${result.message}`;
+  if (!result.success) return `task_append_failed: "${result.message}"`;
+  return `task_appended:\n  message: "${result.message}"`;
 }
 
 interface RemoveTaskArgs {
   project: string;
   subproject: string;
+  folder: string; // 'to-do', 'done-to-do', 'analysis', 'problem-solution'
   domain_file: string;
   task_id: number;
 }
@@ -183,8 +199,9 @@ export async function handleRemoveTask(args: RemoveTaskArgs): Promise<RemoveTask
     const { join } = await import('path');
     const { getWorkspacePaths } = await import('../core/config.js');
 
-    const paths = getWorkspacePaths(args.project);
-    const domainPath = join(paths.tasksRoot, args.subproject, args.domain_file);
+    const paths = getWorkspacePaths(args.project, ''); // Use empty project to avoid double-directory
+    const domainDir = paths.getSubprojectDir(args.subproject, args.folder);
+    const domainPath = join(domainDir, args.domain_file);
 
     const content = readFileSync(domainPath, 'utf-8');
     const lines = content.split('\n');
@@ -222,5 +239,6 @@ export async function handleRemoveTask(args: RemoveTaskArgs): Promise<RemoveTask
 }
 
 export function formatRemoveTaskResult(result: RemoveTaskResult): string {
-  return result.success ? `Task removed successfully` : `Failed to remove task: ${result.message}`;
+  if (!result.success) return `task_remove_failed: "${result.message}"`;
+  return `task_removed:\n  message: "${result.message}"`;
 }

@@ -2,7 +2,7 @@ import { loadCONDUCKSWorkspace } from '../core/storage.js';
 import { validateWorkspaceIdentifier } from '../core/config.js';
 
 interface ListActiveJobsArgs {
-  workspace_id: string;
+  workspace_path: string;
 }
 
 /**
@@ -20,10 +20,10 @@ function getInlineRules(): string {
 export async function handleListActiveJobs(args: ListActiveJobsArgs) {
   try {
     // Validate workspace identifier
-    validateWorkspaceIdentifier(args.workspace_id);
+    validateWorkspaceIdentifier(args.workspace_path);
 
-    const { workspace_id } = args;
-    const storage = await loadCONDUCKSWorkspace(workspace_id);
+    const { workspace_path } = args;
+    const storage = await loadCONDUCKSWorkspace(workspace_path);
     
     // Filter for active jobs (not all tasks completed)
     const activeJobsRecords = storage.jobs.filter(j => {
@@ -32,33 +32,35 @@ export async function handleListActiveJobs(args: ListActiveJobsArgs) {
       return completed < total || total === 0; // zero-task jobs considered active
     });
     
-    let output = `════════════════════════════════════════\n`;
-    output += `ACTIVE JOBS (${activeJobsRecords.length})\n`;
-    output += `════════════════════════════════════════\n\n`;
-    
+    let output = `active_jobs[${activeJobsRecords.length}]:\n`;
+
     if (activeJobsRecords.length === 0) {
-      output += `  None | Use create_job to start\n`;
+      output += `  none: true\n`;
+      output += `  usage: "create_job to start"`;
     } else {
       for (const job of activeJobsRecords) {
         const taskCount = job.tasks.length;
         const completedTasks = job.tasks.filter(t => t.status === 'completed').length;
         const percentage = taskCount > 0 ? Math.round((completedTasks / taskCount) * 100) : 0;
-        output += `[${String(job.id).padStart(3, '0')}] ${job.title}\n`;
-        output += `      Tasks: ${completedTasks}/${taskCount} (${percentage}%) | Domain: ${job.domain || 'none'}\n`;
-        output += `      Created: ${job.created}\n\n`;
+        output += `  - id: ${job.id}\n`;
+        output += `    title: ${job.title}\n`;
+        output += `    tasks_complete: ${completedTasks}\n`;
+        output += `    tasks_total: ${taskCount}\n`;
+        output += `    tasks_percent: ${percentage}\n`;
+        output += `    domain: ${job.domain || 'general'}\n`;
+        output += `    created: '${job.created}'\n`;
       }
+
+      output += `usage: list_jobs_enhanced {job_id: N}`;
     }
-    
-    output += `════════════════════════════════════════\n`;
-    output += `USAGE: list_jobs_enhanced {job_id: N} for details${getInlineRules()}`;
-    
+
     return {
       content: [{ type: "text", text: output }]
     };
-    
+
   } catch (error) {
     return {
-      content: [{ type: "text", text: `LIST ACTIVE JOBS FAILED | ${error}` }]
+      content: [{ type: "text", text: `active_jobs_error: ${error}` }]
     };
   }
 }

@@ -7,7 +7,7 @@ import { loadCONDUCKSWorkspace, saveJobForWorkspace } from '../core/storage.js';
 interface MoveTaskArgs {
   workspace_path?: string;
   project: string;
-  subproject: string;
+  subproject?: string;
   task_file: string; // e.g., "task_001_setup-database.md"
   target_folder: 'to-do' | 'done-to-do' | 'analysis' | 'problem-solution';
   source_folder?: 'to-do' | 'done-to-do' | 'analysis' | 'problem-solution';
@@ -29,16 +29,30 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
 
     // Import getWorkspacePaths dynamically
     const { getWorkspacePaths } = await import('../core/config.js');
-    // Use provided project name or default to ProjectX if missing (for backward compatibility)
-    const projectName = project || 'ProjectX';
-    const paths = getWorkspacePaths(workspace_path, projectName);
+    // Require project parameter - no more defaults
+    if (!project) {
+      return {
+        success: false,
+        message: 'project parameter is required'
+      };
+    }
+    const projectName = project;
+    const paths = getWorkspacePaths(workspace_path, ''); // Use empty project to avoid double-directory
 
     // Support both multi-service (with project/subproject) and single-repo (workspace root only)
-    const subprojectPath = (project && subproject)
-      ? paths.getSubprojectDir(subproject, 'to-do').replace('/to-do', '') // Get base subproject dir
-      : paths.tasksRoot; // Fallback to project root if subproject missing
+    // If subproject is provided, we use it. If not, we assume project root (legacy/single-repo).
+    // But getSubprojectDir requires subproject.
 
-    if (!existsSync(subprojectPath)) {
+    // We can't easily get "base" subproject dir without a folder, so we'll use 'to-do' and dirname, 
+    // OR just use getSubprojectDir when we need specific folders.
+
+    // Prevent double-directory issue when subproject name matches project/workspace name
+    const actualSubprojectPath = (subproject === projectName) ? '' : (subproject || '');
+    const subprojectBase = (project && subproject)
+      ? join(paths.tasksRoot, actualSubprojectPath)
+      : paths.tasksRoot;
+
+    if (!existsSync(subprojectBase)) {
       return {
         success: false,
         message: `Subproject path not found: ${projectName}/${subproject}`
@@ -49,7 +63,7 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
     let sourcePath: string | null = null;
 
     if (source_folder) {
-      const testPath = join(subprojectPath, source_folder, task_file);
+      const testPath = join(subprojectBase, source_folder, task_file);
       if (existsSync(testPath)) {
         sourcePath = testPath;
       }
@@ -57,7 +71,7 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
       // Search all folders
       const folders = ['to-do', 'done-to-do', 'analysis', 'problem-solution'];
       for (const folder of folders) {
-        const testPath = join(subprojectPath, folder, task_file);
+        const testPath = join(subprojectBase, folder, task_file);
         if (existsSync(testPath)) {
           sourcePath = testPath;
           break;
@@ -72,7 +86,10 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
       };
     }
 
-    const destDir = join(subprojectPath, target_folder);
+    const destDir = (project && subproject)
+      ? paths.getSubprojectDir(actualSubprojectPath, target_folder)
+      : join(subprojectBase, target_folder);
+
     const destPath = join(destDir, task_file);
 
     // Ensure destination directory exists
@@ -141,8 +158,8 @@ async function updateTaskStatus(workspace_path: string, taskId: string, isComple
  */
 export function formatMoveTaskResult(result: MoveTaskResult): string {
   if (!result.success) {
-    return `MOVE FAILED | ${result.message}`;
+    return `move_task_failed: "${result.message}"`;
   }
 
-  return `${result.message}\nNew location: ${result.newPath}`;
+  return `task_moved:\n  message: "${result.message}"\n  new_path: ${result.newPath}`;
 }

@@ -179,25 +179,44 @@ export async function handleArchitectureAudit(args: ArchitectureAuditArgs): Prom
 
 export function formatArchitectureAuditResult(result: ArchitectureAuditResult): string {
   if (!result.success) {
-    return `ARCHITECTURE AUDIT FAILED | ${result.errors?.join(' | ')}`;
+    return `architecture_audit_failed: "${result.errors?.join(' | ')}"`;
   }
-  let out = `ARCHITECTURE AUDIT\n\n`;
-  out += `Root Has Git: ${result.rootHasGit} | Nested Git Repos: ${result.nestedGitCount - (result.rootHasGit ? 1 : 0)}\n`;
-  if (result.warnings.length) {
-    out += `\nWARNINGS (${result.warnings.length})\n`;
-    for (const w of result.warnings) out += `- ${w}\n`;
+
+  let out = `audit_results:\n`;
+  out += `  root_has_git: ${result.rootHasGit}\n`;
+  out += `  nested_git_count: ${result.nestedGitCount - (result.rootHasGit ? 1 : 0)}\n`;
+  out += `  repos_total: ${result.repos.length}\n`;
+
+  if (result.warnings.length > 0) {
+    out += `  warnings[${result.warnings.length}]:\n`;
+    for (const w of result.warnings) {
+      out += `    - "${w}"\n`;
+    }
   }
-  if (result.recommendations.length) {
-    out += `\nRECOMMENDATIONS (${result.recommendations.length})\n`;
-    for (const r of result.recommendations) out += `- ${r}\n`;
+
+  if (result.recommendations.length > 0) {
+    out += `  recommendations[${result.recommendations.length}]:\n`;
+    for (const r of result.recommendations) {
+      out += `    - "${r}"\n`;
+    }
   }
-  out += `\nREPOS (${result.repos.length})\n`;
-  for (const repo of result.repos) {
-    out += `${repo.path} | git=${repo.hasGit} pkg=${repo.packageName || '-'} depth=${repo.depth}\n`;
+
+  if (result.duplicatePackageNames.length > 0) {
+    out += `  duplicate_packages[${result.duplicatePackageNames.length}]: ${result.duplicatePackageNames.join(', ')}\n`;
   }
-  if (result.duplicatePackageNames.length) {
-    out += `\nDUPLICATE PACKAGES\n${result.duplicatePackageNames.join(', ')}\n`;
+
+  out += `  repos:\n`;
+  for (const repo of result.repos.slice(0, 10)) {
+    out += `    - path: "${repo.path}"\n`;
+    out += `      name: "${repo.name}"\n`;
+    out += `      has_git: ${repo.hasGit}\n`;
+    out += `      package: "${repo.packageName || ''}"\n`;
+    out += `      depth: ${repo.depth}\n`;
   }
-  out += `\nNEXT: unify boundaries → root architecture.md → consolidate tooling.`;
+
+  if (result.repos.length > 10) {
+    out += `    truncated: ${result.repos.length - 10}\n`;
+  }
+
   return out;
 }

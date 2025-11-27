@@ -5,7 +5,7 @@ import { SubTask } from '../core/types.js';
 import { validateWorkspaceIdentifier } from '../core/config.js';
 
 interface CreateTaskArgs {
-  workspace_id?: string;
+  workspace_path?: string;
   job_id: number;
   title: string;
   description: string;
@@ -57,11 +57,11 @@ export function generateTaskMarkdown(task: SubTask, jobId: number, args: CreateT
 export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTaskResult> {
   try {
     // Validate workspace identifier if provided
-    if (args.workspace_id) {
-      validateWorkspaceIdentifier(args.workspace_id);
+    if (args.workspace_path) {
+      validateWorkspaceIdentifier(args.workspace_path);
     }
 
-    const workspacePath = args.workspace_id || 'docs-organization';
+    const workspacePath = args.workspace_path || 'docs-organization';
     const storage = await import('../core/storage.js').then(m => m.loadCONDUCKSWorkspace(workspacePath));
     const job = storage.jobs.find(j => j.id === args.job_id);
     if (!job) {
@@ -95,16 +95,27 @@ export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTask
     const saveJobForWorkspace = await import('../core/storage.js').then(m => m.saveJobForWorkspace);
     await saveJobForWorkspace(job, workspacePath, false);
 
-    // Create markdown file in Project/Subproject/to-do/
-    const subproject = args.subproject || 'w1';
-    const project = args.project || 'ProjectX'; // Default to ProjectX if not specified, but allow override
+    const subproject = args.subproject;
+    const project = ''; // No hardcoded project - use workspace root
 
     // Import getWorkspacePaths dynamically to avoid circular dependencies if any
     const { getWorkspacePaths } = await import('../core/config.js');
     const paths = getWorkspacePaths(workspacePath, project);
 
     const folder = args.folder || 'to-do';
-    const targetDir = paths.getSubprojectDir(subproject, folder);
+
+    // Support both single-project (no subproject) and multi-project (with subproject) modes
+    let targetDir: string;
+    let actualSubprojectPath = '';
+
+    if (subproject) {
+      // Multi-project mode: use subproject directory
+      actualSubprojectPath = (subproject === workspacePath) ? '' : subproject;
+      targetDir = paths.getSubprojectDir(actualSubprojectPath, folder);
+    } else {
+      // Single-project mode: put tasks directly in workspace root
+      targetDir = join(paths.tasksRoot, folder);
+    }
 
     if (!existsSync(targetDir)) {
       mkdirSync(targetDir, { recursive: true });
@@ -122,7 +133,7 @@ export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTask
       task: {
         id: taskIdStr,
         title: args.title,
-        filePath: `storage/${workspacePath}/${project}/${subproject}/${folder}/${fileName}`
+        filePath: `storage/${workspacePath}/${actualSubprojectPath ? actualSubprojectPath + '/' : ''}${folder}/${fileName}`
       }
     };
   } catch (error) {
@@ -131,6 +142,6 @@ export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTask
 }
 
 export function formatCreateTaskResult(result: CreateTaskResult): string {
-  if (!result.success) return `TASK CREATION FAILED\n\n${result.message}`;
-  return `TASK CREATED\n\nTask ${result.task?.id}: ${result.task?.title}\nFile: ${result.task?.filePath}\n\nNext: edit task file or add more tasks.`;
+  if (!result.success) return `task_creation_failed: "${result.message}"`;
+  return `task_created:\n  id: ${result.task?.id}\n  title: "${result.task?.title}"\n  file: ${result.task?.filePath}\n  next_action: "edit task file or add more tasks"`;
 }

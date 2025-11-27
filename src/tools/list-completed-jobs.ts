@@ -11,14 +11,14 @@ function getInlineRules(): string {
 /**
  * List completed jobs - Shows only jobs where all tasks are completed
  */
-export async function handleListCompletedJobs(args?: { workspace_id?: string }) {
+export async function handleListCompletedJobs(args?: { workspace_path?: string }) {
   try {
     // Validate workspace identifier if provided
-    if (args?.workspace_id) {
-      validateWorkspaceIdentifier(args.workspace_id);
+    if (args?.workspace_path) {
+      validateWorkspaceIdentifier(args.workspace_path);
     }
-    const workspace_id = args?.workspace_id || 'default';
-    const storage = await loadCONDUCKSWorkspace(workspace_id);
+    const workspace_path = args?.workspace_path || 'default';
+    const storage = await loadCONDUCKSWorkspace(workspace_path);
 
     // Filter for completed jobs (all tasks completed, or no tasks)
     const completedJobsRecords = storage.jobs.filter((j: any) => {
@@ -26,31 +26,30 @@ export async function handleListCompletedJobs(args?: { workspace_id?: string }) 
       return total === 0 || j.tasks.every((t: any) => t.status === 'completed');
     });
     
-    let output = `════════════════════════════════════════\n`;
-    output += `COMPLETED JOBS (${completedJobsRecords.length})\n`;
-    output += `════════════════════════════════════════\n\n`;
-    
+    let output = `completed_jobs[${completedJobsRecords.length}]:\n`;
+
     if (completedJobsRecords.length === 0) {
-      output += `  None\n`;
+      output += `  none: true`;
     } else {
       for (const job of completedJobsRecords) {
         const taskCount = job.tasks.length;
-        output += `[${String(job.id).padStart(3, '0')}] ${job.title}\n`;
-        output += `      Tasks: ${taskCount}/${taskCount} (100%) | Domain: ${job.domain || 'none'}\n`;
-        output += `      Created: ${job.created}\n\n`;
+        output += `  - id: ${job.id}\n`;
+        output += `    title: ${job.title}\n`;
+        output += `    tasks_total: ${taskCount}\n`;
+        output += `    tasks_percent: 100\n`;
+        output += `    domain: ${job.domain || 'general'}\n`;
+        output += `    created: '${job.created}'\n`;
       }
+      output += `usage: list_jobs_enhanced {job_id: N}`;
     }
-    
-    output += `════════════════════════════════════════\n`;
-    output += `USAGE: list_jobs_enhanced {job_id: N} for details${getInlineRules()}`;
-    
+
     return {
       content: [{ type: "text", text: output }]
     };
-    
+
   } catch (error) {
     return {
-      content: [{ type: "text", text: `LIST COMPLETED JOBS FAILED | ${error}` }]
+      content: [{ type: "text", text: `completed_jobs_error: ${error}` }]
     };
   }
 }

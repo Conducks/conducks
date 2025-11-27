@@ -36,11 +36,11 @@ const server = new Server(
 const TOOLS = [
   {
     name: "create_job",
-    description: "Step 2: Create a new job container (metadata only). **MUST run initialize_project_structure first.** This creates the job ID and folder, but NO tasks. Use `create_task` or `batch_create_tasks` next.",
+    description: "Step 2: Create a new job container (metadata only). **MUST run initialize_project_structure first.**\\n\\n**CRITICAL - BEFORE calling this tool, you MUST ask the user these questions:**\\n1. What is the main goal/objective of this job?\\n2. What specific outcomes are expected?\\n3. What tasks do you envision for this job?\\n4. Should we analyze the codebase to suggest additional tasks?\\n\\nOnly call this tool AFTER the user has answered these questions. Use their responses to populate the description, objectives, and other fields accurately.\\n\\nThis creates the job ID and folder, but NO tasks. Use `create_task` or `batch_create_tasks` next. DO NOT USE FULL PATHS for workspace_path; use workspace identifier names only.",
     inputSchema: {
       type: "object",
       properties: {
-        workspace_id: { type: "string", description: "Workspace identifier name (e.g., 'workspace1', 'my-project') - no paths allowed" },
+        workspace_path: { type: "string", description: "Workspace identifier name (e.g., 'workspace1', 'my-project')" },
         name: { type: "string", description: "Job name (concise, descriptive)" },
         description: { type: "string", description: "Detailed objective describing complete success criteria" },
         domain: { type: "string", description: "Technical domain (e.g., 'authentication', 'database')" },
@@ -51,7 +51,7 @@ const TOOLS = [
         tags: { type: "array", items: { type: "string" }, description: "Categorization tags" },
         risk_assessment: { type: "string", description: "Known risks and mitigation strategies" }
       },
-      required: ["workspace_id", "name", "description"]
+      required: ["workspace_path", "name", "description"]
     }
   },
   {
@@ -86,7 +86,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        workspace_path: { type: "string", description: "Workspace identifier" },
+        workspace_path: { type: "string", description: "Workspace identifier (optional, defaults to 'docs-organization')" },
         job_id: { type: "number", description: "Parent job ID" },
         title: { type: "string", description: "Task title" },
         description: { type: "string", description: "Task description" },
@@ -95,15 +95,15 @@ const TOOLS = [
         team: { type: "string", description: "Team responsible" },
         service: { type: "string", description: "Service name" },
         dependencies: { type: "array", items: { type: "string" }, description: "Task dependencies" },
-        subproject: { type: "string", enum: ["w1", "w2", "w3"], description: "Subproject (defaults to w1)" },
+        subproject: { type: "string", description: "Subproject name (e.g., 'conducks', 'website', 'DOCS')" },
         folder: { type: "string", description: "Folder for task file (e.g., 'to-do', 'analysis', 'problem-solution'; defaults to 'to-do')" }
       },
-      required: ["workspace_path", "job_id", "title", "description"]
+      required: ["job_id", "title", "description"]
     }
   },
   {
     name: "batch_create_tasks",
-    description: "Step 3b: Add MULTIPLE tasks to an existing job at once. Efficient for initial job population.",
+    description: "Step 3b: Add MULTIPLE tasks to an existing job at once. Efficient for initial job population.\\n\\n**BEFORE calling this tool, you SHOULD:**\\n1. Ask the user what tasks they want to create\\n2. Optionally: Analyze the codebase related to the job domain\\n3. Present a suggested task list to the user for confirmation\\n4. Only create tasks after user approval\\n\\nAfter creating tasks, offer to analyze the codebase and create detailed TODO.md files for each task.",
     inputSchema: {
       type: "object",
       properties: {
@@ -137,13 +137,14 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        workspace_path: { type: "string", description: "Workspace identifier" },
-        subproject: { type: "string", enum: ["w1", "w2", "w3"], description: "Subproject name" },
+        workspace_path: { type: "string", description: "Workspace identifier (optional, defaults to 'default')" },
+        project: { type: "string", description: "Project name (optional, defaults to 'ProjectX')" },
+        subproject: { type: "string", description: "Subproject name" },
         task_file: { type: "string", description: "Task filename" },
-        target_folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"] },
-        source_folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"] }
+        target_folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Target folder" },
+        source_folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Optional source folder (auto-detected if not provided)" }
       },
-      required: ["workspace_path", "subproject", "task_file", "target_folder"]
+      required: ["subproject", "task_file", "target_folder"]
     }
   },
   {
@@ -186,12 +187,12 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        workspace_path: { type: "string", description: "Full absolute filesystem path to workspace root (REQUIRED for accurate structure detection). Example: '/Users/username/my-project' or '/home/user/project'" },
+        project_path: { type: "string", description: "Full absolute filesystem path to workspace root (REQUIRED for accurate structure detection). Example: '/Users/username/my-project' or '/home/user/project'" },
         project_name: { type: "string", description: "Optional: Override detected project name" },
         auto_select: { type: "boolean", description: "Optional: Automatically include all detected subprojects" },
         include_subprojects: { type: "array", items: { type: "string" }, description: "Optional: Filter to only include these specific subproject names if auto_select=false" }
       },
-      required: ["workspace_path"]
+      required: ["project_path"]
     }
   },
   {
@@ -214,6 +215,7 @@ const TOOLS = [
       properties: {
         project: { type: "string" },
         subproject: { type: "string" },
+        folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Folder containing the file" },
         domain_file: { type: "string" },
         task_id: { type: "number" },
         updates: {
@@ -226,7 +228,7 @@ const TOOLS = [
           }
         }
       },
-      required: ["project", "subproject", "domain_file", "task_id", "updates"]
+      required: ["project", "subproject", "folder", "domain_file", "task_id", "updates"]
     }
   },
   {
@@ -237,12 +239,13 @@ const TOOLS = [
       properties: {
         project: { type: "string" },
         subproject: { type: "string" },
+        folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Folder containing the file" },
         domain_file: { type: "string" },
         start_line: { type: "number" },
         end_line: { type: "number" },
         replacement_text: { type: "string" }
       },
-      required: ["project", "subproject", "domain_file", "start_line", "end_line", "replacement_text"]
+      required: ["project", "subproject", "folder", "domain_file", "start_line", "end_line", "replacement_text"]
     }
   },
   {
@@ -253,10 +256,11 @@ const TOOLS = [
       properties: {
         project: { type: "string" },
         subproject: { type: "string" },
+        folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Folder containing the file" },
         domain_file: { type: "string" },
         new_content: { type: "string" }
       },
-      required: ["project", "subproject", "domain_file", "new_content"]
+      required: ["project", "subproject", "folder", "domain_file", "new_content"]
     }
   },
   {
@@ -267,10 +271,11 @@ const TOOLS = [
       properties: {
         project: { type: "string" },
         subproject: { type: "string" },
+        folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Folder containing the file" },
         domain_file: { type: "string" },
         task_content: { type: "string" }
       },
-      required: ["project", "subproject", "domain_file", "task_content"]
+      required: ["project", "subproject", "folder", "domain_file", "task_content"]
     }
   },
   {
@@ -281,10 +286,11 @@ const TOOLS = [
       properties: {
         project: { type: "string" },
         subproject: { type: "string" },
+        folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Folder containing the file" },
         domain_file: { type: "string" },
         task_id: { type: "number" }
       },
-      required: ["project", "subproject", "domain_file", "task_id"]
+      required: ["project", "subproject", "folder", "domain_file", "task_id"]
     }
   }
 ];
@@ -350,9 +356,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "list_completed_jobs": {
-        const completedResult = await handleListCompletedJobs();
+        const completedResult = await handleListCompletedJobs(args as any);
         const response = { content: [{ type: "text", text: completedResult.content[0].text }] };
-        logToolCall("list_completed_jobs", {}, response);
+        logToolCall("list_completed_jobs", args, response);
         return response;
       }
 
@@ -364,7 +370,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "initialize_project_structure": {
-        const initResult = await handleInitializeProjectStructure(args as any);
+        // Map MCP parameter name to handler parameter name
+        const handlerArgs = {
+          ...args,
+          workspace_path: (args as any).project_path
+        };
+        const initResult = await handleInitializeProjectStructure(handlerArgs);
         const response = { content: [{ type: "text", text: formatInitResult(initResult) }] };
         logToolCall("initialize_project_structure", args, response);
         return response;

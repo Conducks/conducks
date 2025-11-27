@@ -5,7 +5,7 @@ import { validateWorkspaceIdentifier } from '../core/config.js';
 import { Job } from '../core/types.js';
 
 interface CreateJobArgs {
-  workspace_id: string;
+  workspace_path: string;
   name: string;
   description: string;
   domain?: string;
@@ -45,12 +45,12 @@ function slugify(text: string): string {
 export async function handleCreateJob(args: CreateJobArgs): Promise<CreateJobResult> {
   try {
     // Validate workspace identifier
-    validateWorkspaceIdentifier(args.workspace_id);
+    validateWorkspaceIdentifier(args.workspace_path);
 
-    const { workspace_id, name, description, domain, dependencies } = args;
+    const { workspace_path, name, description, domain, dependencies } = args;
 
     // Create single job - no automatic splitting
-    const jobId = await getNextJobIdForWorkspace(workspace_id);
+    const jobId = await getNextJobIdForWorkspace(workspace_path);
     const slug = slugify(name);
 
     const job: Job = {
@@ -69,7 +69,7 @@ export async function handleCreateJob(args: CreateJobArgs): Promise<CreateJobRes
       lastUpdated: new Date().toISOString()
     };
 
-    await saveJobForWorkspace(job, workspace_id, false);
+    await saveJobForWorkspace(job, workspace_path, false);
 
     const filename = `${String(jobId).padStart(3, '0')}_${slug}.toon`;
 
@@ -97,21 +97,22 @@ export async function handleCreateJob(args: CreateJobArgs): Promise<CreateJobRes
  */
 export function formatCreateJobResult(result: CreateJobResult): string {
   if (!result.success) {
-    return `JOB CREATION FAILED\n\n${result.message}`;
+    return `job_creation_failed: "${result.message}"`;
   }
 
-  let output = `JOB(S) CREATED\n\n`;
+  let output = `job_created:\n`;
 
   for (const job of result.jobs) {
-    output += `Job ${String(job.id).padStart(3, '0')}: ${job.name}\n`;
-    output += `File: ${job.filePath}\n\n`;
+    output += `  id: ${job.id}\n`;
+    output += `  title: "${job.name}"\n`;
+    output += `  file: ${job.filePath}\n`;
   }
 
-  output += `${result.message}\n\n`;
-  output += `Next steps:\n`;
-  output += `1. Use create_task to add task files\n`;
-  output += `2. Use list_jobs_enhanced for overview\n`;
-  output += `3. Use complete_job when all tasks are completed\n`;
+  output += `message: "${result.message}"\n`;
+  output += `next_steps[3]:\n`;
+  output += `  - "create_task: add task files"\n`;
+  output += `  - "list_jobs_enhanced: get overview"\n`;
+  output += `  - "complete_job: when all tasks done"`;
 
   return output;
 }
