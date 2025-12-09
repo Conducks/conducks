@@ -95,3 +95,21 @@ export function formatCompleteJobResult(result: CompleteJobResult): string {
 
   return output;
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const completeJobTool: Tool<CompleteJobArgs> = {
+  name: "complete_job",
+  description: "Mark a job as completed, move it to the archive, and record completion notes. **Use when all tasks are done.**",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string", description: "Workspace identifier" },
+      job_id: { type: "number", description: "Job ID to complete" },
+      completion_notes: { type: "string", description: "Optional completion notes" }
+    },
+    required: ["workspace_path", "job_id"]
+  },
+  handler: handleCompleteJob,
+  formatter: formatCompleteJobResult
+};

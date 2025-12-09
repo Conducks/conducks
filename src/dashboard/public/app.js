@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', function () {
 				this.loadJobs();
 			} else if (section === 'structure' && this.currentWorkspace) {
 				this.loadStructure();
+			} else if (section === 'setup') {
+				this.loadSetup();
 			}
 		},
 
@@ -95,13 +97,39 @@ document.addEventListener('DOMContentLoaded', function () {
 			this.loadOverview();
 		},
 
+		updateArchitectureMode(mode) {
+			// Update UI to show architecture mode if available
+			const modeIndicator = document.getElementById('architecture-mode');
+			if (modeIndicator) {
+				let modeText = 'Unknown Architecture';
+				let modeClass = 'unknown';
+
+				if (mode === 'single-project') {
+					modeText = '📦 Single-Project Mode';
+					modeClass = 'single';
+				} else if (mode === 'multi-project') {
+					modeText = '🏢 Multi-Project Mode';
+					modeClass = 'multi';
+				} else if (mode === 'mixed') {
+					modeText = '🔄 Mixed Mode';
+					modeClass = 'mixed';
+				}
+
+				modeIndicator.textContent = modeText;
+				modeIndicator.className = `architecture-mode ${modeClass}`;
+			}
+		},
+
 		async loadOverview() {
 			if (!this.currentWorkspace) return;
 
 			try {
-				// Load jobs stats
+				// Load jobs stats and architecture mode
 				const jobsResponse = await fetch(`/api/jobs/${this.currentWorkspace}`);
-				const jobs = await jobsResponse.json();
+				const { jobs, project_mode } = await jobsResponse.json();
+
+				// Update architecture mode display
+				this.updateArchitectureMode(project_mode);
 
 				const totalJobs = jobs.length;
 				const activeJobs = jobs.filter((job) => job.location === 'to-do').length;
@@ -115,8 +143,46 @@ document.addEventListener('DOMContentLoaded', function () {
 					0
 				);
 
+				const completionRate = totalTasks > 0
+					? Math.round((completedTasks / totalTasks) * 100)
+					: 0;
+
+				// Show loading state
 				document.getElementById('overview-stats').innerHTML = `
                     <div class="stats-grid">
+                        <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
+                        <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
+                        <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
+                        <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
+                        <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
+                        <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
+                        <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
+                    </div>
+                    <div class="card">
+                        <h3>Recent Jobs</h3>
+                        <div class="skeleton" style="height: 200px;"></div>
+                    </div>
+                `;
+
+				let modeDescription = '';
+				if (project_mode === 'single-project') {
+					modeDescription = 'Single-project workspace with direct task organization';
+				} else if (project_mode === 'multi-project') {
+					modeDescription = 'Multi-project workspace with component isolation';
+				} else if (project_mode === 'mixed') {
+					modeDescription = 'Mixed-mode workspace with both single and multi-project patterns';
+				} else {
+					modeDescription = 'Architecture mode not detected - may need initialization';
+				}
+
+				// Update with real data
+				document.getElementById('overview-stats').innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-title">Architecture</div>
+                            <div id="architecture-mode">${modeDescription}</div>
+                            <div class="stat-label">${modeDescription}</div>
+                        </div>
                         <div class="stat-card">
                             <div class="stat-number">${totalJobs}</div>
                             <div class="stat-label">Total Jobs</div>
@@ -138,10 +204,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <div class="stat-label">Completed Tasks</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-number">${totalTasks > 0
-						? Math.round((completedTasks / totalTasks) * 100)
-						: 0
-					}%</div>
+                            <div class="stat-number">${completionRate}%</div>
                             <div class="stat-label">Completion Rate</div>
                         </div>
                     </div>
@@ -288,6 +351,9 @@ document.addEventListener('DOMContentLoaded', function () {
 		async loadStructure() {
 			if (!this.currentWorkspace) return;
 
+			const container = document.getElementById('structure-tree');
+			container.innerHTML = `<div class="skeleton" style="height: 300px;"></div>`;
+
 			try {
 				const response = await fetch(
 					`/api/project-structure/${this.currentWorkspace}`
@@ -295,12 +361,11 @@ document.addEventListener('DOMContentLoaded', function () {
 				const data = await response.json();
 				this.renderTree(
 					data.structure,
-					document.getElementById('structure-tree')
+					container
 				);
 			} catch (error) {
 				console.error('Failed to load structure:', error);
-				document.getElementById('structure-tree').innerHTML =
-					'<p>Failed to load project structure.</p>';
+				container.innerHTML = '<p>Failed to load project structure.</p>';
 			}
 		},
 
@@ -346,21 +411,96 @@ document.addEventListener('DOMContentLoaded', function () {
 
 		async showFilePreview(path) {
 			try {
+				// Switch to preview section first, show loading
+				this.switchSection('preview');
+				document.getElementById('preview-title').textContent = path.split('/').pop();
+				document.getElementById('preview-path').textContent = path;
+				this.currentFile = path;
+
+				const preview = document.getElementById('file-preview');
+				preview.innerHTML = `<div class="skeleton" style="height: 400px;"></div>`;
+				preview.className = 'markdown-preview';
+
 				const response = await fetch(
 					`/api/file?path=${this.currentWorkspace}/${path}`
 				);
 				const data = await response.json();
 
-				const preview = document.getElementById('file-preview');
+				// Update with content
 				preview.innerHTML = data.html ? data.html : `<pre>${data.raw}</pre>`;
-				preview.className = 'markdown-preview';
-
-				this.switchSection('preview');
-				document.getElementById('preview-title').textContent = path.split('/').pop();
-				document.getElementById('preview-path').textContent = path;
-				this.currentFile = path;
 			} catch (error) {
 				console.error('Failed to preview file:', error);
+				document.getElementById('file-preview').innerHTML = '<p>Failed to load file preview.</p>';
+			}
+		},
+
+		async loadSetup() {
+			try {
+				const response = await fetch('/api/config-preview');
+				const config = await response.json();
+				document.getElementById('config-preview').textContent = JSON.stringify(config, null, 2);
+			} catch (error) {
+				console.error('Failed to load config preview:', error);
+			}
+		},
+
+		async installMcpServer() {
+			const statusDiv = document.getElementById('install-status');
+			const btn = document.getElementById('btn-install-mcp');
+
+			try {
+				btn.disabled = true;
+				btn.textContent = 'Installing...';
+				statusDiv.className = 'status-message';
+				statusDiv.textContent = 'Copying files and updating config...';
+
+				const response = await fetch('/api/setup', { method: 'POST' });
+				const result = await response.json();
+
+				if (response.ok) {
+					statusDiv.className = 'status-message success';
+					statusDiv.textContent = '✅ Successfully installed! Please restart Claude Desktop.';
+				} else {
+					throw new Error(result.error || 'Installation failed');
+				}
+			} catch (error) {
+				statusDiv.className = 'status-message error';
+				statusDiv.textContent = `❌ Error: ${error.message}`;
+			} finally {
+				btn.disabled = false;
+				btn.textContent = 'Install to Claude';
+			}
+		},
+
+		async uninstallMcpServer() {
+			if (!confirm('Are you sure you want to uninstall CONDUCKS from Claude? This will remove the ~/.conducks folder.')) {
+				return;
+			}
+
+			const statusDiv = document.getElementById('install-status');
+			const btn = document.getElementById('btn-uninstall-mcp');
+
+			try {
+				btn.disabled = true;
+				btn.textContent = 'Uninstalling...';
+				statusDiv.className = 'status-message';
+				statusDiv.textContent = 'Removing files and cleaning config...';
+
+				const response = await fetch('/api/uninstall', { method: 'POST' });
+				const result = await response.json();
+
+				if (response.ok) {
+					statusDiv.className = 'status-message success';
+					statusDiv.textContent = '✅ Successfully uninstalled from Claude.';
+				} else {
+					throw new Error(result.error || 'Uninstall failed');
+				}
+			} catch (error) {
+				statusDiv.className = 'status-message error';
+				statusDiv.textContent = `❌ Error: ${error.message}`;
+			} finally {
+				btn.disabled = false;
+				btn.textContent = 'Uninstall';
 			}
 		},
 

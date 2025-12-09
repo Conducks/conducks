@@ -37,7 +37,7 @@ export async function handleListJobsEnhanced(args?: { workspace_path: string; jo
       const total = j.tasks.length;
       return total > 0 && j.tasks.every((t: any) => t.status === 'completed');
     });
-    
+
     let output = `jobs_overview:\n`;
     output += `  active_jobs[${activeJobsRecords.length}]:\n`;
 
@@ -69,11 +69,11 @@ export async function handleListJobsEnhanced(args?: { workspace_path: string; jo
     }
 
     output += `usage: list_jobs_enhanced {job_id: N} for details`;
-    
+
     return {
       content: [{ type: "text", text: output }]
     };
-    
+
   } catch (error) {
     return {
       content: [{ type: "text", text: `LIST FAILED | ${error}` }]
@@ -124,3 +124,20 @@ async function handleGetJobDetailed(workspace_path: string, jobId: number) {
     };
   }
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const listJobsEnhancedTool: Tool<{ workspace_path: string; job_id?: number }> = {
+  name: "list_jobs_enhanced",
+  description: "Get detailed information about a specific job including all tasks from a workspace.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string", description: "Workspace identifier" },
+      job_id: { type: "number", description: "Job ID for detailed view" }
+    },
+    required: ["workspace_path", "job_id"]
+  },
+  handler: handleListJobsEnhanced,
+  formatter: (result: any) => result.content[0].text
+};

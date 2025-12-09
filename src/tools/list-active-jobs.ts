@@ -24,14 +24,14 @@ export async function handleListActiveJobs(args: ListActiveJobsArgs) {
 
     const { workspace_path } = args;
     const storage = await loadCONDUCKSWorkspace(workspace_path);
-    
+
     // Filter for active jobs (not all tasks completed)
     const activeJobsRecords = storage.jobs.filter(j => {
       const total = j.tasks.length;
       const completed = j.tasks.filter(t => t.status === 'completed').length;
       return completed < total || total === 0; // zero-task jobs considered active
     });
-    
+
     let output = `active_jobs[${activeJobsRecords.length}]:\n`;
 
     if (activeJobsRecords.length === 0) {
@@ -64,3 +64,22 @@ export async function handleListActiveJobs(args: ListActiveJobsArgs) {
     };
   }
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const listActiveJobsTool: Tool<ListActiveJobsArgs> = {
+  name: "list_active_jobs",
+  description: "List all active jobs with progress status for a specific workspace.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string", description: "Workspace identifier" }
+    },
+    required: ["workspace_path"]
+  },
+  handler: async (args: ListActiveJobsArgs) => {
+    const result = await handleListActiveJobs(args);
+    return result.content[0].text;
+  },
+  formatter: (result: string) => result
+};

@@ -5,8 +5,8 @@ import { loadCONDUCKSWorkspace, saveJobForWorkspace } from '../core/storage.js';
 // NOTE: Tool updated to support dynamic workspace paths
 
 interface MoveTaskArgs {
-  workspace_path?: string;
-  project: string;
+  workspace_path?: string; // Default 'default'; required if project is not 'default'
+  project?: string;
   subproject?: string;
   task_file: string; // e.g., "task_001_setup-database.md"
   target_folder: 'to-do' | 'done-to-do' | 'analysis' | 'problem-solution';
@@ -29,15 +29,9 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
 
     // Import getWorkspacePaths dynamically
     const { getWorkspacePaths } = await import('../core/config.js');
-    // Require project parameter - no more defaults
-    if (!project) {
-      return {
-        success: false,
-        message: 'project parameter is required'
-      };
-    }
-    const projectName = project;
-    const paths = getWorkspacePaths(workspace_path, ''); // Use empty project to avoid double-directory
+    // Optional project parameter
+    const projectName = project || workspace_path;
+    const paths = getWorkspacePaths(workspace_path, project || ''); // Use provided project or default to empty
 
     // Support both multi-service (with project/subproject) and single-repo (workspace root only)
     // If subproject is provided, we use it. If not, we assume project root (legacy/single-repo).
@@ -48,7 +42,7 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
 
     // Prevent double-directory issue when subproject name matches project/workspace name
     const actualSubprojectPath = (subproject === projectName) ? '' : (subproject || '');
-    const subprojectBase = (project && subproject)
+    const subprojectBase = subproject
       ? join(paths.tasksRoot, actualSubprojectPath)
       : paths.tasksRoot;
 
@@ -86,7 +80,7 @@ export async function handleMoveTask(args: MoveTaskArgs): Promise<MoveTaskResult
       };
     }
 
-    const destDir = (project && subproject)
+    const destDir = subproject
       ? paths.getSubprojectDir(actualSubprojectPath, target_folder)
       : join(subprojectBase, target_folder);
 
@@ -163,3 +157,24 @@ export function formatMoveTaskResult(result: MoveTaskResult): string {
 
   return `task_moved:\n  message: "${result.message}"\n  new_path: ${result.newPath}`;
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const moveTaskTool: Tool<MoveTaskArgs> = {
+  name: "move_task",
+  description: "Transition a task between workflow stages (e.g., `to-do` -> `analysis` -> `done-to-do`).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string", description: "Workspace identifier (required if project is not 'ProjectX')" },
+      project: { type: "string", description: "Project name (optional, defaults to 'ProjectX')" },
+      subproject: { type: "string", description: "Subproject name" },
+      task_file: { type: "string", description: "Task filename (e.g., 'task_001_setup-database.md' - include .md extension)" },
+      target_folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Target folder" },
+      source_folder: { type: "string", enum: ["to-do", "done-to-do", "analysis", "problem-solution"], description: "Optional source folder (auto-detected if not provided)" }
+    },
+    required: ["subproject", "task_file", "target_folder"]
+  },
+  handler: handleMoveTask,
+  formatter: formatMoveTaskResult
+};

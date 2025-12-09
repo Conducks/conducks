@@ -488,3 +488,29 @@ export function formatInitResult(result: InitResult): string {
 
   return output;
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const initializeProjectStructureTool: Tool<any> = {
+  name: "initialize_project_structure",
+  description: "**STEP 1 (REQUIRED):** Initialize workspace and get system status. **MUST BE RUN BEFORE ANY OTHER TOOL.** Safe to call anytime to check status.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      project_path: { type: "string", description: "Full absolute filesystem path to workspace root (REQUIRED for accurate structure detection). Example: '/Users/username/my-project' or '/home/user/project'" },
+      project_name: { type: "string", description: "Optional: Override detected project name" },
+      auto_select: { type: "boolean", description: "Optional: Automatically include all detected subprojects" },
+      include_subprojects: { type: "array", items: { type: "string" }, description: "Optional: Filter to only include these specific subproject names if auto_select=false" }
+    },
+    required: ["project_path"]
+  },
+  handler: async (args: any) => {
+    // Map MCP parameter name to handler parameter name
+    const handlerArgs = {
+      ...args,
+      workspace_path: args.project_path
+    };
+    return handleInitializeProjectStructure(handlerArgs);
+  },
+  formatter: formatInitResult
+};

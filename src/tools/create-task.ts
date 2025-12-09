@@ -96,7 +96,7 @@ export async function handleCreateTask(args: CreateTaskArgs): Promise<CreateTask
     await saveJobForWorkspace(job, workspacePath, false);
 
     const subproject = args.subproject;
-    const project = ''; // No hardcoded project - use workspace root
+    const project = args.project || ''; // Use provided project or default to empty
 
     // Import getWorkspacePaths dynamically to avoid circular dependencies if any
     const { getWorkspacePaths } = await import('../core/config.js');
@@ -145,3 +145,29 @@ export function formatCreateTaskResult(result: CreateTaskResult): string {
   if (!result.success) return `task_creation_failed: "${result.message}"`;
   return `task_created:\n  id: ${result.task?.id}\n  title: "${result.task?.title}"\n  file: ${result.task?.filePath}\n  next_action: "edit task file or add more tasks"`;
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const createTaskTool: Tool<CreateTaskArgs> = {
+  name: "create_task",
+  description: "Step 3a: Add a SINGLE task to an existing job. **Required for tracking work.** Use `batch_create_tasks` for bulk creation.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string", description: "Workspace identifier (optional, defaults to 'docs-organization')" },
+      job_id: { type: "number", description: "Parent job ID" },
+      title: { type: "string", description: "Task title" },
+      description: { type: "string", description: "Task description" },
+      priority: { type: "string", enum: ["high", "medium", "low", "critical"] },
+      complexity: { type: "string", enum: ["simple", "medium", "complex"] },
+      team: { type: "string", description: "Team responsible" },
+      service: { type: "string", description: "Service name" },
+      dependencies: { type: "array", items: { type: "string" }, description: "Task dependencies" },
+      subproject: { type: "string", description: "Subproject name (e.g., 'conducks', 'website', 'DOCS')" },
+      folder: { type: "string", description: "Folder for task file (e.g., 'to-do', 'analysis', 'problem-solution'; defaults to 'to-do')" }
+    },
+    required: ["job_id", "title", "description"]
+  },
+  handler: handleCreateTask,
+  formatter: formatCreateTaskResult
+};

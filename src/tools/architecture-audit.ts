@@ -220,3 +220,20 @@ export function formatArchitectureAuditResult(result: ArchitectureAuditResult): 
 
   return out;
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const architectureAuditTool: Tool<ArchitectureAuditArgs> = {
+  name: "architecture_audit",
+  description: "Audit repository structure for fragmentation and optimization opportunities. Returns a file tree analysis.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string" },
+      depth: { type: "number" }
+    },
+    required: ["workspace_path"]
+  },
+  handler: handleArchitectureAudit,
+  formatter: formatArchitectureAuditResult
+};

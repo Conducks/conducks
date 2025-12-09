@@ -41,11 +41,12 @@ describe('CONDUCKS Dynamic Project Paths', () => {
 
         // 1. Create Job
         const jobResult = await handleCreateJob({
-            workspace_id: 'test-workspace',
+            workspace_path: 'test-workspace',
             name: 'Custom Project Job',
             description: 'Job for custom project',
             priority: 'high'
         });
+        if (!jobResult.success) console.error('Dynamic Job Create Failed:', jobResult);
         assert.ok(jobResult.success);
         const jobId = jobResult.jobs[0].id;
 
@@ -56,7 +57,7 @@ describe('CONDUCKS Dynamic Project Paths', () => {
             description: 'Task in custom project',
             subproject: 'backend',
             project: 'MyCustomApp', // Custom project name
-            workspace_id: 'test-workspace'
+            workspace_path: 'test-workspace'
         });
 
         console.log('Task Result:', JSON.stringify(taskResult, null, 2));
@@ -84,7 +85,7 @@ describe('CONDUCKS Dynamic Project Paths', () => {
             task_file: taskFile!,
             target_folder: 'done-to-do',
             source_folder: 'to-do',
-            workspace_id: 'test-workspace'
+            workspace_path: 'test-workspace'
         });
 
         assert.ok(moveResult.success, 'Move should succeed');

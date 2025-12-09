@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "condocs": {
+      "command": "node",
+      "args": [
+        "/Users/saidmustafa/Documents/Gospel_Of_Technology/CONDUCKS/conducks/build/index.js"
+      ],
+      "alwaysAllow": [
+        "initialize_project_structure",
+        "create_job",
+        "create_task",
+        "batch_create_tasks",
+        "list_active_jobs",
+        "list_completed_jobs",
+        "list_jobs_enhanced",
+        "move_task",
+        "complete_job",
+        "delete_job",
+        "edit_task",
+        "replace_lines",
+        "rewrite_domain",
+        "append_task",
+        "remove_task",
+        "architecture_audit"
+      ],
+      "disabled": false
+    }
+  }
+}

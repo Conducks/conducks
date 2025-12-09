@@ -11,7 +11,7 @@ function createWindow() {
 	mainWindow = new BrowserWindow({
 		width: 1200,
 		height: 800,
-		icon: path.join(__dirname, 'src/dashboard/public/logo.png'),
+		icon: path.join(__dirname, 'build/dashboard/public/logo.png'),
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -24,24 +24,23 @@ function createWindow() {
 	});
 }
 
-let dashboardProcess = null;
+let dashboardServer = null;
 
-function startDashboardServer() {
-	// Start Express dashboard server in background
-	dashboardProcess = spawn(
-		'node',
-		[path.join(__dirname, 'build/dashboard/server.js')],
-		{
-			stdio: 'inherit',
-			detached: false,
-		}
-	);
+async function startDashboardServer() {
+	try {
+		// Dynamic import of the ESM build
+		const serverModule = await import(path.join(__dirname, 'build/dashboard/server.js'));
+		dashboardServer = serverModule.startServer(2812);
+		console.log('Dashboard server started from Electron main process');
+	} catch (error) {
+		console.error('Failed to start dashboard server:', error);
+	}
 }
 
 function stopDashboardServer() {
-	if (dashboardProcess) {
-		dashboardProcess.kill();
-		dashboardProcess = null;
+	if (dashboardServer) {
+		dashboardServer.close();
+		dashboardServer = null;
 	}
 }
 

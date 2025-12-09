@@ -159,3 +159,38 @@ export function formatBatchCreateTasksResult(result: BatchCreateTasksResult): st
 
   return output;
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const batchCreateTasksTool: Tool<BatchCreateTasksArgs> = {
+  name: "batch_create_tasks",
+  description: "Step 3b: Add MULTIPLE tasks to an existing job at once. Efficient for initial job population.\\n\\n**BEFORE calling this tool, you SHOULD:**\\n1. Ask the user what tasks they want to create\\n2. Optionally: Analyze the codebase related to the job domain\\n3. Present a suggested task list to the user for confirmation\\n4. Only create tasks after user approval\\n\\nAfter creating tasks, offer to analyze the codebase and create detailed TODO.md files for each task.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string", description: "Workspace identifier" },
+      job_id: { type: "number", description: "Parent job ID" },
+      tasks: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            priority: { type: "string", enum: ["high", "medium", "low", "critical"] },
+            complexity: { type: "string", enum: ["simple", "medium", "complex"] },
+            team: { type: "string" },
+            service: { type: "string" },
+            dependencies: { type: "array", items: { type: "string" } },
+            subproject: { type: "string" },
+            folder: { type: "string" }
+          },
+          required: ["title", "description"]
+        }
+      }
+    },
+    required: ["workspace_path", "job_id", "tasks"]
+  },
+  handler: handleBatchCreateTasks,
+  formatter: formatBatchCreateTasksResult
+};

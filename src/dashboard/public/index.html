@@ -35,6 +35,10 @@
           <span class="nav-icon" id="icon-files"></span>
           <span>Files</span>
         </div>
+        <div class="nav-item" data-section="setup">
+          <span class="nav-icon" id="icon-setup"></span>
+          <span>Setup</span>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="workspace-info">
@@ -103,6 +107,33 @@
           </div>
         </div>
 
+        <!-- Setup Section -->
+        <div id="setup" class="content-section">
+          <div class="page-header">
+            <h1>Connect to Claude</h1>
+          </div>
+          <div class="content-grid">
+            <div class="card">
+              <h3>Automatic Setup</h3>
+              <p>Click the button below to install the MCP server to <code>~/.conducks</code> and configure Claude
+                automatically.</p>
+              <button class="btn btn-primary" id="btn-install-mcp" onclick="app.installMcpServer()">
+                Install to Claude
+              </button>
+              <button class="btn btn-secondary" id="btn-uninstall-mcp" onclick="app.uninstallMcpServer()"
+                style="margin-left: 10px; background-color: #dc3545; border-color: #dc3545; color: white;">
+                Uninstall
+              </button>
+              <div id="install-status" class="status-message"></div>
+            </div>
+            <div class="card">
+              <h3>Manual Configuration</h3>
+              <p>Add this to your <code>claude_desktop_config.json</code>:</p>
+              <pre id="config-preview" class="code-block"></pre>
+            </div>
+          </div>
+        </div>
+
         <!-- File Preview Section -->
         <div id="preview" class="content-section">
           <div class="page-header">
@@ -142,6 +173,7 @@
       document.getElementById('icon-files').innerHTML = getIcon('folder', 20);
       document.getElementById('icon-plus').innerHTML = getIcon('plus', 20);
       document.getElementById('icon-file-preview').innerHTML = getIcon('fileText', 24);
+      document.getElementById('icon-setup').innerHTML = getIcon('settings', 20);
     });
   </script>
 </body>

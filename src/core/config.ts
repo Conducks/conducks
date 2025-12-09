@@ -59,6 +59,15 @@ function getWorkspacePaths(workspacePath: string, project: string, createPath: b
     throw new Error('Invalid workspace path: security violation');
   }
 
+  // Security: validate project and subproject if provided (prevent path traversal)
+  if (project && (project.includes('..') || project.includes('/') || project.includes('\\'))) {
+    throw new Error('Invalid project name: security violation');
+  }
+
+  // Note: subproject is passed to getSubprojectDir, so we can't validate it here easily unless we change signature
+  // But we can validate it inside getSubprojectDir closure below
+
+
   const storageRoot = path.resolve(process.env.CONDUCKS_STORAGE_ROOT || DEFAULT_INTERNAL_STORAGE);
   const workspaceDir = path.join(storageRoot, workspacePath);
 
@@ -68,10 +77,14 @@ function getWorkspacePaths(workspacePath: string, project: string, createPath: b
     jobsToDoDir: createPath ? path.join(workspacePath, 'jobs', 'to-do') : path.join(workspaceDir, 'jobs', 'to-do'),
     jobsDoneDir: createPath ? path.join(workspacePath, 'jobs', 'done-to-do') : path.join(workspaceDir, 'jobs', 'done-to-do'),
     tasksRoot: createPath ? path.join(workspacePath, project) : path.join(workspaceDir, project),
-    getSubprojectDir: (subproject: string | undefined, folder: string = 'to-do') =>
-      createPath ?
+    getSubprojectDir: (subproject: string | undefined, folder: string = 'to-do') => {
+      if (subproject && (subproject.includes('..') || subproject.includes('/') || subproject.includes('\\'))) {
+        throw new Error('Invalid subproject name: security violation');
+      }
+      return createPath ?
         path.join(workspacePath, project, subproject || '', folder) :
-        path.join(workspaceDir, project, subproject || '', folder)
+        path.join(workspaceDir, project, subproject || '', folder);
+    }
   };
 }
 export { getWorkspacePaths };

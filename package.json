@@ -2,6 +2,8 @@
 	"name": "conducks",
 	"version": "0.1.0",
 	"description": "keep agent orgianzed and memory always refresh by consolidating their docs in a organized manner",
+	"author": "Conducks Team",
+	"main": "electron-main.cjs",
 	"private": true,
 	"type": "module",
 	"bin": {
@@ -19,7 +21,8 @@
 		"test:verbose": "npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test --test-reporter=spec build/test/**/*.test.js",
 		"type-check": "tsc --noEmit",
 		"dashboard": "ts-node src/dashboard/server.ts",
-		"start:desktop": "electron electron-main.cjs"
+		"start:desktop": "electron electron-main.cjs",
+		"dist": "npm run build && electron-builder"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.22.0",
@@ -39,7 +42,31 @@
 		"@types/marked": "^5.0.2",
 		"@types/node": "^20.11.24",
 		"electron": "^39.2.3",
+		"electron-builder": "^24.13.3",
 		"ts-node": "^10.9.2",
 		"typescript": "^5.3.3"
+	},
+	"build": {
+		"appId": "com.conducks.app",
+		"productName": "CONDUCKS",
+		"icon": "build/dashboard/public/logo.png",
+		"files": [
+			"build/**/*",
+			"electron-main.cjs",
+			"package.json"
+		],
+		"directories": {
+			"output": "dist"
+		},
+		"mac": {
+			"category": "public.app-category.productivity",
+			"identity": null
+		},
+		"win": {
+			"target": "nsis"
+		},
+		"linux": {
+			"target": "AppImage"
+		}
 	}
 }

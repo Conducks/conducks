@@ -166,3 +166,21 @@ export function formatDeleteJobResult(result: DeleteJobResult): string {
 
   return output;
 }
+
+import { Tool } from '../core/tool-registry.js';
+
+export const deleteJobTool: Tool<DeleteJobArgs> = {
+  name: "delete_job",
+  description: "Permanently delete a job and ALL its task files. **WARNING: IRREVERSIBLE.** Use with caution.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      workspace_path: { type: "string", description: "Workspace identifier" },
+      job_id: { type: "number", description: "Job ID to delete" },
+      confirm_deletion: { type: "boolean", description: "Must be true to proceed" }
+    },
+    required: ["workspace_path", "job_id", "confirm_deletion"]
+  },
+  handler: handleDeleteJob,
+  formatter: formatDeleteJobResult
+};

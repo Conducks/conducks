@@ -4,13 +4,18 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
 import { readFileSync, readdirSync, existsSync } from 'fs';
+import { copySync, writeJsonSync, readJsonSync, ensureDirSync, removeSync } from 'fs-extra';
 import { marked } from 'marked';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Storage root (same logic as other tools - absolute relative to conducks root)
-const getStorageRoot = () => process.env.CONDUCKS_STORAGE_ROOT || resolve(__dirname, '..', '..', 'storage');
+const getStorageRoot = () => {
+    const root = process.env.CONDUCKS_STORAGE_ROOT || resolve(__dirname, '..', '..', 'storage');
+    console.log(`📂 Storage Root: ${root}`);
+    return root;
+};
 
 const app = express();
 app.use(cors());
@@ -22,7 +27,7 @@ app.use(express.static(join(__dirname, 'public')));
 
 // Serve index.html for all non-API routes (SPA fallback)
 app.get(/^\/(?!api).*/, (req: Request, res: Response) => {
-  res.sendFile(join(__dirname, 'public', 'index.html'));
+    res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
 // API: return tool call log (line‑delimited JSON)
@@ -94,10 +99,37 @@ app.get('/api/workspaces', (req: Request, res: Response) => {
     }
 });
 
-// API: list jobs for a workspace
+// API: list jobs for a workspace with architecture mode detection
 app.get('/api/jobs/:workspace', (req: Request, res: Response) => {
     const { workspace } = req.params;
     const jobs = [];
+    let projectMode = 'unknown';
+
+    // Detect architecture mode based on storage structure
+    try {
+        const workspacePath = join(getStorageRoot(), workspace);
+        if (existsSync(join(workspacePath, 'jobs'))) {
+            // Has jobs folder - this is a properly initialized workspace
+            const hasDirectTasks = existsSync(join(workspacePath, 'to-do'));
+            const hasSubprojects = readdirSync(workspacePath)
+                .filter(item => {
+                    const itemPath = join(workspacePath, item);
+                    return existsSync(itemPath) &&
+                        readdirSync(itemPath).some(sub => sub === 'to-do' && existsSync(join(itemPath, sub)));
+                })
+                .length > 0;
+
+            if (hasDirectTasks && !hasSubprojects) {
+                projectMode = 'single-project';
+            } else if (!hasDirectTasks && hasSubprojects) {
+                projectMode = 'multi-project';
+            } else {
+                projectMode = 'mixed';
+            }
+        }
+    } catch (e) {
+        // Continue with unknown mode
+    }
 
     // Load from to-do folder
     try {
@@ -110,6 +142,7 @@ app.get('/api/jobs/:workspace', (req: Request, res: Response) => {
                         const content = readFileSync(join(todoPath, file), 'utf-8');
                         const job = JSON.parse(content);
                         job.location = 'to-do';
+                        job.project_mode = projectMode;
                         jobs.push(job);
                     } catch (e) {
                         // Skip invalid JSON
@@ -132,6 +165,7 @@ app.get('/api/jobs/:workspace', (req: Request, res: Response) => {
                         const content = readFileSync(join(donePath, file), 'utf-8');
                         const job = JSON.parse(content);
                         job.location = 'done-to-do';
+                        job.project_mode = projectMode;
                         jobs.push(job);
                     } catch (e) {
                         // Skip invalid JSON
@@ -143,7 +177,7 @@ app.get('/api/jobs/:workspace', (req: Request, res: Response) => {
         // Silently ignore errors for this folder
     }
 
-    res.json(jobs);
+    res.json({ jobs, project_mode: projectMode });
 });
 
 // API: get job details
@@ -238,7 +272,116 @@ app.get('/api/project-structure/:workspace', (req: Request, res: Response) => {
     }
 });
 
-const PORT = process.env.CONDUCKS_DASHBOARD_PORT || 2812;
-app.listen(PORT, () => {
-    console.log(`🔧 CONDUCKS dashboard listening on http://localhost:${PORT}`);
+// API: Get config preview
+app.get('/api/config-preview', (req: Request, res: Response) => {
+    try {
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+        const installDir = join(homeDir, '.conducks');
+        const storageRoot = getStorageRoot();
+
+        const config = {
+            mcpServers: {
+                conducks: {
+                    command: "node",
+                    args: [join(installDir, "index.js")],
+                    env: {
+                        CONDUCKS_STORAGE_ROOT: storageRoot
+                    }
+                }
+            }
+        };
+        res.json(config);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to generate config preview' });
+    }
 });
+
+// API: Install MCP server
+app.post('/api/setup', (req: Request, res: Response) => {
+    try {
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+        const installDir = join(homeDir, '.conducks');
+        const claudeConfigPath = join(homeDir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+
+        // 1. Create install directory
+        ensureDirSync(installDir);
+
+        // 2. Copy build files
+        // We need to copy the entire build directory to ensure dependencies work
+        // In a real app, we might want to bundle this better, but for now copying build/ works
+        const buildDir = resolve(__dirname, '..'); // assuming server.ts is in build/dashboard/
+        copySync(buildDir, installDir, { overwrite: true });
+
+        // 3. Update Claude config
+        let claudeConfig: any = {};
+        if (existsSync(claudeConfigPath)) {
+            try {
+                claudeConfig = readJsonSync(claudeConfigPath);
+            } catch (e) {
+                // Ignore invalid config, start fresh
+            }
+        }
+
+        claudeConfig.mcpServers = claudeConfig.mcpServers || {};
+        claudeConfig.mcpServers.conducks = {
+            command: "node",
+            args: [join(installDir, "index.js")],
+            env: {
+                CONDUCKS_STORAGE_ROOT: getStorageRoot()
+            }
+        };
+
+        ensureDirSync(dirname(claudeConfigPath));
+        writeJsonSync(claudeConfigPath, claudeConfig, { spaces: 2 });
+
+        res.json({ success: true, path: installDir });
+    } catch (e: any) {
+        console.error('Setup failed:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// API: Uninstall MCP server
+app.post('/api/uninstall', (req: Request, res: Response) => {
+    try {
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+        const installDir = join(homeDir, '.conducks');
+        const claudeConfigPath = join(homeDir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+
+        // 1. Remove install directory
+        if (existsSync(installDir)) {
+            removeSync(installDir);
+        }
+
+        // 2. Remove from Claude config
+        if (existsSync(claudeConfigPath)) {
+            try {
+                const claudeConfig = readJsonSync(claudeConfigPath);
+                if (claudeConfig.mcpServers && claudeConfig.mcpServers.conducks) {
+                    delete claudeConfig.mcpServers.conducks;
+                    writeJsonSync(claudeConfigPath, claudeConfig, { spaces: 2 });
+                }
+            } catch (e) {
+                // Ignore config errors
+            }
+        }
+
+        res.json({ success: true });
+    } catch (e: any) {
+        console.error('Uninstall failed:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+const PORT = process.env.CONDUCKS_DASHBOARD_PORT || 2812;
+
+export function startServer(port: number | string = PORT) {
+    return app.listen(port, () => {
+        console.log(`🔧 CONDUCKS dashboard listening on http://localhost:${port}`);
+    });
+}
+
+// Auto-start if run directly (ESM check)
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    startServer();
+}
