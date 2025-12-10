@@ -5,9 +5,17 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Paths for logs
-const PROJECT_LOG_PATH = join(__dirname, '../../project.log');
-const CALLS_LOG_PATH = join(__dirname, '../../dashboard/calls.log');
+// Paths for logs - use storage root if available, otherwise fallback to relative
+const getLogRoot = () => {
+    if (process.env.CONDUCKS_STORAGE_ROOT) {
+        return process.env.CONDUCKS_STORAGE_ROOT;
+    }
+    return join(__dirname, '../../');
+};
+
+const LOG_ROOT = getLogRoot();
+const PROJECT_LOG_PATH = join(LOG_ROOT, 'project.log');
+const CALLS_LOG_PATH = join(LOG_ROOT, 'calls.log');
 
 /**
  * Enhanced logging for comprehensive MCP debugging

@@ -441,47 +441,59 @@ CONDUCKS supports the following environment variables for customization:
 }
 ```
 
-## Installation & Setup
-
-### Prerequisites
-
-- Node.js 18+
-- npm
-
-### For Claude Desktop
-
-On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
-
-```json
-{
-	"mcpServers": {
-		"conducks": {
-			"command": "/path/to/conducks/build/index.js"
-		}
-	}
-}
-```
-
-### Development Setup
-
-```bash
-git clone https://github.com/your-repo/conducks
-cd conducks
-npm install
-npm run build
-npm test  # Run comprehensive test suite
-```
-
-### Debugging
-
-Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
-
-```bash
-npm run inspector
-```
-
-The Inspector will provide a URL to access debugging tools in your browser.
+## 🚀 Getting Started
+ 
+ ### 1. Install the App
+ 1. Download the latest release for your OS (macOS/Windows/Linux).
+ 2. Install and launch the **CONDUCKS** application.
+ 
+ ### 2. Connect to Claude
+ The app manages the MCP server installation for you.
+ 
+ 1. Open the CONDUCKS Dashboard.
+ 2. Go to the **Setup** tab in the sidebar.
+ 3. Click **"Install to Claude"**.
+ 
+ This will automatically:
+ - Copy the server files to `~/.conducks`.
+ - Configure your `claude_desktop_config.json`.
+ 
+ ### 3. Start Using It
+ Restart Claude Desktop, and the `conducks` tools will be available!
+ 
+ ## 🛠️ Building from Source
+ 
+ If you want to build the application yourself:
+ 
+ ```bash
+ # 1. Clone the repository
+ git clone https://github.com/conducks/conducks
+ cd conducks
+ 
+ # 2. Install dependencies
+ npm install
+ 
+ # 3. Build the distribution package
+ npm run dist
+ ```
+ 
+ The packaged application (e.g., `.dmg`, `.exe`) will be created in the `dist/` directory.
+ 
+ ### Development
+ 
+ ```bash
+ # Run locally (Dashboard + Electron)
+ npm run start:desktop
+ 
+ # Run automated tests
+ npm test
+ ```
+ 
+ ### Uninstalling
+ To remove CONDUCKS from Claude:
+ 1. Open the Dashboard and go to the **Setup** tab.
+ 2. Click **"Uninstall"**.
+ 3. Restart Claude Desktop.
 
 ## 🏗️ Architecture
 

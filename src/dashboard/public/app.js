@@ -1,8 +1,15 @@
 /** @format */
 
 document.addEventListener('DOMContentLoaded', function () {
-	const app = {
-		currentWorkspace: null,
+	// Main application logic
+	window.app = {
+		state: {
+			jobs: [],
+			activeJob: null,
+			workspaces: [],
+			currentWorkspace: null,
+		},
+		currentWorkspace: null, // Keep existing properties for now, will be managed by state later
 		currentSection: 'overview',
 		currentFile: null,
 
@@ -10,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			this.setupTabs();
 			this.loadWorkspaces();
 			this.bindEvents();
+			console.log('App initialized and exposed to window.app for debugging.');
 		},
 
 		setupTabs() {
@@ -149,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 				// Show loading state
 				document.getElementById('overview-stats').innerHTML = `
-                    <div class="stats-grid">
+					<div class="stats-grid">
                         <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
                         <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
                         <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
@@ -158,11 +166,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
                         <div class="stat-card skeleton"><div class="stat-title skeleton-text"></div><div class="skeleton-text"></div><div class="skeleton-text"></div></div>
                     </div>
-                    <div class="card">
-                        <h3>Recent Jobs</h3>
-                        <div class="skeleton" style="height: 200px;"></div>
-                    </div>
-                `;
+					<div class="card">
+						<h3>Recent Jobs</h3>
+						<div class="skeleton" style="height: 200px;"></div>
+					</div>
+				`;
 
 				let modeDescription = '';
 				if (project_mode === 'single-project') {
@@ -177,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 				// Update with real data
 				document.getElementById('overview-stats').innerHTML = `
-                    <div class="stats-grid">
+					<div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-title">Architecture</div>
                             <div id="architecture-mode">${modeDescription}</div>
@@ -209,15 +217,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         </div>
                     </div>
 
-                    <div class="card">
-                        <h3>Recent Jobs</h3>
-                        <div id="recent-jobs">
-                            ${jobs
+					<div class="card">
+						<h3>Recent Jobs</h3>
+						<div id="recent-jobs">
+							${jobs
 						.slice(0, 5)
 						.map(
 							(job) => `
-                                <div class="job-item" onclick="app.showJobDetails(${job.id
-								})">
+                                <div class="job-item" onclick="app.showJobDetails(${job.id})">
                                     <strong>#${job.id} - ${job.title}</strong>
                                     <div class="flex-between">
                                         <span class="status-indicator status-${job.location === 'to-do'
@@ -235,9 +242,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             `
 						)
 						.join('')}
-                        </div>
-                    </div>
-                `;
+						</div>
+					</div>
+				`;
 			} catch (error) {
 				console.error('Failed to load overview:', error);
 				document.getElementById('overview-stats').innerHTML = '<p>Failed to load overview data.</p>';
@@ -252,10 +259,10 @@ document.addEventListener('DOMContentLoaded', function () {
 			try {
 				// Show loading state
 				jobsContainer.innerHTML = `
-				<div class="skeleton skeleton-card"></div>
-				<div class="skeleton skeleton-card"></div>
-				<div class="skeleton skeleton-card"></div>
-			`;
+					<div class="skeleton skeleton-card"></div>
+					<div class="skeleton skeleton-card"></div>
+					<div class="skeleton skeleton-card"></div>
+				`;
 
 				const response = await fetch(`/api/jobs/${this.currentWorkspace}`);
 				const jobs = await response.json();
@@ -276,7 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
 					const statusClass = job.location === 'to-do' ? 'active' : 'completed';
 
 					jobElement.innerHTML = `
-                        <div class="flex-between">
+						<div class="flex-between">
                             <h3>#${job.id} - ${job.title}</h3>
                             <div class="status-indicator status-${statusClass}">${status}</div>
                         </div>
@@ -285,7 +292,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <span class="tag">${job.domain || 'general'}</span>
                             <span>${job.tasks.length} tasks</span>
                         </div>
-                    `;
+					`;
 
 					jobsContainer.appendChild(jobElement);
 				});
@@ -378,10 +385,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 				if (node.type === 'file') {
 					element.onclick = () => this.showFilePreview(node.path);
-					const fileIcon = node.ext === 'md' ? getIcon('fileText', 16) : getIcon('file', 16);
+					// Assuming getIcon is defined globally or we need to mock it/import it. 
+					// For now, using simple text if getIcon is missing, but assuming it exists in icons.js
+					const fileIcon = typeof getIcon === 'function' ? (node.ext === 'md' ? getIcon('fileText', 16) : getIcon('file', 16)) : '📄';
 					element.innerHTML = `${fileIcon} <span>${node.name}</span>`;
 				} else {
-					const folderIcon = getIcon('folder', 16);
+					const folderIcon = typeof getIcon === 'function' ? getIcon('folder', 16) : '📁';
 					element.innerHTML = `
                         ${folderIcon} <span>${node.name}</span>
                         <div class="tree-children" style="display: none;"></div>
@@ -445,6 +454,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		},
 
 		async installMcpServer() {
+			console.log('Starting installation...');
 			const statusDiv = document.getElementById('install-status');
 			const btn = document.getElementById('btn-install-mcp');
 
@@ -510,5 +520,5 @@ document.addEventListener('DOMContentLoaded', function () {
 	};
 
 	// Initialize the app
-	app.init();
+	window.app.init();
 });

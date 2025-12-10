@@ -4,7 +4,9 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
 import { readFileSync, readdirSync, existsSync } from 'fs';
-import { copySync, writeJsonSync, readJsonSync, ensureDirSync, removeSync } from 'fs-extra';
+import { execSync } from 'child_process';
+import fsExtra from 'fs-extra';
+const { copySync, writeJsonSync, readJsonSync, ensureDirSync, removeSync } = fsExtra;
 import { marked } from 'marked';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,6 +16,14 @@ const __dirname = dirname(__filename);
 const getStorageRoot = () => {
     const root = process.env.CONDUCKS_STORAGE_ROOT || resolve(__dirname, '..', '..', 'storage');
     console.log(`📂 Storage Root: ${root}`);
+
+    // Ensure storage directory exists
+    try {
+        ensureDirSync(root);
+    } catch (e) {
+        console.error(`Failed to create storage root at ${root}:`, e);
+    }
+
     return root;
 };
 
@@ -32,7 +42,8 @@ app.get(/^\/(?!api).*/, (req: Request, res: Response) => {
 
 // API: return tool call log (line‑delimited JSON)
 app.get('/api/calls', (req: Request, res: Response) => {
-    const logPath = join(__dirname, 'calls.log');
+    const root = process.env.CONDUCKS_STORAGE_ROOT || join(__dirname, '..', '..');
+    const logPath = join(root, 'calls.log');
     try {
         const data = readFileSync(logPath, 'utf-8');
         const lines = data.trim().split('\n').filter(Boolean).map((l: string) => JSON.parse(l));
@@ -304,14 +315,38 @@ app.post('/api/setup', (req: Request, res: Response) => {
         const claudeConfigPath = join(homeDir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
 
         // 1. Create install directory
+        // 1. Create/Clean install directory
         ensureDirSync(installDir);
+        fsExtra.emptyDirSync(installDir);
 
-        // 2. Copy build files
-        // We need to copy the entire build directory to ensure dependencies work
-        // In a real app, we might want to bundle this better, but for now copying build/ works
-        const buildDir = resolve(__dirname, '..'); // assuming server.ts is in build/dashboard/
-        copySync(buildDir, installDir, { overwrite: true });
+        // 2. Copy build files with bundled node_modules
+        // Always use the build directory which contains bundled dependencies
+        let buildDir = resolve(__dirname, '..', '..', 'build');
 
+        // Fix for Electron packaged app: fs-extra copySync fails with ENOTDIR when copying from ASAR.
+        // We must use the unpacked directory.
+        if (buildDir.includes('app.asar')) {
+            buildDir = buildDir.replace('app.asar', 'app.asar.unpacked');
+        }
+
+        // node_modules is a sibling of build in the unpacked app (e.g. app.asar.unpacked/node_modules)
+        const nodeModulesSource = resolve(buildDir, '..', 'node_modules');
+
+        console.log(`Copying from ${buildDir} to ${installDir}`);
+        copySync(buildDir, installDir, { overwrite: true, dereference: true });
+
+        // Explicitly copy node_modules if found (primary install method for packaged app)
+        if (existsSync(nodeModulesSource)) {
+            console.log(`Copying bundled node_modules from ${nodeModulesSource}...`);
+            copySync(nodeModulesSource, join(installDir, 'node_modules'), { overwrite: true, dereference: true });
+        }
+
+        try {
+            console.log('Running npm install in install directory (fallback)...');
+            execSync('npm install --production --ignore-scripts', { cwd: installDir, stdio: 'inherit' });
+        } catch (e) {
+            console.warn('npm install failed, but bundled modules might be sufficient:', e);
+        }
         // 3. Update Claude config
         let claudeConfig: any = {};
         if (existsSync(claudeConfigPath)) {

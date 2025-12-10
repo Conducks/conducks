@@ -13,7 +13,7 @@
 		"build"
 	],
 	"scripts": {
-		"build": "tsc && cp -r build/src/* build/ && rm -rf build/src && chmod 755 build/index.js && cp -r src/dashboard/public build/dashboard/",
+		"build": "tsc && cp -r build/src/* build/ && rm -rf build/src && chmod 755 build/index.js && cp package.json build/ && cd build && npm install --production --ignore-scripts && cd ..",
 		"prepare": "npm run build",
 		"watch": "tsc --watch",
 		"inspector": "npx @modelcontextprotocol/inspector build/index.js",
@@ -52,12 +52,17 @@
 		"icon": "build/dashboard/public/logo.png",
 		"files": [
 			"build/**/*",
+			"node_modules/**",
 			"electron-main.cjs",
 			"package.json"
 		],
 		"directories": {
 			"output": "dist"
 		},
+		"asarUnpack": [
+			"build/**/*",
+			"node_modules/**"
+		],
 		"mac": {
 			"category": "public.app-category.productivity",
 			"identity": null
