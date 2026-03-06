@@ -1,6 +1,5 @@
 import { CallToolRequestSchema, ListToolsRequestSchema, Tool as MCPTool } from "@modelcontextprotocol/sdk/types.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { logToolCall } from "../dashboard/logger.js";
 
 export interface Tool<T = any> {
     name: string;
@@ -41,7 +40,6 @@ export class ToolRegistry {
         try {
             const result = await tool.handler(args);
             const response = { content: [{ type: "text" as const, text: tool.formatter(result) }] };
-            logToolCall(name, args, response);
             return response;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -49,8 +47,6 @@ export class ToolRegistry {
                 content: [{ type: "text" as const, text: `❌ Error: ${errorMessage}` }],
                 isError: true
             };
-            // Log error as well
-            logToolCall(name, args, response);
             return response;
         }
     }
