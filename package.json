@@ -1,9 +1,8 @@
 {
 	"name": "conducks",
 	"version": "0.1.0",
-	"description": "keep agent orgianzed and memory always refresh by consolidating their docs in a organized manner",
+	"description": "rule-only guidance for intent clarification, code hygiene, and documentation parity",
 	"author": "Conducks Team",
-	"main": "electron-main.cjs",
 	"private": true,
 	"type": "module",
 	"bin": {
@@ -13,16 +12,11 @@
 		"build"
 	],
 	"scripts": {
-		"build": "tsc && cp -r build/src/* build/ && rm -rf build/src && chmod 755 build/index.js && cp package.json build/ && cd build && npm install --production --ignore-scripts && cd ..",
+		"build": "tsc && chmod 755 build/index.js && cp package.json build/ && cd build && npm install --production --ignore-scripts && cd ..",
 		"prepare": "npm run build",
 		"watch": "tsc --watch",
 		"inspector": "npx @modelcontextprotocol/inspector build/index.js",
-		"test": "npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test build/test/**/*.test.js",
-		"test:verbose": "npm run build && CONDUCKS_STORAGE_DIR=./build/test-workspace/storage node --import ./build/test/setup.js --test --test-reporter=spec build/test/**/*.test.js",
-		"type-check": "tsc --noEmit",
-		"dashboard": "ts-node src/dashboard/server.ts",
-		"start:desktop": "electron electron-main.cjs",
-		"dist": "npm run build && electron-builder"
+		"type-check": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.22.0",
@@ -41,37 +35,7 @@
 		"@types/fs-extra": "^11.0.4",
 		"@types/marked": "^5.0.2",
 		"@types/node": "^20.11.24",
-		"electron": "^39.2.3",
-		"electron-builder": "^24.13.3",
 		"ts-node": "^10.9.2",
 		"typescript": "^5.3.3"
-	},
-	"build": {
-		"appId": "com.conducks.app",
-		"productName": "CONDUCKS",
-		"icon": "build/dashboard/public/logo.png",
-		"files": [
-			"build/**/*",
-			"node_modules/**",
-			"electron-main.cjs",
-			"package.json"
-		],
-		"directories": {
-			"output": "dist"
-		},
-		"asarUnpack": [
-			"build/**/*",
-			"node_modules/**"
-		],
-		"mac": {
-			"category": "public.app-category.productivity",
-			"identity": null
-		},
-		"win": {
-			"target": "nsis"
-		},
-		"linux": {
-			"target": "AppImage"
-		}
 	}
 }
