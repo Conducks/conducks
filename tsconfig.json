@@ -4,6 +4,8 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "outDir": "./build",
+    "declaration": true,
+    "declarationMap": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

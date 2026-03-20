@@ -12,14 +12,11 @@ import { ToolRegistry } from "./core/tool-registry.js";
 
 // Tool imports
 import {
-  conducksPlanTool,
-  conducksExecuteTool,
-  conducksVerifyTool,
-  conducksMemoryTool,
-  conducksDocumentationTool,
-  conducksDesignStyleTool,
-  conducksNextBlueprintTool
-} from "./tools/rule-guidance.js";
+  lifecycleTool,
+  docsTool,
+  uiTool,
+  architectTool
+} from "./tools/guidance.js";
 
 // Server configuration
 const server = new Server(
@@ -40,13 +37,10 @@ const server = new Server(
 const registry = new ToolRegistry();
 
 // Register Tools
-registry.register(conducksPlanTool);
-registry.register(conducksExecuteTool);
-registry.register(conducksVerifyTool);
-registry.register(conducksMemoryTool);
-registry.register(conducksDocumentationTool);
-registry.register(conducksDesignStyleTool);
-registry.register(conducksNextBlueprintTool);
+registry.register(lifecycleTool);
+registry.register(docsTool);
+registry.register(uiTool);
+registry.register(architectTool);
 
 // Apply registry handlers to server
 registry.applyTo(server);
@@ -54,64 +48,72 @@ registry.applyTo(server);
 // --- RESOURCE REGISTRY ---
 
 const RESOURCES: Resource[] = [
-  // 1. CORE PHILOSOPHY
+  // 1. FOUNDATION (Core Philosophy & Meta)
   {
-    uri: "conducks://overview",
-    name: "[CORE] Framework Overview",
+    uri: "conducks://foundation/overview",
+    name: "[FOUNDATION] Framework Overview",
     description: "The mission statement for documentation-driven governance.",
     mimeType: "text/markdown",
   },
   {
-    uri: "conducks://index",
-    name: "[CORE] Resource & Keyword Index",
+    uri: "conducks://foundation/index",
+    name: "[FOUNDATION] Resource & Keyword Index",
     description: "The 'Map' of the CONDUCKS server. Use this to find specific rules.",
     mimeType: "text/markdown",
   },
   {
-    uri: "conducks://anti-patterns",
-    name: "[CORE] Wall of Shame (Anti-Patterns)",
+    uri: "conducks://foundation/anti-patterns",
+    name: "[FOUNDATION] Wall of Shame (Anti-Patterns)",
     description: "Common 'Vibe-Coding' mistakes and architectural sins to avoid.",
     mimeType: "text/markdown",
   },
 
-  // 2. BLUEPRINTS & TEMPLATES
+  // 2. ARCHITECT (Structure & Standards)
   {
-    uri: "conducks://blueprints/scaffold-structure",
-    name: "[BLUEPRINT] Pure Directory Scaffold",
+    uri: "conducks://architect/scaffold",
+    name: "[ARCHITECT] Pure Directory Scaffold",
     description: "Detailed machine-readable architecture and directory schema.",
     mimeType: "text/markdown",
   },
   {
-    uri: "conducks://templates/manager-pattern",
-    name: "[TEMPLATE] The Manager Pattern",
+    uri: "conducks://architect/manager-pattern",
+    name: "[ARCHITECT] The Manager Pattern",
     description: "Structural example of Shared Contracts | Client Hooks | Server Adapters.",
     mimeType: "text/markdown",
   },
-
-  // 3. STANDARDS & SCHEMAS
   {
-    uri: "conducks://standards/type-protocol",
-    name: "[STANDARD] TypeScript Type Protocol",
+    uri: "conducks://architect/type-protocol",
+    name: "[ARCHITECT] TypeScript Type Protocol",
     description: "Rules for naming, isolation, and interface usage.",
     mimeType: "application/json",
   },
   {
-    uri: "conducks://standards/api-contract",
-    name: "[STANDARD] Unified API Response Contract",
+    uri: "conducks://architect/api-contract",
+    name: "[ARCHITECT] Unified API Response Contract",
     description: "LEGO-brick schema for service communication.",
     mimeType: "application/json",
   },
+
+  // 3. UI (Design & Manifesto)
   {
-    uri: "conducks://standards/i18n-keys",
-    name: "[STANDARD] i18n JSON Schema",
+    uri: "conducks://ui/anti-vibe-manifesto",
+    name: "[UI] Anti-Vibe Manifesto",
+    description: "Mandatory rules for intentional vs vibe-coded design.",
+    mimeType: "text/markdown",
+  },
+
+  // 4. DOCS (Internationalization & Process)
+  {
+    uri: "conducks://docs/i18n-keys",
+    name: "[DOCS] i18n JSON Schema",
     description: "Key-naming conventions for localization files.",
     mimeType: "application/json",
   },
 
-  // 4. TOOLS & SCRIPTS
+  // 5. VERIFY (Compliance & Audits)
   {
-    uri: "conducks://scripts/compliance-check",
-    name: "[SCRIPT] Local Compliance Auditor",
+    uri: "conducks://verify/compliance-check",
+    name: "[VERIFY] Local Compliance Auditor",
     description: "Bash script for manual verification of standards parity.",
     mimeType: "application/x-sh",
   }
@@ -124,9 +126,9 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
-  // --- CORE HANDLERS ---
+  // --- FOUNDATION HANDLERS ---
 
-  if (uri === "conducks://overview") {
+  if (uri === "conducks://foundation/overview") {
     return {
       contents: [{
         uri,
@@ -136,17 +138,17 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (uri === "conducks://index") {
+  if (uri === "conducks://foundation/index") {
     return {
       contents: [{
         uri,
         mimeType: "text/markdown",
-        text: `# CONDUCKS Resource & Keyword Index\n\n## Server Map\n- **Blueprints**: \`conducks://blueprints/scaffold-structure\`\n- **Contracts**: \`conducks://standards/api-contract\`\n- **Types**: \`conducks://standards/type-protocol\`\n- **Localization**: \`conducks://standards/i18n-keys\`\n- **Audit**: \`conducks://scripts/compliance-check\`\n\n## Keyword Lookup\n- **Loading States** -> \`design_style\` tool\n- **Z-Index/Layering** -> \`design_style\` tool\n- **API Integration** -> \`next_blueprint\` tool\n- **Feature Tracking** -> \`documentation\` tool\n- **Error Logging** -> \`verify\` tool`
+        text: `# CONDUCKS Resource & Keyword Index\n\n## Server Map\n- **Foundation**: \`conducks://foundation/overview\` | \`conducks://foundation/anti-patterns\`\n- **Architect**: \`conducks://architect/scaffold\` | \`conducks://architect/type-protocol\` | \`conducks://architect/api-contract\`\n- **UI**: \`conducks://ui/anti-vibe-manifesto\`\n- **Docs**: \`conducks://docs/i18n-keys\`\n- **Verify**: \`conducks://verify/compliance-check\`\n\n## Keyword Lookup\n- **Loading States** -> \`ui\` tool\n- **Z-Index/Layering** -> \`ui\` tool\n- **API Integration** -> \`architect\` tool\n- **Feature Tracking** -> \`docs\` tool\n- **Error Logging** -> \`lifecycle\` tool`
       }]
     };
   }
 
-  if (uri === "conducks://anti-patterns") {
+  if (uri === "conducks://foundation/anti-patterns") {
     return {
       contents: [{
         uri,
@@ -156,9 +158,9 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  // --- BLUEPRINT HANDLERS ---
+  // --- ARCHITECT HANDLERS ---
 
-  if (uri === "conducks://blueprints/scaffold-structure") {
+  if (uri === "conducks://architect/scaffold") {
     return {
       contents: [{
         uri,
@@ -168,7 +170,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (uri === "conducks://templates/domain-pattern") {
+  if (uri === "conducks://architect/manager-pattern") {
     return {
       contents: [{
         uri,
@@ -178,7 +180,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (uri === "conducks://standards/type-protocol") {
+  if (uri === "conducks://architect/type-protocol") {
     return {
       contents: [{
         uri,
@@ -204,7 +206,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (uri === "conducks://standards/api-contract") {
+  if (uri === "conducks://architect/api-contract") {
     return {
       contents: [{
         uri,
@@ -226,7 +228,21 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (uri === "conducks://standards/i18n-keys") {
+  // --- UI HANDLERS ---
+
+  if (uri === "conducks://ui/anti-vibe-manifesto") {
+    return {
+      contents: [{
+        uri,
+        mimeType: "text/markdown",
+        text: `# Anti-Vibe Manifesto\n\nEnsure every UI choice is intentional. Refer to the system-wide rules.txt for specific visual red flags.`
+      }]
+    };
+  }
+
+  // --- DOCS HANDLERS ---
+
+  if (uri === "conducks://docs/i18n-keys") {
     return {
       contents: [{
         uri,
@@ -245,7 +261,9 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (uri === "conducks://scripts/check-dependency") {
+  // --- VERIFY HANDLERS ---
+
+  if (uri === "conducks://verify/compliance-check") {
     return {
       contents: [{
         uri,

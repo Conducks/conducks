@@ -1,21 +1,19 @@
 /**
- * Tools Index - Central export point for all CONDUCKS tools
+ * Tools index — all exported tools for auto-registration.
  */
 
-// Guidance-only tools
 export {
-	handlePlan,
-	handleExecute,
-	handleVerify,
-	handleMemory,
-	handleDocumentation,
-	handleDesignStyle,
-	handleNextBlueprint,
-	conducksPlanTool,
-	conducksExecuteTool,
-	conducksVerifyTool,
-	conducksMemoryTool,
-	conducksDocumentationTool,
-	conducksDesignStyleTool,
-	conducksNextBlueprintTool
-} from './rule-guidance.js';
+  lifecycleTool,
+  docsTool,
+  uiTool,
+  architectTool as structureTool,
+  templateTool,
+} from "./guidance.js";
+
+export {
+  handleLifecycle,
+  handleDocs,
+  handleUI,
+  handleArchitect,
+  handleTemplate,
+} from "./guidance.js";
