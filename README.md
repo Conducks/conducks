@@ -1,111 +1,102 @@
-# CONDUCKS
+# CONDUCKS 🦆
 
-> Engineering governance for AI agents. Encodes professional judgment into mandatory logic patterns.
+> **The Engineering Constitution for AI Agents.**  
+> Encode senior engineering judgment into mandatory logic patterns.
 
-[![Version](https://img.shields.io/badge/version-0.6.4-brightgreen.svg?style=flat-square&color=00ff66&labelColor=000)](https://github.com/Conducks/conducks)
-[![License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square&color=00ff66&labelColor=000)](https://opensource.org/licenses/MIT)
-[![MCP](https://img.shields.io/badge/protocol-MCP-brightgreen.svg?style=flat-square&color=00ff66&labelColor=000)](https://github.com/modelcontextprotocol)
-
----
-
-## What is CONDUCKS?
-
-**CONDUCKS** (Consolidating Documents | Unified Engineering Rules, Templates & Standards Engine) is a **Model Context Protocol (MCP) server** that acts as an engineering constitution for AI coding agents.
-
-It encodes senior engineering judgment — planning discipline, execution standards, verification laws, and design rules — into **mandatory, tool-based guidance** that agents cannot bypass.
-
-### The Problem
-
-AI agents vibe-code by default:
-- Skip planning, jump straight to implementation
-- No verification — bugs ship silently  
-- Context lost between sessions
-- Hardcoded values, scattered types, architectural spaghetti
-
-### The Solution
-
-CONDUCKS enforces a **4-phase governance loop** at the tool level:
-
-```
-Plan → Execute → Verify → Remember
-```
+[![Version](https://img.shields.io/badge/version-0.7.0-00ff66?style=flat-square&labelColor=000)](https://github.com/Conducks/conducks)
+[![License](https://img.shields.io/badge/license-Apache--2.0-00ff66?style=flat-square&labelColor=000)](LICENSE)
+[![Website](https://img.shields.io/badge/website-conducks.com-00ff66?style=flat-square&labelColor=000)](https://conducks.com)
+[![MCP](https://img.shields.io/badge/protocol-MCP-00ff66?style=flat-square&labelColor=000)](https://github.com/modelcontextprotocol)
 
 ---
 
-## Tools
+## 🏗️ What is CONDUCKS?
 
-| Tool | Phase | What It Enforces |
-|---|---|---|
-| `conducks.plan` | Phase 1 | Codebase analysis, task atomicity, boundary detection before writing a line |
-| `conducks.execute` | Phase 2 | Clean code mandates, root-cause fixes, specialist orchestration |
-| `conducks.verify` | Phase 3 | Automated testing req., output validation, post-diff audits |
-| `conducks.memory` | Phase 4 | Cross-session persistence of critical findings |
-| `conducks.documentation` | Standard | `docs/project/` lifecycle enforcement and blueprint parity |
-| `conducks.design_style` | Standard | Anti-Vibe Manifesto, Tailwind v4 @theme, 3-Layer Theme Mapping |
-| `conducks.next_blueprint` | Standard | Service isolation, Manager Pattern, i18n/Config standards |
+**CONDUCKS** is a documentation-driven governance engine delivered via the **Model Context Protocol (MCP)**. It serves as a "Source of Truth" for AI coding agents, providing them with the architectural laws and execution patterns they must follow to build production-grade software.
+
+Instead of letting agents "vibe-code," CONDUCKS forces them to audit their work against a rigorous hierarchy of standards: **Plan → Execute → Verify → Remember.**
 
 ---
 
-## Resources
+## 🛠️ Unified Governance Tools
 
-7 readable resources are exposed via `read_resource`:
+CONDUCKS uses a **Hub-and-Spoke** discovery model. Agents should start with the `detailed-tool-list` and then dive into specific domains as needed.
 
-- `conducks://overview` — Framework mission and philosophy
-- `conducks://index` — Resource keyword map and lookup
-- `conducks://anti-patterns` — Wall of Shame: vibe-coding sins to avoid
-- `conducks://blueprints/scaffold-structure` — Directory schema blueprint
-- `conducks://templates/manager-pattern` — Shared Contracts | Client | Server template
-- `conducks://standards/type-protocol` — TypeScript naming and isolation rules
-- `conducks://standards/api-contract` — Unified API response envelope schema
+| Tool | Category | Purpose |
+| :--- | :--- | :--- |
+| `detailed-tool-list` | **Core** | Entry point for agents. Explains how to use the server and lists all rules. |
+| `lifecycle` | **Core** | Phase-based workflow rules (Plan, Execute, Verify, Memory). |
+| `structure` | **Core** | Architectural decision rules and project structural patterns. |
+| `docs` | **Core** | Documentation standards and required file structures for parity. |
+| `frontend` | **Hub** | Presentation layer, component standards, and state management. |
+| `backend` | **Hub** | API contracts, database patterns, and service isolation. |
+| `security` | **Hub** | Security audits, privacy standards, and sensitive data handling. |
+| `presentation` | **Hub** | Styling, motion, and design-system token alignment. |
 
 ---
 
-## Install
+## 🚀 Getting Started
 
-**Step 1 — Clone**
+### 1. Installation
+
 ```bash
 git clone https://github.com/Conducks/conducks
 cd conducks/conducks
-```
-
-**Step 2 — Build**
-```bash
 npm install && npm run build
 ```
 
-**Step 3 — Add to your agent's MCP config** (VS Code, Cursor, Antigravity, Windsurf, Claude Desktop, etc.)
+### 2. Configure Your Agent
+
+Add the server to your MCP configuration file (e.g., `claude_desktop_config.json`):
+
 ```json
 {
-  "conducks": {
-    "command": "node",
-    "args": ["/absolute/path/to/conducks/dist/index.js"]
+  "mcpServers": {
+    "conducks": {
+      "command": "node",
+      "args": ["/absolute/path/to/conducks/build/index.js"]
+    }
   }
 }
 ```
 
+### 3. SSE Mode (Web Clients)
+
+To use with the **MCP Inspector** or web-based clients:
+
+```bash
+PORT=3001 node build/index.js --sse
+```
+
 ---
 
-## Package Structure
+## 📂 Project Anatomy
 
-```
+```text
 conducks/
-├── src/
-│   ├── index.ts          # MCP server entry, tool + resource registry
-│   ├── core/
-│   │   └── tool-registry.ts  # Typed tool registration system
-│   └── tools/
-│       └── rule-guidance.ts  # All 7 governance tool handlers
-├── dist/                 # Compiled output (after npm run build)
-└── package.json
+├── src/                # Core MCP implementation
+│   ├── core/           # Dynamic discovery and tool registry
+│   └── index.ts        # Entry point (Stdio & SSE)
+├── tools-structure/    # The "Laws": Markdown-based governance docs
+└── build/              # Production output
 ```
 
 ---
 
-## Philosophy
+## ⚖️ Governance Principles
 
-> *"Getting your ducks in a row."*  
-> CONDUCKS doesn't own your workflow. It shapes agent reasoning and enforces hygiene — documentation-first, always.
+- **Stateless Truth**: The server provides the laws; the agent applies them to the local project.
+- **Audit-First Discovery**: Categorical "Hubs" ensure agents see "unknown unknowns" rather than just searching for keywords.
+- **Intent Documentation**: CONDUCKS prioritizes **why** a decision was made, not just **what** was written.
 
 ---
 
-*Made with 🦆 by the CONDUCKS team*
+## 🛡️ License & Contributions
+
+- **License**: Licensed under the [Apache License 2.0](LICENSE).
+- **Contributions**: We welcome contributions! By submitting a PR, you agree to our [Contributor License Agreement (CLA)](CLA.md). See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+- **Security**: Report vulnerabilities to [contact@conducks.com](mailto:contact@conducks.com). See [SECURITY.md](SECURITY.md).
+
+---
+
+*“Getting your ducks in a row — one commit at a time.”*

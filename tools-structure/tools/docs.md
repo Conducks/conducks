@@ -1,3 +1,5 @@
+<!-- description: Documentation standards for all services. Required files, writing rules, and how to keep docs current without bloat. -->
+
 # Docs Guidance
 
 > Every service is self-documenting. A new agent must be able to onboard from docs alone — no verbal handoff, no tribal knowledge.
@@ -18,7 +20,7 @@ Every service has exactly these files under `docs/project/[service]/`:
 | `todo.md` | Phases and tasks with acceptance criteria | During plan phase, updated throughout |
 | `memory.md` | Critical agent-only notes that must survive sessions | Agent appends during execute and memory phases |
 
-If any of these files are missing when a session starts, create them from `tools-data/templates/` before doing anything else.
+If any of these files are missing when a session starts, create them from templates before doing anything else.
 
 ---
 
@@ -47,3 +49,23 @@ All doc files use `#` and `##` headings, plain prose, and tables where structure
 
 **DOCS-8 — Memory is Terse** `[severity: medium]`
 `memory.md` entries must be short. If an entry needs more than three or four lines, it belongs in `handover.md` or `architecture.md` instead. Memory is a quick-reference — not a log.
+
+---
+
+## Writing standards
+
+**Tone:** Write for the next agent, not for a human presentation. Be direct, specific, and terse. Name files and functions. Avoid vague summaries.
+
+**What belongs where:**
+- A decision and why → `architecture.md`
+- A constraint from outside the codebase → `memory.md`
+- A rule the team follows → `conventions.md`
+- The story of what changed → `vision.md` or `implementation.md`
+- The current broken state → `handover.md`
+- What to do next → `todo.md`
+
+**What never belongs in docs:**
+- Marketing language or aspirational copy
+- Explanations of what good code looks like (those belong in the governance tools)
+- Duplicate information that already lives in another required file
+- Placeholder text left from templates

@@ -1,9 +1,9 @@
 {
 	"name": "conducks",
-	"version": "0.1.0",
-	"description": "rule-only guidance for intent clarification, code hygiene, and documentation parity",
-	"author": "Conducks Team",
-	"private": true,
+	"version": "0.7.0",
+	"description": "A documentation-driven governance engine for AI agents, providing structured engineering standards via the Model Context Protocol (MCP).",
+	"author": "Conducks Team <contact@conducks.com>",
+	"license": "Apache-2.0",
 	"type": "module",
 	"bin": {
 		"conducks": "./build/index.js"

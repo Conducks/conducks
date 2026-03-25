@@ -7,7 +7,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface Tool<T = any> {
+export interface Tool<T = unknown> {
   name: string;
   description: string;
   inputSchema: {
@@ -36,6 +36,10 @@ type RegistryOptions = {
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
+/**
+ * The ToolRegistry manages a collection of MCP-compatible tools.
+ * It handles tool registration, request dispatching, and optional result caching.
+ */
 export class ToolRegistry {
   private tools = new Map<string, Tool>();
   private cache = new Map<string, CacheEntry>();
@@ -47,15 +51,23 @@ export class ToolRegistry {
 
   // ── Registration ────────────────────────────────────────────────────────────
 
+  /**
+   * Manually registers a single tool instance.
+   * @param tool - The tool implementation to register.
+   * @throws Error if a tool with the same name is already registered.
+   */
   register(tool: Tool): void {
     if (this.tools.has(tool.name)) {
-      throw new Error(`Tool "${tool.name}" is already registered`);
+      throw new Error(`Tool "${tool.name}" is already registered.`);
     }
     this.tools.set(tool.name, tool);
-    this.log(`registered tool: ${tool.name}`);
+    this.log(`registered: ${tool.name}`);
   }
 
-  // Auto-register all Tool-shaped exports from a module path.
+  /**
+   * Auto-registers all Tool-shaped exports from a module path.
+   * Skips silently if a candidate does not match the Tool interface.
+   */
   async autoRegister(modulePath: string): Promise<void> {
     try {
       const mod = await import(modulePath);
@@ -89,7 +101,7 @@ export class ToolRegistry {
   async handleRequest(name: string, args: unknown): Promise<ToolResponse> {
     const tool = this.tools.get(name);
     if (!tool) {
-      return errorResponse(`Unknown tool: "${name}"`);
+      return errorResponse(`Unknown tool: "${name}". Call the "index" tool to see all available tools.`);
     }
 
     const cacheKey = `${name}:${JSON.stringify(args ?? {})}`;
@@ -119,6 +131,10 @@ export class ToolRegistry {
 
   // ── MCP wiring ───────────────────────────────────────────────────────────────
 
+  /**
+   * Wires the registry's tool list and request handler into the MCP Server.
+   * Call this after all tools have been registered.
+   */
   applyTo(server: Server): void {
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: this.getTools(),
@@ -133,11 +149,11 @@ export class ToolRegistry {
   // ── Internal ─────────────────────────────────────────────────────────────────
 
   private log(msg: string): void {
-    if (this.options.enableLogging) console.info(`[ToolRegistry] ${msg}`);
+    if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
   }
 
   private warn(msg: string): void {
-    if (this.options.enableLogging) console.warn(`[ToolRegistry] ${msg}`);
+    if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
   }
 }
 

@@ -1,3 +1,5 @@
+<!-- description: Four-phase session lifecycle: Plan → Execute → Verify → Memory. Mandatory order, no skipping. -->
+
 # Lifecycle Guidance
 
 > Four mandatory phases. Always in order: Plan → Execute → Verify → Memory.
@@ -9,10 +11,8 @@
 
 **Philosophy:** Intent first, code second. No file is touched until a written, approved plan exists in `todo.md`.
 
-### Rules
-
 **PLAN-1 — Vision Check** `[severity: high]`
-When a new idea, requirement, or change in direction arrives, read `vision.md` first. Decide if this is genuinely new or a refinement of something already logged. Then **confirm with the user before writing anything**: _"I think this is a new direction — shall I log it to vision.md?"_ Append only after explicit confirmation.
+When a new idea, requirement, or change in direction arrives, read `vision.md` first. Decide if this is genuinely new or a refinement of something already logged. Then confirm with the user before writing anything: _"I think this is a new direction — shall I log it to vision.md?"_ Append only after explicit confirmation.
 
 **PLAN-2 — Write the Plan First** `[severity: high]`
 Before touching any file, write the full plan in `todo.md` using phases and tasks. Each task must name the files it affects and have acceptance criteria. A plan without acceptance criteria is not a plan.
@@ -31,8 +31,6 @@ Present the plan and wait for an explicit yes. Do not interpret silence or a vag
 ## Phase: Execute
 
 **Philosophy:** The plan is approved. Execute it precisely. No scope creep, no unrequested changes, no cleanup detours.
-
-### Rules
 
 **EXEC-1 — Plan Must Exist** `[severity: high]`
 If there is no approved plan in `todo.md`, stop. Return to Plan phase. A feeling that you know what to do is not a plan.
@@ -64,8 +62,6 @@ Mark tasks `[x]` in `todo.md` as they complete. Mark blocked tasks `[!]` with th
 
 **Philosophy:** Trust but verify. Every change must be proven correct before the session closes.
 
-### Rules
-
 **VERIFY-1 — All Tasks Accounted For** `[severity: high]`
 Every task in the current phase of `todo.md` must be `[x]` or `[!]` before verify begins. An unmarked task is an unfinished task.
 
@@ -89,8 +85,6 @@ Check application logs and system output for new errors or warnings introduced b
 ## Phase: Memory
 
 **Philosophy:** The next agent starts cold. Leave the trail you wish you had found.
-
-### Rules
 
 **MEM-1 — Verify First** `[severity: high]`
 Do not write memory until verify is complete. Memory written before verification may document a state that doesn't hold.
