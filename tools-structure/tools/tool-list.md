@@ -17,6 +17,8 @@ There are two kinds of tools:
 lifecycle        → four-phase session rules (Plan → Execute → Verify → Memory)
 structure        → project architecture and path decisions
 docs             → documentation standards and required files
+debugging        → cerebral circuit protocol and resonance tracing
+refactoring      → structural evolution and GVR rules
 ```
 
 **Category hubs** — call by name to see the index, then call again with `tool=` to get a specific guide.
@@ -44,6 +46,24 @@ presentation     → call presentation to see the index
 presentation tool=copy       → writing standards, error messages, empty states
 presentation tool=typography → type scale, font pairing, hierarchy
 presentation tool=motion     → what moves, what doesn't, timing rules
+```
+
+---
+
+## Apostolic Intelligence (The Engine)
+
+These tools provide active structural and behavioral intelligence by querying the **Synapse Graph**.
+
+```
+synapse_query    → High-fidelity symbol/structural search
+synapse_context  → 360-degree symbol heritage and immediate blast radius
+synapse_impact   → Deep structural blast radius analysis (d1-d3)
+synapse_groups   → DAAC functional community mapping
+synapse_refactor → Atomic, graph-verified renames (GVR)
+sentinel_audit   → Active scanner for structural law (ARCH-X) violations
+blueprint_gen    → Generate the AI-native structural manifest
+kinetic_circuit  → Trace the 'Cerebral Circuit' (Execution Flow)
+kinetic_wave     → Search for logical patterns via Resonance
 ```
 
 ---

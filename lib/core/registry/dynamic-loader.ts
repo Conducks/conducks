@@ -24,8 +24,9 @@ export class DynamicToolLoader {
   /**
    * Initializes the loader with a base directory.
    * @param baseDir - The directory containing conducks.config.json and the tools folder.
+   * @param fileSystem - Mockable filesystem engine (defaults to fs-extra).
    */
-  constructor(baseDir: string) {
+  constructor(baseDir: string, private readonly fileSystem: any = fs) {
     this.baseDir = baseDir;
   }
 
@@ -38,14 +39,14 @@ export class DynamicToolLoader {
 
     const configPath = path.join(this.baseDir, "conducks.config.json");
 
-    if (!(await fs.pathExists(configPath))) {
+    if (!(await this.fileSystem.pathExists(configPath))) {
       throw new Error(
         `[DynamicToolLoader] conducks.config.json not found at ${configPath}. ` +
         `Create it in your configuration directory.`
       );
     }
 
-    const raw = await fs.readFile(configPath, "utf8");
+    const raw = await this.fileSystem.readFile(configPath, "utf8");
 
     try {
       this.config = JSON.parse(raw) as ConducksConfig;
@@ -68,22 +69,22 @@ export class DynamicToolLoader {
     const tools: Tool[] = [];
     const toolsDir = path.join(this.baseDir, config.toolsDir);
 
-    if (!(await fs.pathExists(this.baseDir))) {
+    if (!(await this.fileSystem.pathExists(this.baseDir))) {
       console.error(`[DynamicToolLoader] Base directory not found: ${this.baseDir}`);
       return [];
     }
 
-    if (!(await fs.pathExists(toolsDir))) {
-      await fs.ensureDir(toolsDir);
+    if (!(await this.fileSystem.pathExists(toolsDir))) {
+      await this.fileSystem.ensureDir(toolsDir);
     }
 
-    const items = await fs.readdir(toolsDir);
+    const items = await this.fileSystem.readdir(toolsDir);
 
     for (const item of items) {
       if (item.startsWith(".")) continue;
 
       const fullPath = path.join(toolsDir, item);
-      const stat = await fs.stat(fullPath);
+      const stat = await this.fileSystem.stat(fullPath);
 
       if (stat.isDirectory()) {
         const tool = await this.createHubTool(item, fullPath);
@@ -106,7 +107,7 @@ export class DynamicToolLoader {
   private async createHubTool(categoryName: string, folderPath: string): Promise<Tool | null> {
     const indexPath = path.join(folderPath, "tools.md");
 
-    if (!(await fs.pathExists(indexPath))) {
+    if (!(await this.fileSystem.pathExists(indexPath))) {
       console.error(
         `[DynamicToolLoader] Skipping category "${categoryName}": tools.md not found. ` +
         `Add a tools.md file to make this folder a hub tool.`
@@ -114,13 +115,16 @@ export class DynamicToolLoader {
       return null;
     }
 
-    const indexContent = await fs.readFile(indexPath, "utf8");
+    const indexContent = await this.fileSystem.readFile(indexPath, "utf8");
     const description =
       this.extractDescription(indexContent) ??
       `Governance guidance for ${categoryName}. Call without arguments to see the index.`;
 
     return {
+      id: `doc-tool-${categoryName.toLowerCase()}`,
       name: categoryName.toLowerCase(),
+      type: 'tool',
+      version: '1.0.0',
       description,
       inputSchema: {
         type: "object",
@@ -142,14 +146,14 @@ export class DynamicToolLoader {
         const safeName = path.basename(args.tool);
         const subToolPath = path.join(folderPath, "tools", `${safeName}.md`);
 
-        if (!(await fs.pathExists(subToolPath))) {
+        if (!(await this.fileSystem.pathExists(subToolPath))) {
           return (
             `❌ Sub-tool "${args.tool}" not found in "${categoryName}".\n\n` +
             `Call "${categoryName}" without arguments to see the full list of available sub-tools.`
           );
         }
 
-        return fs.readFile(subToolPath, "utf8");
+        return this.fileSystem.readFile(subToolPath, "utf8");
       },
       formatter: (result: unknown) => result as string,
     };
@@ -169,13 +173,16 @@ export class DynamicToolLoader {
       name = "detailed-tool-list";
     }
 
-    const content = await fs.readFile(fullPath, "utf8");
+    const content = await this.fileSystem.readFile(fullPath, "utf8");
     const description =
       this.extractDescription(content) ??
       `Governance guidance for ${name}.`;
 
     return {
+      id: `doc-tool-${name}`,
       name,
+      type: 'tool',
+      version: '1.0.0',
       description,
       inputSchema: {
         type: "object",

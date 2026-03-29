@@ -21,7 +21,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
-
+docs/
 # Python
 .venv/
 __pycache__/
@@ -38,3 +38,4 @@ venv/
 *.swp
 .cache/
 dist/
+.conducks/
