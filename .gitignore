@@ -5,7 +5,7 @@ build/
 
 # Storage directory (user data)
 storage/
-
+coverage/
 # OS files
 .DS_Store
 .DS_Store?
