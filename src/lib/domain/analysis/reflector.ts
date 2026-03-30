@@ -216,6 +216,10 @@ export class ConducksReflector {
           const scope = getScopeAt(captureRow);
           this.flow.processRequest(url, method, scope, spectrum);
         }
+        else if (cName === 'pulse_type_target') {
+          const scope = getScopeAt(captureRow);
+          this.calls.process(cText, scope, 'USES' as any, spectrum, [], context);
+        }
 
         // 4. Phase 3.2: Debt Dispatch
         else if (cName === 'comment' && provider.extractDebt) {

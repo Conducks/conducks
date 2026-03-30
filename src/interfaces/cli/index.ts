@@ -58,10 +58,7 @@ export async function main() {
     positionalArgs.push(arg);
   }
 
-  const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows'].includes(commandId);
-  const pathArg = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
-
-  const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
+  const targetPath = process.cwd();
   const isReadCommand = ['diff', 'explain', 'status', 'list', 'context'].includes(commandId);
   const persistence = new GraphPersistence(targetPath, isReadCommand);
 

@@ -1,5 +1,5 @@
 import { ConducksCommand } from "../command.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { main as startMcpServer } from "../../tools/index.js";
 
 /**

@@ -1,6 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import { registry } from "@/registry/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 
 /**
  * Conducks — Resonance (Compare) Command
@@ -19,9 +19,15 @@ export class ResonanceCommand implements ConducksCommand {
     
     await persistence.load(registry.intelligence.graph.getGraph());
     const diff = await registry.intelligence.compare(otherPath);
+
+    const fmt = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? "0" : Math.round(n * 100).toString();
+    };
+
     console.log(`\n\x1b[1m--- 📡 Project Resonance: Comparison ---\x1b[0m`);
     console.log(`- Resonance Score: ${diff.similarity || 0}%`);
     console.log(`- Summary: ${diff.summary}`);
-    console.log(`\x1b[33m- Metrics: Density (${Math.round((diff.metrics?.density || 0) * 100)}%), Typology (${Math.round((diff.metrics?.typology || 0) * 100)}%)\x1b[0m`);
+    console.log(`\x1b[33m- Metrics: Density (${fmt(diff.metrics?.density)}%), Typology (${fmt(diff.metrics?.typology)}%)\x1b[0m`);
   }
 }

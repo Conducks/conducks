@@ -14,16 +14,23 @@ export class TypeScriptResolver {
     // 0. Strip Quotes (Tree-sitter 'string' node includes them)
     const cleanPath = rawImportPath.replace(/^['"]|['"]$/g, '');
 
-    // 1. Bare Module Resolution (e.g., 'react' or 'express')
-    if (!cleanPath.startsWith('.') && !cleanPath.startsWith('/')) {
+    // 1. Alias Resolution (@/lib/core/...)
+    if (cleanPath.startsWith('@/')) {
+        // Conducks: Workspace-aware alias resolution
+        const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        const absoluteAlias = path.resolve(projectRoot, 'src', cleanPath.slice(2)).toLowerCase();
+        return this.tryFile(absoluteAlias, allFiles) || this.tryDirectory(absoluteAlias, allFiles);
+    }
+
+    // 2. Bare Module Resolution (e.g., 'react' or 'express')
+    if (!cleanPath.startsWith('.')) {
         return undefined;
     }
 
-    // 2. Local File Resolution
+    // 3. Local File Resolution
     const dir = path.dirname(currentFile);
     
     // Conducks.6: Extension-Aware Stripping (Node.js ESM support)
-    // Strip trailing extensions before trying resolution candidates
     const baseWithoutExt = cleanPath.replace(/\.(js|jsx|ts|tsx)$/, '');
     const targetBase = path.resolve(dir, baseWithoutExt).toLowerCase();
 

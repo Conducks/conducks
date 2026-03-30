@@ -15,10 +15,11 @@ export const TYPESCRIPT_QUERIES = `
 
   ;; --- Imports & Bindings ---
   (import_statement 
+    "type"?
     (import_clause (named_imports (import_specifier name: (identifier) @name alias: (identifier)? @alias))*)*
     source: (string) @source) @isImport
-  (import_statement (import_clause (namespace_import (identifier) @name)) source: (string) @source) @isImport
-  (import_statement (import_clause (identifier) @name) source: (string) @source) @isImport
+  (import_statement "type"? (import_clause (namespace_import (identifier) @name)) source: (string) @source) @isImport
+  (import_statement "type"? (import_clause (identifier) @name) source: (string) @source) @isImport
 
   ;; --- Kinetic Calls ---
   ;; do1()
@@ -31,6 +32,10 @@ export const TYPESCRIPT_QUERIES = `
   ;; --- Pulse Flow (Assignments) ---
   (variable_declarator name: (identifier) @pulse_assignment_name value: (_) @pulse_assignment_value)
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
+
+  ;; --- Parameter Type Captures ---
+  (required_parameter name: (identifier) @pulse_param_name type: (type_annotation (type_identifier) @pulse_type_target))
+  (optional_parameter name: (identifier) @pulse_param_name type: (type_annotation (type_identifier) @pulse_type_target))
 
   ;; --- Phase 3.2: Debt Markers ---
   (comment) @comment

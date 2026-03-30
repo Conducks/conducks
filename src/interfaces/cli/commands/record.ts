@@ -1,6 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import { registry } from "@/registry/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
 
 /**

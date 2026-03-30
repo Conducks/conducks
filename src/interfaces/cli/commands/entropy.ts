@@ -1,6 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import { registry } from "@/registry/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 
 /**
  * Conducks — Entropy Command
@@ -18,8 +18,11 @@ export class EntropyCommand implements ConducksCommand {
     }
     await persistence.load(registry.intelligence.graph.getGraph());
     const { entropy, risk } = await registry.metrics.calculateEntropy(symbolId);
+
+    const fmt = (v: any) => isNaN(Number(v)) ? "0.00" : (Number(v) * 100).toFixed(2);
+
     console.log(`\n\x1b[35mStructural Entropy (${symbolId}):\x1b[0m ${entropy.toFixed(4)}`);
-    console.log(`\x1b[33mOwnership Risk Factor:\x1b[0m ${(risk * 100).toFixed(1)}%`);
+    console.log(`\x1b[33mOwnership Risk Factor:\x1b[0m ${fmt(risk)}%`);
     console.log(`\x1b[34m- Note: This measures social fragmentation and ownership drift.\x1b[0m`);
   }
 }

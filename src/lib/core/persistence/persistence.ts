@@ -83,12 +83,8 @@ export class DuckDbPersistence implements SynapsePersistence {
       this.dbPath = ":memory:";
       this.cacheDir = "";
     } else {
-      // Resolve to absolute path
       projectRoot = path.resolve(projectRoot);
-
-      // Safeguard: Ensure we're not trying to index the root of the filesystem unless explicitly told
       if (projectRoot === '/' || projectRoot === '\\') {
-        console.error(`[Conducks Persistence] ⚠️  Warning: Resolved projectRoot to system root (/). Defaulting to current execution path.`);
         projectRoot = path.resolve('.');
       }
 
@@ -152,7 +148,6 @@ export class DuckDbPersistence implements SynapsePersistence {
         try {
           db.exec("BEGIN TRANSACTION");
 
-          // 1. Metadata (Conducks)
           db.run("DELETE FROM metadata");
           const metaStmt = db.prepare("INSERT INTO metadata (key, value) VALUES (?, ?)");
           for (const [key, val] of graph.getAllMetadata().entries()) {
@@ -160,10 +155,8 @@ export class DuckDbPersistence implements SynapsePersistence {
           }
           metaStmt.finalize();
 
-          // 2. Pulse Snapshot
           await new Promise<void>((res, rej) => db.run("INSERT INTO pulses (id, timestamp, metadata) VALUES (?, ?, ?)", pulseId, Date.now(), JSON.stringify({ nodeCount: nodes.length }), (err: any) => err ? rej(err) : res()));
 
-          // 3. Nodes
           const nodeStmt = db.prepare(`INSERT INTO nodes (id, pulseId, kind, name, file, gravity, kineticEnergy, frameworks, isTest, complexity, debtMarkers, resonance, entropy, primaryAuthor, authorCount, lastModified, tenureDays, coveredBy, anomaly, isEntryPoint, ecosystem, version, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
           for (const node of nodes) {
             await new Promise<void>((res, rej) => {
@@ -192,7 +185,6 @@ export class DuckDbPersistence implements SynapsePersistence {
           }
           nodeStmt.finalize();
 
-          // 4. Edges
           const edgeStmt = db.prepare("INSERT INTO edges (id, pulseId, sourceId, targetId, type, confidence, properties) VALUES (?, ?, ?, ?, ?, ?, ?)");
           for (const e of allEdges) {
             await new Promise<void>((res, rej) => edgeStmt.run(e.id, pulseId, e.sourceId, e.targetId, e.type, e.confidence, JSON.stringify(e.properties || {}), (err: any) => err ? rej(err) : res()));
@@ -232,9 +224,6 @@ export class DuckDbPersistence implements SynapsePersistence {
       edges.forEach(row => graph.addEdge({ id: row.id, sourceId: row.sourceId, targetId: row.targetId, type: row.type, confidence: row.confidence, properties: row.properties ? JSON.parse(row.properties) : {} }));
       return true;
     } catch (err: any) {
-      if (err && err.message && err.message.includes('Conflicting lock')) {
-        console.error(`[Conducks Persistence] 🔒 Multi-Project Lock Error: Another process is using the database at ${this.dbPath}.`);
-      }
       return false;
     }
   }

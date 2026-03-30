@@ -72,14 +72,23 @@ export class ImportProcessor {
     });
   }
 
-  /**
-   * Conducks.3: Process specialized symbol-level bindings (e.g. from X import Y)
-   */
   public processBinding(resolvedPath: string, originalName: string, localAlias: string, spectrum: PrismSpectrum, context?: PulseContext): void {
     if (context) {
       context.registerLocalBinding(localAlias, resolvedPath);
     }
 
+    // [The Great Binding] Link local symbol to absolute origin
+    // Normalize path by stripping build-time extensions and enforcing canonical lowercase
+    const normalizedTarget = resolvedPath.replace(/\.(js|jsx)$/, '.ts').toLowerCase();
+    
+    spectrum.relationships.push({
+      sourceName: localAlias,
+      targetName: `${normalizedTarget}::${originalName}`,
+      type: 'IMPORTS',
+      confidence: 1.0
+    });
+
+    // Link file-level import
     spectrum.relationships.push({
       sourceName: 'global',
       targetName: resolvedPath,

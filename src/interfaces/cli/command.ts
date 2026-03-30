@@ -1,4 +1,4 @@
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 
 /**
  * Conducks — Command Interface

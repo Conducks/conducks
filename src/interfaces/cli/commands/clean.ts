@@ -1,5 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 
 /**
  * Conducks — Clean Command
