@@ -1,4 +1,4 @@
-import { Conducks } from "../../src/conducks-core.js";
+import { registry } from "../../src/registry/index.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,32 +8,22 @@ const __dirname = path.dirname(__filename);
 const CONDUCKS_DIR = path.resolve(__dirname, "../.conducks");
 
 /**
- * Apostle v6 — Structural Integrity Test Suite 💎
+ * Conducks — Structural Integrity Test Suite 💎
  * 
  * Verifies the mathematical and topological properties of the Gospel Core.
  * Ensures the structural mirror is numerically stable and deterministic.
  * Each test runs in a fully clean state (no DuckDB contamination).
  */
-describe("Apostle v6: Structural Integrity (The Gospel Core)", () => {
-  let conducks: Conducks;
-
+describe("Conducks: Structural Integrity (The Gospel Core)", () => {
   beforeEach(async () => {
-    // Unique folder per run to ensure visibility and isolation
-    const testId = `test_run_${Date.now()}`;
-    const testDir = path.resolve(__dirname, `../.conducks_${testId}`);
-    conducks = new Conducks({ baseDir: testDir });
+    // Conducks: Lazy initialization for wasm/grammars
+    await registry.initialize();
+    registry.infrastructure.graphEngine.getGraph().clear();
   }, 30000);
-
-  afterEach(async () => {
-    // Explicitly drain and close to ensure no leaked connections in Jest
-    if ((conducks as any).persistence && typeof (conducks as any).persistence.close === 'function') {
-      await (conducks as any).persistence.close();
-    }
-  });
 
   afterAll(async () => {
     // Final cleanup of the .conducks dir if any stray files were created
-    try { await fs.rm(CONDUCKS_DIR, { recursive: true, force: true }); } catch {}
+    try { await fs.rm(CONDUCKS_DIR, { recursive: true, force: true }); } catch { }
   });
 
   test("Topological Balance: Total Edge Count Is Stable Across The Graph", async () => {
@@ -42,16 +32,16 @@ describe("Apostle v6: Structural Integrity (The Gospel Core)", () => {
       { path: "math/advanced.py", source: "from math.core import add\ndef square(n): return add(n, n)" }
     ];
 
-    await conducks.pulse(mockFiles);
-    const graph = conducks.graph.getGraph();
+    await registry.analysis.pulse(mockFiles);
+    const graph = registry.intelligence.graph.getGraph();
 
     // Count edges from the raw internal maps (source of truth)
     const outEdges = (graph as any).outEdges as Map<string, Set<any>>;
-    const inEdges  = (graph as any).inEdges  as Map<string, Set<any>>;
+    const inEdges = (graph as any).inEdges as Map<string, Set<any>>;
 
     let totalOut = 0, totalIn = 0;
     outEdges.forEach(set => { totalOut += set.size; });
-    inEdges.forEach(set  => { totalIn  += set.size; });
+    inEdges.forEach(set => { totalIn += set.size; });
 
     // Every edge is stored in exactly one out-set and one in-set
     // so the raw totals MUST always be identical
@@ -70,8 +60,8 @@ describe("Apostle v6: Structural Integrity (The Gospel Core)", () => {
       { path: "/app/spoke4.py", source: "import hub\ndef do4(): hub.main()" }
     ];
 
-    await conducks.pulse(mockFiles);
-    const graph = conducks.graph.getGraph();
+    await registry.analysis.pulse(mockFiles);
+    const graph = registry.intelligence.graph.getGraph();
 
     const hubNode = graph.getNode("/app/hub.py::main");
     const spoke1Node = graph.getNode("/app/spoke1.py::do1");
@@ -90,12 +80,12 @@ describe("Apostle v6: Structural Integrity (The Gospel Core)", () => {
       { path: "D.py", source: "def leaf(): pass" }
     ];
 
-    await conducks.pulse(mockFiles);
-    const firstSignature = conducks.graph.getGraph().stats.edgeCount;
+    await registry.analysis.pulse(mockFiles);
+    const firstSignature = registry.intelligence.graph.getGraph().stats.edgeCount;
     expect(firstSignature).toBeGreaterThan(0);
 
     // A second pulse of identical inputs must produce an identical structural signature
-    await conducks.pulse(mockFiles);
-    expect(conducks.graph.getGraph().stats.edgeCount).toBe(firstSignature);
+    await registry.analysis.pulse(mockFiles);
+    expect(registry.intelligence.graph.getGraph().stats.edgeCount).toBe(firstSignature);
   });
 });

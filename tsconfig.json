@@ -4,6 +4,10 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "outDir": "./build",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "declaration": true,
     "declarationMap": true,
     "strict": true,
@@ -12,6 +16,6 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*", "lib/**/*", "tests/**/*"],
+  "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "test-workspace", "build"]
 }

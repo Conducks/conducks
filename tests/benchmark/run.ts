@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
-import { conducks } from '../../src/conducks-core.js';
-import { ChronicleInterface } from '../../lib/core/git/chronicle-interface.js';
+import { registry } from '../../src/registry/index.js';
+import { chronicle } from '../../src/lib/core/git/chronicle-interface.js';
 import path from 'node:path';
 
 /**
@@ -11,8 +11,7 @@ import path from 'node:path';
 async function run() {
   console.log('\x1b[35m[Conducks Benchmark] Initializing Synapse resonance...\x1b[0m');
 
-  const voyager = new ChronicleInterface(process.cwd());
-  const files = await voyager.discoverFiles();
+  const files = await chronicle.discoverFiles();
 
   console.log(`- Benchmarking on \x1b[36m${files.length}\x1b[0m units...`);
 
@@ -22,16 +21,16 @@ async function run() {
   for (const f of files) {
     stream.push({
       path: f,
-      source: await voyager.readFile(f)
+      source: await chronicle.readFile(f)
     });
   }
   const endResonance = performance.now();
 
   const startPulse = performance.now();
-  await conducks.pulse(stream);
+  await registry.analysis.pulse(stream);
   const endPulse = performance.now();
 
-  const status = conducks.status();
+  const status = registry.governance.status();
 
   console.log('\n\x1b[1m--- 📊 Resonance Metrics ---\x1b[0m');
   console.log(`- Discovery & Read (Mirroring): ${(endResonance - startResonance).toFixed(2)}ms`);

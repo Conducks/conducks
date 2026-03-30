@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "./lib/core/graph/persistence.js";
+import { DuckDbPersistence } from "./src/lib/core/persistence/persistence.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 

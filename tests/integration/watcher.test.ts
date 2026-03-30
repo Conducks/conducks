@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ConducksWatcher } from '../../lib/core/watcher/watcher.js';
-import { ConducksGraph } from '../../lib/product/indexing/graph-engine.js';
+import { ConducksWatcher } from "../../src/lib/domain/evolution/watcher.js";
+import { ConducksGraph } from "../../src/lib/core/graph/graph-engine.js";
 
 describe('ConducksWatcher Integration', () => {
   let watcher: ConducksWatcher;
@@ -35,6 +35,7 @@ describe('ConducksWatcher Integration', () => {
     });
 
     it('should ignore events if the watcher is stopped', async () => {
+      watcher.start();
       await watcher.stop();
       expect(mockChokidar.close).toHaveBeenCalled();
     });

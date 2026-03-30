@@ -4,7 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 describe('Conducks CLI Integration', () => {
-  const cliPath = path.resolve('build/src/cli.js');
+  const cliPath = path.resolve('build/src/interfaces/cli/index.js');
   const testRepo = path.resolve('tests/fixtures/mock-repo');
 
   beforeAll(() => {

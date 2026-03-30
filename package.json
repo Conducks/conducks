@@ -6,19 +6,19 @@
 	"license": "Apache-2.0",
 	"type": "module",
 	"bin": {
-		"conducks": "./build/src/cli/index.js"
+		"conducks": "./build/src/interfaces/cli/index.js"
 	},
 	"files": [
 		"build"
 	],
 	"scripts": {
-		"build": "tsc && chmod 755 build/src/cli/index.js && cp package.json sentinel.json build/ && cp -r grammars tools-structure build/",
-		"clean": "rm -rf build .conducks",
+		"build": "tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/",
+		"clean": "rm -rf build data .conducks",
 		"prepare": "npm run build",
 		"watch": "tsc --watch",
 		"inspector": "npx @modelcontextprotocol/inspector build/index.js",
 		"type-check": "tsc --noEmit",
-		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns=tests/persistence",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns='tests/legacy/archived-tests'",
 		"test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
 		"test:int": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
 		"benchmark": "node --loader ts-node/esm tests/benchmark/run.ts",
@@ -51,6 +51,7 @@
 		"jest": "^30.3.0",
 		"ts-jest": "^29.4.6",
 		"ts-node": "^10.9.2",
+		"tsc-alias": "^1.8.16",
 		"typescript": "^5.3.3",
 		"vitest": "^4.1.2"
 	}

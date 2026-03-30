@@ -1,0 +1,2033 @@
+
+> conducks@0.7.0 test
+> cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns='tests/legacy/archived-tests' --coverage
+
+  console.error
+    [Conducks MCP] Bootstrapping Conducks HyperToon Registry...
+
+      49 |    */
+      50 |   public async bootstrap(): Promise<void> {
+    > 51 |     console.error('[Conducks MCP] Bootstrapping Conducks HyperToon Registry...');
+         |             ^
+      52 |     
+      53 |     // 1. Build hypertoon registry (Syncing static tools with documentation)
+      54 |     const staticTools = [
+
+      at ConducksMCPServer.error [as bootstrap] (src/interfaces/tools/server.ts:51:13)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:18)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-backend (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: backend
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-debugging (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: debugging
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-docs (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: docs
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-frontend (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: frontend
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-lifecycle (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: lifecycle
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-presentation (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: presentation
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-refactoring (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: refactoring
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-security (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: security
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-structure (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: structure
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-detailed-tool-list (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: detailed-tool-list
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-analyze (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_analyze
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-query (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_query
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-governance (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_governance
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-metrics (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_metrics
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-trace (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_trace
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-evolution (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_evolution
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-system (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_system
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-link (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_link
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks MCP] System ready. 18 HyperToon tools indexed.
+
+      67 |     this.registerResources();
+      68 |
+    > 69 |     console.error(`[Conducks MCP] System ready. ${tools.length} HyperToon tools indexed.`);
+         |             ^
+      70 |   }
+      71 |
+      72 |   private registerResources(): void {
+
+      at ConducksMCPServer.error [as bootstrap] (src/interfaces/tools/server.ts:69:13)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:37:5)
+
+  console.error
+    [Conducks MCP] Bootstrapping Conducks HyperToon Registry...
+
+      49 |    */
+      50 |   public async bootstrap(): Promise<void> {
+    > 51 |     console.error('[Conducks MCP] Bootstrapping Conducks HyperToon Registry...');
+         |             ^
+      52 |     
+      53 |     // 1. Build hypertoon registry (Syncing static tools with documentation)
+      54 |     const staticTools = [
+
+      at ConducksMCPServer.error [as bootstrap] (src/interfaces/tools/server.ts:51:13)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:18)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-backend (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: backend
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-debugging (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: debugging
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-docs (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: docs
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-frontend (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: frontend
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-lifecycle (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: lifecycle
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-presentation (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: presentation
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-refactoring (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: refactoring
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-security (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: security
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-structure (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: structure
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-detailed-tool-list (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: detailed-tool-list
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-analyze (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_analyze
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-query (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_query
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-governance (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_governance
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-metrics (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_metrics
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-trace (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_trace
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-evolution (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_evolution
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-system (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_system
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-link (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_link
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks MCP] System ready. 18 HyperToon tools indexed.
+
+      67 |     this.registerResources();
+      68 |
+    > 69 |     console.error(`[Conducks MCP] System ready. ${tools.length} HyperToon tools indexed.`);
+         |             ^
+      70 |   }
+      71 |
+      72 |   private registerResources(): void {
+
+      at ConducksMCPServer.error [as bootstrap] (src/interfaces/tools/server.ts:69:13)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:43:5)
+
+  console.error
+    [Conducks MCP] Running via stdio.
+
+      122 |     const transport = new StdioServerTransport();
+      123 |     await this.server.connect(transport);
+    > 124 |     console.error("[Conducks MCP] Running via stdio.");
+          |             ^
+      125 |   }
+      126 |
+      127 |   /**
+
+      at ConducksMCPServer.error [as startStdio] (src/interfaces/tools/server.ts:124:13)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:44:5)
+
+  console.error
+    [Conducks MCP] Bootstrapping Conducks HyperToon Registry...
+
+      49 |    */
+      50 |   public async bootstrap(): Promise<void> {
+    > 51 |     console.error('[Conducks MCP] Bootstrapping Conducks HyperToon Registry...');
+         |             ^
+      52 |     
+      53 |     // 1. Build hypertoon registry (Syncing static tools with documentation)
+      54 |     const staticTools = [
+
+      at ConducksMCPServer.error [as bootstrap] (src/interfaces/tools/server.ts:51:13)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:18)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-backend (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: backend
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-debugging (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: debugging
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-docs (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: docs
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-frontend (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: frontend
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-lifecycle (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: lifecycle
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-presentation (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: presentation
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-refactoring (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: refactoring
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-security (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: security
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-structure (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: structure
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: doc-tool-detailed-tool-list (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: detailed-tool-list
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-analyze (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_analyze
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-query (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_query
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-governance (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_governance
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-metrics (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_metrics
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-trace (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_trace
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-evolution (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_evolution
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-system (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_system
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks Registry] Registered: conducks-link (type: tool, version: 2.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [ToolRegistry] registered: conducks_link
+
+      143 |
+      144 |   private log(msg: string): void {
+    > 145 |     if (this.options.enableLogging) console.error(`[ToolRegistry] ${msg}`);
+          |                                             ^
+      146 |   }
+      147 |
+      148 |   private warn(msg: string): void {
+
+      at ToolRegistry.error [as log] (src/registry/tool-registry.ts:145:45)
+      at ToolRegistry.log [as register] (src/registry/tool-registry.ts:62:10)
+      at ConducksMCPServer.register [as bootstrap] (src/interfaces/tools/server.ts:62:21)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Conducks MCP] System ready. 18 HyperToon tools indexed.
+
+      67 |     this.registerResources();
+      68 |
+    > 69 |     console.error(`[Conducks MCP] System ready. ${tools.length} HyperToon tools indexed.`);
+         |             ^
+      70 |   }
+      71 |
+      72 |   private registerResources(): void {
+
+      at ConducksMCPServer.error [as bootstrap] (src/interfaces/tools/server.ts:69:13)
+      at Object.<anonymous> (tests/unit/interfaces/tools/mcp-server.test.ts:50:5)
+
+  console.error
+    [Mirror Server] Dashboard active at http://localhost:3333
+
+
+
+      at Server.<anonymous> (src/interfaces/web/mirror-server.ts:1290:15)
+
+  console.error
+    [Conducks Registry] Registered: test-1 (type: test, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ConducksRegistry.error [as register] (src/registry/base.ts:33:13)
+      at Object.<anonymous> (tests/unit/registry/registry-full.test.ts:22:16)
+
+  console.error
+    [Conducks Registry] Registered: test-1 (type: test, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ConducksRegistry.error [as register] (src/registry/base.ts:33:13)
+      at Object.<anonymous> (tests/unit/registry/registry-full.test.ts:29:16)
+
+  console.error
+    [Conducks Registry] Registered: 1 (type: t, version: 1)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ConducksRegistry.error [as register] (src/registry/base.ts:33:13)
+      at Object.<anonymous> (tests/unit/registry/registry-full.test.ts:34:16)
+
+  console.error
+    [Conducks Registry] Registered: 2 (type: t, version: 1)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ConducksRegistry.error [as register] (src/registry/base.ts:33:13)
+      at Object.<anonymous> (tests/unit/registry/registry-full.test.ts:35:16)
+
+  console.error
+    [Conducks Registry] Registered: 1 (type: t, version: 1)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ConducksRegistry.error [as register] (src/registry/base.ts:33:13)
+      at Object.<anonymous> (tests/unit/registry/registry-full.test.ts:40:16)
+
+  console.error
+    [Conducks Registry] Registered: tool-1 (type: tool, version: 1.0.0)
+
+      31 |     });
+      32 |
+    > 33 |     console.error(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+         |             ^
+      34 |   }
+      35 |
+      36 |   /**
+
+      at ToolRegistry.error (src/registry/base.ts:33:13)
+      at ToolRegistry.register (src/registry/tool-registry.ts:61:11)
+      at Object.<anonymous> (tests/unit/registry/registry-full.test.ts:83:11)
+
+-----------------------------------|---------|----------|---------|---------|-------------------------------------------------------------
+File                               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                           
+-----------------------------------|---------|----------|---------|---------|-------------------------------------------------------------
+All files                          |   73.47 |    60.52 |   71.25 |   75.22 |                                                             
+ interfaces/cli                    |    4.54 |    15.38 |       0 |    4.76 |                                                             
+  index.ts                         |    4.54 |    15.38 |       0 |    4.76 | 39-104,110-112                                              
+ interfaces/cli/commands           |   65.51 |    32.22 |   55.22 |   68.09 |                                                             
+  advise.ts                        |   94.44 |       75 |     100 |     100 | 25-28                                                       
+  analyze.ts                       |     100 |    54.54 |     100 |     100 | 22-26,45-90                                                 
+  blueprint.ts                     |     100 |      100 |     100 |     100 |                                                             
+  clean.ts                         |     100 |      100 |     100 |     100 |                                                             
+  cohesion.ts                      |   85.71 |       75 |     100 |   85.71 | 17-18                                                       
+  context.ts                       |   76.47 |       50 |     100 |   76.47 | 16-17,24-25                                                 
+  diff.ts                          |   16.26 |     4.76 |    9.52 |   19.04 | 32-93,111-213                                               
+  entropy.ts                       |   83.33 |       50 |     100 |   83.33 | 16-17                                                       
+  entry.ts                         |   84.37 |    36.36 |      60 |   87.09 | 42,48-50                                                    
+  explain.ts                       |   35.71 |     12.5 |     100 |   35.71 | 18-19,30-49                                                 
+  flows.ts                         |   46.66 |        0 |      50 |   58.33 | 19-23                                                       
+  help.ts                          |     100 |      100 |     100 |     100 |                                                             
+  impact.ts                        |      60 |     62.5 |     100 |      60 | 17-18,33-44                                                 
+  link.ts                          |      75 |       50 |     100 |      75 | 15-16,21                                                    
+  list.ts                          |     100 |      100 |     100 |     100 |                                                             
+  mirror.ts                        |     100 |       50 |     100 |     100 | 25                                                          
+  prune.ts                         |   66.66 |       25 |      50 |   66.66 | 21-24                                                       
+  query.ts                         |   72.72 |       50 |   66.66 |   72.72 | 16-17,25-28                                                 
+  rename.ts                        |    62.5 |    66.66 |      50 |   66.66 | 18-19,26-28                                                 
+  resonance.ts                     |   84.61 |       50 |     100 |   84.61 | 16-17                                                       
+  setup.ts                         |     100 |      100 |     100 |     100 |                                                             
+  status.ts                        |      90 |    35.71 |      40 |   89.65 | 50-51,56                                                    
+  trace.ts                         |   58.33 |       40 |      50 |   58.33 | 20-21,30-31,38-45                                           
+  verify.ts                        |   85.71 |       50 |   66.66 |   91.66 | 22                                                          
+  watch.ts                         |     100 |      100 |     100 |     100 |                                                             
+ interfaces/tools                  |   43.18 |    41.37 |   33.33 |   44.18 |                                                             
+  entry.ts                         |   30.76 |    83.33 |       0 |   30.76 | 11-20,34-36                                                 
+  hypertoon.ts                     |   63.63 |       25 |   66.66 |   63.63 | 27,53-57,71-72                                              
+  index.ts                         |   22.22 |     62.5 |       0 |   23.52 | 12-30,45-47                                                 
+  server.ts                        |   45.71 |        0 |      40 |   47.05 | 91-114,131-148                                              
+ interfaces/tools/tools            |     2.7 |        0 |       0 |    3.03 |                                                             
+  kinetic.ts                       |    4.34 |        0 |       0 |    4.54 | 26-107                                                      
+  synapse.ts                       |    1.96 |        0 |       0 |    2.27 | 18-146                                                      
+ interfaces/web                    |   36.11 |        0 |   30.76 |   38.23 |                                                             
+  mirror-server.ts                 |   36.11 |        0 |   30.76 |   38.23 | 26,251-277,282-300,309                                      
+ lib/core/algorithms               |   88.46 |    69.56 |      90 |    91.3 |                                                             
+  cochange-engine.ts               |   83.78 |     64.7 |   85.71 |   88.23 | 22,31-32,79                                                 
+  entropy.ts                       |     100 |    83.33 |     100 |     100 | 25                                                          
+ lib/core/algorithms/clustering    |   96.87 |     87.5 |      90 |   96.66 |                                                             
+  daac.ts                          |   96.87 |     87.5 |      90 |   96.66 | 89,146                                                      
+ lib/core/algorithms/refactor      |      96 |    66.66 |      75 |   95.83 |                                                             
+  gvr-engine.ts                    |      96 |    66.66 |      75 |   95.83 | 27                                                          
+ lib/core/git                      |   61.42 |    61.01 |   55.17 |   61.83 |                                                             
+  chronicle-interface.ts           |   61.42 |    61.01 |   55.17 |   61.83 | 39,57-153,181,205,268,282,308                               
+ lib/core/graph                    |   80.57 |    71.89 |   90.51 |   81.85 |                                                             
+  adjacency-list.ts                |   82.08 |    69.23 |   94.11 |   82.75 | 251-308,443,465,540                                         
+  diff-engine.ts                   |   96.07 |     92.1 |     100 |   97.77 | 63                                                          
+  graph-engine.ts                  |   54.47 |    54.16 |   68.42 |   54.95 | 25-69,109-117,137-176,238-239,262-266,295                   
+  linker-federated.ts              |     100 |       75 |     100 |     100 | 37                                                          
+  linker.ts                        |    92.3 |    86.66 |     100 |      96 | 88                                                          
+  persistence.ts                   |   89.85 |    74.21 |   93.33 |   94.28 | 127,186,195-196,217,222                                     
+ lib/core/parsing                  |   89.02 |    74.19 |   77.27 |   90.78 |                                                             
+  context.ts                       |   80.95 |      100 |   55.55 |      80 | 49-56,69-73                                                 
+  grammar-registry.ts              |    86.2 |    66.66 |    87.5 |   88.88 | 22,60,82                                                    
+  pipeline.ts                      |   96.87 |    78.57 |     100 |     100 | 25-26,44                                                    
+ lib/core/parsing/languages/python |   86.36 |    88.88 |   81.25 |    87.5 |                                                             
+  bindings.ts                      |   96.15 |     87.5 |     100 |     100 | 20,25,45                                                    
+  extractor.ts                     |     100 |      100 |     100 |     100 |                                                             
+  index.ts                         |   88.23 |      100 |   66.66 |    87.5 | 53-61                                                       
+  queries.ts                       |     100 |      100 |     100 |     100 |                                                             
+  resolver.ts                      |   68.42 |    81.25 |      75 |   67.74 | 22,56-69                                                    
+ lib/core/parsing/processors       |   88.67 |    71.42 |     100 |   97.72 |                                                             
+  binding.ts                       |     100 |      100 |     100 |     100 |                                                             
+  call.ts                          |      75 |       40 |     100 |     100 | 13-17                                                       
+  flow.ts                          |     100 |       50 |     100 |     100 | 30                                                          
+  heritage.ts                      |     100 |      100 |     100 |     100 |                                                             
+  import.ts                        |   84.84 |    69.23 |     100 |   96.15 | 49                                                          
+ lib/core/parsing/providers        |      50 |      100 |       0 |      50 |                                                             
+  base.ts                          |      50 |      100 |       0 |      50 | 75                                                          
+ lib/core/persistence              |   84.05 |    72.65 |   84.44 |   87.61 |                                                             
+  persistence.ts                   |   84.05 |    72.65 |   84.44 |   87.61 | 40-46,90-92,127,186,195-196,217,222,232                     
+ lib/domain/analysis               |   77.36 |    59.54 |   94.11 |   78.23 |                                                             
+  orchestrator.ts                  |     100 |      100 |     100 |     100 |                                                             
+  reflector.ts                     |   72.95 |    56.55 |   91.66 |   73.94 | 172,175,186-188,191-194,197-200,205-212,227,261-263,269-283 
+ lib/domain/evolution              |   78.16 |    73.07 |   73.68 |   79.26 |                                                             
+  dead-code.ts                     |     100 |    90.47 |     100 |     100 | 48,60                                                       
+  gvr-engine.ts                    |     100 |    88.88 |     100 |     100 | 40                                                          
+  watcher.ts                       |   40.62 |       50 |    37.5 |   43.33 | 40,50-61,78-99                                              
+ lib/domain/federation             |   88.23 |    66.66 |   71.42 |      90 |                                                             
+  conducks-installer.ts             |     100 |      100 |     100 |     100 |                                                             
+  context.ts                       |   71.42 |        0 |   55.55 |      75 | 27-28,42,69-73                                              
+  mcp-configurator.ts              |     100 |    83.33 |     100 |     100 | 37                                                          
+ lib/domain/governance             |   82.84 |    65.09 |   77.77 |   85.98 |                                                             
+  advisor.ts                       |   85.71 |    65.11 |   76.92 |   87.32 | 74,89,131-132,143-146,195                                   
+  blueprint-generator.ts           |   71.42 |       40 |      50 |      80 | 38-39,58-59,65                                              
+  config-detector.ts               |   83.33 |       75 |     100 |   83.33 | 47-51                                                       
+  sentinel.ts                      |   84.61 |    66.66 |     100 |   87.75 | 103,114-120,128                                             
+ lib/domain/intelligence           |   90.56 |       80 |     100 |     100 |                                                             
+  gql-parser.ts                    |   89.47 |    81.25 |     100 |     100 | 29-33                                                       
+  search-engine.ts                 |   91.17 |    79.31 |     100 |     100 | 24-27,34-35                                                 
+ lib/domain/kinetic                |    86.2 |    58.13 |   94.11 |   90.41 |                                                             
+  flow-engine.ts                   |   93.02 |    63.15 |     100 |     100 | 16-61,78-82                                                 
+  impact.ts                        |   84.21 |       50 |     100 |   86.66 | 62-63                                                       
+  trace.ts                         |      76 |    57.14 |   66.66 |   77.27 | 25-31                                                       
+ lib/domain/metrics                |   94.91 |    77.14 |     100 |     100 |                                                             
+  resonance.ts                     |   93.75 |       75 |     100 |     100 | 43-64,83-84                                                 
+  test-aligner.ts                  |   96.29 |       80 |     100 |     100 | 40,44-47                                                    
+ registry                          |   70.76 |     60.8 |   65.57 |   73.23 |                                                             
+  base.ts                          |     100 |    88.88 |     100 |     100 | 56                                                          
+  dynamic-loader.ts                |   85.18 |    76.74 |   84.61 |   86.48 | 54,73-74,78,111-115,150,158,203,232                         
+  index.ts                         |   58.22 |    51.16 |   55.55 |   61.42 | 74,96-110,130-131,138-143,187-194                           
+  synapse-registry.ts              |   64.28 |       50 |   57.14 |   69.23 | 28-29,37,45                                                 
+  tool-registry.ts                 |   58.69 |    42.85 |   46.66 |   60.97 | 69-89,125,137-138,149-166                                   
+-----------------------------------|---------|----------|---------|---------|-------------------------------------------------------------

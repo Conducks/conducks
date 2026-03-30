@@ -29,9 +29,9 @@ Calculate the "Blast Radius" of a proposed change.
 
 ---
 
-## 💎 The Apostle's Intelligence (Deep Analysis)
+## 💎 The Conducks's Intelligence (Deep Analysis)
 
-### 🏺 Apostle v2: The Kinetic Synapse
+### 🏺 Conducks: The Kinetic Synapse
 Conducks has evolved into a high-performance structural intelligence platform. By transitioning from JSON to **DuckDB**, we now support sub-millisecond analytical queries across millions of symbols.
 
 - **Storage**: Vectorized DuckDB for massive scale.
@@ -39,11 +39,11 @@ Conducks has evolved into a high-performance structural intelligence platform. B
 - **Governance**: Sentinel-enforced policy validation.
 - **Visual**: High-fidelity Mirror Dashboard for real-time synapse exploration.
 
-### 🎓 Apostle Architecture Advisor (`advise`)
+### 🎓 Conducks Architecture Advisor (`advise`)
 A cost-free, AI-less structural auditor that identifies "Architectural Sins."
 *   **Circular Dependency Detection**: [FATAL] Identifies recursive import/call loops (A -> B -> A).
 *   **Monolithic Hubs**: Flags symbols that are "too coupled" (Monolithic Hubs) relative to the median density.
-*   **The Apostle's Intuition**: Infers relationships by matching string literals to symbol names (Inference).
+*   **The Conducks's Intuition**: Infers relationships by matching string literals to symbol names (Inference).
 
 ### 📡 Project Resonance (`resonance`)
 Compare the structural "Soul" of two different repositories.
@@ -75,7 +75,7 @@ Detect architectural regressions before they are committed.
 
 ## 🛡️ Governance & Manifest
 
-### 🏺 Apostolic Blueprint (`blueprint`)
+### 🏺 Conducksic Blueprint (`blueprint`)
 Generates a high-fidelity structural manifest (**`BLUEPRINT.md`**) of every node and relationship in the synapse.
 
 ### 🛡️ Sentinel Verification (`verify`)
@@ -89,7 +89,7 @@ Enforces custom architectural rules (e.g., "No database calls in the UI layer") 
 *   **Lens**: Language-specific parsers (TypeScript, Python, etc.).
 *   **Chronicle**: Git-native file discovery layer.
 *   **Kinetic Energy**: A metric of how "active" or "important" a node is in the graph.
-*   **Apostle**: High-level analysis engines (Advisor, Resonance, Prune).
+*   **Conducks**: High-level analysis engines (Advisor, Resonance, Prune).
 
 ## 🏺 The Synapse Persistence (SBP)
 As of v0.8.0, Conducks uses **Synapse Binary Prism (SBP)** powered by DuckDB. 
