@@ -25,6 +25,10 @@ export class ApostleAdvisor {
     // 1. Detect Circular Dependencies (Fatal Logic - Non-Exit)
     const cycles = graph.detectCycles();
     cycles.forEach(cycle => {
+      cycle.forEach(nodeId => {
+        const node = graph.getNode(nodeId);
+        if (node) node.properties.anomaly = 'cycle';
+      });
       advice.push({
         level: 'ERROR',
         type: 'CIRCULAR',
@@ -75,6 +79,119 @@ export class ApostleAdvisor {
       });
     }
 
+    // 5. Composite Risk Score Analysis (Apostle v3)
+    const highRiskNodes = nodes
+      .map(node => {
+        const breakdown = this.calculateRiskBreakdown(node, graph);
+        return { node, risk: breakdown.total, breakdown };
+      })
+      .filter(entry => entry.risk > 0.4) // Threshold for surfacing risk hotspots
+      .sort((a, b) => b.risk - a.risk)
+      .slice(0, 10);
+
+    if (highRiskNodes.length > 0) {
+      advice.push({
+        level: 'WARNING',
+        type: 'HUB',
+        message: `High Risk Symbols: Surfaces complex, central, or debt-heavy units.`,
+        nodes: highRiskNodes.map(entry => {
+          const b = entry.breakdown;
+          const markers = entry.node.properties.debtMarkers || [];
+          const debtStr = markers.length > 0 ? ` (${markers.length} markers)` : '';
+          
+          return `${entry.node.properties.name} — Risk: ${entry.risk.toFixed(2)}
+    ├── gravity:     ${b.gravity.toFixed(2)}
+    ├── complexity:  ${b.complexity.toFixed(2)} (cyclomatic: ${entry.node.properties.complexity || 1})
+    ├── fan-out:     ${b.fanOut.toFixed(2)}
+    ├── debt:        ${b.debt.toFixed(2)}${debtStr}
+    ├── churn:       ${b.churn.toFixed(2)}
+    └── entropy:     ${b.entropy.toFixed(2)}`;
+        })
+      });
+    }
+
+    // 6. External Dependency Coupling (Phase 5.2)
+    const externalDeps = nodes.filter(n => n.label === 'external_dependency');
+    const couplingThreshold = 5; // Lowered for stress test visibility (Apostle v6)
+    
+    for (const node of nodes) {
+      if (node.label === 'external_dependency') continue;
+      
+      // Apostle v6: Aggregate module and global scope dependencies
+      const directDeps = graph.getNeighbors(node.id, 'downstream').filter(e => e.type === 'DEPENDS_ON');
+      const globalId = node.id + '::global';
+      const globalDeps = graph.getNeighbors(globalId, 'downstream').filter(e => e.type === 'DEPENDS_ON');
+      const totalDeps = [...directDeps, ...globalDeps];
+
+      if (totalDeps.length > 0) {
+        // Apostle v6 logic: Mark high-coupling hotspots
+      }
+
+      if (totalDeps.length > couplingThreshold) {
+        node.properties.anomaly = 'coupling';
+        advice.push({
+          level: 'WARNING',
+          type: 'HIDDEN_COUPLING',
+          message: `Heavy External Coupling: This module depends on ${totalDeps.length} external packages.`,
+          nodes: [node.id]
+        });
+      }
+    }
+
+    // 7. Unpinned Dependencies
+    for (const dep of externalDeps) {
+      const version = dep.properties.version || 'latest';
+      if (version === 'latest' || version === '*' || version.includes('^') || version.includes('~')) {
+        dep.properties.anomaly = 'unpinned';
+        advice.push({
+          level: 'INFO',
+          type: 'ORPHAN', // Reusing type for versioning advice
+          message: `Unpinned Dependency: Package "${dep.properties.name}" uses a loose version constraint (${version}).`,
+          nodes: [dep.id]
+        });
+      }
+    }
+
     return advice;
+  }
+
+  public calculateRiskBreakdown(node: ConducksNode, graph: ConducksAdjacencyList) {
+    const rank = node.properties.rank || 0;
+    const complexity = node.properties.complexity || 1;
+    const debtCount = (node.properties.debtMarkers || []).length;
+    const fanOut = graph.getNeighbors(node.id, 'downstream').length;
+    const resonance = node.properties.resonance || 0;
+    const entropy = node.properties.entropy || 0;
+
+    const wGravity = 0.25;
+    const wComplexity = 0.35;
+    const wFanOut = 0.15;
+    const wDebt = 0.05;
+    const wResonance = 0.1;
+    const wEntropy = 0.1;
+
+    const nComplexity = Math.min(complexity / 20, 1.0);
+    const nFanOut = Math.min(fanOut / 10, 1.0);
+    const nDebt = Math.min(debtCount / 5, 1.0);
+    const nResonance = Math.min(resonance / 100, 1.0);
+    const nEntropy = entropy; 
+
+    return {
+      gravity: wGravity * rank,
+      complexity: wComplexity * nComplexity,
+      fanOut: wFanOut * nFanOut,
+      debt: wDebt * nDebt,
+      churn: wResonance * nResonance, // Resonance is a proxy for churn
+      entropy: wEntropy * nEntropy,
+      total: (wGravity * rank) + (wComplexity * nComplexity) + (wFanOut * nFanOut) + (wDebt * nDebt) + (wResonance * nResonance) + (wEntropy * nEntropy)
+    };
+  }
+
+  /**
+   * Apostle v3 — Composite Risk Formula (Final 6-Signal Model)
+   * legacy method maintained for compatibility
+   */
+  private calculateRiskScore(node: ConducksNode, graph: ConducksAdjacencyList): number {
+    return this.calculateRiskBreakdown(node, graph).total;
   }
 }

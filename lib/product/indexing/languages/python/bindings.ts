@@ -15,9 +15,11 @@ export class PythonBindings {
 
     // 1. from x import User, Repo as R
     if (node.type === 'import_from_statement') {
+      console.error(`[PythonBindings] Processing import_from_statement with ${node.namedChildCount} named children.`);
       for (let i = 0; i < node.namedChildCount; i++) {
         const child = node.namedChild(i);
         if (!child) continue;
+        console.error(`[PythonBindings]   - Child ${i}: type=${child.type}, text=${child.text}`);
 
         if (child.type === 'aliased_import') {
           const original = child.childForFieldName('name')?.text;
@@ -25,6 +27,12 @@ export class PythonBindings {
           if (original && alias) {
             bindings.push({ local: alias, exported: original });
           }
+        } else if (child.type === 'identifier' || child.type === 'dotted_name') {
+           // Skip the module name itself (the first dotted_name) if it matches the 'module_name' field
+           const moduleName = node.childForFieldName('module_name');
+           if (child.id !== moduleName?.id) {
+             bindings.push({ local: child.text, exported: child.text });
+           }
         }
       }
     }

@@ -40,7 +40,7 @@ export class GVREngine {
       }
     });
 
-    console.log(`[GVR] Identified ${affectedFiles.size} affected files.`);
+    console.error(`[GVR] Identified ${affectedFiles.size} affected files.`);
 
     // 2. Conflict Check (Simplified for now)
     // In a real implementation, we would re-parse each file and check scopes.

@@ -40,6 +40,35 @@ export class ConducksDiffEngine {
       }
     }
 
+    // Property Drift Detection (Architectural Drift)
+    const drift: Record<string, any> = {};
+    for (const hn of headNodes) {
+      const bn = base.getNode(hn.id);
+      if (bn) {
+        const deltas: any = {};
+        const threshold = 0.01;
+
+        if (Math.abs((hn.properties.rank || 0) - (bn.properties.rank || 0)) > threshold) {
+          deltas.gravityShift = (hn.properties.rank || 0) - (bn.properties.rank || 0);
+        }
+        const bComp = Number(bn.properties.complexity || 0);
+        const hComp = Number(hn.properties.complexity || 0);
+        if (hComp !== bComp) {
+          deltas.complexityBloat = hComp - bComp;
+        }
+
+        const bRes = Number(bn.properties.resonance || 0);
+        const hRes = Number(hn.properties.resonance || 0);
+        if (hRes !== bRes) {
+          deltas.resonanceDrift = hRes - bRes;
+        }
+
+        if (Object.keys(deltas).length > 0) {
+          drift[hn.id] = deltas;
+        }
+      }
+    }
+
     return {
       nodes: {
         added: addedNodes.length,
@@ -53,12 +82,18 @@ export class ConducksDiffEngine {
         added: addedEdges.length,
         removed: removedEdges.length
       },
-      summary: this.summarize(addedNodes.length, removedNodes.length, addedEdges.length, removedEdges.length)
+      drift,
+      summary: this.summarize(addedNodes.length, removedNodes.length, addedEdges.length, removedEdges.length, Object.keys(drift).length)
     };
   }
 
-  private summarize(an: number, rn: number, ae: number, re: number): string {
-    if (an === 0 && rn === 0 && ae === 0 && re === 0) return "No structural changes.";
-    return `Delta: +${an}/-${rn} Symbols, +${ae}/-${re} Relationships.`;
+  private summarize(an: number, rn: number, ae: number, re: number, driftCount: number): string {
+    let summary = `Delta: +${an}/-${rn} Symbols, +${ae}/-${re} Relationships.`;
+    if (driftCount > 0) {
+      summary += ` ${driftCount} symbols showed structural drift.`;
+    } else if (an === 0 && rn === 0 && ae === 0 && re === 0) {
+      return "No structural changes.";
+    }
+    return summary;
   }
 }

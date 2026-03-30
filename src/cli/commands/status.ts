@@ -1,6 +1,7 @@
 import { ApostleCommand } from "../command.js";
 import { conducks } from "../../conducks-core.js";
 import { GraphPersistence, SynapsePersistence } from "../../../lib/core/graph/persistence.js";
+import { chronicle } from "../../../lib/core/git/chronicle-interface.js";
 import path from "node:path";
 
 /**
@@ -18,6 +19,7 @@ export class StatusCommand implements ApostleCommand {
     // Apostle v3 — Align Persistence with the Target Project Path
     const persistence = new GraphPersistence(targetPath);
     (conducks as any).persistence = persistence;
+    chronicle.setProjectDir(targetPath);
 
     await persistence.load(conducks.graph.getGraph());
     
@@ -32,6 +34,12 @@ export class StatusCommand implements ApostleCommand {
     console.log(`- Edges:   ${status.stats.edgeCount}`);
     console.log(`- Density: ${status.stats.density.toFixed(6)} relationships/symbol`);
     console.log(`- Status:  ${status.status}`);
+    
+    if (status.staleness.stale) {
+      console.log(`- \x1b[33mStaleness: Stale (${status.staleness.commitsBehind} commits behind HEAD)\x1b[0m`);
+    } else {
+      console.log(`- \x1b[32mStaleness: Synchronized\x1b[0m`);
+    }
 
     const nodes = Array.from(graph.getAllNodes());
     const topGravity = nodes

@@ -18,10 +18,11 @@
 		"watch": "tsc --watch",
 		"inspector": "npx @modelcontextprotocol/inspector build/index.js",
 		"type-check": "tsc --noEmit",
-		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns=tests/persistence",
 		"test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
 		"test:int": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
-		"benchmark": "node --loader ts-node/esm tests/benchmark/run.ts"
+		"benchmark": "node --loader ts-node/esm tests/benchmark/run.ts",
+		"test:persistence": "jest --config jest.persistence.config.cjs"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.22.0",
@@ -50,6 +51,7 @@
 		"jest": "^30.3.0",
 		"ts-jest": "^29.4.6",
 		"ts-node": "^10.9.2",
-		"typescript": "^5.3.3"
+		"typescript": "^5.3.3",
+		"vitest": "^4.1.2"
 	}
 }

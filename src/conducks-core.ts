@@ -16,6 +16,7 @@ import { ResonanceAnalyzer } from "../lib/product/analysis/resonance.js";
 import { DeadCodeAnalyzer } from "../lib/product/analysis/dead-code.js";
 import { ApostleAdvisor } from "../lib/product/analysis/advisor.js";
 import { CoChangeEngine } from "../lib/core/algorithms/cochange-engine.js";
+import { TestAligner } from "../lib/product/analysis/test-aligner.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "../lib/core/algorithms/entropy.js";
 import { chronicle } from "../lib/core/git/chronicle-interface.js";
 import path from "node:path";
@@ -38,13 +39,17 @@ export class Conducks {
   private resonance = new ResonanceAnalyzer();
   private death = new DeadCodeAnalyzer();
   private advisor = new ApostleAdvisor();
+  private aligner = new TestAligner();
   
   private orchestrator: PulseOrchestrator;
   private registry = new SynapseRegistry<ConducksComponent>();
   private persistence: SynapsePersistence = new GraphPersistence();
   private linker = new GlobalSymbolLinker();
   
-  constructor() {
+  constructor(options?: { baseDir?: string }) {
+    if (options?.baseDir) {
+      this.persistence = new GraphPersistence(options.baseDir);
+    }
     this.orchestrator = new PulseOrchestrator(this.registry, this.graph);
     this.setupDefaults();
   }
@@ -63,24 +68,75 @@ export class Conducks {
    * Parallelizes reflection by independent dependency batches to maximize 
    * structural throughput.
    */
-  public async pulse(files: Array<{ path: string, source: string }>): Promise<void> {
+  public async pulse(files: Array<{ path: string, source: string }>): Promise<string> {
     console.log("[Conducks] Initiating Apostle v6 'Structural Resonance' Pulse...");
     
+    console.error("[ConducksCore] Loading persistence...");
     await this.persistence.load(this.graph.getGraph());
+    console.error("[ConducksCore] Persistence loaded.");
+
+    console.error("[ConducksCore] Initializing grammars...");
     await grammars.init(); 
-    
+    console.error("[ConducksCore] Grammars initialized.");    
     // Support both build/ (../../grammars) and src/ (../grammars)
     let grammarDir = path.resolve(__dirname, "../grammars");
     if (!fs.existsSync(grammarDir)) {
       grammarDir = path.resolve(__dirname, "../../grammars");
     }
     
-    await grammars.loadLanguage("python", path.join(grammarDir, "tree-sitter-python.wasm"));
+    const wasmPath = path.join(grammarDir, "tree-sitter-python.wasm");
+    if (!fs.existsSync(wasmPath)) {
+      throw new Error(`Critical dependency missing: ${wasmPath}`);
+    }
+    
+    console.error(`[ConducksCore] Loading grammar: ${wasmPath}`);
+    await grammars.loadLanguage("python", wasmPath);
+    console.error(`[ConducksCore] Grammar loaded.`);
 
-    // Delegate to the Orchestrator
-    await this.orchestrator.executePulse(files);
+    // Apostle v6: Kinetic Root Alignment
+    if (files.length > 0) {
+      const firstFile = files[0].path;
+      // Heuristic: find the last 'stress_test' or 'stress_test_git' or use the directory
+      const projectRoot = firstFile.includes('stress_test_git') ? 
+        firstFile.split('stress_test_git')[0] + 'stress_test_git' :
+        firstFile.includes('stress_test') ? 
+        firstFile.split('stress_test')[0] + 'stress_test' :
+        path.dirname(firstFile);
+      
+      chronicle.setProjectDir(projectRoot);
+    }
 
-    await this.persistence.save(this.graph.getGraph());
+    console.error(`[ConducksCore] Calling Orchestrator with ${files.length} units.`);
+    try {
+      await this.orchestrator.executePulse(files);
+      const framework = (this.orchestrator as any).context.getFramework();
+      if (framework) {
+        this.graph.getGraph().setMetadata('framework', framework);
+      }
+      console.error(`[ConducksCore] Orchestrator call complete.`);
+    } catch (e) {
+      console.error(`[ConducksCore] Orchestrator FAILED: ${e}`);
+      throw e;
+    }
+    
+    // Apostle v3.4: Align Test Coverage
+    this.aligner.align(this.graph.getGraph());
+
+    // Apostle v3.6: Architectural Audit (Mark Anomalies)
+    this.advisor.analyze(this.graph.getGraph());
+
+    // Apostle v6: Final structural resonance (Reflects gravity and entry points)
+    await this.resonate();
+
+    // Apostle v5.4: Sync Staleness Sensor (Store HEAD hash)
+    const headHash = chronicle.getHeadHash();
+    if (headHash) {
+      console.error(`[ConducksCore] Capturing pulse snapshot at: ${headHash}`);
+      chronicle.setLastPulsedCommit(this.graph.getGraph(), headHash);
+      console.error(`[ConducksCore] Metadata set. Current metadata:`, Array.from(this.graph.getGraph().getAllMetadata().entries()));
+    }
+
+    return await this.persistence.save(this.graph.getGraph());
   }
 
   public query(query: string, options: { gql?: boolean } = {}) {
@@ -90,10 +146,10 @@ export class Conducks {
 
   public trace(startId: string) { return this.flows.trace(startId); }
 
-  public getImpact(symbolId: string, depth: number = 3) {
-    const analyzer = this.registry.getComponent("blast-radius-analyzer") as BlastRadiusAnalyzer;
+  public getImpact(symbolId: string, direction: 'upstream' | 'downstream' = 'upstream', depth: number = 5): any {
+    const analyzer = this.registry.getComponent("blast-radius-analyzer") as any;
     if (!analyzer) throw new Error("Conducks Error: Blast Radius Analyzer not found.");
-    return analyzer.analyzeImpact(this.graph.getGraph(), symbolId, depth);
+    return analyzer.analyzeImpact(this.graph.getGraph(), symbolId, direction, depth);
   }
 
   public async diffWithBase(): Promise<any> {
@@ -140,14 +196,17 @@ export class Conducks {
     const graph = this.graph.getGraph();
     const node = graph.getNode(nodeId);
     if (!node) return null;
-    const { risk: entropyRisk } = await this.calculateEntropy(nodeId);
-    const resonance = await chronicle.getCommitResonance(node.properties.filePath);
-    const churnRisk = Math.min(resonance.count / 100, 1.0);
+    
+    // Leverage Apostle v3 persistent signals
+    const entropyRisk = node.properties.entropy || 0;
+    const churnRisk = Math.min((node.properties.resonance || 0) / 100, 1.0);
+    const complexityRisk = Math.min((node.properties.complexity || 1) / 20, 1.0);
     const outgoing = graph.getNeighbors(nodeId, 'downstream').length;
     const fanOutRisk = Math.min(outgoing / 10, 1.0);
     const gravity = node.properties.rank || 0;
-    const score = (gravity * 0.3) + (entropyRisk * 0.3) + (churnRisk * 0.2) + (fanOutRisk * 0.2);
-    return { score, breakdown: { gravity, entropy: entropyRisk, churn: churnRisk, fanOut: fanOutRisk } };
+    
+    const score = (gravity * 0.25) + (complexityRisk * 0.35) + (entropyRisk * 0.1) + (churnRisk * 0.1) + (fanOutRisk * 0.15);
+    return { score, breakdown: { gravity, complexity: complexityRisk, entropy: entropyRisk, churn: churnRisk, fanOut: fanOutRisk } };
   }
 
   public async resonate(): Promise<void> {
@@ -174,7 +233,46 @@ export class Conducks {
 
   public status(): any {
     const graph = this.graph.getGraph();
-    return { status: "ready", version: "2.0.0", stats: { nodeCount: graph.stats.nodeCount, edgeCount: graph.stats.edgeCount } };
+    const stats = graph.stats;
+    const allMeta = graph.getAllMetadata();
+    console.error(`[ConducksCore] Status metadata check:`, Array.from(allMeta.entries()));
+    const lastCommit = chronicle.getLastPulsedCommit(graph) || "none";
+    const currentHead = chronicle.getHeadHash();
+    const isStale = currentHead && lastCommit !== "none" && currentHead !== lastCommit;
+    const commitsBehind = isStale ? chronicle.getCommitsBehind(lastCommit) : 0;
+
+    return { 
+      status: "ready", 
+      version: "2.0.0", 
+      framework: graph.getMetadata('framework') || "generic",
+      staleness: {
+        stale: isStale,
+        lastPulsedCommit: lastCommit,
+        currentHead: currentHead || "non-git",
+        commitsBehind
+      },
+      stats: { 
+        nodeCount: stats.nodeCount, 
+        edgeCount: stats.edgeCount,
+        density: (stats as any).density || 0
+      } 
+    };
+  }
+
+  /**
+   * Apostle v5.4 — Active Staleness Verification
+   */
+  public checkStaleness(): { stale: boolean, commitsBehind: number } {
+    const graph = this.graph.getGraph();
+    const lastCommit = chronicle.getLastPulsedCommit(graph);
+    if (!lastCommit) return { stale: false, commitsBehind: 0 };
+
+    const currentHead = chronicle.getHeadHash();
+    if (!currentHead) return { stale: false, commitsBehind: 0 };
+    if (currentHead === lastCommit) return { stale: false, commitsBehind: 0 };
+
+    const diff = chronicle.getCommitsBehind(lastCommit);
+    return { stale: true, commitsBehind: diff };
   }
 
   public audit(): any {

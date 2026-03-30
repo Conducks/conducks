@@ -40,7 +40,7 @@ export class ConducksWatcher {
    * Starts the Synapse Monitor.
    */
   public start(): void {
-    console.log(`[Conducks Synapse Monitor] Monitoring: ${this.rootDir}`);
+    console.error(`[Conducks Synapse Monitor] Monitoring: ${this.rootDir}`);
 
     if (this.watcher) {
       this.watcher
@@ -57,7 +57,7 @@ export class ConducksWatcher {
     if (this.isInitialized) return;
     await (Parser as any).init();
     this.isInitialized = true;
-    console.log("[Conducks Synapse Monitor] Core Beam Engine initialized.");
+    console.error("[Conducks Synapse Monitor] Core Beam Engine initialized.");
   }
 
   /**
@@ -74,7 +74,7 @@ export class ConducksWatcher {
    * Performs an incremental Synapse Pulse for a single file event.
    */
   private async handlePulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
-    console.log(`[Conducks Synapse Monitor] Event [${event}]: ${filePath}`);
+    console.error(`[Conducks Synapse Monitor] Event [${event}]: ${filePath}`);
     
     if (event === "unlink") {
       // Logic to prune stale synapse nodes would go here
@@ -100,7 +100,7 @@ export class ConducksWatcher {
         globalMirror.broadcastPulse({ event, filePath });
       }
 
-      console.log(`[Conducks Synapse Monitor] Synapse updated for: ${filePath}`);
+      console.error(`[Conducks Synapse Monitor] Synapse updated for: ${filePath}`);
     } catch (err) {
       console.error(`[Conducks Synapse Monitor] Pulse failure in ${filePath}:`, err);
     }

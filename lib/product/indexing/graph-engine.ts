@@ -23,7 +23,7 @@ export class ConducksGraph {
    */
   public async pulseStructuralStream(stream: PrismRequest[]): Promise<void> {
     const unitCount = stream.length;
-    console.log(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
+    console.error(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
 
     if (unitCount === 0) return;
 
@@ -66,7 +66,7 @@ export class ConducksGraph {
     // Phase 2: Neural Binding (Universal Workspace Resolution)
     this.bindNeuralCircuits();
 
-    console.log(`[Conducks Synapse] Pulse complete: ${this.graph.stats.nodeCount} Neurons active.`);
+    console.error(`[Conducks Synapse] Pulse complete: ${this.graph.stats.nodeCount} Neurons active.`);
   }
 
   /**
@@ -78,7 +78,7 @@ export class ConducksGraph {
    * 3. Gravity Recalculation (PageRank)
    */
   public resonate(): void {
-    console.log(`[Conducks Synapse] Pushing Structural Resonance Flow...`);
+    console.error(`[Conducks Synapse] Pushing Structural Resonance Flow...`);
     this.bindNeuralCircuits();
     this.bindRouteCircuits();
     this.bindPulseCircuits();
@@ -199,9 +199,12 @@ export class ConducksGraph {
       // All other edges (CALLS, ACCESSES) are local-first; Neural Binding resolves cross-file.
       const isFileRef = rel.type === 'IMPORTS';
       const targetId = isFileRef ? rel.targetName : `${filePath}::${rel.targetName}`;
+      
+      // Apostle v6.4: Unique IDs for symbol-level imports
+      const bindingSuffix = (isFileRef && rel.metadata?.name) ? `::${rel.metadata.name}` : '';
 
       const edge: ConducksEdge = {
-        id: `${filePath}::${rel.sourceName}->${rel.targetName}::${rel.type}`,
+        id: `${filePath}::${rel.sourceName}->${rel.targetName}::${rel.type}${bindingSuffix}`,
         sourceId: `${filePath}::${rel.sourceName}`,
         targetId,
         type: rel.type as any,
@@ -225,7 +228,7 @@ export class ConducksGraph {
       const outgoing = this.graph.getNeighbors(node.id, 'downstream');
       
       for (const edge of outgoing) {
-        if (edge.type === 'CALLS' || edge.type === 'ACCESSES') {
+        if (edge.type === 'CALLS' || edge.type === 'ACCESSES' || edge.type === 'CONSTRUCTS' || edge.type === 'MEMBER_OF') {
           const rawTarget = edge.properties.rawTarget;
           if (!rawTarget) continue;
 
@@ -243,13 +246,19 @@ export class ConducksGraph {
           const localImports = outgoing.filter(e => e.type === 'IMPORTS');
           const fileImports = this.graph.getNeighbors(globalId, 'downstream').filter(e => e.type === 'IMPORTS');
           const allImports = [...localImports, ...fileImports];
+          
+          if (allImports.length > 0) {
+            console.error(`[NeuralBinding] Node ${node.id} is checking ${allImports.length} imports to resolve ${rawTarget}.`);
+          }
 
           for (const imp of allImports) {
             const targetFile = imp.targetId;
             const impName = imp.properties.name || path.basename(targetFile, path.extname(targetFile));
+            console.error(`[NeuralBinding]   - Checking import ${impName} from ${targetFile}`);
             
             // Case A: Exact match (e.g., from X import Y -> call Y())
             if (rawTarget === impName) {
+               console.error(`[NeuralBinding]   -> MATCH FOUND! Rebinding to ${targetFile}::${rawTarget}`);
                const originId = `${targetFile}::${rawTarget}`;
                if (this.graph.getNode(originId)) {
                  this.graph.rebindEdgeTarget(edge, originId);

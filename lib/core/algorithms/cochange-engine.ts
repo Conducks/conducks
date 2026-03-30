@@ -15,7 +15,7 @@ export class CoChangeEngine {
    * Identifies file pairs with high temporal coupling but no structural link.
    */
   public async discoverHiddenCoupling(graph: ConducksAdjacencyList, db: any): Promise<Array<{ fileA: string, fileB: string, confidence: number }>> {
-    console.log("[Conducks Co-Change] Extraction in progress...");
+    console.error("[Conducks Co-Change] Extraction in progress...");
     
     // 1. Get entire Git history in a machine-readable format
     // Format: <hash> <file>
@@ -72,7 +72,7 @@ export class CoChangeEngine {
               hiddenCoupling.push({
                 fileA: row.fA,
                 fileB: row.fB,
-                confidence: Math.min(row.count / 10, 1.0) // Simple confidence heuristic
+                confidence: Math.min(Number(row.count) / 10, 1.0) // Simple confidence heuristic
               });
             }
           }

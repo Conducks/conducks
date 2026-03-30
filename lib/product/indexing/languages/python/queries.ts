@@ -11,7 +11,7 @@ export const PYTHON_QUERIES = `
   (import_from_statement module_name: (dotted_name) @source) @isImport
   (import_from_statement module_name: (relative_import) @source) @isImport
   
-  (aliased_import name: (dotted_name) @name alias: (identifier) @alias) @isBinding
+  (aliased_import name: (dotted_name) @source alias: (identifier) @alias) @isBinding
   
   ;; Simple function call: do1()
   (call function: (identifier) @kinesis_target arguments: (argument_list (_) @kinesis_arg)*)
@@ -39,5 +39,8 @@ export const PYTHON_QUERIES = `
   ;; Heritage
   (class_definition name: (identifier) @name
     (argument_list (identifier) @heritage)) @isClass
+
+  ;; Phase 3.2: Debt Markers
+  (comment) @comment
 `;
 

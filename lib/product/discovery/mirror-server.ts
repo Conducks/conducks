@@ -207,7 +207,7 @@ export class MirrorServer {
     const pulseSource = new EventSource('/api/pulse');
     pulseSource.onmessage = (event) => {
       const pulseData = JSON.parse(event.data);
-      console.log('[Synapse] Kinetic shift received:', pulseData);
+      console.error('[Synapse] Kinetic shift received:', pulseData);
       
       const adviceEl = document.getElementById('buddy-advice');
       adviceEl.innerHTML = \`
@@ -295,7 +295,7 @@ export class MirrorServer {
    * Broadcasts a pulse to all connected mirrors.
    */
   public broadcastPulse(data: any) {
-    console.log(`[Mirror Server] Broadcasting pulse to ${this.clients.length} mirrors...`);
+    console.error(`[Mirror Server] Broadcasting pulse to ${this.clients.length} mirrors...`);
     this.clients.forEach(c => {
       c.write(`data: ${JSON.stringify(data)}\n\n`);
     });
@@ -306,7 +306,7 @@ export class MirrorServer {
    */
   public start(port: number = 3333) {
     this.app.listen(port, () => {
-      console.log(`[Mirror Server] Dashboard active at http://localhost:${port}`);
+      console.error(`[Mirror Server] Dashboard active at http://localhost:${port}`);
     });
   }
 }

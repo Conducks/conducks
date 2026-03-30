@@ -39,6 +39,16 @@ export interface ApostleProvider {
   extractNamedBindings?(node: any): Array<{ name: string; alias?: string }>;
 
   /**
+   * Optional language-specific complexity calculation (branch count/cyclomatic).
+   */
+  calculateComplexity?(node: any): number;
+
+  /**
+   * Optional language-specific debt extraction (TODO, FIXME markers).
+   */
+  extractDebt?(node: any): string[];
+
+  /**
    * Language-specific heritage normalization.
    */
   normalizeHeritage?(name: string): string;

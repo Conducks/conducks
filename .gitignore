@@ -22,6 +22,7 @@ Thumbs.db
 *.swo
 *~
 docs/
+tests/fixtures/
 # Python
 .venv/
 __pycache__/
@@ -39,3 +40,4 @@ venv/
 .cache/
 dist/
 .conducks/
+.gitnexus

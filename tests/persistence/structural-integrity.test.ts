@@ -1,4 +1,4 @@
-import { Conducks } from "../src/conducks-core.js";
+import { Conducks } from "../../src/conducks-core.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,12 +18,21 @@ describe("Apostle v6: Structural Integrity (The Gospel Core)", () => {
   let conducks: Conducks;
 
   beforeEach(async () => {
-    // Clean slate: wipe DuckDB between tests to prevent contamination
-    try { await fs.rm(CONDUCKS_DIR, { recursive: true, force: true }); } catch {}
-    conducks = new Conducks();
+    // Unique folder per run to ensure visibility and isolation
+    const testId = `test_run_${Date.now()}`;
+    const testDir = path.resolve(__dirname, `../.conducks_${testId}`);
+    conducks = new Conducks({ baseDir: testDir });
+  }, 30000);
+
+  afterEach(async () => {
+    // Explicitly drain and close to ensure no leaked connections in Jest
+    if ((conducks as any).persistence && typeof (conducks as any).persistence.close === 'function') {
+      await (conducks as any).persistence.close();
+    }
   });
 
   afterAll(async () => {
+    // Final cleanup of the .conducks dir if any stray files were created
     try { await fs.rm(CONDUCKS_DIR, { recursive: true, force: true }); } catch {}
   });
 

@@ -38,4 +38,56 @@ export class PythonExtractor {
 
     return fields;
   }
+  
+  /**
+   * Apostle v3 — Structural Complexity
+   * 
+   * Calculates the branch complexity (Cyclomatic-lite) of a Python node 
+   * by counting logical branch points.
+   */
+  public calculateComplexity(node: any): number {
+    let complexity = 1; // Base complexity
+    
+    const branchNodes = new Set([
+      'if_statement',
+      'elif_clause',
+      'for_statement',
+      'while_statement',
+      'try_statement',
+      'except_clause',
+      'with_statement',
+      'conditional_expression' // x if y else z
+    ]);
+
+    const traverse = (n: any) => {
+      if (branchNodes.has(n.type)) {
+        complexity++;
+      }
+      for (let i = 0; i < n.childCount; i++) {
+        traverse(n.child(i));
+      }
+    };
+
+    traverse(node);
+    return complexity;
+  }
+
+  /**
+   * Apostle v3 — Technical Debt Signals
+   * 
+   * Extracts debt markers (TODO, FIXME, etc.) from a node's text.
+   */
+  public extractDebt(node: any): string[] {
+    const text = node.text;
+    const markers = ['TODO', 'FIXME', 'HACK', 'BUG', 'REFACTOR', 'DEPRECATED', 'XXX'];
+    const found: string[] = [];
+
+    for (const marker of markers) {
+      if (text.includes(marker)) {
+        found.push(marker);
+      }
+    }
+
+    return found;
+  }
 }

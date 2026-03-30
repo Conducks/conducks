@@ -15,7 +15,7 @@ export class GlobalSymbolLinker {
   public link(graph: ConducksAdjacencyList): void {
     const nodes = Array.from((graph as any).nodes.values()) as any[]; 
     
-    console.log(`[Conducks Linker] Starting global resolution for ${nodes.length} nodes...`);
+    console.error(`[Conducks Linker] Starting global resolution for ${nodes.length} nodes...`);
 
     for (const node of nodes) {
       if (node.label === 'import') {
@@ -53,7 +53,7 @@ export class GlobalSymbolLinker {
         properties: {}
       };
       graph.addEdge(edge);
-      console.log(`[Conducks Linker] Linked: ${node.id} -> ${targetNodeId}`);
+      console.error(`[Conducks Linker] Linked: ${node.id} -> ${targetNodeId}`);
     } else {
       // Fuzzy match or cross-package link placeholder
       this.fuzzyLink(node, symbolName, graph);

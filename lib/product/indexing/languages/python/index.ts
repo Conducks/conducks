@@ -37,6 +37,22 @@ export class PythonProvider extends WasmProvider {
   }
 
   /**
+   * Apostle v3 — Structural Complexity
+   * Counts logical regions within a scope (functions/classes).
+   */
+  public calculateComplexity(node: any): number {
+    return this.extractor.calculateComplexity(node);
+  }
+
+  /**
+   * Apostle v3 — Technical Debt Signals
+   * Extracts markers (TODO, FIXME, etc.) from comments.
+   */
+  public extractDebt(node: any): string[] {
+    return this.extractor.extractDebt(node);
+  }
+
+  /**
    * Normalizes heritage names for Python's MRO.
    */
   public normalizeHeritage(name: string): string {

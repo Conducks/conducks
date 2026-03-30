@@ -8,10 +8,11 @@ import { SynapsePersistence } from "../../../lib/core/graph/persistence.js";
 export class ImpactCommand implements ApostleCommand {
   public id = "impact";
   public description = "Perform blast radius analysis on a symbol";
-  public usage = "conducks impact <symbolId>";
+  public usage = "conducks impact <symbolId> [direction: upstream|downstream]";
 
   public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
     const symbolId = args[0];
+    const direction = (args[1] === "downstream" ? "downstream" : "upstream") as "upstream" | "downstream";
     if (!symbolId) {
       console.error("Error: Please provide a symbol ID for impact analysis.");
       return;
@@ -20,10 +21,10 @@ export class ImpactCommand implements ApostleCommand {
     await persistence.load(conducks.graph.getGraph());
     
     try {
-      const impact = conducks.getImpact(symbolId);
+      const impact = conducks.getImpact(symbolId, direction);
       const composite = await conducks.calculateCompositeRisk(symbolId);
 
-      console.log(`\n\x1b[1m--- Apostle Impact Report: ${symbolId} ---\x1b[0m`);
+      console.log(`\n\x1b[1m--- Apostle ${direction.toUpperCase()} Impact Report: ${symbolId} ---\x1b[0m`);
       console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${impact.affectedCount} Symbols affected`);
       console.log(`\x1b[35mShortest Weighted Path:\x1b[0m ${impact.affectedNodes[0]?.distance.toFixed(2) || 0}`);
       console.log(`\x1b[35mImpact Score:\x1b[0m ${impact.impactScore}`);

@@ -22,18 +22,18 @@ export class SynapseRegistry<T extends ConducksComponent> {
     if (this.suites.has(suite.name)) return;
     this.suites.set(suite.name, suite);
     suite.register(synapse);
-    console.log(`[Synapse Registry] Registered Apostle Suite: ${suite.name} (v${suite.version})`);
+    console.error(`[Synapse Registry] Registered Apostle Suite: ${suite.name} (v${suite.version})`);
   }
 
   public registerComponent(component: T): void {
     const id = component.id;
     this.components.set(id, component);
-    console.log(`[Synapse Registry] Component Registered: ${id}`);
+    console.error(`[Synapse Registry] Component Registered: ${id}`);
   }
 
   public registerProvider(extension: string, provider: any): void {
     this.providers.set(extension, provider);
-    console.log(`[Synapse Registry] Language Provider Registered for [${extension}]`);
+    console.error(`[Synapse Registry] Language Provider Registered for [${extension}]`);
   }
 
   public getComponent(id: string): T | undefined {

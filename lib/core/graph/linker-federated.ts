@@ -42,13 +42,13 @@ export class FederatedLinker {
    */
   public async hydrate(mainGraph: ConducksAdjacencyList): Promise<void> {
     const links = await this.getLinks();
-    console.log(`[Federated Linker] Hydrating ${links.length} external graphs...`);
+    console.error(`[Federated Linker] Hydrating ${links.length} external graphs...`);
 
     for (const linkPath of links) {
       const persistence = new GraphPersistence(linkPath);
       const success = await persistence.load(mainGraph);
       if (success) {
-        console.log(`- Linked: ${linkPath} (Merged)`);
+        console.error(`- Linked: ${linkPath} (Merged)`);
       } else {
         console.warn(`- Failed to load linked project: ${linkPath}`);
       }

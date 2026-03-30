@@ -11,9 +11,9 @@ import { ApostleProvider } from "../providers/base.js";
  */
 export class ImportProcessor {
   /**
-   * Resolves raw import text (from @source) to a valid file path.
+   * Resolves raw import text (from @source) to a valid file path or external package.
    */
-  public resolve(source: string, callerPath: string, allPaths: string[], provider?: ApostleProvider): string | undefined {
+  public resolve(source: string, callerPath: string, allPaths: string[], provider?: ApostleProvider, context?: PulseContext): string | { name: string, kind: 'external_dependency' } | undefined {
     // 1. Specialized Provider Resolution (Apostle Suite)
     if (provider?.resolveImport) {
         const specialized = provider.resolveImport(source, callerPath, allPaths);
@@ -39,6 +39,15 @@ export class ImportProcessor {
         if (p.endsWith(source + ext)) return p;
       }
     }
+    
+    // 5. External Dependency Resolve (Phase 5.2)
+    let searchName = source;
+    // Heuristic: Common Python Package mappings
+    if (source === 'yaml') searchName = 'pyyaml';
+    
+    if (context?.isExternalPackage(searchName)) {
+      return { name: searchName.split('.')[0], kind: 'external_dependency' };
+    }
 
     return undefined;
   }
@@ -46,16 +55,33 @@ export class ImportProcessor {
   /**
    * Processes a capture and adds an IMPORTS relationship.
    */
-  public process(source: string, callerPath: string, allPaths: string[], spectrum: PrismSpectrum, provider?: ApostleProvider): void {
-    const resolved = this.resolve(source, callerPath, allPaths, provider);
+  public process(source: string, callerPath: string, allPaths: string[], spectrum: PrismSpectrum, provider?: ApostleProvider, context?: PulseContext): void {
+    const resolved = this.resolve(source, callerPath, allPaths, provider, context);
     if (!resolved) return;
+
+    const isExternal = typeof resolved === 'object' && (resolved as any).kind === 'external_dependency';
+    const targetName = isExternal ? (resolved as any).name : resolved as string;
+    if (isExternal) console.error(`[ImportProcessor] Processing EXTERNAL dependency: ${targetName}`);
 
     spectrum.relationships.push({
       sourceName: 'global', // Imports are typically global to the module
-      targetName: resolved,
-      type: 'IMPORTS',
+      targetName,
+      type: isExternal ? 'DEPENDS_ON' as any : 'IMPORTS',
       confidence: 1.0,
       metadata: { name: source } // Apostle v6: Preserve raw module name for Neural Binding
+    });
+  }
+
+  /**
+   * Apostle v6.3: Process specialized symbol-level bindings (e.g. from X import Y)
+   */
+  public processBinding(resolvedPath: string, originalName: string, localAlias: string, spectrum: PrismSpectrum): void {
+    spectrum.relationships.push({
+      sourceName: 'global',
+      targetName: resolvedPath,
+      type: 'IMPORTS',
+      confidence: 1.0,
+      metadata: { name: localAlias, original: originalName }
     });
   }
 }

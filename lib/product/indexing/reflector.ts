@@ -8,6 +8,9 @@ import { CallProcessor } from "./processors/call.js";
 import { HeritageProcessor } from "./processors/heritage.js";
 import { FlowProcessor } from "./processors/flow.js";
 import { PulseContext } from "./context.js";
+import { chronicle } from "../../core/git/chronicle-interface.js";
+import { calculateShannonEntropy, normalizeEntropyRisk } from "../../core/algorithms/entropy.js";
+import path from "node:path";
 
 
 /**
@@ -38,6 +41,8 @@ export class ApostleReflector {
       metadata: { language: provider.langId }
     };
 
+    const isTestFile = file.path.includes("test_") || file.path.includes("/tests/") || file.path.includes(".test.");
+
     const lang = grammars.getLanguage(provider.langId);
     if (!lang) throw new Error(`[Apostle] Missing grammar: ${provider.langId}`);
 
@@ -57,7 +62,7 @@ export class ApostleReflector {
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: file.path,
       isExport: true,
-      metadata: { isGlobalNode: true }
+      metadata: { isGlobalNode: true, isTest: isTestFile }
     });
 
 
@@ -67,12 +72,11 @@ export class ApostleReflector {
     const scopeMap: ScopeEntry[] = [];
 
     for (const match of matches) {
-      const nameCap = match.captures.find((c: any) => 
-        c.name === 'name' || 
-        c.name === 'isFunction' || 
-        c.name === 'isClass' || 
-        c.name === 'pulse_assignment_name'
-      );
+      // Apostle v14: Fix node identity resolution. 
+      // Prioritize explicit name captures over structural kind captures.
+      const nameCap = match.captures.find((c: any) => c.name === 'name' || c.name === 'pulse_assignment_name') ||
+                      match.captures.find((c: any) => c.name === 'isFunction' || c.name === 'isClass');
+      
       if (!nameCap) continue;
       
       const name = nameCap.node.text;
@@ -88,7 +92,7 @@ export class ApostleReflector {
           },
           filePath: file.path,
           isExport: true,
-          metadata: {}
+          metadata: { isTest: isTestFile }
         });
       }
 
@@ -103,10 +107,11 @@ export class ApostleReflector {
     }
 
     // Helper: get enclosing scope name for a given row position
-    const getScopeAt = (row: number): string => {
+    const getScopeAt = (row: number, excludeName?: string): string => {
       // Find the innermost scope containing this row
       let best: ScopeEntry | undefined;
       for (const s of scopeMap) {
+        if (excludeName && s.name === excludeName) continue;
         if (row >= s.startRow && row <= s.endRow) {
           if (!best || (s.endRow - s.startRow) < (best.endRow - best.startRow)) {
             best = s;
@@ -141,19 +146,27 @@ export class ApostleReflector {
           if (node) {
             node.kind = kind as any;
             node.metadata[cName] = true;
-          }
-          if (cName === 'isImport') {
-            this.imports.process(cText, file.path, allPaths, spectrum, provider);
-            if (provider.extractNamedBindings) {
-               const bindings = provider.extractNamedBindings(capture.node.parent ?? capture.node);
-               bindings.forEach(b => this.bindings.processAlias(b.name, b.alias ?? b.name, spectrum));
+
+            // Apostle v3: Structural Complexity Signal
+            if (provider.calculateComplexity && (kind === 'function' || kind === 'method' || kind === 'class')) {
+              const comp = provider.calculateComplexity(capture.node);
+              node.metadata.complexity = comp;
+              (node as any).complexity = comp; // For convenience during persistence
             }
           }
         }
 
         // 2. Semantic Dispatch
         else if (cName === 'source') {
-          this.imports.process(cText, file.path, allPaths, spectrum, provider);
+          const resolved = this.imports.resolve(cText, file.path, allPaths, provider, context);
+          if (resolved) {
+            const bindings = provider.extractNamedBindings ? provider.extractNamedBindings(capture.node.parent ?? capture.node) : [];
+            if (bindings.length > 0) {
+               bindings.forEach(b => this.imports.processBinding(resolved as string, b.name, b.alias ?? b.name, spectrum));
+            } else {
+               this.imports.process(cText, file.path, allPaths, spectrum, provider, context);
+            }
+          }
         }
         else if (cName === 'heritage' && node) {
           this.heritage.process(cText, node.name, spectrum);
@@ -178,7 +191,7 @@ export class ApostleReflector {
            const path = captureMap['kinesis_route_path'] ?? '/';
            const method = captureMap['route_method'] ?? 'GET';
            const scope = getScopeAt(captureRow);
-           this.flow.processRoute(path, method, scope, spectrum);
+           this.flow.processRoute(path, method, scope, spectrum, context.getFramework());
         }
         else if (cName === 'kinesis_request') {
            const url = captureMap['kinesis_request_url'] ?? '/';
@@ -186,11 +199,90 @@ export class ApostleReflector {
            const scope = getScopeAt(captureRow);
            this.flow.processRequest(url, method, scope, spectrum);
         }
+
+        // 4. Phase 3.2: Debt Dispatch
+        else if (cName === 'comment' && provider.extractDebt) {
+           const markers = provider.extractDebt(capture.node);
+           if (markers.length > 0) {
+             const scope = getScopeAt(captureRow);
+             const targetNode = nodeCache.get(`${file.path}::${scope}`);
+             if (targetNode) {
+               if (!targetNode.metadata.debtMarkers) targetNode.metadata.debtMarkers = [];
+               targetNode.metadata.debtMarkers.push(...markers);
+               (targetNode as any).debtMarkers = targetNode.metadata.debtMarkers;
+             }
+           }
+        }
       }
     }
 
 
     spectrum.nodes = [...spectrum.nodes, ...nodeCache.values()];
+
+    // Apostle v6.5: Structural Membership Binding (Parent -> Child)
+    for (const node of nodeCache.values()) {
+        if (node.name === 'global') continue;
+        const scope = getScopeAt(node.range.start.line - 1, node.name);
+        if (scope && scope !== 'global' && scope !== node.name) {
+            spectrum.relationships.push({
+                sourceName: scope,
+                targetName: node.name,
+                type: 'MEMBER_OF',
+                confidence: 1.0
+            });
+        }
+    }
+
+    // Apostle v3.3: Ingest Kinetic Git Signals
+    const resonance = await chronicle.getCommitResonance(file.path);
+    const distribution = await chronicle.getAuthorDistribution(file.path);
+    const blameData = await chronicle.getBlameData(file.path);
+    const entropyRaw = calculateShannonEntropy(distribution);
+    const entropyRisk = normalizeEntropyRisk(entropyRaw, Object.keys(distribution).length);
+    const now = Math.floor(Date.now() / 1000);
+
+    for (const n of spectrum.nodes) {
+        // 1. File-level Kinetic Signals
+        n.metadata.resonance = resonance.count;
+        n.metadata.entropy = entropyRisk;
+        (n as any).resonance = resonance.count;
+        (n as any).entropy = entropyRisk;
+
+        // 2. Symbol-level Blame Attribution
+        const startLine = n.range.start.line;
+        const endLine = n.range.end.line;
+        const authors: Record<string, number> = {};
+        let latestTime = 0;
+        let earliestTime = now;
+
+        for (let line = startLine; line <= endLine; line++) {
+            const meta = blameData[line];
+            if (meta) {
+                authors[meta.author] = (authors[meta.author] || 0) + 1;
+                if (meta.timestamp > latestTime) latestTime = meta.timestamp;
+                if (meta.timestamp < earliestTime) earliestTime = meta.timestamp;
+            }
+        }
+
+        const authorEntries = Object.entries(authors);
+        if (authorEntries.length > 0) {
+            authorEntries.sort((a, b) => b[1] - a[1]);
+            const primary = authorEntries[0][0];
+            const count = authorEntries.length;
+            const tenure = Math.floor((now - earliestTime) / 86400);
+
+            n.metadata.primaryAuthor = primary;
+            n.metadata.authorCount = count;
+            n.metadata.lastModified = latestTime;
+            n.metadata.tenureDays = tenure > 0 ? tenure : 0;
+            
+            // Legacy/Aliased support for persistence
+            (n as any).primaryAuthor = primary;
+            (n as any).authorCount = count;
+            (n as any).lastModified = latestTime;
+            (n as any).tenureDays = n.metadata.tenureDays;
+        }
+    }
     
     // Seed Context for topological resolution
     spectrum.nodes.forEach(n => context.registerSymbol(`${file.path}::${n.name}`, n));

@@ -24,17 +24,18 @@ export class FlowProcessor {
   /**
    * Processes an HTTP route definition (e.g. FastAPI @app.get('/path')).
    */
-  public processRoute(path: string, method: string, scope: string, spectrum: PrismSpectrum): void {
+  public processRoute(path: string, method: string, scope: string, spectrum: PrismSpectrum, framework?: string | null): void {
     const routeId = `ROUTE::${path}::${method.toUpperCase()}`;
+    const kind = framework ? `${framework}_route` : 'route';
     
     // Add a virtual node for the Route
     spectrum.nodes.push({
       name: routeId,
-      kind: 'route' as any,
+      kind: kind as any,
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: 'network',
       isExport: true,
-      metadata: { isRoute: true, path, method: method.toUpperCase() }
+      metadata: { isRoute: true, path, method: method.toUpperCase(), framework }
     });
 
     spectrum.relationships.push({

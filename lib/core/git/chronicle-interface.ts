@@ -8,10 +8,18 @@ import path from 'node:path';
  * Replaces the generic filesystem crawler with a high-fidelity Git-native engine.
  */
 export class ChronicleInterface {
+  private projectDir: string;
+  
   constructor(
-    private readonly projectDir: string = process.cwd(),
+    projectDir: string = process.cwd(),
     private readonly exec: typeof execSync = execSync
-  ) {}
+  ) {
+    this.projectDir = projectDir;
+  }
+
+  public setProjectDir(dir: string): void {
+    this.projectDir = dir;
+  }
 
   /**
    * Discovers all versioned files, including submodules (Federated Progenitors).
@@ -42,7 +50,7 @@ export class ChronicleInterface {
     } catch { /* Full Git failure falls through to FS scan */ }
 
     // 2. Fallback: Recursive FS Scan (Apostle v6 Universal Discovery)
-    console.log(`[Chronicle Interface] Git discovery failed. Falling back to universal FS scan for: ${this.projectDir}`);
+    console.error(`[Chronicle Interface] Git discovery failed. Falling back to universal FS scan for: ${this.projectDir}`);
     const fs = await import('node:fs/promises');
     
     const scan = async (dir: string) => {
@@ -180,6 +188,95 @@ export class ChronicleInterface {
     } catch {
       return {};
     }
+  }
+
+  /**
+   * Apostle v3.3 — Line-Level Blame Mapping
+   * Extracts porcelain metadata to attribute history to specific symbols.
+   */
+  public async getBlameData(filePath: string): Promise<Record<number, { author: string, timestamp: number }>> {
+    const blameMap: Record<number, { author: string, timestamp: number }> = {};
+    try {
+      const relativePath = path.relative(this.projectDir, filePath);
+      const command = `git blame --porcelain -- "${relativePath}"`;
+      const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8' }) as string;
+      const lines = output.split('\n');
+      
+      let currentAuthor = '';
+      let currentTime = 0;
+      const hashCommitMeta: Record<string, { author: string, timestamp: number }> = {};
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.match(/^[a-f0-9]{40}/)) {
+          const parts = line.split(' ');
+          const hash = parts[0];
+          const finalLine = parseInt(parts[2], 10);
+          
+          if (!hashCommitMeta[hash]) {
+            // Need to find meta for this hash in subsequent porcelain lines
+            let j = i + 1;
+            let foundAuthor = '';
+            let foundTime = 0;
+            while (j < lines.length && !lines[j].match(/^[a-f0-9]{40}/)) {
+              if (lines[j].startsWith('author-mail ')) foundAuthor = lines[j].replace('author-mail <', '').replace('>', '').trim();
+              if (lines[j].startsWith('author-time ')) foundTime = parseInt(lines[j].replace('author-time ', ''), 10);
+              j++;
+            }
+            hashCommitMeta[hash] = { author: foundAuthor, timestamp: foundTime };
+          }
+          
+          blameMap[finalLine] = hashCommitMeta[hash];
+        }
+      }
+
+      return blameMap;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Apostle v5.4 — Sync Staleness Sensor
+   * Fetches the current HEAD hash of the repository.
+   */
+  public getHeadHash(): string | null {
+    try {
+      const output = this.exec('git rev-parse HEAD', { cwd: this.projectDir, encoding: 'utf-8' }) as string;
+      return output.trim();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Apostle v5.4 — Sync Staleness Sensor
+   * Returns the number of commits between a base hash and current HEAD.
+   */
+  public getCommitsBehind(baseHash: string): number {
+    try {
+      const command = `git rev-list ${baseHash}..HEAD --count`;
+      const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8' }) as string;
+      return parseInt(output.trim(), 10) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Apostle v5.4 — Sync Staleness Sensor
+   * Retrieves the last pulsed commit from the graph's metadata.
+   */
+  public getLastPulsedCommit(graph: any): string | null {
+    return graph.getMetadata('lastPulsedCommit');
+  }
+
+  /**
+   * Apostle v5.4 — Sync Staleness Sensor
+   * Stores the current commit hash in the graph's metadata.
+   */
+  public setLastPulsedCommit(graph: any, hash: string): void {
+    graph.setMetadata('lastPulsedCommit', hash);
   }
 }
 

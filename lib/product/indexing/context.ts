@@ -14,6 +14,12 @@ export class PulseContext {
   /** Global Symbol Table (Symbols discovered during Pass 2) */
   private symbolTable: Map<string, any> = new Map();
 
+  /** Known External Packages (pip, npm) discovered during Essence refraction */
+  private externalPackages: Set<string> = new Set();
+
+  /** Detected Application Framework (FastAPI, Flask, Next.js, Express) */
+  private framework: string | null = null;
+
   /**
    * Registers a dependency relationship.
    */
@@ -44,11 +50,37 @@ export class PulseContext {
   }
 
   /**
+   * Registers an external package name.
+   */
+  public registerExternalPackage(name: string): void {
+    this.externalPackages.add(name);
+  }
+
+  /**
+   * Returns whether a name is a known external package.
+   */
+  public isExternalPackage(name: string): boolean {
+    // Handle both exact match and sub-module matches (e.g. 'requests' or 'requests.models')
+    const root = name.split('.')[0];
+    return this.externalPackages.has(root);
+  }
+
+  public setFramework(framework: string): void {
+    this.framework = framework;
+  }
+
+  public getFramework(): string | null {
+    return this.framework;
+  }
+
+  /**
    * Resets the context for a fresh pulse.
    */
   public reset(): void {
     this.importMap.clear();
     this.folderMap.clear();
     this.symbolTable.clear();
+    this.externalPackages.clear();
+    this.framework = null;
   }
 }

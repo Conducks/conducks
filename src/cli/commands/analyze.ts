@@ -70,7 +70,15 @@ export class AnalyzeCommand implements ApostleCommand {
     if (isVerbose) console.log(`\x1b[90m[Audit] Federated Linkage took ${linkageTime.toFixed(2)}ms\x1b[0m`);
 
     const status = conducks.status();
+    
+    // Apostle v5.4: Sync Staleness Sensor (Capture final high-fidelity snapshot)
+    const headHash = voyager.getHeadHash();
+    if (headHash) {
+      conducks.graph.getGraph().setMetadata('lastPulsedCommit', headHash);
+    }
+
     console.log("\n\x1b[1m--- 📊 Graph Analysis Result ---\x1b[0m");
+    console.log(`\x1b[34m- Framework:         ${status.framework}\x1b[0m`);
     console.log(`\x1b[34m- Symbols (Nodes):   ${status.stats.nodeCount}\x1b[0m`);
     console.log(`\x1b[34m- Relationships (Edges):  ${status.stats.edgeCount}\x1b[0m`);
     console.log(`\x1b[34m- Status:            ${status.status}\x1b[0m`);

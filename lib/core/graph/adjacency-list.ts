@@ -6,7 +6,7 @@
  */
 
 export type NodeId = string;
-export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK';
+export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS';
 
 export interface ConducksNode<T = any> {
   id: NodeId;
@@ -16,7 +16,17 @@ export interface ConducksNode<T = any> {
     filePath: string;
     kineticEnergy?: number;
     rank?: number;
+    complexity?: number; // Apostle v3: Cyclomatic/Cognitive Complexity
+    debtMarkers?: string[]; // Apostle v3: Technical Debt Signals (TODO, FIXME)
+    resonance?: number; // Apostle v3.3: Commit Churn (Frequency)
+    entropy?: number; // Apostle v3.3: Authorship Diversity (Shannon Entropy)
+    primaryAuthor?: string; // Apostle v3.3: Dominant author (blame-based)
+    authorCount?: number; // Apostle v3.3: Individual author count per symbol
+    lastModified?: number; // Apostle v3.3: Timestamp of last modification
+    tenureDays?: number; // Apostle v3.3: Age of the symbol in the codebase
+    coveredBy?: string[]; // Apostle v3.4: Test files covering this symbol
     layer?: number; // Apostle v2: Structural layer (0=Surface, 10=Foundation)
+    isEntryPoint?: boolean; // Phase 5.1: Primary entry point (CLI, API, Main)
   };
 }
 
@@ -37,6 +47,15 @@ export class ConducksAdjacencyList {
   private outEdges: Map<NodeId, Set<ConducksEdge>> = new Map(); // Forward: source -> edges
   private inEdges: Map<NodeId, Set<ConducksEdge>> = new Map();  // Backward: target -> edges
   private nameIndex: Map<string, NodeId[]> = new Map(); // Fast search index
+  private metadata: Map<string, string> = new Map(); // Global project metadata (Phase 5.3)
+  
+  public clear(): void {
+    this.nodes.clear();
+    this.outEdges.clear();
+    this.inEdges.clear();
+    this.nameIndex.clear();
+    this.metadata.clear();
+  }
 
   /**
    * Adds or updates a node in the graph.
@@ -299,6 +318,18 @@ export class ConducksAdjacencyList {
     return this.nodes.values();
   }
 
+  public setMetadata(key: string, value: string): void {
+    this.metadata.set(key, value);
+  }
+
+  public getMetadata(key: string): string | undefined {
+    return this.metadata.get(key);
+  }
+
+  public getAllMetadata(): Map<string, string> {
+    return this.metadata;
+  }
+
   /**
    * High-fidelity structural search.
    * Performs O(1) exact lookup, falling back to O(N) fuzzy resonance if needed.
@@ -383,6 +414,58 @@ export class ConducksAdjacencyList {
       node.properties.rank = ranks.get(node.id) || 0;
       node.properties.kineticEnergy = (node.properties.rank || 0) * AN;
     }
+
+    // 4. Apostle v5.1 — Identify Entry Points after importance is known
+    this.detectEntryPoints();
+  }
+
+  /**
+   * Apostle v5.1 — Entry Point Intelligence
+   * 
+   * Identifies primary entry points (CLI commands, API routes, main functions)
+   * using a combination of naming heuristics, structural signatures, and 
+   * framework-specific markers.
+   */
+  public detectEntryPoints(): void {
+    const entryPointNames = new Set(['main', 'app', 'run', 'start', 'cli', 'index', 'handler', 'server']);
+    const entryPointFiles = new Set(['main.py', 'app.py', 'index.ts', 'server.ts', 'cli.ts']);
+
+    for (const node of this.nodes.values()) {
+      const props = node.properties;
+      const lowerName = props.name?.toLowerCase() || '';
+      const basename = props.filePath ? props.filePath.split('/').pop() : '';
+
+      let isEntry = false;
+
+      // 1. Explicit Route Markers (from Phase 3.7/5.3)
+      if (node.label === 'route' || node.label.includes('route') || props.kind?.includes('route')) {
+        isEntry = true;
+      }
+
+      // 2. Naming Heuristic (Exact Match)
+      if (entryPointNames.has(lowerName)) {
+        isEntry = true;
+      }
+
+      // 3. File Path Heuristic
+      if (basename && entryPointFiles.has(basename) && (node.label === 'module' || node.label === 'file')) {
+        isEntry = true;
+      }
+
+      // 4. Structural Source Heuristic (A pure source with high fan-out)
+      const incoming = this.inEdges.get(node.id)?.size || 0;
+      const outgoing = this.outEdges.get(node.id)?.size || 0;
+      if (incoming === 0 && outgoing >= 3) {
+        isEntry = true;
+      }
+
+      // 5. Explicit framework indicators (Phase 5.3)
+      if (props.isEntryPoint) {
+        isEntry = true;
+      }
+
+      node.properties.isEntryPoint = isEntry;
+    }
   }
 
   public get stats() {
@@ -390,10 +473,14 @@ export class ConducksAdjacencyList {
     degrees.sort((a, b) => a - b);
     const median = degrees.length > 0 ? degrees[Math.floor(degrees.length / 2)] : 0;
 
+    const nodeCount = this.nodes.size;
+    const edgeCount = degrees.reduce((sum, d) => sum + d, 0);
+
     return {
-      nodeCount: this.nodes.size,
-      edgeCount: degrees.reduce((sum, d) => sum + d, 0),
-      medianDegree: median
+      nodeCount,
+      edgeCount,
+      medianDegree: median,
+      density: nodeCount > 0 ? (edgeCount / nodeCount) : 0
     };
   }
 

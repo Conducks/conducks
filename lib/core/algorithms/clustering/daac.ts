@@ -31,7 +31,7 @@ export class DAACClustering {
       clusterMembers.set(clusterId, new Set([file]));
     });
 
-    console.log(`[DAAC] Initialized ${uniqueFiles.length} communities.`);
+    console.error(`[DAAC] Initialized ${uniqueFiles.length} communities.`);
 
     // 2. Compute Affinity & Merge
     let merged = true;
@@ -63,7 +63,7 @@ export class DAACClustering {
       }
     }
 
-    console.log(`[DAAC] Clustering complete. Final communities: ${clusterMembers.size}`);
+    console.error(`[DAAC] Clustering complete. Final communities: ${clusterMembers.size}`);
     return clusters;
   }
 
