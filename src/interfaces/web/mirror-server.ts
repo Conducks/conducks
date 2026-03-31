@@ -4,11 +4,11 @@ import { ConducksGraph } from '@/lib/core/graph/graph-engine.js';
 import { registry } from '@/registry/index.js';
 
 /**
- * Conducks — Professional Command Center (v1.6.0) 💎
+ * Conducks — Professional Command Center (v1.6.1) 💎
  * 
  * High-fidelity structural dashboard with adaptive naming and path focusing.
  * 
- * v1.6.0 Evolution: Full Circuit Resonance & Fluid Inspector.
+ * v1.6.1 Evolution: Directional Resonance (Lineage vs Impact).
  */
 export class MirrorServer {
   private app = express();
@@ -73,6 +73,7 @@ export class MirrorServer {
     .gap-4 { gap: 1rem; }
     .mb-2 { margin-bottom: 0.5rem; }
     .mb-6 { margin-bottom: 1.5rem; }
+    .mt-4 { margin-top: 1rem; }
     .text-xs { font-size: 0.75rem; }
     .text-dim { color: #8b949e; }
     .text-blue { color: var(--blue-bright); }
@@ -80,6 +81,13 @@ export class MirrorServer {
     .tracking-widest { letter-spacing: 0.15em; }
     .font-mono { font-family: ui-monospace, monospace; }
     
+    /* SELECTS / TOGGLES (v1.6.1) */
+    .trace-control {
+       background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+       padding: 8px 12px; color: white; font-size: 11px; width: 100%; outline: none;
+       appearance: none; cursor: pointer;
+    }
+
     /* CUSTOM TOGGLE */
     .switch {
       position: relative; display: inline-block; width: 28px; height: 16px;
@@ -114,7 +122,6 @@ export class MirrorServer {
     }
     #node-inspector.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
     
-    /* v1.6.0 Overflow Guard */
     .inspector-path {
        word-break: break-all;
        overflow-wrap: anywhere;
@@ -155,24 +162,35 @@ export class MirrorServer {
   <div id="loading-overlay">
     <div class="spinner mb-6"></div>
     <div class="text-blue text-xs uppercase tracking-widest animate-pulse">Synchronizing Resonance</div>
-    <div class="text-dim text-[9px] uppercase tracking-widest mt-4">Structural Intelligence v1.6.0</div>
+    <div class="text-dim text-[9px] uppercase tracking-widest mt-4">Structural Intelligence v1.6.1</div>
   </div>
 
   <div id="focus-indicator">
     <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-    FULL CIRCUIT ISOLATION — CLICK TO RESET
+    <span id="focus-text">PATH ISOLATION ACTIVE — CLICK TO RESET</span>
   </div>
 
   <div class="command-sidebar">
     <div class="panel-header">
       <div class="flex items-center justify-between mb-2">
         <h1 style="margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.5px;">COMMAND CENTER</h1>
-        <span class="badge text-blue">V1.6.0</span>
+        <span class="badge text-blue">V1.6.1</span>
       </div>
       <p class="text-dim text-[10px] uppercase tracking-widest">Architectural Controller</p>
     </div>
     
     <div class="panel-content custom-scrollbar">
+      <!-- RESONANCE ENGINE (v1.6.1) -->
+      <div class="glass-card">
+        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Resonance Engine</h2>
+        <p class="text-[10px] text-dim mb-3">Isolation Mode Physics</p>
+        <select id="trace-direction" class="trace-control">
+          <option value="downstream">TRACE IMPACT (DOWNSTREAM)</option>
+          <option value="upstream">TRACE LINEAGE (UPSTREAM)</option>
+          <option value="bidirectional">FULL CIRCUIT (BI-DIRECTIONAL)</option>
+        </select>
+      </div>
+
       <div class="glass-card">
         <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Resonance Layers</h2>
         <div id="layer-filters" class="flex flex-col gap-3">
@@ -226,9 +244,10 @@ export class MirrorServer {
     let selectedLayers = [0, 1, 2, 3, 4, 5];
     let selectedClusters = [];
     
-    // v1.6.0: Full Circuit Resonance state
+    // v1.6.1: Directional Resonance State
     let focusNodes = new Set();
     let focusLinks = new Set();
+    let lastSelectedNode = null;
 
     const LAYERS = [
       { id: 0, name: 'Ecosystem', color: '#60a5fa' },
@@ -268,6 +287,10 @@ export class MirrorServer {
           else selectedClusters = selectedClusters.filter(x => x !== id);
           refreshSynapse();
         }
+      });
+
+      document.getElementById('trace-direction').addEventListener('change', () => {
+         if (lastSelectedNode) focusSubgraph(lastSelectedNode);
       });
 
       document.getElementById('origin-search').addEventListener('input', e => {
@@ -322,13 +345,12 @@ export class MirrorServer {
       }).strength(1));
     }
 
-    // v1.6.0: Full Circuit Tracing Logic
-    function computeConnectedSubgraph(rootNodeId) {
+    // v1.6.1: Improved Direction-Strict Tracing
+    function computeDirectionalSubgraph(rootNodeId, mode) {
       const gNodes = new Set([rootNodeId]);
       const gLinks = new Set();
       const queue = [rootNodeId];
-      
-      const MAX_DEPTH = 8;
+      const MAX_DEPTH = 12; // Deeper trace for linear direction
       let depth = 0;
 
       while(queue.length > 0 && depth < MAX_DEPTH) {
@@ -338,13 +360,24 @@ export class MirrorServer {
            activeWave.links.forEach(l => {
               const sId = typeof l.source === 'object' ? l.source.id : l.source;
               const tId = typeof l.target === 'object' ? l.target.id : l.target;
-              if (sId === id || tId === id) {
+              
+              let isMatch = false;
+              let nextId = null;
+
+              if (mode === 'downstream') {
+                 if (sId === id) { isMatch = true; nextId = tId; }
+              } else if (mode === 'upstream') {
+                 if (tId === id) { isMatch = true; nextId = sId; }
+              } else {
+                 if (sId === id || tId === id) { isMatch = true; nextId = (sId === id ? tId : sId); }
+              }
+
+              if (isMatch) {
                  if (!gLinks.has(l)) {
                     gLinks.add(l);
-                    const next = sId === id ? tId : sId;
-                    if (!gNodes.has(next)) {
-                       gNodes.add(next);
-                       queue.push(next);
+                    if (!gNodes.has(nextId)) {
+                       gNodes.add(nextId);
+                       queue.push(nextId);
                     }
                  }
               }
@@ -362,7 +395,7 @@ export class MirrorServer {
         .nodeRelSize(4)
         .linkCurvature(0.1)
         .linkWidth(link => {
-          if (focusLinks.size > 0) return focusLinks.has(link) ? 3 : 0.1;
+          if (focusLinks.size > 0) return focusLinks.has(link) ? 3 : 0.05;
           return link.isTransitive ? 0.4 : 1.2;
         })
         .linkColor(link => {
@@ -378,7 +411,7 @@ export class MirrorServer {
           const color = node.clusterColor || '#9ca3af';
           const isDimmed = focusNodes.size > 0 && !focusNodes.has(node.id);
 
-          ctx.globalAlpha = isDimmed ? 0.05 : 1;
+          ctx.globalAlpha = isDimmed ? 0.02 : 1; // v1.6.1: Higher dimming for focus
           
           if (node.level <= 1 && !isDimmed) {
             ctx.shadowBlur = 15 / globalScale;
@@ -417,12 +450,18 @@ export class MirrorServer {
     }
 
     function focusSubgraph(node) {
-      const { nodes, links } = computeConnectedSubgraph(node.id);
+      lastSelectedNode = node;
+      const mode = document.getElementById('trace-direction').value;
+      const { nodes, links } = computeDirectionalSubgraph(node.id, mode);
       focusNodes = nodes;
       focusLinks = links;
       
-      document.getElementById('focus-indicator').style.display = 'flex';
+      const indicator = document.getElementById('focus-indicator');
+      indicator.style.display = 'flex';
       
+      const txt = mode === 'downstream' ? 'IMPACT ISOLATION ACTIVE' : (mode === 'upstream' ? 'LINEAGE ISOLATION ACTIVE' : 'FULL CIRCUIT ACTIVE');
+      document.getElementById('focus-text').innerText = \`\${txt} — CLICK TO RESET\`;
+
       // Update Inspector
       const ins = document.getElementById('node-inspector');
       ins.classList.add('active');
@@ -430,9 +469,8 @@ export class MirrorServer {
       document.getElementById('ins-type').innerText = (node.group || node.label || 'SYMBOL').toUpperCase();
       document.getElementById('ins-level').innerText = 'L' + node.level;
       
-      // Fix Architectural Anchor display (v1.6.0)
       const cluster = activeWave.clusters.find(c => c.id === node.clusterId);
-      document.getElementById('ins-cluster').innerText = cluster ? cluster.name : 'Unknown';
+      document.getElementById('ins-cluster').innerText = cluster ? cluster.name : 'Unknown Cluster';
       
       document.getElementById('ins-degree').innerText = node.degree || 0;
       document.getElementById('ins-mass').innerText = node.mass?.toFixed(2) || '1.00';
@@ -444,6 +482,7 @@ export class MirrorServer {
     function resetFocus() {
       focusNodes.clear();
       focusLinks.clear();
+      lastSelectedNode = null;
       document.getElementById('focus-indicator').style.display = 'none';
       document.getElementById('node-inspector').classList.remove('active');
       Graph.zoom(1, 1000);

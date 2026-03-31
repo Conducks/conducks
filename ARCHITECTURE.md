@@ -1,5 +1,5 @@
 # Architecture Context — conducks
-Generated: 2026-03-31T20:53:04.680Z | Pulse: pulse_1774990382539_y1yhi
+Generated: 2026-03-31T21:05:13.641Z | Pulse: pulse_1774991111740_8fzsu
 
 ## Entry Points (top 10 by gravity)
 - `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/tools/index.ts::silence` [function, gravity: 0.0133, risk: 0.0000]
