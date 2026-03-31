@@ -361,8 +361,9 @@ export class ConducksAdjacencyList {
     // 2. Fuzzy / Case-Insensitive Resonance (Fallback)
     const fuzzyMatches: ConducksNode[] = [];
     for (const node of this.nodes.values()) {
-      const nodeName = node.properties.name.toLowerCase();
-      if (nodeName.includes(query) || node.label.toLowerCase().includes(query)) {
+      const nodeName = node.properties.name?.toLowerCase() || '';
+      const nodeLabel = node.label?.toLowerCase() || '';
+      if (nodeName.includes(query) || nodeLabel.includes(query)) {
         fuzzyMatches.push(node);
       }
       if (fuzzyMatches.length >= 20) break;
@@ -393,9 +394,11 @@ export class ConducksAdjacencyList {
     if (!filePath || typeof filePath !== 'string') return undefined;
     // FIX 4: Normalise once — all comparisons below use this canonical value.
     const targetPath = filePath.toLowerCase();
-
     const nodesInFile = Array.from(this.nodes.values())
-      .filter(n => n.properties.filePath.toLowerCase() === targetPath);
+      .filter(n => {
+        const path = n.properties.filePath;
+        return path && path.toLowerCase() === targetPath;
+      });
 
     if (nodesInFile.length === 0) {
       console.log(`[AdjacencyList Debug] No nodes found for path: ${targetPath}`);

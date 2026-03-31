@@ -35,19 +35,44 @@ export class PulseOrchestrator implements ConducksComponent {
     this.context.reset();
     const context = this.context;
     
-    // Conducks.6: Canonical Path Normalization (macOS APFS support)
-    const normalizedFiles = files.map(f => ({ path: f.path.toLowerCase(), source: f.source }));
+    // Conducks.6: Canonical Path Normalization & Invariant Validation (v1.3.6)
+    const normalizedFiles = files.map(f => {
+      if (!f || !f.path) {
+        throw new Error(`[Conducks] Structural integrity failure: Received null or undefined file path during pulse.`);
+      }
+      return { path: f.path.toLowerCase(), source: f.source };
+    });
+    
     const allPaths = normalizedFiles.map(f => f.path);
     const spectra = new Map<string, any>();
+    const pulseErrors: string[] = [];
 
     // Step 1: Pre-Pulse Discovery & Single-Pass Reflection
     for (const file of normalizedFiles) {
-      const ext = path.extname(file.path);
-      const provider = this.registry.getProvider(ext);
-      if (!provider) continue;
+      try {
+        const ext = path.extname(file.path);
+        const provider = this.registry.getProvider(ext);
+        if (!provider) continue;
 
-      const spectrum = await this.reflector.reflect(file, provider, context, allPaths);
-      spectra.set(file.path, spectrum);
+        const spectrum = await this.reflector.reflect(file, provider, context, allPaths);
+        spectra.set(file.path, spectrum);
+      } catch (err: any) {
+        pulseErrors.push(`${file.path}: ${err.message}`);
+        console.error(`[Conducks] Pulse Warning: Failed to reflect ${file.path}. Structural unit may be missing from this wave.`, err);
+        
+        // Materialize a "Broken Unit" node to prevent total structural collapse
+        this.graph.ingestSpectrum(file.path, {
+          nodes: [{
+            name: 'CORRUPT_UNIT',
+            kind: 'file' as any,
+            canonicalKind: 'UNIT',
+            canonicalRank: 2,
+            range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
+            metadata: { isError: true, error: err.message, displayName: path.basename(file.path) }
+          }],
+          relationships: []
+        });
+      }
     }
 
     // Step 2: Topological Leveling

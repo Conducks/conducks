@@ -380,7 +380,7 @@ export const registry = {
     }
   },
   mirror: {
-    getWave: () => mirror.getVisualWave()
+    getWave: (layers?: number[]) => (mirror as any).getVisualWave(layers)
   },
   initialize: initializeRegistry
 };

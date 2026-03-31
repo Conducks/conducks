@@ -12,16 +12,18 @@ export class MirrorEngine {
   /**
    * Refracts the structural graph into a visual wave.
    * Calculates clusters, hierarchy, mass, and initial seeding.
+   * 
+   * v1.5.0: Professional Command Center & Adaptive Scaling.
    */
-  public getVisualWave() {
+  public getVisualWave(visibleLayers: number[] = [0, 1, 2, 3, 4, 5], visibleClusters: string[] = []) {
     const g = this.graph as any;
+    const layerSet = new Set(visibleLayers);
+    const clusterSet = new Set(visibleClusters);
     
-    // 1. Kinetic Continent Discovery (O(N) clustering)
-    const continentMap = new Map<string, number>();
-    let continentCounter = 0;
-
-    // 2. Identify Hub Nodes (Node Degrees)
+    // 1. Identify Hub Nodes (Node Degrees)
     const degreeMap = new Map<string, number>();
+    const allNodes = Array.from(this.graph.getAllNodes());
+    
     for (const [sourceId, edges] of g.outEdges) {
       degreeMap.set(sourceId, (degreeMap.get(sourceId) || 0) + edges.size);
       for (const edge of edges) {
@@ -29,101 +31,130 @@ export class MirrorEngine {
       }
     }
 
-    // 3. Pre-calculate Cluster Centers (Recursive Namespace Awareness)
-    const namespaces = Array.from(this.graph.getAllNodes()).filter(n => n.properties.canonicalKind === 'NAMESPACE' || n.properties.isFolder);
-    const clusterCenters = new Map<string, { x: number; y: number }>();
-    const nodeCount = this.graph.stats.nodeCount;
-    const structuralSpread = Math.sqrt(nodeCount) * 85; // Increased for unbraiding
-    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    // 2. Nearest Visible Parent (NVP) Map
+    const nvpMap = new Map<string, string | null>();
+    const nodeMap = new Map(allNodes.map(n => [n.id, n]));
 
-    namespaces.forEach((ns, i) => {
-      const radius = structuralSpread * Math.sqrt((i + 1) / (namespaces.length || 1));
+    const findNVP = (nodeId: string): string | null => {
+      const n = nodeMap.get(nodeId);
+      if (!n) return null;
+      const rank = n.properties.canonicalRank !== undefined ? n.properties.canonicalRank : 4;
+      if (layerSet.has(rank)) return nodeId;
+      const incoming = this.graph.getNeighbors(nodeId, 'upstream');
+      const parentLink = incoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF');
+      return parentLink ? findNVP(parentLink.sourceId) : null;
+    };
+    allNodes.forEach(n => nvpMap.set(n.id, findNVP(n.id)));
+
+    // 3. Cluster Centers & Cosmic Colors (v1.4.0)
+    const clusters = allNodes.filter(n => n.properties.canonicalKind === 'NAMESPACE' || n.properties.isFolder);
+    const clusterCenters = new Map<string, { x: number; y: number; color: string; name: string }>();
+    const nodeCount = allNodes.length;
+    const structuralSpread = Math.min(1200, Math.sqrt(nodeCount) * 85); 
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    
+    const COSMIC_PALETTE = [
+      '#60a5fa', '#818cf8', '#22d3ee', '#fcd34d', '#c084fc', 
+      '#4ade80', '#fb923c', '#f472b6', '#38bdf8', '#fb7185'
+    ];
+
+    clusters.forEach((ns, i) => {
+      const radius = structuralSpread * Math.sqrt((i + 1) / (clusters.length || 1));
       const angle = i * goldenAngle;
       clusterCenters.set(ns.id, {
         x: radius * Math.cos(angle),
-        y: radius * Math.sin(angle)
+        y: radius * Math.sin(angle),
+        name: ns.properties.name,
+        color: COSMIC_PALETTE[i % COSMIC_PALETTE.length]
       });
     });
 
-    // 4. Map Nodes to Visual Atoms
-    const nodes = Array.from(this.graph.getAllNodes()).map((n: any) => {
-      // High-Fidelity Dynamic Layer Mapping (No Hardcoding)
-      const level = n.properties.canonicalRank !== undefined ? n.properties.canonicalRank : 4;
-      
-      // Hierarchy Resolution (Graph-Based Parent Discovery)
-      const incoming = this.graph.getNeighbors(n.id, 'upstream');
-      const parentLink = incoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF' || e.type === 'HAS_METHOD' || e.type === 'HAS_PROPERTY');
-      const parentId = parentLink ? parentLink.sourceId : null;
+    // 4. Final Visible Nodes with Constraint Awareness
+    let visualNodes = allNodes
+      .filter(n => layerSet.has(n.properties.canonicalRank !== undefined ? n.properties.canonicalRank : 4))
+      .map((n: any) => {
+        const level = n.properties.canonicalRank !== undefined ? n.properties.canonicalRank : 4;
+        const incoming = this.graph.getNeighbors(n.id, 'upstream');
+        const techParent = incoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF')?.sourceId;
+        const visualParentId = techParent ? nvpMap.get(techParent) : null;
 
-      // O(N) Clustering: Recursive Namespace Discovery
-      let clusterId = 'root';
-      let currentSearchId = n.id;
-      let depthLimit = 3; 
-
-      while (depthLimit-- > 0) {
-        const currentIncoming = this.graph.getNeighbors(currentSearchId, 'upstream');
-        const namespaceLink = currentIncoming.find(e => e.type === 'CONTAINS' && e.sourceId.startsWith('NAMESPACE::'));
-        
-        if (namespaceLink) {
-          clusterId = namespaceLink.sourceId;
-          break;
+        // Find the "Origin Cluster" (The nearest L1 namespace)
+        let clusterId = 'root';
+        let currentSearchId = n.id;
+        let depthLimit = 10; 
+        while (depthLimit-- > 0) {
+          const vParent = nvpMap.get(currentSearchId);
+          if (vParent && vParent.startsWith('NAMESPACE::')) {
+            clusterId = vParent;
+            break;
+          }
+          const structural = this.graph.getNeighbors(currentSearchId, 'upstream')
+            .find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF')?.sourceId;
+          if (structural && structural !== currentSearchId) currentSearchId = structural;
+          else break;
         }
-
-        const structuralParent = currentIncoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF');
-        if (structuralParent && structuralParent.sourceId !== currentSearchId) {
-          currentSearchId = structuralParent.sourceId;
-        } else {
-          break;
-        }
-      }
-      
-      const clusterPos = clusterCenters.get(clusterId) || { x: 0, y: 0 };
-      const degree = degreeMap.get(n.id) || 0;
-      const jitter = Math.sqrt(nodeCount) * 5;
-
-      return {
-        id: n.id,
-        name: n.properties.displayName || n.properties.name || n.id.split('::').pop(),
-        parentId,
-        group: n.properties.canonicalKind || n.label,
-        level,
-        cluster: clusterId,
-        degree,
-        mass: 1 + (degree / 10),
-        x: clusterPos.x + (Math.random() - 0.5) * jitter,
-        y: clusterPos.y + (Math.random() - 0.5) * jitter,
         
-        // Diagnostic Signals
-        coverageCount: Array.isArray(n.properties.coveredBy) ? n.properties.coveredBy.length : 0,
-        isEntryPoint: !!n.properties.isEntryPoint,
-        complexity: n.properties.complexity || 1,
-        resonance: n.properties.resonance || 0,
-        entropy: n.properties.entropy || 0,
-        lastModified: n.properties.lastModified || 0,
-        ...n.properties
-      };
-    });
+        const clusterInfo = clusterCenters.get(clusterId) || { x: 0, y: 0, color: '#9ca3af' };
+        const degree = degreeMap.get(n.id) || 0;
+        const jitter = 50; 
 
-    // 5. Map Edges to Visual Links
+        return {
+          id: n.id,
+          name: n.properties.displayName || n.properties.name || n.id.split('::').pop(),
+          parentId: visualParentId,
+          group: n.properties.canonicalKind || n.label,
+          level,
+          clusterId: clusterId,
+          clusterColor: clusterInfo.color,
+          clusterX: clusterInfo.x,
+          clusterY: clusterInfo.y,
+          degree,
+          mass: 1 + (degree / 12),
+          x: (clusterInfo.x || 0) + (Math.random() - 0.5) * jitter,
+          y: (clusterInfo.y || 0) + (Math.random() - 0.5) * jitter,
+          ...n.properties
+        };
+      });
+
+    // Drill-Down: Filter by Clusters if specified
+    if (clusterSet.size > 0) {
+      visualNodes = visualNodes.filter(n => clusterSet.has(n.clusterId));
+    }
+
+    // 5. Edge Promotion (Structural Bridging)
     const links = [];
-    const nodeIds = new Set(nodes.map(n => n.id));
-    
-    for (const node of this.graph.getAllNodes()) {
-      if (!nodeIds.has(node.id)) continue;
-      const neighbors = this.graph.getNeighbors(node.id, 'downstream');
-      for (const edge of neighbors) {
-        if (!nodeIds.has(edge.targetId)) continue;
-        links.push({
-          id: edge.id,
-          source: edge.sourceId,
-          target: edge.targetId,
-          type: edge.type,
-          confidence: edge.confidence,
-          ...edge.properties
-        });
+    const linkCheck = new Set<string>();
+    const visualNodeIds = new Set(visualNodes.map(n => n.id));
+
+    for (const [sourceId, edges] of g.outEdges) {
+      const vSrc = nvpMap.get(sourceId);
+      if (!vSrc || !visualNodeIds.has(vSrc)) continue;
+
+      for (const edge of edges) {
+        const vTgt = nvpMap.get(edge.targetId);
+        if (!vTgt || !visualNodeIds.has(vTgt)) continue;
+        if (vSrc === vTgt) continue;
+
+        const key = `${vSrc}->${vTgt}`;
+        if (!linkCheck.has(key)) {
+          links.push({
+            id: `TRANSITIVE::${edge.id}`,
+            source: vSrc,
+            target: vTgt,
+            type: edge.type,
+            confidence: edge.confidence,
+            isTransitive: (vSrc !== sourceId || vTgt !== edge.targetId),
+            ...edge.properties
+          });
+          linkCheck.add(key);
+        }
       }
     }
 
-    return { nodes, links };
+    return { 
+      nodes: visualNodes, 
+      links, 
+      clusters: Array.from(clusterCenters.keys()).map(id => ({ id, ...clusterCenters.get(id) })) 
+    };
   }
 }

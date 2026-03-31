@@ -68,7 +68,10 @@ export class ConducksWatcher {
         "**/*.d.ts",
         "**/*.map",
         "**/*.html",
-        "**/*.css"
+        "**/*.css",
+        "**/*.db",
+        "**/*.sqlite",
+        "**/*.log"
       ],
       persistent: true,
       ignoreInitial: true,
@@ -136,7 +139,10 @@ export class ConducksWatcher {
       }
 
       // 2. Partial Structural Reflection
-      await this.graph.pulseStructuralStream([{ path: filePath, source }]);
+      // Conducks: Canonical Normalization (v1.3.5)
+      if (!filePath) return;
+      const normalizedPath = path.resolve(filePath).toLowerCase();
+      await this.graph.pulseStructuralStream([{ path: normalizedPath, source }]);
 
       // 3. Global Synapse Re-Linking
       this.linker.link(this.graph.getGraph());
@@ -146,8 +152,7 @@ export class ConducksWatcher {
         const affectedSymbols = new Set<string>();
         const g = this.graph.getGraph();
         for (const line of changedLines) {
-          if (!filePath) continue;
-          const symbol = (g as any).findSymbolAtLine(filePath, line as number);
+          const symbol = (g as any).findSymbolAtLine(normalizedPath, line as number);
           if (symbol) affectedSymbols.add(symbol.id as string);
         }
 

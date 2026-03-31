@@ -180,7 +180,11 @@ export class ConducksGraph {
   /**
    * Conducks — Ingests a reflected spectrum into the Synapse Graph.
    */
-  public ingestSpectrum(filePath: string, spectrum: any): void {
+  public ingestSpectrum(rawPath: string, spectrum: any): void {
+    // Conducks: Canonical ID Unification (v1.3.5)
+    // Enforce lowercase absolute IDs to prevent L1 duplication across macOS/Windows
+    const filePath = rawPath.toLowerCase();
+
     // Conducks: Idempotent Ingestion (Clear structural footprint before refresh)
     this.graph.clearFile(filePath);
 

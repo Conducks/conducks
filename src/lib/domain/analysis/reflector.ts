@@ -84,14 +84,18 @@ export class ConducksReflector {
     const scopeMap: ScopeEntry[] = [];
 
     for (const match of matches) {
+      if (!match || !match.captures) continue;
+
       // Conducks: Fix node identity resolution. 
       // Prioritize explicit name captures over structural kind captures.
       const nameCap = match.captures.find((c: any) => c.name === 'name' || c.name === 'pulse_assignment_name') ||
         match.captures.find((c: any) => c.name === 'isFunction' || c.name === 'isClass');
 
-      if (!nameCap) continue;
+      if (!nameCap || !nameCap.node) continue;
 
       const name = nameCap.node.text;
+      if (!name) continue;
+
       const nodeId = `${file.path}::${name}`;
 
       if (!nodeCache.has(nodeId)) {

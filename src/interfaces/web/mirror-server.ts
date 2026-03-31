@@ -4,10 +4,11 @@ import { ConducksGraph } from '@/lib/core/graph/graph-engine.js';
 import { registry } from '@/registry/index.js';
 
 /**
- * Conducks — Unified Visual Mirror Server (v1.0.0)
+ * Conducks — Professional Command Center (v1.5.0) 💎
  * 
- * Provides a real-time HTTP + SSE bridge for the Structural Dashboard.
- * HTML is embedded to ensure a single source of truth and robust pathing.
+ * High-fidelity structural dashboard with adaptive naming and path focusing.
+ * 
+ * v1.5.0: Adaptive Semantic Scaling & Photon Path Focusing.
  */
 export class MirrorServer {
   private app = express();
@@ -26,184 +27,188 @@ export class MirrorServer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conducks — Synapse Visual Mirror</title>
+  <title>Conducks — Professional Command Center</title>
+  
+  <script src="https://unpkg.com/d3@7"></script>
   <script src="https://unpkg.com/force-graph"></script>
-  <script src="https://unpkg.com/d3-force"></script>
-  <script src="https://unpkg.com/d3-quadtree"></script>
-  <script src="https://unpkg.com/d3-dispatch"></script>
-  <script src="https://unpkg.com/d3-timer"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
-    body { margin: 0; background: #010409; font-family: 'Outfit', sans-serif; overflow: hidden; color: #e6edf3; }
+    :root {
+      --bg: #010409;
+      --panel: rgba(13, 17, 23, 0.85);
+      --glass: rgba(255, 255, 255, 0.03);
+      --border: rgba(255, 255, 255, 0.08);
+      --blue: #3b82f6;
+      --blue-bright: #60a5fa;
+      --neon-blue: #00d2ff;
+      --font: 'Outfit', sans-serif;
+    }
+    
+    body { margin: 0; background: var(--bg); font-family: var(--font); overflow: hidden; color: #e6edf3; }
     #graph-container { width: 100vw; height: 100vh; }
-    .glass {
-      background: rgba(13, 17, 23, 0.7);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
+    
+    /* PANELS */
+    .command-sidebar {
+      position: absolute; top: 0; left: 0; bottom: 0; width: 340px;
+      background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-right: 1px solid var(--border); z-index: 40;
+      display: flex; flex-direction: column; transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
     }
-    .pulse { animation: pulse-ring 2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite; }
-    @keyframes pulse-ring { 
-      0% { transform: scale(.95); box-shadow: 0 0 0 0 rgba(79, 172, 254, 0.7); }
-      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(79, 172, 254, 0); }
-      100% { transform: scale(.95); box-shadow: 0 0 0 0 rgba(79, 172, 254, 0); }
+    .command-sidebar.collapsed { transform: translateX(-100%); }
+    
+    .panel-header { padding: 32px 24px; border-bottom: 1px solid var(--border); }
+    .panel-content { flex: 1; overflow-y: auto; padding: 24px; }
+    
+    .glass-card {
+      background: var(--glass); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px; margin-bottom: 20px;
     }
+    
+    /* UTILITIES */
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-4 { gap: 1rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .text-xs { font-size: 0.75rem; }
+    .text-dim { color: #8b949e; }
+    .text-blue { color: var(--blue-bright); }
+    .uppercase { text-transform: uppercase; }
+    .tracking-widest { letter-spacing: 0.15em; }
+    .font-mono { font-family: ui-monospace, monospace; }
+    
+    /* CUSTOM TOGGLE */
+    .switch {
+      position: relative; display: inline-block; width: 28px; height: 16px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #30363d; transition: .4s; border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 10px; width: 10px; left: 3px; bottom: 3px;
+      background-color: white; transition: .4s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--blue); }
+    input:checked + .slider:before { transform: translateX(12px); }
+    
+    /* SEARCH */
+    #origin-search {
+      width: 100%; background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; color: white; font-size: 13px; margin-bottom: 16px; outline: none;
+      transition: border-color 0.2s;
+    }
+    #origin-search:focus { border-color: var(--blue); }
+    
+    /* INSPECTOR */
+    #node-inspector {
+      position: absolute; bottom: 32px; right: 32px; width: 400px;
+      background: var(--panel); backdrop-filter: blur(20px); border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px; z-index: 10;
+      opacity: 0; transform: translateY(20px); transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+      pointer-events: none;
+    }
+    #node-inspector.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    
+    /* OVERLAY */
+    #loading-overlay {
+      position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; background: var(--bg);
+      transition: opacity 1s;
+    }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid rgba(59, 130, 246, 0.1);
+      border-top-color: var(--blue); border-radius: 50%; animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.3); border-radius: 10px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.5); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.2); border-radius: 10px; }
+    
+    .badge {
+      font-size: 8px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03);
+    }
+
+    /* FOCUS MODE */
+    #focus-indicator {
+      position: absolute; top: 32px; right: 32px; padding: 12px 20px;
+      background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 30px; color: var(--blue-bright); font-size: 11px; font-weight: 600;
+      display: none; align-items: center; gap: 10px; z-index: 30; cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div id="loading-overlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#010409] transition-opacity duration-1000">
-    <div class="relative w-24 h-24 mb-8">
-      <div class="absolute inset-0 border-4 border-blue-500/10 rounded-full"></div>
-      <div id="loading-spinner" class="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      <div class="absolute inset-0 flex items-center justify-center">
-        <span id="loading-pct" class="text-[10px] font-mono text-blue-400">0%</span>
+  <div id="loading-overlay">
+    <div class="spinner mb-6"></div>
+    <div class="text-blue text-xs uppercase tracking-widest animate-pulse">Synchronizing Resonance</div>
+    <div class="text-dim text-[9px] uppercase tracking-widest mt-4">Structural Intelligence v1.5.0</div>
+  </div>
+
+  <div id="focus-indicator">
+    <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+    ISOLATION ACTIVE — CLICK TO RESET
+  </div>
+
+  <div class="command-sidebar">
+    <div class="panel-header">
+      <div class="flex items-center justify-between mb-2">
+        <h1 style="margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.5px;">COMMAND CENTER</h1>
+        <span class="badge text-blue">V1.5.0</span>
+      </div>
+      <p class="text-dim text-[10px] uppercase tracking-widest">Architectural Controller</p>
+    </div>
+    
+    <div class="panel-content custom-scrollbar">
+      <!-- LAYER FILTER -->
+      <div class="glass-card">
+        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Resonance Layers</h2>
+        <div id="layer-filters" class="flex flex-col gap-3">
+          <!-- Populated via script -->
+        </div>
+      </div>
+      
+      <!-- CONSTELLATION FILTER -->
+      <div class="glass-card">
+        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Origin Clusters</h2>
+        <input type="text" id="origin-search" placeholder="Search Namespaces...">
+        <div id="cluster-filters" class="flex flex-col gap-3 max-height-[400px]">
+          <!-- Populated via script -->
+        </div>
       </div>
     </div>
-    <div class="text-blue-400 font-mono text-xs tracking-[0.3em] uppercase animate-pulse mb-6">Syncing Synapse</div>
-    <div class="w-64 h-1 bg-white/5 rounded-full overflow-hidden mb-2">
-      <div id="loading-bar" class="h-full bg-blue-500 transition-all duration-300 shadow-[0_0_15px_#3b82f6]" style="width: 0%"></div>
-    </div>
-    <div id="loading-status" class="text-gray-500 text-[9px] font-mono uppercase tracking-widest">Refracting Structural Wave</div>
   </div>
 
   <div id="graph-container"></div>
   
-  <div class="absolute top-8 left-8 p-6 glass w-[380px] z-10">
-    <div class="flex items-center gap-3 mb-6">
-      <div class="w-3 h-3 rounded-full bg-blue-500 pulse"></div>
-      <h1 class="text-xl font-semibold tracking-tight uppercase">Visual Mirror</h1>
-      <span class="ml-auto text-[8px] font-mono text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded border border-blue-500/20">V3 BUBBLE</span>
+  <div id="node-inspector">
+    <div class="flex justify-between items-start mb-6">
+      <div>
+        <h3 id="ins-name" style="margin: 0; font-size: 20px; font-weight: 600;">Symbol</h3>
+        <p id="ins-type" class="text-blue text-xs font-mono uppercase tracking-widest mt-1">KIND</p>
+      </div>
+      <div id="ins-level" class="badge">L2</div>
     </div>
     
-    <div class="space-y-4 mb-8">
-      <div class="flex items-center justify-between">
-        <span class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Structural Filter</span>
-        <button id="reset-filters" class="text-[9px] text-blue-400 hover:text-blue-300 transition-colors">RESET</button>
+    <div class="flex flex-col gap-4">
+      <div style="padding-left: 12px; border-left: 3px solid var(--blue);">
+        <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Architectural Anchor</p>
+        <span id="ins-cluster" class="text-blue font-mono text-[11px]">namespace::core</span>
       </div>
       
-      <div id="layer-selector" class="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="0" checked class="accent-blue-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L0: Ecosystem</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-blue-400/50"></div>
-        </label>
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="1" checked class="accent-indigo-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L1: Namespaces</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-indigo-400/50"></div>
-        </label>
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="2" checked class="accent-cyan-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L2: Units (Files)</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-cyan-400/50"></div>
-        </label>
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="3" checked class="accent-yellow-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L3: Infrastructure</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-yellow-400/50"></div>
-        </label>
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="4" checked class="accent-purple-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L4: Structures</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-purple-400/50"></div>
-        </label>
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="5" checked class="accent-green-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L5: Behaviors</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-green-400/50"></div>
-        </label>
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="6" class="accent-orange-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L6: Atoms</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-orange-400/50"></div>
-        </label>
-        <label class="flex items-center justify-between group cursor-pointer">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" data-layer="7" class="accent-gray-400">
-            <span class="text-[11px] text-gray-400 group-hover:text-white transition-colors">L7: Data</span>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-gray-400/50"></div>
-        </label>
-      </div>
-    </div>
-
-    <div class="mt-8 space-y-4">
-      <span class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Diagnostic Lens</span>
-      <select id="diagnostic-lens" class="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-xs text-gray-300 focus:outline-none focus:border-blue-500/50">
-        <option value="default">Default: Cluster Wave</option>
-        <option value="complexity">Heatmap: Complexity</option>
-        <option value="coverage">Audit: Test Coverage</option>
-        <option value="risk">Risk: Bus Factor (Entropy)</option>
-        <option value="age">History: Temporal Decay</option>
-      </select>
-    </div>
-
-    <div class="flex gap-2 mb-6">
-      <button id="mode-graph" class="flex-1 py-2 glass text-[10px] font-mono text-blue-400 border-blue-500/40 bg-blue-500/10">GRAPH VIEW</button>
-      <button id="mode-bubble" class="flex-1 py-2 glass text-[10px] font-mono text-gray-500 hover:text-blue-400 transition-colors">BUBBLE VIEW</button>
-    </div>
-
-    <div id="buddy-advice" class="p-3 bg-blue-900/10 border border-blue-500/10 rounded-lg">
-      <p class="text-[11px] text-blue-200/60 leading-relaxed font-light">
-        Layered Batching active. The Synapse is Materializing in structural sequences.
-      </p>
-    </div>
-  </div>
-
-  <div class="absolute bottom-8 right-8 z-10 pointer-events-none">
-    <div id="node-inspector" class="p-6 glass w-[380px] opacity-0 translate-y-4 transition-all duration-500 pointer-events-auto">
-      <div class="flex items-start justify-between mb-4">
-        <div>
-          <h3 id="node-name" class="text-lg font-semibold text-white truncate max-w-[280px]">Symbol</h3>
-          <p id="node-type" class="text-[10px] font-mono text-blue-400 uppercase tracking-widest mt-1">Kind</p>
-          <div id="lens-status" class="hidden mt-2 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[9px] font-mono text-blue-300 animate-pulse">LENS ACTIVE</div>
+      <div class="flex gap-4 items-center pt-4 border-t border-white/5">
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Degree</p>
+          <span id="ins-degree" class="font-mono text-white text-md">0</span>
         </div>
-        <div class="px-2 py-1 bg-white/5 rounded text-[10px] font-mono text-gray-500" id="node-level">L0</div>
-      </div>
-      
-      <div class="space-y-4">
-        <div class="text-[11px] text-gray-400 border-l-2 border-blue-500/30 pl-3">
-          <p class="uppercase text-[9px] tracking-tighter text-gray-500 mb-1">Location</p>
-          <span id="node-file" class="font-mono">Internal</span>
-        </div>
-        
-        <div class="grid grid-cols-2 gap-4 py-3 border-y border-white/5">
-          <div>
-            <p class="text-[9px] uppercase text-gray-500 mb-1">Fan Out</p>
-            <span id="node-degree" class="text-xs font-mono text-white">0</span>
-          </div>
-          <div>
-            <p class="text-[9px] uppercase text-gray-500 mb-1">Mass</p>
-            <span id="node-mass" class="text-xs font-mono text-white">1.0</span>
-          </div>
-        </div>
-
-        <div id="gravity-editor-inner">
-          <div class="flex justify-between text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-2">
-            <span>Structural Gravity</span>
-            <span id="gravity-val" class="text-blue-400">0.00</span>
-          </div>
-          <input type="range" id="gravity-slider" min="0" max="1" step="0.01" class="w-full h-1 bg-blue-500/20 rounded-full appearance-none cursor-pointer accent-blue-500">
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Mass</p>
+          <span id="ins-mass" class="font-mono text-white text-md">1.00</span>
         </div>
       </div>
     </div>
@@ -211,324 +216,220 @@ export class MirrorServer {
 
   <script>
     const Graph = ForceGraph()(document.getElementById('graph-container'));
-    let fullWave = null;
     let activeWave = null;
-    let isBubbleMode = false;
-    let activeLens = 'default';
-    let selectedNode = null;
-    const manualOverrides = new Map();
-    const palette = [
-      '#60a5fa', '#818cf8', '#22d3ee', '#fac638', '#c084fc', '#4ade80', '#fb923c', '#9ca3af'
+    let selectedLayers = [0, 1, 2, 3, 4, 5];
+    let selectedClusters = [];
+    let focusedPath = null;
+    let currentGlobalScale = 1;
+
+    const LAYERS = [
+      { id: 0, name: 'Ecosystem', color: '#60a5fa' },
+      { id: 1, name: 'Namespaces', color: '#818cf8' },
+      { id: 2, name: 'Units (Files)', color: '#22d3ee' },
+      { id: 3, name: 'Infrastructure', color: '#fcd34d' },
+      { id: 4, name: 'Structures', color: '#c084fc' },
+      { id: 5, name: 'Behaviors', color: '#4ade80' },
+      { id: 6, name: 'Atoms', color: '#fb923c' }
     ];
-    const heatmapColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
-    const activePulses = new Map();
 
-    async function materialiseSynapse() {
-      const res = await fetch('/api/synapse');
-      fullWave = await res.json();
-      
-      const statusEl = document.getElementById('loading-status');
-      if (statusEl) statusEl.innerText = 'Materializing ' + fullWave.nodes.length + ' Structural Units';
+    function initUI() {
+      // 1. Layers
+      const layerCtn = document.getElementById('layer-filters');
+      LAYERS.forEach(l => {
+        const item = document.createElement('div');
+        item.className = 'flex justify-between items-center';
+        item.innerHTML = \`
+          <span class="text-xs text-dim">\${l.name}</span>
+          <label class="switch">
+            <input type="checkbox" data-layer="\${l.id}" \${selectedLayers.includes(l.id) ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+        \`;
+        layerCtn.appendChild(item);
+      });
 
-      try {
-        const stored = localStorage.getItem('conducks_filters');
-        if (stored) {
-          layerFilters = JSON.parse(stored);
-        } else {
-          layerFilters = { 0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: false, 7: false };
-          localStorage.setItem('conducks_filters', JSON.stringify(layerFilters));
+      // Events
+      document.body.addEventListener('change', e => {
+        if (e.target.dataset.layer) {
+          const id = parseInt(e.target.dataset.layer);
+          if (e.target.checked) selectedLayers.push(id);
+          else selectedLayers = selectedLayers.filter(x => x !== id);
+          refreshSynapse();
         }
-      } catch (e) {
-        layerFilters = { 0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: false, 7: false };
-      }
+        if (e.target.dataset.cluster) {
+          const id = e.target.dataset.cluster;
+          if (e.target.checked) selectedClusters.push(id);
+          else selectedClusters = selectedClusters.filter(x => x !== id);
+          refreshSynapse();
+        }
+      });
 
-      configureGraph();
-      applyFilters();
+      document.getElementById('origin-search').addEventListener('input', e => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('.cluster-item').forEach(el => {
+          el.style.display = el.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
+        });
+      });
+
+      document.getElementById('focus-indicator').addEventListener('click', () => resetFocus());
+    }
+
+    async function refreshSynapse() {
+      const layers = selectedLayers.join(',');
+      const clusters = selectedClusters.join(',');
+      const res = await fetch(\`/api/synapse?layers=\${layers}&clusters=\${clusters}\`);
+      const wave = await res.json();
+      activeWave = wave;
+
+      // Update Cluster Filters
+      const clusterCtn = document.getElementById('cluster-filters');
+      const currentQ = document.getElementById('origin-search').value.toLowerCase();
+      clusterCtn.innerHTML = '';
+      wave.clusters.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'flex justify-between items-center cluster-item';
+        if (currentQ && !c.name.toLowerCase().includes(currentQ)) item.style.display = 'none';
+        item.innerHTML = \`
+          <div class="flex items-center gap-4">
+            <div style="width:6px; height:6px; border-radius:50%; background:\${c.color}"></div>
+            <span class="text-xs text-dim truncate" style="max-width: 140px;">\${c.name}</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" data-cluster="\${c.id}" \${selectedClusters.includes(c.id) ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+        \`;
+        clusterCtn.appendChild(item);
+      });
+
+      Graph.graphData(activeWave);
+      applyForces();
+      hideOverlay();
+    }
+
+    function applyForces() {
+      if (typeof d3 === 'undefined') return;
+      Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(0.15));
+      Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(0.15));
+      Graph.d3Force('collide', d3.forceCollide(node => {
+        const size = Math.max((node.rank || 0.1) * 24, 6);
+        return size * 1.5 + 8;
+      }).strength(1));
     }
 
     function configureGraph() {
       Graph
         .backgroundColor('#010409')
         .nodeId('id')
-        .nodeVal(node => {
-          const override = manualOverrides.get(node.id);
-          const r = override !== undefined ? override : (node.rank || 0);
-          return Math.max(r * 30, node.level === 0 ? 12 : 5);
-        })
-        .nodeColor(node => palette[node.level % palette.length] || '#444444')
         .nodeRelSize(4)
-        .linkCurvature(0.15)
-        .linkWidth(link => link.type === 'MEMBER_OF' ? 0.5 : 1)
-        .linkColor(link => {
-           const t = link.type;
-           const opacity = link.isTransitive ? '0.15' : '0.4';
-           if (t === 'MEMBER_OF') return 'rgba(139, 92, 246, ' + opacity + ')';
-           if (t === 'CALLS') return 'rgba(59, 130, 246, ' + opacity + ')';
-           if (t === 'IMPORTS') return 'rgba(34, 197, 94, ' + opacity + ')';
-           if (t === 'ACCESSES') return 'rgba(245, 158, 11, ' + opacity + ')';
-           return 'rgba(255, 255, 255, ' + opacity + ')';
+        .linkCurvature(0.1)
+        .linkWidth(link => {
+          if (focusedPath) {
+             return focusedPath.includes(link) ? 3 : 0.2;
+          }
+          return link.isTransitive ? 0.4 : 1.2;
         })
-        .linkDirectionalArrowLength(link => (Graph.zoom() > 2 ? 3 : 0))
-        .d3VelocityDecay(0.3)
-        .cooldownTicks(150)
-        .onEngineStop(() => hideOverlay())
+        .linkColor(link => {
+          if (focusedPath) {
+             return focusedPath.includes(link) ? '#00d2ff' : 'rgba(255,255,255,0.02)';
+          }
+          const base = link.isTransitive ? '#484f58' : (link.source.clusterColor || '#3b82f6');
+          return base + (link.isTransitive ? '33' : '66');
+        })
+        .linkDirectionalParticles(link => focusedPath && focusedPath.includes(link) ? 6 : 0)
+        .linkDirectionalParticleSpeed(0.015)
+        .linkDirectionalParticleWidth(4)
         .nodeCanvasObject((node, ctx, globalScale) => {
-          renderNode(node, ctx, globalScale);
+          currentGlobalScale = globalScale;
+          const size = Math.max((node.rank || 0.1) * 24, 6);
+          const color = node.clusterColor || '#9ca3af';
+          const isDimmed = focusedPath && !isNodeInFocusedPath(node);
+
+          ctx.globalAlpha = isDimmed ? 0.05 : 1;
+          
+          // Outer Glow
+          if (node.level <= 1 && !isDimmed) {
+            ctx.shadowBlur = 15 / globalScale;
+            ctx.shadowColor = color;
+          }
+
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+          ctx.fillStyle = color;
+          ctx.fill();
+          
+          ctx.shadowBlur = 0;
+
+          // ADAPTIVE SEMANTIC SCALING (v1.5.0)
+          const baseFontSize = 14; 
+          const adaptiveSize = Math.max(1, baseFontSize / globalScale);
+          
+          let showText = true;
+          if (globalScale < 0.3 && node.level > 1) showText = false;
+          if (globalScale < 0.8 && node.level > 2) showText = false;
+          if (globalScale < 2 && node.level > 4) showText = false;
+
+          if (showText && !isDimmed) {
+            ctx.font = \`\${adaptiveSize}px var(--font)\`;
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.textAlign = 'center';
+            ctx.fillText(node.name, node.x, node.y + size + adaptiveSize + 2);
+          }
+          
+          ctx.globalAlpha = 1;
         })
         .onNodeClick(node => focusNode(node))
-        .onBackgroundClick(() => defocus());
-        
-      syncFilterUI();
-    }
-
-    function applyFilters() {
-      if (!fullWave) return;
+        .onLinkClick(link => focusPath(link))
+        .onBackgroundClick(() => resetFocus());
       
-      const activeNodes = fullWave.nodes.filter(n => layerFilters[n.level]);
-      const nodeIds = new Set(activeNodes.map(n => n.id));
-      const nodeMap = new Map(fullWave.nodes.map(n => [n.id, n]));
-
-      // 1. Recursive Nearest Visible Parent (NVP) lookup
-      function getNVP(nodeId) {
-        if (!nodeId) return null;
-        if (nodeIds.has(nodeId)) return nodeId;
-        const n = nodeMap.get(nodeId);
-        return n ? getNVP(n.parentId) : null;
-      }
-
-      // 2. Transitive Edge Resolution (Structural Contraction)
-      const transitiveLinks = [];
-      const linkCheck = new Set();
-
-      fullWave.links.forEach(l => {
-        const sId = typeof l.source === 'string' ? l.source : l.source.id;
-        const tId = typeof l.target === 'string' ? l.target : l.target.id;
-        
-        const vSrc = getNVP(sId);
-        const vTgt = getNVP(tId);
-
-        if (vSrc && vTgt && vSrc !== vTgt) {
-          const key = vSrc + '->' + vTgt;
-          if (!linkCheck.has(key)) {
-            transitiveLinks.push({
-              source: vSrc,
-              target: vTgt,
-              type: l.type,
-              isTransitive: (vSrc !== sId || vTgt !== tId)
-            });
-            linkCheck.add(key);
-          }
-        }
-      });
-
-      activeWave = { nodes: activeNodes, links: transitiveLinks };
-      Graph.graphData(activeWave);
-      if (activeNodes.length > 0) hideOverlay();
-      Graph.d3Force('charge').strength(node => -600 * (node.mass || 1));
-      if (typeof d3 !== 'undefined' && d3.forceCollide) {
-        Graph.d3Force('collide', d3.forceCollide(node => {
-          const override = manualOverrides.get(node.id);
-          const r = override !== undefined ? override : (node.rank || 0);
-          return Math.max(r * 40, 25);
-        }));
-      }
+      Graph.d3Force('charge').strength(-800);
+      Graph.d3Force('center', d3.forceCenter(0,0).strength(0.01));
     }
 
-    function renderNode(node, ctx, globalScale) {
-      const override = manualOverrides.get(node.id);
-      const effectiveRank = override !== undefined ? override : (node.rank || 0);
-      const size = Math.max(effectiveRank * 20, node.level <= 2 ? 10 : 5);
-      let color = (palette[node.level] || '#444444').substring(0, 7);
-      let opacity = 1.0;
-      let hollow = false;
+    function isNodeInFocusedPath(node) {
+      if (!focusedPath) return false;
+      return focusedPath.some(l => l.source.id === node.id || l.target.id === node.id);
+    }
 
-      if (activeLens === 'complexity') {
-        const c = Math.min(node.complexity || 1, 20) / 20;
-        color = heatmapColors[Math.min(Math.floor(c * heatmapColors.length), heatmapColors.length - 1)];
-      } else if (activeLens === 'coverage') {
-        if (node.level > 1 && !node.isTest) {
-          hollow = (node.coverageCount === 0);
-          color = hollow ? '#ef4444' : '#10b981';
-        }
-      } else if (activeLens === 'risk') {
-        const e = Math.min(node.entropy || 0, 1);
-        if (e > 0.5) {
-          color = '#f59e0b';
-          if (Math.sin(Date.now()/500) > 0) color = '#ef4444';
-        }
-      } else if (activeLens === 'age') {
-        const now = Date.now() / 1000;
-        const age = now - node.lastModified;
-        const week = 60 * 60 * 24 * 7;
-        opacity = Math.max(0.1, 1 - (age / (week * 52)));
-      }
+    function focusPath(link) {
+      focusedPath = [link];
+      document.getElementById('focus-indicator').style.display = 'flex';
+      Graph.centerAt(link.source.x, link.source.y, 800);
+      Graph.zoom(2.5, 800);
+    }
 
-      const label = node.name || node.label;
-
-      if (isBubbleMode && node.level <= 4) {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, size * 2.5, 0, 2 * Math.PI, false);
-        ctx.fillStyle = color + '08';
-        ctx.strokeStyle = color + '22';
-        ctx.lineWidth = 1/globalScale;
-        ctx.fill();
-        ctx.stroke();
-      }
-
-      const pulse = activePulses.get(node.id);
-      if (pulse) {
-        const age = Date.now() - pulse.time;
-        if (age < 2000) {
-          const ratio = age / 2000;
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, size + (ratio * 60), 0, 2 * Math.PI, false);
-          ctx.strokeStyle = color + Math.floor((1-ratio) * 255).toString(16).padStart(2, '0');
-          ctx.lineWidth = 4 / globalScale;
-          ctx.stroke();
-        } else activePulses.delete(node.id);
-      }
-
-      if (globalScale > 1.2 || node.level <= 1 || node.rank > 0.1) {
-        const fontSize = 12/globalScale;
-        ctx.font = '300 ' + fontSize + 'px Outfit';
-        const textWidth = ctx.measureText(label).width;
-        ctx.fillStyle = \`rgba(255, 255, 255, \${opacity * 0.6})\`;
-        ctx.fillText(label, node.x - textWidth/2, node.y + size + 10);
-      }
-
-      ctx.globalAlpha = opacity;
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-      if (hollow) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2 / globalScale;
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = color;
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1.0;
+    function resetFocus() {
+      focusedPath = null;
+      document.getElementById('focus-indicator').style.display = 'none';
+      document.getElementById('node-inspector').classList.remove('active');
+      Graph.zoom(1, 1000);
     }
 
     function focusNode(node) {
-      selectedNode = node;
-      Graph.centerAt(node.x, node.y, 1000);
-      Graph.zoom(4, 1000);
+      Graph.centerAt(node.x, node.y, 800);
+      Graph.zoom(3.5, 800);
       const ins = document.getElementById('node-inspector');
-      ins.parentElement.classList.remove('pointer-events-none');
-      ins.style.opacity = '1';
-      ins.style.transform = 'translateY(0)';
-      document.getElementById('node-name').innerText = node.name;
-      document.getElementById('node-type').innerText = (node.kind || node.group || 'unknown').toUpperCase();
-      document.getElementById('node-level').innerText = 'L' + node.level;
-      document.getElementById('node-file').innerText = node.filePath || 'Internal';
-      document.getElementById('node-degree').innerText = node.degree || 0;
-      document.getElementById('node-mass').innerText = node.mass?.toFixed(2) || '1.00';
-      const override = manualOverrides.get(node.id);
-      const gravity = override !== undefined ? override : (node.rank || 0);
-      document.getElementById('gravity-val').innerText = gravity.toFixed(2);
-      document.getElementById('gravity-slider').value = gravity;
-    }
-
-    document.getElementById('gravity-slider').addEventListener('input', (e) => {
-      if (!selectedNode) return;
-      const val = parseFloat(e.target.value);
-      manualOverrides.set(selectedNode.id, val);
-      document.getElementById('gravity-val').innerText = val.toFixed(2);
-      Graph.refresh();
-      Graph.d3AlphaTarget(0.1).restart();
-      setTimeout(() => Graph.d3AlphaTarget(0), 500);
-    });
-
-    function defocus() {
-      selectedNode = null;
-      const ins = document.getElementById('node-inspector');
-      ins.parentElement.classList.add('pointer-events-none');
-      ins.style.opacity = '0';
-      ins.style.transform = 'translateY(1rem)';
-      Graph.zoomToFit(1000);
-    }
-
-    document.getElementById('layer-selector').addEventListener('change', (e) => {
-      layerFilters[e.target.dataset.layer] = e.target.checked;
-      localStorage.setItem('conducks_filters', JSON.stringify(layerFilters));
-      applyFilters();
-    });
-
-    document.getElementById('reset-filters').addEventListener('click', () => {
-      layerFilters = { 0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: false, 7: false };
-      localStorage.setItem('conducks_filters', JSON.stringify(layerFilters));
-      syncFilterUI();
-      applyFilters();
-    });
-
-    function syncFilterUI() {
-      document.querySelectorAll('#layer-selector input').forEach(input => {
-        input.checked = layerFilters[input.dataset.layer];
-      });
-    }
-
-    document.getElementById('diagnostic-lens').addEventListener('change', (e) => {
-      activeLens = e.target.value;
-      const lensStatus = document.getElementById('lens-status');
-      if (lensStatus) {
-        if (activeLens !== 'default') {
-          lensStatus.innerText = 'LENS: ' + activeLens.toUpperCase();
-          lensStatus.classList.remove('hidden');
-        } else {
-          lensStatus.classList.add('hidden');
-        }
-      }
-      console.log('[Mirror] Lens Switched:', activeLens);
-      Graph.refresh();
-      Graph.d3AlphaTarget(0.4).restart();
-      setTimeout(() => Graph.d3AlphaTarget(0), 1000);
-    });
-
-    document.getElementById('mode-graph').addEventListener('click', () => setMode(false));
-    document.getElementById('mode-bubble').addEventListener('click', () => setMode(true));
-
-    function setMode(bubble) {
-      isBubbleMode = bubble;
-      const btnG = document.getElementById('mode-graph');
-      const btnB = document.getElementById('mode-bubble');
-      if (bubble) {
-        btnB.classList.add('text-blue-400', 'border-blue-500/40', 'bg-blue-500/10');
-        btnB.classList.remove('text-gray-500');
-        btnG.classList.remove('text-blue-400', 'border-blue-500/40', 'bg-blue-500/10');
-        btnG.classList.add('text-gray-500');
-      } else {
-        btnG.classList.add('text-blue-400', 'border-blue-500/40', 'bg-blue-500/10');
-        btnG.classList.remove('text-gray-500');
-        btnB.classList.remove('text-blue-400', 'border-blue-500/40', 'bg-blue-500/10');
-        btnB.classList.add('text-gray-500');
-      }
-      console.log('[Mirror] Mode Change:', bubble ? 'Bubble' : 'Graph');
-      Graph.refresh();
-      Graph.d3AlphaTarget(0.4).restart();
-      setTimeout(() => Graph.d3AlphaTarget(0), 1200);
+      ins.classList.add('active');
+      document.getElementById('ins-name').innerText = node.name;
+      document.getElementById('ins-type').innerText = (node.group || node.label || 'SYMBOL').toUpperCase();
+      document.getElementById('ins-level').innerText = 'L' + node.level;
+      document.getElementById('ins-cluster').innerText = node.clusterId.split('::').pop();
+      document.getElementById('ins-degree').innerText = node.degree || 0;
+      document.getElementById('ins-mass').innerText = node.mass?.toFixed(2) || '1.00';
     }
 
     function hideOverlay() {
       const overlay = document.getElementById('loading-overlay');
-      if (overlay.style.display === 'none') return;
-      overlay.classList.add('opacity-0');
+      overlay.style.opacity = '0';
       setTimeout(() => overlay.style.display = 'none', 1000);
     }
 
-    const pulseSource = new EventSource('/api/pulse');
-    pulseSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      const adv = document.getElementById('buddy-advice');
-      adv.innerHTML = '<p class=\"text-[11px] text-blue-300 font-semibold uppercase tracking-widest mb-1\">Mirror Alert</p>' +
-                      '<p class=\"text-[10px] text-gray-400\">Structural shift in <span class=\"text-blue-200 font-mono\">' + data.filePath + '</span></p>';
-      const node = Graph.graphData().nodes.find(n => n.filePath === data.filePath);
-      if (node) activePulses.set(node.id, { time: Date.now() });
-    };
-
-    function animate() { requestAnimationFrame(animate); }
-    animate();
-    materialiseSynapse();
+    initUI();
+    configureGraph();
+    refreshSynapse();
+    
+    const sse = new EventSource('/api/pulse');
+    sse.onmessage = () => refreshSynapse();
   </script>
 </body>
 </html>
@@ -536,7 +437,12 @@ export class MirrorServer {
     });
 
     this.app.get('/api/synapse', (req, res) => {
-      const wave = registry.mirror.getWave();
+      const layersParam = req.query.layers as string;
+      const clustersParam = (req.query.clusters as string) || '';
+      const layers = layersParam ? layersParam.split(',').map(n => parseInt(n, 10)) : [0, 1, 2, 3, 4, 5];
+      const clusters = clustersParam ? clustersParam.split(',') : [];
+      
+      const wave = (registry.mirror as any).getWave(layers, clusters);
       res.json(wave);
     });
 
@@ -560,7 +466,7 @@ export class MirrorServer {
 
   public start(port: number = 3333) {
     this.app.listen(port, () => {
-      console.error(`[Mirror Server] Unified Dashboard active at http://localhost:${port}`);
+      console.error(`[Mirror Server] Structural Resonance Active at http://localhost:${port}`);
     });
   }
 }
