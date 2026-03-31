@@ -284,7 +284,12 @@ export class ConducksGraph {
       if (isAbsolute) {
         targetId = rel.targetName;
       } else if (isFileRef) {
-        targetId = `${rel.targetName}::UNIT`;
+        // Conducks: External/Absolute Resolution Guard
+        if (rel.targetName.startsWith('ECOSYSTEM::') || rel.targetName.includes('::')) {
+          targetId = rel.targetName;
+        } else {
+          targetId = `${rel.targetName}::UNIT`;
+        }
       } else {
         targetId = `${filePath}::${rel.targetName}`;
       }

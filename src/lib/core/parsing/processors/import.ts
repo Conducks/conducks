@@ -60,8 +60,8 @@ export class ImportProcessor {
     if (!resolved) return;
 
     const isExternal = typeof resolved === 'object' && (resolved as any).kind === 'external_dependency';
-    const targetName = isExternal ? (resolved as any).name : resolved as string;
-    if (isExternal) console.error(`[ImportProcessor] Processing EXTERNAL dependency: ${targetName}`);
+    const targetName = isExternal ? `ECOSYSTEM::${(resolved as any).name}` : resolved as string;
+    if (isExternal) console.debug(`[ImportProcessor] Processing EXTERNAL dependency: ${targetName}`);
 
     spectrum.relationships.push({
       sourceName: 'UNIT', // Imports are typically global to the module
@@ -72,18 +72,28 @@ export class ImportProcessor {
     });
   }
 
-  public processBinding(resolvedPath: string, originalName: string, localAlias: string, spectrum: PrismSpectrum, context?: PulseContext): void {
+  public processBinding(resolved: string | { name: string, kind: 'external_dependency' }, originalName: string, localAlias: string, spectrum: PrismSpectrum, context?: PulseContext): void {
+    const isExternal = typeof resolved === 'object' && (resolved as any).kind === 'external_dependency';
+    const resolvedPath = isExternal ? (resolved as any).name : resolved as string;
+
     if (context) {
       context.registerLocalBinding(localAlias, resolvedPath);
     }
 
     // [The Great Binding] Link local symbol to absolute origin
     // Normalize path by stripping build-time extensions and enforcing canonical lowercase
-    const normalizedTarget = resolvedPath.replace(/\.(js|jsx)$/, '.ts').toLowerCase();
+    let targetName: string;
+    
+    if (isExternal) {
+      targetName = `ECOSYSTEM::${resolvedPath}::${originalName}`;
+    } else {
+      const normalizedTarget = resolvedPath.replace(/\.(js|jsx)$/, '.ts').toLowerCase();
+      targetName = `${normalizedTarget}::${originalName}`;
+    }
     
     spectrum.relationships.push({
       sourceName: localAlias,
-      targetName: `${normalizedTarget}::${originalName}`,
+      targetName,
       type: 'IMPORTS',
       confidence: 1.0
     });
@@ -91,7 +101,7 @@ export class ImportProcessor {
     // Link file-level import
     spectrum.relationships.push({
       sourceName: 'UNIT',
-      targetName: resolvedPath,
+      targetName: isExternal ? `ECOSYSTEM::${resolvedPath}` : resolvedPath,
       type: 'IMPORTS',
       confidence: 1.0,
       metadata: { name: localAlias, original: originalName }

@@ -57,15 +57,21 @@ export class ConducksReflector {
     const nodeCache = new Map<string, SpectrumNode>();
 
     const fileMeta = mapToCanonical('file');
-    nodeCache.set(`${file.path}::global`, {
-      name: 'global',
+    nodeCache.set(`${file.path}::UNIT`, {
+      name: 'UNIT',
       kind: 'file' as any,
       canonicalKind: fileMeta.kind,
       canonicalRank: fileMeta.rank,
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: file.path,
       isExport: true,
-      metadata: { isGlobalNode: true, isTest: isTestFile }
+      metadata: { 
+        isGlobalNode: true, 
+        isTest: isTestFile,
+        displayName: path.basename(file.path),
+        canonicalRank: 2,
+        canonicalKind: 'UNIT'
+      }
     });
 
 
@@ -129,7 +135,7 @@ export class ConducksReflector {
           }
         }
       }
-      return best?.name ?? 'global';
+      return best?.name ?? 'UNIT';
     };
 
     // === Pass 2: Semantic Dispatch ===
@@ -178,11 +184,16 @@ export class ConducksReflector {
           }
 
           if (node) {
-            const canonical = mapToCanonical(kind);
             node.kind = kind as any;
+            node.metadata[cName] = true;
+            
+            // Conducks.4: Calibrate Canonical Taxonomy
+            const canonical = mapToCanonical(kind);
             node.canonicalKind = canonical.kind;
             node.canonicalRank = canonical.rank;
-            node.metadata[cName] = true;
+            node.metadata.canonicalKind = canonical.kind;
+            node.metadata.canonicalRank = canonical.rank;
+            node.metadata.displayName = node.name; // Preserve for UI
 
             // Conducks: Structural Complexity Signal
             if (provider.calculateComplexity && (kind === 'function' || kind === 'method' || kind === 'class')) {
@@ -251,9 +262,11 @@ export class ConducksReflector {
 
     // Conducks.5: Structural Membership Binding (Parent -> Child)
     for (const node of nodeCache.values()) {
-      if (node.name === 'global') continue;
+      if (node.name === 'UNIT') continue;
       const scope = getScopeAt(node.range.start.line - 1, node.name);
-      if (scope && scope !== 'global' && scope !== node.name) {
+      
+      // Conducks: Hierarchical Unification (L2-L7 Parentage)
+      if (scope && scope !== node.name) {
         spectrum.relationships.push({
           sourceName: scope,
           targetName: node.name,

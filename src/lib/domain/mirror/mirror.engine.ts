@@ -33,7 +33,7 @@ export class MirrorEngine {
     const namespaces = Array.from(this.graph.getAllNodes()).filter(n => n.properties.canonicalKind === 'NAMESPACE' || n.properties.isFolder);
     const clusterCenters = new Map<string, { x: number; y: number }>();
     const nodeCount = this.graph.stats.nodeCount;
-    const structuralSpread = Math.sqrt(nodeCount) * 45;
+    const structuralSpread = Math.sqrt(nodeCount) * 85; // Increased for unbraiding
     const goldenAngle = Math.PI * (3 - Math.sqrt(5));
 
     namespaces.forEach((ns, i) => {
@@ -55,9 +55,27 @@ export class MirrorEngine {
       const parentLink = incoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF' || e.type === 'HAS_METHOD' || e.type === 'HAS_PROPERTY');
       const parentId = parentLink ? parentLink.sourceId : null;
 
-      // O(N) Clustering: Group by Namespace/Folder
-      const namespaceLink = incoming.find(e => e.type === 'CONTAINS' && e.sourceId.startsWith('NAMESPACE::'));
-      const clusterId = namespaceLink ? namespaceLink.sourceId : 'root';
+      // O(N) Clustering: Recursive Namespace Discovery
+      let clusterId = 'root';
+      let currentSearchId = n.id;
+      let depthLimit = 3; 
+
+      while (depthLimit-- > 0) {
+        const currentIncoming = this.graph.getNeighbors(currentSearchId, 'upstream');
+        const namespaceLink = currentIncoming.find(e => e.type === 'CONTAINS' && e.sourceId.startsWith('NAMESPACE::'));
+        
+        if (namespaceLink) {
+          clusterId = namespaceLink.sourceId;
+          break;
+        }
+
+        const structuralParent = currentIncoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF');
+        if (structuralParent && structuralParent.sourceId !== currentSearchId) {
+          currentSearchId = structuralParent.sourceId;
+        } else {
+          break;
+        }
+      }
       
       const clusterPos = clusterCenters.get(clusterId) || { x: 0, y: 0 };
       const degree = degreeMap.get(n.id) || 0;
