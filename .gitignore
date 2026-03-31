@@ -16,7 +16,7 @@ ehthumbs.db
 Thumbs.db
 tests/fixtures
 tests/legacy
-
+/data
 # IDE
 .vscode/
 .idea/
