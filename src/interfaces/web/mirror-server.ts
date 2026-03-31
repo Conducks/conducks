@@ -4,11 +4,11 @@ import { ConducksGraph } from '@/lib/core/graph/graph-engine.js';
 import { registry } from '@/registry/index.js';
 
 /**
- * Conducks — Professional Command Center (v1.5.0) 💎
+ * Conducks — Professional Command Center (v1.6.0) 💎
  * 
  * High-fidelity structural dashboard with adaptive naming and path focusing.
  * 
- * v1.5.0: Adaptive Semantic Scaling & Photon Path Focusing.
+ * v1.6.0 Evolution: Full Circuit Resonance & Fluid Inspector.
  */
 export class MirrorServer {
   private app = express();
@@ -106,7 +106,7 @@ export class MirrorServer {
     
     /* INSPECTOR */
     #node-inspector {
-      position: absolute; bottom: 32px; right: 32px; width: 400px;
+      position: absolute; bottom: 32px; right: 32px; width: 420px;
       background: var(--panel); backdrop-filter: blur(20px); border: 1px solid var(--border);
       border-radius: 20px; padding: 28px; z-index: 10;
       opacity: 0; transform: translateY(20px); transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
@@ -114,6 +114,14 @@ export class MirrorServer {
     }
     #node-inspector.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
     
+    /* v1.6.0 Overflow Guard */
+    .inspector-path {
+       word-break: break-all;
+       overflow-wrap: anywhere;
+       line-height: 1.4;
+       display: block;
+    }
+
     /* OVERLAY */
     #loading-overlay {
       position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column;
@@ -147,25 +155,24 @@ export class MirrorServer {
   <div id="loading-overlay">
     <div class="spinner mb-6"></div>
     <div class="text-blue text-xs uppercase tracking-widest animate-pulse">Synchronizing Resonance</div>
-    <div class="text-dim text-[9px] uppercase tracking-widest mt-4">Structural Intelligence v1.5.0</div>
+    <div class="text-dim text-[9px] uppercase tracking-widest mt-4">Structural Intelligence v1.6.0</div>
   </div>
 
   <div id="focus-indicator">
     <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-    ISOLATION ACTIVE — CLICK TO RESET
+    FULL CIRCUIT ISOLATION — CLICK TO RESET
   </div>
 
   <div class="command-sidebar">
     <div class="panel-header">
       <div class="flex items-center justify-between mb-2">
         <h1 style="margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.5px;">COMMAND CENTER</h1>
-        <span class="badge text-blue">V1.5.0</span>
+        <span class="badge text-blue">V1.6.0</span>
       </div>
       <p class="text-dim text-[10px] uppercase tracking-widest">Architectural Controller</p>
     </div>
     
     <div class="panel-content custom-scrollbar">
-      <!-- LAYER FILTER -->
       <div class="glass-card">
         <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Resonance Layers</h2>
         <div id="layer-filters" class="flex flex-col gap-3">
@@ -173,7 +180,6 @@ export class MirrorServer {
         </div>
       </div>
       
-      <!-- CONSTELLATION FILTER -->
       <div class="glass-card">
         <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Origin Clusters</h2>
         <input type="text" id="origin-search" placeholder="Search Namespaces...">
@@ -188,7 +194,7 @@ export class MirrorServer {
   
   <div id="node-inspector">
     <div class="flex justify-between items-start mb-6">
-      <div>
+      <div style="max-width: 300px;">
         <h3 id="ins-name" style="margin: 0; font-size: 20px; font-weight: 600;">Symbol</h3>
         <p id="ins-type" class="text-blue text-xs font-mono uppercase tracking-widest mt-1">KIND</p>
       </div>
@@ -198,7 +204,7 @@ export class MirrorServer {
     <div class="flex flex-col gap-4">
       <div style="padding-left: 12px; border-left: 3px solid var(--blue);">
         <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Architectural Anchor</p>
-        <span id="ins-cluster" class="text-blue font-mono text-[11px]">namespace::core</span>
+        <span id="ins-cluster" class="text-blue font-mono text-[11px] inspector-path">namespace::core</span>
       </div>
       
       <div class="flex gap-4 items-center pt-4 border-t border-white/5">
@@ -219,8 +225,10 @@ export class MirrorServer {
     let activeWave = null;
     let selectedLayers = [0, 1, 2, 3, 4, 5];
     let selectedClusters = [];
-    let focusedPath = null;
-    let currentGlobalScale = 1;
+    
+    // v1.6.0: Full Circuit Resonance state
+    let focusNodes = new Set();
+    let focusLinks = new Set();
 
     const LAYERS = [
       { id: 0, name: 'Ecosystem', color: '#60a5fa' },
@@ -233,7 +241,6 @@ export class MirrorServer {
     ];
 
     function initUI() {
-      // 1. Layers
       const layerCtn = document.getElementById('layer-filters');
       LAYERS.forEach(l => {
         const item = document.createElement('div');
@@ -248,7 +255,6 @@ export class MirrorServer {
         layerCtn.appendChild(item);
       });
 
-      // Events
       document.body.addEventListener('change', e => {
         if (e.target.dataset.layer) {
           const id = parseInt(e.target.dataset.layer);
@@ -281,7 +287,6 @@ export class MirrorServer {
       const wave = await res.json();
       activeWave = wave;
 
-      // Update Cluster Filters
       const clusterCtn = document.getElementById('cluster-filters');
       const currentQ = document.getElementById('origin-search').value.toLowerCase();
       clusterCtn.innerHTML = '';
@@ -317,6 +322,39 @@ export class MirrorServer {
       }).strength(1));
     }
 
+    // v1.6.0: Full Circuit Tracing Logic
+    function computeConnectedSubgraph(rootNodeId) {
+      const gNodes = new Set([rootNodeId]);
+      const gLinks = new Set();
+      const queue = [rootNodeId];
+      
+      const MAX_DEPTH = 8;
+      let depth = 0;
+
+      while(queue.length > 0 && depth < MAX_DEPTH) {
+        const size = queue.length;
+        for(let i=0; i<size; i++) {
+           const id = queue.shift();
+           activeWave.links.forEach(l => {
+              const sId = typeof l.source === 'object' ? l.source.id : l.source;
+              const tId = typeof l.target === 'object' ? l.target.id : l.target;
+              if (sId === id || tId === id) {
+                 if (!gLinks.has(l)) {
+                    gLinks.add(l);
+                    const next = sId === id ? tId : sId;
+                    if (!gNodes.has(next)) {
+                       gNodes.add(next);
+                       queue.push(next);
+                    }
+                 }
+              }
+           });
+        }
+        depth++;
+      }
+      return { nodes: gNodes, links: gLinks };
+    }
+
     function configureGraph() {
       Graph
         .backgroundColor('#010409')
@@ -324,30 +362,24 @@ export class MirrorServer {
         .nodeRelSize(4)
         .linkCurvature(0.1)
         .linkWidth(link => {
-          if (focusedPath) {
-             return focusedPath.includes(link) ? 3 : 0.2;
-          }
+          if (focusLinks.size > 0) return focusLinks.has(link) ? 3 : 0.1;
           return link.isTransitive ? 0.4 : 1.2;
         })
         .linkColor(link => {
-          if (focusedPath) {
-             return focusedPath.includes(link) ? '#00d2ff' : 'rgba(255,255,255,0.02)';
-          }
+          if (focusLinks.size > 0) return focusLinks.has(link) ? '#00d2ff' : 'rgba(255,255,255,0.01)';
           const base = link.isTransitive ? '#484f58' : (link.source.clusterColor || '#3b82f6');
           return base + (link.isTransitive ? '33' : '66');
         })
-        .linkDirectionalParticles(link => focusedPath && focusedPath.includes(link) ? 6 : 0)
+        .linkDirectionalParticles(link => focusLinks.has(link) ? 6 : 0)
         .linkDirectionalParticleSpeed(0.015)
         .linkDirectionalParticleWidth(4)
         .nodeCanvasObject((node, ctx, globalScale) => {
-          currentGlobalScale = globalScale;
           const size = Math.max((node.rank || 0.1) * 24, 6);
           const color = node.clusterColor || '#9ca3af';
-          const isDimmed = focusedPath && !isNodeInFocusedPath(node);
+          const isDimmed = focusNodes.size > 0 && !focusNodes.has(node.id);
 
           ctx.globalAlpha = isDimmed ? 0.05 : 1;
           
-          // Outer Glow
           if (node.level <= 1 && !isDimmed) {
             ctx.shadowBlur = 15 / globalScale;
             ctx.shadowColor = color;
@@ -360,7 +392,6 @@ export class MirrorServer {
           
           ctx.shadowBlur = 0;
 
-          // ADAPTIVE SEMANTIC SCALING (v1.5.0)
           const baseFontSize = 14; 
           const adaptiveSize = Math.max(1, baseFontSize / globalScale);
           
@@ -375,47 +406,47 @@ export class MirrorServer {
             ctx.textAlign = 'center';
             ctx.fillText(node.name, node.x, node.y + size + adaptiveSize + 2);
           }
-          
           ctx.globalAlpha = 1;
         })
-        .onNodeClick(node => focusNode(node))
-        .onLinkClick(link => focusPath(link))
+        .onNodeClick(node => focusSubgraph(node))
+        .onLinkClick(link => focusSubgraph(link.source))
         .onBackgroundClick(() => resetFocus());
       
       Graph.d3Force('charge').strength(-800);
       Graph.d3Force('center', d3.forceCenter(0,0).strength(0.01));
     }
 
-    function isNodeInFocusedPath(node) {
-      if (!focusedPath) return false;
-      return focusedPath.some(l => l.source.id === node.id || l.target.id === node.id);
-    }
-
-    function focusPath(link) {
-      focusedPath = [link];
+    function focusSubgraph(node) {
+      const { nodes, links } = computeConnectedSubgraph(node.id);
+      focusNodes = nodes;
+      focusLinks = links;
+      
       document.getElementById('focus-indicator').style.display = 'flex';
-      Graph.centerAt(link.source.x, link.source.y, 800);
-      Graph.zoom(2.5, 800);
-    }
-
-    function resetFocus() {
-      focusedPath = null;
-      document.getElementById('focus-indicator').style.display = 'none';
-      document.getElementById('node-inspector').classList.remove('active');
-      Graph.zoom(1, 1000);
-    }
-
-    function focusNode(node) {
-      Graph.centerAt(node.x, node.y, 800);
-      Graph.zoom(3.5, 800);
+      
+      // Update Inspector
       const ins = document.getElementById('node-inspector');
       ins.classList.add('active');
       document.getElementById('ins-name').innerText = node.name;
       document.getElementById('ins-type').innerText = (node.group || node.label || 'SYMBOL').toUpperCase();
       document.getElementById('ins-level').innerText = 'L' + node.level;
-      document.getElementById('ins-cluster').innerText = node.clusterId.split('::').pop();
+      
+      // Fix Architectural Anchor display (v1.6.0)
+      const cluster = activeWave.clusters.find(c => c.id === node.clusterId);
+      document.getElementById('ins-cluster').innerText = cluster ? cluster.name : 'Unknown';
+      
       document.getElementById('ins-degree').innerText = node.degree || 0;
       document.getElementById('ins-mass').innerText = node.mass?.toFixed(2) || '1.00';
+      
+      Graph.centerAt(node.x, node.y, 800);
+      Graph.zoom(2.5, 800);
+    }
+
+    function resetFocus() {
+      focusNodes.clear();
+      focusLinks.clear();
+      document.getElementById('focus-indicator').style.display = 'none';
+      document.getElementById('node-inspector').classList.remove('active');
+      Graph.zoom(1, 1000);
     }
 
     function hideOverlay() {

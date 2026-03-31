@@ -78,10 +78,12 @@ export class MirrorEngine {
         const techParent = incoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF')?.sourceId;
         const visualParentId = techParent ? nvpMap.get(techParent) : null;
 
+        // 3. Cluster Discovery (v1.6.0)
         // Find the "Origin Cluster" (The nearest L1 namespace)
         let clusterId = 'root';
         let currentSearchId = n.id;
-        let depthLimit = 10; 
+        let depthLimit = 20; 
+        
         while (depthLimit-- > 0) {
           const vParent = nvpMap.get(currentSearchId);
           if (vParent && vParent.startsWith('NAMESPACE::')) {
@@ -91,7 +93,15 @@ export class MirrorEngine {
           const structural = this.graph.getNeighbors(currentSearchId, 'upstream')
             .find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF')?.sourceId;
           if (structural && structural !== currentSearchId) currentSearchId = structural;
-          else break;
+          else {
+            // Fallback: Path-based namespace resolution for orphaned nodes
+            const pathParts = n.id.split('::')[0].split('/');
+            const nsPath = pathParts.slice(0, -1).join('/');
+            if (nsPath) {
+               clusterId = `NAMESPACE::\${nsPath.toLowerCase()}`;
+            }
+            break;
+          }
         }
         
         const clusterInfo = clusterCenters.get(clusterId) || { x: 0, y: 0, color: '#9ca3af' };
