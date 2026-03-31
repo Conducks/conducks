@@ -8,7 +8,7 @@ import { registry } from "@/registry/index.js";
  * They provide structural health summaries, graph querying, governance
  * auditing, and deep-dive metric decomposition.
  * 
- * All tool descriptions follow the GitNexus high-fidelity standard:
+ * All tool descriptions follow a high-fidelity structural standard:
  * WHEN TO USE → AFTER THIS → Returns → Tips
  */
 export const synapseTools: Record<string, Tool> = {
@@ -17,24 +17,29 @@ export const synapseTools: Record<string, Tool> = {
     name: "conducks_analyze",
     type: "tool",
     version: "2.0.0",
-    description: `High-level structural health summary of the indexed codebase.
-Returns hotspots (highest-gravity symbols), entry points, architectural violations, and overall graph stats.
+    description: `High level structural summary of the indexed project. 
+Returns hotspots: entry points: architectural violations: and graph statistics.
 
-WHEN TO USE: First step when starting work on a codebase. Run this before any other tool to understand structural health, identify high-risk areas, and see active architectural violations. Also run after \`conducks analyze\` CLI to see the latest pulse results.
-AFTER THIS: Use conducks_query() to search for specific symbols. Use conducks_metrics(mode:'explain', symbolId:'...') to deep-dive into any hotspot. Use conducks_governance(mode:'audit') for the full violation list.
+THIS IS THE PRIMARY INDEXING TOOL. Use this to bootstrap a new repository or refresh the structural resonance of an existing one.
+
+WHEN TO USE: First step when starting work on a codebase. Run this BEFORE any other tool to understand structural health and identify high risk code.
+MANDATORY REFRESH: Run periodically or when indexStaleness is true to sync the graph with the current HEAD.
+MANDATORY BOOTSTRAP: If other tools return empty results you MUST run this with fullAnalysis set to true to perform the initial structural crawl.
+
+AFTER THIS: Use conducks_query to search for specific symbols. Use conducks_metrics to deep dive into any hotspot. Use conducks_governance for the full violation list.
 
 Returns:
 - symbolCount: total nodes in the structural graph
-- edgeCount: total relationships (CALLS, IMPORTS, INHERITS, etc.)
-- hotspots[10]: top symbols by PageRank gravity — these are the most structurally important symbols
-- entryPoints[10]: detected entry points (main, handlers, routes) ranked by gravity
-- violations[10]: active architectural law violations ({id, rule})
-- indexStaleness: boolean — true if the graph is behind HEAD (run \`conducks analyze\` to refresh)
+- edgeCount: total relationships like CALLS: IMPORTS: and INHERITS
+- hotspots: the 10 most structurally important symbols ranked by PageRank gravity
+- entryPoints: detected entry points like main: handlers: and routes
+- violations: active architectural rule violations
+- indexStaleness: true if the graph is behind HEAD
 
-Node shape (all lists): { id, kind, file, name, risk, gravity, summary }
+Node shape: { id, kind, file, name, risk, gravity, summary }
 
-TIP: If indexStaleness is true, results may be outdated. Run \`conducks analyze\` in the terminal first.
-TIP: Hotspots with high gravity AND high risk are the most dangerous symbols — changes to them have the widest blast radius.`,
+TIP: Always run with fullAnalysis set to true if you are entering a new codebase for the first time.
+TIP: Hotspots with high gravity and high risk are the most dangerous symbols.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -91,26 +96,28 @@ TIP: Hotspots with high gravity AND high risk are the most dangerous symbols —
     name: "conducks_query",
     type: "tool",
     version: "2.0.0",
-    description: `Query the structural graph for symbols and relationships by name, pattern, or concept.
-Returns matching symbols ranked by structural importance: entry points first, then by PageRank gravity.
+    description: `Query the structural graph for symbols and relationships by name: pattern: or concept.
+Returns matching symbols ranked by structural importance: entry points first: then by PageRank gravity.
 
-WHEN TO USE: Finding specific functions, classes, or modules. Understanding where a concept lives in the codebase. Narrowing down before a deep-dive with conducks_metrics.
-AFTER THIS: Use conducks_metrics(mode:'explain', symbolId:'<id>') for full risk decomposition of a result. Use conducks_trace(symbol:'<id>') to trace execution flow from a result.
+PREREQUISITE: You MUST run conducks_analyze with fullAnalysis set to true at least once before using this tool in a new repository. If results are empty the graph is likely in a Void State.
+
+WHEN TO USE: Finding specific functions: classes: or modules. Understanding where a concept lives in the codebase. Narrowing down before a deep dive with conducks_metrics.
+AFTER THIS: Use conducks_metrics for full risk decomposition of a result. Use conducks_trace to trace execution flow from a result.
 
 Returns:
-- symbols[10]: matching nodes ranked by gravity, entry points prioritized
-- total: total number of matches (may exceed the 10-item limit)
-- indexStaleness: boolean — true if graph is behind HEAD
+- symbols: matching nodes ranked by gravity with entry points prioritized
+- total: total number of matches found
+- indexStaleness: true if graph is behind HEAD
 
 Node shape: { id, kind, file, name, risk, gravity, summary }
 
 Search modes:
-- fuzzy (default): Natural language or partial name matching. Best for exploratory queries.
+- fuzzy (default): Natural language or partial name matching.
 - pattern: Exact pattern matching for precise symbol lookup.
 
-TIP: Entry points are always ranked first — they're the most useful starting points.
-TIP: Results are capped at 10. Use more specific queries to narrow results on large repos.
-TIP: The "id" field in results is the symbol's unique graph identifier — use it with conducks_trace and conducks_metrics.`,
+TIP: Entry points are always ranked first. They are the most useful starting points.
+TIP: Results are capped at 10. Use more specific queries to narrow results on large repositories.
+TIP: The id field in results is the unique identifier. Use it with conducks_trace and conducks_metrics.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -156,27 +163,25 @@ TIP: The "id" field in results is the symbol's unique graph identifier — use i
     name: "conducks_governance",
     type: "tool",
     version: "2.0.0",
-    description: `Audit architectural integrity. Detects circular dependencies, god objects, hub overload, and rule violations.
+    description: `Audit architectural integrity. Detects circular dependencies: god objects: hub overload: and rule violations.
 
-WHEN TO USE: Before committing changes — to verify no new violations were introduced. During code review — to check structural health of modified areas. When investigating technical debt — to find the worst offenders.
-AFTER THIS: Use conducks_metrics(mode:'explain', symbolId:'<violating_symbol>') to understand why a symbol is flagged. Use conducks_trace(symbol:'<id>') to trace the violation's blast radius.
+PREREQUISITE: You MUST run conducks_analyze with fullAnalysis set to true to populate the structural graph before an audit can be performed.
+
+WHEN TO USE: Before committing changes to verify no new violations were introduced. During code review to check structural health of modified areas. When investigating technical debt to find the worst offenders.
+AFTER THIS: Use conducks_metrics with mode set to explain to understand why a symbol is flagged. Use conducks_trace to trace the violation blast radius.
 
 Modes:
-- audit (default): Runs the full Sentinel scanner. Returns all active violations including circular dependencies (ARCH-3), god objects, and hub overload.
-- advice: Runs the Conducks Advisor for structural improvement recommendations. Returns actionable suggestions ranked by impact.
-- refactor-candidates: Identifies symbols that are strong candidates for extraction or splitting based on cohesion analysis.
+- audit (default): Runs the full Sentinel scanner to find circular dependencies and god objects.
+- advice: Runs the Architecture Advisor for structural improvement recommendations.
+- refactor-candidates: Identifies symbols that are strong candidates for extraction or splitting.
 
-Returns (audit mode):
-- violations[10]: active violations with { id (nodeId), rule (ruleId) }
-- indexStaleness: boolean
-
-Returns (advice mode):
-- advice: structured improvement recommendations
-- indexStaleness: boolean
+Returns:
+- violations: active violations including the node ID and rule ID
+- indexStaleness: true if the graph is behind HEAD
 
 TIP: Run this after every significant code change to catch regressions early.
-TIP: Circular dependency violations (ARCH-3) are the most critical — they indicate structural decay.
-TIP: Use with conducks_evolution(mode:'diff') to see if recent changes introduced new violations.`,
+TIP: Circular dependency violations are the most critical. They indicate structural decay.
+TIP: Use with conducks_evolution to see if recent changes introduced new violations.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -205,30 +210,31 @@ TIP: Use with conducks_evolution(mode:'diff') to see if recent changes introduce
     name: "conducks_metrics",
     type: "tool",
     version: "2.0.0",
-    description: `Deep-dive into technical risk signals for a specific symbol or the overall codebase.
-This is the ONLY tool that returns full detail for a single symbol. All other tools return summaries.
+    description: `Deep dive into technical risk signals for a specific symbol or the entire codebase.
+This is the ONLY tool that returns full detail for a single symbol. Other tools return summaries.
 
-WHEN TO USE: After conducks_query() or conducks_analyze() identifies a symbol of interest. When you need to understand WHY a symbol is high-risk. When comparing structural coupling between two symbols.
-AFTER THIS: Use conducks_trace(symbol:'<id>') to trace execution flow. Use conducks_evolution(mode:'uncommitted') to see if the symbol was recently modified.
+PREREQUISITE: You MUST run conducks_analyze with fullAnalysis set to true to index the codebase before you can decompose metrics.
+
+WHEN TO USE: After conducks_query identifies a symbol of interest. When you need to understand why a symbol is high risk. When comparing structural coupling between two symbols.
+AFTER THIS: Use conducks_trace to trace execution flow. Use conducks_evolution with mode set to uncommitted to see if the symbol was recently modified.
 
 Modes:
-- hotspots (default): Returns the top 10 highest-gravity symbols across the entire codebase. No symbolId required.
-- explain: Full 6-signal risk decomposition for ONE symbol. Requires symbolId. Returns:
-  - gravity: PageRank centrality (0-1) — how structurally important this symbol is
-  - entropy: Shannon entropy of author distribution — how many people touch this code
-  - churn: normalized change frequency — how often this code changes
-  - fanOut: outgoing dependency count — how many things this symbol depends on
-  - composite score: weighted combination (gravity 40%, entropy 30%, churn 20%, fanOut 10%)
-  - breakdown: per-signal value and weight for transparency
-- entropy: Shannon entropy calculation for a specific symbol. Requires symbolId.
-- cohesion: Structural cohesion vector between two symbols. Requires symbolId and targetId. Returns a 0-1 score where 1.0 = identical dependency neighborhoods.
+- hotspots (default): Returns the 10 highest gravity symbols across the codebase.
+- explain: Full 6-signal risk decomposition for a single symbol. Requires symbolId.
+- entropy: Shannon entropy calculation for author distribution.
+- cohesion: Structural similarity between two symbols. Requires targetId.
 
-Node shape (hotspots mode): { id, kind, file, name, risk, gravity, summary }
+Returns:
+- gravity: PageRank centrality (0 to 1) showing structural importance
+- entropy: Shannon entropy of author distribution
+- churn: normalized change frequency
+- fanOut: outgoing dependency count
+- composite score: weighted combination of all signals
 
-TIP: The 'explain' mode is the most powerful — it tells you exactly WHY a symbol is risky.
-TIP: High entropy + high churn = "bus factor risk" — too many authors touching frequently-changed code.
-TIP: High gravity + low fanOut = "structural pillar" — critical but well-contained.
-TIP: Use 'cohesion' mode to identify god objects (low cohesion with many neighbors).`,
+TIP: The explain mode is the most powerful. It tells you exactly why a symbol is risky.
+TIP: High entropy and high churn indicates a bus factor risk.
+TIP: High gravity and low fanOut indicates a structural pillar.
+TIP: Use cohesion mode to identify god objects with many neighbors.`,
     inputSchema: {
       type: "object",
       properties: {

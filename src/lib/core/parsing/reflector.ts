@@ -13,13 +13,18 @@ import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algori
 import path from "node:path";
 
 
+import { ConducksComponent } from "@/registry/types.js";
+
 /**
  * Conducks — Structural Reflector (v5 Modular Evolution) 💎
  * 
  * The core engine that mirrors source code and delegates semantic
  * tasks to specialized processors.
  */
-export class ConducksReflector {
+export class ConducksReflector implements ConducksComponent {
+  public readonly id = "structural-reflector";
+  public readonly type = "analyzer";
+  public readonly version = "2.0.0";
   private imports = new ImportProcessor();
   private bindings = new BindingProcessor();
   private calls = new CallProcessor();
@@ -55,14 +60,20 @@ export class ConducksReflector {
 
     const nodeCache = new Map<string, SpectrumNode>();
 
-    // Conducks: Global Sentinel (Canonical File Anchor)
-    nodeCache.set(`${file.path}::global`, {
-      name: 'global',
+    // Conducks: UNIT Sentinel (Canonical File Anchor)
+    nodeCache.set(`${file.path}::UNIT`, {
+      name: 'UNIT', // Name must match ID suffix for metadata merging
       kind: 'module',
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: file.path,
       isExport: true,
-      metadata: { isGlobalNode: true, isTest: isTestFile }
+      metadata: { 
+        isGlobalNode: true, 
+        isTest: isTestFile,
+        displayName: path.basename(file.path), // Preserved for UI
+        canonicalRank: 2,      // Guideline 7.2: Layer 2 (Unit)
+        canonicalKind: 'UNIT'  // Descriptive Role
+      }
     });
 
 
@@ -118,7 +129,7 @@ export class ConducksReflector {
           }
         }
       }
-      return best?.name ?? 'global';
+      return best?.name ?? 'UNIT';
     };
 
     // === Pass 2: Semantic Dispatch ===
@@ -179,6 +190,10 @@ export class ConducksReflector {
           const type = this.calls.isConstructor(cText, provider) ? 'CONSTRUCTS' : 'CALLS';
           this.calls.process(cText, scope, type, spectrum, args);
         }
+        else if (cName === 'pulse_type_target') {
+          const scope = getScopeAt(captureRow);
+          this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum);
+        }
 
 
         // 3. Phase 2: Flow Dispatch
@@ -196,8 +211,9 @@ export class ConducksReflector {
         else if (cName === 'kinesis_request') {
           const url = captureMap['kinesis_request_url'] ?? '/';
           const method = captureMap['req_method'] ?? 'GET';
+          const receiver = captureMap['req_receiver'] ?? null;
           const scope = getScopeAt(captureRow);
-          this.flow.processRequest(url, method, scope, spectrum);
+          this.flow.processRequest(url, method, scope, spectrum, receiver);
         }
 
         // 4. Phase 3.2: Debt Dispatch
@@ -221,9 +237,9 @@ export class ConducksReflector {
 
     // Conducks.5: Structural Membership Binding (Parent -> Child)
     for (const node of nodeCache.values()) {
-      if (node.name === 'global') continue;
+      if (node.name === path.basename(file.path)) continue; // Skip the anchor itself
       const scope = getScopeAt(node.range.start.line - 1, node.name);
-      if (scope && scope !== 'global' && scope !== node.name) {
+      if (scope && scope !== node.name) {
         spectrum.relationships.push({
           sourceName: scope,
           targetName: node.name,

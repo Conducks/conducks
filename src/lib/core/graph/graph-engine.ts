@@ -29,8 +29,8 @@ export class ConducksGraph {
 
     const coreCount = Math.max(1, os.cpus().length - 1);
     const chunkSize = Math.ceil(unitCount / coreCount);
-    const grammarDir = path.resolve(process.cwd(), "grammars");
-    const workerScript = path.resolve(process.cwd(), "build/lib/core/parsing/pulse-worker.js");
+    const grammarDir = path.resolve(__dirname, "../../../resources/grammars");
+    const workerScript = path.resolve(__dirname, "../parsing/pulse-worker.js");
 
     const workerPromises = [];
 
@@ -188,9 +188,89 @@ export class ConducksGraph {
     for (const metaNode of spectrum.nodes) {
       this.graph.addNode({
         id: `${filePath}::${metaNode.name}`,
-        label: metaNode.kind, // In v5, label is the kind
-        properties: { ...metaNode.metadata, filePath, name: metaNode.name, range: metaNode.range, isExport: metaNode.isExport }
+        label: metaNode.kind,
+        properties: { 
+          ...metaNode.metadata, 
+          filePath, 
+          name: metaNode.name, 
+          range: metaNode.range, 
+          isExport: metaNode.isExport,
+          canonicalKind: metaNode.canonicalKind,
+          canonicalRank: metaNode.canonicalRank
+        }
       });
+    }
+
+    // New: Recursive Namespace (Folder) Ingestion
+    const parts = filePath.split('/');
+    let currentPath = '';
+    const isAbsolute = filePath.startsWith('/');
+
+    for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (i === 0 && isAbsolute && part === '') {
+            currentPath = '/';
+            continue;
+        }
+
+        const folderName = part || 'root';
+        const parentPath = currentPath;
+        
+        // Conducks: Strict Absolute Joining
+        if (isAbsolute && currentPath === '/') {
+            currentPath = `/${folderName}`;
+        } else {
+            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+        }
+
+        // Canonical ID Unification (Lowercase Identity)
+        const folderId = `NAMESPACE::${currentPath.toLowerCase()}`;
+        if (!this.graph.getNode(folderId)) {
+            const node: any = {
+              id: folderId,
+              label: 'NAMESPACE',
+              properties: {
+                name: folderName,
+                canonicalKind: 'NAMESPACE',
+                canonicalRank: 1, // L1: Structure-Namespace (Guideline 7.2)
+                isVirtual: true,
+                summary: `Namespace: ${folderName}`
+              }
+            };
+            this.graph.addNode(node);
+            
+            // Link to parent folder if applicable
+            if (parentPath) {
+                const parentId = `NAMESPACE::${parentPath.toLowerCase()}`;
+                const edgeId = `CONTAINS::${parentId}->${folderId}`;
+                if (!this.graph.hasEdge(edgeId)) {
+                    this.graph.addEdge({
+                        id: edgeId,
+                        sourceId: parentId,
+                        targetId: folderId,
+                        type: 'CONTAINS' as any,
+                        confidence: 1.0,
+                        properties: {}
+                    });
+                }
+            }
+        }
+    }
+
+    // Link the file (UNIT) to its immediate parent folder
+    // ID must match the accumulated currentPath from the loop
+    const finalFolderId = `NAMESPACE::${currentPath.toLowerCase() || 'root'}`;
+    const fileNodeId = `${filePath}::UNIT`; // The file-level anchor (Suffix must match Reflector)
+    
+    if (this.graph.getNode(fileNodeId)) {
+        this.graph.addEdge({
+            id: `CONTAINS::${finalFolderId}->${fileNodeId}`,
+            sourceId: finalFolderId,
+            targetId: fileNodeId,
+            type: 'CONTAINS' as any,
+            confidence: 1.0,
+            properties: {}
+        });
     }
 
     // Cache relationships for the second-pass "Neural Binding"
@@ -204,7 +284,7 @@ export class ConducksGraph {
       if (isAbsolute) {
         targetId = rel.targetName;
       } else if (isFileRef) {
-        targetId = `${rel.targetName}::global`;
+        targetId = `${rel.targetName}::UNIT`;
       } else {
         targetId = `${filePath}::${rel.targetName}`;
       }
@@ -237,7 +317,7 @@ export class ConducksGraph {
       const outgoing = this.graph.getNeighbors(node.id, 'downstream');
 
       for (const edge of outgoing) {
-        if (edge.type === 'CALLS' || edge.type === 'ACCESSES' || edge.type === 'CONSTRUCTS' || edge.type === 'MEMBER_OF') {
+        if (edge.type === 'CALLS' || edge.type === 'ACCESSES' || edge.type === 'CONSTRUCTS' || edge.type === 'MEMBER_OF' || edge.type === 'TYPE_REFERENCE' || edge.type === 'EXTENDS' || edge.type === 'IMPLEMENTS') {
           const rawTarget = edge.properties.rawTarget;
           if (!rawTarget) continue;
 
@@ -251,7 +331,7 @@ export class ConducksGraph {
           // 2. Trace Imports (Exhaustive Resolution)
           // Conducks: We check BOTH the node's local imports and the file-level (global) imports.
           const fileId = node.properties.filePath;
-          const globalId = `${fileId}::global`;
+          const globalId = `${fileId}::UNIT`;
           const localImports = outgoing.filter(e => e.type === 'IMPORTS');
           const fileImports = this.graph.getNeighbors(globalId, 'downstream').filter(e => e.type === 'IMPORTS');
           const allImports = [...localImports, ...fileImports];
@@ -262,7 +342,7 @@ export class ConducksGraph {
 
           for (const imp of allImports) {
             const targetFile = imp.targetId;
-            const cleanTargetFile = targetFile.replace('::global', '');
+            const cleanTargetFile = targetFile.replace('::UNIT', '');
             const impName = imp.properties.name || path.basename(targetFile, path.extname(targetFile));
             this.log(`[NeuralBinding]   - Checking import ${impName} from ${targetFile}`);
 

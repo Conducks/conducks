@@ -10,6 +10,7 @@ import { FlowProcessor } from "@/lib/core/parsing/processors/flow.js";
 import { PulseContext } from "@/lib/core/parsing/context.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
+import { mapToCanonical, CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 import path from "node:path";
 
 
@@ -55,10 +56,12 @@ export class ConducksReflector {
 
     const nodeCache = new Map<string, SpectrumNode>();
 
-    // Conducks: Global Sentinel (Canonical File Anchor)
+    const fileMeta = mapToCanonical('file');
     nodeCache.set(`${file.path}::global`, {
       name: 'global',
-      kind: 'module',
+      kind: 'file' as any,
+      canonicalKind: fileMeta.kind,
+      canonicalRank: fileMeta.rank,
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: file.path,
       isExport: true,
@@ -93,9 +96,12 @@ export class ConducksReflector {
           rangeNode = nameCap.node.parent;
         }
 
+        const canonical = mapToCanonical('variable');
         nodeCache.set(nodeId, {
           name,
           kind: 'variable',
+          canonicalKind: canonical.kind,
+          canonicalRank: canonical.rank,
           range: {
             start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
             end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
@@ -172,7 +178,10 @@ export class ConducksReflector {
           }
 
           if (node) {
+            const canonical = mapToCanonical(kind);
             node.kind = kind as any;
+            node.canonicalKind = canonical.kind;
+            node.canonicalRank = canonical.rank;
             node.metadata[cName] = true;
 
             // Conducks: Structural Complexity Signal

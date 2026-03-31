@@ -26,8 +26,6 @@ export class StatusCommand implements ConducksCommand {
     chronicle.setProjectDir(targetPath);
 
     try {
-      await persistence.load(registry.intelligence.graph.getGraph());
-
       // Ensure gravity is fresh based on the architectural anchors
       (registry.infrastructure.graphEngine as any).resonate();
 

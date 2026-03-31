@@ -13,17 +13,19 @@ export class ContextGenerator {
   private readonly TOKEN_CAP_CHARS = 15000; // Roughly 4000 tokens
 
   private async getLatestPulseId(db: any): Promise<string | null> {
+    if (!db) return null;
     return new Promise((res) => {
       db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => {
-        res(err || rows.length === 0 ? null : rows[0].id);
+        res(err || !rows || rows.length === 0 ? null : rows[0].id);
       });
     });
   }
 
   private async queryNodes(db: any, pulseId: string, orderBy: string, limit: number = 10): Promise<any[]> {
+    if (!db) return [];
     return new Promise((res) => {
       db.all(`SELECT * FROM nodes WHERE pulseId = ? ORDER BY ${orderBy} LIMIT ?`, pulseId, limit, (err: any, rows: any[]) => {
-        res(err ? [] : rows.map((r: any) => ({
+        res(err || !rows ? [] : rows.map((r: any) => ({
           id: r.id,
           kind: r.kind,
           file: r.file,
@@ -38,6 +40,8 @@ export class ContextGenerator {
 
   public async generateTop10Context(persistence: any): Promise<any> {
     const db = await persistence.getRawConnection();
+    if (!db) return { error: "No structural pulse found (Database connection failed)." };
+
     const pulseId = await this.getLatestPulseId(db);
     if (!pulseId) return { error: "No structural pulse found." };
 
@@ -45,8 +49,9 @@ export class ContextGenerator {
     const hotspots = await this.queryNodes(db, pulseId, "risk DESC", 10);
 
     const cycles: any[] = await new Promise((res) => {
+      if (!db) return res([]);
       db.all("SELECT * FROM nodes WHERE pulseId = ? AND anomaly = 'cycle' LIMIT 10", pulseId, (err: any, rows: any[]) => {
-        res(err ? [] : rows);
+        res(err || !rows ? [] : rows);
       });
     });
 
@@ -90,7 +95,10 @@ export class ContextGenerator {
     md += `\n`;
 
     md += `## Framework\n`;
-    const frameworkRows: any[] = await new Promise((res) => db.all("SELECT value FROM metadata WHERE key = 'framework'", (err: any, rows: any[]) => res(rows || [])));
+    const frameworkRows: any[] = await new Promise((res) => {
+      if (!db) return res([]);
+      db.all("SELECT value FROM metadata WHERE key = 'framework'", (err: any, rows: any[]) => res(rows || []));
+    });
     const framework = frameworkRows.length > 0 ? frameworkRows[0].value : 'generic';
     md += `- Detected: ${framework}\n`;
 

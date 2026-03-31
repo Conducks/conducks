@@ -6,6 +6,7 @@ import {
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ConducksComponent } from "./types.js";
 import { ConducksRegistry } from "./base.js";
+import { registry } from "./index.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,10 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
     }
 
     try {
+      // Conducks Lazy Resonance: Initialize only for the duration of the request
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+      
       const result = await tool.handler(args);
       const response: ToolResponse = {
         content: [{ type: "text", text: tool.formatter(result) }],
@@ -123,6 +128,9 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
       return response;
     } catch (err) {
       return errorResponse(errorMessage(err));
+    } finally {
+      // Release the structural lock to allow parallel analysis
+      await registry.infrastructure.persistence.close();
     }
   }
 

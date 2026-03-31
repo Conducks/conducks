@@ -26,9 +26,6 @@ export async function main() {
   const server = new ConducksMCPServer();
   await server.bootstrap();
 
-  // High-performance structural resonance initialization (Conducks)
-  await registry.initialize();
-
   if (process.argv.includes("--sse")) {
     await server.startSSE();
   } else {

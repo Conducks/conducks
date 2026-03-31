@@ -9,10 +9,11 @@ import { ConducksAdjacencyList, ConducksNode } from "@/lib/core/graph/adjacency-
  */
 export interface SentinelRule {
   id: string;
-  type: 'require_heritage' | 'require_export' | 'require_caller' | 'framework_check' | 'require_file';
+  type: 'require_heritage' | 'require_export' | 'require_caller' | 'framework_check' | 'require_file' | 'max_fans';
   matchPath?: string; // Glob pattern for files to check
   matchLabel?: string; // e.g. 'function' or 'class'
   target?: string;    // e.g. 'BaseService' or 'handler'
+  max?: number;       // For max_fans rule
 }
 
 export interface SentinelReport {
@@ -51,6 +52,7 @@ export class ConducksSentinel {
 
       // 2. Node-Specific Rule Handling
       for (const node of allNodes) {
+        // Conducks: Regex path matching for structural scoping
         if (rule.matchPath && !new RegExp(rule.matchPath).test(node.id)) continue;
         if (rule.matchLabel && node.label !== rule.matchLabel) continue;
 
@@ -91,8 +93,17 @@ export class ConducksSentinel {
 
     switch (rule.type) {
       case 'require_heritage':
-        if (!p || !p.heritage || !p.heritage.includes(rule.target)) {
-          return `Missing required heritage: Expected [${rule.target}] but found [${p?.heritage?.join(', ') || 'None'}]`;
+        if (!node) return "Illegal state: Node required for heritage check.";
+        const heritageEdges = graph.getNeighbors(node.id, 'downstream').filter(e => 
+          e.type === 'EXTENDS' || e.type === 'IMPLEMENTS' || e.type === 'TYPE_REFERENCE'
+        );
+        const hasTarget = heritageEdges.some(e => 
+          e.targetId.endsWith(`::${rule.target}`) || e.properties.rawTarget === rule.target
+        );
+        
+        if (!hasTarget) {
+          const found = heritageEdges.map(e => e.targetId.split('::').pop()).join(', ');
+          return `Missing required heritage: Expected [${rule.target}] but found [${found || 'None'}]`;
         }
         break;
 
@@ -116,6 +127,15 @@ export class ConducksSentinel {
       case 'framework_check':
         if (!p || !p.frameworks || !p.frameworks.includes(rule.target)) {
           return `Missing required framework marker: [${rule.target}] in [${p?.name || node?.id || 'Unknown'}]`;
+        }
+        break;
+
+      case 'max_fans':
+        if (!node) return "Illegal state: Node required for fan check.";
+        const totalFans = graph.getNeighbors(node.id, 'upstream').length;
+        const limit = rule.max || 30;
+        if (totalFans > limit) {
+          return `ARCH-1: Hub Overload detected. Symbol has [${totalFans}] upstream connections (Limit: ${limit}).`;
         }
         break;
 

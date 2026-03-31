@@ -12,7 +12,6 @@ export class AdviseCommand implements ConducksCommand {
 
   public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
     try {
-      await persistence.load(registry.intelligence.graph.getGraph());
       const advice = await registry.governance.advise();
       console.log(`\n\x1b[1m--- 💎 Conducks Architecture Advisor ---\x1b[0m`);
 

@@ -16,18 +16,19 @@ export class QueryCommand implements ConducksCommand {
       console.error("Error: Please provide a search query.");
       return;
     }
-    await persistence.load(registry.intelligence.graph.getGraph());
-    const query = args.join(" ");
-    const results = (registry.intelligence.search as any).search(query, 10);
     const isGQL = args.includes('--gql');
-    
+    const query = args.filter(a => a !== '--gql').join(" ");
+
     if (isGQL) {
+      const results = registry.intelligence.gql.query(registry.intelligence.graph.getGraph(), query);
       console.log(`--- GQL Pattern Match: "${query}" ---`);
       (results as any[]).forEach(r => {
         console.log(`- (${r.source})-[:${r.type}]->(${r.target})`);
         console.log(`  at ${r.sourceFile} -> ${r.targetFile}`);
       });
+      if (results.length === 0) console.log("No structural patterns found.");
     } else {
+      const results = (registry.intelligence.search as any).search(query, 10);
       console.log(`--- Graph Search Results: "${query}" ---`);
       (results as any[]).forEach(n => {
         const name = n.properties?.name || n.id;
@@ -35,6 +36,7 @@ export class QueryCommand implements ConducksCommand {
         const path = n.properties?.filePath || 'unknown';
         console.log(`- [Rank: ${rank}] ${name} (${path})`);
       });
+      if (results.length === 0) console.log("No symbols found.");
     }
   }
 }

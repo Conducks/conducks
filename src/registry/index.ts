@@ -25,6 +25,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { Logger } from "@/lib/core/utils/logger.js";
+import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
+import { MirrorEngine } from "@/lib/domain/mirror/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,7 +43,7 @@ const resourcesDir = path.resolve(__dirname, "../resources/grammars");
 // 1. Instantiate Core Capability Layer
 const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
 const graph = new ConducksGraph();
-const persistence = new GraphPersistence(workspaceRoot);
+let persistence = new GraphPersistence(workspaceRoot);
 const search = new ConducksSearch(graph.getGraph());
 const flows = new ConducksFlowEngine(graph.getGraph());
 const gvr = new GVREngine();
@@ -54,6 +56,7 @@ const diffEngine = new ConducksDiffEngine();
 const impactAnalyzer = new BlastRadiusAnalyzer();
 const contextGenerator = new ContextGenerator();
 const manifest = new ManifestEngine();
+const mirror = new MirrorEngine(graph.getGraph());
 
 // 2. Instantiate Bridge Layer Registry (for dynamic plugins)
 const synapseRegistry = new SynapseRegistry();
@@ -64,38 +67,102 @@ synapseRegistry.registerProvider('.js', TYPESCRIPT_SUITE.provider);
 synapseRegistry.registerProvider('.jsx', TYPESCRIPT_SUITE.provider);
 
 // Conducks: Lazy Structural Reflection (Load Python Wasm)
-let isInitialized = false;
+let isGrammarInitialized = false;
 const logger = new Logger("Registry");
 
 /**
  * Initializes the Structural Intelligence Layer.
  * Must be called by entry points (CLI, Tools) before execution.
+ * 
+ * @param readOnly Whether to open the database in read-only mode.
+ * @param root Optional workspace root to override the default process.cwd().
  */
-export async function initializeRegistry() {
-  if (isInitialized) return;
-  await grammars.init();
-  await grammars.loadLanguage('python', path.join(resourcesDir, 'tree-sitter-python.wasm'));
-  await grammars.loadLanguage('typescript', path.join(resourcesDir, 'tree-sitter-typescript.wasm'));
-
-  // High-performance structural loading (Conducks)
-  const success = await persistence.load(graph.getGraph());
-  if (success) {
-    logger.info(`Structural graph loaded from persistence (${graph.getGraph().stats.nodeCount} nodes).`);
-  } else {
-    logger.warn('No persisted graph found. Run "conducks analyze" to index the project.');
+export async function initializeRegistry(readOnly: boolean = true, root?: string) {
+  // 1. One-time Grammar Initialization (Phase 3.1)
+  if (!isGrammarInitialized) {
+    await grammars.init();
+    await grammars.loadLanguage('python', path.join(resourcesDir, 'tree-sitter-python.wasm'));
+    await grammars.loadLanguage('typescript', path.join(resourcesDir, 'tree-sitter-typescript.wasm'));
+    isGrammarInitialized = true;
   }
 
-  isInitialized = true;
+  // 2. Structural Persistence Lifecycle (Lazy Resilience)
+  const effectiveRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  
+  // Re-initialization Check: Mode/Root change (Consistency Fix)
+  const isCurrentlyConnected = persistence.isConnected();
+  const rootChanged = chronicle.getProjectDir() !== effectiveRoot;
+  const modeChanged = (persistence as any).readOnly !== readOnly;
+
+  if (isCurrentlyConnected && !rootChanged && !modeChanged) {
+    return; // Already anchored and correctly connected
+  }
+
+  if (rootChanged || modeChanged || !isCurrentlyConnected) {
+    if (isCurrentlyConnected) {
+      await persistence.close();
+    }
+    
+    logger.info(`${modeChanged ? 'Switching to' : 'Initializing'} ${readOnly ? 'READ_ONLY' : 'WRITER'} mode at: ${effectiveRoot}`);
+    (persistence as any) = new GraphPersistence(effectiveRoot, readOnly);
+    chronicle.setProjectDir(effectiveRoot);
+  }
+  
+  try {
+    await persistence.load(graph.getGraph());
+    logger.info(`Structural graph loaded from persistence (${graph.getGraph().stats.nodeCount} nodes).`);
+    const linker = new FederatedLinker(effectiveRoot);
+    await linker.hydrate(graph.getGraph());
+  } catch (err: any) {
+    const errorStr = (err.message || String(err) || '').toString();
+    
+    if (!readOnly && (errorStr.includes('locked') || errorStr.includes('busy') || errorStr.includes('Conflicting lock'))) {
+      // THE POLITE WRITER (GUIDELINES Section 13.5)
+      // High-Fidelity PID Extraction: Supports both native objects and stringified reports.
+      const pidMatch = errorStr.match(/PID (\d+)/);
+      if (pidMatch && pidMatch[1]) {
+        const blockerPid = parseInt(pidMatch[1], 10);
+        logger.warn(`[Registry] Synapse lock held by PID ${blockerPid}. Sending Yield Signal (SIGUSR2)...`);
+        try {
+          // Verify process exists before signaling
+          process.kill(blockerPid, 'SIGUSR2');
+          // Wait a beat for the OS handle to release
+          await new Promise(res => setTimeout(res, 500));
+        } catch (killErr) {
+          logger.debug(`Could not signal PID ${blockerPid} (stale lock or lack of permissions)`);
+        }
+      }
+      // Re-attempt load (automatic retry logic inside persistence.ts will now handle the wait)
+      const success = await persistence.load(graph.getGraph());
+      if (success) {
+        logger.info(`Structural graph loaded after lock yield.`);
+        const linker = new FederatedLinker(effectiveRoot);
+        await linker.hydrate(graph.getGraph());
+        return;
+      }
+    }
+    logger.warn(`No persisted graph found at ${effectiveRoot}. Run "conducks analyze" to index the project.`);
+  }
 }
 
 // 3. Domain Orchestration Logic (The Conducks's Brain)
 const analysisOrchestrator = new PulseOrchestrator(synapseRegistry, graph, aligner);
 
+// Singleton watcher instance — prevents GC and ensures event loop stays alive
+let _watcherInstance: any = null;
+
 function getWatcher() {
-  const projectRoot = chronicle.getProjectDir();
-  if (projectRoot && projectRoot !== "/" && projectRoot !== "." && projectRoot !== "C:\\") {
-    return new ConducksWatcher(projectRoot, graph.getGraph() as any, { persistence });
+  const rawRoot = chronicle.getProjectDir();
+  const projectRoot = path.resolve(rawRoot);
+  
+  if (projectRoot && projectRoot !== "/" && projectRoot !== "C:\\") {
+    if (!_watcherInstance) {
+      logger.info(`Initializing Structural Watcher at: ${projectRoot}`);
+      _watcherInstance = new ConducksWatcher(projectRoot, graph, { persistence });
+    }
+    return _watcherInstance;
   }
+  logger.warn(`Watcher could not initialize — invalid project root: ${projectRoot}`);
   return null;
 }
 
@@ -156,7 +223,7 @@ export const registry = {
       for (const unit of allUnits) {
         const fw = essenceLens.detectFramework(path.basename(unit.path), unit.source);
         if (fw) graph.getGraph().setMetadata('framework', fw);
-        
+
         if (path.basename(unit.path) === 'package.json' || path.basename(unit.path) === 'requirements.txt') {
           const spectrum = essenceLens.refract(unit.path, unit.source);
           graph.ingestSpectrum(unit.path, spectrum);
@@ -194,9 +261,11 @@ export const registry = {
     gql,
     graph,
     diff: diffEngine,
+    federation: new FederatedLinker(workspaceRoot),
     compare: async (otherPath: string) => {
       const otherGraph = new ConducksGraph();
-      const otherPersistence = new GraphPersistence(otherPath);
+      // Enforce READ_ONLY for comparison to avoid locking neighbor projects
+      const otherPersistence = new GraphPersistence(otherPath, true);
       const success = await otherPersistence.load(otherGraph.getGraph());
       if (!success) throw new Error(`[Conducks] Failed to load structural signature for: ${otherPath}`);
       return resonance.analyzeResonance(graph.getGraph(), otherGraph.getGraph()) as any;
@@ -229,8 +298,13 @@ export const registry = {
       const g = graph.getGraph();
       const node = g.getNode(symbolId);
       if (!node || !node.properties.filePath) return { entropy: 0, risk: 0 };
+
       const distribution = await chronicle.getAuthorDistribution(node.properties.filePath);
-      return { entropy: 0.5, risk: 0.5 }; // Formula handled in domain layer
+      const authors = Object.keys(distribution);
+      const entropy = calculateShannonEntropy(distribution);
+      const risk = normalizeEntropyRisk(entropy, authors.length);
+
+      return { entropy, risk, authorCount: authors.length };
     },
     calculateCompositeRisk: (nodeId: string) => {
       const g = graph.getGraph();
@@ -269,7 +343,7 @@ export const registry = {
 
       return {
         status: "ready",
-        version: "2.0.0",
+        "version": "0.7.1",
         projectName: path.basename(chronicle.getProjectDir() || "unknown"),
         framework: g.getMetadata('framework') || "generic",
         staleness: {
@@ -304,6 +378,9 @@ export const registry = {
       const p = (registry.infrastructure as any).persistence;
       return contextGenerator.generateFileSummary(p);
     }
+  },
+  mirror: {
+    getWave: () => mirror.getVisualWave()
   },
   initialize: initializeRegistry
 };

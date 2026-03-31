@@ -1,12 +1,12 @@
 /**
  * Conducks — Optimized Graph Logic
- * 
+ *
  * High-performance adjacency list for structural codebase representation.
  * Optimized for O(1) neighborhood lookups and recursive traversals.
  */
 
 export type NodeId = string;
-export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS';
+export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY';
 
 export interface ConducksNode<T = any> {
   id: NodeId;
@@ -16,17 +16,17 @@ export interface ConducksNode<T = any> {
     filePath: string;
     kineticEnergy?: number;
     rank?: number;
-    complexity?: number; // Conducks: Cyclomatic/Cognitive Complexity
-    debtMarkers?: string[]; // Conducks: Technical Debt Signals (TODO, FIXME)
-    resonance?: number; // Conducks: Commit Churn (Frequency)
-    entropy?: number; // Conducks: Authorship Diversity (Shannon Entropy)
-    primaryAuthor?: string; // Conducks: Dominant author (blame-based)
-    authorCount?: number; // Conducks: Individual author count per symbol
-    lastModified?: number; // Conducks: Timestamp of last modification
-    tenureDays?: number; // Conducks: Age of the symbol in the codebase
-    coveredBy?: string[]; // Conducks: Test files covering this symbol
-    layer?: number; // Conducks: Structural layer (0=Surface, 10=Foundation)
-    isEntryPoint?: boolean; // Phase 5.1: Primary entry point (CLI, API, Main)
+    complexity?: number;       // Conducks: Cyclomatic/Cognitive Complexity
+    debtMarkers?: string[];    // Conducks: Technical Debt Signals (TODO, FIXME)
+    resonance?: number;        // Conducks: Commit Churn (Frequency)
+    entropy?: number;          // Conducks: Authorship Diversity (Shannon Entropy)
+    primaryAuthor?: string;    // Conducks: Dominant author (blame-based)
+    authorCount?: number;      // Conducks: Individual author count per symbol
+    lastModified?: number;     // Conducks: Timestamp of last modification
+    tenureDays?: number;       // Conducks: Age of the symbol in the codebase
+    coveredBy?: string[];      // Conducks: Test files covering this symbol
+    layer?: number;            // Conducks: Structural layer (0=Surface, 10=Foundation)
+    isEntryPoint?: boolean;    // Phase 5.1: Primary entry point (CLI, API, Main)
   };
 }
 
@@ -46,8 +46,8 @@ export class ConducksAdjacencyList {
   private nodes: Map<NodeId, ConducksNode> = new Map();
   private outEdges: Map<NodeId, Set<ConducksEdge>> = new Map(); // Forward: source -> edges
   private inEdges: Map<NodeId, Set<ConducksEdge>> = new Map();  // Backward: target -> edges
-  private nameIndex: Map<string, NodeId[]> = new Map(); // Fast search index
-  private metadata: Map<string, string> = new Map(); // Global project metadata (Phase 5.3)
+  private nameIndex: Map<string, NodeId[]> = new Map();          // Fast search index
+  private metadata: Map<string, string> = new Map();             // Global project metadata (Phase 5.3)
 
   public clear(): void {
     this.nodes.clear();
@@ -73,7 +73,7 @@ export class ConducksAdjacencyList {
   }
 
   /**
-   * Adds a relationship between two nodes. 
+   * Adds a relationship between two nodes.
    * Allows adding edges even if nodes don't exist yet (Neural Binding).
    */
   public addEdge(edge: ConducksEdge): void {
@@ -84,8 +84,7 @@ export class ConducksAdjacencyList {
     const outSet = this.outEdges.get(edge.sourceId)!;
     const inSet = this.inEdges.get(edge.targetId)!;
 
-    // 2. Conducks: ID-Based Idempotency check 
-    // (Prevents duplication from reloaded persistence or redundant pulses)
+    // 2. Conducks: ID-Based Idempotency check
     for (const e of outSet) if (e.id === edge.id) return;
 
     outSet.add(edge);
@@ -97,8 +96,20 @@ export class ConducksAdjacencyList {
   }
 
   /**
+   * Checks if an edge exists by ID.
+   */
+  public hasEdge(edgeId: string): boolean {
+    for (const edges of this.outEdges.values()) {
+        for (const e of edges) {
+            if (e.id === edgeId) return true;
+        }
+    }
+    return false;
+  }
+
+  /**
    * Conducks — Surgical Rebinding
-   * 
+   *
    * Moves an edge to a new targetId in the backward index.
    * Essential for neural binding where temporary IDs are resolved to origins.
    */
@@ -121,12 +132,18 @@ export class ConducksAdjacencyList {
     this.inEdges.get(newTargetId)!.add(edge);
   }
 
-  /**
-   * Clears all structural data associated with a specific file.
-   * Ensures idempotency during re-ingestion.
-   */
   public clearFile(filePath: string): void {
-    const nodesInFile = Array.from(this.nodes.values()).filter(n => n.properties.filePath === filePath);
+    if (!filePath || typeof filePath !== 'string') return;
+    const targetPath = filePath.toLowerCase();
+    
+    // 1. Identify "Physical Units" in this file path. 
+    // We skip 'NAMESPACE' (Phase 7.2) nodes as they are stable Virtual Containers 
+    // that should persist even if specific files within them are being re-indexed.
+    const nodesInFile = Array.from(this.nodes.values()).filter(n => {
+      const path = n?.properties?.filePath;
+      if (!path) return false; // Virtual node (no physical file origin)
+      return path.toLowerCase() === targetPath;
+    });
     const nodeIds = new Set(nodesInFile.map(n => n.id));
 
     for (const id of nodeIds) {
@@ -169,7 +186,7 @@ export class ConducksAdjacencyList {
 
   /**
    * Incremental Gravity Update (Heuristic)
-   * 
+   *
    * Provides a fast, local estimate of importance during indexing.
    * Full PageRank structural alignment occurs during globalRecalculateGravity.
    */
@@ -244,7 +261,7 @@ export class ConducksAdjacencyList {
 
   /**
    * Conducks — Kinetic A* Search
-   * 
+   *
    * High-precision pathfinding between symbols using structural heuristics.
    */
   public traverseAStar(startId: NodeId, targetId: NodeId, heuristic?: (n: ConducksNode) => number): NodeId[] {
@@ -257,7 +274,6 @@ export class ConducksAdjacencyList {
       const node = this.nodes.get(nodeId);
       if (!node) return 1000;
       if (heuristic) return heuristic(node);
-      // Default heuristic: Layer distance or minimal hop estimate
       const targetLayer = this.nodes.get(targetId)?.properties.layer || 0;
       return Math.abs(targetLayer - (node.properties.layer || 0));
     };
@@ -265,7 +281,6 @@ export class ConducksAdjacencyList {
     fScore.set(startId, h(startId));
 
     while (openSet.size > 0) {
-      // Find node in openSet with lowest fScore
       let currentId: NodeId | null = null;
       let lowestFScore = Infinity;
 
@@ -280,7 +295,6 @@ export class ConducksAdjacencyList {
       if (!currentId) break;
 
       if (currentId === targetId) {
-        // Reconstruct path
         const path = [currentId];
         let step = currentId;
         while (cameFrom.has(step)) {
@@ -351,7 +365,7 @@ export class ConducksAdjacencyList {
       if (nodeName.includes(query) || node.label.toLowerCase().includes(query)) {
         fuzzyMatches.push(node);
       }
-      if (fuzzyMatches.length >= 20) break; // Limit blast radius
+      if (fuzzyMatches.length >= 20) break;
     }
 
     return fuzzyMatches;
@@ -359,13 +373,35 @@ export class ConducksAdjacencyList {
 
   /**
    * Conducks — Kinetic Symbol Resolver
-   * 
-   * Returns the specific architectural symbol (function, class, module) 
+   *
+   * Returns the specific architectural symbol (function, class, module)
    * enclosing a given line number within a file.
+   *
+   * FIX 4 (macOS Path Case-Sensitivity):
+   * chokidar on macOS/HFS+ can emit paths with different casing than what is
+   * stored in the graph (e.g. the OS returns "src/Core/engine.ts" but the
+   * graph stored "src/core/engine.ts"). The original implementation used a
+   * simple `.toLowerCase()` on both sides — which is correct — but only on
+   * the *outer* filter. The sort comparator and the module-label fallback
+   * `find()` call were also using the raw `filePath` argument, causing
+   * `.filter()` to silently return an empty array and skip symbol resolution.
+   *
+   * The fix normalises the incoming filePath once at the top of the method
+   * and reuses that single canonical value everywhere inside.
    */
   public findSymbolAtLine(filePath: string, line: number): ConducksNode | undefined {
+    if (!filePath || typeof filePath !== 'string') return undefined;
+    // FIX 4: Normalise once — all comparisons below use this canonical value.
+    const targetPath = filePath.toLowerCase();
+
     const nodesInFile = Array.from(this.nodes.values())
-      .filter(n => n.properties.filePath === filePath);
+      .filter(n => n.properties.filePath.toLowerCase() === targetPath);
+
+    if (nodesInFile.length === 0) {
+      console.log(`[AdjacencyList Debug] No nodes found for path: ${targetPath}`);
+    } else {
+      console.log(`[AdjacencyList Debug] Found ${nodesInFile.length} nodes for path. Checking line ${line}...`);
+    }
 
     // Sort by smallest range (innermost scope) first
     nodesInFile.sort((a, b) => {
@@ -384,14 +420,16 @@ export class ConducksAdjacencyList {
       }
     }
 
-    // Fallback: Return the module node if no specific symbol matches
+    // Fallback: Return the module node if no specific symbol matches the line.
+    // nodesInFile is already filtered to the correct (normalised) path,
+    // so this find() is safe and consistent with the outer filter.
     return nodesInFile.find(n => n.label === 'module');
   }
 
   /**
    * High-Fidelity PageRank Convergence
-   * 
-   * Performs iterative power iteration to determine the true structural 
+   *
+   * Performs iterative power iteration to determine the true structural
    * importance (Gravity) of every node in the Synapse.
    */
   public globalRecalculateGravity(iterations: number = 30, damping: number = 0.85): void {
@@ -415,14 +453,12 @@ export class ConducksAdjacencyList {
       const nextRanks = new Map<NodeId, number>();
       let sinkRank = 0;
 
-      // Calculate Sink Influence
       for (const node of anchors) {
         const out = this.outEdges.get(node.id);
         const archOut = out ? Array.from(out).filter(e => ranks.has(e.targetId)) : [];
         if (archOut.length === 0) sinkRank += ranks.get(node.id)!;
       }
 
-      // Distribute Influence
       for (const node of anchors) {
         let rankSum = 0;
         const incoming = this.inEdges.get(node.id);
@@ -453,10 +489,6 @@ export class ConducksAdjacencyList {
 
   /**
    * Conducks — Entry Point Intelligence
-   * 
-   * Identifies primary entry points (CLI commands, API routes, main functions)
-   * using a combination of naming heuristics, structural signatures, and 
-   * framework-specific markers.
    */
   public detectEntryPoints(): void {
     const entryPointNames = new Set(['main', 'app', 'run', 'start', 'cli', 'index', 'handler', 'server']);
@@ -469,29 +501,24 @@ export class ConducksAdjacencyList {
 
       let isEntry = false;
 
-      // 1. Explicit Route Markers (from Phase 3.7/5.3)
       if (node.label === 'route' || node.label.includes('route') || props.kind?.includes('route')) {
         isEntry = true;
       }
 
-      // 2. Naming Heuristic (Exact Match)
       if (entryPointNames.has(lowerName)) {
         isEntry = true;
       }
 
-      // 3. File Path Heuristic
       if (basename && entryPointFiles.has(basename) && (node.label === 'module' || node.label === 'file')) {
         isEntry = true;
       }
 
-      // 4. Structural Source Heuristic (A pure source with high fan-out)
       const incoming = this.inEdges.get(node.id)?.size || 0;
       const outgoing = this.outEdges.get(node.id)?.size || 0;
       if (incoming === 0 && outgoing >= 3) {
         isEntry = true;
       }
 
-      // 5. Explicit framework indicators (Phase 5.3)
       if (props.isEntryPoint) {
         isEntry = true;
       }
@@ -517,9 +544,8 @@ export class ConducksAdjacencyList {
   }
 
   /**
-   * Detects all Strongly Connected Components (SCCs) in the graph using Tarjan's algorithm.
+   * Detects all Strongly Connected Components (SCCs) using Tarjan's algorithm.
    * Linear time complexity: O(V + E).
-   * Any SCC with more than one node (or a self-loop) is a circular dependency.
    */
   public detectCycles(): NodeId[][] {
     const cycles: NodeId[][] = [];
@@ -530,28 +556,22 @@ export class ConducksAdjacencyList {
     const lowlink = new Map<NodeId, number>();
 
     const strongconnect = (nodeId: NodeId) => {
-      // Set the depth index for v to the smallest unused index
       indices.set(nodeId, index);
       lowlink.set(nodeId, index);
       index++;
       stack.push(nodeId);
       onStack.add(nodeId);
 
-      // Consider successors of v
       const neighbors = this.getNeighbors(nodeId, 'downstream');
       for (const edge of neighbors) {
         if (!indices.has(edge.targetId)) {
-          // Successor w has not yet been visited; recurse on it
           strongconnect(edge.targetId);
           lowlink.set(nodeId, Math.min(lowlink.get(nodeId)!, lowlink.get(edge.targetId)!));
         } else if (onStack.has(edge.targetId)) {
-          // Successor w is in stack and hence in the current SCC
-          // Note: If v -> w and w is on stack, w is an ancestor of v in the DFS tree
           lowlink.set(nodeId, Math.min(lowlink.get(nodeId)!, indices.get(edge.targetId)!));
         }
       }
 
-      // If v is a root node, pop the stack and generate an SCC
       if (lowlink.get(nodeId) === indices.get(nodeId)) {
         const component: NodeId[] = [];
         let w: NodeId;
@@ -561,11 +581,9 @@ export class ConducksAdjacencyList {
           component.push(w);
         } while (w !== nodeId);
 
-        // An SCC is a cycle if it has > 1 node, OR it has 1 node with a self-loop
         if (component.length > 1) {
           cycles.push(component);
         } else if (component.length === 1) {
-          // Check for self-loop
           const selfEdges = this.getNeighbors(component[0], 'downstream');
           if (selfEdges.some(e => e.targetId === component[0])) {
             cycles.push(component);
@@ -583,4 +601,3 @@ export class ConducksAdjacencyList {
     return cycles;
   }
 }
-

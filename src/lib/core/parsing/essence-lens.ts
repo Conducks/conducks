@@ -1,4 +1,5 @@
 import { PrismSpectrum } from "@/lib/core/persistence/prism-core.js";
+import { mapToCanonical } from "@/lib/core/parsing/taxonomy.js";
 import path from "node:path";
 
 /**
@@ -62,9 +63,12 @@ export class EssenceLens {
       console.error(`[EssenceLens]   -> Found ${Object.keys(deps).length} dependencies.`);
 
       for (const [name, version] of Object.entries(deps)) {
+        const canonical = mapToCanonical('external_dependency');
         spectrum.nodes.push({
           name,
           kind: 'external_dependency' as any,
+          canonicalKind: canonical.kind,
+          canonicalRank: canonical.rank,
           range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
           filePath: filePath,
           isExport: true,
@@ -103,9 +107,12 @@ export class EssenceLens {
         const name = match[1];
         const version = match[2].trim() || 'latest';
 
+        const canonical = mapToCanonical('external_dependency');
         spectrum.nodes.push({
           name,
           kind: 'external_dependency' as any,
+          canonicalKind: canonical.kind,
+          canonicalRank: canonical.rank,
           range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
           filePath: filePath,
           isExport: true,
@@ -117,7 +124,7 @@ export class EssenceLens {
         });
 
         spectrum.relationships.push({
-          sourceName: 'global',
+          sourceName: 'UNIT',
           targetName: name,
           type: 'DEPENDS_ON' as any,
           confidence: 1.0,

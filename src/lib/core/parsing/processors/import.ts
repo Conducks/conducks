@@ -64,7 +64,7 @@ export class ImportProcessor {
     if (isExternal) console.error(`[ImportProcessor] Processing EXTERNAL dependency: ${targetName}`);
 
     spectrum.relationships.push({
-      sourceName: 'global', // Imports are typically global to the module
+      sourceName: 'UNIT', // Imports are typically global to the module
       targetName,
       type: isExternal ? 'DEPENDS_ON' as any : 'IMPORTS',
       confidence: 1.0,
@@ -90,7 +90,7 @@ export class ImportProcessor {
 
     // Link file-level import
     spectrum.relationships.push({
-      sourceName: 'global',
+      sourceName: 'UNIT',
       targetName: resolvedPath,
       type: 'IMPORTS',
       confidence: 1.0,

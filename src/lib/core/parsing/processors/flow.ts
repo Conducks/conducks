@@ -48,10 +48,48 @@ export class FlowProcessor {
     });
   }
 
+  private readonly WHITELISTED_METHODS = new Set([
+    'get', 'post', 'put', 'delete', 'patch', 'request', 'head', 'options', 'fetch', 'goto'
+  ]);
+
+  private readonly RECEIVER_BLACKLIST = new Set([
+    'os', 'self', 'item', 'record', 'context', 'dict', 'environ', 'url', 'path', 're', 'data', 'data_', 'record_'
+  ]);
+
+  private readonly WHITELISTED_OBJECTS = new Set([
+    'requests', 'http', 'client', 'session', 'browser', 'page', 'httpx', 'aiohttp'
+  ]);
+
   /**
    * Processes an HTTP client request (e.g. requests.get('/path')).
    */
-  public processRequest(url: string, method: string, scope: string, spectrum: PrismSpectrum): void {
+  public processRequest(url: string, method: string, scope: string, spectrum: PrismSpectrum, receiver?: string | null): void {
+    const rawMethod = method.toLowerCase();
+    const rawUrl = url.toLowerCase();
+    const rawReceiver = receiver?.toLowerCase() ?? '';
+    
+    // 1. Structural Confidence Phase: Receiver Specificity
+    if (this.RECEIVER_BLACKLIST.has(rawReceiver)) {
+      return; // Reject known generic containers (e.g. os.getenv, dict.get)
+    }
+
+    const isNetworkObject = this.WHITELISTED_OBJECTS.has(rawReceiver);
+    const isWhitelistedMethod = this.WHITELISTED_METHODS.has(rawMethod);
+    const hasProtocolConfidence = rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
+    const isVibrantUrl = hasProtocolConfidence && rawUrl.includes('.');
+
+    // 2. High-Fidelity Promotion Logic:
+    // Only promote if we have an explicit network object OR high-confidence URL interaction.
+    // If the receiver is unknown (null/empty), we require a Strong Protocol signature.
+    const isGenuineNetworkInteraction = 
+      isNetworkObject || 
+      (isWhitelistedMethod && isVibrantUrl) ||
+      (isWhitelistedMethod && !rawReceiver && hasProtocolConfidence);
+
+    if (!isGenuineNetworkInteraction) {
+      return; // Reject noisy interaction traces (e.g. self.get, some_dict.get)
+    }
+
     const requestId = `REQUEST::${url}::${method.toUpperCase()}`;
 
     spectrum.nodes.push({
@@ -60,7 +98,7 @@ export class FlowProcessor {
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: 'network',
       isExport: false,
-      metadata: { isRequest: true, url, method: method.toUpperCase() }
+      metadata: { isRequest: true, url, method: method.toUpperCase(), receiver }
     });
 
     spectrum.relationships.push({

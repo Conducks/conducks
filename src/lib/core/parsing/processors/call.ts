@@ -11,7 +11,7 @@ export class CallProcessor {
   /**
    * Processes a call-site capture (@kinesis_target) and identifies its relationship.
    */
-  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS', spectrum: PrismSpectrum, args: string[] = [], context?: PulseContext): void {
+  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: PulseContext): void {
     if (!target) return;
 
     let targetName = target;
@@ -25,7 +25,7 @@ export class CallProcessor {
     }
 
     spectrum.relationships.push({
-      sourceName: source || 'global',
+      sourceName: source || 'UNIT',
       targetName: targetName,
       type: type,
       confidence: 0.85,

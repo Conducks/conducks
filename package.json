@@ -1,6 +1,6 @@
 {
 	"name": "conducks",
-	"version": "0.7.0",
+	"version": "0.7.7",
 	"description": "A documentation-driven governance engine for AI agents, providing structured engineering standards via the Model Context Protocol (MCP).",
 	"author": "Conducks Team <contact@conducks.com>",
 	"license": "Apache-2.0",

@@ -11,7 +11,8 @@ export class GQLParser {
    * Executes a GQL query on the provided graph.
    */
   public query(graph: ConducksAdjacencyList, queryString: string): any[] {
-    const pattern = /\(([^)]*)\)-\[:([^\]]*)\]->\(([^)]*)\)/;
+    // Conducks: Support optional labels (e.g. ()-[:EDGE]->())
+    const pattern = /\(([^)]*)\)-\[:([^\]]+)\]->\(([^)]*)\)/;
     const match = queryString.match(pattern);
 
     if (!match) {
@@ -21,23 +22,28 @@ export class GQLParser {
     const [, sourceLabel, edgeType, targetLabel] = match;
     const results: any[] = [];
 
-    for (const sourceNode of Array.from(graph.getAllNodes())) {
-      if (sourceLabel && !sourceNode.label.toLowerCase().includes(sourceLabel.toLowerCase())) continue;
+    const nodes = Array.from(graph.getAllNodes());
+    for (const sourceNode of nodes) {
+      // Label filter (if specified)
+      if (sourceLabel && sourceLabel.trim() !== "" && !sourceNode.label.toLowerCase().includes(sourceLabel.toLowerCase())) continue;
 
       const neighbors = graph.getNeighbors(sourceNode.id, 'downstream');
       for (const edge of neighbors) {
-        if (edgeType && edge.type !== edgeType.toUpperCase()) continue;
+        // Edge type filter (case-insensitive)
+        if (edgeType && edgeType.trim() !== "*" && edge.type.toUpperCase() !== edgeType.toUpperCase()) continue;
 
         const targetNode = graph.getNode(edge.targetId);
         if (targetNode) {
-          if (targetLabel && !targetNode.label.toLowerCase().includes(targetLabel.toLowerCase())) continue;
-          
+          // Target label filter (if specified)
+          if (targetLabel && targetLabel.trim() !== "" && !targetNode.label.toLowerCase().includes(targetLabel.toLowerCase())) continue;
+
           results.push({
             source: sourceNode.properties.name,
             type: edge.type,
             target: targetNode.properties.name,
             sourceFile: sourceNode.properties.filePath,
-            targetFile: targetNode.properties.filePath
+            targetFile: targetNode.properties.filePath,
+            confidence: edge.confidence
           });
         }
       }

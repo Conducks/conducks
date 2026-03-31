@@ -3,6 +3,7 @@ import { ConducksComponent } from "@/registry/types.js";
 import { SynapseRegistry } from "@/registry/synapse-registry.js";
 import { PulseOrchestrator } from "@/lib/domain/analysis/orchestrator.js";
 import { PythonProvider } from "@/lib/core/parsing/languages/python/index.js";
+import { TypeScriptProvider } from "@/lib/core/parsing/languages/typescript/index.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import { GlobalSymbolLinker } from "@/lib/core/graph/linker.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
@@ -29,7 +30,12 @@ const __dirname = path.dirname(__filename);
 /**
  * Project Conducks — Application Core
  */
-export class Conducks {
+export class Conducks implements ConducksComponent {
+  public readonly id = "conducks-core";
+  public readonly type = "analyzer";
+  public readonly version = "2.0.0";
+  public readonly description = "The central structural intelligence engine of Conducks.";
+
   public graph = new ConducksGraph();
   public search = new ConducksSearch(this.graph.getGraph());
   public flows = new ConducksFlowEngine(this.graph.getGraph());
@@ -58,7 +64,12 @@ export class Conducks {
     const impactAnalyzer = new BlastRadiusAnalyzer();
     this.registry.registerComponent(impactAnalyzer);
 
-    // Conducks: The Gospel Core (Python Suite Only 💎)
+    // Conducks: The Gospel Core (Multi-Lens Resonance 💎)
+    const ts = new TypeScriptProvider();
+    this.registry.registerProvider(".ts", ts);
+    this.registry.registerProvider(".tsx", ts);
+    this.registry.registerProvider(".js", ts);
+    this.registry.registerProvider(".jsx", ts);
     this.registry.registerProvider(".py", new PythonProvider());
   }
 

@@ -33,7 +33,7 @@ export interface PrismSpectrum {
   relationships: Array<{
     sourceName: string;
     targetName: string;
-    type: 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'CONSTRUCTS' | 'ALIASES';
+    type: 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'CONSTRUCTS' | 'ALIASES' | 'TYPE_REFERENCE';
     confidence: number;
     metadata?: Record<string, any>;
   }>;

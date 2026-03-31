@@ -57,8 +57,8 @@ export class DiffCommand implements ConducksCommand {
 
       for (const line of change.lines) {
         const symbol = nodes.find(n => n.properties.range &&
-          line >= n.properties.range.startLine &&
-          line <= n.properties.range.endLine);
+          line >= n.properties.range.start.line &&
+          line <= n.properties.range.end.line);
         if (symbol) impactedSymbols.add(symbol.id);
       }
     }
@@ -196,7 +196,7 @@ export class DiffCommand implements ConducksCommand {
 
     for (const line of lines) {
       if (line.startsWith('+++ b/')) {
-        currentFile = path.resolve(process.cwd(), line.replace('+++ b/', ''));
+        currentFile = path.resolve(process.cwd(), line.replace('+++ b/', '')).toLowerCase();
         changes.push({ file: currentFile, lines: [] });
       } else if (line.startsWith('@@')) {
         const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);

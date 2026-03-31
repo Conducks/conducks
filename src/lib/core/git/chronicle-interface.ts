@@ -120,7 +120,15 @@ export class ChronicleInterface {
     }
 
     try {
-      const relativePath = path.relative(this.projectDir, filePath);
+      const fixedPath = path.resolve(filePath);
+      const projectRoot = path.resolve(this.projectDir);
+
+      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
+      let relativePath = path.relative(projectRoot, fixedPath);
+      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
+        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
+      }
+
       const command = `git show :0:${relativePath}`;
       const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] });
       return output as string;
@@ -164,7 +172,14 @@ export class ChronicleInterface {
     }
 
     try {
-      const relativePath = path.relative(this.projectDir, filePath);
+      const fixedPath = path.resolve(filePath);
+      const projectRoot = path.resolve(this.projectDir);
+
+      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
+      let relativePath = path.relative(projectRoot, fixedPath);
+      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
+        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
+      }
 
       // 1. Commit Count (Frequency)
       const countCmd = `git rev-list --count HEAD -- "${relativePath}"`;
@@ -191,7 +206,15 @@ export class ChronicleInterface {
     }
 
     try {
-      const relativePath = path.relative(this.projectDir, filePath);
+      const fixedPath = path.resolve(filePath);
+      const projectRoot = path.resolve(this.projectDir);
+
+      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
+      let relativePath = path.relative(projectRoot, fixedPath);
+      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
+        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
+      }
+
       const command = `git log --format="%ae" -- "${relativePath}"`;
       const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
       const authors = output.split('\n').filter(a => a.trim().length > 0);
@@ -201,7 +224,7 @@ export class ChronicleInterface {
         distribution[author] = (distribution[author] || 0) + 1;
       }
       return distribution;
-    } catch {
+    } catch (err) {
       return {};
     }
   }
@@ -217,7 +240,14 @@ export class ChronicleInterface {
     }
 
     try {
-      const relativePath = path.relative(this.projectDir, filePath);
+      const fixedPath = path.resolve(filePath);
+      const projectRoot = path.resolve(this.projectDir);
+
+      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
+      let relativePath = path.relative(projectRoot, fixedPath);
+      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
+        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
+      }
       const command = `git blame --porcelain -- "${relativePath}"`;
       const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
       const lines = output.split('\n');
@@ -288,8 +318,9 @@ export class ChronicleInterface {
       return true;
     }
 
-    const resolved = path.resolve(filePath);
-    return resolved === this.projectDir || resolved.startsWith(this.projectDir + path.sep);
+    const resolved = path.resolve(filePath).toLowerCase();
+    const projectDir = this.projectDir.toLowerCase();
+    return resolved === projectDir || resolved.startsWith(projectDir + path.sep);
   }
 
   /**

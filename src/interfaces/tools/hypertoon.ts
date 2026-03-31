@@ -1,4 +1,5 @@
 import { Tool } from "@/registry/tool-registry.js";
+import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "fs-extra";
 import { fileURLToPath } from "node:url";
@@ -50,6 +51,27 @@ export class ConducksRegistry {
           console.error(`[Conducks] Syncing high-fidelity description for "${tool.name}" from documentation.`);
         }
       }
+
+      // Conducks Lazy Resonance: Wrap tool handler to ensure database connection yields
+      const originalHandler = tool.handler;
+      tool.handler = async (args: any) => {
+        // Conducks Self-Aware Resonance: Resolve root relative to script if process.cwd() is root
+        let rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        if (rootPath === "/" || !rootPath || !fs.existsSync(path.join(rootPath, "package.json"))) {
+          rootPath = path.resolve(__dirname, "../../../../");
+          console.error(`[Conducks] CWD is root or invalid. Auto-resolving to script-relative root: ${rootPath}`);
+        }
+        try {
+          // Acquire the lock for the duration of the query
+          // WRITER ACCESS: Only if fullAnalysis is requested (Phase 11.4)
+          const isWriteMode = tool.name === "conducks_analyze" && args.fullAnalysis;
+          await registry.initialize(!isWriteMode, rootPath);
+          return await originalHandler(args);
+        } finally {
+          // Immediately release the lock so the CLI and watch processes are not frozen
+          await registry.infrastructure.persistence.close();
+        }
+      };
     }
 
     // Rule 6/13: Return ONLY the 8 static tools. No dynamic additions.

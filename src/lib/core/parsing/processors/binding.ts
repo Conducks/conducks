@@ -27,7 +27,7 @@ export class BindingProcessor {
   public synthesizeWildcard(callerPath: string, targetPath: string, targetSymbols: string[], spectrum: PrismSpectrum): void {
     for (const sym of targetSymbols) {
       spectrum.relationships.push({
-        sourceName: 'global',
+        sourceName: 'UNIT',
         targetName: `${targetPath}::${sym}`,
         type: 'ACCESSES',
         confidence: 0.8

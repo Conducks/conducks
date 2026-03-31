@@ -33,7 +33,7 @@ export const PYTHON_QUERIES = `
 
   ;; HTTP Client Requests (Outgoing)
   (call
-    function: (attribute object: (identifier) @req_receiver attribute: (identifier) @req_method)
+    function: (attribute object: (_) @req_receiver attribute: (identifier) @req_method)
     arguments: (argument_list (string (string_content) @kinesis_request_url))) @kinesis_request
 
   ;; Heritage

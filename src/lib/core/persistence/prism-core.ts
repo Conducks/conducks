@@ -22,6 +22,8 @@ export interface SpectrumNode {
   };
   filePath: string;
   isExport: boolean;
+  canonicalKind: string;
+  canonicalRank: number;
   metadata: Record<string, any>;
 }
 

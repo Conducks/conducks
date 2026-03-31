@@ -123,106 +123,116 @@ export class ConducksMCPServer {
 
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
-      const status = registry.governance.status();
-      const nodes = Array.from(registry.intelligence.graph.getGraph().getAllNodes());
+      
+      try {
+        // Conducks Lazy Resonance: Initialize only for the duration of the request
+        const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await registry.initialize(true, rootPath);
+        
+        const status = registry.governance.status();
+        const nodes = Array.from(registry.intelligence.graph.getGraph().getAllNodes());
 
-      const summarizeNodes = (items: any[]) => items.map(n => ({
-        id: n.id,
-        kind: n.label,
-        file: n.properties.filePath,
-        name: n.properties.name,
-        risk: n.properties.risk || 0,
-        gravity: n.properties.rank || 0
-      }));
+        const summarizeNodes = (items: any[]) => items.map(n => ({
+          id: n.id,
+          kind: n.label,
+          file: n.properties.filePath,
+          name: n.properties.name,
+          risk: n.properties.risk || 0,
+          gravity: n.properties.rank || 0
+        }));
 
-      if (uri === "resource://conducks/symbols") {
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              items: summarizeNodes(nodes.slice(0, 50)),
-              totalCount: nodes.length,
-              truncated: nodes.length > 50
-            })
-          }]
-        };
+        if (uri === "resource://conducks/symbols") {
+          return {
+            contents: [{
+              uri,
+              mimeType: "application/json",
+              text: JSON.stringify({
+                items: summarizeNodes(nodes.slice(0, 50)),
+                totalCount: nodes.length,
+                truncated: nodes.length > 50
+              })
+            }]
+          };
+        }
+
+        if (uri === "resource://conducks/hotspots") {
+          const hotspots = nodes.sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0)).slice(0, 20);
+          return {
+            contents: [{
+              uri,
+              mimeType: "application/json",
+              text: JSON.stringify({
+                items: summarizeNodes(hotspots),
+                totalCount: hotspots.length,
+                truncated: false
+              })
+            }]
+          };
+        }
+
+        if (uri === "resource://conducks/entry-points") {
+          const entryPoints = nodes.filter((n: any) => n.properties.isEntryPoint).sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0));
+          return {
+            contents: [{
+              uri,
+              mimeType: "application/json",
+              text: JSON.stringify({
+                items: summarizeNodes(entryPoints),
+                totalCount: entryPoints.length,
+                truncated: false
+              })
+            }]
+          };
+        }
+
+        if (uri === "resource://conducks/violations") {
+          const audit = registry.governance.audit();
+          return {
+            contents: [{
+              uri,
+              mimeType: "application/json",
+              text: JSON.stringify({
+                items: audit.violations,
+                totalCount: audit.violations.length,
+                truncated: false
+              })
+            }]
+          };
+        }
+
+        if (uri === "resource://conducks/lies") {
+          return {
+            contents: [{
+              uri,
+              mimeType: "application/json",
+              text: JSON.stringify({
+                items: [], // Synchronize with CoChange engine in Phase 7
+                totalCount: 0,
+                truncated: false
+              })
+            }]
+          };
+        }
+
+        if (uri === "resource://conducks/pulses") {
+          return {
+            contents: [{
+              uri,
+              mimeType: "application/json",
+              text: JSON.stringify({
+                items: status.pulses || [],
+                totalCount: (status.pulses || []).length,
+                truncated: false
+              })
+            }]
+          };
+        }
+
+        throw new Error(`Resource not found: ${uri}`);
+      } finally {
+        // Release the structural lock to allow parallel analysis
+        await registry.infrastructure.persistence.close();
       }
-
-      if (uri === "resource://conducks/hotspots") {
-        const hotspots = nodes.sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0)).slice(0, 20);
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              items: summarizeNodes(hotspots),
-              totalCount: hotspots.length,
-              truncated: false
-            })
-          }]
-        };
-      }
-
-      if (uri === "resource://conducks/entry-points") {
-        const entryPoints = nodes.filter((n: any) => n.properties.isEntryPoint).sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0));
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              items: summarizeNodes(entryPoints),
-              totalCount: entryPoints.length,
-              truncated: false
-            })
-          }]
-        };
-      }
-
-      if (uri === "resource://conducks/violations") {
-        const audit = registry.governance.audit();
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              items: audit.violations,
-              totalCount: audit.violations.length,
-              truncated: false
-            })
-          }]
-        };
-      }
-
-      if (uri === "resource://conducks/lies") {
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              items: [], // Synchronize with CoChange engine in Phase 7
-              totalCount: 0,
-              truncated: false
-            })
-          }]
-        };
-      }
-
-      if (uri === "resource://conducks/pulses") {
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              items: status.pulses || [],
-              totalCount: (status.pulses || []).length,
-              truncated: false
-            })
-          }]
-        };
-      }
-
-      throw new Error(`Resource not found: ${uri}`);
     });
   }
 

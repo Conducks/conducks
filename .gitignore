@@ -42,4 +42,4 @@ venv/
 .cache/
 dist/
 .conducks/
-.gitnexus
+.conducks

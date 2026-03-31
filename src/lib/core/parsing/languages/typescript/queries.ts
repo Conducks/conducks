@@ -2,6 +2,8 @@ export const TYPESCRIPT_QUERIES = `
   ;; --- Definitions ---
   (class_declaration name: (type_identifier) @name) @isClass
   (interface_declaration name: (type_identifier) @name) @isInterface
+  
+
   (enum_declaration name: (identifier) @name) @isEnum
   (function_declaration name: (identifier) @name) @isFunction
   
@@ -33,9 +35,8 @@ export const TYPESCRIPT_QUERIES = `
   (variable_declarator name: (identifier) @pulse_assignment_name value: (_) @pulse_assignment_value)
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
 
-  ;; --- Parameter Type Captures ---
-  (required_parameter name: (identifier) @pulse_param_name type: (type_annotation (type_identifier) @pulse_type_target))
-  (optional_parameter name: (identifier) @pulse_param_name type: (type_annotation (type_identifier) @pulse_type_target))
+  ;; --- Type Captures (Phase 3.5: GVR High-Fidelity) ---
+  (type_identifier) @pulse_type_target
 
   ;; --- Phase 3.2: Debt Markers ---
   (comment) @comment

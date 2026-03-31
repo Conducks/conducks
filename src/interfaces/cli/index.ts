@@ -25,6 +25,7 @@ import { PruneCommand } from "./commands/prune.js";
 import { AdviseCommand } from "./commands/advise.js";
 import { WatchCommand } from "./commands/watch.js";
 import { MirrorCommand } from "./commands/mirror.js";
+import { VisualizeCommand } from "./commands/visualize.js";
 import { TraceCommand } from "./commands/trace.js";
 import { ExplainCommand } from "./commands/explain.js";
 import { HelpCommand } from "./commands/help.js";
@@ -58,9 +59,9 @@ export async function main() {
     positionalArgs.push(arg);
   }
 
-  const targetPath = process.cwd();
-  const isReadCommand = ['diff', 'explain', 'status', 'list', 'context'].includes(commandId);
-  const persistence = new GraphPersistence(targetPath, isReadCommand);
+  const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  const writeCommands = ['analyze', 'setup', 'clean', 'rename'];
+  const isReadOnly = !writeCommands.includes(commandId);
 
   chronicle.setProjectDir(targetPath);
 
@@ -70,7 +71,7 @@ export async function main() {
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
     new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
     new AdviseCommand(), new PruneCommand(), new BlueprintCommand(), new MirrorCommand(),
-    new ContextGenCommand(),
+    new ContextGenCommand(), new LinkCommand(), new VisualizeCommand(),
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new EntryCommand(), new McpCommand(),
     new BootstrapDocsCommand(), new RecordCommand()
@@ -82,13 +83,34 @@ export async function main() {
   const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'mcp', 'bootstrap-docs', 'record'].includes(commandId);
   const isMcpCommand = commandId === 'mcp';
 
+  /**
+   * FIX 2: Long-running commands must NOT have their persistence layer closed
+   * by the CLI's finally block. The original code had this list but the
+   * finally block always called persistence.close() unconditionally.
+   * The guard below ensures close() is skipped for persistent commands,
+   * allowing the watcher/mcp event loop to remain alive.
+   */
+  const persistentCommands = new Set(['watch', 'mcp']);
+  const isPersistent = persistentCommands.has(commandId);
+
+  if (isMcpCommand) {
+    /**
+     * FIX 3 (CORE): Redirect all console.log to stderr for MCP commands.
+     * This ensures human-readable CLI logs do not pollute the stdout stream,
+     * which is reserved for the JSON-RPC Model Context Protocol messages.
+     */
+    console.log = (...args: any[]) => console.error(...args);
+    console.info = (...args: any[]) => console.error(...args);
+  }
+
   if (command) {
     try {
-      // Lazy load heavy dependencies (WASM, grammars) only upon execution
-      await registry.initialize();
+      console.log(`[CLI] Initializing registry (readOnly: ${isReadOnly}, root: ${targetPath})...`);
+      await registry.initialize(isReadOnly, targetPath);
+      console.log(`[CLI] Registry initialized. Executing command: ${commandId}...`);
+      const persistence = registry.infrastructure.persistence;
 
       if (!isStalenessBypass && !isMcpCommand) {
-        await persistence.load(registry.intelligence.graph.getGraph());
         const status = registry.governance.status();
         if (status.staleness.stale) {
           const commits = (status.staleness as any).commitsBehind || 0;
@@ -96,12 +118,19 @@ export async function main() {
         }
       }
 
-      await command.execute(cmdArgs, persistence);
+      console.log(`[CLI] Calling ${command.id}.execute()...`);
+      await command.execute(cmdArgs, persistence as any);
+      console.log(`[CLI] ${command.id}.execute() completed.`);
     } catch (err) {
       console.error(`\x1b[31m[Conducks CLI] Execution Error:\x1b[0m`, err);
       process.exit(1);
     } finally {
-      await persistence.close();
+      // FIX 2: Only close persistence for short-lived commands.
+      // Persistent commands (watch, mcp) manage their own lifecycle
+      // and rely on the DB connection staying open until SIGINT/SIGTERM.
+      if (!isPersistent) {
+        await registry.infrastructure.persistence.close();
+      }
     }
   } else {
     console.error(`\x1b[31mError: Unknown command "${commandId}"\x1b[0m`);

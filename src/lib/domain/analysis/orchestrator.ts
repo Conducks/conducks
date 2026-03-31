@@ -6,13 +6,19 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import path from "node:path";
 
+import { ConducksComponent } from "@/registry/types.js";
+
 /**
  * Conducks — Pulse Orchestrator
  * 
  * The central orchestration engine for the Gospel of Technology.
  * Manages the batch-parallel topological pulse and structural resonance.
  */
-export class PulseOrchestrator {
+export class PulseOrchestrator implements ConducksComponent {
+  public readonly id = "pulse-orchestrator";
+  public readonly type = "analyzer";
+  public readonly version = "2.0.0";
+
   public context = new PulseContext();
 
   constructor(

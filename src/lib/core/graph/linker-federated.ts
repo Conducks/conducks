@@ -26,12 +26,12 @@ export class FederatedLinker {
     const links = await this.getLinks();
     const absolutePath = path.resolve(projectPath);
     
-    // Verify it's a valid Conducks project
-    const cachePath = path.join(absolutePath, '.conducks', 'cache.json');
+    // Verify it's a valid Conducks project (DuckDB Sync)
+    const dbPath = path.join(absolutePath, 'data', 'conducks-synapse.db');
     try {
-      await this.fsMock.access(cachePath);
+      await this.fsMock.access(dbPath);
     } catch {
-      throw new Error(`[Federated Linker] Target path is not a valid Conducks project: ${absolutePath}`);
+      throw new Error(`[Federated Linker] Target path is not a valid Conducks project (No DuckDB synapse found at ${dbPath})`);
     }
 
     if (!links.includes(absolutePath)) {
@@ -46,8 +46,15 @@ export class FederatedLinker {
   public async hydrate(mainGraph: ConducksAdjacencyList): Promise<void> {
     const links = await this.getLinks();
     for (const linkPath of links) {
-      const p = new DuckDbPersistence(linkPath);
-      await p.load(mainGraph);
+      const p = new DuckDbPersistence(linkPath, true); // Force READ_ONLY for federation neighbors
+      const before = mainGraph.stats.nodeCount;
+      const success = await p.load(mainGraph, true);
+      if (success) {
+        const added = mainGraph.stats.nodeCount - before;
+        console.log(`[Federated Linker] Resonated with ${linkPath} (+${added} nodes).`);
+      } else {
+        console.warn(`[Federated Linker] ⚠️  Hydration failed for: ${linkPath}`);
+      }
     }
   }
 

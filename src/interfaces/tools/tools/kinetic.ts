@@ -1,7 +1,8 @@
 import { Tool } from "@/registry/types.js";
 import { registry } from "@/registry/index.js";
-import fs from "fs-extra";
 import path from "node:path";
+import fs from "fs-extra";
+import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { execSync } from "node:child_process";
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
 
@@ -12,7 +13,7 @@ import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
  * They provide execution tracing, structural evolution, system management,
  * and cross-repository linking.
  * 
- * All tool descriptions follow the GitNexus high-fidelity standard:
+ * All tool descriptions follow a high-fidelity documentation standard:
  * WHEN TO USE → AFTER THIS → Returns → Tips
  */
 export const kineticTools: Record<string, Tool> = {
@@ -22,28 +23,30 @@ export const kineticTools: Record<string, Tool> = {
     type: "tool",
     version: "2.0.0",
     description: `Trace execution flow or data lineage from a starting symbol through the structural graph.
-Maps the "Cerebral Circuit" — the path data and control flow take through the codebase.
+Maps the Cerebral Circuit: the path data and control flow take through the codebase.
 
-WHEN TO USE: Debugging — trace upstream to find where bad data originates. Understanding code — trace downstream to see what a function affects. Pathfinding — find the shortest structural path between two symbols.
-AFTER THIS: Use conducks_metrics(mode:'explain', symbolId:'<step_id>') on any step to understand its risk. Use conducks_evolution(mode:'uncommitted') to see if any step was recently modified.
+PREREQUISITE: You MUST run conducks_analyze with fullAnalysis set to true to populate the structural graph before you can trace execution flows or find structural paths.
+
+WHEN TO USE: Debugging to find where bad data originates. Understanding code to see what a function affects. Pathfinding to find the shortest structural path between two symbols.
+AFTER THIS: Use conducks_metrics with mode set to explain to understand step risk. Use conducks_evolution with mode set to uncommitted to see recent modifications.
 
 Modes:
-- execution (default): Traces the execution flow downstream from the starting symbol. Follows CALLS and IMPORTS edges. Returns the ordered sequence of symbols that execute after the starting point.
-- flow: Traces data lineage — how data flows through the system from the starting symbol. Similar to execution but weighted towards data-passing relationships.
-- path: Finds the shortest structural path between two symbols using A* search. Requires the 'target' parameter. Useful for understanding how two seemingly unrelated symbols are connected.
+- execution (default): Traces the execution flow downstream from the starting symbol. Follows CALLS and IMPORTS edges.
+- flow: Traces data lineage: showing how data flows through the system. Weighted towards data relationships.
+- path: Finds the shortest structural path between two symbols using A* search. Requires the target parameter.
 
 Returns:
 - symbol: the starting symbol ID
 - mode: the trace mode used
-- steps[10]: ordered sequence of symbols in the trace, each with { id, kind, file, name, risk, gravity, summary }
-- indexStaleness: boolean — true if graph is behind HEAD
-- (path mode) path[10]: A*-optimized shortest path between symbol and target
+- steps: ordered sequence of symbols in the trace
+- indexStaleness: true if graph is behind HEAD
+- path: A* optimized shortest path between symbol and target
 
 Node shape: { id, kind, file, name, risk, gravity, summary }
 
-TIP: Start tracing from entry points (found via conducks_analyze) for the most meaningful execution flows.
-TIP: In path mode, the path reveals hidden structural coupling between distant parts of the codebase.
-TIP: High-risk symbols in a trace are potential failure points — prioritize them for testing.`,
+TIP: Start tracing from entry points for the most meaningful execution flows.
+TIP: In path mode the results reveal hidden structural coupling between distant parts of the codebase.
+TIP: High risk symbols in a trace are potential failure points.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -93,43 +96,31 @@ TIP: High-risk symbols in a trace are potential failure points — prioritize th
     name: "conducks_evolution",
     type: "tool",
     version: "2.0.0",
-    description: `Structural evolution intelligence: diffing, dead code detection, graph-verified renaming, and uncommitted change analysis.
-This is the "before you commit" tool — it shows what changed, what's dead, and what your working tree looks like structurally.
+    description: `Structural evolution intelligence: diffing: dead code detection: graph-verified renaming: and uncommitted change analysis.
+This is the before you commit tool. It shows what changed: what is dead: and what your working tree looks like structurally.
 
-WHEN TO USE: Before committing — use mode 'uncommitted' to see what your changes affect structurally. During cleanup — use mode 'prune' to find dead code. During refactoring — use mode 'rename' for safe, graph-verified atomic renames.
-AFTER THIS: Use conducks_governance(mode:'audit') to verify no new violations. Use conducks_metrics(mode:'explain', symbolId:'<id>') on changed symbols to understand risk impact.
+PREREQUISITE: You MUST run conducks_analyze with fullAnalysis set to true to ensure the baseline structural graph is populated before performing evolution analysis.
+
+WHEN TO USE: Before committing use mode uncommitted to see what your changes affect structurally. During cleanup use mode prune to find dead code. During refactoring use mode rename for safe: graph-verified atomic renames.
+AFTER THIS: Use conducks_governance with mode set to audit to verify no new violations. Use conducks_metrics with mode set to explain on changed symbols to understand risk impact.
 
 Modes:
-- diff (default): Structural diff between the current graph and the previous pulse. Shows ΔNodes and ΔEdges — what was added or removed since the last \`conducks analyze\`.
-- prune: Dead code detection. Finds orphan symbols with no incoming edges (unreachable code). Returns candidates for safe removal.
-- rename: Graph-Verified Refactoring (GVR). Safely renames a symbol across ALL references using the structural graph. Requires 'symbol' and 'newName' parameters. Atomic — all-or-nothing.
-- uncommitted: Analyzes your current git working tree changes. Maps uncommitted diffs to symbols, computes the blast radius of your changes, and calculates the risk delta. This is the most operationally useful mode for day-to-day work.
+- diff (default): Structural diff between the current graph and the previous pulse.
+- prune: Dead code detection. Finds orphan symbols with no incoming edges.
+- rename: Graph-Verified Refactoring (GVR). Safely renames a symbol across all references. Requires symbol and newName parameters.
+- uncommitted: Analyzes your current git working tree changes. Computes the blast radius of your changes and calculates the risk delta.
 
-Returns (diff mode):
-- nodes: { added, removed }
-- edges: { added, removed }
-- indexStaleness: boolean
-
-Returns (prune mode):
-- orphans[10]: dead symbols with { id, kind, file, name, risk, gravity, summary }
-- totalCount: total orphans found
-- indexStaleness: boolean
-
-Returns (rename mode):
-- result: GVR rename result with updated references
-- indexStaleness: boolean
-
-Returns (uncommitted mode):
-- changedSymbols[10]: symbols modified in the working tree
-- blastRadius[10]: symbols affected by your changes (d1 dependencies)
+Returns:
+- changedSymbols: symbols modified in the working tree
+- blastRadius: symbols affected by your changes
 - riskDelta: net risk change from uncommitted modifications
-- indexStaleness: boolean
+- indexStaleness: true if the graph is behind HEAD
 
 Node shape: { id, kind, file, name, risk, gravity, summary }
 
-TIP: Run 'uncommitted' mode before every commit to catch unexpected blast radius.
-TIP: Dead code from 'prune' mode is safe to delete — these symbols have zero incoming edges.
-TIP: GVR rename is safer than find-and-replace — it uses the structural graph, not text matching.`,
+TIP: Run uncommitted mode before every commit to catch unexpected blast radius.
+TIP: Dead code from prune mode is safe to delete. These symbols have zero incoming edges.
+TIP: GVR rename is safer than find-and-replace because it uses the structural graph: not text matching.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -243,39 +234,27 @@ TIP: GVR rename is safer than find-and-replace — it uses the structural graph,
     name: "conducks_system",
     type: "tool",
     version: "2.0.0",
-    description: `System management, architecture context, and skill guide access.
-The "meta" tool — provides information about Conducks itself and the indexed project's structural state.
+    description: `System management: architecture context: and skill guide access.
+The meta tool. Provides information about Conducks and the indexed project structural state.
 
-WHEN TO USE: First contact — use mode 'status' to check if Conducks is healthy and see graph stats. Onboarding — use mode 'architecture-context' to get an LLM-optimized summary of the entire codebase (hard-capped at 4000 tokens). Task-specific guidance — use mode 'skill' to retrieve step-by-step tool-call workflows for common tasks.
-AFTER THIS: Use conducks_analyze() for deeper structural health data. Use conducks_query() to search for symbols mentioned in the architecture context.
+WHEN TO USE: First contact use mode status to check health and see graph stats. Onboarding use mode architecture-context to get an LLM optimized summary of the entire codebase. Task guidance use mode skill to retrieve step-by-step tool workflows.
+AFTER THIS: Use conducks_analyze with fullAnalysis set to true for deeper structural health data if the codebase is unrecognized. Use conducks_query to search for symbols mentioned in the architecture context.
 
 Modes:
-- status (default): System health check. Returns node count, edge count, staleness status, and last pulse timestamp. Quick sanity check that the graph is loaded and current.
-- staleness: Detailed staleness report. Shows lastPulsedCommit vs current HEAD and how many commits behind.
-- architecture-context: LLM-optimized codebase summary. Returns top-10 entry points, top-10 hotspots, active violations, and framework detection — all in under 4000 tokens. This is the best way to understand an unfamiliar codebase quickly.
-- skill: Retrieve a task-specific skill guide. Requires the 'skill' parameter. Available skills:
-  • 'pr-review' — Steps to structurally review a PR using Conducks tools
-  • 'debugging' — Steps to trace a bug through the structural graph
-  • 'refactoring' — Steps to safely refactor using GVR and blast radius analysis
-  • 'architecture-exploration' — Steps to understand an unfamiliar codebase
-  • 'governance' — Steps to enforce architectural laws
+- status (default): System health check. Returns node count: edge count: and staleness status.
+- staleness: Detailed staleness report showing how many commits the index is behind HEAD.
+- architecture-context: LLM optimized codebase summary. Returns entry points: hotspots: and architectural violations.
+- skill: Retrieve a task specific skill guide. Requires the skill parameter.
 
-Returns (status mode):
-- indexStaleness: boolean
-- lastPulse: timestamp of last pulse
+Returns:
+- indexStaleness: true if the graph is behind HEAD
+- lastPulse: timestamp of the last structural pulse
 - nodeCount: total graph nodes
 - edgeCount: total graph edges
 
-Returns (architecture-context mode):
-- Full JSON payload with entry points, hotspots, violations, framework info (under 4000 tokens)
-
-Returns (skill mode):
-- skill: name of the requested skill
-- content: full markdown content of the skill guide with step-by-step tool-call instructions
-
-TIP: Always start with 'architecture-context' when entering an unfamiliar codebase.
-TIP: Skills are self-contained workflows — follow them step-by-step for best results.
-TIP: If status shows high staleness, run \`conducks analyze\` in the terminal before using other tools.`,
+TIP: Always start with architecture-context when entering an unfamiliar codebase.
+TIP: Skills are self-contained workflows. Follow them step-by-step for best results.
+TIP: If status shows high staleness run conducks_analyze with fullAnalysis set to true to refresh structural resonance.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -312,24 +291,26 @@ TIP: If status shows high staleness, run \`conducks analyze\` in the terminal be
     name: "conducks_link",
     type: "tool",
     version: "2.0.0",
-    description: `Cross-repository structural intelligence. Query and link synapses across multiple codebases.
-Enables federated structural analysis — find how symbols in one repo relate to symbols in another.
+    description: `Cross repository structural intelligence. Query and link synapses across multiple codebases.
+Enables federated structural analysis to find how symbols in one repository relate to symbols in another.
 
-WHEN TO USE: Multi-repo architectures — when a change in repo A may affect repo B. Microservice environments — to trace cross-service data lineage. Monorepo boundary analysis — to detect structural coupling between packages.
-AFTER THIS: Use conducks_trace() on identified cross-repo symbols for deeper analysis. Use conducks_metrics(mode:'explain') on federated hotspots.
+PREREQUISITE: You MUST run conducks_analyze with fullAnalysis set to true in ALL participating repositories to establish their individual structural graphs before they can be linked.
+
+WHEN TO USE: Multi repository architectures where a change in repo A may affect repo B. Microservice environments to trace cross service data lineage. Monorepo boundary analysis to detect structural coupling between packages.
+AFTER THIS: Use conducks_trace on identified cross repo symbols for deeper analysis. Use conducks_metrics on federated hotspots.
 
 Modes:
-- query (default): Search for structural relationships between the current repo and other indexed repos. Returns cross-repo symbol matches and federated edges.
-- link: Establish structural connections between repos by indexing their shared interfaces (API contracts, shared types, event schemas).
+- query (default): Search for structural relationships between the current repository and other indexed repositories.
+- link: Establish structural connections between repositories by indexing their shared interfaces like API contracts or event schemas.
 
 Returns:
-- federatedEdges[10]: cross-repo structural relationships with { source, target, type, confidence }
-- crossRepoSymbols[10]: symbols that participate in cross-repo relationships
-- indexStaleness: boolean
+- federatedEdges: cross repository structural relationships including confidence scores
+- crossRepoSymbols: symbols that participate in cross repository relationships
+- indexStaleness: true if the graph is behind HEAD
 
-TIP: Link mode must be run once before query mode can find cross-repo relationships.
+TIP: Link mode must be run once before query mode can find cross repository relationships.
 TIP: Start with query mode to discover existing connections before establishing new links.
-TIP: Cross-repo edges have lower confidence — verify with source code inspection.`,
+TIP: Cross repository edges have lower confidence. Verify them with source code inspection.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -338,8 +319,68 @@ TIP: Cross-repo edges have lower confidence — verify with source code inspecti
       }
     },
     handler: async ({ repoPaths, mode }: any) => {
-      return { federatedEdges: [], crossRepoSymbols: [], indexStaleness: registry.governance.status().staleness.stale };
+      const linker = new FederatedLinker();
+      const status = registry.governance.status();
+      
+      if (mode === 'link' && repoPaths) {
+        for (const p of repoPaths) {
+          await linker.link(p);
+        }
+      }
+      
+      // Hydrate from links to Establish federated resonance
+      await linker.hydrate(registry.intelligence.graph.getGraph());
+      
+      return { 
+        federatedEdges: [], // Future: calculate cross-repo edges in federated-linker
+        crossRepoSymbols: [], 
+        indexStaleness: status.staleness.stale 
+      };
+    }
+  },
+
+  conducks_visualize: {
+    id: "conducks-visualize",
+    name: "conducks_visualize",
+    type: "tool",
+    version: "1.0.0",
+    description: `Generate a high-fidelity structural visualization (Mermaid) of the current Synapse.
+Provides a visual 'Watch Graph' reflected in a workspace artifact.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", default: 20, description: "Number of high-gravity nodes to include in the visualization." }
+      }
     },
-    formatter: (res: any) => `## Conducks Federated Linker`
+    handler: async ({ limit }: any) => {
+      const g = registry.intelligence.graph.getGraph();
+      const nodes = Array.from(g.getAllNodes())
+        .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
+        .slice(0, limit || 20);
+      
+      const nodeIds = new Set(nodes.map(n => n.id));
+      const mermaidLines = ["graph TD"];
+      
+      for (const node of nodes) {
+        const cleanName = node.properties.name.replace(/[^a-zA-Z0-9]/g, '_');
+        const label = `${node.label}::${node.properties.name}`;
+        mermaidLines.push(`  ${node.id}["${label}"]`);
+        
+        const neighbors = g.getNeighbors(node.id, 'downstream');
+        for (const edge of neighbors) {
+          if (nodeIds.has(edge.targetId)) {
+            mermaidLines.push(`  ${edge.sourceId} -- ${edge.type} --> ${edge.targetId}`);
+          }
+        }
+      }
+
+      const content = mermaidLines.join('\n');
+      const baseDir = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      const artifactPath = path.join(baseDir, '.conducks', 'structural_mirror.md');
+      
+      await fs.outputFile(artifactPath, `# Structural Mirror — Real-time Pulse\n\n\`\`\`mermaid\n${content}\n\`\`\`\n`, 'utf-8');
+      
+      return { artifactPath, nodeCount: nodes.length };
+    }
   }
 };

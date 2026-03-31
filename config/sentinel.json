@@ -1,20 +1,20 @@
 [
   {
-    "id": "require-base-service",
+    "id": "require-conducks-component",
     "type": "require_heritage",
-    "matchPath": "lib/product/indexing",
+    "matchPath": "src/lib/domain/analysis",
     "matchLabel": "class",
-    "target": "SemanticPlugin"
+    "target": "ConducksComponent"
   },
   {
-    "id": "api-export-standard",
-    "type": "require_export",
-    "matchPath": "lib/product/tools",
-    "matchLabel": "function"
+    "id": "hub-overload-prevention",
+    "type": "max_fans",
+    "matchPath": "src/registry",
+    "max": 30
   },
   {
     "id": "sentinel-config-presence",
     "type": "require_file",
-    "target": "sentinel.json"
+    "target": "config/sentinel.json"
   }
 ]
