@@ -1,7 +1,7 @@
 {
   "server": {
     "name": "conducks",
-    "version": "0.7.0",
+    "version": "0.7.7",
     "title": "CONDUCKS: Dynamic Documentation Governance Engine"
   },
   "description": "Documentation-driven governance for engineering teams. Provides structured rules for lifecycle, architecture, frontend, backend, security, and presentation standards.",

@@ -19,7 +19,7 @@ export class ContextCommand implements ConducksCommand {
     }
 
     try {
-      const g = registry.intelligence.graph.getGraph();
+      const g = registry.query.graph.getGraph();
       await persistence.load(g);
       const analyzer = new TraceAnalyzer(g);
       const steps = analyzer.trace(symbolId);

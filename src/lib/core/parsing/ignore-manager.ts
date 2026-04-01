@@ -61,6 +61,20 @@ export class IgnoreManager {
   }
 
   /**
+   * Static Helper: Checks if the directory contains a .conducks vault
+   */
+  public static hasConfig(dir: string): boolean {
+    return fs.existsSync(path.join(dir, ".conducks"));
+  }
+
+  /**
+   * Static Helper: Checks if the directory contains a package.json
+   */
+  public static hasPackageJson(dir: string): boolean {
+    return fs.existsSync(path.join(dir, "package.json"));
+  }
+
+  /**
    * Returns the full list of active patterns.
    */
   public getPatterns(): string[] {

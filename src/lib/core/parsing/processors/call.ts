@@ -1,6 +1,6 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
-import { PulseContext } from "@/lib/core/parsing/context.js";
+import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 
 /**
  * Conducks — Call Processor
@@ -11,7 +11,7 @@ export class CallProcessor {
   /**
    * Processes a call-site capture (@kinesis_target) and identifies its relationship.
    */
-  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: PulseContext): void {
+  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: AnalyzeContext): void {
     if (!target) return;
 
     let targetName = target;

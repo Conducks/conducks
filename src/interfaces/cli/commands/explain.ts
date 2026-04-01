@@ -25,7 +25,7 @@ export class ExplainCommand implements ConducksCommand {
     
     // Conducks: Intelligent Fallback Resolve
     if (!node) {
-      const results = await registry.intelligence.query(symbolId, 1);
+      const results = await registry.query.query(symbolId, 1);
       if (results.length > 0) {
         node = registry.infrastructure.graphEngine.getGraph().getNode(results[0].id);
       }
@@ -36,8 +36,8 @@ export class ExplainCommand implements ConducksCommand {
       return;
     }
 
-    const entropyRes = await registry.metrics.calculateEntropy(node.id);
-    const riskData = registry.metrics.calculateCompositeRisk(node.id);
+    const entropyRes = await registry.explain.calculateEntropy(node.id);
+    const riskData = registry.explain.calculateCompositeRisk(node.id);
 
     if (!riskData) {
       console.error(`Error: Could not calculate risk for "${symbolId}".`);

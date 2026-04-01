@@ -7,7 +7,7 @@ import { AnalyzeCommand } from "./commands/analyze.js";
 import { StatusCommand } from "./commands/status.js";
 import { QueryCommand } from "./commands/query.js";
 import { ContextCommand } from "./commands/context.js";
-import { VerifyCommand } from "./commands/verify.js";
+import { AuditCommand } from "./commands/audit.js";
 import { CleanCommand } from "./commands/clean.js";
 import { ContextGenCommand } from "./commands/context-gen.js";
 import { BlueprintCommand } from "./commands/blueprint.js";
@@ -86,7 +86,7 @@ export async function main() {
 
   // Registry of modular commands
   const commands: ConducksCommand[] = [
-    new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new VerifyCommand(),
+    new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
     new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
     new AdviseCommand(), new PruneCommand(), new BlueprintCommand(), new MirrorCommand(),
@@ -98,18 +98,7 @@ export async function main() {
 
   commands.push(new HelpCommand(commands));
 
-  // Conducks: Command Symmetry & Aliasing
-  const aliasMap: Record<string, string> = {
-    "search": "query",
-    "map": "status",
-    "audit": "verify",
-    "refactor": "rename",
-    "evolution": "diff",
-    "metrics": "explain",
-    "system": "status"
-  };
-
-  const effectiveId = aliasMap[commandId] || commandId;
+  const effectiveId = commandId;
   const command = commands.find(c => c.id === effectiveId);
   const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'mcp', 'bootstrap-docs', 'record'].includes(effectiveId);
 
@@ -131,7 +120,7 @@ export async function main() {
       const persistence = registry.infrastructure.persistence;
 
       if (!isStalenessBypass && !isMcpCommand) {
-        const status = registry.governance.status();
+        const status = registry.audit.status();
         if (status.staleness.stale) {
           const commits = (status.staleness as any).commitsBehind || 0;
           console.log(`\x1b[33m⚠️  [Conducks] Index is ${commits} commits behind HEAD. Run 'conducks analyze' to refresh structural resonance.\x1b[0m\n`);

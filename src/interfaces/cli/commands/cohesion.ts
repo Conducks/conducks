@@ -19,10 +19,10 @@ export class CohesionCommand implements ConducksCommand {
       return;
     }
 
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
 
     try {
-      const vector = registry.metrics.getCohesionVector(s1, s2);
+      const vector = registry.explain.getCohesionVector(s1, s2);
       console.log(`\n\x1b[1m--- Structural Cohesion Report ---\x1b[0m`);
       console.log(`\x1b[35mVector Similarity:\x1b[0m ${(vector * 100).toFixed(2)}%`);
     } catch (err) {

@@ -15,15 +15,15 @@ export class MirrorCommand implements ConducksCommand {
     console.log("\x1b[35m[Conducks] Initializing Visual Dashboard...\x1b[0m");
     
     // 1. Load Graph
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
     
     // 2. Start Mirror Server
-    const server = initGlobalMirror(registry.intelligence.graph, persistence);
+    const server = initGlobalMirror(registry.query.graph, persistence);
     server.start(3333);
     
     // 3. Start Watcher (Live Connection)
-    if (registry.evolution.watcher) {
-      registry.evolution.watcher.start();
+    if (registry.rename.watcher) {
+      registry.rename.watcher.start();
     }
     
     console.log("\n\x1b[32m✅ Conducks Mirror is LIVE.\x1b[0m");

@@ -27,9 +27,9 @@ export class VisualizeCommand implements ConducksCommand {
       // Resonate to ensure PageRank gravity is calculated on the merged graph
       (registry.infrastructure.graphEngine as any).resonate();
 
-      const graph = registry.intelligence.graph.getGraph();
-      const nodes = Array.from(graph.getAllNodes())
-        .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
+      const graph = registry.query.graph.getGraph();
+      const nodes = Array.from(graph.getAllNodes() as Iterable<any>)
+        .sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0))
         .slice(0, limit);
 
       const mermaidLines: string[] = ["graph TD"];
@@ -44,8 +44,8 @@ export class VisualizeCommand implements ConducksCommand {
 
       for (const node of nodes) {
         const neighbors = graph.getNeighbors(node.id, 'downstream');
-        for (const neighbor of neighbors) {
-          if (nodes.find(n => n.id === neighbor.id)) {
+        for (const neighbor of (neighbors as any)) {
+          if (nodes.find((n: any) => n.id === neighbor.id)) {
             const edgeKey = `${node.id}->${neighbor.id}`;
             if (!edges.has(edgeKey)) {
               // Sanitize IDs for Mermaid

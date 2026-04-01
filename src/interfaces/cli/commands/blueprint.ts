@@ -15,14 +15,14 @@ export class BlueprintCommand implements ConducksCommand {
   public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
     try {
       console.log("[Conducks] Generating Structural Graph...");
-      await persistence.load(registry.intelligence.graph.getGraph());
+      await persistence.load(registry.query.graph.getGraph());
       
       // Hydrate Federated Graphs
       const linker = new FederatedLinker();
-      await linker.hydrate(registry.intelligence.graph.getGraph());
+      await linker.hydrate(registry.query.graph.getGraph());
       
       const generator = new BlueprintGenerator();
-      const targetPath = await generator.generate(registry.intelligence.graph.getGraph());
+      const targetPath = await generator.generate(registry.query.graph.getGraph());
       console.log(`✅ Structural Graph generated at: ${targetPath}`);
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks

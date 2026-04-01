@@ -1,4 +1,4 @@
-import { PulseOrchestrator } from "./orchestrator.js";
+import { AnalyzeOrchestrator } from "./orchestrator.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
@@ -19,19 +19,19 @@ const logger = new Logger("AnalysisDomain");
  */
 export class AnalysisService {
   constructor(
-    private orchestrator: PulseOrchestrator,
+    private orchestrator: AnalyzeOrchestrator,
     private graph: ConducksGraph,
     private persistence: SynapsePersistence,
     private contextGenerator: ContextGenerator
   ) {}
 
   /**
-   * Performs a high-fidelity structural pulse on the entire project.
+   * Performs a high-fidelity structural analysis on the entire project.
    * Consolidates discovery, batch reflection, gravity resonance, and persistence.
    * 
-   * Standardized naming: pulse()
+   * Standardized naming: analyze()
    */
-  public async pulse(options: { staged?: boolean, verbose?: boolean } = {}): Promise<{ success: boolean, files: number }> {
+  public async analyze(options: { staged?: boolean, verbose?: boolean } = {}): Promise<{ success: boolean, files: number }> {
     let targetPath = chronicle.getProjectDir();
 
     // Safeguard against indexing the root of the filesystem
@@ -59,8 +59,8 @@ export class AnalysisService {
       allUnits.push(...batch);
     }
 
-    // Execute the core pulse
-    await this.orchestrator.pulse(allUnits);
+    // Execute the core analysis wave
+    await this.orchestrator.analyze(allUnits);
 
     // 3. Significance Analysis & Federated Linkage
     // We delegate the metadata enrichment to the domain service
@@ -81,7 +81,7 @@ export class AnalysisService {
     // 4. Persistence & Sync Metadata
     const headHash = voyager.getHeadHash();
     if (headHash) {
-      this.graph.getGraph().setMetadata('lastPulsedCommit', headHash);
+      this.graph.getGraph().setMetadata('lastAnalyzedCommit', headHash);
     }
 
     await this.persistence.save(this.graph.getGraph());
@@ -100,5 +100,5 @@ export class AnalysisService {
   }
 }
 
-export { PulseOrchestrator } from "./orchestrator.js";
+export { AnalyzeOrchestrator } from "./orchestrator.js";
 export { ConducksReflector } from "./reflector.js";

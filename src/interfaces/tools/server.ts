@@ -19,7 +19,7 @@ import {
  * Conducks tool registry server that orchestrates internal APIs and tool scheduler.
  * Consolidates all structural and behavioral tools into a documentation-driven registry.
  * 
- * Rule 10/13 ENFORCEMENT: Exactly 10 Unified Conducks MCP Tools. No more, no less.
+ * Rule 10/13 ENFORCEMENT: Exactly 9 Unified Conducks MCP Tools. No more, no less.
  */
 export class ConducksMCPServer {
   private server: Server;
@@ -62,8 +62,8 @@ export class ConducksMCPServer {
       this.registry.register(tool);
     }
 
-    // Rule 10/13 ENFORCEMENT: Exactly 10 Unified Conducks MCP Tools.
-    const MANDATED_TOOL_COUNT = 10;
+    // Rule 10/13 ENFORCEMENT: Exactly 9 Unified Conducks MCP Tools.
+    const MANDATED_TOOL_COUNT = 9;
     if (tools.length !== MANDATED_TOOL_COUNT) {
       console.error(
         `[Conducks MCP] ⚠️ Rule 10/13 VIOLATION: Expected ${MANDATED_TOOL_COUNT} tools, ` +
@@ -126,8 +126,8 @@ export class ConducksMCPServer {
       
       try {
         // Conducks Lazy Resonance: Relies on CLI-level initialization for the session
-        const status = registry.governance.status();
-        const nodes = Array.from(registry.intelligence.graph.getGraph().getAllNodes());
+        const status = registry.audit.status();
+        const nodes = Array.from(registry.query.graph.getGraph().getAllNodes());
 
         const summarizeNodes = (items: any[]) => items.map(n => ({
           id: n.id,
@@ -183,7 +183,7 @@ export class ConducksMCPServer {
         }
 
         if (uri === "resource://conducks/violations") {
-          const audit = registry.governance.audit();
+          const audit = registry.audit.audit();
           return {
             contents: [{
               uri,

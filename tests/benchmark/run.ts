@@ -27,10 +27,10 @@ async function run() {
   const endResonance = performance.now();
 
   const startPulse = performance.now();
-  await registry.analysis.pulse(stream);
+  await registry.analyze.analyze(stream);
   const endPulse = performance.now();
 
-  const status = registry.governance.status();
+  const status = registry.audit.status();
 
   console.log('\n\x1b[1m--- 📊 Resonance Metrics ---\x1b[0m');
   console.log(`- Discovery & Read (Mirroring): ${(endResonance - startResonance).toFixed(2)}ms`);

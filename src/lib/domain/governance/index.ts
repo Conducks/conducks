@@ -73,7 +73,7 @@ export class GovernanceService {
       framework: this.graph.getMetadata('framework') || "generic",
       staleness: {
         stale: isStale,
-        lastPulsedCommit: lastCommit,
+        lastAnalyzedCommit: lastCommit,
         currentHead: currentHead || "non-git",
         commitsBehind: isStale ? chronicle.getCommitsBehind(lastCommit) : 0,
       },

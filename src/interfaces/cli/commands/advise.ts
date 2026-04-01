@@ -12,7 +12,7 @@ export class AdviseCommand implements ConducksCommand {
 
   public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
     try {
-      const advice = await registry.governance.advise();
+      const advice = await registry.audit.advise();
       console.log(`\n\x1b[1m--- 💎 Conducks Architecture Advisor ---\x1b[0m`);
 
       if (advice.length === 0) {

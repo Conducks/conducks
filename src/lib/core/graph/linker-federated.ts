@@ -27,7 +27,7 @@ export class FederatedLinker {
     const absolutePath = path.resolve(projectPath);
     
     // Verify it's a valid Conducks project (DuckDB Sync)
-    const dbPath = path.join(absolutePath, 'data', 'conducks-synapse.db');
+    const dbPath = path.join(absolutePath, '.conducks', 'conducks-synapse.db');
     try {
       await this.fsMock.access(dbPath);
     } catch {

@@ -15,13 +15,13 @@ export class HelpCommand implements ConducksCommand {
 
   public async execute(_args: string[], _persistence: SynapsePersistence): Promise<void> {
     const domains: Record<string, string[]> = {
-      "DISCOVERY (Discovery)": ["query", "search", "list"],
-      "MAPPING (Landscape)": ["entry", "status", "link"],
+      "DISCOVERY (Query)": ["analyze", "query", "list", "entry"],
+      "LANDSCAPE (Status)": ["status", "link", "resonance", "blueprint"],
       "BEHAVIORAL (Impact)": ["impact", "flows", "trace"],
-      "ANALYTICAL (Metrics)": ["entropy", "cohesion", "explain", "resonance"],
-      "GOVERNANCE (Integrity)": ["verify", "advise", "blueprint", "context"],
-      "HISTORICAL (Delta)": ["diff"],
-      "MUTATIONAL (Refactor)": ["rename", "prune", "clean"],
+      "METRICS (Explain)": ["explain", "entropy", "cohesion"],
+      "GOVERNANCE (Audit)": ["audit", "advise", "context"],
+      "HISTORICAL (Diff)": ["diff"],
+      "MUTATIONAL (Rename)": ["rename", "prune", "clean"],
       "VISUAL (Mirror)": ["mirror", "visualize"],
       "SYSTEM (Meta)": ["mcp", "setup", "watch", "record", "bootstrap-docs", "help"]
     };

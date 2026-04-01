@@ -58,6 +58,12 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
    * Manually registers a single tool instance.
    */
   override register(tool: Tool): void {
+    // Safety Fallback: Ensure a formatter exists to prevent MCP runtime crashes
+    if (typeof tool.formatter !== 'function') {
+      this.warn(`Tool "${tool.name}" is missing a formatter. Injecting default JSON formatter.`);
+      (tool as any).formatter = (res: any) => JSON.stringify(res, null, 2);
+    }
+
     // id is used for the registry, name is used for MCP
     super.register(tool);
     this.log(`registered: ${tool.name}`);
@@ -164,9 +170,9 @@ function isTool(candidate: unknown): candidate is Tool {
   return (
     candidate !== null &&
     typeof candidate === "object" &&
-    typeof (candidate as Tool).name === "string" &&
-    typeof (candidate as Tool).handler === "function" &&
-    typeof (candidate as Tool).formatter === "function"
+    typeof (candidate as any).name === "string" &&
+    typeof (candidate as any).handler === "function"
+    // formatter is now mandatory in type, but we allow its absence here to repair it in register()
   );
 }
 

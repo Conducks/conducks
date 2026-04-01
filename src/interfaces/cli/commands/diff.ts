@@ -29,7 +29,7 @@ export class DiffCommand implements ConducksCommand {
     }
 
     // Default: Git-based PR Risk Engine
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
 
     console.log(`\n\x1b[1m--- 🛡️ Conducks PR Risk Engine ---\x1b[0m`);
 
@@ -52,7 +52,7 @@ export class DiffCommand implements ConducksCommand {
 
     // 2. Map Hunks to Symbols
     for (const change of changes) {
-      const nodes = Array.from(registry.intelligence.graph.getGraph().getAllNodes())
+      const nodes = Array.from(registry.query.graph.getGraph().getAllNodes() as Iterable<any>)
         .filter(n => n.properties.filePath === change.file);
 
       for (const line of change.lines) {
@@ -75,7 +75,7 @@ export class DiffCommand implements ConducksCommand {
 
     // 3. Calculate Aggregated Risk
     for (const symbolId of impactedSymbols) {
-      const risk = await registry.metrics.calculateCompositeRisk(symbolId);
+      const risk = await registry.explain.calculateCompositeRisk(symbolId);
       if (risk) {
         totalRisk += risk.score;
         reports.push({ id: symbolId, risk: risk.score });

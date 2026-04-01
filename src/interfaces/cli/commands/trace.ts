@@ -21,11 +21,11 @@ export class TraceCommand implements ConducksCommand {
       return;
     }
 
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
 
     let symbolId = symbolInput;
-    if (!registry.intelligence.graph.getGraph().getNode(symbolInput)) {
-      const results = await registry.intelligence.query(symbolInput, 1);
+    if (!registry.query.graph.getGraph().getNode(symbolInput)) {
+      const results = await registry.query.query(symbolInput, 1);
       if (results.length > 0) {
         symbolId = results[0].id;
       }
@@ -36,7 +36,7 @@ export class TraceCommand implements ConducksCommand {
     try {
       const steps = isFlow ? registry.kinetic.flow(symbolId) : registry.kinetic.trace(symbolId);
       steps.slice(0, 15).forEach((id: string, i: number) => {
-        const n = registry.intelligence.graph.getGraph().getNode(id);
+        const n = registry.query.graph.getGraph().getNode(id);
         const prefix = (i + 1).toString().padStart(2, '0');
         console.log(`${prefix}. [\x1b[35m${n?.label || 'unknown'}\x1b[0m] ${n?.properties.name || 'unknown'} (\x1b[2m${n?.properties.filePath || 'unknown'}\x1b[0m)`);
       });

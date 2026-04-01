@@ -1,7 +1,7 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
-import { AnalysisService, PulseOrchestrator } from "@/lib/domain/analysis/index.js";
+import { AnalysisService, AnalyzeOrchestrator } from "@/lib/domain/analysis/index.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, ContextGenerator, BlueprintGenerator } from "@/lib/domain/governance/index.js";
@@ -22,6 +22,53 @@ import path from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const resourcesDir = path.resolve(__dirname, "../resources/grammars");
+
+/**
+ * Conducks — Structural Anchor Discovery
+ * 
+ * Autonomously resolves the nearest project root by searching upward
+ * for a .conducks vault or package.json. This is the foundation 
+ * for "Zero-Hint" structural intelligence.
+ */
+function discoverRoot(startPath: string): string {
+  const binaryAnchor = path.dirname(__filename);
+  const searchPaths = [startPath, binaryAnchor];
+  const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
+
+  // Phase 1: High-Priority Vault Search (.conducks) 🏺
+  // Find the nearest structural synapse before falling back to generic project indicators.
+  for (const start of searchPaths) {
+    let current = start;
+    while (current !== path.parse(current).root) {
+      if (IgnoreManager.hasConfig(current)) {
+        if (!forbiddenArtifacts.includes(path.basename(current))) {
+          return current;
+        }
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+
+  // Phase 2: Fallback Project Search (package.json) 🧬
+  // Identify the project boundary, explicitly skipping build/dist/out artifacts.
+  for (const start of searchPaths) {
+    let current = start;
+    while (current !== path.parse(current).root) {
+      if (IgnoreManager.hasPackageJson(current)) {
+        if (!forbiddenArtifacts.includes(path.basename(current))) {
+          return current;
+        }
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+  
+  return startPath;
+}
 
 /**
  * Conducks — Master Registry (The v1.9.0 Bridge Layer) 🛡️ 🧠 💎
@@ -60,8 +107,8 @@ const blueprint = new BlueprintGenerator();
 const mirrorEngine = new MirrorEngine(graph.getGraph());
 
 // 4. Domain Facade Consolidation (Service Layer)
-const analysisOrchestrator = new PulseOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
-const analysis = new AnalysisService(analysisOrchestrator, graph, persistence, contextGenerator);
+const orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
+const analysis = new AnalysisService(orchestrator, graph, persistence, contextGenerator);
 const kinetic = new KineticService(graph.getGraph());
 const metrics = new MetricsService(graph, deadCode, resonance, aligner);
 const governance = new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint);
@@ -82,7 +129,9 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
     console.error(`🛡️ [Conducks Registry] Grammar Engine Ready (Python, TypeScript indexed).`);
   }
 
-  const effectiveRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  // 🧬 Standardize Structural Anchor (v1.12.5)
+  const baseRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  const effectiveRoot = (baseRoot === ":memory:") ? baseRoot : discoverRoot(baseRoot);
   
   // 🏺 💎 Anchor Structural Diagnostic Sink (v1.12.0)
   if (effectiveRoot !== ":memory:") {
@@ -109,7 +158,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
     persistence = new GraphPersistence(effectiveRoot, readOnly);
     chronicle.setProjectDir(effectiveRoot);
     ignoreManager = new IgnoreManager(effectiveRoot);
-    (analysisOrchestrator as any).ignoreManager = ignoreManager;
+    (orchestrator as any).ignoreManager = ignoreManager;
   }
   
   try {
@@ -128,21 +177,25 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
 /**
  * The Unified Registry Singleton (The v1.9.0 Bridge)
  */
+/**
+ * The Unified Registry Singleton (Conducks Production Standard)
+ */
 export const registry = {
-  manifest: {
+  status: {
     bootstrap: (projectRoot: string, projectName: string) => new ManifestService(manifestEngine).bootstrap(projectRoot, projectName),
-    record: (projectRoot: string, projectName: string, type: string, content: string) => new ManifestService(manifestEngine).record(projectRoot, projectName, type, content)
+    record: (projectRoot: string, projectName: string, type: string, content: string) => new ManifestService(manifestEngine).record(projectRoot, projectName, type, content),
+    health: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).status()
   },
-  analysis: {
-    pulse: (files: any[]) => {
-      (analysisOrchestrator as any).persistence = persistence;
-      (analysisOrchestrator as any).ignoreManager = ignoreManager;
-      return analysisOrchestrator.pulse(files);
+  analyze: {
+    analyze: (files: any[]) => {
+      (orchestrator as any).persistence = persistence;
+      (orchestrator as any).ignoreManager = ignoreManager;
+      return orchestrator.analyze(files);
     },
     full: (options: any = {}) => {
-      (analysisOrchestrator as any).persistence = persistence;
-      (analysisOrchestrator as any).ignoreManager = ignoreManager;
-      return new AnalysisService(analysisOrchestrator, graph, persistence, contextGenerator).pulse(options);
+      (orchestrator as any).persistence = persistence;
+      (orchestrator as any).ignoreManager = ignoreManager;
+      return new AnalysisService(orchestrator, graph, persistence, contextGenerator).analyze(options);
     }
   },
   kinetic: {
@@ -153,38 +206,38 @@ export const registry = {
     flow: (symbolId: string) => new KineticService(graph.getGraph()).flow(symbolId),
     getProcesses: () => new KineticService(graph.getGraph()).getProcesses()
   },
-  intelligence: {
+  query: {
     query: (q: string, limit?: number) => new IntelligenceService(graph, search, gql, federation).query(q, limit),
     parseGQL: (query: string) => new IntelligenceService(graph, search, gql, federation).parseGQL(query),
     link: (projectPath: string) => new IntelligenceService(graph, search, gql, federation).link(projectPath),
     resonate: () => graph.resonate(),
     get graph() { return graph; },
-    diff: diffEngine
+    get diff() { return diffEngine; }
   },
-  evolution: {
+  rename: {
     rename: (symbolId: string, newName: string, dryRun?: boolean) => new EvolutionService(graph, persistence).rename(symbolId, newName, dryRun),
     get watcher() { return new EvolutionService(graph, persistence).getWatcher(chronicle.getProjectDir()); }
   },
-  metrics: {
+  explain: {
     prune: () => new MetricsService(graph, deadCode, resonance, aligner).prune(),
     calculateEntropy: (symbolId: string) => new MetricsService(graph, deadCode, resonance, aligner).calculateEntropy(symbolId),
     calculateCompositeRisk: (nodeId: string) => new MetricsService(graph, deadCode, resonance, aligner).calculateCompositeRisk(nodeId),
     getCohesionVector: (sourceId: string, targetId: string) => new MetricsService(graph, deadCode, resonance, aligner).getLevelSimilarity(sourceId, targetId),
     compare: (otherPath: string) => new MetricsService(graph, deadCode, resonance, aligner).compare(otherPath)
   },
-  infrastructure: {
-    get graphEngine() { return graph; },
-    get persistence() { return persistence; },
-    get chronicle() { return chronicle; },
-    get registry() { return synapseRegistry; }
-  },
-  governance: {
+  audit: {
     audit: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).audit(),
     advise: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).advise(),
     context: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).generateContext(persistence),
     contextFile: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).generateManifest(persistence),
     blueprint: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).generateBlueprint(),
     status: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).status()
+  },
+  infrastructure: {
+    get graphEngine() { return graph; },
+    get persistence() { return persistence; },
+    get chronicle() { return chronicle; },
+    get registry() { return synapseRegistry; }
   },
   mirror: {
     getWave: (layers?: number[], clusters?: string[]) => (mirrorEngine as any).getVisualWave(layers, clusters)

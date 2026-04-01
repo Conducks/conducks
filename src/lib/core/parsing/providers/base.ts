@@ -1,5 +1,5 @@
 import * as Parser from "web-tree-sitter";
-import { PulseContext } from "@/lib/core/parsing/context.js";
+import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 
 /**
  * Conducks — Language Provider Registry (Parity with  v14 Spec)

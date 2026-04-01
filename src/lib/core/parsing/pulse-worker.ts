@@ -1,6 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
-import { PulseContext } from "@/lib/core/parsing/context.js";
+import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { grammars } from "./grammar-registry.js";
 import { PythonProvider } from "@/lib/core/parsing/languages/python/index.js";
 import path from 'node:path';
@@ -14,7 +14,7 @@ async function runWorker() {
 
   await grammars.init();
   const reflector = new ConducksReflector();
-  const context = new PulseContext();
+  const context = new AnalyzeContext();
   const allPaths = units.map((u: any) => u.path);
 
   // Conducks: Python only 🐍

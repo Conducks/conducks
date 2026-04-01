@@ -1,4 +1,4 @@
-import { PulseContext } from "./context.js";
+import { AnalyzeContext } from "./context.js";
 
 import { ConducksComponent } from "@/registry/types.js";
 

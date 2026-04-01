@@ -1,6 +1,6 @@
 import { ConducksPipeline } from "@/lib/core/parsing/pipeline.js";
 import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
-import { PulseContext } from "@/lib/core/parsing/context.js";
+import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { SynapseRegistry } from "@/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
@@ -12,16 +12,16 @@ import { ConducksComponent } from "@/registry/types.js";
 import { logger } from "@/lib/core/utils/logger.js";
 
 /**
- * Conducks — Pulse Orchestrator
+ * Conducks — Analyze Orchestrator
  * 
  * The central orchestration engine for structural analysis.
  * Manages the batch-parallel topological pulse and structural resonance.
  */
-export class PulseOrchestrator implements ConducksComponent {
-  public readonly id = "pulse-orchestrator";
+export class AnalyzeOrchestrator implements ConducksComponent {
+  public readonly id = "analyze-orchestrator";
   public readonly type = "analyzer";
 
-  public context = new PulseContext();
+  public context = new AnalyzeContext();
 
   constructor(
     private registry: SynapseRegistry<any>,
@@ -33,10 +33,10 @@ export class PulseOrchestrator implements ConducksComponent {
   ) { }
 
   /**
-   * Orchestrates a high-fidelity pulse on the provided files.
-   * Standardized naming: pulse()
+   * Orchestrates a high-fidelity structural analysis on the provided files.
+   * Standardized naming: analyze()
    */
-  public async pulse(files: Array<{ path: string, source: string }>): Promise<string> {
+  public async analyze(files: Array<{ path: string, source: string }>): Promise<string> {
     this.context.reset();
     const context = this.context;
 
@@ -53,7 +53,7 @@ export class PulseOrchestrator implements ConducksComponent {
     // We preserve casing for Linux compatibility while resolving relative paths
     const normalizedFiles = activeFiles.map(f => {
       if (!f || !f.path) {
-        throw new Error(`[Conducks] Structural integrity failure: Received null or undefined file path during pulse.`);
+        throw new Error(`[Conducks] Structural integrity failure: Received null or undefined file path during analyze.`);
       }
       return { path: path.resolve(f.path), source: f.source };
     });
@@ -78,7 +78,7 @@ export class PulseOrchestrator implements ConducksComponent {
         indexCount++;
         // Periodic Milestone Log: Providing structural visibility for large projects.
         if (indexCount % 100 === 0 || indexCount === normalizedFiles.length) {
-          logger.info(`Structural Pulse: Reflecting unit ${indexCount}/${normalizedFiles.length} (${Math.round((indexCount / normalizedFiles.length) * 100)}%)...`);
+          logger.info(`Structural Analysis: Reflecting unit ${indexCount}/${normalizedFiles.length} (${Math.round((indexCount / normalizedFiles.length) * 100)}%)...`);
         }
 
         // Filename-Aware Provider Mapping

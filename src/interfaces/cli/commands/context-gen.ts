@@ -15,9 +15,9 @@ export class ContextGenCommand implements ConducksCommand {
   public async execute(_args: string[], persistence: DuckDbPersistence): Promise<void> {
     try {
       console.log("[Conducks] Generating Neural Architecture Context...");
-      await persistence.load(registry.intelligence.graph.getGraph());
+      await persistence.load(registry.query.graph.getGraph());
       
-      const contextMd = await (registry.governance as any).contextFile();
+      const contextMd = await (registry.audit as any).contextFile();
       const outputPath = path.join(process.cwd(), 'ARCHITECTURE.md');
       
       await fs.writeFile(outputPath, contextMd, 'utf-8');

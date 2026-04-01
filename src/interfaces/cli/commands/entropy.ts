@@ -16,8 +16,8 @@ export class EntropyCommand implements ConducksCommand {
       console.log("\x1b[31mError: No symbol specified for entropy analysis.\x1b[0m");
       return;
     }
-    await persistence.load(registry.intelligence.graph.getGraph());
-    const { entropy, risk, authorCount } = await registry.metrics.calculateEntropy(symbolId) as any;
+    await persistence.load(registry.query.graph.getGraph());
+    const { entropy, risk, authorCount } = await registry.explain.calculateEntropy(symbolId) as any;
 
     const fmt = (v: any) => isNaN(Number(v)) ? "0.00" : (Number(v) * 100).toFixed(2);
 

@@ -46,8 +46,8 @@ export interface Tool extends ConducksComponent {
   /** The execution logic for the tool */
   handler: (args: any) => Promise<any>;
   
-  /** Optional formatter to convert the raw result into a human-readable string */
-  formatter?: (res: any) => string;
+  /** Mandatory formatter to convert the raw result into a human-readable string */
+  formatter: (res: any) => string;
 }
 
 /**

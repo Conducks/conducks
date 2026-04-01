@@ -11,7 +11,7 @@ export class FlowsCommand implements ConducksCommand {
   public usage = "registry flows";
 
   public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
     const processes = registry.kinetic.getProcesses();
     console.log("\x1b[1m--- 🌊 Behavioral Processes ---\x1b[0m");
     

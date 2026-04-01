@@ -7,7 +7,7 @@ import { BindingProcessor } from "@/lib/core/parsing/processors/binding.js";
 import { CallProcessor } from "@/lib/core/parsing/processors/call.js";
 import { HeritageProcessor } from "@/lib/core/parsing/processors/heritage.js";
 import { FlowProcessor } from "@/lib/core/parsing/processors/flow.js";
-import { PulseContext } from "@/lib/core/parsing/context.js";
+import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
 import { mapToCanonical, CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
@@ -33,7 +33,7 @@ export class ConducksReflector {
   public async reflect(
     file: { path: string, source: string },
     provider: ConducksProvider,
-    context: PulseContext,
+    context: AnalyzeContext,
     allPaths: string[]
   ): Promise<PrismSpectrum> {
     const spectrum: PrismSpectrum = {

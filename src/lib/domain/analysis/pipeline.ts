@@ -1,4 +1,4 @@
-import { PulseContext } from "@/lib/core/parsing/context.js";
+import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 
 /**
  * Conducks — Pulse Pipeline

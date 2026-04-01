@@ -1,9 +1,52 @@
 import fs from 'node:fs/promises';
 import { ConducksAdjacencyList, ConducksNode, ConducksEdge } from "@/lib/core/graph/adjacency-list.js";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import duckdb from "duckdb";
 import { logger } from "@/lib/core/utils/logger.js";
 import os from "node:os";
+import fsSync from "node:fs";
+
+/**
+ * Conducks — Structural Anchor Discovery
+ */
+function findNearestVault(startDir: string): string {
+  const binaryAnchor = path.dirname(fileURLToPath(import.meta.url));
+  const searchPaths = [startDir, binaryAnchor];
+  const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
+
+  // Phase 1: High-Priority Vault Search (.conducks) 🏺 🧬
+  for (const start of searchPaths) {
+    let current = path.resolve(start);
+    while (current !== path.parse(current).root) {
+      if (fsSync.existsSync(path.join(current, ".conducks"))) {
+        if (!forbiddenArtifacts.includes(path.basename(current))) {
+          return current;
+        }
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+
+  // Phase 2: Fallback Project Search (package.json)
+  for (const start of searchPaths) {
+    let current = path.resolve(start);
+    while (current !== path.parse(current).root) {
+      if (fsSync.existsSync(path.join(current, "package.json"))) {
+        if (!forbiddenArtifacts.includes(path.basename(current))) {
+          return current;
+        }
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+  
+  return startDir;
+}
 
 /**
  * Conducks — Synapse Persistence Interface
@@ -39,9 +82,12 @@ export class DuckDbPersistence implements SynapsePersistence {
       projectRoot = path.resolve(projectRoot);
       if (projectRoot === '/' || projectRoot === '\\') {
         projectRoot = path.join(os.homedir(), '.conducks', 'synapses', 'root-fallback');
+      } else {
+        // 🧬 Standardize Structural Anchor (v1.12.5)
+        projectRoot = findNearestVault(projectRoot);
       }
 
-      this.cacheDir = path.join(projectRoot, 'data');
+      this.cacheDir = path.join(projectRoot, '.conducks');
       this.dbPath = path.join(this.cacheDir, 'conducks-synapse.db');
       logger.info(`Persistence Initialized at: ${projectRoot}`);
     }

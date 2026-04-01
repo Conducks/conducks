@@ -26,28 +26,28 @@ export class EntryCommand implements ConducksCommand {
       : injectedPersistence);
 
     try {
-      const success = await persistence.load(registry.intelligence.graph.getGraph());
+      const success = await persistence.load(registry.query.graph.getGraph());
       if (!success) {
-        console.error(`\x1b[31m[Conducks CLI] Error: No structural index found at ${targetPath}. Run 'registry analyze' first.\x1b[0m`);
+        console.error(`\x1b[31m[Conducks CLI] Error: No structural index found at ${targetPath}. Run 'conducks analyze' first.\x1b[0m`);
         return;
       }
 
       // Ensure entry point detection is fresh
-      registry.intelligence.graph.getGraph().detectEntryPoints();
+      (registry.query.graph.getGraph() as any).detectEntryPoints?.();
 
-      const graph = registry.intelligence.graph.getGraph();
-      const nodes = Array.from(graph.getAllNodes());
+      const graph = registry.query.graph.getGraph();
+      const nodes = Array.from(graph.getAllNodes() as Iterable<any>);
 
       const entryPoints = nodes
-        .filter(n => n.properties.isEntryPoint)
-        .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0));
+        .filter(n => n.properties?.isEntryPoint)
+        .sort((a, b) => (b.properties?.rank || 0) - (a.properties?.rank || 0));
 
       console.log("\x1b[1m--- 🚪 Project Entry Points (Conducks) ---\x1b[0m");
       console.log(`- Detected: ${entryPoints.length} anchors found.\n`);
 
       if (entryPoints.length === 0) {
         console.log("No explicit entry points detected. Heuristics found no 'main', 'app', or routes.");
-        console.log("Try running 'registry analyze --verbose' to see structural orientation.");
+        console.log("Try running 'conducks analyze --verbose' to see structural orientation.");
         return;
       }
 
@@ -55,7 +55,7 @@ export class EntryCommand implements ConducksCommand {
       console.log("-".repeat(80));
 
       entryPoints.forEach(n => {
-        const gravity = (n.properties.rank || 0).toFixed(4);
+        const gravity = (n.properties?.rank || 0).toFixed(4);
         const kind = n.label || "unknown";
         const id = n.id.length > 47 ? "..." + n.id.slice(-47) : n.id;
 

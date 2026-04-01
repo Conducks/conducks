@@ -1,7 +1,7 @@
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
 import { ConducksComponent } from "@/registry/types.js";
 import { SynapseRegistry } from "@/registry/synapse-registry.js";
-import { PulseOrchestrator } from "@/lib/domain/analysis/orchestrator.js";
+import { AnalyzeOrchestrator } from "@/lib/domain/analysis/orchestrator.js";
 import { PythonProvider } from "@/lib/core/parsing/languages/python/index.js";
 import { TypeScriptProvider } from "@/lib/core/parsing/languages/typescript/index.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
@@ -47,7 +47,7 @@ export class Conducks implements ConducksComponent {
   private advisor = new ConducksAdvisor();
   private aligner = new TestAligner();
 
-  private orchestrator: PulseOrchestrator;
+  private orchestrator: AnalyzeOrchestrator;
   private registry = new SynapseRegistry<ConducksComponent>();
   private persistence: SynapsePersistence = new GraphPersistence();
   private linker = new GlobalSymbolLinker();
@@ -56,7 +56,7 @@ export class Conducks implements ConducksComponent {
     if (options?.baseDir) {
       this.persistence = new GraphPersistence(options.baseDir);
     }
-    this.orchestrator = new PulseOrchestrator(this.registry, this.graph, this.aligner, this.persistence);
+    this.orchestrator = new AnalyzeOrchestrator(this.registry, this.graph, this.aligner, this.persistence);
     this.setupDefaults();
   }
 
@@ -116,7 +116,7 @@ export class Conducks implements ConducksComponent {
 
     console.error(`[ConducksCore] Calling Orchestrator with ${files.length} units.`);
     try {
-      await this.orchestrator.pulse(files);
+      await this.orchestrator.analyze(files);
       const framework = (this.orchestrator as any).context.getFramework();
       if (framework) {
         this.graph.getGraph().setMetadata('framework', framework);
@@ -255,7 +255,7 @@ export class Conducks implements ConducksComponent {
       framework: graph.getMetadata('framework') || "generic",
       staleness: {
         stale: isStale,
-        lastPulsedCommit: lastCommit,
+        lastAnalyzedCommit: lastCommit,
         currentHead: currentHead || "non-git",
         commitsBehind
       },

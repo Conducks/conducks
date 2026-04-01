@@ -1,6 +1,6 @@
 import path from "node:path";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
-import { PulseContext } from "@/lib/core/parsing/context.js";
+import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { ConducksProvider } from "@/lib/core/parsing/providers/base.js";
 
 /**
@@ -13,7 +13,7 @@ export class ImportProcessor {
   /**
    * Resolves raw import text (from @source) to a valid file path or external package.
    */
-  public resolve(source: string, callerPath: string, allPaths: string[], provider?: ConducksProvider, context?: PulseContext): string | { name: string, kind: 'external_dependency' } | undefined {
+  public resolve(source: string, callerPath: string, allPaths: string[], provider?: ConducksProvider, context?: AnalyzeContext): string | { name: string, kind: 'external_dependency' } | undefined {
     // 1. Specialized Provider Resolution (Conducks Suite)
     if (provider?.resolveImport) {
       const specialized = provider.resolveImport(source, callerPath, allPaths);
@@ -55,7 +55,7 @@ export class ImportProcessor {
   /**
    * Processes a capture and adds an IMPORTS relationship.
    */
-  public process(source: string, callerPath: string, allPaths: string[], spectrum: PrismSpectrum, provider?: ConducksProvider, context?: PulseContext): void {
+  public process(source: string, callerPath: string, allPaths: string[], spectrum: PrismSpectrum, provider?: ConducksProvider, context?: AnalyzeContext): void {
     const resolved = this.resolve(source, callerPath, allPaths, provider, context);
     if (!resolved) return;
 
@@ -73,7 +73,7 @@ export class ImportProcessor {
     });
   }
 
-  public processBinding(resolved: string | { name: string, kind: 'external_dependency' }, originalName: string, localAlias: string, spectrum: PrismSpectrum, context?: PulseContext): void {
+  public processBinding(resolved: string | { name: string, kind: 'external_dependency' }, originalName: string, localAlias: string, spectrum: PrismSpectrum, context?: AnalyzeContext): void {
     const isExternal = typeof resolved === 'object' && (resolved as any).kind === 'external_dependency';
     const resolvedPath = isExternal ? (resolved as any).name : (resolved as string).toLowerCase();
 

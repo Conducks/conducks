@@ -19,10 +19,10 @@ export class QueryCommand implements ConducksCommand {
     const isGQL = args.includes('--gql');
     const query = args.filter(a => a !== '--gql').join(" ");
 
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
 
     if (isGQL) {
-      const results = registry.intelligence.parseGQL(query);
+      const results = registry.query.parseGQL(query);
       console.log(`--- GQL Pattern Match: "${query}" ---`);
       (results as any[]).forEach(r => {
         console.log(`- (${r.source})-[:${r.type}]->(${r.target})`);
@@ -31,7 +31,7 @@ export class QueryCommand implements ConducksCommand {
       if (results.length === 0) console.log("No structural patterns found.");
     } else {
       try {
-        const nodes = await registry.intelligence.query(query);
+        const nodes = await registry.query.query(query);
         console.log(`\n\x1b[1m--- Structural Discovery: "${query}" ---\x1b[0m`);
         nodes.forEach(n => {
           console.log(`\x1b[36m${n.properties.name}\x1b[0m (${n.label}) - \x1b[2m${n.properties.filePath}\x1b[0m`);

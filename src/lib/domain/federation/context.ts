@@ -4,7 +4,7 @@
  * Manages the state and cache during a multi-pass topological pulse.
  */
 
-export class PulseContext {
+export class AnalyzeContext {
   /** Map of file paths to their direct dependencies (Import Map) */
   private importMap: Map<string, Set<string>> = new Map();
 

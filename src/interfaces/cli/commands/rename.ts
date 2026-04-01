@@ -32,7 +32,7 @@ export class RenameCommand implements ConducksCommand {
     await persistence.load(registry.infrastructure.graphEngine.getGraph());
     
     // Conducks: Graph-Verified Refactoring (GVR)
-    const result = await registry.evolution.rename(symbolId, newName, dryRun);
+    const result = await registry.rename.rename(symbolId, newName, dryRun);
 
     if (result.success) {
       const icon = dryRun ? "🔍" : "✅";

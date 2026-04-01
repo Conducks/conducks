@@ -18,7 +18,7 @@ export class ImpactCommand implements ConducksCommand {
       return;
     }
 
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
 
     const fmt = (v: any) => {
       const val = typeof v === 'object' && v !== null ? v.value : v;
@@ -29,7 +29,7 @@ export class ImpactCommand implements ConducksCommand {
     try {
       // Registry Alignment: kinetic.getImpact + metrics.calculateCompositeRisk
       const impact = registry.kinetic.getImpact(symbolId, direction);
-      const composite = await registry.metrics.calculateCompositeRisk(symbolId);
+      const composite = await registry.explain.calculateCompositeRisk(symbolId);
 
       console.log(`\n\x1b[1m--- Conducks ${direction.toUpperCase()} Impact Report: ${symbolId} ---\x1b[0m`);
       console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${impact.affectedCount} Symbols affected`);

@@ -328,7 +328,7 @@ export class ChronicleInterface {
    * Retrieves the last pulsed commit from the graph's metadata.
    */
   public getLastPulsedCommit(graph: any): string | null {
-    return graph.getMetadata('lastPulsedCommit');
+    return graph.getMetadata('lastAnalyzedCommit');
   }
 
   /**
@@ -336,7 +336,7 @@ export class ChronicleInterface {
    * Stores the current commit hash in the graph's metadata.
    */
   public setLastPulsedCommit(graph: any, hash: string): void {
-    graph.setMetadata('lastPulsedCommit', hash);
+    graph.setMetadata('lastAnalyzedCommit', hash);
   }
 }
 

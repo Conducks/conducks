@@ -28,10 +28,10 @@ export class WatchCommand implements ConducksCommand {
 
   public async execute(args: string[], persistence: DuckDbPersistence): Promise<void> {
     console.log('[Watch] Step 1: loading graph...');
-    await persistence.load(registry.intelligence.graph.getGraph());
+    await persistence.load(registry.query.graph.getGraph());
 
     console.log('[Watch] Step 2: getting watcher instance...');
-    const watcher = registry.evolution.watcher;
+    const watcher = registry.rename.watcher;
 
     console.log('[Watch] Step 3: watcher =', watcher ? 'OK' : 'NULL');
     if (!watcher) {

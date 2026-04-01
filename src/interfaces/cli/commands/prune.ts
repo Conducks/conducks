@@ -11,8 +11,8 @@ export class PruneCommand implements ConducksCommand {
   public usage = "registry prune";
 
   public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
-    await persistence.load(registry.intelligence.graph.getGraph());
-    const findings = registry.metrics.prune();
+    await persistence.load(registry.query.graph.getGraph());
+    const findings = registry.explain.prune();
     console.log(`\n\x1b[1m--- ✂️ Dead Weight Discovery ---\x1b[0m`);
     
     if (findings.length === 0) {

@@ -17,8 +17,8 @@ export class ResonanceCommand implements ConducksCommand {
       return;
     }
     
-    await persistence.load(registry.intelligence.graph.getGraph());
-    const diff = await registry.metrics.compare(otherPath);
+    await persistence.load(registry.query.graph.getGraph());
+    const diff = await registry.explain.compare(otherPath);
 
     const fmt = (v: any) => {
       const n = Number(v);

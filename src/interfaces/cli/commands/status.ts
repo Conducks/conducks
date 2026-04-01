@@ -29,8 +29,8 @@ export class StatusCommand implements ConducksCommand {
       // Ensure gravity is fresh based on the architectural anchors
       (registry.infrastructure.graphEngine as any).resonate();
 
-      const status = registry.governance.status();
-      const graph = registry.intelligence.graph.getGraph();
+      const status = registry.audit.status();
+      const graph = registry.query.graph.getGraph();
 
       console.log("\x1b[1m--- 🏺 Graph Status ---\x1b[0m");
       console.log(`- Nodes:   ${status.stats.nodeCount}`);
