@@ -57,7 +57,11 @@ export class ConducksReflector {
     const nodeCache = new Map<string, SpectrumNode>();
 
     const fileMeta = mapToCanonical('file');
-    nodeCache.set(`${file.path}::UNIT`, {
+    const canonicalPath = file.path.toLowerCase();
+    const fileId = `${canonicalPath}::unit`;
+    const fileName = path.basename(file.path);
+    
+    nodeCache.set(fileId, {
       name: 'UNIT',
       kind: 'file' as any,
       canonicalKind: fileMeta.kind,
@@ -96,7 +100,7 @@ export class ConducksReflector {
       const name = nameCap.node.text;
       if (!name) continue;
 
-      const nodeId = `${file.path}::${name}`;
+      const nodeId = `${file.path.toLowerCase()}::${name.toLowerCase()}`;
 
       if (!nodeCache.has(nodeId)) {
         // Determine if this match is a function or class definition to capture full body range
@@ -139,13 +143,13 @@ export class ConducksReflector {
           }
         }
       }
-      return best?.name ?? 'UNIT';
+      return best?.name ?? path.basename(file.path);
     };
 
     // === Pass 2: Semantic Dispatch ===
     for (const match of matches) {
       const nameCap = match.captures.find((c: any) => c.name === 'name');
-      const node = nameCap ? nodeCache.get(`${file.path}::${nameCap.node.text}`) : undefined;
+      const node = nameCap ? nodeCache.get(`${file.path.toLowerCase()}::${nameCap.node.text.toLowerCase()}`) : undefined;
 
       const captureMap: Record<string, string> = {};
       const args: string[] = [];
@@ -170,7 +174,7 @@ export class ConducksReflector {
             const sourceCap = match.captures.find((c: any) => c.name === 'source');
             if (sourceCap) {
               const sourceText = sourceCap.node.text;
-              const resolved = this.imports.resolve(sourceText, file.path, allPaths, provider, context);
+              const resolved = this.imports.resolve(sourceText, file.path.toLowerCase(), allPaths, provider, context);
               if (resolved) {
                 // Register ALL named bindings in this match
                 for (let i = 0; i < match.captures.length; i++) {
@@ -182,7 +186,7 @@ export class ConducksReflector {
                   }
                 }
                 // Also process the file-level import edge
-                this.imports.process(sourceText, file.path, allPaths, spectrum, provider, context);
+                this.imports.process(sourceText, file.path.toLowerCase(), allPaths, spectrum, provider, context);
               }
             }
           }
@@ -233,6 +237,12 @@ export class ConducksReflector {
           const method = captureMap['route_method'] ?? 'GET';
           const scope = getScopeAt(captureRow);
           this.flow.processRoute(path, method, scope, spectrum, context.getFramework());
+
+          // Conducks: Promote Logical Routes to Active Entry Points
+          const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scope.toLowerCase()}`);
+          if (targetNode) {
+            targetNode.metadata.isEntryPoint = true;
+          }
         }
         else if (cName === 'kinesis_request') {
           const url = captureMap['kinesis_request_url'] ?? '/';
@@ -250,7 +260,7 @@ export class ConducksReflector {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
             const scope = getScopeAt(captureRow);
-            const targetNode = nodeCache.get(`${file.path}::${scope}`);
+            const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scope.toLowerCase()}`);
             if (targetNode) {
               if (!targetNode.metadata.debtMarkers) targetNode.metadata.debtMarkers = [];
               targetNode.metadata.debtMarkers.push(...markers);
@@ -265,8 +275,9 @@ export class ConducksReflector {
     spectrum.nodes = [...spectrum.nodes, ...nodeCache.values()];
 
     // Conducks.5: Structural Membership Binding (Parent -> Child)
+    const fileAnchorName = path.basename(file.path);
     for (const node of nodeCache.values()) {
-      if (node.name === 'UNIT') continue;
+      if (node.name === fileAnchorName) continue;
       const scope = getScopeAt(node.range.start.line - 1, node.name);
       
       // Conducks: Hierarchical Unification (L2-L7 Parentage)
@@ -332,12 +343,11 @@ export class ConducksReflector {
     }
 
     // Seed Context for topological resolution
-    spectrum.nodes.forEach(n => context.registerSymbol(`${file.path}::${n.name}`, n));
+    spectrum.nodes.forEach(n => context.registerSymbol(`${file.path.toLowerCase()}::${n.name.toLowerCase()}`, n));
     spectrum.relationships.filter(r => r.type === 'IMPORTS').forEach(r => {
-      context.registerImport(file.path, r.targetName);
+      context.registerImport(file.path.toLowerCase(), r.targetName.toLowerCase());
     });
 
     return spectrum;
   }
 }
-

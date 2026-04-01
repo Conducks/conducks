@@ -119,7 +119,7 @@ export class ConducksAdvisor {
 
       // Conducks: Aggregate module and global scope dependencies
       const directDeps = graph.getNeighbors(node.id, 'downstream').filter(e => e.type === 'DEPENDS_ON');
-      const globalId = node.id + '::global';
+      const globalId = node.id + '::unit';
       const globalDeps = graph.getNeighbors(globalId, 'downstream').filter(e => e.type === 'DEPENDS_ON');
       const totalDeps = [...directDeps, ...globalDeps];
 

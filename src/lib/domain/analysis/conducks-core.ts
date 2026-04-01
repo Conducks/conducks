@@ -56,7 +56,7 @@ export class Conducks implements ConducksComponent {
     if (options?.baseDir) {
       this.persistence = new GraphPersistence(options.baseDir);
     }
-    this.orchestrator = new PulseOrchestrator(this.registry, this.graph);
+    this.orchestrator = new PulseOrchestrator(this.registry, this.graph, this.aligner, this.persistence);
     this.setupDefaults();
   }
 

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { ConducksGraph } from '@/lib/core/graph/graph-engine.js';
 import { registry } from '@/registry/index.js';
+import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
 
 /**
  * Conducks — Professional Command Center (v1.6.1) 💎
@@ -14,7 +15,7 @@ export class MirrorServer {
   private app = express();
   private clients: any[] = [];
 
-  constructor(private graph: ConducksGraph) {
+  constructor(private graph: ConducksGraph, private persistence: SynapsePersistence) {
     this.setupRoutes();
   }
 
@@ -187,6 +188,7 @@ export class MirrorServer {
         <select id="trace-direction" class="trace-control">
           <option value="downstream">TRACE IMPACT (DOWNSTREAM)</option>
           <option value="upstream">TRACE LINEAGE (UPSTREAM)</option>
+          <option value="direct">DIRECT NEIGHBORS (HUB VIEW)</option>
           <option value="bidirectional">FULL CIRCUIT (BI-DIRECTIONAL)</option>
         </select>
       </div>
@@ -233,6 +235,22 @@ export class MirrorServer {
         <div style="flex: 1;">
           <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Mass</p>
           <span id="ins-mass" class="font-mono text-white text-md">1.00</span>
+        </div>
+      </div>
+
+      <!-- HYDRATED MEAT (v1.6.5) -->
+      <div id="ins-meat" class="flex gap-4 items-center pt-4 border-t border-white/5 opacity-0 transition-opacity">
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Complexity</p>
+          <span id="ins-complexity" class="font-mono text-blue-400 text-xs">-</span>
+        </div>
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Diversity</p>
+          <span id="ins-entropy" class="font-mono text-purple-400 text-xs">-</span>
+        </div>
+         <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Churn</p>
+          <span id="ins-resonance" class="font-mono text-orange-400 text-xs">-</span>
         </div>
       </div>
     </div>
@@ -345,12 +363,12 @@ export class MirrorServer {
       }).strength(1));
     }
 
-    // v1.6.1: Improved Direction-Strict Tracing
+    // v1.6.2: Improved Direction-Strict Tracing
     function computeDirectionalSubgraph(rootNodeId, mode) {
       const gNodes = new Set([rootNodeId]);
       const gLinks = new Set();
       const queue = [rootNodeId];
-      const MAX_DEPTH = 12; // Deeper trace for linear direction
+      const MAX_DEPTH = mode === 'direct' ? 1 : 12; // 1 level for direct hub view
       let depth = 0;
 
       while(queue.length > 0 && depth < MAX_DEPTH) {
@@ -368,6 +386,8 @@ export class MirrorServer {
                  if (sId === id) { isMatch = true; nextId = tId; }
               } else if (mode === 'upstream') {
                  if (tId === id) { isMatch = true; nextId = sId; }
+              } else if (mode === 'direct') {
+                 if (sId === id || tId === id) { isMatch = true; nextId = (sId === id ? tId : sId); }
               } else {
                  if (sId === id || tId === id) { isMatch = true; nextId = (sId === id ? tId : sId); }
               }
@@ -459,7 +479,7 @@ export class MirrorServer {
       const indicator = document.getElementById('focus-indicator');
       indicator.style.display = 'flex';
       
-      const txt = mode === 'downstream' ? 'IMPACT ISOLATION ACTIVE' : (mode === 'upstream' ? 'LINEAGE ISOLATION ACTIVE' : 'FULL CIRCUIT ACTIVE');
+      const txt = mode === 'downstream' ? 'IMPACT ISOLATION ACTIVE' : (mode === 'upstream' ? 'LINEAGE ISOLATION ACTIVE' : (mode === 'direct' ? 'DIRECT HUB ISOLATION ACTIVE' : 'FULL CIRCUIT ACTIVE'));
       document.getElementById('focus-text').innerText = \`\${txt} — CLICK TO RESET\`;
 
       // Update Inspector
@@ -477,6 +497,28 @@ export class MirrorServer {
       
       Graph.centerAt(node.x, node.y, 800);
       Graph.zoom(2.5, 800);
+
+      // Conducks: On-Demand Hydration (v1.6.5)
+      const meatPanel = document.getElementById('ins-meat');
+      if (node.isShallow) {
+        meatPanel.style.opacity = '0.3';
+        fetch('/api/node/' + encodeURIComponent(node.id))
+          .then(r => r.json())
+          .then(hydrated => {
+             document.getElementById('ins-complexity').innerText = hydrated.complexity || '1';
+             document.getElementById('ins-entropy').innerText = (hydrated.entropy || 0).toFixed(2);
+             document.getElementById('ins-resonance').innerText = hydrated.resonance || '0';
+             meatPanel.style.opacity = '1';
+             // Cache on the node so we don't fetch again
+             node.properties = { ...node.properties, ...hydrated };
+             node.isShallow = false;
+          });
+      } else {
+        document.getElementById('ins-complexity').innerText = node.complexity || '1';
+        document.getElementById('ins-entropy').innerText = (node.entropy || 0).toFixed(2);
+        document.getElementById('ins-resonance').innerText = node.resonance || '0';
+        meatPanel.style.opacity = '1';
+      }
     }
 
     function resetFocus() {
@@ -516,6 +558,27 @@ export class MirrorServer {
       res.json(wave);
     });
 
+    // Conducks: On-Demand Hydration (v1.6.5)
+    this.app.get('/api/node/:id', async (req, res) => {
+      const id = req.params.id;
+      const g = this.graph.getGraph();
+      const node = g.getNode(id);
+      
+      if (!node) {
+        return res.status(404).json({ error: 'Node not found in current synapse.' });
+      }
+
+      // If shallow, hydrate meat from persistence
+      if (node.isShallow) {
+        const meat = await this.persistence.fetchNodeMeat(id);
+        if (meat) {
+          return res.json({ ...node.properties, ...meat, isShallow: false });
+        }
+      }
+
+      res.json(node.properties);
+    });
+
     this.app.get('/api/pulse', (req, res) => {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -542,7 +605,7 @@ export class MirrorServer {
 }
 
 export let globalMirror: MirrorServer | null = null;
-export function initGlobalMirror(graph: ConducksGraph) {
-  globalMirror = new MirrorServer(graph);
+export function initGlobalMirror(graph: ConducksGraph, persistence: SynapsePersistence) {
+  globalMirror = new MirrorServer(graph, persistence);
   return globalMirror;
 }

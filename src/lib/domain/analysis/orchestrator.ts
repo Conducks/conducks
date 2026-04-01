@@ -4,6 +4,8 @@ import { PulseContext } from "@/lib/core/parsing/context.js";
 import { SynapseRegistry } from "@/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/registry/types.js";
@@ -25,7 +27,9 @@ export class PulseOrchestrator implements ConducksComponent {
     private registry: SynapseRegistry<any>,
     private graph: ConducksGraph,
     private aligner?: TestAligner,
-    private reflector: ConducksReflector = new ConducksReflector()
+    private persistence?: SynapsePersistence,
+    private reflector: ConducksReflector = new ConducksReflector(),
+    private ignoreManager?: IgnoreManager
   ) { }
 
   /**
@@ -34,27 +38,53 @@ export class PulseOrchestrator implements ConducksComponent {
   public async executePulse(files: Array<{ path: string, source: string }>): Promise<string> {
     this.context.reset();
     const context = this.context;
-    
-    // Conducks.6: Canonical Path Normalization & Invariant Validation (v1.3.6)
-    const normalizedFiles = files.map(f => {
+
+    // Conducks: Structural Exclusion Guard (v1.6.5)
+    const activeFiles = this.ignoreManager ? 
+      files.filter(f => !this.ignoreManager!.isIgnored(f.path)) : 
+      files;
+
+    if (this.ignoreManager && activeFiles.length < files.length) {
+      console.log(`🛡️ [Conducks] Structural Ignore: Excluding ${files.length - activeFiles.length} units from the structural wave.`);
+    }
+
+    // Conducks.6: Path Normalization & Canonical Identity (v1.6.5)
+    // We preserve casing for Linux compatibility while resolving relative paths
+    const normalizedFiles = activeFiles.map(f => {
       if (!f || !f.path) {
         throw new Error(`[Conducks] Structural integrity failure: Received null or undefined file path during pulse.`);
       }
-      return { path: f.path.toLowerCase(), source: f.source };
+      return { path: path.resolve(f.path), source: f.source };
     });
     
     const allPaths = normalizedFiles.map(f => f.path);
     const spectra = new Map<string, any>();
     const pulseErrors: string[] = [];
 
+    // Conducks: Adaptive Memory Pressure Calculation (v1.6.5)
+    const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
+    const isLargeProject = normalizedFiles.length > 100;
+    const useShallowMode = memoryUsage > 1000 || isLargeProject;
+
+    if (useShallowMode) {
+      console.log(`[Conducks] Adaptive Scaling: Engaging Shallow Internalization (RAM: ${Math.round(memoryUsage)}MB, Files: ${normalizedFiles.length})`);
+    }
+
     // Step 1: Pre-Pulse Discovery & Single-Pass Reflection
     for (const file of normalizedFiles) {
       try {
-        const ext = path.extname(file.path);
-        const provider = this.registry.getProvider(ext);
+        // Conducks: Filename-Aware Provider Mapping (v1.6.5)
+        const provider = this.registry.getProvider(file.path);
         if (!provider) continue;
 
         const spectrum = await this.reflector.reflect(file, provider, context, allPaths);
+        
+        // Conducks: Streaming Persistence (v1.6.5)
+        // We write the 'Meat' to disk immediately to free up RAM if needed
+        if (this.persistence && useShallowMode) {
+          await this.persistence.saveSpectrum(file.path, spectrum);
+        }
+
         spectra.set(file.path, spectrum);
       } catch (err: any) {
         pulseErrors.push(`${file.path}: ${err.message}`);
@@ -83,7 +113,7 @@ export class PulseOrchestrator implements ConducksComponent {
       const tasks = level.map(async (filePath) => {
         const spectrum = spectra.get(filePath);
         if (!spectrum) return;
-        this.graph.ingestSpectrum(filePath, spectrum);
+        this.graph.ingestSpectrum(filePath, spectrum, useShallowMode);
       });
       await Promise.all(tasks);
     }

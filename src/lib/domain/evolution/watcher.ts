@@ -8,6 +8,7 @@ import { globalMirror } from "@/interfaces/web/mirror-server.js";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
+import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 
 /**
  * FIX 3: Remove the `registry` import entirely.
@@ -41,13 +42,16 @@ export class ConducksWatcher {
   private watcher: FSWatcher | null = null;
   private linker = new GlobalSymbolLinker();
   private impactAnalyzer = new BlastRadiusAnalyzer();
+  private ignoreManager: IgnoreManager;
   private isInitialized = false;
 
   constructor(
     private rootDir: string,
     private graph: ConducksGraph,
     private options: WatcherOptions = {}
-  ) { }
+  ) { 
+    this.ignoreManager = new IgnoreManager(this.rootDir);
+  }
 
   /**
    * Starts the Synapse Monitor.
@@ -60,19 +64,7 @@ export class ConducksWatcher {
     }
 
     this.watcher = this.options.watcher || chokidar.watch(this.rootDir, {
-      ignored: this.options.ignored || [
-        "**/node_modules/**", 
-        "**/dist/**", 
-        "**/build/**", 
-        "**/.git/**", 
-        "**/*.d.ts",
-        "**/*.map",
-        "**/*.html",
-        "**/*.css",
-        "**/*.db",
-        "**/*.sqlite",
-        "**/*.log"
-      ],
+      ignored: (p) => this.ignoreManager.isIgnored(p),
       persistent: true,
       ignoreInitial: true,
     });
@@ -139,9 +131,9 @@ export class ConducksWatcher {
       }
 
       // 2. Partial Structural Reflection
-      // Conducks: Canonical Normalization (v1.3.5)
+      // Conducks: Resolved Canonical Identity (v1.6.5)
       if (!filePath) return;
-      const normalizedPath = path.resolve(filePath).toLowerCase();
+      const normalizedPath = path.resolve(filePath);
       await this.graph.pulseStructuralStream([{ path: normalizedPath, source }]);
 
       // 3. Global Synapse Re-Linking
@@ -170,7 +162,8 @@ export class ConducksWatcher {
             const db: any = await (this.options.persistence as any)?.getRawConnection();
             let riskDelta = 0;
             if (db) {
-              const prevNode: any = await new Promise((res) => db.get("SELECT risk FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1", symbolId, (err: any, row: any) => res(row)));
+              const rows: any[] = await new Promise((res) => db.all("SELECT risk, complexity FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1", symbolId, (err: any, rows: any[]) => res(rows || [])));
+              const prevNode = rows[0];
               if (prevNode) riskDelta = (node.properties.risk || 0) - prevNode.risk;
             }
 

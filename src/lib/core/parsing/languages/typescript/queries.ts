@@ -31,6 +31,27 @@ export const TYPESCRIPT_QUERIES = `
   ;; Constructor calls: new X()
   (new_expression constructor: (identifier) @kinesis_target arguments: (arguments (_) @kinesis_arg)*)
 
+  ;; --- Phase 2.1: Logical Entry Points (Express/Fastify/Nest) ---
+  ;; app.get('/path', handler)
+  (call_expression
+    function: (member_expression
+      object: (identifier) @req_receiver
+      property: (property_identifier) @route_method (#match? @route_method "^(get|post|put|delete|patch|use|all)$"))
+    arguments: (arguments (string) @kinesis_route_path . (_) @kinesis_route))
+
+  ;; router.get('/path', handler)
+  (call_expression
+    function: (member_expression
+      object: (identifier) @req_receiver (#match? @req_receiver "^(router|route|api)$")
+      property: (property_identifier) @route_method (#match? @route_method "^(get|post|put|delete|patch)$"))
+    arguments: (arguments (string) @kinesis_route_path . (_) @kinesis_route))
+
+  ;; Decorators: @Get('/path')
+  (decorator
+    (call_expression
+      function: (identifier) @decorator_name (#match? @decorator_name "^(Get|Post|Put|Delete|Patch|Controller|Authorized)$")
+      arguments: (arguments (string)? @kinesis_route_path))) @kinesis_route
+
   ;; --- Pulse Flow (Assignments) ---
   (variable_declarator name: (identifier) @pulse_assignment_name value: (_) @pulse_assignment_value)
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)

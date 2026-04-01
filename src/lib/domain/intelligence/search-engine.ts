@@ -53,7 +53,8 @@ export class ConducksSearch {
     return Array.from(results.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit)
-      .map(([id]) => this.graph.getNode(id)!);
+      .map(([id]) => this.graph.getNode(id))
+      .filter((n): n is ConducksNode => n !== undefined);
   }
 
   /**
@@ -69,6 +70,7 @@ export class ConducksSearch {
 
     const neighbors = this.graph.getNeighbors(startId, 'upstream'); // Propagate to callers
     for (const edge of neighbors) {
+      if (!this.graph.hasNode(edge.sourceId)) continue;
       const current = results.get(edge.sourceId) || 0;
       results.set(edge.sourceId, current + energy);
       

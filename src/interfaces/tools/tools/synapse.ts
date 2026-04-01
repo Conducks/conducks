@@ -128,6 +128,10 @@ TIP: The id field in results is the unique identifier. Use it with conducks_trac
       required: ["q"]
     },
     handler: async ({ q, mode, limit }: any) => {
+      // Ensure registry is initialized for structural resonance
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+      
       const results = await (registry.intelligence.search as any).search(q, 10);
       const graph = registry.intelligence.graph.getGraph();
 
@@ -141,11 +145,13 @@ TIP: The id field in results is the unique identifier. Use it with conducks_trac
         summary: `${n.label} ${n.properties.name} in ${n.properties.filePath}`
       });
 
-      const ranked = results.sort((a: any, b: any) => {
-        if (a.properties.isEntryPoint && !b.properties.isEntryPoint) return -1;
-        if (!a.properties.isEntryPoint && b.properties.isEntryPoint) return 1;
-        return (b.properties.rank || 0) - (a.properties.rank || 0);
-      }).slice(0, Math.min(limit || 10, 10));
+      const ranked = results
+        .filter((n: any) => n !== undefined)
+        .sort((a: any, b: any) => {
+          if (a.properties.isEntryPoint && !b.properties.isEntryPoint) return -1;
+          if (!a.properties.isEntryPoint && b.properties.isEntryPoint) return 1;
+          return (b.properties.rank || 0) - (a.properties.rank || 0);
+        }).slice(0, Math.min(limit || 10, 10));
 
       return {
         symbols: ranked.map(standardize),
@@ -189,6 +195,10 @@ TIP: Use with conducks_evolution to see if recent changes introduced new violati
       }
     },
     handler: async ({ mode }: any) => {
+      // Ensure registry is initialized
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+
       if (mode === "audit") {
         const audit = registry.governance.audit();
         return {
@@ -244,6 +254,10 @@ TIP: Use cohesion mode to identify god objects with many neighbors.`,
       }
     },
     handler: async ({ symbolId, mode, targetId }: any) => {
+      // Ensure registry is initialized
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+
       const status = registry.governance.status();
       const graph = registry.intelligence.graph.getGraph();
 

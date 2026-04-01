@@ -10,9 +10,9 @@ describe('Conducks: Kinetic Symbol Mapping Unit Tests 💎', () => {
 
     // Add a module node
     graph.addNode({
-      id: 'test.py::global',
+      id: 'test.py::unit',
       label: 'module',
-      properties: { name: 'global', filePath, range: { start: { line: 1, column: 0 }, end: { line: 100, column: 0 } } }
+      properties: { name: 'UNIT', filePath, range: { start: { line: 1, column: 0 }, end: { line: 100, column: 0 } } }
     });
 
     // Add a function node
@@ -45,7 +45,7 @@ describe('Conducks: Kinetic Symbol Mapping Unit Tests 💎', () => {
   it('should fallback to the module if outside any specific symbol', () => {
     const symbol = graph.findSymbolAtLine(filePath, 5);
     expect(symbol).toBeDefined();
-    expect(symbol?.properties.name).toBe('global');
+    expect(symbol?.properties.name).toBe('UNIT');
   });
 
   it('should return undefined for a non-existent file', () => {

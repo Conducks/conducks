@@ -179,8 +179,9 @@ export class ConducksGraph {
 
   /**
    * Conducks — Ingests a reflected spectrum into the Synapse Graph.
+   * If shallow is true, only 'Skeleton' properties are retained in RAM.
    */
-  public ingestSpectrum(rawPath: string, spectrum: any): void {
+  public ingestSpectrum(rawPath: string, spectrum: any, shallow: boolean = false): void {
     // Conducks: Canonical ID Unification (v1.3.5)
     // Enforce lowercase absolute IDs to prevent L1 duplication across macOS/Windows
     const filePath = rawPath.toLowerCase();
@@ -191,8 +192,9 @@ export class ConducksGraph {
     // Populate Synapse Nodes (Symbols)
     for (const metaNode of spectrum.nodes) {
       this.graph.addNode({
-        id: `${filePath}::${metaNode.name}`,
+        id: `${filePath.toLowerCase()}::${metaNode.name.toLowerCase()}`,
         label: metaNode.kind,
+        isShallow: shallow, // Pass mode to AdjacencyList
         properties: { 
           ...metaNode.metadata, 
           filePath, 
@@ -206,25 +208,28 @@ export class ConducksGraph {
     }
 
     // New: Recursive Namespace (Folder) Ingestion
-    const parts = filePath.split('/');
+    const parts = filePath.split(/[/\\]/); // Cross-platform path splitting
     let currentPath = '';
-    const isAbsolute = filePath.startsWith('/');
+    const isAbsolute = filePath.startsWith('/') || /^[a-zA-Z]:\\/.test(filePath);
+    
+    // Conducks: Dynamic Project Root (L0/L1 Transition)
+    const projectRootLabel = 'conducks'.toUpperCase(); 
 
     for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i];
-        if (i === 0 && isAbsolute && part === '') {
-            currentPath = '/';
+        if (i === 0 && isAbsolute && (part === '' || part.endsWith(':'))) {
+            currentPath = part === '' ? '/' : part + '\\';
             continue;
         }
 
-        const folderName = part || 'root';
+        const folderName = part || projectRootLabel;
         const parentPath = currentPath;
         
-        // Conducks: Strict Absolute Joining
-        if (isAbsolute && currentPath === '/') {
-            currentPath = `/${folderName}`;
+        // Conducks: Strict Path Joining
+        if (currentPath === '/' || currentPath.endsWith('\\')) {
+            currentPath = `${currentPath}${part}`;
         } else {
-            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
         }
 
         // Canonical ID Unification (Lowercase Identity)
@@ -234,20 +239,20 @@ export class ConducksGraph {
               id: folderId,
               label: 'NAMESPACE',
               properties: {
-                name: folderName,
+                name: part || projectRootLabel,
                 canonicalKind: 'NAMESPACE',
-                canonicalRank: 1, // L1: Structure-Namespace (Guideline 7.2)
+                canonicalRank: 1, 
                 isVirtual: true,
-                summary: `Namespace: ${folderName}`
+                summary: `Namespace: ${part || projectRootLabel}`
               }
             };
             this.graph.addNode(node);
             
             // Link to parent folder if applicable
-            if (parentPath) {
+            if (parentPath && parentPath !== currentPath) {
                 const parentId = `NAMESPACE::${parentPath.toLowerCase()}`;
                 const edgeId = `CONTAINS::${parentId}->${folderId}`;
-                if (!this.graph.hasEdge(edgeId)) {
+                if (this.graph.getNode(parentId) && !this.graph.hasEdge(edgeId)) {
                     this.graph.addEdge({
                         id: edgeId,
                         sourceId: parentId,
@@ -262,19 +267,29 @@ export class ConducksGraph {
     }
 
     // Link the file (UNIT) to its immediate parent folder
-    // ID must match the accumulated currentPath from the loop
-    const finalFolderId = `NAMESPACE::${currentPath.toLowerCase() || 'root'}`;
-    const fileNodeId = `${filePath}::UNIT`; // The file-level anchor (Suffix must match Reflector)
+    const finalFolderId = `NAMESPACE::${currentPath.toLowerCase()}`;
+    const fileNodeId = `${filePath}::unit`.toLowerCase();
     
-    if (this.graph.getNode(fileNodeId)) {
-        this.graph.addEdge({
-            id: `CONTAINS::${finalFolderId}->${fileNodeId}`,
-            sourceId: finalFolderId,
-            targetId: fileNodeId,
-            type: 'CONTAINS' as any,
-            confidence: 1.0,
-            properties: {}
-        });
+    const fileNode = this.graph.getNode(fileNodeId);
+    if (fileNode) {
+        // Conducks: UNIT Identity Fix (v1.6.5)
+        // Ensure the L2 node shows the actual filename, not the generic 'UNIT' string
+        fileNode.properties.name = path.basename(filePath);
+        fileNode.properties.displayName = path.basename(filePath);
+    }
+    
+    if (fileNode && this.graph.getNode(finalFolderId)) {
+        const edgeId = `CONTAINS::${finalFolderId}->${fileNodeId}`;
+        if (!this.graph.hasEdge(edgeId)) {
+            this.graph.addEdge({
+                id: edgeId,
+                sourceId: finalFolderId,
+                targetId: fileNodeId,
+                type: 'CONTAINS' as any,
+                confidence: 1.0,
+                properties: { reason: 'structural_ancestry' }
+            });
+        }
     }
 
     // Cache relationships for the second-pass "Neural Binding"
@@ -286,30 +301,29 @@ export class ConducksGraph {
       
       let targetId: string;
       if (isAbsolute) {
-        targetId = rel.targetName;
+        targetId = `${rel.targetName.toLowerCase()}::unit`;
       } else if (isFileRef) {
         // Conducks: External/Absolute Resolution Guard
         if (rel.targetName.startsWith('ECOSYSTEM::') || rel.targetName.includes('::')) {
-          targetId = rel.targetName;
+          targetId = rel.targetName.toLowerCase();
         } else {
-          targetId = `${rel.targetName}::UNIT`;
+          targetId = `${rel.targetName.toLowerCase()}::unit`;
         }
       } else {
-        targetId = `${filePath}::${rel.targetName}`;
+        targetId = `${filePath.toLowerCase()}::${rel.targetName.toLowerCase()}`;
       }
 
       // Conducks.4: Unique IDs for symbol-level imports
-      const bindingSuffix = (isFileRef && rel.metadata?.name) ? `::${rel.metadata.name}` : '';
+      const bindingSuffix = (isFileRef && rel.metadata?.name) ? `::${rel.metadata.name.toLowerCase()}` : '';
 
-      const edge: ConducksEdge = {
-        id: `${filePath}::${rel.sourceName}->${rel.targetName}::${rel.type}${bindingSuffix}`,
-        sourceId: `${filePath}::${rel.sourceName}`,
+      this.graph.addEdge({
+        id: `${filePath.toLowerCase()}::${rel.sourceName.toLowerCase()}->${targetId}::${rel.type.toLowerCase()}${bindingSuffix}`,
+        sourceId: `${filePath.toLowerCase()}::${rel.sourceName.toLowerCase()}`,
         targetId,
         type: rel.type as any,
         confidence: rel.confidence,
         properties: { rawTarget: rel.targetName, ...rel.metadata }
-      };
-      this.graph.addEdge(edge);
+      });
     }
   }
 
@@ -340,7 +354,7 @@ export class ConducksGraph {
           // 2. Trace Imports (Exhaustive Resolution)
           // Conducks: We check BOTH the node's local imports and the file-level (global) imports.
           const fileId = node.properties.filePath;
-          const globalId = `${fileId}::UNIT`;
+          const globalId = `${fileId}::unit`;
           const localImports = outgoing.filter(e => e.type === 'IMPORTS');
           const fileImports = this.graph.getNeighbors(globalId, 'downstream').filter(e => e.type === 'IMPORTS');
           const allImports = [...localImports, ...fileImports];
@@ -351,7 +365,7 @@ export class ConducksGraph {
 
           for (const imp of allImports) {
             const targetFile = imp.targetId;
-            const cleanTargetFile = targetFile.replace('::UNIT', '');
+            const cleanTargetFile = targetFile.replace('::unit', '');
             const impName = imp.properties.name || path.basename(targetFile, path.extname(targetFile));
             this.log(`[NeuralBinding]   - Checking import ${impName} from ${targetFile}`);
 

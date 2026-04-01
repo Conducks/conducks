@@ -75,10 +75,12 @@ describe('Analysis Domain Integration (The Pulse Pipeline) 🧬', () => {
 
     await orchestrator.executePulse(files);
     
+    const adjacencyList = graph.getGraph();
+    console.log('Nodes in Graph:', Array.from(adjacencyList.getAllNodes()).map(n => n.id));
     const cycles = adjacencyList.detectCycles();
     expect(cycles.length).toBeGreaterThan(0);
-    expect(cycles[0]).toContain('/root/a.py::global');
-    expect(cycles[0]).toContain('/root/b.py::global');
+    expect(cycles[0]).toContain('/root/a.py::unit');
+    expect(cycles[0]).toContain('/root/b.py::unit');
   });
 
   it('should propagate structural entropy in the pipeline', async () => {

@@ -20,11 +20,40 @@ export class SetupCommand implements ConducksCommand {
     console.log(`✅ Synced ${skillResult.global.length} Skills to Global.`);
     console.log(`✅ Synced ${skillResult.workspace.length} Skills to Workspace.`);
 
-    // 2. Register MCP
     const configurator = new MCPConfigurator();
     const buildPath = path.join(process.cwd(), "build", "index.js");
     const mcpResult = await configurator.registerClaude(buildPath);
     console.log(mcpResult.message);
+
+    // 3. Harden Environment (.conducksignore)
+    console.log("\x1b[35m[Conducks Setup] Hardening Environment...\x1b[0m");
+    const fs = await import("fs-extra");
+    const ignorePath = path.join(process.cwd(), ".conducksignore");
+    if (!fs.existsSync(ignorePath)) {
+      const defaults = [
+        "# Conducks Structural Ignore 🛡️",
+        "node_modules/",
+        "dist/",
+        "build/",
+        ".git/",
+        "**/*.db",
+        "**/*.sqlite",
+        "**/*.log",
+        ".gemini/",
+        ""
+      ];
+
+      // Auto-detect common heavy folders
+      if (fs.existsSync(path.join(process.cwd(), "venv"))) defaults.push("venv/");
+      if (fs.existsSync(path.join(process.cwd(), ".venv"))) defaults.push(".venv/");
+      if (fs.existsSync(path.join(process.cwd(), "target"))) defaults.push("target/");
+      if (fs.existsSync(path.join(process.cwd(), "vendor"))) defaults.push("vendor/");
+
+      fs.writeFileSync(ignorePath, defaults.join("\n"));
+      console.log("✅ Generated .conducksignore with auto-detected exclusions.");
+    } else {
+      console.log("ℹ️  .conducksignore already exists. Skipping generation.");
+    }
 
     console.log("\n\x1b[32m[Conducks] Setup complete.\x1b[0m");
   }

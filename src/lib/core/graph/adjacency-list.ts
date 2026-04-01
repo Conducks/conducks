@@ -11,22 +11,27 @@ export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSE
 export interface ConducksNode<T = any> {
   id: NodeId;
   label: string;
+  isShallow?: boolean;        // Conducks: If true, properties only contains Skeleton data
   properties: T & {
     name: string;
     filePath: string;
+    kind?: string;            // Conducks: Language-specific kind (class, function)
+    parentname?: string;      // Conducks: Hierarchical parent name (L1/L2)
     kineticEnergy?: number;
     rank?: number;
-    complexity?: number;       // Conducks: Cyclomatic/Cognitive Complexity
-    debtMarkers?: string[];    // Conducks: Technical Debt Signals (TODO, FIXME)
-    resonance?: number;        // Conducks: Commit Churn (Frequency)
-    entropy?: number;          // Conducks: Authorship Diversity (Shannon Entropy)
-    primaryAuthor?: string;    // Conducks: Dominant author (blame-based)
-    authorCount?: number;      // Conducks: Individual author count per symbol
-    lastModified?: number;     // Conducks: Timestamp of last modification
-    tenureDays?: number;       // Conducks: Age of the symbol in the codebase
-    coveredBy?: string[];      // Conducks: Test files covering this symbol
-    layer?: number;            // Conducks: Structural layer (0=Surface, 10=Foundation)
-    isEntryPoint?: boolean;    // Phase 5.1: Primary entry point (CLI, API, Main)
+    isEntryPoint?: boolean;
+    // Meat (Metadata - only present if not shallow)
+    complexity?: number;
+    debtMarkers?: string[];
+    resonance?: number;
+    entropy?: number;
+    primaryAuthor?: string;
+    authorCount?: number;
+    lastModified?: number;
+    tenureDays?: number;
+    coveredBy?: string[];
+    layer?: number;
+    range?: any;              // Position data
   };
 }
 
@@ -39,6 +44,9 @@ export interface ConducksEdge<T = any> {
   properties: T;
 }
 
+import zlib from "zlib";
+
+
 /**
  * High-performance graph storage optimized for intelligence analysis.
  */
@@ -48,6 +56,7 @@ export class ConducksAdjacencyList {
   private inEdges: Map<NodeId, Set<ConducksEdge>> = new Map();  // Backward: target -> edges
   private nameIndex: Map<string, NodeId[]> = new Map();          // Fast search index
   private metadata: Map<string, string> = new Map();             // Global project metadata (Phase 5.3)
+  private compressedMeat: Map<NodeId, Buffer> = new Map();       // VMC: Memory Zip for non-skeleton properties
 
   public clear(): void {
     this.nodes.clear();
@@ -55,28 +64,73 @@ export class ConducksAdjacencyList {
     this.inEdges.clear();
     this.nameIndex.clear();
     this.metadata.clear();
+    this.compressedMeat.clear();
   }
 
   /**
    * Adds or updates a node in the graph.
+   * If isShallow is true, only structural properties are retained in RAM.
+   * 
+   * v1.7.0 (VMC): If isShallow is false, we compress the 'Meat' to preserve memory.
    */
   public addNode(node: ConducksNode): void {
-    if (this.nodes.has(node.id)) return; // Conducks: Idempotent node addition
-    this.nodes.set(node.id, node);
+    const id = node.id.toLowerCase();
+    node.id = id;
 
-    // Update Fast Search Index
+    // 1. Structural Skeleton Extraction (Always in RAM)
+    const skeletonNode: ConducksNode = {
+      id: node.id,
+      label: node.label,
+      isShallow: node.isShallow ?? false,
+      properties: {
+        name: node.properties.name,
+        filePath: node.properties.filePath,
+        kind: node.properties.kind,
+        parentname: node.properties.parentname,
+        rank: node.properties.rank,
+        kineticEnergy: node.properties.kineticEnergy,
+        isEntryPoint: node.properties.isEntryPoint
+      } as any
+    };
+
+    // 2. Memory Zip (VMC): Compress the 'Meat' (metadata) if present
+    if (!node.isShallow) {
+      try {
+        const meat = { ...node.properties };
+        // Remove skeleton props from meat to avoid redundancy
+        delete (meat as any).name;
+        delete (meat as any).filePath;
+        delete (meat as any).kind;
+        delete (meat as any).parentname;
+        
+        const compressed = zlib.deflateSync(JSON.stringify(meat));
+        this.compressedMeat.set(id, compressed);
+      } catch (err) {
+        console.error(`[Conducks VMC] Compression failed for node ${id}:`, err);
+      }
+    }
+
+    this.nodes.set(id, skeletonNode);
+
+    // 3. Update Fast Search Index
     const name = node.properties.name || '';
     if (name) {
       if (!this.nameIndex.has(name)) this.nameIndex.set(name, []);
-      this.nameIndex.get(name)!.push(node.id);
+      const indexArray = this.nameIndex.get(name)!;
+      if (!indexArray.includes(id)) indexArray.push(id);
     }
   }
+
+
 
   /**
    * Adds a relationship between two nodes.
    * Allows adding edges even if nodes don't exist yet (Neural Binding).
    */
   public addEdge(edge: ConducksEdge): void {
+    edge.id = edge.id.toLowerCase();
+    edge.sourceId = edge.sourceId.toLowerCase();
+    edge.targetId = edge.targetId.toLowerCase();
     // 1. Initialize adjacency sets
     if (!this.outEdges.has(edge.sourceId)) this.outEdges.set(edge.sourceId, new Set());
     if (!this.inEdges.has(edge.targetId)) this.inEdges.set(edge.targetId, new Set());
@@ -208,11 +262,9 @@ export class ConducksAdjacencyList {
   /**
    * Fetches neighbors in a specific direction.
    */
-  public getNeighbors(nodeId: NodeId, direction: 'upstream' | 'downstream'): ConducksEdge[] {
-    const edgeSet = direction === 'downstream'
-      ? this.outEdges.get(nodeId)
-      : this.inEdges.get(nodeId);
-
+  public getNeighbors(nodeId: NodeId, direction: 'upstream' | 'downstream' = 'downstream', type?: EdgeType): ConducksEdge[] {
+    const normalizedId = nodeId.toLowerCase();
+    const edgeSet = direction === 'downstream' ? this.outEdges.get(normalizedId) : this.inEdges.get(normalizedId);
     return edgeSet ? Array.from(edgeSet) : [];
   }
 
@@ -241,7 +293,7 @@ export class ConducksAdjacencyList {
    */
   public traverseUpstream(startId: NodeId, maxDepth: number = 5): Map<NodeId, number> {
     const depths = new Map<NodeId, number>();
-    const queue: [NodeId, number][] = [[startId, 0]];
+    const queue: [NodeId, number][] = [[startId.toLowerCase(), 0]];
     const visited = new Set<NodeId>();
 
     while (queue.length > 0) {
@@ -265,20 +317,22 @@ export class ConducksAdjacencyList {
    * High-precision pathfinding between symbols using structural heuristics.
    */
   public traverseAStar(startId: NodeId, targetId: NodeId, heuristic?: (n: ConducksNode) => number): NodeId[] {
-    const openSet = new Set<NodeId>([startId]);
+    const sId = startId.toLowerCase();
+    const tId = targetId.toLowerCase();
+    const openSet = new Set<NodeId>([sId]);
     const cameFrom = new Map<NodeId, NodeId>();
-    const gScore = new Map<NodeId, number>([[startId, 0]]);
-    const fScore = new Map<NodeId, number>([[startId, 0]]);
+    const gScore = new Map<NodeId, number>([[sId, 0]]);
+    const fScore = new Map<NodeId, number>([[sId, 0]]);
 
     const h = (nodeId: NodeId) => {
       const node = this.nodes.get(nodeId);
       if (!node) return 1000;
       if (heuristic) return heuristic(node);
-      const targetLayer = this.nodes.get(targetId)?.properties.layer || 0;
+      const targetLayer = this.nodes.get(tId)?.properties.layer || 0;
       return Math.abs(targetLayer - (node.properties.layer || 0));
     };
 
-    fScore.set(startId, h(startId));
+    fScore.set(sId, h(sId));
 
     while (openSet.size > 0) {
       let currentId: NodeId | null = null;
@@ -294,7 +348,7 @@ export class ConducksAdjacencyList {
 
       if (!currentId) break;
 
-      if (currentId === targetId) {
+      if (currentId === tId) {
         const path = [currentId];
         let step = currentId;
         while (cameFrom.has(step)) {
@@ -323,10 +377,41 @@ export class ConducksAdjacencyList {
   }
 
   /**
-   * Returns a node by ID.
+   * Retrieves a node by ID (Case-Insensitive).
+   * 
+   * v1.7.0 (VMC): Hydrates the node with 'Meat' (properties) from the compressed store.
    */
-  public getNode(id: NodeId): ConducksNode | undefined {
-    return this.nodes.get(id);
+  public getNode(nodeId: NodeId): ConducksNode | undefined {
+    const id = nodeId.toLowerCase();
+    const skeleton = this.nodes.get(id);
+    if (!skeleton) return undefined;
+
+    const compressed = this.compressedMeat.get(id);
+    if (compressed) {
+      try {
+        const meat = JSON.parse(zlib.inflateSync(compressed).toString());
+        return {
+          ...skeleton,
+          isShallow: false,
+          properties: {
+            ...skeleton.properties,
+            ...meat
+          }
+        };
+      } catch (err) {
+        console.error(`[Conducks VMC] Decompression failed for node ${id}:`, err);
+      }
+    }
+
+    return skeleton;
+  }
+
+
+  /**
+   * Checks if a node exists (Case-Insensitive).
+   */
+  public hasNode(nodeId: NodeId): boolean {
+    return this.nodes.has(nodeId.toLowerCase());
   }
 
   public getAllNodes(): IterableIterator<ConducksNode> {
@@ -494,34 +579,43 @@ export class ConducksAdjacencyList {
    * Conducks — Entry Point Intelligence
    */
   public detectEntryPoints(): void {
-    const entryPointNames = new Set(['main', 'app', 'run', 'start', 'cli', 'index', 'handler', 'server']);
-    const entryPointFiles = new Set(['main.py', 'app.py', 'index.ts', 'server.ts', 'cli.ts']);
+    const entryPointNames = new Set(['main', 'app', 'run', 'start', 'cli', 'index', 'handler', 'server', 'cmd', 'entry']);
+    const entryPointFiles = new Set(['main.py', 'app.py', 'index.ts', 'server.ts', 'cli.ts', 'main.go', 'main.rs']);
 
     for (const node of this.nodes.values()) {
       const props = node.properties;
       const lowerName = props.name?.toLowerCase() || '';
-      const basename = props.filePath ? props.filePath.split('/').pop() : '';
+      const basename = props.filePath ? props.filePath.split('/').pop() || '' : '';
 
       let isEntry = false;
 
+      // 1. Explicit Framework Routes (Detected during refraction)
       if (node.label === 'route' || node.label.includes('route') || props.kind?.includes('route')) {
         isEntry = true;
       }
 
+      // 2. Transitive Root Signature (0 In-Degree, 1+ Out-Degree)
+      const incoming = this.inEdges.get(node.id)?.size || 0;
+      const outgoing = this.outEdges.get(node.id)?.size || 0;
+
+      // Significance Check: To be an entry, it should call something else.
+      // If it's a structural unit with no callers, it's likely a script or command.
+      if (incoming === 0 && outgoing > 0) {
+        if (node.label === 'module' || node.label === 'file' || node.label === 'function' || node.label === 'class') {
+           isEntry = true;
+        }
+      }
+
+      // 3. Global Constants & Naming Heuristics (Broadened)
       if (entryPointNames.has(lowerName)) {
         isEntry = true;
       }
 
-      if (basename && entryPointFiles.has(basename) && (node.label === 'module' || node.label === 'file')) {
+      if (basename && entryPointFiles.has(basename)) {
         isEntry = true;
       }
 
-      const incoming = this.inEdges.get(node.id)?.size || 0;
-      const outgoing = this.outEdges.get(node.id)?.size || 0;
-      if (incoming === 0 && outgoing >= 3) {
-        isEntry = true;
-      }
-
+      // 4. Force override if already marked during analysis
       if (props.isEntryPoint) {
         isEntry = true;
       }

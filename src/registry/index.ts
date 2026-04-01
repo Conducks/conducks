@@ -12,6 +12,7 @@ import { DeadCodeAnalyzer } from "@/lib/domain/evolution/dead-code.js";
 import { ResonanceAnalyzer } from "@/lib/domain/metrics/resonance.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
+import { TraceAnalyzer } from "@/lib/domain/kinetic/trace.js";
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
 import { ConducksWatcher } from "@/lib/domain/evolution/watcher.js";
 import { ContextGenerator } from "@/lib/domain/governance/context-generator.js";
@@ -27,6 +28,7 @@ import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { Logger } from "@/lib/core/utils/logger.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
 import { MirrorEngine } from "@/lib/domain/mirror/index.js";
+import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,7 +47,7 @@ const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
 const graph = new ConducksGraph();
 let persistence = new GraphPersistence(workspaceRoot);
 const search = new ConducksSearch(graph.getGraph());
-const flows = new ConducksFlowEngine(graph.getGraph());
+const flows = new TraceAnalyzer();
 const gvr = new GVREngine();
 const gql = new GQLParser();
 const advisor = new ConducksAdvisor();
@@ -57,6 +59,7 @@ const impactAnalyzer = new BlastRadiusAnalyzer();
 const contextGenerator = new ContextGenerator();
 const manifest = new ManifestEngine();
 const mirror = new MirrorEngine(graph.getGraph());
+let ignoreManager = new IgnoreManager(workspaceRoot);
 
 // 2. Instantiate Bridge Layer Registry (for dynamic plugins)
 const synapseRegistry = new SynapseRegistry();
@@ -106,6 +109,8 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
     logger.info(`${modeChanged ? 'Switching to' : 'Initializing'} ${readOnly ? 'READ_ONLY' : 'WRITER'} mode at: ${effectiveRoot}`);
     (persistence as any) = new GraphPersistence(effectiveRoot, readOnly);
     chronicle.setProjectDir(effectiveRoot);
+    ignoreManager = new IgnoreManager(effectiveRoot);
+    (analysisOrchestrator as any).ignoreManager = ignoreManager;
   }
   
   try {
@@ -146,7 +151,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
 }
 
 // 3. Domain Orchestration Logic (The Conducks's Brain)
-const analysisOrchestrator = new PulseOrchestrator(synapseRegistry, graph, aligner);
+const analysisOrchestrator = new PulseOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
 
 // Singleton watcher instance — prevents GC and ensures event loop stays alive
 let _watcherInstance: any = null;
@@ -287,7 +292,7 @@ export const registry = {
   },
   kinetic: {
     flows,
-    getProcesses: () => flows.groupProcesses()
+    getProcesses: () => (flows as any).groupProcesses()
   },
   metrics: {
     deadCode,

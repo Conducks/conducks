@@ -18,7 +18,7 @@ export class MirrorCommand implements ConducksCommand {
     await persistence.load(registry.intelligence.graph.getGraph());
     
     // 2. Start Mirror Server
-    const server = initGlobalMirror(registry.intelligence.graph);
+    const server = initGlobalMirror(registry.intelligence.graph, persistence);
     server.start(3333);
     
     // 3. Start Watcher (Live Connection)

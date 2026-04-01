@@ -114,6 +114,7 @@ export class MirrorEngine {
           parentId: visualParentId,
           group: n.properties.canonicalKind || n.label,
           level,
+          isShallow: n.isShallow, // Pass flag to UI
           clusterId: clusterId,
           clusterColor: clusterInfo.color,
           clusterX: clusterInfo.x,

@@ -10,7 +10,9 @@ import os from "node:os";
  */
 export interface SynapsePersistence {
   save(graph: ConducksAdjacencyList): Promise<string>;
+  saveSpectrum(filePath: string, spectrum: any): Promise<void>;
   load(graph: ConducksAdjacencyList): Promise<boolean>;
+  fetchNodeMeat(nodeId: string): Promise<any | null>;
   clear(): Promise<void>;
   close(): Promise<void>;
   isConnected(): boolean;
@@ -24,6 +26,10 @@ export class JsonPersistence implements SynapsePersistence {
 
   constructor(baseDir: string = process.cwd(), private readonly fileSystem: any = fs) {
     this.cacheDir = path.join(baseDir, '.conducks');
+  }
+
+  public async saveSpectrum(): Promise<void> {
+    return; // Legacy no-op
   }
 
   public async save(graph: ConducksAdjacencyList): Promise<string> {
@@ -57,6 +63,10 @@ export class JsonPersistence implements SynapsePersistence {
       if (data.edges) for (const edge of data.edges) graph.addEdge(edge);
       return true;
     } catch { return false; }
+  }
+
+  public async fetchNodeMeat(): Promise<any | null> {
+    return null; // Not implemented for JSON
   }
 
   public async close(): Promise<void> { /* No-op */ }
@@ -310,6 +320,44 @@ export class DuckDbPersistence implements SynapsePersistence {
     }
   }
 
+  public async saveSpectrum(filePath: string, spectrum: any): Promise<void> {
+    const db = await this.connect();
+    if (!db) return;
+
+    const pulseId = `stream_${Date.now()}`; // Temporary stream pulse ID
+
+    return new Promise((resolve, reject) => {
+      db.serialize(async () => {
+        try {
+          db.exec("BEGIN TRANSACTION");
+
+          const nodeStmt = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, kind, name, file, gravity, kineticEnergy, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+          for (const metaNode of spectrum.nodes) {
+            const nodeId = `${filePath.toLowerCase()}::${metaNode.name}`;
+            await new Promise<void>((res, rej) => {
+              nodeStmt.run(
+                nodeId,
+                pulseId,
+                metaNode.kind || 'unknown',
+                metaNode.name || 'unknown',
+                filePath.toLowerCase(),
+                0, 0,
+                JSON.stringify({ ...metaNode.metadata, name: metaNode.name, range: metaNode.range }),
+                (err: any) => err ? rej(err) : res()
+              );
+            });
+          }
+          nodeStmt.finalize();
+          
+          db.exec("COMMIT", (err: any) => err ? reject(err) : resolve());
+        } catch (err) {
+          db.exec("ROLLBACK");
+          reject(err);
+        }
+      });
+    });
+  }
+
   public async save(graph: ConducksAdjacencyList): Promise<string> {
     const db = await this.connect();
     const nodes = Array.from((graph as any).nodes.values()) as ConducksNode[];
@@ -427,6 +475,27 @@ export class DuckDbPersistence implements SynapsePersistence {
 
   public async clear(): Promise<void> {
     if (this.dbPath !== ":memory:") await fs.rm(this.cacheDir, { recursive: true, force: true });
+  }
+
+  public async fetchNodeMeat(nodeId: string): Promise<any | null> {
+    try {
+      const db = await this.connect();
+      if (!db) return null;
+
+      // Fetch from the latest pulse
+      const latestPulseId: string | null = await new Promise((res) => db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => res(err || rows.length === 0 ? null : rows[0].id)));
+      if (!latestPulseId) return null;
+
+      const rows: any[] = await new Promise((res) => db.all("SELECT metadata FROM nodes WHERE id = ? AND pulseId = ?", nodeId, latestPulseId, (err: any, rows: any[]) => res(err ? [] : rows)));
+      
+      if (rows.length > 0 && rows[0].metadata) {
+        return JSON.parse(rows[0].metadata);
+      }
+      return null;
+    } catch (err) {
+      logger.error(`[Conducks Persistence] Meat fetch failed for ${nodeId}:`, err);
+      return null;
+    }
   }
 
   public async getRawConnection(): Promise<any> { return this.connect(); }

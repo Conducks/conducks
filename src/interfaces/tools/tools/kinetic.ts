@@ -57,9 +57,14 @@ TIP: High risk symbols in a trace are potential failure points.`,
       required: ["symbol"]
     },
     handler: async ({ symbol, mode, target }: any) => {
+      // Ensure registry is initialized
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+
       const g = registry.intelligence.graph.getGraph();
       const status = registry.governance.status();
       const isStale = status.staleness.stale;
+      const traceAnalyzer = registry.kinetic.flows as any;
 
       const standardize = (id: string): any => {
         const node = g.getNode(id);
@@ -67,27 +72,30 @@ TIP: High risk symbols in a trace are potential failure points.`,
         return {
           id: node.id,
           kind: node.label,
-          file: node.properties.filePath,
-          name: node.properties.name,
-          risk: node.properties.risk || 0,
-          gravity: node.properties.rank || 0,
-          summary: `${node.label} ${node.properties.name} in ${node.properties.filePath}`
+          file: node.properties?.filePath,
+          name: node.properties?.name,
+          risk: node.properties?.risk || 0,
+          gravity: node.properties?.rank || 0,
+          summary: `${node.label} ${node.properties?.name || 'unknown'} in ${node.properties?.filePath || 'unknown'}`
         };
       };
 
       if (mode === "path" && target) {
-        const pathResult = (g as any).traverseAStar(symbol, target);
-        return { symbol, mode, target, path: (pathResult || []).slice(0, 10).map((id: string) => standardize(id)) };
+        const pathResult = traceAnalyzer.findPath(g, symbol, target);
+        return { symbol, mode, target, path: (pathResult || []).slice(0, 15).map((id: string) => standardize(id)), indexStaleness: isStale };
       }
 
-      const steps = registry.kinetic.flows.trace(symbol);
+      const steps = traceAnalyzer.trace(g, symbol);
+      const stepsArray = Array.isArray(steps) ? steps : (steps ? Array.from(steps as any) : []);
+
       return {
         symbol,
         mode,
-        steps: (steps || []).slice(0, 10).map((id: string) => standardize(id)),
+        steps: stepsArray.slice(0, 15).map((id: string) => standardize(id)),
         indexStaleness: isStale
       };
     },
+
     formatter: (res: any) => `## Conducks Kinetic Trace: ${res.symbol}\nFound results for mode: **${res.mode}**.`
   },
 
@@ -130,6 +138,10 @@ TIP: GVR rename is safer than find-and-replace because it uses the structural gr
       }
     },
     handler: async ({ mode, symbol, newName }: any) => {
+      // Ensure registry is initialized
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+
       const g = registry.intelligence.graph.getGraph();
       const status = registry.governance.status();
       const isStale = status.staleness.stale;
@@ -140,11 +152,11 @@ TIP: GVR rename is safer than find-and-replace because it uses the structural gr
         return {
           id: node.id,
           kind: node.label,
-          file: node.properties.filePath,
-          name: node.properties.name,
-          risk: node.properties.risk || 0,
-          gravity: node.properties.rank || 0,
-          summary: `${node.label} ${node.properties.name} in ${node.properties.filePath}`
+          file: node.properties?.filePath,
+          name: node.properties?.name,
+          risk: node.properties?.risk || 0,
+          gravity: node.properties?.rank || 0,
+          summary: `${node.label} ${node.properties?.name || 'unknown'} in ${node.properties?.filePath || 'unknown'}`
         };
       };
 
@@ -154,9 +166,10 @@ TIP: GVR rename is safer than find-and-replace because it uses the structural gr
 
       if (mode === "prune") {
         const orphans = registry.metrics.prune();
+        const orphansArray = Array.isArray(orphans) ? orphans : (orphans ? Array.from(orphans as any) : []);
         return {
-          orphans: orphans.slice(0, 10).map((id: string) => standardize(id)),
-          totalCount: orphans.length,
+          orphans: orphansArray.slice(0, 10).map((id: string) => standardize(id)),
+          totalCount: orphansArray.length,
           indexStaleness: isStale
         };
       }
@@ -205,7 +218,7 @@ TIP: GVR rename is safer than find-and-replace because it uses the structural gr
 
             const db: any = await (registry.infrastructure as any).persistence?.getRawConnection();
             if (db) {
-              const prev: any = await new Promise((res) => db.get("SELECT risk FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1", sId, (err: any, row: any) => res(row)));
+              const prev: any = await new Promise((res) => db.all("SELECT risk FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1", sId, (err: any, rows: any[]) => res(rows?.[0])));
               if (prev) {
                 const currentNode = g.getNode(sId);
                 if (currentNode) totalRiskDelta += (currentNode.properties.risk || 0) - prev.risk;
@@ -263,6 +276,10 @@ TIP: If status shows high staleness run conducks_analyze with fullAnalysis set t
       }
     },
     handler: async ({ mode, skill }: any) => {
+      // Ensure registry is initialized
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+
       const status = registry.governance.status();
       if (mode === "architecture-context") {
         return await (registry.governance as any).context();
@@ -283,7 +300,12 @@ TIP: If status shows high staleness run conducks_analyze with fullAnalysis set t
         projectRoot: (registry.infrastructure as any).chronicle?.getProjectDir() || 'unknown'
       };
     },
-    formatter: (res: any) => `## Conducks System Status: Healthy\nCWD: \`${res.cwd}\` | ProjectRoot: \`${res.projectRoot}\``
+    formatter: (res: any) => {
+      if (res.hotspots || res.entryPoints) {
+        return `## Conducks Architectural Context\nStructural Snapshot of the indexed synapse.`;
+      }
+      return `## Conducks System Status: Healthy\nCWD: \`${res.cwd || 'sandboxed'}\` | ProjectRoot: \`${res.projectRoot || 'local'}\``;
+    }
   },
 
   conducks_link: {
@@ -319,6 +341,10 @@ TIP: Cross repository edges have lower confidence. Verify them with source code 
       }
     },
     handler: async ({ repoPaths, mode }: any) => {
+      // Ensure registry is initialized
+      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      await registry.initialize(true, rootPath);
+
       const linker = new FederatedLinker();
       const status = registry.governance.status();
       
@@ -336,51 +362,6 @@ TIP: Cross repository edges have lower confidence. Verify them with source code 
         crossRepoSymbols: [], 
         indexStaleness: status.staleness.stale 
       };
-    }
-  },
-
-  conducks_visualize: {
-    id: "conducks-visualize",
-    name: "conducks_visualize",
-    type: "tool",
-    version: "1.0.0",
-    description: `Generate a high-fidelity structural visualization (Mermaid) of the current Synapse.
-Provides a visual 'Watch Graph' reflected in a workspace artifact.`,
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "number", default: 20, description: "Number of high-gravity nodes to include in the visualization." }
-      }
-    },
-    handler: async ({ limit }: any) => {
-      const g = registry.intelligence.graph.getGraph();
-      const nodes = Array.from(g.getAllNodes())
-        .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
-        .slice(0, limit || 20);
-      
-      const nodeIds = new Set(nodes.map(n => n.id));
-      const mermaidLines = ["graph TD"];
-      
-      for (const node of nodes) {
-        const cleanName = node.properties.name.replace(/[^a-zA-Z0-9]/g, '_');
-        const label = `${node.label}::${node.properties.name}`;
-        mermaidLines.push(`  ${node.id}["${label}"]`);
-        
-        const neighbors = g.getNeighbors(node.id, 'downstream');
-        for (const edge of neighbors) {
-          if (nodeIds.has(edge.targetId)) {
-            mermaidLines.push(`  ${edge.sourceId} -- ${edge.type} --> ${edge.targetId}`);
-          }
-        }
-      }
-
-      const content = mermaidLines.join('\n');
-      const baseDir = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-      const artifactPath = path.join(baseDir, '.conducks', 'structural_mirror.md');
-      
-      await fs.outputFile(artifactPath, `# Structural Mirror — Real-time Pulse\n\n\`\`\`mermaid\n${content}\n\`\`\`\n`, 'utf-8');
-      
-      return { artifactPath, nodeCount: nodes.length };
     }
   }
 };

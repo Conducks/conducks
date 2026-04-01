@@ -60,7 +60,8 @@ export class ImportProcessor {
     if (!resolved) return;
 
     const isExternal = typeof resolved === 'object' && (resolved as any).kind === 'external_dependency';
-    const targetName = isExternal ? `ECOSYSTEM::${(resolved as any).name}` : resolved as string;
+    const resolvedPath = isExternal ? (resolved as any).name : (resolved as string).toLowerCase();
+    const targetName = isExternal ? `ECOSYSTEM::${resolvedPath}` : resolvedPath;
     if (isExternal) console.debug(`[ImportProcessor] Processing EXTERNAL dependency: ${targetName}`);
 
     spectrum.relationships.push({
@@ -74,7 +75,7 @@ export class ImportProcessor {
 
   public processBinding(resolved: string | { name: string, kind: 'external_dependency' }, originalName: string, localAlias: string, spectrum: PrismSpectrum, context?: PulseContext): void {
     const isExternal = typeof resolved === 'object' && (resolved as any).kind === 'external_dependency';
-    const resolvedPath = isExternal ? (resolved as any).name : resolved as string;
+    const resolvedPath = isExternal ? (resolved as any).name : (resolved as string).toLowerCase();
 
     if (context) {
       context.registerLocalBinding(localAlias, resolvedPath);
@@ -85,10 +86,10 @@ export class ImportProcessor {
     let targetName: string;
     
     if (isExternal) {
-      targetName = `ECOSYSTEM::${resolvedPath}::${originalName}`;
+      targetName = `ECOSYSTEM::${resolvedPath.toLowerCase()}::${originalName.toLowerCase()}`;
     } else {
       const normalizedTarget = resolvedPath.replace(/\.(js|jsx)$/, '.ts').toLowerCase();
-      targetName = `${normalizedTarget}::${originalName}`;
+      targetName = `${normalizedTarget}::${originalName.toLowerCase()}`;
     }
     
     spectrum.relationships.push({
