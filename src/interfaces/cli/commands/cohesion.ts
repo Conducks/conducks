@@ -7,31 +7,26 @@ import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
  */
 export class CohesionCommand implements ConducksCommand {
   public id = "cohesion";
-  public description = "Measure shared structural context between symbols";
-  public usage = "registry cohesion <symbolA> <symbolB>";
+  public description = "Calculate structural similarity between two symbols";
+  public usage = "conducks cohesion <id1> <id2>";
 
   public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
-    const sourceId = args[0];
-    const targetId = args[1];
-    if (!sourceId || !targetId) {
-      console.log("\x1b[31mError: Two symbols are required for cohesion analysis.\x1b[0m");
+    const s1 = args[0];
+    const s2 = args[1];
+
+    if (!s1 || !s2) {
+      console.error("Error: Please provide two symbol IDs.");
       return;
     }
 
+    await persistence.load(registry.intelligence.graph.getGraph());
+
     try {
-      await persistence.load(registry.intelligence.graph.getGraph());
-      const cohesion = registry.intelligence.getCohesionVector(sourceId, targetId);
-
-      const fmt = (v: any) => {
-        const n = Number(v);
-        return isNaN(n) ? "0.00" : (n * 100).toFixed(2);
-      };
-
-      console.log(`\n\x1b[34mStructural Cohesion Score:\x1b[0m ${fmt(cohesion)}%`);
-      console.log(`\x1b[33m- Measuring the degree of shared structural context between symbols.\x1b[0m`);
-    } finally {
-      // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks
-      await persistence.close();
+      const vector = registry.metrics.getCohesionVector(s1, s2);
+      console.log(`\n\x1b[1m--- Structural Cohesion Report ---\x1b[0m`);
+      console.log(`\x1b[35mVector Similarity:\x1b[0m ${(vector * 100).toFixed(2)}%`);
+    } catch (err) {
+      console.error(`Cohesion Error: ${(err as Error).message}`);
     }
   }
 }

@@ -8,7 +8,7 @@ import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 export class QueryCommand implements ConducksCommand {
   public id = "query";
   public description = "Search code (use --gql for patterns)";
-  public usage = "registry query <text> [--gql]";
+  public usage = "conducks query <text> [--gql]";
 
   public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
     const queryInput = args[0];
@@ -19,8 +19,10 @@ export class QueryCommand implements ConducksCommand {
     const isGQL = args.includes('--gql');
     const query = args.filter(a => a !== '--gql').join(" ");
 
+    await persistence.load(registry.intelligence.graph.getGraph());
+
     if (isGQL) {
-      const results = registry.intelligence.gql.query(registry.intelligence.graph.getGraph(), query);
+      const results = registry.intelligence.parseGQL(query);
       console.log(`--- GQL Pattern Match: "${query}" ---`);
       (results as any[]).forEach(r => {
         console.log(`- (${r.source})-[:${r.type}]->(${r.target})`);
@@ -28,15 +30,16 @@ export class QueryCommand implements ConducksCommand {
       });
       if (results.length === 0) console.log("No structural patterns found.");
     } else {
-      const results = (registry.intelligence.search as any).search(query, 10);
-      console.log(`--- Graph Search Results: "${query}" ---`);
-      (results as any[]).forEach(n => {
-        const name = n.properties?.name || n.id;
-        const rank = n.properties?.rank?.toFixed(2) || '0.00';
-        const path = n.properties?.filePath || 'unknown';
-        console.log(`- [Rank: ${rank}] ${name} (${path})`);
-      });
-      if (results.length === 0) console.log("No symbols found.");
+      try {
+        const nodes = await registry.intelligence.query(query);
+        console.log(`\n\x1b[1m--- Structural Discovery: "${query}" ---\x1b[0m`);
+        nodes.forEach(n => {
+          console.log(`\x1b[36m${n.properties.name}\x1b[0m (${n.label}) - \x1b[2m${n.properties.filePath}\x1b[0m`);
+        });
+        if (nodes.length === 0) console.log("No symbols found matching your query.");
+      } catch (err) {
+        console.error(`Search Error: ${(err as Error).message}`);
+      }
     }
   }
 }

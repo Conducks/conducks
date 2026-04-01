@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import { ConducksAdjacencyList, NodeId } from '@/lib/core/graph/adjacency-list.js';
 
-interface RefactorResult {
+export interface RefactorResult {
   success: boolean;
   affectedFiles: string[];
   message: string;

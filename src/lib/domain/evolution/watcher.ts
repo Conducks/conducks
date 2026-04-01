@@ -70,9 +70,9 @@ export class ConducksWatcher {
     });
 
     this.watcher
-      .on("add", (filePath: string) => { console.log(`[Watcher Debug] add: ${filePath}`); this.handlePulseEvent("add", filePath); })
-      .on("change", (filePath: string) => { console.log(`[Watcher Debug] change: ${filePath}`); this.handlePulseEvent("change", filePath); })
-      .on("unlink", (filePath: string) => { console.log(`[Watcher Debug] unlink: ${filePath}`); this.handlePulseEvent("unlink", filePath); });
+      .on("add", (filePath: string) => { console.error(`[Watcher Debug] add: ${filePath}`); this.handlePulseEvent("add", filePath); })
+      .on("change", (filePath: string) => { console.error(`[Watcher Debug] change: ${filePath}`); this.handlePulseEvent("change", filePath); })
+      .on("unlink", (filePath: string) => { console.error(`[Watcher Debug] unlink: ${filePath}`); this.handlePulseEvent("unlink", filePath); });
   }
 
   /**
@@ -127,7 +127,7 @@ export class ConducksWatcher {
         // This ensures the structural resonance is still mapped for the modified units.
         const lineCount = source.split('\n').length;
         for (let i = 1; i <= lineCount; i++) changedLines.push(i);
-        console.log(`[Watcher Debug] Git diff unavailable. Falling back to full-resonance for: ${path.basename(filePath)}`);
+        console.error(`[Watcher Debug] Git diff unavailable. Falling back to full-resonance for: ${path.basename(filePath)}`);
       }
 
       // 2. Partial Structural Reflection
@@ -167,14 +167,14 @@ export class ConducksWatcher {
               if (prevNode) riskDelta = (node.properties.risk || 0) - prevNode.risk;
             }
 
-            console.log(`\x1b[35m⚡ Change detected: \x1b[0m${path.relative(this.rootDir, filePath)}`);
-            console.log(`   \x1b[1mModified symbol: \x1b[0m${node.properties.name}`);
-            console.log(`   \x1b[1mBlast radius:    \x1b[0m${impact.affectedCount} symbols affected`);
-            console.log(`   \x1b[1mRisk delta:      \x1b[0m${riskDelta > 0 ? '+' : ''}${riskDelta.toFixed(4)}`);
+            console.error(`\x1b[35m⚡ Change detected: \x1b[0m${path.relative(this.rootDir, filePath)}`);
+            console.error(`   \x1b[1mModified symbol: \x1b[0m${node.properties.name}`);
+            console.error(`   \x1b[1mBlast radius:    \x1b[0m${impact.affectedCount} symbols affected`);
+            console.error(`   \x1b[1mRisk delta:      \x1b[0m${riskDelta > 0 ? '+' : ''}${riskDelta.toFixed(4)}`);
             if (downstreamNames.length > 0) {
-              console.log(`   \x1b[1mDownstream:      \x1b[0m[${downstreamNames.join(', ')}${upstreamIds.length > 5 ? '...' : ''}]`);
+              console.error(`   \x1b[1mDownstream:      \x1b[0m[${downstreamNames.join(', ')}${upstreamIds.length > 5 ? '...' : ''}]`);
             }
-            console.log("");
+            console.error("");
           }
         }
       }

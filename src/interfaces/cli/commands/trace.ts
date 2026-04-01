@@ -3,63 +3,43 @@ import { registry } from "@/registry/index.js";
 import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 
 /**
- * Conducks — Trace Command (Conducks)
+ * Conducks — Trace (Lineage) Command
  * 
- * Visualizes the structural dependency chain of a symbol.
+ * Maps the execution flow downstream or data lineage upstream.
  */
 export class TraceCommand implements ConducksCommand {
   public id = "trace";
-  public description = "Visualize the structural dependency chain of a symbol";
-  public usage = "registry trace <symbolId> [maxDepth: number]";
+  public description = "Trace structural dependencies (use --flow for data lineage)";
+  public usage = "conducks trace <symbol_id> [--flow]";
 
   public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
-    const symbolId = args[0];
-    const maxDepth = parseInt(args[1]) || 10;
+    const isFlow = args.includes('--flow');
+    const symbolInput = args.filter(a => a !== '--flow')[0];
+
+    if (!symbolInput) {
+      console.error("Usage: conducks trace <symbol_id> [--flow]");
+      return;
+    }
+
+    await persistence.load(registry.intelligence.graph.getGraph());
+
+    let symbolId = symbolInput;
+    if (!registry.intelligence.graph.getGraph().getNode(symbolInput)) {
+      const results = await registry.intelligence.query(symbolInput, 1);
+      if (results.length > 0) {
+        symbolId = results[0].id;
+      }
+    }
+
+    console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${symbolId} ---\x1b[0m`);
+
     try {
-      const symbolId = args[0];
-      const maxDepth = parseInt(args[1]) || 10;
-
-      if (!symbolId) {
-        console.error("Error: Please provide a symbol ID to trace.");
-        return;
-      }
-
-      await persistence.load(registry.intelligence.graph.getGraph());
-
-      let activeId = symbolId;
-      let node = registry.intelligence.graph.getGraph().getNode(symbolId);
-
-      // Conducks: Intelligent Fallback Resolve
-      if (!node) {
-        const results = registry.intelligence.search.search(symbolId, 1);
-        if (results.length > 0) {
-          node = results[0];
-          activeId = node.id;
-        }
-      }
-
-      const circuit = await (registry.analysis as any).getImpact(activeId, 'downstream', maxDepth);
-
-      if (circuit.exists === false) {
-        console.error(`Error: Symbol ${symbolId} not found in the structural index.`);
-        return;
-      }
-
-      console.log(`\n\x1b[1m--- Conducks Structural Flow Trace: ${symbolId} ---\x1b[0m`);
-      console.log(`\x1b[35mTotal Structural Steps:\x1b[0m ${circuit.affectedCount}`);
-
-      if (circuit.affectedNodes.length === 0) {
-        console.log(`\x1b[33mNo downstream dependencies found.\x1b[0m`);
-        return;
-      }
-
-      circuit.affectedNodes.forEach((node: any) => {
-        const indent = "  ".repeat(Math.floor(node.distance));
-        const typeColor = node.kind === 'function' ? '\x1b[32m' : '\x1b[34m';
-        const typeLabel = node.path.length > 0 ? node.path[node.path.length - 1] : 'ROOT';
-        console.log(`${indent}${typeColor}└─ [${typeLabel}]\x1b[0m ${node.name} \x1b[90m(${node.filePath})\x1b[0m`);
+      const steps = isFlow ? registry.kinetic.flow(symbolId) : registry.kinetic.trace(symbolId);
+      steps.slice(0, 15).forEach((id: string, i: number) => {
+        const n = registry.intelligence.graph.getGraph().getNode(id);
+        const prefix = (i + 1).toString().padStart(2, '0');
+        console.log(`${prefix}. [\x1b[35m${n?.label || 'unknown'}\x1b[0m] ${n?.properties.name || 'unknown'} (\x1b[2m${n?.properties.filePath || 'unknown'}\x1b[0m)`);
       });
-
     } catch (err) {
       console.error(`Trace Error: ${(err as Error).message}`);
     }

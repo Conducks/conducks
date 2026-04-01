@@ -19,7 +19,7 @@ import {
  * Conducks tool registry server that orchestrates internal APIs and tool scheduler.
  * Consolidates all structural and behavioral tools into a documentation-driven registry.
  * 
- * Rule 6/13 ENFORCEMENT: Exactly 8 Unified Conducks MCP Tools. No more, no less.
+ * Rule 10/13 ENFORCEMENT: Exactly 10 Unified Conducks MCP Tools. No more, no less.
  */
 export class ConducksMCPServer {
   private server: Server;
@@ -62,11 +62,11 @@ export class ConducksMCPServer {
       this.registry.register(tool);
     }
 
-    // Rule 6/13 ENFORCEMENT: Exactly 8 Unified Conducks MCP Tools.
-    const MANDATED_TOOL_COUNT = 8;
+    // Rule 10/13 ENFORCEMENT: Exactly 10 Unified Conducks MCP Tools.
+    const MANDATED_TOOL_COUNT = 10;
     if (tools.length !== MANDATED_TOOL_COUNT) {
       console.error(
-        `[Conducks MCP] ⚠️ Rule 6/13 VIOLATION: Expected ${MANDATED_TOOL_COUNT} tools, ` +
+        `[Conducks MCP] ⚠️ Rule 10/13 VIOLATION: Expected ${MANDATED_TOOL_COUNT} tools, ` +
         `found ${tools.length}. Tools: ${tools.map(t => t.name).join(', ')}`
       );
     }
@@ -76,7 +76,7 @@ export class ConducksMCPServer {
     // 3. Register Resources (The Conducksic Prism)
     this.registerResources();
 
-    console.error(`[Conducks MCP] System ready. ${tools.length} Unified Conducks Tools indexed (Rule 6/13 enforced).`);
+    console.error(`[Conducks MCP] System ready. ${tools.length} Unified Conducks Tools indexed (Rule 10/13 enforced).`);
   }
 
   private registerResources(): void {
@@ -125,10 +125,7 @@ export class ConducksMCPServer {
       const { uri } = request.params;
       
       try {
-        // Conducks Lazy Resonance: Initialize only for the duration of the request
-        const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-        await registry.initialize(true, rootPath);
-        
+        // Conducks Lazy Resonance: Relies on CLI-level initialization for the session
         const status = registry.governance.status();
         const nodes = Array.from(registry.intelligence.graph.getGraph().getAllNodes());
 
@@ -220,8 +217,8 @@ export class ConducksMCPServer {
               uri,
               mimeType: "application/json",
               text: JSON.stringify({
-                items: status.pulses || [],
-                totalCount: (status.pulses || []).length,
+                items: [],
+                totalCount: 0,
                 truncated: false
               })
             }]
@@ -229,9 +226,8 @@ export class ConducksMCPServer {
         }
 
         throw new Error(`Resource not found: ${uri}`);
-      } finally {
-        // Release the structural lock to allow parallel analysis
-        await registry.infrastructure.persistence.close();
+      } catch (err: any) {
+        throw new Error(`Failed to read resource ${uri}: ${err.message}`);
       }
     });
   }

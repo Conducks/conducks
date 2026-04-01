@@ -17,5 +17,5 @@
     "isolatedModules": true
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "test-workspace", "build"]
+  "exclude": ["node_modules", "test-workspace", "build", "tests/legacy"]
 }

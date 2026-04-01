@@ -8,7 +8,7 @@ import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 export class ResonanceCommand implements ConducksCommand {
   public id = "resonance";
   public description = "Compare structure to another foundation project";
-  public usage = "registry resonance <path>";
+  public usage = "conducks resonance <path>";
 
   public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
     const otherPath = args[0];
@@ -18,7 +18,7 @@ export class ResonanceCommand implements ConducksCommand {
     }
     
     await persistence.load(registry.intelligence.graph.getGraph());
-    const diff = await registry.intelligence.compare(otherPath);
+    const diff = await registry.metrics.compare(otherPath);
 
     const fmt = (v: any) => {
       const n = Number(v);

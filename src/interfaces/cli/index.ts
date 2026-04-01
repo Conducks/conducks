@@ -43,7 +43,26 @@ import { fileURLToPath } from 'url';
  */
 export async function main() {
   const args = process.argv.slice(2);
-  const commandId = args[0] || "help";
+  let commandId = args[0] || "help";
+  if (commandId.startsWith("--")) {
+    commandId = commandId.slice(2);
+  }
+  const isMcpCommand = commandId === 'mcp';
+
+  if (isMcpCommand) {
+    /**
+     * FIX 3 (CORE): Redirect all console methods to stderr for MCP commands.
+     * This ensures human-readable CLI logs do not pollute the stdout stream,
+     * which is reserved for the JSON-RPC Model Context Protocol messages.
+     * We do this as the very first action in main().
+     */
+    const silence = (...args: any[]) => console.error(...args);
+    console.log = silence;
+    console.info = silence;
+    console.warn = silence;
+    console.debug = silence;
+  }
+
   const cmdArgs = args.slice(1);
 
   // Conducks: Intelligent Persistence Targeting
@@ -79,9 +98,20 @@ export async function main() {
 
   commands.push(new HelpCommand(commands));
 
-  const command = commands.find(c => c.id === commandId);
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'mcp', 'bootstrap-docs', 'record'].includes(commandId);
-  const isMcpCommand = commandId === 'mcp';
+  // Conducks: Command Symmetry & Aliasing
+  const aliasMap: Record<string, string> = {
+    "search": "query",
+    "map": "status",
+    "audit": "verify",
+    "refactor": "rename",
+    "evolution": "diff",
+    "metrics": "explain",
+    "system": "status"
+  };
+
+  const effectiveId = aliasMap[commandId] || commandId;
+  const command = commands.find(c => c.id === effectiveId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'mcp', 'bootstrap-docs', 'record'].includes(effectiveId);
 
   /**
    * FIX 2: Long-running commands must NOT have their persistence layer closed
@@ -92,16 +122,6 @@ export async function main() {
    */
   const persistentCommands = new Set(['watch', 'mcp']);
   const isPersistent = persistentCommands.has(commandId);
-
-  if (isMcpCommand) {
-    /**
-     * FIX 3 (CORE): Redirect all console.log to stderr for MCP commands.
-     * This ensures human-readable CLI logs do not pollute the stdout stream,
-     * which is reserved for the JSON-RPC Model Context Protocol messages.
-     */
-    console.log = (...args: any[]) => console.error(...args);
-    console.info = (...args: any[]) => console.error(...args);
-  }
 
   if (command) {
     try {

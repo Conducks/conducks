@@ -9,17 +9,17 @@ import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/registry/types.js";
+import { logger } from "@/lib/core/utils/logger.js";
 
 /**
  * Conducks — Pulse Orchestrator
  * 
- * The central orchestration engine for the Gospel of Technology.
+ * The central orchestration engine for structural analysis.
  * Manages the batch-parallel topological pulse and structural resonance.
  */
 export class PulseOrchestrator implements ConducksComponent {
   public readonly id = "pulse-orchestrator";
   public readonly type = "analyzer";
-  public readonly version = "2.0.0";
 
   public context = new PulseContext();
 
@@ -34,21 +34,22 @@ export class PulseOrchestrator implements ConducksComponent {
 
   /**
    * Orchestrates a high-fidelity pulse on the provided files.
+   * Standardized naming: pulse()
    */
-  public async executePulse(files: Array<{ path: string, source: string }>): Promise<string> {
+  public async pulse(files: Array<{ path: string, source: string }>): Promise<string> {
     this.context.reset();
     const context = this.context;
 
-    // Conducks: Structural Exclusion Guard (v1.6.5)
+    // Structural Exclusion Guard
     const activeFiles = this.ignoreManager ? 
       files.filter(f => !this.ignoreManager!.isIgnored(f.path)) : 
       files;
 
     if (this.ignoreManager && activeFiles.length < files.length) {
-      console.log(`🛡️ [Conducks] Structural Ignore: Excluding ${files.length - activeFiles.length} units from the structural wave.`);
+      logger.info(`Structural Ignore: Excluding ${files.length - activeFiles.length} units from the structural wave.`);
     }
 
-    // Conducks.6: Path Normalization & Canonical Identity (v1.6.5)
+    // Path Normalization & Canonical Identity
     // We preserve casing for Linux compatibility while resolving relative paths
     const normalizedFiles = activeFiles.map(f => {
       if (!f || !f.path) {
@@ -61,25 +62,32 @@ export class PulseOrchestrator implements ConducksComponent {
     const spectra = new Map<string, any>();
     const pulseErrors: string[] = [];
 
-    // Conducks: Adaptive Memory Pressure Calculation (v1.6.5)
+    // Adaptive Memory Pressure Calculation
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
     const isLargeProject = normalizedFiles.length > 100;
     const useShallowMode = memoryUsage > 1000 || isLargeProject;
 
     if (useShallowMode) {
-      console.log(`[Conducks] Adaptive Scaling: Engaging Shallow Internalization (RAM: ${Math.round(memoryUsage)}MB, Files: ${normalizedFiles.length})`);
+      logger.info(`Adaptive Scaling: Engaging Shallow Internalization (RAM: ${Math.round(memoryUsage)}MB, Files: ${normalizedFiles.length})`);
     }
 
     // Step 1: Pre-Pulse Discovery & Single-Pass Reflection
+    let indexCount = 0;
     for (const file of normalizedFiles) {
       try {
-        // Conducks: Filename-Aware Provider Mapping (v1.6.5)
+        indexCount++;
+        // Periodic Milestone Log: Providing structural visibility for large projects.
+        if (indexCount % 100 === 0 || indexCount === normalizedFiles.length) {
+          logger.info(`Structural Pulse: Reflecting unit ${indexCount}/${normalizedFiles.length} (${Math.round((indexCount / normalizedFiles.length) * 100)}%)...`);
+        }
+
+        // Filename-Aware Provider Mapping
         const provider = this.registry.getProvider(file.path);
         if (!provider) continue;
 
         const spectrum = await this.reflector.reflect(file, provider, context, allPaths);
         
-        // Conducks: Streaming Persistence (v1.6.5)
+        // Streaming Persistence
         // We write the 'Meat' to disk immediately to free up RAM if needed
         if (this.persistence && useShallowMode) {
           await this.persistence.saveSpectrum(file.path, spectrum);
@@ -88,7 +96,7 @@ export class PulseOrchestrator implements ConducksComponent {
         spectra.set(file.path, spectrum);
       } catch (err: any) {
         pulseErrors.push(`${file.path}: ${err.message}`);
-        console.error(`[Conducks] Pulse Warning: Failed to reflect ${file.path}. Structural unit may be missing from this wave.`, err);
+        logger.warn(`Pulse Warning: Failed to reflect ${file.path}. Structural unit may be missing from this wave.`, err);
         
         // Materialize a "Broken Unit" node to prevent total structural collapse
         this.graph.ingestSpectrum(file.path, {
@@ -135,3 +143,4 @@ export class PulseOrchestrator implements ConducksComponent {
     }
   }
 }
+

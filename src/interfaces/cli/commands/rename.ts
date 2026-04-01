@@ -29,13 +29,10 @@ export class RenameCommand implements ConducksCommand {
       console.log(`\x1b[33m⚠️  DRY RUN mode (pass --confirm to apply changes)\x1b[0m`);
     }
 
-    await persistence.load(registry.intelligence.graph.getGraph());
-    const result = await registry.evolution.gvr.renameSymbol(
-      registry.intelligence.graph.getGraph(),
-      symbolId,
-      newName,
-      dryRun
-    );
+    await persistence.load(registry.infrastructure.graphEngine.getGraph());
+    
+    // Conducks: Graph-Verified Refactoring (GVR)
+    const result = await registry.evolution.rename(symbolId, newName, dryRun);
 
     if (result.success) {
       const icon = dryRun ? "🔍" : "✅";

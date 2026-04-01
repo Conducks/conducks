@@ -11,7 +11,7 @@ import path from "node:path";
 export class RecordCommand implements ConducksCommand {
   public id = "record";
   public description = "Record a learning, decision, or intent into the Manifest";
-  public usage = "registry record --type [vision|convention|memory|todo] \"content\"";
+  public usage = "conducks record --type [vision|architecture|implementation|handover|conventions|todo|memory] \"content\"";
 
   public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
     const typeArg = args.find(a => a.startsWith('--type='));
@@ -19,7 +19,7 @@ export class RecordCommand implements ConducksCommand {
     const content = args[args.length - 1];
 
     if (!content || content.startsWith('--')) {
-      console.error("Usage: registry record --type [vision|convention|memory|todo] \"content\"");
+      console.error("Usage: conducks record --type [vision|architecture|implementation|handover|conventions|todo|memory] \"content\"");
       return;
     }
 
@@ -31,7 +31,9 @@ export class RecordCommand implements ConducksCommand {
       'convention': 'conventions',
       'rules': 'conventions',
       'learning': 'memory',
-      'intent': 'vision'
+      'intent': 'vision',
+      'arch': 'architecture',
+      'impl': 'implementation'
     };
 
     const targetType = typeMap[type.toLowerCase()] || type.toLowerCase();

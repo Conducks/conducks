@@ -51,7 +51,7 @@ export class FederatedLinker {
       const success = await p.load(mainGraph, true);
       if (success) {
         const added = mainGraph.stats.nodeCount - before;
-        console.log(`[Federated Linker] Resonated with ${linkPath} (+${added} nodes).`);
+        console.error(`[Federated Linker] Resonated with ${linkPath} (+${added} nodes).`);
       } else {
         console.warn(`[Federated Linker] ⚠️  Hydration failed for: ${linkPath}`);
       }

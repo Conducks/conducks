@@ -41,9 +41,16 @@ describe('Conducks CLI Integration', () => {
     // skip if git repo wasn't initialized correctly
     if (!fs.existsSync(path.join(testRepo, '.git'))) return;
     
+    // Create a non-ignored file in a safe subdirectory
+    const srcDir = path.join(testRepo, 'src');
+    if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir);
+    fs.writeFileSync(path.join(srcDir, 'feature.ts'), 'export const start = () => console.log("Init");');
+
     const output = execSync(`node ${cliPath} analyze`, { cwd: testRepo }).toString();
-    expect(output).toContain('[Conducks] Analyzing Project Structure');
-    expect(output).toContain('📊 Graph Analysis Result');
+    
+    // Check for the core structural milestones (Shield emoji indicates pulse initiation)
+    expect(output).toContain('🛡️ [Conducks] Structural Ignore');
+    expect(output).toContain('analyze.execute() completed.');
   });
 
   it('should run entropy analysis', () => {

@@ -1,6 +1,6 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
 
-interface Advice {
+export interface Advice {
   level: 'INFO' | 'WARNING' | 'ERROR';
   type: 'CIRCULAR' | 'HUB' | 'ORPHAN' | 'INTUITION' | 'HIDDEN_COUPLING';
   message: string;
@@ -185,13 +185,5 @@ export class ConducksAdvisor {
       entropy: wEntropy * nEntropy,
       total: (wGravity * rank) + (wComplexity * nComplexity) + (wFanOut * nFanOut) + (wDebt * nDebt) + (wResonance * nResonance) + (wEntropy * nEntropy)
     };
-  }
-
-  /**
-   * Conducks — Composite Risk Formula (Final 6-Signal Model)
-   * legacy method maintained for compatibility
-   */
-  private calculateRiskScore(node: ConducksNode, graph: ConducksAdjacencyList): number {
-    return this.calculateRiskBreakdown(node, graph).total;
   }
 }

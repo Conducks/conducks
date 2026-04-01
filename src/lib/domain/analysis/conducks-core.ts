@@ -80,7 +80,7 @@ export class Conducks implements ConducksComponent {
    * structural throughput.
    */
   public async pulse(files: Array<{ path: string, source: string }>): Promise<string> {
-    console.log("[Conducks] Initiating Conducks 'Structural Resonance' Pulse...");
+    console.error("[Conducks] Initiating Conducks 'Structural Resonance' Pulse...");
 
     console.error("[ConducksCore] Loading persistence...");
     await this.persistence.load(this.graph.getGraph());
@@ -90,7 +90,7 @@ export class Conducks implements ConducksComponent {
     await grammars.init();
     console.error("[ConducksCore] Grammars initialized.");
     // Conducks: High-Fidelity Resource Discovery
-    const grammarDir = path.resolve(__dirname, "../../resources/grammars");
+    const grammarDir = path.resolve(__dirname, "../../../resources/grammars");
 
     const wasmPath = path.join(grammarDir, "tree-sitter-python.wasm");
     if (!fs.existsSync(wasmPath)) {
@@ -116,7 +116,7 @@ export class Conducks implements ConducksComponent {
 
     console.error(`[ConducksCore] Calling Orchestrator with ${files.length} units.`);
     try {
-      await this.orchestrator.executePulse(files);
+      await this.orchestrator.pulse(files);
       const framework = (this.orchestrator as any).context.getFramework();
       if (framework) {
         this.graph.getGraph().setMetadata('framework', framework);
@@ -218,7 +218,7 @@ export class Conducks implements ConducksComponent {
   }
 
   public async resonate(): Promise<void> {
-    console.log("[Conducks] Pushing Structural Resonance Flow...");
+    console.error("[Conducks] Pushing Structural Resonance Flow...");
     this.graph.resonate();
     await this.persistence.save(this.graph.getGraph());
   }

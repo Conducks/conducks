@@ -66,11 +66,9 @@ class PriorityQueue<T extends { weight: number }> {
 export abstract class BaseAnalyzer implements ConducksComponent {
   public abstract readonly id: string;
   public readonly type = 'analyzer';
-  public abstract readonly version: string;
 
   /**
    * Performs a breadth-first search on the graph from a starting point.
-   * Legacy wrapper for Dijkstra with uniform weights.
    */
   protected bfs(
     graph: any, 
@@ -90,8 +88,6 @@ export abstract class BaseAnalyzer implements ConducksComponent {
   /**
    * Performs a Dijkstra traversal to find the "Shortest Weighted Path".
    * Factor in architectural relationship weights (e.g., EXTENDS > CALLS > IMPORTS).
-   * 
-   * Optimization (v1.7.0): Uses a Binary Heap Priority Queue for O(E log V).
    */
   protected dijkstra(
     graph: ConducksAdjacencyList,
@@ -136,7 +132,6 @@ export abstract class BaseAnalyzer implements ConducksComponent {
  */
 export class TraceAnalyzer extends BaseAnalyzer {
   public readonly id = 'trace-analyzer';
-  public readonly version = '2.0.0';
 
   constructor(private readonly graph?: ConducksAdjacencyList) {
     super();

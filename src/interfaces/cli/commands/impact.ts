@@ -8,7 +8,7 @@ import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 export class ImpactCommand implements ConducksCommand {
   public id = "impact";
   public description = "Perform blast radius analysis on a symbol";
-  public usage = "registry impact <symbolId> [direction: upstream|downstream]";
+  public usage = "conducks impact <symbolId> [direction: upstream|downstream]";
 
   public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
     const symbolId = args[0];
@@ -27,7 +27,8 @@ export class ImpactCommand implements ConducksCommand {
     };
 
     try {
-      const impact = registry.analysis.getImpact(symbolId, direction);
+      // Registry Alignment: kinetic.getImpact + metrics.calculateCompositeRisk
+      const impact = registry.kinetic.getImpact(symbolId, direction);
       const composite = await registry.metrics.calculateCompositeRisk(symbolId);
 
       console.log(`\n\x1b[1m--- Conducks ${direction.toUpperCase()} Impact Report: ${symbolId} ---\x1b[0m`);

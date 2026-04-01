@@ -20,8 +20,8 @@ export interface ConducksComponent {
   /** human-readable description of what this component provides */
   readonly description?: string;
   
-  /** Version of the component for evolution tracking */
-  readonly version: string;
+  /** Optional version of the component for evolution tracking */
+  readonly version?: string;
 }
 
 /**

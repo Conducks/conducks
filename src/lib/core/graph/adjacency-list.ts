@@ -485,12 +485,6 @@ export class ConducksAdjacencyList {
         return path && path.toLowerCase() === targetPath;
       });
 
-    if (nodesInFile.length === 0) {
-      console.log(`[AdjacencyList Debug] No nodes found for path: ${targetPath}`);
-    } else {
-      console.log(`[AdjacencyList Debug] Found ${nodesInFile.length} nodes for path. Checking line ${line}...`);
-    }
-
     // Sort by smallest range (innermost scope) first
     nodesInFile.sort((a, b) => {
       const aRange = (a as any).originalRange || a.properties.range;

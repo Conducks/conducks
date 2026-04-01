@@ -1,6 +1,6 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
 
-interface Finding {
+export interface Finding {
   type: 'ORPHAN' | 'UNUSED_EXPORT' | 'UNREACHABLE_LOGIC' | 'STALE_IMPORT';
   symbol: string;
   file: string;

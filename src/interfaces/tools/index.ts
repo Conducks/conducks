@@ -9,15 +9,15 @@ import { Logger } from "@/lib/core/utils/logger.js";
  * Standard entry point for the Conducks Model Context Protocol server.
  */
 export async function main() {
-  const logger = new Logger("Synapse Tools");
-  logger.info(`Starting MCP Server (CWD: ${process.cwd()})`);
-
   // Safeguard: Redirect all standard console methods to stderr to prevent stdout corruption
   const silence = (...args: any[]) => console.error(...args);
   console.log = silence;
   console.info = silence;
   console.warn = silence;
   console.debug = silence;
+
+  const logger = new Logger("Synapse Tools");
+  logger.info(`Starting MCP Server (CWD: ${process.cwd()})`);
 
   // Dynamic import ensures that the ConducksMCPServer (and its dependencies)
   // are only loaded AFTER console.log has been silenced.

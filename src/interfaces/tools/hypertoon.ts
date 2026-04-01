@@ -62,14 +62,11 @@ export class ConducksRegistry {
           console.error(`[Conducks] CWD is root or invalid. Auto-resolving to script-relative root: ${rootPath}`);
         }
         try {
-          // Acquire the lock for the duration of the query
-          // WRITER ACCESS: Only if fullAnalysis is requested (Phase 11.4)
-          const isWriteMode = tool.name === "conducks_analyze" && args.fullAnalysis;
-          await registry.initialize(!isWriteMode, rootPath);
+          // Conducks Lazy Resonance: Handlers now rely on the persistent CLI-level initialization
           return await originalHandler(args);
-        } finally {
-          // Immediately release the lock so the CLI and watch processes are not frozen
-          await registry.infrastructure.persistence.close();
+        } catch (err: any) {
+          console.error(`[Conducks] Tool Handler Error: ${err.message}`);
+          throw err;
         }
       };
     }

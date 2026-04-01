@@ -10,7 +10,6 @@ import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib
  */
 export class BlastRadiusAnalyzer extends BaseAnalyzer {
   public readonly id = 'blast-radius-analyzer';
-  public readonly version = '1.0.0';
 
   /**
    * Conducks — Weighted Blast Radius
