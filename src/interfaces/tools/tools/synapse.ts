@@ -201,5 +201,51 @@ Returns:
         return { error: `Explanation Failed: ${err.message}` };
       }
     }
+  },
+
+  conducks_guide: {
+    id: "conducks-guide",
+    name: "conducks_guide",
+    type: "tool",
+    version: "2.1.0",
+    description: `Access the dynamic architectural guidance library. Serves engineering standards and rules.
+
+WHEN TO USE: You need specific guidance on UI, Backend, Security, or Project Structure.
+AFTER THIS: Apply the provided rules to your implementation.
+
+No Arguments: Returns the list of all available guidance modules.
+'skill' Argument: Returns the specific markdown content for a module (e.g., 'frontend/tools/color').`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        skill: { type: "string", description: "Optional: The ID of the skill to retrieve (e.g., 'frontend/tools/color')." },
+        path: { type: "string", description: "Optional: The absolute project root." }
+      }
+    },
+    formatter: (res: any) => JSON.stringify(res, null, 2),
+    handler: async ({ skill, path: customPath }: any) => {
+      try {
+        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        
+        // Ensure Oracle is bootstrapped (lazy load)
+        await (registry.oracle as any).bootstrap();
+
+        if (skill) {
+          const detail = registry.oracle.get(skill);
+          if (!detail) {
+            return { error: `Skill '${skill}' not found in the Oracle.`, available: registry.oracle.list().map(s => s.id) };
+          }
+          return { skill: detail.id, name: detail.name, content: detail.content };
+        }
+
+        const list = registry.oracle.list();
+        return {
+          message: "Conducks Dynamic Guidance Library Active.",
+          available_modules: list.map(s => ({ id: s.id, name: s.name, description: s.description }))
+        };
+      } catch (err: any) {
+        return { error: `Oracle Request Failed: ${err.message}` };
+      }
+    }
   }
 };

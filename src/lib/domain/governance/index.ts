@@ -97,3 +97,4 @@ export { ConducksAdvisor } from "./advisor.js";
 export { ConducksSentinel } from "./sentinel.js";
 export { ContextGenerator } from "./context-generator.js";
 export { BlueprintGenerator } from "./blueprint-generator.js";
+export { GuidanceOracle } from "./oracle.js";

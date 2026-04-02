@@ -36,14 +36,19 @@ export class MirrorServer {
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #010409;
-      --panel: rgba(13, 17, 23, 0.85);
-      --glass: rgba(255, 255, 255, 0.03);
-      --border: rgba(255, 255, 255, 0.08);
-      --blue: #3b82f6;
-      --blue-bright: #60a5fa;
-      --neon-blue: #00d2ff;
+      /* Void Space — Apostolic Palette */
+      --bg: #0d1117;
+      --panel: #161b22;
+      --card: #0d1117;
+      --border: #30363d;
+      --border-bright: #444c56;
+      --blue: #58a6ff;
+      --blue-bright: #79c0ff;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
       --font: 'Outfit', sans-serif;
+      --spacing-sm: 12px;
+      --spacing-md: 20px;
     }
     
     body { margin: 0; background: var(--bg); font-family: var(--font); overflow: hidden; color: #e6edf3; }
@@ -52,19 +57,19 @@ export class MirrorServer {
     /* PANELS */
     .command-sidebar {
       position: absolute; top: 0; left: 0; bottom: 0; width: 340px;
-      background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-      border-right: 1px solid var(--border); z-index: 40;
+      background: var(--panel); border-right: 1px solid var(--border); z-index: 40;
       display: flex; flex-direction: column; transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
     }
     .command-sidebar.collapsed { transform: translateX(-100%); }
     
     .panel-header { padding: 32px 24px; border-bottom: 1px solid var(--border); }
-    .panel-content { flex: 1; overflow-y: auto; padding: 24px; }
+    .panel-content { flex: 1; overflow-y: auto; padding: var(--spacing-md); }
     
     .glass-card {
-      background: var(--glass); border: 1px solid var(--border); border-radius: 12px;
-      padding: 20px; margin-bottom: 20px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px; margin-bottom: 16px; transition: border-color 0.2s;
     }
+    .glass-card:hover { border-color: var(--border-bright); }
     
     /* UTILITIES */
     .flex { display: flex; }
@@ -111,36 +116,28 @@ export class MirrorServer {
       padding: 10px 14px; color: white; font-size: 13px; margin-bottom: 16px; outline: none;
       transition: border-color 0.2s;
     }
-    #origin-search:focus { border-color: var(--blue); }
-    
-    /* INSPECTOR */
+    #origin-search:focus { border-color: var(--blue);     /* INSPECTOR */
     #node-inspector {
       position: absolute; bottom: 32px; right: 32px; width: 420px;
-      background: var(--panel); backdrop-filter: blur(20px); border: 1px solid var(--border);
-      border-radius: 20px; padding: 28px; z-index: 10;
-      opacity: 0; transform: translateY(20px); transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px; z-index: 10;
+      opacity: 0; transform: translateY(10px); transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
       pointer-events: none;
     }
     #node-inspector.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
     
-    .inspector-path {
-       word-break: break-all;
-       overflow-wrap: anywhere;
-       line-height: 1.4;
-       display: block;
-    }
-
     /* OVERLAY */
     #loading-overlay {
       position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column;
       align-items: center; justify-content: center; background: var(--bg);
-      transition: opacity 1s;
+      transition: opacity 0.8s;
     }
     .spinner {
-      width: 40px; height: 40px; border: 3px solid rgba(59, 130, 246, 0.1);
-      border-top-color: var(--blue); border-radius: 50%; animation: spin 1s linear infinite;
+      width: 32px; height: 32px; border: 2px solid #30363d;
+      border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+); } }
     
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.2); border-radius: 10px; }
@@ -197,105 +194,119 @@ export class MirrorServer {
       </div>
 
       <!-- PHYSICS CONTROLLER (v1.6.2) ⚙️ -->
-      <div class="glass-card">
-        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Physics Controller</h2>
-        
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Structural Repulsion</span>
-            <span id="label-repulsion" class="text-[9px] font-mono text-blue-400">-4477</span>
+          <div class="panel-header">
+            <div class="flex items-center gap-3">
+              <div class="spinner" id="status-pulse" style="width: 10px; height: 10px; border-width: 1px; animation: none;"></div>
+              <h1 style="font-size: 16px; font-weight: 600; color: var(--blue);">Conducks Mirror</h1>
+            </div>
           </div>
-          <input type="range" id="ctrl-repulsion" class="physics-slider" min="-8000" max="-200" value="-4477">
-        </div>
+          
+          <div class="panel-content custom-scrollbar">
+            <!-- DISCOVERY -->
+            <div class="glass-card">
+              <div class="mb-3 text-[11px] font-semibold text-blue">Structural Discovery</div>
+              <input type="text" id="origin-search" placeholder="Search symbols (fuzzy)..." autocomplete="off" 
+                     style="width: 100%; background: #0d1117; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; color: var(--text); font-size: 12px; outline: none;">
+            </div>
 
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Relational Tension</span>
-            <span id="label-tension" class="text-[9px] font-mono text-blue-400">20</span>
+            <!-- PHYSICS -->
+            <div class="glass-card">
+              <div class="mb-4 text-[11px] font-semibold text-blue">Structural Field</div>
+              
+              <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Repulsion</span>
+                  <span id="label-repulsion" class="text-[10px] font-mono text-blue">-4477</span>
+                </div>
+                <input type="range" id="ctrl-repulsion" class="physics-slider" min="-8000" max="-200" value="-4477">
+              </div>
+
+              <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Relational Tension</span>
+                  <span id="label-tension" class="text-[10px] font-mono text-blue">20</span>
+                </div>
+                <input type="range" id="ctrl-tension" class="physics-slider" min="5" max="500" value="20">
+              </div>
+
+              <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Structural Stiffness</span>
+                  <span id="label-stiffness" class="text-[10px] font-mono text-blue">0.9</span>
+                </div>
+                <input type="range" id="ctrl-stiffness" class="physics-slider" min="0.1" max="2.0" step="0.1" value="0.9">
+              </div>
+
+              <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Structural Arena</span>
+                  <span id="label-spread" class="text-[10px] font-mono text-blue">1200</span>
+                </div>
+                <input type="range" id="ctrl-spread" class="physics-slider" min="500" max="10000" step="100" value="1200">
+              </div>
+
+              <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Cluster Gravity</span>
+                  <span id="label-gravity" class="text-[10px] font-mono text-blue">0.15</span>
+                </div>
+                <input type="range" id="ctrl-gravity" class="physics-slider" min="0.05" max="1.0" step="0.05" value="0.15">
+              </div>
+
+              <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Edge Curvature</span>
+                  <span id="label-curvature" class="text-[10px] font-mono text-blue">0</span>
+                </div>
+                <input type="range" id="ctrl-curvature" class="physics-slider" min="0" max="1.0" step="0.05" value="0">
+              </div>
+
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Collision Buffer</span>
+                  <span id="label-buffer" class="text-[10px] font-mono text-blue">10</span>
+                </div>
+                <input type="range" id="ctrl-buffer" class="physics-slider" min="0" max="100" value="10">
+              </div>
+            </div>
+
+            <!-- OPTIMIZER -->
+            <div class="glass-card">
+              <div class="mb-4 text-[11px] font-semibold text-blue">Layout Optimizer</div>
+              
+              <button id="btn-untangle" class="trace-control mb-4" style="border-color: var(--blue); color: var(--blue); background: transparent; font-weight: 600;">
+                UNTANGLE LAYOUT (ALPHA PULSE)
+              </button>
+
+              <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Simulation Fluidity</span>
+                  <span id="label-fluidity" class="text-[10px] font-mono text-blue">0.90</span>
+                </div>
+                <input type="range" id="ctrl-fluidity" class="physics-slider" min="0.1" max="0.9" step="0.05" value="0.9">
+              </div>
+
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-muted">Cooldown Rate</span>
+                  <span id="label-cooldown" class="text-[10px] font-mono text-blue">0.020</span>
+                </div>
+                <input type="range" id="ctrl-cooldown" class="physics-slider" min="0.001" max="0.1" step="0.001" value="0.02">
+              </div>
+            </div>
+
+            <!-- LAYERS -->
+            <div class="glass-card">
+              <div class="mb-4 text-[11px] font-semibold text-blue">Resonance Layers</div>
+              <div id="layer-filters" class="flex flex-col gap-3"></div>
+            </div>
+            
+            <!-- CLUSTERS -->
+            <div class="glass-card">
+              <div class="mb-4 text-[11px] font-semibold text-blue">Origin Clusters</div>
+              <div id="cluster-filters" class="flex flex-col gap-3"></div>
+            </div>
           </div>
-          <input type="range" id="ctrl-tension" class="physics-slider" min="5" max="500" value="20">
-        </div>
-
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Structural Stiffness</span>
-            <span id="label-stiffness" class="text-[9px] font-mono text-blue-400">0.9</span>
-          </div>
-          <input type="range" id="ctrl-stiffness" class="physics-slider" min="0.1" max="2.0" step="0.1" value="0.9">
-        </div>
-
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Structural Arena</span>
-            <span id="label-spread" class="text-[9px] font-mono text-blue-400">1200</span>
-          </div>
-          <input type="range" id="ctrl-spread" class="physics-slider" min="500" max="10000" step="100" value="1200">
-        </div>
-
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Cluster Gravity</span>
-            <span id="label-gravity" class="text-[9px] font-mono text-blue-400">0.15</span>
-          </div>
-          <input type="range" id="ctrl-gravity" class="physics-slider" min="0.05" max="1.0" step="0.05" value="0.15">
-        </div>
-
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Edge Curvature</span>
-            <span id="label-curvature" class="text-[9px] font-mono text-blue-400">0</span>
-          </div>
-          <input type="range" id="ctrl-curvature" class="physics-slider" min="0" max="1.0" step="0.05" value="0">
-        </div>
-
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Collision Buffer</span>
-            <span id="label-buffer" class="text-[9px] font-mono text-blue-400">10</span>
-          </div>
-          <input type="range" id="ctrl-buffer" class="physics-slider" min="0" max="100" value="10">
-        </div>
-      </div>
-
-      <!-- LAYOUT OPTIMIZER (v1.6.3) 🧠 -->
-      <div class="glass-card">
-        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Layout Optimizer</h2>
-        
-        <button id="btn-untangle" class="trace-control mb-4" style="border-color: var(--blue-bright); color: var(--blue-bright);">
-          UNTANGLE LAYOUT (ALPHA PULSE)
-        </button>
-
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Simulation Fluidity</span>
-            <span id="label-fluidity" class="text-[9px] font-mono text-blue-400">0.90</span>
-          </div>
-          <input type="range" id="ctrl-fluidity" class="physics-slider" min="0.1" max="0.9" step="0.05" value="0.9">
-        </div>
-
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-[10px] text-dim uppercase">Cooldown Rate</span>
-            <span id="label-cooldown" class="text-[9px] font-mono text-blue-400">0.020</span>
-          </div>
-          <input type="range" id="ctrl-cooldown" class="physics-slider" min="0.001" max="0.1" step="0.001" value="0.02">
-        </div>
-      </div>
-
-      <div class="glass-card">
-        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Resonance Layers</h2>
-        <div id="layer-filters" class="flex flex-col gap-3">
-          <!-- Populated via script -->
-        </div>
-      </div>
-      
-      <div class="glass-card">
-        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Origin Clusters</h2>
-        <input type="text" id="origin-search" placeholder="Search Namespaces...">
-        <div id="cluster-filters" class="flex flex-col gap-3 max-height-[400px]">
-          <!-- Populated via script -->
-        </div>
-      </div>
     </div>
   </div>
 
@@ -386,13 +397,15 @@ export class MirrorServer {
           const id = parseInt(e.target.dataset.layer);
           if (e.target.checked) selectedLayers.push(id);
           else selectedLayers = selectedLayers.filter(x => x !== id);
-          refreshSynapse();
+          // v1.7.0: Instant Re-render (No refetch)
+          Graph.nodeCanvasObject(Graph.nodeCanvasObject());
         }
         if (e.target.dataset.cluster) {
           const id = e.target.dataset.cluster;
           if (e.target.checked) selectedClusters.push(id);
           else selectedClusters = selectedClusters.filter(x => x !== id);
-          refreshSynapse();
+          // v1.7.0: Instant Highlighting (No refetch)
+          Graph.nodeCanvasObject(Graph.nodeCanvasObject());
         }
       });
 
@@ -484,10 +497,11 @@ export class MirrorServer {
 
     async function refreshSynapse() {
       try {
-        const layers = selectedLayers.join(',');
-        const clusters = selectedClusters.join(',');
+        // v1.7.0: Pre-Hydrate all core layers (0-5) for non-destructive filtering.
+        // We no longer pass clusters to the API to prevent 'Graph Disappearance'.
+        const layers = "0,1,2,3,4,5"; 
         const spread = document.getElementById('ctrl-spread')?.value || '1200';
-        const res = await fetch(\`/api/synapse?layers=\${layers}&clusters=\${clusters}&spread=\${spread}\`);
+        const res = await fetch(\`/api/synapse?layers=\${layers}&spread=\${spread}\`);
         if (!res.ok) throw new Error('Synapse Hydration Failed');
         
         const wave = await res.json();
@@ -498,6 +512,8 @@ export class MirrorServer {
         
         const currentQ = document.getElementById('origin-search')?.value?.toLowerCase() || '';
         clusterCtn.innerHTML = '';
+        
+        // Build the visual cluster list from the hydrated wave
         wave.clusters.forEach(c => {
           const item = document.createElement('div');
           item.className = 'flex justify-between items-center cluster-item';
@@ -598,9 +614,21 @@ export class MirrorServer {
           return link.isTransitive ? 0.4 : 1.2;
         })
         .linkColor(link => {
+          // v1.7.0: Non-destructive link filtering
+          const sLevel = link.source.level;
+          const tLevel = link.target.level;
+          if (!selectedLayers.includes(sLevel) || !selectedLayers.includes(tLevel)) return 'transparent';
+
           if (focusLinks.size > 0) return focusLinks.has(link) ? '#00d2ff' : 'rgba(255,255,255,0.01)';
+          
+          let alpha = link.isTransitive ? '33' : '66';
+          if (selectedClusters.length > 0) {
+            const inFocus = selectedClusters.includes(link.source.clusterId) || selectedClusters.includes(link.target.clusterId);
+            if (!inFocus) alpha = '05'; // Super dim for context
+          }
+
           const base = link.isTransitive ? '#484f58' : (link.source.clusterColor || '#3b82f6');
-          return base + (link.isTransitive ? '33' : '66');
+          return base + alpha;
         })
         .linkDirectionalParticles(link => focusLinks.has(link) ? 6 : 0)
         .linkDirectionalParticleSpeed(0.015)
@@ -608,11 +636,27 @@ export class MirrorServer {
         .nodeCanvasObject((node, ctx, globalScale) => {
           const size = Math.max((node.rank || 0.1) * 24, 6);
           const color = node.clusterColor || '#9ca3af';
-          const isDimmed = focusNodes.size > 0 && !focusNodes.has(node.id);
-
-          ctx.globalAlpha = isDimmed ? 0.02 : 1; // v1.6.1: Higher dimming for focus
           
-          if (node.level <= 1 && !isDimmed) {
+          // v1.7.0: Professional Structural Highlighting & Ghosting
+          // 1. Layer Visibility Check
+          if (!selectedLayers.includes(node.level)) {
+            ctx.globalAlpha = 0; // Completely hidden
+            return; 
+          }
+
+          // 2. High-Frequency Focus Pass (Clusters)
+          let alpha = 1.0;
+          if (selectedClusters.length > 0 && !selectedClusters.includes(node.clusterId)) {
+            alpha = 0.05; // Ghosted context
+          }
+
+          // 3. Lineage/Impact Isolation Pass (Tracing)
+          const isDimmedByFocus = focusNodes.size > 0 && !focusNodes.has(node.id);
+          if (isDimmedByFocus) alpha = 0.02;
+
+          ctx.globalAlpha = alpha;
+          
+          if (node.level <= 1 && !isDimmedByFocus && alpha === 1.0) {
             ctx.shadowBlur = 15 / globalScale;
             ctx.shadowColor = color;
           }
@@ -632,7 +676,7 @@ export class MirrorServer {
           if (globalScale < 0.8 && node.level > 2) showText = false;
           if (globalScale < 2 && node.level > 4) showText = false;
 
-          if (showText && !isDimmed) {
+          if (showText && ctx.globalAlpha > 0.05) {
             ctx.font = \`\${adaptiveSize}px var(--font)\`;
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
             ctx.textAlign = 'center';

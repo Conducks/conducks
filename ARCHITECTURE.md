@@ -1,17 +1,17 @@
 # Architecture Context — conducks
-Generated: 2026-04-02T10:26:00.860Z | Pulse: pulse_1775125559619_4ofd8
+Generated: 2026-04-02T13:09:27.454Z | Pulse: pulse_1775135366567_jkc3l
 
 ## Entry Points (top 10 by gravity)
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/index.ts::silence` [function, gravity: 0.0789, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/tools/index.ts::silence` [function, gravity: 0.0789, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/entropy.ts::fmt` [function, gravity: 0.0426, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/impact.ts::fmt` [function, gravity: 0.0426, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/resonance.ts::fmt` [function, gravity: 0.0426, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/watch.ts::shutdown` [function, gravity: 0.0426, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/tools/server.ts::summarizenodes` [function, gravity: 0.0426, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/tools/tools/synapse.ts::standardize` [function, gravity: 0.0426, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/git/chronicle-interface.ts::scan` [function, gravity: 0.0426, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/languages/python/extractor.ts::traverse` [function, gravity: 0.0426, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/index.ts::silence` [function, gravity: 0.0732, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/tools/index.ts::silence` [function, gravity: 0.0732, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/entropy.ts::fmt` [function, gravity: 0.0396, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/impact.ts::fmt` [function, gravity: 0.0396, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/resonance.ts::fmt` [function, gravity: 0.0396, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/watch.ts::shutdown` [function, gravity: 0.0396, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/tools/server.ts::summarizenodes` [function, gravity: 0.0396, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/tools/tools/synapse.ts::standardize` [function, gravity: 0.0396, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/git/chronicle-interface.ts::scan` [function, gravity: 0.0396, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/algorithms/cycle-detector.ts::strongconnect` [function, gravity: 0.0396, risk: 0.0000]
 
 ## Structural Hotspots (top 10 by risk)
 

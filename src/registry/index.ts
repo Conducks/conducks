@@ -4,7 +4,7 @@ import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { AnalysisService, AnalyzeOrchestrator } from "@/lib/domain/analysis/index.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
-import { GovernanceService, ConducksAdvisor, ConducksSentinel, ContextGenerator, BlueprintGenerator } from "@/lib/domain/governance/index.js";
+import { GovernanceService, ConducksAdvisor, ConducksSentinel, ContextGenerator, BlueprintGenerator, GuidanceOracle } from "@/lib/domain/governance/index.js";
 import { IntelligenceService, ConducksSearch, GQLParser, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { ManifestService, ManifestEngine } from "@/lib/domain/manifest/index.js";
@@ -60,6 +60,7 @@ const diffEngine = new ConducksDiffEngine();
 const manifestEngine = new ManifestEngine();
 const contextGenerator = new ContextGenerator();
 const blueprint = new BlueprintGenerator();
+const oracle = new GuidanceOracle();
 const mirrorEngine = new MirrorEngine(graph.getGraph());
 
 // 4. Domain Facade Consolidation (Service Layer)
@@ -148,6 +149,11 @@ export const registry = {
     contextFile: () => governance.generateManifest(persistence),
     blueprint: () => governance.generateBlueprint(),
     status: () => governance.status()
+  },
+  oracle: {
+    bootstrap: () => oracle.bootstrap(),
+    list: () => oracle.listSkills(),
+    get: (id: string) => oracle.getSkill(id)
   },
   infrastructure: {
     get graphEngine() { return graph; },
