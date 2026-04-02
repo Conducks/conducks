@@ -1,19 +1,14 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
-
-export interface Advice {
-  level: 'INFO' | 'WARNING' | 'ERROR';
-  type: 'CIRCULAR' | 'HUB' | 'ORPHAN' | 'INTUITION' | 'HIDDEN_COUPLING';
-  message: string;
-  nodes: string[]; // Can be symbols or file paths
-}
+import type { Advice } from '@/types/domain.js';
+import { ConducksComponent } from '@/registry/types.js';
 
 /**
  * Conducks — Conducks Architecture Advisor
- * 
- * Deep structural analysis of the Synapse. Identifies architectural 
- * "Sins" and provides "Intuition" by linking strings to symbols.
  */
-export class ConducksAdvisor {
+export class ConducksAdvisor implements ConducksComponent {
+  public readonly id = 'architecture-advisor';
+  public readonly type = 'analyzer';
+  public readonly description = 'Provides structural intuition and deep-dive architectural analysis of the Synapse.';
   /**
    * Performs a comprehensive architectural audit.
    */

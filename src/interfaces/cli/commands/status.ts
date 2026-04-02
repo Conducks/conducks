@@ -1,7 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import path from "node:path";
 
@@ -13,16 +11,16 @@ export class StatusCommand implements ConducksCommand {
   public description = "Show health and symbol counts";
   public usage = "registry status [path]";
 
-  public async execute(args: string[], injectedPersistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const pathArg = args.find(a => !a.startsWith('--'));
     const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
 
-    // Conducks — Align Persistence with the Target Project Path
-    // Use injected persistence if provided (aids unit testing), 
-    // otherwise create new persistence for the target path.
-    const persistence: SynapsePersistence = injectedPersistence || new GraphPersistence(targetPath);
+    // If target path is explicitly provided, re-initialize the structural anchor
+    if (pathArg || process.env.CONDUCKS_WORKSPACE_ROOT !== targetPath) {
+      console.log(`[CLI] Re-anchoring status to: ${targetPath}`);
+      await registry.initialize(true, targetPath);
+    }
 
-    (registry as any).persistence = persistence;
     chronicle.setProjectDir(targetPath);
 
     try {
@@ -56,7 +54,7 @@ export class StatusCommand implements ConducksCommand {
       });
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks
-      await persistence.close();
+      await registry.infrastructure.persistence.close();
     }
   }
 }

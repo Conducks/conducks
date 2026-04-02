@@ -14,8 +14,8 @@ export class FlowProcessor {
     // Conducks: Create an ACCESSES relationship representing the flow
     // We treat the assignment as the source of the data pulse.
     spectrum.relationships.push({
-      sourceName: scope,
-      targetName: name,
+      sourceName: (scope || 'unit').toLowerCase(),
+      targetName: name.toLowerCase(),
       type: 'ACCESSES' as any,
       confidence: 1.0,
       metadata: { reason: 'assignment', value }
@@ -40,7 +40,7 @@ export class FlowProcessor {
     });
 
     spectrum.relationships.push({
-      sourceName: scope,
+      sourceName: (scope || 'unit').toLowerCase(),
       targetName: routeId,
       type: 'DEFINES' as any,
       confidence: 1.0,
@@ -102,7 +102,7 @@ export class FlowProcessor {
     });
 
     spectrum.relationships.push({
-      sourceName: scope,
+      sourceName: (scope || 'unit').toLowerCase(),
       targetName: requestId,
       type: 'CALLS' as any,
       confidence: 1.0,

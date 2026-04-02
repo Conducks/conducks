@@ -1,5 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
+import type { Registry } from "@/registry/index.js";
 import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
 import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
@@ -15,15 +15,15 @@ export class EntryCommand implements ConducksCommand {
   public description = "List detected project entry points (API, CLI, Main)";
   public usage = "registry entry [path]";
 
-  public async execute(args: string[], injectedPersistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const pathArg = args.find(a => !a.startsWith('--'));
     const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
 
     // When a specific external path is provided, scope persistence to that project.
-    // Otherwise use the injected persistence (enables clean unit testing).
-    const persistence: SynapsePersistence = injectedPersistence || (pathArg
+    // Otherwise use the injected persistence.
+    const persistence: SynapsePersistence = pathArg
       ? new GraphPersistence(targetPath, true)
-      : injectedPersistence);
+      : registry.infrastructure.persistence;
 
     try {
       const success = await persistence.load(registry.query.graph.getGraph());

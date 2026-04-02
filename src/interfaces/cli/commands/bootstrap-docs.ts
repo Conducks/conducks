@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 
 /**
@@ -14,7 +13,7 @@ export class BootstrapDocsCommand implements ConducksCommand {
   public description = "Initialize the 7-file documentation standard (Manifest)";
   public usage = "registry bootstrap-docs [project_name]";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
     const projectName = args[0] || path.basename(projectRoot);
 
@@ -33,7 +32,7 @@ export class BootstrapDocsCommand implements ConducksCommand {
     } catch (err) {
       console.error(`Bootstrap Error: ${(err as Error).message}`);
     } finally {
-      await persistence.close();
+      await registry.infrastructure.persistence.close();
     }
   }
 }

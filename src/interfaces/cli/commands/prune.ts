@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Prune Command
@@ -10,8 +9,9 @@ export class PruneCommand implements ConducksCommand {
   public description = "Identify unused exports and dead code";
   public usage = "registry prune";
 
-  public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
-    await persistence.load(registry.query.graph.getGraph());
+  public async execute(_args: string[], registry: Registry): Promise<void> {
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
     const findings = registry.explain.prune();
     console.log(`\n\x1b[1m--- ✂️ Dead Weight Discovery ---\x1b[0m`);
     

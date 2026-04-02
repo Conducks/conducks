@@ -1,5 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import { execSync } from "child_process";
 
 /**
@@ -12,7 +12,7 @@ export class CleanCommand implements ConducksCommand {
   public description = "Nuclear Purge: Evict blocked handles and purge structural cache";
   public usage = "conducks clean";
 
-  public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     console.log("🛡️ Starting Nuclear Clean protocol...");
 
     // 1. Surgical Process Eviction: Kill only background Conducks/MCP servers
@@ -62,7 +62,7 @@ export class CleanCommand implements ConducksCommand {
 
 
     // 2. Structural Cache Purge
-    await persistence.clear();
+    await registry.infrastructure.persistence.clear();
     
     console.log("✅ Structural handles evicted and memory cache purged.");
   }

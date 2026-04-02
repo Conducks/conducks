@@ -1,7 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import path from "node:path";
 import fs from "fs-extra";
@@ -14,13 +12,11 @@ export class VisualizeCommand implements ConducksCommand {
   public description = "Generate a static Mermaid structural mirror";
   public usage = "registry visualize [limit]";
 
-  public async execute(args: string[], injectedPersistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const limitArg = args.find(a => !a.startsWith('--'));
     const limit = limitArg ? parseInt(limitArg, 10) : 30;
     const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
 
-    const persistence: SynapsePersistence = injectedPersistence || new GraphPersistence(targetPath);
-    (registry as any).persistence = persistence;
     chronicle.setProjectDir(targetPath);
 
     try {
@@ -68,7 +64,7 @@ export class VisualizeCommand implements ConducksCommand {
       console.log(`- Nodes Visualized: ${nodes.length}`);
       console.log(`- Federated Pulse: Active`);
     } finally {
-      await persistence.close();
+      await registry.infrastructure.persistence.close();
     }
   }
 }

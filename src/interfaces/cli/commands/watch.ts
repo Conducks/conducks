@@ -1,34 +1,20 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Watch Command
  *
  * FIX 5: Robust process-lifetime management.
- *
- * The original implementation registered SIGINT/SIGTERM listeners inside the
- * Promise executor. Two problems with that approach:
- *
- *   1. process.on() listeners accumulate if the command is somehow invoked
- *      multiple times in the same process (e.g. tests). Node emits a warning
- *      after 10 listeners are attached to the same event.
- *
- *   2. If the watcher fails to start (e.g. invalid rootDir), the Promise
- *      never resolves and the process hangs forever, requiring a force-kill.
- *
- * The fix uses process.once() (auto-removes after first fire) and adds an
- * explicit early-return guard so a failed watcher start still resolves the
- * lifetime Promise cleanly.
  */
 export class WatchCommand implements ConducksCommand {
   public id = "watch";
   public description = "Start real-time monitoring of structural shifts";
   public usage = "conducks watch";
 
-  public async execute(args: string[], persistence: DuckDbPersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     console.log('[Watch] Step 1: loading graph...');
-    await persistence.load(registry.query.graph.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     console.log('[Watch] Step 2: getting watcher instance...');
     const watcher = registry.rename.watcher;

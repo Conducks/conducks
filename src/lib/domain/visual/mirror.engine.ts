@@ -1,4 +1,5 @@
 import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
  * Conducks — Mirror Engine
@@ -6,7 +7,10 @@ import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
  * Domain service responsible for translating the technical structural graph
  * into a high-fidelity visual wave for the Mirror interface.
  */
-export class MirrorEngine {
+export class MirrorEngine implements ConducksComponent {
+  public readonly id = 'mirror-engine';
+  public readonly type = 'analyzer';
+  public readonly description = 'Translates the structural graph into high-fidelity visual waves and clusters.';
   constructor(private graph: ConducksAdjacencyList) {}
 
   /**
@@ -15,7 +19,7 @@ export class MirrorEngine {
    * 
    * v1.5.0: Professional Command Center & Adaptive Scaling.
    */
-  public getVisualWave(visibleLayers: number[] = [0, 1, 2, 3, 4, 5], visibleClusters: string[] = []) {
+  public getVisualWave(visibleLayers: number[] = [0, 1, 2, 3, 4, 5], visibleClusters: string[] = [], spread: number = 1200) {
     const g = this.graph as any;
     const layerSet = new Set(visibleLayers);
     const clusterSet = new Set(visibleClusters);
@@ -50,7 +54,7 @@ export class MirrorEngine {
     const clusters = allNodes.filter(n => n.properties.canonicalKind === 'NAMESPACE' || n.properties.isFolder);
     const clusterCenters = new Map<string, { x: number; y: number; color: string; name: string }>();
     const nodeCount = allNodes.length;
-    const structuralSpread = Math.min(1200, Math.sqrt(nodeCount) * 85); 
+    const structuralSpread = Math.min(spread, Math.sqrt(nodeCount) * (spread / 14)); 
     const goldenAngle = Math.PI * (3 - Math.sqrt(5));
     
     const COSMIC_PALETTE = [

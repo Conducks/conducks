@@ -1,12 +1,13 @@
 import { ManifestEngine } from "./manifest-engine.js";
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
- * Conducks — Manifest Service (The Memory Facade)
- *
- * Implements high-fidelity documentation governance and 
- * strategic learning recovery using the 9th Domain (Manifest).
+ * Conducks — Manifest Service
  */
-export class ManifestService {
+export class ManifestService implements ConducksComponent {
+  public readonly id = 'manifest-service';
+  public readonly type = 'analyzer';
+  public readonly description = 'Implements high-fidelity documentation governance and strategic learning recovery.';
   constructor(private readonly engine: ManifestEngine = new ManifestEngine()) {}
 
   /**

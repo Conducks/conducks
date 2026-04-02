@@ -1,5 +1,5 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
-import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
+import { DuckDbPersistence, SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { AnalysisService, AnalyzeOrchestrator } from "@/lib/domain/analysis/index.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
@@ -13,9 +13,9 @@ import { SynapseRegistry } from "@/registry/synapse-registry.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { PYTHON_SUITE } from "@/lib/core/parsing/languages/python/index.js";
 import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/languages/typescript/index.js";
-import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
-import { Logger, logger } from "@/lib/core/utils/logger.js";
+import { Logger } from "@/lib/core/utils/logger.js";
+import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -23,52 +23,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const resourcesDir = path.resolve(__dirname, "../resources/grammars");
 
-/**
- * Conducks — Structural Anchor Discovery
- * 
- * Autonomously resolves the nearest project root by searching upward
- * for a .conducks vault or package.json. This is the foundation 
- * for "Zero-Hint" structural intelligence.
- */
-function discoverRoot(startPath: string): string {
-  const binaryAnchor = path.dirname(__filename);
-  const searchPaths = [startPath, binaryAnchor];
-  const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
-
-  // Phase 1: High-Priority Vault Search (.conducks) 🏺
-  // Find the nearest structural synapse before falling back to generic project indicators.
-  for (const start of searchPaths) {
-    let current = start;
-    while (current !== path.parse(current).root) {
-      if (IgnoreManager.hasConfig(current)) {
-        if (!forbiddenArtifacts.includes(path.basename(current))) {
-          return current;
-        }
-      }
-      const parent = path.dirname(current);
-      if (parent === current) break;
-      current = parent;
-    }
-  }
-
-  // Phase 2: Fallback Project Search (package.json) 🧬
-  // Identify the project boundary, explicitly skipping build/dist/out artifacts.
-  for (const start of searchPaths) {
-    let current = start;
-    while (current !== path.parse(current).root) {
-      if (IgnoreManager.hasPackageJson(current)) {
-        if (!forbiddenArtifacts.includes(path.basename(current))) {
-          return current;
-        }
-      }
-      const parent = path.dirname(current);
-      if (parent === current) break;
-      current = parent;
-    }
-  }
-  
-  return startPath;
-}
+// No logic allowed here as per Rule 11.
 
 /**
  * Conducks — Master Registry (The v1.9.0 Bridge Layer) 🛡️ 🧠 💎
@@ -79,8 +34,9 @@ function discoverRoot(startPath: string): string {
 
 // 1. Core Capability Layer (Infrastructure)
 const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+const bootstrapper = new RegistryBootstrapper();
 const graph = new ConducksGraph();
-let persistence = new GraphPersistence(workspaceRoot);
+let persistence: SynapsePersistence = new DuckDbPersistence(workspaceRoot);
 let ignoreManager = new IgnoreManager(workspaceRoot);
 
 // 2. Bridge Layer (Registry Infrastructure)
@@ -117,61 +73,21 @@ const evolution = new EvolutionService(graph, persistence);
 const manifest = new ManifestService(manifestEngine);
 
 // 5. Lifecycle Management
-let isGrammarInitialized = false;
-
 export async function initializeRegistry(readOnly: boolean = true, root?: string) {
-  if (!isGrammarInitialized) {
-    console.error(`🛡️ [Conducks Registry] Initializing Grammar Engine...`);
-    await grammars.init();
-    await grammars.loadLanguage('python', path.join(resourcesDir, 'tree-sitter-python.wasm'));
-    await grammars.loadLanguage('typescript', path.join(resourcesDir, 'tree-sitter-typescript.wasm'));
-    isGrammarInitialized = true;
-    console.error(`🛡️ [Conducks Registry] Grammar Engine Ready (Python, TypeScript indexed).`);
-  }
-
-  // 🧬 Standardize Structural Anchor (v1.12.5)
-  const baseRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-  const effectiveRoot = (baseRoot === ":memory:") ? baseRoot : discoverRoot(baseRoot);
-  
-  // 🏺 💎 Anchor Structural Diagnostic Sink (v1.12.0)
-  if (effectiveRoot !== ":memory:") {
-    const logPath = path.join(effectiveRoot, '.conducks', 'mcp.log');
-    logger.setLogFile(logPath);
-  }
-
-  console.error(`🛡️ [Conducks Registry] Anchoring structural synapse at: ${effectiveRoot}`);
-  const isCurrentlyConnected = persistence.isConnected();
-  const rootChanged = chronicle.getProjectDir() !== effectiveRoot;
-  const modeChanged = (persistence as any).readOnly !== readOnly;
-
-  if (isCurrentlyConnected && !rootChanged && !modeChanged) return;
-
-  if (rootChanged || modeChanged || !isCurrentlyConnected) {
-    if (isCurrentlyConnected) await persistence.close();
-    
-    // Conducks Purity: 🏺 💎 Explicitly clear the graph singleton 
-    // when switching project roots to prevent structural ghost leaks.
-    if (rootChanged) {
-      graph.getGraph().clear();
+  await bootstrapper.initialize(
+    { readOnly, root },
+    {
+      graph,
+      persistence,
+      ignoreManager,
+      federation,
+      updatePersistence: (p) => { persistence = p; },
+      updateIgnoreManager: (i) => { 
+        ignoreManager = i;
+        (orchestrator as any).ignoreManager = i;
+      }
     }
-
-    persistence = new GraphPersistence(effectiveRoot, readOnly);
-    chronicle.setProjectDir(effectiveRoot);
-    ignoreManager = new IgnoreManager(effectiveRoot);
-    (orchestrator as any).ignoreManager = ignoreManager;
-  }
-  
-  try {
-    const loaded = await persistence.load(graph.getGraph());
-    if (loaded) {
-      console.error(`🛡️ [Conducks Registry] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
-      await federation.hydrate(graph.getGraph());
-    } else {
-      console.error(`🛡️ [Conducks Registry] No persisted structural wave detected.`);
-    }
-  } catch (err: any) {
-    console.error(`🛡️ [Conducks Registry] Structural load failed: ${err.message}`);
-  }
+  );
 }
 
 /**
@@ -182,9 +98,9 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
  */
 export const registry = {
   status: {
-    bootstrap: (projectRoot: string, projectName: string) => new ManifestService(manifestEngine).bootstrap(projectRoot, projectName),
-    record: (projectRoot: string, projectName: string, type: string, content: string) => new ManifestService(manifestEngine).record(projectRoot, projectName, type, content),
-    health: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).status()
+    bootstrap: (root: string, name: string) => manifest.bootstrap(root, name),
+    record: (root: string, name: string, type: string, content: string) => manifest.record(root, name, type, content),
+    health: () => governance.status()
   },
   analyze: {
     analyze: (files: any[]) => {
@@ -195,43 +111,43 @@ export const registry = {
     full: (options: any = {}) => {
       (orchestrator as any).persistence = persistence;
       (orchestrator as any).ignoreManager = ignoreManager;
-      return new AnalysisService(orchestrator, graph, persistence, contextGenerator).analyze(options);
+      return analysis.analyze(options);
     }
   },
   kinetic: {
-    trace: (symbolId: string, depth?: number) => new KineticService(graph.getGraph()).trace(symbolId, depth),
-    findPath: (startId: string, targetId: string) => new KineticService(graph.getGraph()).findPath(startId, targetId),
+    trace: (symbolId: string, depth?: number) => kinetic.trace(symbolId, depth),
+    findPath: (startId: string, targetId: string) => kinetic.findPath(startId, targetId),
     getImpact: (symbolId: string, direction: 'upstream'|'downstream' = 'upstream', depth: number = 5) =>
-      new KineticService(graph.getGraph()).getImpact(symbolId, direction, depth),
-    flow: (symbolId: string) => new KineticService(graph.getGraph()).flow(symbolId),
-    getProcesses: () => new KineticService(graph.getGraph()).getProcesses()
+      kinetic.getImpact(symbolId, direction, depth),
+    flow: (symbolId: string) => kinetic.flow(symbolId),
+    getProcesses: () => kinetic.getProcesses()
   },
   query: {
-    query: (q: string, limit?: number) => new IntelligenceService(graph, search, gql, federation).query(q, limit),
-    parseGQL: (query: string) => new IntelligenceService(graph, search, gql, federation).parseGQL(query),
-    link: (projectPath: string) => new IntelligenceService(graph, search, gql, federation).link(projectPath),
+    query: (q: string, limit?: number) => intelligence.query(q, limit),
+    parseGQL: (query: string) => intelligence.parseGQL(query),
+    link: (projectPath: string) => intelligence.link(projectPath),
     resonate: () => graph.resonate(),
     get graph() { return graph; },
     get diff() { return diffEngine; }
   },
   rename: {
-    rename: (symbolId: string, newName: string, dryRun?: boolean) => new EvolutionService(graph, persistence).rename(symbolId, newName, dryRun),
-    get watcher() { return new EvolutionService(graph, persistence).getWatcher(chronicle.getProjectDir()); }
+    rename: (symbolId: string, newName: string, dryRun?: boolean) => evolution.rename(symbolId, newName, dryRun),
+    get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); }
   },
   explain: {
-    prune: () => new MetricsService(graph, deadCode, resonance, aligner).prune(),
-    calculateEntropy: (symbolId: string) => new MetricsService(graph, deadCode, resonance, aligner).calculateEntropy(symbolId),
-    calculateCompositeRisk: (nodeId: string) => new MetricsService(graph, deadCode, resonance, aligner).calculateCompositeRisk(nodeId),
-    getCohesionVector: (sourceId: string, targetId: string) => new MetricsService(graph, deadCode, resonance, aligner).getLevelSimilarity(sourceId, targetId),
-    compare: (otherPath: string) => new MetricsService(graph, deadCode, resonance, aligner).compare(otherPath)
+    prune: () => metrics.prune(),
+    calculateEntropy: (symbolId: string) => metrics.calculateEntropy(symbolId),
+    calculateCompositeRisk: (nodeId: string) => metrics.calculateCompositeRisk(nodeId),
+    getCohesionVector: (sourceId: string, targetId: string) => metrics.getLevelSimilarity(sourceId, targetId),
+    compare: (otherPath: string) => metrics.compare(otherPath)
   },
   audit: {
-    audit: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).audit(),
-    advise: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).advise(),
-    context: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).generateContext(persistence),
-    contextFile: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).generateManifest(persistence),
-    blueprint: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).generateBlueprint(),
-    status: () => new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint).status()
+    audit: () => governance.audit(),
+    advise: () => governance.advise(),
+    context: () => governance.generateContext(persistence),
+    contextFile: () => governance.generateManifest(persistence),
+    blueprint: () => governance.generateBlueprint(),
+    status: () => governance.status()
   },
   infrastructure: {
     get graphEngine() { return graph; },
@@ -240,7 +156,7 @@ export const registry = {
     get registry() { return synapseRegistry; }
   },
   mirror: {
-    getWave: (layers?: number[], clusters?: string[]) => (mirrorEngine as any).getVisualWave(layers, clusters)
+    getVisualWave: (layers?: number[], clusters?: string[], spread?: number) => (mirrorEngine as any).getVisualWave(layers, clusters, spread)
   },
   initialize: initializeRegistry
 };

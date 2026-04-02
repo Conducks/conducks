@@ -150,12 +150,15 @@ export class MirrorServer {
       border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03);
     }
 
-    /* FOCUS MODE */
-    #focus-indicator {
-      position: absolute; top: 32px; right: 32px; padding: 12px 20px;
-      background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3);
-      border-radius: 30px; color: var(--blue-bright); font-size: 11px; font-weight: 600;
-      display: none; align-items: center; gap: 10px; z-index: 30; cursor: pointer;
+    /* SLIDERS (v1.6.2) */
+    .physics-slider {
+      width: 100%; height: 4px; background: #30363d; border-radius: 2px;
+      appearance: none; outline: none; transition: background 0.2s;
+    }
+    .physics-slider::-webkit-slider-thumb {
+      appearance: none; width: 12px; height: 12px; background: var(--blue-bright);
+      border-radius: 50%; cursor: pointer; border: 2px solid #0d1117;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
     }
   </style>
 </head>
@@ -191,6 +194,92 @@ export class MirrorServer {
           <option value="direct">DIRECT NEIGHBORS (HUB VIEW)</option>
           <option value="bidirectional">FULL CIRCUIT (BI-DIRECTIONAL)</option>
         </select>
+      </div>
+
+      <!-- PHYSICS CONTROLLER (v1.6.2) ⚙️ -->
+      <div class="glass-card">
+        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Physics Controller</h2>
+        
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Structural Repulsion</span>
+            <span id="label-repulsion" class="text-[9px] font-mono text-blue-400">-4477</span>
+          </div>
+          <input type="range" id="ctrl-repulsion" class="physics-slider" min="-8000" max="-200" value="-4477">
+        </div>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Relational Tension</span>
+            <span id="label-tension" class="text-[9px] font-mono text-blue-400">20</span>
+          </div>
+          <input type="range" id="ctrl-tension" class="physics-slider" min="5" max="500" value="20">
+        </div>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Structural Stiffness</span>
+            <span id="label-stiffness" class="text-[9px] font-mono text-blue-400">0.9</span>
+          </div>
+          <input type="range" id="ctrl-stiffness" class="physics-slider" min="0.1" max="2.0" step="0.1" value="0.9">
+        </div>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Structural Arena</span>
+            <span id="label-spread" class="text-[9px] font-mono text-blue-400">1200</span>
+          </div>
+          <input type="range" id="ctrl-spread" class="physics-slider" min="500" max="10000" step="100" value="1200">
+        </div>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Cluster Gravity</span>
+            <span id="label-gravity" class="text-[9px] font-mono text-blue-400">0.15</span>
+          </div>
+          <input type="range" id="ctrl-gravity" class="physics-slider" min="0.05" max="1.0" step="0.05" value="0.15">
+        </div>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Edge Curvature</span>
+            <span id="label-curvature" class="text-[9px] font-mono text-blue-400">0</span>
+          </div>
+          <input type="range" id="ctrl-curvature" class="physics-slider" min="0" max="1.0" step="0.05" value="0">
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Collision Buffer</span>
+            <span id="label-buffer" class="text-[9px] font-mono text-blue-400">10</span>
+          </div>
+          <input type="range" id="ctrl-buffer" class="physics-slider" min="0" max="100" value="10">
+        </div>
+      </div>
+
+      <!-- LAYOUT OPTIMIZER (v1.6.3) 🧠 -->
+      <div class="glass-card">
+        <h2 class="text-xs uppercase tracking-widest mb-4 font-semibold">Layout Optimizer</h2>
+        
+        <button id="btn-untangle" class="trace-control mb-4" style="border-color: var(--blue-bright); color: var(--blue-bright);">
+          UNTANGLE LAYOUT (ALPHA PULSE)
+        </button>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Simulation Fluidity</span>
+            <span id="label-fluidity" class="text-[9px] font-mono text-blue-400">0.90</span>
+          </div>
+          <input type="range" id="ctrl-fluidity" class="physics-slider" min="0.1" max="0.9" step="0.05" value="0.9">
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-dim uppercase">Cooldown Rate</span>
+            <span id="label-cooldown" class="text-[9px] font-mono text-blue-400">0.020</span>
+          </div>
+          <input type="range" id="ctrl-cooldown" class="physics-slider" min="0.001" max="0.1" step="0.001" value="0.02">
+        </div>
       </div>
 
       <div class="glass-card">
@@ -319,47 +408,137 @@ export class MirrorServer {
       });
 
       document.getElementById('focus-indicator').addEventListener('click', () => resetFocus());
+
+      // v1.6.2: Physics Controls
+      document.getElementById('ctrl-repulsion').addEventListener('input', e => {
+        const val = parseInt(e.target.value);
+        document.getElementById('label-repulsion').innerText = val;
+        Graph.d3Force('charge').strength(val);
+        Graph.d3AlphaTarget(0.3).restart();
+      });
+
+      document.getElementById('ctrl-tension').addEventListener('input', e => {
+        const val = parseInt(e.target.value);
+        document.getElementById('label-tension').innerText = val;
+        Graph.d3Force('link').distance(val);
+        Graph.d3AlphaTarget(0.3).restart();
+      });
+
+      document.getElementById('ctrl-stiffness').addEventListener('input', e => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('label-stiffness').innerText = val;
+        Graph.d3Force('link').strength(val);
+        Graph.d3AlphaTarget(0.3).restart();
+      });
+
+      document.getElementById('ctrl-buffer').addEventListener('input', e => {
+        const val = parseInt(e.target.value);
+        document.getElementById('label-buffer').innerText = val;
+        applyForces(); 
+        Graph.d3AlphaTarget(0.3).restart();
+      });
+
+      document.getElementById('ctrl-spread').addEventListener('input', e => {
+        const val = parseInt(e.target.value);
+        document.getElementById('label-spread').innerText = val;
+      });
+
+      document.getElementById('ctrl-spread').addEventListener('change', () => {
+        refreshSynapse();
+      });
+
+      document.getElementById('ctrl-gravity').addEventListener('input', e => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('label-gravity').innerText = val;
+        applyForces(); 
+        Graph.d3AlphaTarget(0.3).restart();
+      });
+
+      document.getElementById('ctrl-curvature').addEventListener('input', e => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('label-curvature').innerText = val;
+        Graph.linkCurvature(val);
+      });
+
+      // v1.6.3: Optimizer Logic
+      document.getElementById('btn-untangle').addEventListener('click', () => {
+        activeWave.nodes.forEach(n => {
+          n.x += (Math.random() - 0.5) * 20;
+          n.y += (Math.random() - 0.5) * 20;
+        });
+        Graph.d3Alpha(1).restart();
+      });
+
+      document.getElementById('ctrl-fluidity').addEventListener('input', e => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('label-fluidity').innerText = val.toFixed(2);
+        Graph.d3VelocityDecay(1 - val);
+      });
+
+      document.getElementById('ctrl-cooldown').addEventListener('input', e => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('label-cooldown').innerText = val.toFixed(3);
+        Graph.d3AlphaDecay(val);
+      });
     }
 
     async function refreshSynapse() {
-      const layers = selectedLayers.join(',');
-      const clusters = selectedClusters.join(',');
-      const res = await fetch(\`/api/synapse?layers=\${layers}&clusters=\${clusters}\`);
-      const wave = await res.json();
-      activeWave = wave;
+      try {
+        const layers = selectedLayers.join(',');
+        const clusters = selectedClusters.join(',');
+        const spread = document.getElementById('ctrl-spread')?.value || '1200';
+        const res = await fetch(\`/api/synapse?layers=\${layers}&clusters=\${clusters}&spread=\${spread}\`);
+        if (!res.ok) throw new Error('Synapse Hydration Failed');
+        
+        const wave = await res.json();
+        activeWave = wave;
 
-      const clusterCtn = document.getElementById('cluster-filters');
-      const currentQ = document.getElementById('origin-search').value.toLowerCase();
-      clusterCtn.innerHTML = '';
-      wave.clusters.forEach(c => {
-        const item = document.createElement('div');
-        item.className = 'flex justify-between items-center cluster-item';
-        if (currentQ && !c.name.toLowerCase().includes(currentQ)) item.style.display = 'none';
-        item.innerHTML = \`
-          <div class="flex items-center gap-4">
-            <div style="width:6px; height:6px; border-radius:50%; background:\${c.color}"></div>
-            <span class="text-xs text-dim truncate" style="max-width: 140px;">\${c.name}</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox" data-cluster="\${c.id}" \${selectedClusters.includes(c.id) ? 'checked' : ''}>
-            <span class="slider"></span>
-          </label>
-        \`;
-        clusterCtn.appendChild(item);
-      });
+        const clusterCtn = document.getElementById('cluster-filters');
+        if (!clusterCtn) return;
+        
+        const currentQ = document.getElementById('origin-search')?.value?.toLowerCase() || '';
+        clusterCtn.innerHTML = '';
+        wave.clusters.forEach(c => {
+          const item = document.createElement('div');
+          item.className = 'flex justify-between items-center cluster-item';
+          if (currentQ && !c.name.toLowerCase().includes(currentQ)) item.style.display = 'none';
+          item.innerHTML = \`
+            <div class="flex items-center gap-4">
+              <div style="width:6px; height:6px; border-radius:50%; background:\${c.color}"></div>
+              <span class="text-xs text-dim truncate" style="max-width: 140px;">\${c.name}</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" data-cluster="\${c.id}" \${selectedClusters.includes(c.id) ? 'checked' : ''}>
+              <span class="slider"></span>
+            </label>
+          \`;
+          clusterCtn.appendChild(item);
+        });
 
-      Graph.graphData(activeWave);
-      applyForces();
-      hideOverlay();
+        Graph.graphData(activeWave);
+        applyForces();
+        
+        // v1.6.7: Reactive Structural Bloom. 
+        if (Graph.d3Alpha) {
+          Graph.d3Alpha(1).restart();
+        }
+      } catch (err) {
+        console.error("[Mirror] Structural Refresh Error:", err);
+      } finally {
+        hideOverlay();
+      }
     }
 
     function applyForces() {
       if (typeof d3 === 'undefined') return;
-      Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(0.15));
-      Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(0.15));
+      const buffer = parseInt(document.getElementById('ctrl-buffer')?.value || '8');
+      const gravity = parseFloat(document.getElementById('ctrl-gravity')?.value || '0.15');
+      
+      Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(gravity));
+      Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(gravity));
       Graph.d3Force('collide', d3.forceCollide(node => {
         const size = Math.max((node.rank || 0.1) * 24, 6);
-        return size * 1.5 + 8;
+        return size * 1.5 + buffer;
       }).strength(1));
     }
 
@@ -465,8 +644,12 @@ export class MirrorServer {
         .onLinkClick(link => focusSubgraph(link.source))
         .onBackgroundClick(() => resetFocus());
       
-      Graph.d3Force('charge').strength(-800);
+      Graph.d3Force('charge').strength(-4477);
       Graph.d3Force('center', d3.forceCenter(0,0).strength(0.01));
+      Graph.d3Force('link').distance(20).strength(0.9);
+      Graph.d3VelocityDecay(0.1); // 1 - Fluidity(0.9)
+      Graph.d3AlphaDecay(0.02);   // v1.6.7: Smoother Bloom
+      Graph.linkCurvature(0);
     }
 
     function focusSubgraph(node) {
@@ -551,10 +734,12 @@ export class MirrorServer {
     this.app.get('/api/synapse', (req, res) => {
       const layersParam = req.query.layers as string;
       const clustersParam = (req.query.clusters as string) || '';
+      const spreadParam = (req.query.spread as string) || '1200';
       const layers = layersParam ? layersParam.split(',').map(n => parseInt(n, 10)) : [0, 1, 2, 3, 4, 5];
       const clusters = clustersParam ? clustersParam.split(',') : [];
+      const spread = parseInt(spreadParam, 10) || 1200;
       
-      const wave = (registry.mirror as any).getWave(layers, clusters);
+      const wave = (registry.mirror as any).getVisualWave(layers, clusters, spread);
       res.json(wave);
     });
 

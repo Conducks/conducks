@@ -1,105 +1,167 @@
-# 🏺 CONDUCKS — Structural Intelligence Repository
+# 🏺 CONDUCKS — Structural Intelligence & Governance
 
-**Conducks** is a high-fidelity, Git-native architectural observation platform designed to transform raw source code into a living **Synapse Graph**. Built as a part of the *Gospel of Technology*, it surpasses standard static analysis by modeling the **Kinetic Energy** and **Behavioral Flows** of a codebase.
-
----
-
-## 🏛️ The Kinetic Suite (Core Features)
-
-### 🌊 Structural Pulse (`analyze`)
-The foundational phase where the physical project is reflected into the Synapse Graph.
-*   **Chronicle Discovery**: Uses Git Object Model mirroring to find staged/untracked files instantly.
-*   **High-Speed Batch Extraction**: Uses `cat-file --batch` for 5x faster indexing than standard tools.
-*   **Multi-Lens Spectrum**: Built-in support for 7+ languages (TypeScript, Python, Go, Ruby, etc.) via Tree-sitter.
-
-### 🔍 Structural Search (`query`)
-Beyond simple grep, Conducks searches the topological relationships.
-*   **GQL (Graph Query Language)**: Cypher-like pattern matching (e.g., `"(A)-[:CALLS]->(B)"`).
-*   **Wavefront Resonance**: Fuzzy/Exact search weighted by **Kinetic Gravity** (importance).
-
-### 🧬 Circuit Tracing (`context`)
-Visualize the actual execution path of a symbol.
-*   **Kinetic Flow Trace**: Step-by-step downstream call-graph traversal.
-*   **Cerebral Circuit**: Identifies every function and variable participating in a specific behavioral flow.
-
-### ☢️ Impact Analysis (`impact`)
-Calculate the "Blast Radius" of a proposed change.
-*   **Recursive Upstream Traversal**: Finds every direct and indirect caller that will break if a symbol is modified.
-*   **Risk Scoring**: Categorizes changes as LOW, MEDIUM, HIGH, or CRITICAL based on structural entropy.
+**Conducks** is a high-fidelity, Git-native architectural observation platform. It transforms your source code into a living **Synapse Graph**, enabling real-time structural audits, behavioral tracing, and automated governance.
 
 ---
 
-## 💎 The Conducks's Intelligence (Deep Analysis)
+## 🧬 Interface Spectrum (CLI & MCP)
+Conducks is a unified structural engine designed for both **Human Developers** and **AI Agents**. By sharing a common Synapse Graph, it ensures that your code standards are maintained regardless of who is modifying the project.
 
-### 🏺 Conducks: The Kinetic Synapse
-Conducks has evolved into a high-performance structural intelligence platform. By transitioning from JSON to **DuckDB**, we now support sub-millisecond analytical queries across millions of symbols.
-
-- **Storage**: Vectorized DuckDB for massive scale.
-- **Algorithms**: A* Kinetic Pathfinding for structural impact analysis.
-- **Governance**: Sentinel-enforced policy validation.
-- **Visual**: High-fidelity Mirror Dashboard for real-time synapse exploration.
-
-### 🎓 Conducks Architecture Advisor (`advise`)
-A cost-free, AI-less structural auditor that identifies "Architectural Sins."
-*   **Circular Dependency Detection**: [FATAL] Identifies recursive import/call loops (A -> B -> A).
-*   **Monolithic Hubs**: Flags symbols that are "too coupled" (Monolithic Hubs) relative to the median density.
-*   **The Conducks's Intuition**: Infers relationships by matching string literals to symbol names (Inference).
-
-### 📡 Project Resonance (`resonance`)
-Compare the structural "Soul" of two different repositories.
-*   **Structural Fingerprinting**: Calculates a signature based on density, kinetic energy, and typology.
-*   **Similarity Score**: Returns a 0-100% resonance rating between two foundation projects.
-
-### ✂️ Dead Weight Pruning (`prune`)
-Identifies structural waste for manual or automated cleanup.
-*   **Orphaned Symbols**: Declarations never referenced locally or globally.
-*   **Unused Exports**: Symbols exported but never imported by any other file.
-*   **Stale Imports**: Imports declared at the top of a file but never called.
-*   **Unused Local Variables**: Logic assigned but never read.
+- **💻 Terminal CLI**: Optimized for developer experience with rich terminal output, interactive dashboards, and rapid architectural feedback.
+- **🤖 MCP Server**: A high-fidelity Model Context Protocol interface that allows AI Agents (like Antigravity) to perform deep-dives, trace execution, and verify structural integrity before proposing changes.
 
 ---
 
-## 🛠️ Safe Evolution (Refactoring & Regressions)
+## 🚀 Key Features
 
-### 🔄 Graph-Verified Refactoring (`rename`)
-Atomic, multi-file symbol renaming with 100% confidence.
-*   **GVR Engine**: Verifies every single call site in the graph before making a single disk change.
-*   **Automatic Rollback**: Reverts all changes if a single file write fails.
+### 🌊 The Kinetic Suite (Structural Pulse)
+- **`analyze`**: Full structural reflection of the codebase into a Synapse Graph.
+- **`status`**: High-level structural health check (Node/Edge density).
+- **`list`**: Paginated listing of all identified symbols.
+- **`setup`**: Automated environment and vault initialization.
 
-### 📉 Structural Diff (`diff`)
-Detect architectural regressions before they are committed.
-*   **Snapshotted State**: Compares the live graph against the base branch graph.
-*   **Regressions**: Alerts you if a new commit adds a circular dependency or breaks a "Sentinel" rule.
+### 🔍 Structural Intelligence
+- **`query`**: Topological search across the synapse using pattern matching.
+- **`explain`**: Deep-dive risk-scoring for any symbol (Risk vs Gravity).
+- **`impact`**: Recursive "Blast Radius" calculation for proposed changes.
+- **`trace`**: Step-by-step execution flow visualization.
+- **`flows`**: Discovery of behavioral circuits and handler patterns.
+
+### 🛡️ Core Governance
+- **`audit`**: Structural policy verification against the Sentinel laws.
+- **`advise`**: AI-less architectural consultant for refactoring paths.
+- **`blueprint`**: Generation of high-fidelity architectural manifests.
+- **`entry`**: Automated identification of system entry points (Routes, Handlers).
+
+### 🧬 Optimization & Physics
+- **`resonance`**: Cross-project structural similarity comparison.
+- **`entropy`**: Analysis of authorship fragmentation and cognitive load.
+- **`cohesion`**: Calculation of logical binding strength between components.
+- **`prune`**: Automated discovery of orphaned symbols and dead-weight code.
+
+### 🔄 Refactoring & Evolution
+- **`rename`**: Graph-verified atomic renaming across the entire codebase.
+- **`diff`**: Architectural regression detection (Historical vs Working Tree).
+- **`record`**: Structural snapshot versioning for long-term health tracking.
+- **`watch`**: Real-time background indexing of file changes.
 
 ---
 
-## 🛡️ Governance & Manifest
+## 📦 Installation
 
-### 🏺 Conducksic Blueprint (`blueprint`)
-Generates a high-fidelity structural manifest (**`BLUEPRINT.md`**) of every node and relationship in the synapse.
+```bash
+# Clone the repository
+git clone https://github.com/gospel-of-technology/conducks.git
+cd conducks
 
-### 🛡️ Sentinel Verification (`verify`)
-Enforces custom architectural rules (e.g., "No database calls in the UI layer") using the Synapse graph.
+# Install dependencies and Build
+npm install
+npm run build
+
+# Link the binary (Optional)
+npm link
+```
+
+## 🔧 Usage & Workflows
+
+### 🧬 1. Initialize the Structural Synapse
+First, calibrate the environment and perform the initial reflection of your project.
+```bash
+conducks setup           # Anchor the vault
+conducks analyze full    # Reflect structure (Saves to .conducks/conducks-synapse.db)
+conducks status          # Verify node/edge density
+```
+
+### 🛡️ 2. Architectural Guardrails (Audit)
+Verify that your codebase isn't drifting from the intended design laws.
+```bash
+conducks audit           # Detect sentinel violations
+conducks advise          # Get AI-less structural recommendations
+```
+
+### 🔍 3. Symbol Discovery & Impact
+Understand the risk and centrality of any symbol before modifying it.
+```bash
+conducks query "Persistence" # Find symbols by name/pattern
+conducks explain "Persistence::load" # Risk score (Risk / 10.0)
+conducks impact "Persistence::save" --direction upstream # Find callers
+```
+
+### 🛡️ Sentinel Governance (`sentinel.json`)
+
+**Sentinel** is the core architectural enforcement engine of Conducks. It allows you to define and enforce structural "Laws" (MVC, Onion, Clean Architecture, etc.) to prevent architectural drift.
+
+#### 🐚 Zero-Intrusive & Discovery-First
+Conducks is designed to be **Zero-Intrusive** and works with your existing code exactly as it is.
+- **Automatic Discovery**: Conducks discovers structural data automatically across your codebase. There are **no source code additives, keywords, or decorators** needed.
+- **Opt-in Governance**: Sentinel is a purely **optional** layer. If you don't have a `sentinel.json`, Conducks remains a pure intelligence and observation platform (Mirror, Impact, Trace).
+- **Specialized Hardening**: You only use Sentinel when you want to "Harden" your architecture. You can build these rules manually or have an **AI Agent** generate a technical manifest to enforce your specific standards.
+
+#### ⚙️ Quick Setup
+1. **Create the file**: Place a `config/sentinel.json` file in your project root.
+2. **Define rules**: Add rule objects to the JSON array (see catalog below).
+3. **Audit**: Run `conducks audit` to verify compliance.
+
+#### 📜 Rule Catalog & Format
+The `sentinel.json` file is a JSON array of `SentinelRule` objects.
+
+```json
+[
+  {
+    "id": "ui-layer-isolation",
+    "type": "require_caller",
+    "matchPath": "src/services",
+    "target": "DomainOrchestrator"
+  }
+]
+```
+
+| Type | Description | Use Case |
+| :--- | :--- | :--- |
+| `require_heritage` | Ensures a class implements an interface or extends a base. | Enforcing `BaseService` or `IController`. |
+| `max_fans` | Limits the number of incoming dependencies (Fan-In). | **God Object Prevention**. |
+| `require_caller` | Ensures a function is ONLY called by a specific parent. | Enforcing **Layer Isolation**. |
+| `require_export` | Ensures a specific symbol is exported. | Enforcing Public APIs. |
+| `require_file` | Ensures a specific file exists (e.g., `.conducksignore`). | Enforcing Documentation Standards. |
+| `framework_check` | Ensures a class has a specific framework marker. | Verifying technology stack compliance. |
+
+#### 🛡️ Example: Protecting an MVC Architecture
+To ensure all Controllers in `/src/controllers` extend a `BaseController`:
+```json
+{
+  "id": "mvc-controller-law",
+  "type": "require_heritage",
+  "matchPath": "src/controllers",
+  "matchLabel": "class",
+  "target": "BaseController"
+}
+```
 
 ---
 
-## 📖 Architecture Glossary
-*   **Synapse**: The central Graph Orchestration Engine.
-*   **Prism**: The reflection layer that transforms code into metadata.
-*   **Lens**: Language-specific parsers (TypeScript, Python, etc.).
-*   **Chronicle**: Git-native file discovery layer.
-*   **Kinetic Energy**: A metric of how "active" or "important" a node is in the graph.
-*   **Conducks**: High-level analysis engines (Advisor, Resonance, Prune).
+### 🪞 Structural Mirror (Visualization)
+The **Conducks Mirror** is a high-fidelity visual exploration dashboard that provides a real-time graphical representation of your codebase.
 
-## 🏺 The Synapse Persistence (SBP)
-As of v0.8.0, Conducks uses **Synapse Binary Prism (SBP)** powered by DuckDB. 
+- **Command**: `conducks mirror`
+- **Dashboard**: `http://localhost:3333`
 
-### Why DuckDB?
-1. **Analytical Throughput**: Vectorized execution allows for instant "Kinetic Gravity" calculations over 100k+ nodes.
-2. **Framework Coverage**: Enables ecosystem-wide aggregation of framework usage (Sentinel Framework Check) across federated projects.
-3. **Scale**: Reduces 100MB+ JSON bloat to optimized binary storage.
-4. **Graph Queries**: Native SQL/PGQ support for complex structural pattern matching.
+#### 🔮 Key Visual Intelligence:
+- **Kinetic Gravity Mapping**: Nodes are dynamically sized and colored based on their architectural importance (centrality).
+- **Behavioral Clustering**: Automatically identifies and groups related logic into visual clusters.
+- **Semantic Zoom**: Seamlessly navigate from high-level system modules down to granular function-level dependencies.
+- **Live Pulse**: Integrates with the file watcher to reflect structural changes in the graph instantly.
 
-### Neural Binding & A* Search
-- **Universal Workspace Resolver**: Correctly stitches relative imports across multi-package projects (monorepos).
-- **A* Traversal**: Uses structural heuristics ($h(n)$) to find the most critical architectural paths.
+---
+
+## 💎 Advanced Intelligence (Physics of Code)
+Conducks uses a custom structural physics model to quantify technical debt and risk:
+
+- **Kinetic Energy ($E_k$ )**: Measures the temporal activity and volatility of a symbol based on change frequency and resonance.
+- **Structural Gravity ($G$ )**: Calculated via PageRank. High-gravity symbols are critical hubs; if they fail, the system fails.
+- **Architectural Entropy ($S$ )**: Measures the fragmentation of logic. High entropy indicates a symbol that is being touched by too many people for too many reasons.
+
+## 🏺 The Synapse Persistence (DuckDB)
+As of v1.0, Conducks uses **DuckDB** for vectorized structural analysis. This allows for sub-millisecond graph traversal across projects with millions of nodes while maintaining zero-effort project portability.
+
+---
+© 2026 Gospel of Technology. Structural Resonance Confirmed.

@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 
 /**
@@ -13,7 +12,7 @@ export class RenameCommand implements ConducksCommand {
   public description = "Safely rename a symbol everywhere in the graph";
   public usage = "conducks rename <symbolId> <newName> [--confirm]";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];
     const newName = args[1];
     const confirmed = args.includes("--confirm");
@@ -29,7 +28,8 @@ export class RenameCommand implements ConducksCommand {
       console.log(`\x1b[33m⚠️  DRY RUN mode (pass --confirm to apply changes)\x1b[0m`);
     }
 
-    await persistence.load(registry.infrastructure.graphEngine.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.infrastructure.graphEngine.getGraph());
     
     // Conducks: Graph-Verified Refactoring (GVR)
     const result = await registry.rename.rename(symbolId, newName, dryRun);

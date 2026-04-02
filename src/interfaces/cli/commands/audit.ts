@@ -1,5 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
+import type { Registry } from "@/registry/index.js";
 import { ConducksSentinel } from "@/lib/domain/governance/sentinel.js";
 import fs from "node:fs/promises";
 
@@ -11,7 +11,7 @@ export class AuditCommand implements ConducksCommand {
   public description = "Audit structural integrity and governance";
   public usage = "conducks audit";
 
-  public async execute(_args: string[], _persistence: any): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks Audit] Auditing Structural Integrity...\x1b[0m");
 
     const sentinel = new ConducksSentinel();

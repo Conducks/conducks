@@ -1,4 +1,5 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksComponent } from "@/registry/types.js";
 
 interface StructuralSignature {
   density: number;
@@ -11,10 +12,11 @@ interface StructuralSignature {
  * Conducks — Project Resonance Analyzer
  * 
  * Logic for comparing two structural foundation repositories.
- * Calculates a "Signature" (Fingerprint) based on graph topology
- * and compares them using Jaccard Similarity and Euclidean Distance.
  */
-export class ResonanceAnalyzer {
+export class ResonanceAnalyzer implements ConducksComponent {
+  public readonly id = 'resonance-analyzer';
+  public readonly type = 'analyzer';
+  public readonly description = 'Calculates structural resonance and similarity between codebases.';
   /**
    * Compares the 'current' graph with an 'other' graph.
    */

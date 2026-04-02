@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Cohesion Command
@@ -10,7 +9,7 @@ export class CohesionCommand implements ConducksCommand {
   public description = "Calculate structural similarity between two symbols";
   public usage = "conducks cohesion <id1> <id2>";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const s1 = args[0];
     const s2 = args[1];
 
@@ -19,7 +18,8 @@ export class CohesionCommand implements ConducksCommand {
       return;
     }
 
-    await persistence.load(registry.query.graph.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     try {
       const vector = registry.explain.getCohesionVector(s1, s2);

@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Impact Command
@@ -10,7 +9,7 @@ export class ImpactCommand implements ConducksCommand {
   public description = "Perform blast radius analysis on a symbol";
   public usage = "conducks impact <symbolId> [direction: upstream|downstream]";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];
     const direction = (args[1] === "downstream" ? "downstream" : "upstream") as "upstream" | "downstream";
     if (!symbolId) {
@@ -18,7 +17,8 @@ export class ImpactCommand implements ConducksCommand {
       return;
     }
 
-    await persistence.load(registry.query.graph.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     const fmt = (v: any) => {
       const val = typeof v === 'object' && v !== null ? v.value : v;

@@ -1,13 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
- * Conducks — Manifest Engine (The 9th Domain) 💎
- * 
- * Implements high-fidelity documentation governance and 
- * strategic learning recovery.
+ * Conducks — Manifest Engine
  */
-export class ManifestEngine {
+export class ManifestEngine implements ConducksComponent {
+  public readonly id = 'manifest-engine';
+  public readonly type = 'analyzer';
+  public readonly description = 'Implements high-fidelity documentation governance and strategic learning recovery.';
   private readonly requiredFiles = [
     { name: 'vision.md', title: 'Vision & Intent', description: 'The why. Original intent and every evolution since.' },
     { name: 'architecture.md', title: 'Architecture Context', description: 'Module map, file tree, dependency directions.' },

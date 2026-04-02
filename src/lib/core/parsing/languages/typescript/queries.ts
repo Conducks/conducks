@@ -1,10 +1,14 @@
 export const TYPESCRIPT_QUERIES = `
   ;; --- Definitions ---
-  (class_declaration name: (type_identifier) @name) @isClass
+  (export_statement (class_declaration name: (type_identifier) @name (class_heritage [(extends_clause value: (_) @heritage) (implements_clause (_) @heritage)])? @heritage_clause) @isClass) @isExported
+  (class_declaration name: (type_identifier) @name (class_heritage [(extends_clause value: (_) @heritage) (implements_clause (_) @heritage)])? @heritage_clause) @isClass
+
+  (export_statement (interface_declaration name: (type_identifier) @name) @isInterface) @isExported
   (interface_declaration name: (type_identifier) @name) @isInterface
   
 
   (enum_declaration name: (identifier) @name) @isEnum
+  (export_statement (function_declaration name: (identifier) @name) @isFunction) @isExported
   (function_declaration name: (identifier) @name) @isFunction
   
   ;; Anonymous/Expression functions
@@ -24,12 +28,17 @@ export const TYPESCRIPT_QUERIES = `
   (import_statement "type"? (import_clause (identifier) @name) source: (string) @source) @isImport
 
   ;; --- Kinetic Calls ---
-  ;; do1()
-  (call_expression function: (identifier) @kinesis_target arguments: (arguments (_) @kinesis_arg)*)
-  ;; obj.method()
-  (call_expression function: (member_expression property: (property_identifier) @kinesis_target) arguments: (arguments (_) @kinesis_arg)*)
+  ;; do1() | new User()
+  (call_expression function: (_) @kinesis_target arguments: (arguments (_) @kinesis_arg)*)
+  
+  ;; obj.method() | User.static()
+  (call_expression function: (member_expression object: (_) @kinesis_object property: (property_identifier) @kinesis_target) arguments: (arguments (_) @kinesis_arg)*)
+
   ;; Constructor calls: new X()
-  (new_expression constructor: (identifier) @kinesis_target arguments: (arguments (_) @kinesis_arg)*)
+  (new_expression constructor: (_) @kinesis_target arguments: (arguments (_) @kinesis_arg)*)
+
+  ;; Qualified Constructor: new ns.X()
+  (new_expression constructor: (member_expression object: (_) @kinesis_object property: (property_identifier) @kinesis_target))
 
   ;; --- Phase 2.1: Logical Entry Points (Express/Fastify/Nest) ---
   ;; app.get('/path', handler)

@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
 import { MCPConfigurator } from "@/lib/domain/federation/mcp-configurator.js";
+import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 
 /**
@@ -11,7 +12,7 @@ export class SetupCommand implements ConducksCommand {
   public description = "Configure MCP and install skills";
   public usage = "registry setup";
 
-  public async execute(_args: string[], _persistence: any): Promise<void> {
+  public async execute(_args: string[], _registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks Setup] Initializing Environment...\x1b[0m");
 
     // 1. Sync Conduckss (Skills)

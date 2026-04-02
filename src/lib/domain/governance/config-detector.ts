@@ -1,13 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
  * Conducks — High-Fidelity Infrastructure Discovery
- * 
- * Automatically detects Config Files (package.json, go.mod, etc.) 
- * and identifies project Entry Points (main.py, index.ts).
  */
-export class ConfigDetector {
+export class ConfigDetector implements ConducksComponent {
+  public readonly id = 'config-detector';
+  public readonly type = 'analyzer';
+  public readonly description = 'Automatically detects project configuration and identifiers entry points.';
   private anchorFiles = [
     'package.json',
     'tsconfig.json',

@@ -39,7 +39,7 @@ export class GlobalSymbolLinker {
     const absoluteSource = path.resolve(path.dirname(filePath), sourcePath);
     
     // 2. Search for the actual definition in the target file
-    const targetNodeId = `${absoluteSource}::${symbolName}`;
+    const targetNodeId = `${absoluteSource.toLowerCase()}::${symbolName.toLowerCase()}`;
     const targetNode = graph.getNode(targetNodeId);
 
     if (targetNode) {

@@ -6,7 +6,11 @@ import { ConducksComponent } from '@/registry/types.js';
  * 
  * Logic for performing Wavefront Resonance search on the graph.
  */
-export class ConducksSearch {
+export class ConducksSearch implements ConducksComponent {
+  public readonly id = 'search-engine';
+  public readonly type = 'analyzer';
+  public readonly description = 'Provides pattern-based discovery across the structural graph.';
+
   constructor(private readonly graph: ConducksAdjacencyList) {}
 
   /**

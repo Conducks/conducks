@@ -9,39 +9,40 @@ import fsSync from "node:fs";
 
 /**
  * Conducks — Structural Anchor Discovery
+ * 
+ * Locates the nearest structural vault (.conducks) or project root (package.json).
+ * This enforces a "Project Boundary" check to prevent Home Folder Leakage.
  */
 function findNearestVault(startDir: string): string {
   const binaryAnchor = path.dirname(fileURLToPath(import.meta.url));
   const searchPaths = [startDir, binaryAnchor];
   const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
+  const homeDir = os.homedir();
 
-  // Phase 1: High-Priority Vault Search (.conducks) 🏺 🧬
+  // Unified Discovery Pulse: Resolve the absolute Project Boundary
   for (const start of searchPaths) {
     let current = path.resolve(start);
     while (current !== path.parse(current).root) {
-      if (fsSync.existsSync(path.join(current, ".conducks"))) {
-        if (!forbiddenArtifacts.includes(path.basename(current))) {
-          return current;
-        }
-      }
-      const parent = path.dirname(current);
-      if (parent === current) break;
-      current = parent;
-    }
-  }
+       // Stop Discovery if we hit a forbidden artifact folder
+       if (forbiddenArtifacts.includes(path.basename(current))) break;
 
-  // Phase 2: Fallback Project Search (package.json)
-  for (const start of searchPaths) {
-    let current = path.resolve(start);
-    while (current !== path.parse(current).root) {
-      if (fsSync.existsSync(path.join(current, "package.json"))) {
-        if (!forbiddenArtifacts.includes(path.basename(current))) {
-          return current;
-        }
-      }
-      const parent = path.dirname(current);
-      if (parent === current) break;
-      current = parent;
+       const hasVault = fsSync.existsSync(path.join(current, ".conducks"));
+       const hasManifest = fsSync.existsSync(path.join(current, "package.json"));
+
+       // Priority 1: Current Project Root (Package Manifest + Vault existence check)
+       if (hasVault || hasManifest) {
+         // Security Guard: We never automatically anchor to the User Home Root
+         // unless we are explicitly in the Home directory to begin with.
+         if (current === homeDir && start !== homeDir) {
+            // Leakage detected! Stop and anchor to the startDir instead.
+            break; 
+         }
+         return current;
+       }
+
+       const parent = path.dirname(current);
+       if (parent === current) break;
+       current = parent;
     }
   }
   
@@ -151,11 +152,12 @@ export class DuckDbPersistence implements SynapsePersistence {
         attempts++;
         if (isLockError(err.message || '') && attempts < maxAttempts) {
           const waitTime = Math.pow(2, attempts) * 500;
-          console.error(`🛡️ [Conducks Persistence] Vault locked. Retrying in ${waitTime}ms...`);
+          const role = this.readOnly ? 'Reader' : 'Writer';
+          console.error(`🛡️ [Conducks Persistence] Structural Vault Locked. Role: ${role}. Conflicting process detected. Retrying in ${waitTime}ms...`);
           await new Promise(res => setTimeout(res, waitTime));
           continue;
         }
-        throw err;
+        throw new Error(`[Conducks Persistence] Structural Vault Lock Contention: ${err.message}. (Attempt ${attempts}/${maxAttempts})`);
       }
     }
 
@@ -257,7 +259,7 @@ export class DuckDbPersistence implements SynapsePersistence {
         try {
           const nodeStmt = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, kind, name, file, gravity, kineticEnergy, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
           for (const metaNode of spectrum.nodes) {
-            const nodeId = `${filePath.toLowerCase()}::${metaNode.name}`;
+            const nodeId = `${filePath.toLowerCase()}::${metaNode.name.toLowerCase()}`;
             await new Promise<void>((r, j) => nodeStmt.run(nodeId, pulseId, metaNode.kind || 'unknown', metaNode.name || 'unknown', filePath.toLowerCase(), 0, 0, JSON.stringify({ ...metaNode.metadata, name: metaNode.name, range: metaNode.range }), (e: any) => e ? j(e) : r()));
           }
           nodeStmt.finalize();
@@ -300,18 +302,26 @@ export class DuckDbPersistence implements SynapsePersistence {
     } catch (err) {
       console.error(err);
       return false;
+    } finally {
+      // FIX 5: Release structural vault handle for passive readers to enable concurrency
+      if (this.readOnly) await this.close();
     }
   }
 
   public async getRawConnection(): Promise<any> { return this.connect(); }
 
   public async fetchNodeMeat(nodeId: string): Promise<any | null> {
-    const db = await this.connect();
-    if (!db) return null;
-    const pulseRows: any[] = await new Promise((res) => db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => res(err ? [] : rows)));
-    if (pulseRows.length === 0) return null;
-    const rows: any[] = await new Promise((res) => db.all("SELECT metadata FROM nodes WHERE id = ? AND pulseId = ?", [nodeId, pulseRows[0].id], (err: any, rows: any[]) => res(err ? [] : rows)));
-    return (rows.length > 0 && rows[0].metadata) ? JSON.parse(rows[0].metadata) : null;
+    try {
+      const db = await this.connect();
+      if (!db) return null;
+      const pulseRows: any[] = await new Promise((res) => db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => res(err ? [] : rows)));
+      if (pulseRows.length === 0) return null;
+      const rows: any[] = await new Promise((res) => db.all("SELECT metadata FROM nodes WHERE id = ? AND pulseId = ?", [nodeId, pulseRows[0].id], (err: any, rows: any[]) => res(err ? [] : rows)));
+      return (rows.length > 0 && rows[0].metadata) ? JSON.parse(rows[0].metadata) : null;
+    } finally {
+      // FIX 5: Release handle after tool call
+      if (this.readOnly) await this.close();
+    }
   }
 
   public async close(): Promise<void> {

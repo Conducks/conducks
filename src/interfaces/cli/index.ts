@@ -79,7 +79,7 @@ export async function main() {
   }
 
   const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-  const writeCommands = ['analyze', 'setup', 'clean', 'rename'];
+  const writeCommands = ['analyze', 'setup', 'clean', 'rename', 'watch'];
   const isReadOnly = !writeCommands.includes(commandId);
 
   chronicle.setProjectDir(targetPath);
@@ -128,7 +128,7 @@ export async function main() {
       }
 
       console.log(`[CLI] Calling ${command.id}.execute()...`);
-      await command.execute(cmdArgs, persistence as any);
+      await command.execute(cmdArgs, registry as any);
       console.log(`[CLI] ${command.id}.execute() completed.`);
     } catch (err) {
       console.error(`\x1b[31m[Conducks CLI] Execution Error:\x1b[0m`, err);

@@ -8,6 +8,7 @@ import { Logger } from "@/lib/core/utils/logger.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+import { ConducksComponent } from "@/registry/types.js";
 
 const logger = new Logger("AnalysisDomain");
 
@@ -17,7 +18,11 @@ const logger = new Logger("AnalysisDomain");
  * High-level product logic for structural analysis, discovery, 
  * and neural context regeneration.
  */
-export class AnalysisService {
+export class AnalysisService implements ConducksComponent {
+  public readonly id = 'analysis-service';
+  public readonly type = 'analyzer';
+  public readonly description = 'Orchestrates structural reflection and synapse discovery.';
+
   constructor(
     private orchestrator: AnalyzeOrchestrator,
     private graph: ConducksGraph,

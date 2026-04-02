@@ -1,4 +1,4 @@
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Command Interface
@@ -7,7 +7,7 @@ export interface ConducksCommand {
   id: string;
   description: string;
   usage: string;
-  execute(args: string[], persistence: SynapsePersistence): Promise<void>;
+  execute(args: string[], registry: Registry): Promise<void>;
 }
 
 

@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -12,10 +11,11 @@ export class ContextGenCommand implements ConducksCommand {
   public description = "Generate LLM-optimized ARCHITECTURE.md";
   public usage = "registry context-gen";
 
-  public async execute(_args: string[], persistence: DuckDbPersistence): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     try {
       console.log("[Conducks] Generating Neural Architecture Context...");
-      await persistence.load(registry.query.graph.getGraph());
+      // Structural Sync via Registry Bridge
+      await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
       
       const contextMd = await (registry.audit as any).contextFile();
       const outputPath = path.join(process.cwd(), 'ARCHITECTURE.md');
@@ -25,7 +25,7 @@ export class ContextGenCommand implements ConducksCommand {
       console.log(`✅ Neural Context generated at: ${outputPath}`);
       console.log(`🚀 This file is optimized for LLM context windows (max 4000 tokens).`);
     } finally {
-      await persistence.close();
+      await registry.infrastructure.persistence.close();
     }
   }
 }

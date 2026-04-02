@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Link Command
@@ -9,7 +10,7 @@ export class LinkCommand implements ConducksCommand {
   public description = "Link a proprietary foundation synapse";
   public usage = "registry link <path>";
 
-  public async execute(args: string[], _persistence: any): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const projectPath = args[0];
     if (!projectPath) {
       console.error("Error: Please provide a path to the proprietary project to link.");

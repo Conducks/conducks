@@ -1,14 +1,15 @@
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { GVREngine, RefactorResult } from "./gvr-engine.js";
 import { ConducksWatcher } from "./watcher.js";
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
- * Conducks — Evolution Service (The Movement Facade)
- *
- * Encapsulates structural evolution, atomic refactoring (GVR),
- * and real-time filesystem monitoring.
+ * Conducks — Evolution Service
  */
-export class EvolutionService {
+export class EvolutionService implements ConducksComponent {
+  public readonly id = 'evolution-service';
+  public readonly type = 'analyzer';
+  public readonly description = 'Orchestrates structural evolution, atomic refactoring (GVR), and real-time monitoring.';
   private _watcher: ConducksWatcher | null = null;
 
   constructor(

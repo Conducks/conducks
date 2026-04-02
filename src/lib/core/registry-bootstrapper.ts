@@ -1,0 +1,139 @@
+import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { DuckDbPersistence, SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { grammars } from "@/lib/core/parsing/grammar-registry.js";
+import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { logger } from "@/lib/core/utils/logger.js";
+import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import fsSync from "node:fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const resourcesDir = path.resolve(__dirname, "../../resources/grammars");
+
+/**
+ * Conducks — Registry Bootstrapper (Capability Layer)
+ * 
+ * Handles the heavy lifting of environment discovery, grammar initialization,
+ * and structural anchor resolution. This ensures the Registry remains a 
+ * pure composition point.
+ */
+export class RegistryBootstrapper {
+  private isGrammarInitialized = false;
+
+  /**
+   * Autonomously resolves the nearest project root.
+   */
+  public discoverRoot(startPath: string): string {
+    const binaryAnchor = path.dirname(__filename);
+    const searchPaths = [startPath, binaryAnchor];
+    const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
+
+    // Phase 1: High-Fidelity Vault Search (.conducks) 🏺 🧬
+    for (const start of searchPaths) {
+      let current = path.resolve(start);
+      while (current !== path.parse(current).root) {
+        if (IgnoreManager.hasConfig(current)) {
+          if (!forbiddenArtifacts.includes(path.basename(current))) {
+            return current;
+          }
+        }
+        
+        // Prevent escaping to global home directory if we are in a project
+        if (IgnoreManager.hasPackageJson(current) || fsSync.existsSync(path.join(current, ".git"))) {
+          // If we find a project marker, stop searching UP for .conducks.
+          // This keeps us anchored to the nearest project.
+          return current;
+        }
+
+        const parent = path.dirname(current);
+        if (parent === current) break;
+        current = parent;
+      }
+    }
+    
+    return startPath;
+  }
+
+  /**
+   * High-fidelity initialization wave.
+   */
+  public async initialize(
+    options: { readOnly: boolean; root?: string },
+    context: {
+      graph: ConducksGraph;
+      persistence: SynapsePersistence;
+      ignoreManager: IgnoreManager;
+      federation: FederatedLinker;
+      updatePersistence: (p: SynapsePersistence) => void;
+      updateIgnoreManager: (i: IgnoreManager) => void;
+    }
+  ): Promise<void> {
+    const { readOnly, root } = options;
+    const { graph, persistence, ignoreManager, federation, updatePersistence, updateIgnoreManager } = context;
+
+    if (!this.isGrammarInitialized) {
+      console.error(`🛡️ [Conducks Bootstrapper] Initializing Grammar Engine...`);
+      await grammars.init();
+      await grammars.loadLanguage('python', path.join(resourcesDir, 'tree-sitter-python.wasm'));
+      await grammars.loadLanguage('typescript', path.join(resourcesDir, 'tree-sitter-typescript.wasm'));
+      this.isGrammarInitialized = true;
+      console.error(`🛡️ [Conducks Bootstrapper] Grammar Engine Ready.`);
+    }
+
+    const baseRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+    const effectiveRoot = (baseRoot === ":memory:") ? baseRoot : this.discoverRoot(baseRoot);
+    
+    if (effectiveRoot !== ":memory:") {
+      const logPath = path.join(effectiveRoot, '.conducks', 'mcp.log');
+      logger.setLogFile(logPath);
+    }
+
+    console.error(`🛡️ [Conducks Bootstrapper] Anchoring structural synapse at: ${effectiveRoot}`);
+    const isCurrentlyConnected = persistence.isConnected();
+    const rootChanged = chronicle.getProjectDir() !== effectiveRoot;
+    const modeChanged = (persistence as any).readOnly !== readOnly;
+
+    if (isCurrentlyConnected && !rootChanged && !modeChanged) return;
+
+    if (rootChanged || modeChanged || !isCurrentlyConnected) {
+      if (isCurrentlyConnected) await persistence.close();
+      
+      if (rootChanged) {
+        graph.getGraph().clear();
+      }
+
+      const newPersistence = new DuckDbPersistence(effectiveRoot, readOnly);
+      updatePersistence(newPersistence);
+      chronicle.setProjectDir(effectiveRoot);
+      
+      const newIgnoreManager = new IgnoreManager(effectiveRoot);
+      updateIgnoreManager(newIgnoreManager);
+      
+      // FIX: Use the updated instance for the initial load
+      try {
+        const loaded = await newPersistence.load(graph.getGraph());
+        if (loaded) {
+          console.error(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
+          await federation.hydrate(graph.getGraph());
+        }
+      } catch (err: any) {
+        console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
+      }
+      return; // Wave complete
+    }
+    
+    // Fallback: Default load if no re-connection was needed
+    try {
+      const loaded = await persistence.load(graph.getGraph());
+      if (loaded) {
+        console.error(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
+        await federation.hydrate(graph.getGraph());
+      }
+    } catch (err: any) {
+      console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
+    }
+  }
+}

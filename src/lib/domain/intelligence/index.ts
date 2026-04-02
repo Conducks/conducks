@@ -1,14 +1,15 @@
 import { ConducksSearch } from "./search-engine.js";
 import { GQLParser } from "./gql-parser.js";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
- * Conducks — Intelligence Service (The Discovery Facade)
- *
- * Encapsulates global structural search, graph query parsing (GQL),
- * and cross-project federated linking.
+ * Conducks — Intelligence Service
  */
-export class IntelligenceService {
+export class IntelligenceService implements ConducksComponent {
+  public readonly id = 'intelligence-service';
+  public readonly type = 'analyzer';
+  public readonly description = 'Encapsulates global structural search, graph query parsing (GQL), and cross-project federated linking.';
   constructor(
     private readonly graph: any,
     public readonly search: ConducksSearch,

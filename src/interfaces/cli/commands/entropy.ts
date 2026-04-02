@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Entropy Command
@@ -10,13 +9,15 @@ export class EntropyCommand implements ConducksCommand {
   public description = "Measure the structural risk of a symbol";
   public usage = "registry entropy <symbolId>";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];
     if (!symbolId) {
       console.log("\x1b[31mError: No symbol specified for entropy analysis.\x1b[0m");
       return;
     }
-    await persistence.load(registry.query.graph.getGraph());
+    
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
     const { entropy, risk, authorCount } = await registry.explain.calculateEntropy(symbolId) as any;
 
     const fmt = (v: any) => isNaN(Number(v)) ? "0.00" : (Number(v) * 100).toFixed(2);

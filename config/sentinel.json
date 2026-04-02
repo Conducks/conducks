@@ -2,15 +2,21 @@
   {
     "id": "require-conducks-component",
     "type": "require_heritage",
-    "matchPath": "src/lib/domain/analysis",
+    "matchPath": "src/lib/domain/",
     "matchLabel": "class",
     "target": "ConducksComponent"
+  },
+  {
+    "id": "domain-visibility-rule",
+    "type": "require_export",
+    "matchPath": "src/lib/domain/",
+    "matchLabel": "class"
   },
   {
     "id": "hub-overload-prevention",
     "type": "max_fans",
     "matchPath": "src/registry",
-    "max": 30
+    "max": 25
   },
   {
     "id": "sentinel-config-presence",

@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import { initGlobalMirror } from "@/interfaces/web/mirror-server.js";
 
 /**
@@ -11,18 +10,19 @@ export class MirrorCommand implements ConducksCommand {
   public description = "Start high-fidelity visual explorer";
   public usage = "registry mirror";
 
-  public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks] Initializing Visual Dashboard...\x1b[0m");
     
     // 1. Load Graph
-    await persistence.load(registry.query.graph.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
     
     // 2. Start Mirror Server
-    const server = initGlobalMirror(registry.query.graph, persistence);
+    const server = initGlobalMirror(registry.query.graph, registry.infrastructure.persistence);
     server.start(3333);
     
-    // 3. Start Watcher (Live Connection)
-    if (registry.rename.watcher) {
+    // 3. Start Watcher (Live Connection) - Optional (v1.12.6)
+    if (registry.rename.watcher && (_args.includes('--live') || _args.includes('--watch'))) {
       registry.rename.watcher.start();
     }
     

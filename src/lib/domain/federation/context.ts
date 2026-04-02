@@ -1,10 +1,12 @@
+import { ConducksComponent } from "@/registry/types.js";
+
 /**
  * Conducks — Pulse Context
- * 
- * Manages the state and cache during a multi-pass topological pulse.
  */
-
-export class AnalyzeContext {
+export class AnalyzeContext implements ConducksComponent {
+  public readonly id = 'analyze-context';
+  public readonly type = 'analyzer';
+  public readonly description = 'Encapsulates the state and cache during a multi-pass topological Pulse.';
   /** Map of file paths to their direct dependencies (Import Map) */
   private importMap: Map<string, Set<string>> = new Map();
 

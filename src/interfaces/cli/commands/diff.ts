@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 
@@ -15,7 +14,7 @@ export class DiffCommand implements ConducksCommand {
   public description = "Analyze structural risk of current changes (staged/unstaged)";
   public usage = "registry diff [--base <id>] [--head <id>]";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const baseIdx = args.indexOf('--base');
     const headIdx = args.indexOf('--head');
 
@@ -24,12 +23,13 @@ export class DiffCommand implements ConducksCommand {
       const headPulseId = headIdx !== -1 ? args[headIdx + 1] : null; // null means current
       console.log(`[DEBUG] Diffing Base: ${basePulseId}, Head: ${headPulseId}`);
 
-      await this.executeChronoscopicDiff(basePulseId, headPulseId, persistence);
+      await this.executeChronoscopicDiff(basePulseId, headPulseId, registry);
       return;
     }
 
     // Default: Git-based PR Risk Engine
-    await persistence.load(registry.query.graph.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     console.log(`\n\x1b[1m--- 🛡️ Conducks PR Risk Engine ---\x1b[0m`);
 
@@ -94,7 +94,7 @@ export class DiffCommand implements ConducksCommand {
     });
   }
 
-  private async executeChronoscopicDiff(baseId: string, headId: string | null, persistence: SynapsePersistence): Promise<void> {
+  private async executeChronoscopicDiff(baseId: string, headId: string | null, registry: Registry): Promise<void> {
     const { ConducksAdjacencyList } = await import("@/lib/core/graph/adjacency-list.js");
     const { ConducksDiffEngine } = await import("@/lib/core/graph/diff-engine.js");
     const { DuckDbPersistence } = await import("@/lib/core/persistence/persistence.js");
@@ -102,7 +102,7 @@ export class DiffCommand implements ConducksCommand {
     const baseGraph = new ConducksAdjacencyList();
     const headGraph = new ConducksAdjacencyList();
 
-    const db = persistence as any;
+    const db = registry.infrastructure.persistence;
     if (!(db instanceof DuckDbPersistence)) {
       console.error("Chronoscopic diff requires DuckDB persistence.");
       return;
@@ -127,7 +127,7 @@ export class DiffCommand implements ConducksCommand {
       console.log(`[DEBUG] Loaded Head: ${headNodes.length} nodes, ${headEdges.length} edges`);
       this.reconstitute(headGraph, headNodes, headEdges);
     } else {
-      await persistence.load(headGraph);
+      await registry.infrastructure.persistence.load(headGraph);
     }
 
     const diffEngine = new ConducksDiffEngine();

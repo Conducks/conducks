@@ -20,6 +20,9 @@ export interface ConducksNode<T = any> {
     kineticEnergy?: number;
     rank?: number;
     isEntryPoint?: boolean;
+    isExport?: boolean;
+    canonicalKind: string;    // Conducks: Canonical Taxonomy Layer (STRUCTURE, BEHAVIOR, etc.)
+    canonicalRank: number;    // Conducks: Architectural Rank (0-7)
     // Meat (Metadata - only present if not shallow)
     complexity?: number;
     debtMarkers?: string[];
@@ -44,6 +47,9 @@ export interface ConducksEdge<T = any> {
   properties: T;
 }
 
+import { CycleDetector } from "./algorithms/cycle-detector.js";
+import { StructuralRanker } from "./algorithms/ranker.js";
+import { GraphTraversal } from "./algorithms/traversal.js";
 import zlib from "zlib";
 
 
@@ -89,7 +95,10 @@ export class ConducksAdjacencyList {
         parentname: node.properties.parentname,
         rank: node.properties.rank,
         kineticEnergy: node.properties.kineticEnergy,
-        isEntryPoint: node.properties.isEntryPoint
+        isEntryPoint: node.properties.isEntryPoint,
+        isExport: node.properties.isExport,
+        canonicalKind: node.properties.canonicalKind,
+        canonicalRank: node.properties.canonicalRank
       } as any
     };
 
@@ -292,23 +301,7 @@ export class ConducksAdjacencyList {
    * Recursive BFS traversal to calculate "Blast Radius" (Impact Analysis).
    */
   public traverseUpstream(startId: NodeId, maxDepth: number = 5): Map<NodeId, number> {
-    const depths = new Map<NodeId, number>();
-    const queue: [NodeId, number][] = [[startId.toLowerCase(), 0]];
-    const visited = new Set<NodeId>();
-
-    while (queue.length > 0) {
-      const [currentId, depth] = queue.shift()!;
-
-      if (visited.has(currentId) || depth > maxDepth) continue;
-      visited.add(currentId);
-      depths.set(currentId, depth);
-
-      for (const edge of this.getNeighbors(currentId, 'upstream')) {
-        queue.push([edge.sourceId, depth + 1]);
-      }
-    }
-
-    return depths;
+    return GraphTraversal.traverseUpstream(this, startId, maxDepth);
   }
 
   /**
@@ -317,63 +310,7 @@ export class ConducksAdjacencyList {
    * High-precision pathfinding between symbols using structural heuristics.
    */
   public traverseAStar(startId: NodeId, targetId: NodeId, heuristic?: (n: ConducksNode) => number): NodeId[] {
-    const sId = startId.toLowerCase();
-    const tId = targetId.toLowerCase();
-    const openSet = new Set<NodeId>([sId]);
-    const cameFrom = new Map<NodeId, NodeId>();
-    const gScore = new Map<NodeId, number>([[sId, 0]]);
-    const fScore = new Map<NodeId, number>([[sId, 0]]);
-
-    const h = (nodeId: NodeId) => {
-      const node = this.nodes.get(nodeId);
-      if (!node) return 1000;
-      if (heuristic) return heuristic(node);
-      const targetLayer = this.nodes.get(tId)?.properties.layer || 0;
-      return Math.abs(targetLayer - (node.properties.layer || 0));
-    };
-
-    fScore.set(sId, h(sId));
-
-    while (openSet.size > 0) {
-      let currentId: NodeId | null = null;
-      let lowestFScore = Infinity;
-
-      for (const id of openSet) {
-        const score = fScore.get(id) ?? Infinity;
-        if (score < lowestFScore) {
-          lowestFScore = score;
-          currentId = id;
-        }
-      }
-
-      if (!currentId) break;
-
-      if (currentId === tId) {
-        const path = [currentId];
-        let step = currentId;
-        while (cameFrom.has(step)) {
-          step = cameFrom.get(step)!;
-          path.unshift(step);
-        }
-        return path;
-      }
-
-      openSet.delete(currentId);
-
-      for (const edge of this.getNeighbors(currentId, 'downstream')) {
-        const weight = edge.confidence || 1.0;
-        const tentativeGScore = (gScore.get(currentId) || 0) + weight;
-
-        if (tentativeGScore < (gScore.get(edge.targetId) ?? Infinity)) {
-          cameFrom.set(edge.targetId, currentId);
-          gScore.set(edge.targetId, tentativeGScore);
-          fScore.set(edge.targetId, tentativeGScore + h(edge.targetId));
-          openSet.add(edge.targetId);
-        }
-      }
-    }
-
-    return []; // No path found
+    return GraphTraversal.traverseAStar(this, startId, targetId, heuristic);
   }
 
   /**
@@ -515,107 +452,14 @@ export class ConducksAdjacencyList {
    * importance (Gravity) of every node in the Synapse.
    */
   public globalRecalculateGravity(iterations: number = 30, damping: number = 0.85): void {
-    const nodes = Array.from(this.nodes.values());
-    if (nodes.length === 0) return;
-
-    // 1. Identify Architectural Anchors
-    const anchors = nodes.filter(node => {
-      const p = node.properties;
-      return p.isClass || p.isFunction || p.isInterface || p.isType || p.isEnum || p.isMethod || p.isModule || node.label === 'module' || node.label === 'function';
-    });
-
-    const AN = anchors.length;
-    if (AN === 0) return;
-
-    let ranks = new Map<NodeId, number>();
-    for (const node of anchors) ranks.set(node.id, 1 / AN);
-
-    // 2. Power Iteration
-    for (let i = 0; i < iterations; i++) {
-      const nextRanks = new Map<NodeId, number>();
-      let sinkRank = 0;
-
-      for (const node of anchors) {
-        const out = this.outEdges.get(node.id);
-        const archOut = out ? Array.from(out).filter(e => ranks.has(e.targetId)) : [];
-        if (archOut.length === 0) sinkRank += ranks.get(node.id)!;
-      }
-
-      for (const node of anchors) {
-        let rankSum = 0;
-        const incoming = this.inEdges.get(node.id);
-        if (incoming) {
-          for (const edge of incoming) {
-            if (!ranks.has(edge.sourceId)) continue;
-            const srcOut = this.outEdges.get(edge.sourceId);
-            const srcOutDegree = srcOut ? Array.from(srcOut).filter(e => ranks.has(e.targetId)).length : 1;
-            rankSum += ranks.get(edge.sourceId)! / Math.max(1, srcOutDegree);
-          }
-        }
-
-        const newRank = ((1 - damping) / AN) + damping * (rankSum + (sinkRank / AN));
-        nextRanks.set(node.id, newRank);
-      }
-      ranks = nextRanks;
-    }
-
-    // 3. Commit Gravity
-    for (const node of nodes) {
-      node.properties.rank = ranks.get(node.id) || 0;
-      node.properties.kineticEnergy = (node.properties.rank || 0) * AN;
-    }
-
-    // 4. Conducks — Identify Entry Points after importance is known
-    this.detectEntryPoints();
+    StructuralRanker.calculateGravity(this, iterations, damping);
   }
 
   /**
    * Conducks — Entry Point Intelligence
    */
   public detectEntryPoints(): void {
-    const entryPointNames = new Set(['main', 'app', 'run', 'start', 'cli', 'index', 'handler', 'server', 'cmd', 'entry']);
-    const entryPointFiles = new Set(['main.py', 'app.py', 'index.ts', 'server.ts', 'cli.ts', 'main.go', 'main.rs']);
-
-    for (const node of this.nodes.values()) {
-      const props = node.properties;
-      const lowerName = props.name?.toLowerCase() || '';
-      const basename = props.filePath ? props.filePath.split('/').pop() || '' : '';
-
-      let isEntry = false;
-
-      // 1. Explicit Framework Routes (Detected during refraction)
-      if (node.label === 'route' || node.label.includes('route') || props.kind?.includes('route')) {
-        isEntry = true;
-      }
-
-      // 2. Transitive Root Signature (0 In-Degree, 1+ Out-Degree)
-      const incoming = this.inEdges.get(node.id)?.size || 0;
-      const outgoing = this.outEdges.get(node.id)?.size || 0;
-
-      // Significance Check: To be an entry, it should call something else.
-      // If it's a structural unit with no callers, it's likely a script or command.
-      if (incoming === 0 && outgoing > 0) {
-        if (node.label === 'module' || node.label === 'file' || node.label === 'function' || node.label === 'class') {
-           isEntry = true;
-        }
-      }
-
-      // 3. Global Constants & Naming Heuristics (Broadened)
-      if (entryPointNames.has(lowerName)) {
-        isEntry = true;
-      }
-
-      if (basename && entryPointFiles.has(basename)) {
-        isEntry = true;
-      }
-
-      // 4. Force override if already marked during analysis
-      if (props.isEntryPoint) {
-        isEntry = true;
-      }
-
-      node.properties.isEntryPoint = isEntry;
-    }
+    StructuralRanker.detectEntryPoints(this);
   }
 
   public get stats() {
@@ -639,56 +483,6 @@ export class ConducksAdjacencyList {
    * Linear time complexity: O(V + E).
    */
   public detectCycles(): NodeId[][] {
-    const cycles: NodeId[][] = [];
-    let index = 0;
-    const stack: NodeId[] = [];
-    const onStack = new Set<NodeId>();
-    const indices = new Map<NodeId, number>();
-    const lowlink = new Map<NodeId, number>();
-
-    const strongconnect = (nodeId: NodeId) => {
-      indices.set(nodeId, index);
-      lowlink.set(nodeId, index);
-      index++;
-      stack.push(nodeId);
-      onStack.add(nodeId);
-
-      const neighbors = this.getNeighbors(nodeId, 'downstream');
-      for (const edge of neighbors) {
-        if (!indices.has(edge.targetId)) {
-          strongconnect(edge.targetId);
-          lowlink.set(nodeId, Math.min(lowlink.get(nodeId)!, lowlink.get(edge.targetId)!));
-        } else if (onStack.has(edge.targetId)) {
-          lowlink.set(nodeId, Math.min(lowlink.get(nodeId)!, indices.get(edge.targetId)!));
-        }
-      }
-
-      if (lowlink.get(nodeId) === indices.get(nodeId)) {
-        const component: NodeId[] = [];
-        let w: NodeId;
-        do {
-          w = stack.pop()!;
-          onStack.delete(w);
-          component.push(w);
-        } while (w !== nodeId);
-
-        if (component.length > 1) {
-          cycles.push(component);
-        } else if (component.length === 1) {
-          const selfEdges = this.getNeighbors(component[0], 'downstream');
-          if (selfEdges.some(e => e.targetId === component[0])) {
-            cycles.push(component);
-          }
-        }
-      }
-    };
-
-    for (const nodeId of this.nodes.keys()) {
-      if (!indices.has(nodeId)) {
-        strongconnect(nodeId);
-      }
-    }
-
-    return cycles;
+    return CycleDetector.detect(this);
   }
 }

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { ConducksAdjacencyList, NodeId } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksComponent } from "@/registry/types.js";
 
 export interface RefactorResult {
   success: boolean;
@@ -17,7 +18,10 @@ export interface RefactorResult {
  * Traverses both CALLS (upstream) and IMPORTS edges to ensure
  * type-only references (import type) are also captured.
  */
-export class GVREngine {
+export class GVREngine implements ConducksComponent {
+  public readonly id = 'gvr-engine';
+  public readonly type = 'analyzer';
+  public readonly description = 'Executes graph-verified, multi-file refactoring and renames.';
   constructor(private readonly fileSystem: any = fs) {}
 
   /**

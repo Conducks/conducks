@@ -1,5 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Professional Structural Help Engine (v2.0.0)
@@ -13,7 +13,7 @@ export class HelpCommand implements ConducksCommand {
 
   constructor(private commands: ConducksCommand[]) {}
 
-  public async execute(_args: string[], _persistence: SynapsePersistence): Promise<void> {
+  public async execute(_args: string[], _registry: Registry): Promise<void> {
     const domains: Record<string, string[]> = {
       "DISCOVERY (Query)": ["analyze", "query", "list", "entry"],
       "LANDSCAPE (Status)": ["status", "link", "resonance", "blueprint"],

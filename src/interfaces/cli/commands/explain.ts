@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Explain Command (Signal Decomposition)
@@ -12,14 +11,15 @@ export class ExplainCommand implements ConducksCommand {
   public description = "Provide a detailed risk signal decomposition for a symbol";
   public usage = "conducks explain <symbol_id>";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];
     if (!symbolId) {
       console.error("Usage: conducks explain <symbol_id>");
       return;
     }
 
-    await persistence.load(registry.infrastructure.graphEngine.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.infrastructure.graphEngine.getGraph());
 
     let node = registry.infrastructure.graphEngine.getGraph().getNode(symbolId);
     

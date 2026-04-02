@@ -2,11 +2,15 @@ import fs from "fs-extra";
 import path from "node:path";
 import os from "node:os";
 
+import { ConducksComponent } from "@/registry/types.js";
+
 /**
- * The Conducksic Installer handles the automated synchronization 
- * of Conducks instructions (SKILL.md) to the IDE's skill directories.
+ * The Conducks Installer
  */
-export class ConducksInstaller {
+export class ConducksInstaller implements ConducksComponent {
+  public readonly id = 'conducks-installer';
+  public readonly type = 'analyzer';
+  public readonly description = 'Handles the automated synchronization of Conducks instructions (SKILL.md) to the IDE.';
   private readonly globalSkillsDir: string;
   private readonly workspaceSkillsDir: string;
 

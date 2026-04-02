@@ -266,14 +266,12 @@ export class ConducksGraph {
         }
     }
 
-    // Link the file (UNIT) to its immediate parent folder
+    // Link the file (unit) to its immediate parent folder
     const finalFolderId = `NAMESPACE::${currentPath.toLowerCase()}`;
     const fileNodeId = `${filePath}::unit`.toLowerCase();
     
     const fileNode = this.graph.getNode(fileNodeId);
     if (fileNode) {
-        // Conducks: UNIT Identity Fix (v1.6.5)
-        // Ensure the L2 node shows the actual filename, not the generic 'UNIT' string
         fileNode.properties.name = path.basename(filePath);
         fileNode.properties.displayName = path.basename(filePath);
     }
@@ -292,33 +290,29 @@ export class ConducksGraph {
         }
     }
 
-    // Cache relationships for the second-pass "Neural Binding"
+    // Process relationships with Canonical Identity Awareness
     for (const rel of spectrum.relationships) {
-      // Conducks.6: Absolute ID Awareness (The Great Binding)
-      // If the target is already a resolved absolute ID (path::symbol), use it directly.
       const isAbsolute = rel.targetName.includes('::');
       const isFileRef = rel.type === 'IMPORTS';
       
       let targetId: string;
       if (isAbsolute) {
-        targetId = `${rel.targetName.toLowerCase()}::unit`;
+        targetId = rel.targetName.toLowerCase();
+        // Ensure unit suffixes are correctly applied if missing from FQN
+        if (!targetId.includes('::')) targetId = `${targetId}::unit`;
       } else if (isFileRef) {
-        // Conducks: External/Absolute Resolution Guard
-        if (rel.targetName.startsWith('ECOSYSTEM::') || rel.targetName.includes('::')) {
-          targetId = rel.targetName.toLowerCase();
-        } else {
-          targetId = `${rel.targetName.toLowerCase()}::unit`;
-        }
+        targetId = `${rel.targetName.toLowerCase()}::unit`;
       } else {
+        // Local Reference: Default to current file scope
         targetId = `${filePath.toLowerCase()}::${rel.targetName.toLowerCase()}`;
       }
 
-      // Conducks.4: Unique IDs for symbol-level imports
-      const bindingSuffix = (isFileRef && rel.metadata?.name) ? `::${rel.metadata.name.toLowerCase()}` : '';
+      // Canonical Source Resolution (Default to 'unit')
+      const sourceId = `${filePath.toLowerCase()}::${(rel.sourceName || 'unit').toLowerCase()}`;
 
       this.graph.addEdge({
-        id: `${filePath.toLowerCase()}::${rel.sourceName.toLowerCase()}->${targetId}::${rel.type.toLowerCase()}${bindingSuffix}`,
-        sourceId: `${filePath.toLowerCase()}::${rel.sourceName.toLowerCase()}`,
+        id: `${sourceId}->${targetId}::${rel.type.toLowerCase()}`,
+        sourceId,
         targetId,
         type: rel.type as any,
         confidence: rel.confidence,
@@ -328,10 +322,11 @@ export class ConducksGraph {
   }
 
   /**
-   * Universal Workspace Resolver (Conducks)
+   * Conducks — Neural Binding (Simplified)
    * 
-   * Resolves temporary symbol IDs to their true origin by tracing imports 
-   * and exports across the Synapse.
+   * In the Two-Pass architecture, most symbols are resolved during Induction.
+   * This pass remains as a safety net for any remaining dynamic or cross-file
+   * ambiguities that weren't captured by the Symbol Registry.
    */
   private bindNeuralCircuits(): void {
     const allNodes = Array.from(this.graph.getAllNodes());
@@ -340,54 +335,14 @@ export class ConducksGraph {
       const outgoing = this.graph.getNeighbors(node.id, 'downstream');
 
       for (const edge of outgoing) {
-        if (edge.type === 'CALLS' || edge.type === 'ACCESSES' || edge.type === 'CONSTRUCTS' || edge.type === 'MEMBER_OF' || edge.type === 'TYPE_REFERENCE' || edge.type === 'EXTENDS' || edge.type === 'IMPLEMENTS') {
+        if (edge.type === 'CALLS' || edge.type === 'ACCESSES' || edge.type === 'CONSTRUCTS' || edge.type === 'TYPE_REFERENCE') {
           const rawTarget = edge.properties.rawTarget;
-          if (!rawTarget) continue;
+          if (!rawTarget || edge.targetId.includes('::')) continue; // Already resolved
 
-          // 1. Look for target in the same file
-          const localId = `${node.properties.filePath}::${rawTarget}`;
+          // Attempt local file resolution fallback
+          const localId = `${node.properties.filePath}::${rawTarget.toLowerCase()}`;
           if (this.graph.getNode(localId)) {
             edge.targetId = localId;
-            continue;
-          }
-
-          // 2. Trace Imports (Exhaustive Resolution)
-          // Conducks: We check BOTH the node's local imports and the file-level (global) imports.
-          const fileId = node.properties.filePath;
-          const globalId = `${fileId}::unit`;
-          const localImports = outgoing.filter(e => e.type === 'IMPORTS');
-          const fileImports = this.graph.getNeighbors(globalId, 'downstream').filter(e => e.type === 'IMPORTS');
-          const allImports = [...localImports, ...fileImports];
-
-          if (allImports.length > 0) {
-            this.log(`[NeuralBinding] Node ${node.id} is checking ${allImports.length} imports to resolve ${rawTarget}.`);
-          }
-
-          for (const imp of allImports) {
-            const targetFile = imp.targetId;
-            const cleanTargetFile = targetFile.replace('::unit', '');
-            const impName = imp.properties.name || path.basename(targetFile, path.extname(targetFile));
-            this.log(`[NeuralBinding]   - Checking import ${impName} from ${targetFile}`);
-
-            // Case A: Exact match (e.g., from X import Y -> call Y())
-            if (rawTarget === impName) {
-              this.log(`[NeuralBinding]   -> MATCH FOUND! Rebinding to ${cleanTargetFile}::${rawTarget}`);
-              const originId = `${cleanTargetFile}::${rawTarget}`;
-              if (this.graph.getNode(originId)) {
-                this.graph.rebindEdgeTarget(edge, originId);
-                break;
-              }
-            }
-
-            // Case B: Qualified match (e.g., import X -> call X.Y())
-            if (rawTarget.startsWith(impName + '.')) {
-              const symbolPart = rawTarget.slice(impName.length + 1);
-              const originId = `${cleanTargetFile}::${symbolPart}`;
-              if (this.graph.getNode(originId)) {
-                this.graph.rebindEdgeTarget(edge, originId);
-                break;
-              }
-            }
           }
         }
       }

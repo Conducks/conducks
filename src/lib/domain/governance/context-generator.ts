@@ -1,15 +1,15 @@
 import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
- * Conducks — Neural Context Generator 🧠
- * 
- * Generates an LLM-optimized architectural summary.
- * - generateFile(): Produced the 4000-token ARCHITECTURE.md.
- * - generateTop10Context(): Produces a structured Top-10 context for MCP.
+ * Conducks — Neural Context Generator
  */
-export class ContextGenerator {
+export class ContextGenerator implements ConducksComponent {
+  public readonly id = 'context-generator';
+  public readonly type = 'analyzer';
+  public readonly description = 'Generates LLM-optimized architectural summaries and localized structural context.';
   private readonly TOKEN_CAP_CHARS = 15000; // Roughly 4000 tokens
 
   private async getLatestPulseId(db: any): Promise<string | null> {

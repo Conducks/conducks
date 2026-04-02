@@ -4,15 +4,15 @@ import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { DAACClustering } from '@/lib/core/algorithms/clustering/daac.js';
 import { ConfigDetector } from './config-detector.js';
 import { ConducksSentinel } from './sentinel.js';
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
  * Conducks — Blueprint (AI-Readiness Generator)
- * 
- * Generates a dense project manifest designed for Generative 
- * Engine Optimization (GEO). It allows other AIs to understand 
- * the project instantly.
  */
-export class BlueprintGenerator {
+export class BlueprintGenerator implements ConducksComponent {
+  public readonly id = 'blueprint-generator';
+  public readonly type = 'analyzer';
+  public readonly description = 'Generates high-fidelity project manifests for structural intelligence and GEO.';
   private daac = new DAACClustering();
   private detector = new ConfigDetector();
   private sentinel = new ConducksSentinel();

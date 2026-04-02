@@ -17,7 +17,7 @@ export class HeritageProcessor {
     const relType = this.isInterfacePattern(heritage) ? 'IMPLEMENTS' : 'EXTENDS';
 
     spectrum.relationships.push({
-      sourceName: source,
+      sourceName: source || 'UNIT',
       targetName: heritage,
       type: relType,
       confidence: 1.0

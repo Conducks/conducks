@@ -1,10 +1,12 @@
-import { ConducksAdvisor, Advice } from "./advisor.js";
+import { ConducksAdvisor } from "./advisor.js";
+import type { Advice } from "@/types/domain.js";
 import { ConducksSentinel } from "./sentinel.js";
 import { ContextGenerator } from "./context-generator.js";
 import { BlueprintGenerator } from "./blueprint-generator.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { ConducksComponent } from "@/registry/types.js";
 import path from "node:path";
 
 /**
@@ -12,7 +14,11 @@ import path from "node:path";
  * 
  * Logic for architectural auditing, advisory, and context generation.
  */
-export class GovernanceService {
+export class GovernanceService implements ConducksComponent {
+  public readonly id = 'governance-service';
+  public readonly type = 'analyzer';
+  public readonly description = 'Orchestrates architectural auditing and structural advice.';
+
   constructor(
     private graph: ConducksAdjacencyList,
     private advisor: ConducksAdvisor,

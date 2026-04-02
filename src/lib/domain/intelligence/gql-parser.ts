@@ -1,4 +1,5 @@
 import { ConducksAdjacencyList, ConducksNode, EdgeType } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
  * Conducks — GQL (Graph Query Language) Parser
@@ -6,7 +7,10 @@ import { ConducksAdjacencyList, ConducksNode, EdgeType } from "@/lib/core/graph/
  * A simplified Cypher-like parser for structural pattern matching.
  * Syntax: (NodeLabel)-[:EDGE_TYPE]->(NodeLabel)
  */
-export class GQLParser {
+export class GQLParser implements ConducksComponent {
+  public readonly id = 'gql-parser';
+  public readonly type = 'analyzer';
+  public readonly description = 'Parses and executes structural graph queries.';
   /**
    * Executes a GQL query on the provided graph.
    */

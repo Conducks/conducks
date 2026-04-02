@@ -1,6 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
+import type { Advice } from "@/types/domain.js";
 
 /**
  * Conducks — Advise Command
@@ -10,9 +10,9 @@ export class AdviseCommand implements ConducksCommand {
   public description = "Get architectural recommendations";
   public usage = "registry advise";
 
-  public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     try {
-      const advice = await registry.audit.advise();
+      const advice: Advice[] = await registry.audit.advise();
       console.log(`\n\x1b[1m--- 💎 Conducks Architecture Advisor ---\x1b[0m`);
 
       if (advice.length === 0) {
@@ -20,7 +20,7 @@ export class AdviseCommand implements ConducksCommand {
         return;
       }
 
-      advice.forEach((a: any) => {
+      advice.forEach((a: Advice) => {
         const color = a.level === 'ERROR' ? '\x1b[31m' : a.level === 'WARNING' ? '\x1b[33m' : '\x1b[34m';
         console.log(`${color}- [${a.type}] ${a.message}\x1b[0m`);
         a.nodes.slice(0, 3).forEach((n: string) => console.log(`  └─ ${n}`));
@@ -28,7 +28,7 @@ export class AdviseCommand implements ConducksCommand {
       });
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks
-      await persistence.close();
+      await registry.infrastructure.persistence.close();
     }
   }
 }

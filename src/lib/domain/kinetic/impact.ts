@@ -1,15 +1,13 @@
 import { BaseAnalyzer } from './trace.js';
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
  * Conducks — Blast Radius Analyzer
- * 
- * Calculates the recursive impact of changing a node in the codebase.
- * It traverses the 'upstream' (callers/importers) graph to find
- * all potentially affected symbols.
  */
-export class BlastRadiusAnalyzer extends BaseAnalyzer {
+export class BlastRadiusAnalyzer extends BaseAnalyzer implements ConducksComponent {
   public readonly id = 'blast-radius-analyzer';
+  public readonly description = 'Calculates the recursive structural impact and risk score of changes.';
 
   /**
    * Conducks — Weighted Blast Radius

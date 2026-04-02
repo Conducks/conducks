@@ -14,13 +14,15 @@ import { mapToCanonical, CanonicalKind, CanonicalRank } from "@/lib/core/parsing
 import path from "node:path";
 
 
+import { ConducksComponent } from "@/registry/types.js";
+
 /**
- * Conducks — Structural Reflector (v5 Modular Evolution) 💎
- * 
- * The core engine that mirrors source code and delegates semantic
- * tasks to specialized processors.
+ * Conducks — Structural Reflector
  */
-export class ConducksReflector {
+export class ConducksReflector implements ConducksComponent {
+  public readonly id = 'structural-reflector';
+  public readonly type = 'analyzer';
+  public readonly description = 'Analyzes source code units and reflects their structure into a Synapse graph.';
   private imports = new ImportProcessor();
   private bindings = new BindingProcessor();
   private calls = new CallProcessor();
@@ -82,51 +84,28 @@ export class ConducksReflector {
     // Conducks.6: Clinical Scope Initialization
     context.clearLocalBindings();
 
-    // === Pass 1: Build Node Cache & Scope Map ===
-    // Map from source-row to enclosing scope name for correct call attribution
+    // === Pass 1: Build Scope Map ===
     type ScopeEntry = { name: string; startRow: number; endRow: number };
     const scopeMap: ScopeEntry[] = [];
 
     for (const match of matches) {
-      if (!match || !match.captures) continue;
-
-      // Conducks: Fix node identity resolution. 
-      // Prioritize explicit name captures over structural kind captures.
-      const nameCap = match.captures.find((c: any) => c.name === 'name' || c.name === 'pulse_assignment_name') ||
-        match.captures.find((c: any) => c.name === 'isFunction' || c.name === 'isClass');
-
-      if (!nameCap || !nameCap.node) continue;
-
-      const name = nameCap.node.text;
-      if (!name) continue;
-
-      const nodeId = `${file.path.toLowerCase()}::${name.toLowerCase()}`;
-
-      if (!nodeCache.has(nodeId)) {
-        // Determine if this match is a function or class definition to capture full body range
-        const isScoped = match.captures.some((c: any) => c.name === 'isFunction' || c.name === 'isClass');
-        let rangeNode = nameCap.node;
-        if (isScoped && nameCap.node.parent) {
-          rangeNode = nameCap.node.parent;
-        }
-
-        const canonical = mapToCanonical('variable');
-        nodeCache.set(nodeId, {
-          name,
-          kind: 'variable',
-          canonicalKind: canonical.kind,
-          canonicalRank: canonical.rank,
-          range: {
-            start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
-            end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
-          },
-          filePath: file.path,
-          isExport: true,
-          metadata: { isTest: isTestFile }
-        });
-
-        if (isScoped && nameCap.node.parent) {
-          scopeMap.push({ name, startRow: rangeNode.startPosition.row, endRow: rangeNode.endPosition.row });
+      const isScoped = match.captures.some((c: any) => 
+        c.name === 'isFunction' || 
+        c.name === 'isClass' || 
+        c.name === 'isMethod' || 
+        c.name === 'isInterface' || 
+        c.name === 'isEnum'
+      );
+      if (isScoped) {
+        const nameCap = match.captures.find((c: any) => c.name === 'name');
+        if (nameCap && nameCap.node) {
+          const name = nameCap.node.text;
+          const rangeNode = nameCap.node.parent || nameCap.node;
+          scopeMap.push({ 
+            name, 
+            startRow: rangeNode.startPosition.row, 
+            endRow: rangeNode.endPosition.row 
+          });
         }
       }
     }
@@ -143,13 +122,69 @@ export class ConducksReflector {
           }
         }
       }
-      return best?.name ?? path.basename(file.path);
+      return best ? best.name : '';
     };
 
-    // === Pass 2: Semantic Dispatch ===
+    // === Pass 2: Semantic Pulse (Implementation & Binding) ===
     for (const match of matches) {
-      const nameCap = match.captures.find((c: any) => c.name === 'name');
-      const node = nameCap ? nodeCache.get(`${file.path.toLowerCase()}::${nameCap.node.text.toLowerCase()}`) : undefined;
+      if (!match || !match.captures) continue;
+
+      const currentMatchRow = match.captures[0].node.startPosition.row;
+      const matchNameCap = match.captures.find((c: any) => c.name === 'name' || c.name === 'pulse_assignment_name');
+      
+      let node: any;
+      if (matchNameCap && matchNameCap.node) {
+        const name = matchNameCap.node.text;
+        const scope = getScopeAt(currentMatchRow, name);
+        const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
+        const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
+        
+        // Conducks.5: Identity Isolation (Lazy-init only for actual Definitions)
+        const isDefinition = match.captures.some((c: any) => 
+          c.name.startsWith('is') && 
+          c.name !== 'isImport' && 
+          c.name !== 'isExported'
+        );
+
+        if (isDefinition) {
+           // Pass 1: Global Discovery
+           if (context.isDiscoveryMode()) {
+             context.registerGlobalSymbol(scopedId, { name, kind: 'unknown', filePath: file.path });
+           }
+
+           if (!nodeCache.has(scopedId)) {
+             const isScoped = match.captures.some((c: any) => c.name === 'isFunction' || c.name === 'isClass' || c.name === 'isMethod');
+             let rangeNode = matchNameCap.node;
+             if (isScoped && matchNameCap.node.parent) {
+               rangeNode = matchNameCap.node.parent;
+             }
+
+             nodeCache.set(scopedId, {
+               name,
+               kind: 'variable',
+               canonicalKind: mapToCanonical('variable').kind,
+               canonicalRank: mapToCanonical('variable').rank,
+               range: {
+                 start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
+                 end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
+               },
+               filePath: file.path,
+               isExport: false,
+               metadata: { isTest: isTestFile, isExport: false }
+             });
+           }
+        }
+        node = nodeCache.get(scopedId);
+      }
+
+      // If we are only in Discovery Mode, we skip relationship establishment
+      if (context.isDiscoveryMode()) continue;
+      
+      // Conducks.4: Identity Elevation - Capture export status from pass
+      if (node && match.captures.some((c: any) => c.name === 'isExported')) {
+        node.isExport = true;
+        node.metadata.isExport = true;
+      }
 
       const captureMap: Record<string, string> = {};
       const args: string[] = [];
@@ -158,8 +193,6 @@ export class ConducksReflector {
         captureMap[c.name] = c.node.text;
         if (c.name === 'kinesis_arg') args.push(c.node.text);
       });
-
-      const captureRow = match.captures[0].node.startPosition.row;
 
       for (const capture of match.captures) {
         const cName = capture.name;
@@ -182,7 +215,9 @@ export class ConducksReflector {
                   if (cap.name === 'name') {
                     const aliasCap = (i + 1 < match.captures.length && match.captures[i+1].name === 'alias') 
                       ? match.captures[i+1] : undefined;
-                    this.imports.processBinding(resolved as string, cap.node.text, aliasCap ? aliasCap.node.text : cap.node.text, spectrum, context);
+                    const bindingName = cap.node.text.toLowerCase();
+                    const aliasName = aliasCap ? aliasCap.node.text.toLowerCase() : bindingName;
+                    this.imports.processBinding(resolved as string, bindingName, aliasName, spectrum, context);
                   }
                 }
                 // Also process the file-level import edge
@@ -203,6 +238,13 @@ export class ConducksReflector {
             node.metadata.canonicalRank = canonical.rank;
             node.metadata.displayName = node.name; // Preserve for UI
 
+            // Update Registry with the discovered kind for better resolution
+            const scope = getScopeAt(currentMatchRow, node.name);
+            const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
+            const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${node.name.toLowerCase()}`;
+            const registryEntry = context.getGlobalSymbol(scopedId);
+            if (registryEntry) registryEntry.kind = kind;
+
             // Conducks: Structural Complexity Signal
             if (provider.calculateComplexity && (kind === 'function' || kind === 'method' || kind === 'class')) {
               const comp = provider.calculateComplexity(capture.node);
@@ -220,26 +262,35 @@ export class ConducksReflector {
           this.bindings.processAlias(node.name, cText, spectrum);
         }
         else if (cName === 'kinesis_target' || cName === 'kinesis_qualified_target') {
-          const scope = getScopeAt(captureRow);
-          const type = this.calls.isConstructor(cText, provider) ? 'CONSTRUCTS' : 'CALLS';
-          this.calls.process(cText, scope, type, spectrum, args, context);
+          const scope = getScopeAt(currentMatchRow);
+          
+          // Conducks.6: Qualified Resolve (Object.Property)
+          let finalTarget = cText;
+          if (captureMap['kinesis_object']) {
+            finalTarget = `${captureMap['kinesis_object']}.${cText}`;
+          }
+
+          const type = this.calls.isConstructor(finalTarget, provider) ? 'CONSTRUCTS' : 'CALLS';
+          this.calls.process(finalTarget, scope, type, spectrum, args, context);
         }
 
 
         // 3. Phase 2: Flow Dispatch
         else if (cName === 'pulse_assignment_name') {
           const val = captureMap['pulse_assignment_value'] ?? 'unknown';
-          const scope = getScopeAt(captureRow);
-          this.flow.processAssignment(cText, val, scope, spectrum);
+          const scopeName = getScopeAt(currentMatchRow);
+          this.flow.processAssignment(cText, val, scopeName, spectrum);
         }
         else if (cName === 'kinesis_route') {
           const path = captureMap['kinesis_route_path'] ?? '/';
           const method = captureMap['route_method'] ?? 'GET';
-          const scope = getScopeAt(captureRow);
-          this.flow.processRoute(path, method, scope, spectrum, context.getFramework());
+          const scopeName = getScopeAt(currentMatchRow);
+          this.flow.processRoute(path, method, scopeName, spectrum, context.getFramework());
 
           // Conducks: Promote Logical Routes to Active Entry Points
-          const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scope.toLowerCase()}`);
+          const scope = getScopeAt(currentMatchRow);
+          const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
+          const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scopePrefix}${scope ? scope.toLowerCase() : 'unit'}`);
           if (targetNode) {
             targetNode.metadata.isEntryPoint = true;
           }
@@ -247,20 +298,22 @@ export class ConducksReflector {
         else if (cName === 'kinesis_request') {
           const url = captureMap['kinesis_request_url'] ?? '/';
           const method = captureMap['req_method'] ?? 'GET';
-          const scope = getScopeAt(captureRow);
-          this.flow.processRequest(url, method, scope, spectrum);
+          const scopeName = getScopeAt(currentMatchRow);
+          this.flow.processRequest(url, method, scopeName, spectrum);
         }
         else if (cName === 'pulse_type_target') {
-          const scope = getScopeAt(captureRow);
-          this.calls.process(cText, scope, 'USES' as any, spectrum, [], context);
+          const scope = getScopeAt(currentMatchRow);
+          this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum, [], context);
         }
 
         // 4. Phase 3.2: Debt Dispatch
         else if (cName === 'comment' && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
-            const scope = getScopeAt(captureRow);
-            const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scope.toLowerCase()}`);
+            const scopeName = getScopeAt(currentMatchRow);
+            const scopePrefix = scopeName ? `${scopeName.toLowerCase()}.` : '';
+            const targetId = `${file.path.toLowerCase()}::${scopePrefix}${scopeName ? scopeName.toLowerCase() : 'unit'}`;
+            const targetNode = nodeCache.get(targetId);
             if (targetNode) {
               if (!targetNode.metadata.debtMarkers) targetNode.metadata.debtMarkers = [];
               targetNode.metadata.debtMarkers.push(...markers);
@@ -275,15 +328,15 @@ export class ConducksReflector {
     spectrum.nodes = [...spectrum.nodes, ...nodeCache.values()];
 
     // Conducks.5: Structural Membership Binding (Parent -> Child)
-    const fileAnchorName = path.basename(file.path);
-    for (const node of nodeCache.values()) {
-      if (node.name === fileAnchorName) continue;
-      const scope = getScopeAt(node.range.start.line - 1, node.name);
-      
-      // Conducks: Hierarchical Unification (L2-L7 Parentage)
-      if (scope && scope !== node.name) {
+    if (!context.isDiscoveryMode()) {
+      const fileAnchorName = path.basename(file.path);
+      for (const node of nodeCache.values()) {
+        if (node.name === fileAnchorName || node.name === 'UNIT') continue;
+        const scope = getScopeAt(node.range.start.line - 1, node.name);
+        
+        // Conducks: Hierarchical Unification (L2-L7 Parentage)
         spectrum.relationships.push({
-          sourceName: scope,
+          sourceName: scope || 'unit',
           targetName: node.name,
           type: 'MEMBER_OF',
           confidence: 1.0
@@ -291,62 +344,65 @@ export class ConducksReflector {
       }
     }
 
-    // Conducks: Ingest Kinetic Git Signals
-    const resonance = await chronicle.getCommitResonance(file.path);
-    const distribution = await chronicle.getAuthorDistribution(file.path);
-    const blameData = await chronicle.getBlameData(file.path);
-    const entropyRaw = calculateShannonEntropy(distribution);
-    const entropyRisk = normalizeEntropyRisk(entropyRaw, Object.keys(distribution).length);
-    const now = Math.floor(Date.now() / 1000);
+    // Conducks: Ingest Kinetic Git Signals (Only in Resolution Mode)
+    if (!context.isDiscoveryMode()) {
+      const resonance = await chronicle.getCommitResonance(file.path);
+      const distribution = await chronicle.getAuthorDistribution(file.path);
+      const blameData = await chronicle.getBlameData(file.path);
+      const entropyRaw = calculateShannonEntropy(distribution);
+      const entropyRisk = normalizeEntropyRisk(entropyRaw, Object.keys(distribution).length);
+      const now = Math.floor(Date.now() / 1000);
 
-    for (const n of spectrum.nodes) {
-      // 1. File-level Kinetic Signals
-      n.metadata.resonance = resonance.count;
-      n.metadata.entropy = entropyRisk;
-      (n as any).resonance = resonance.count;
-      (n as any).entropy = entropyRisk;
+      for (const n of spectrum.nodes) {
+        // 1. File-level Kinetic Signals
+        n.metadata.resonance = resonance.count;
+        n.metadata.entropy = entropyRisk;
+        (n as any).resonance = resonance.count;
+        (n as any).entropy = entropyRisk;
 
-      // 2. Symbol-level Blame Attribution
-      const startLine = n.range.start.line;
-      const endLine = n.range.end.line;
-      const authors: Record<string, number> = {};
-      let latestTime = 0;
-      let earliestTime = now;
+        // 2. Symbol-level Blame Attribution
+        const startLine = n.range.start.line;
+        const endLine = n.range.end.line;
+        const authors: Record<string, number> = {};
+        let latestTime = 0;
+        let earliestTime = now;
 
-      for (let line = startLine; line <= endLine; line++) {
-        const meta = blameData[line];
-        if (meta) {
-          authors[meta.author] = (authors[meta.author] || 0) + 1;
-          if (meta.timestamp > latestTime) latestTime = meta.timestamp;
-          if (meta.timestamp < earliestTime) earliestTime = meta.timestamp;
+        for (let line = startLine; line <= endLine; line++) {
+          const meta = blameData[line];
+          if (meta) {
+            authors[meta.author] = (authors[meta.author] || 0) + 1;
+            if (meta.timestamp > latestTime) latestTime = meta.timestamp;
+            if (meta.timestamp < earliestTime) earliestTime = meta.timestamp;
+          }
         }
-      }
 
-      const authorEntries = Object.entries(authors);
-      if (authorEntries.length > 0) {
-        authorEntries.sort((a, b) => b[1] - a[1]);
-        const primary = authorEntries[0][0];
-        const count = authorEntries.length;
-        const tenure = Math.floor((now - earliestTime) / 86400);
+        const authorEntries = Object.entries(authors);
+        if (authorEntries.length > 0) {
+          authorEntries.sort((a, b) => b[1] - a[1]);
+          const primary = authorEntries[0][0];
+          const count = authorEntries.length;
+          const tenure = Math.floor((now - earliestTime) / 86400);
 
-        n.metadata.primaryAuthor = primary;
-        n.metadata.authorCount = count;
-        n.metadata.lastModified = latestTime;
-        n.metadata.tenureDays = tenure > 0 ? tenure : 0;
+          n.metadata.primaryAuthor = primary;
+          n.metadata.authorCount = count;
+          n.metadata.lastModified = latestTime;
+          n.metadata.tenureDays = tenure > 0 ? tenure : 0;
 
-        // Legacy/Aliased support for persistence
-        (n as any).primaryAuthor = primary;
-        (n as any).authorCount = count;
-        (n as any).lastModified = latestTime;
-        (n as any).tenureDays = n.metadata.tenureDays;
+          // Legacy/Aliased support for persistence
+          (n as any).primaryAuthor = primary;
+          (n as any).authorCount = count;
+          (n as any).lastModified = latestTime;
+          (n as any).tenureDays = n.metadata.tenureDays;
+        }
       }
     }
 
-    // Seed Context for topological resolution
-    spectrum.nodes.forEach(n => context.registerSymbol(`${file.path.toLowerCase()}::${n.name.toLowerCase()}`, n));
-    spectrum.relationships.filter(r => r.type === 'IMPORTS').forEach(r => {
-      context.registerImport(file.path.toLowerCase(), r.targetName.toLowerCase());
-    });
+    // Seed Import Map (Only in Discovery Mode)
+    if (context.isDiscoveryMode()) {
+       spectrum.relationships.filter(r => r.type === 'IMPORTS').forEach(r => {
+         context.registerImport(file.path.toLowerCase(), r.targetName.toLowerCase());
+       });
+    }
 
     return spectrum;
   }

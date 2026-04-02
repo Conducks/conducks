@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 import { TraceAnalyzer } from "@/lib/domain/kinetic/trace.js";
 
 /**
@@ -11,7 +10,7 @@ export class ContextCommand implements ConducksCommand {
   public description = "View symbol relationships and technical flows";
   public usage = "registry context <symbolId>";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];
     if (!symbolId) {
       console.error("Error: Please provide a symbol ID (filePath::name) to trace.");
@@ -20,7 +19,8 @@ export class ContextCommand implements ConducksCommand {
 
     try {
       const g = registry.query.graph.getGraph();
-      await persistence.load(g);
+      // Structural Sync via Registry Bridge
+      await registry.infrastructure.persistence.load(g);
       const analyzer = new TraceAnalyzer(g);
       const steps = analyzer.trace(symbolId);
       
@@ -36,7 +36,7 @@ export class ContextCommand implements ConducksCommand {
       });
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks
-      await persistence.close();
+      await registry.infrastructure.persistence.close();
     }
   }
 }

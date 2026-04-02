@@ -11,8 +11,11 @@ export class AnalyzeContext {
   /** Map of folder paths to their constituent files */
   private folderMap: Map<string, Set<string>> = new Map();
 
-  /** Global Symbol Table (Symbols discovered during Pass 2) */
-  private symbolTable: Map<string, any> = new Map();
+  /** 
+   * Global Symbol Registry (The "Discovery" Cache)
+   * Maps FQN (package::module::symbol) to its discovered metadata.
+   */
+  private registry: Map<string, any> = new Map();
 
   /** Known External Packages (pip, npm) discovered during Essence refraction */
   private externalPackages: Set<string> = new Set();
@@ -23,6 +26,21 @@ export class AnalyzeContext {
   /** Local Symbol Bindings (current file only) — Maps LocalName to SourcePath */
   private localBindings: Map<string, string> = new Map();
 
+  /** Analysis Mode: Discovery (Pass 1) vs Resolution (Pass 2) */
+  private discoveryMode: boolean = false;
+
+  public setDiscoveryMode(active: boolean): void {
+    this.discoveryMode = active;
+  }
+
+  public isDiscoveryMode(): boolean {
+    return this.discoveryMode;
+  }
+
+  public isResolutionMode(): boolean {
+    return !this.discoveryMode;
+  }
+
   /**
    * Registers a dependency relationship.
    */
@@ -32,10 +50,24 @@ export class AnalyzeContext {
   }
 
   /**
-   * Registers a symbol in the global table for cross-file resolution.
+   * Registers a symbol in the global registry for cross-file resolution.
    */
-  public registerSymbol(symbolId: string, node: any): void {
-    this.symbolTable.set(symbolId, node);
+  public registerGlobalSymbol(fqn: string, metadata: any): void {
+    this.registry.set(fqn.toLowerCase(), metadata);
+  }
+
+  /**
+   * Returns a specific global symbol if found.
+   */
+  public getGlobalSymbol(fqn: string): any | undefined {
+    return this.registry.get(fqn.toLowerCase());
+  }
+
+  /**
+   * Checks if an FQN exists in the registry.
+   */
+  public hasGlobalSymbol(fqn: string): boolean {
+    return this.registry.has(fqn.toLowerCase());
   }
 
   /**
@@ -43,13 +75,6 @@ export class AnalyzeContext {
    */
   public getImportMap(): Map<string, Set<string>> {
     return this.importMap;
-  }
-
-  /**
-   * Returns a specific symbol if found.
-   */
-  public getSymbol(symbolId: string): any | undefined {
-    return this.symbolTable.get(symbolId);
   }
 
   /**
@@ -63,7 +88,6 @@ export class AnalyzeContext {
    * Returns whether a name is a known external package.
    */
   public isExternalPackage(name: string): boolean {
-    // Handle both exact match and sub-module matches (e.g. 'requests' or 'requests.models')
     const root = name.split('.')[0];
     return this.externalPackages.has(root);
   }
@@ -77,21 +101,21 @@ export class AnalyzeContext {
   }
 
   /**
-   * Conducks.6: Registers a local symbol-to-source mapping for the current unit.
+   * Registers a local symbol-to-source mapping for the current unit.
    */
   public registerLocalBinding(localName: string, sourcePath: string): void {
-    this.localBindings.set(localName, sourcePath);
+    this.localBindings.set(localName.toLowerCase(), sourcePath.toLowerCase());
   }
 
   /**
-   * Conducks.6: Resolves a local symbol name to its absolute source path.
+   * Resolves a local symbol name to its absolute source path.
    */
   public resolveLocalBinding(localName: string): string | undefined {
-    return this.localBindings.get(localName);
+    return this.localBindings.get(localName.toLowerCase());
   }
 
   /**
-   * Conducks.6: Clears local bindings (scoped to a single file reflection).
+   * Clears local bindings (scoped to a single file reflection).
    */
   public clearLocalBindings(): void {
     this.localBindings.clear();
@@ -103,8 +127,9 @@ export class AnalyzeContext {
   public reset(): void {
     this.importMap.clear();
     this.folderMap.clear();
-    this.symbolTable.clear();
+    this.registry.clear();
     this.externalPackages.clear();
     this.framework = null;
+    this.discoveryMode = false;
   }
 }

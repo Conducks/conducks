@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Query Command
@@ -10,7 +9,7 @@ export class QueryCommand implements ConducksCommand {
   public description = "Search code (use --gql for patterns)";
   public usage = "conducks query <text> [--gql]";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const queryInput = args[0];
     if (!queryInput) {
       console.error("Error: Please provide a search query.");
@@ -19,7 +18,8 @@ export class QueryCommand implements ConducksCommand {
     const isGQL = args.includes('--gql');
     const query = args.filter(a => a !== '--gql').join(" ");
 
-    await persistence.load(registry.query.graph.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     if (isGQL) {
       const results = registry.query.parseGQL(query);

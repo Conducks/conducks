@@ -2,11 +2,15 @@ import fs from "fs-extra";
 import path from "node:path";
 import os from "node:os";
 
+import { ConducksComponent } from "@/registry/types.js";
+
 /**
- * Automates the registration of the Conducks MCP server 
- * in the user's IDE configuration (Claude Desktop, etc.).
+ * Conducks — MCP Configurator
  */
-export class MCPConfigurator {
+export class MCPConfigurator implements ConducksComponent {
+  public readonly id = 'mcp-configurator';
+  public readonly type = 'analyzer';
+  public readonly description = 'Automates the anchoring of the Model Context Protocol in AI desktop environments.';
   private readonly claudeConfigPath: string;
 
   constructor(

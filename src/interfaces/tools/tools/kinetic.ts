@@ -188,7 +188,7 @@ WHEN TO USE: Generating visual documentation or exploring structural clusters.`,
     handler: async ({ layers, path: customPath }: any) => {
       try {
         const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-        const wave = await registry.mirror.getWave(layers);
+        const wave = await (registry.mirror as any).getVisualWave(layers);
         return { ...wave, indexStaleness: registry.audit.status().staleness.stale };
       } catch (err: any) {
         return { error: `Mirror Wave Generation Failed: ${err.message}` };

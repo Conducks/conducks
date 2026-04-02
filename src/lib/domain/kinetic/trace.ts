@@ -5,9 +5,11 @@ import { ConducksComponent } from '@/registry/types.js';
  * Structural Priority Queue (Min-Heap)
  * 
  * Optimized for Dijkstra traversals in large structural graphs.
- * Provides O(log N) insertion and extraction.
  */
-class PriorityQueue<T extends { weight: number }> {
+export class PriorityQueue<T extends { weight: number }> implements ConducksComponent {
+  public readonly id = 'priority-queue';
+  public readonly type = 'resolver';
+  public readonly description = 'Optimized Min-Heap for structural graph traversals.';
   private heap: T[] = [];
 
   public push(item: T): void {
@@ -127,11 +129,10 @@ export abstract class BaseAnalyzer implements ConducksComponent {
 
 /**
  * Conducks — Trace Analyzer
- * 
- * Provides high-fidelity execution tracing and pathfinding.
  */
-export class TraceAnalyzer extends BaseAnalyzer {
+export class TraceAnalyzer extends BaseAnalyzer implements ConducksComponent {
   public readonly id = 'trace-analyzer';
+  public readonly description = 'Provides high-fidelity execution tracing and risk-weighted pathfinding.';
 
   constructor(private readonly graph?: ConducksAdjacencyList) {
     super();

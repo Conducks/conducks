@@ -1,13 +1,15 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
  * Conducks — Test Aligner (Conducks) 🧪
  * 
  * Bridging the gap between tests and production logic.
- * Traces outgoing edges from test files to identify which structural 
- * symbols are covered by which test suites.
  */
-export class TestAligner {
+export class TestAligner implements ConducksComponent {
+  public readonly id = 'test-aligner';
+  public readonly type = 'analyzer';
+  public readonly description = 'Traces test coverage by mapping test suites to structural production logic.';
   /**
    * Aligns the graph by populating 'coveredBy' property on production nodes.
    */

@@ -1,11 +1,16 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksComponent } from "@/registry/types.js";
 
 /**
  * Conducks — Technical Flow Engine
  * 
  * High-fidelity execution flow tracing across the graph.
  */
-export class ConducksFlowEngine {
+export class ConducksFlowEngine implements ConducksComponent {
+  public readonly id = 'flow-engine';
+  public readonly type = 'analyzer';
+  public readonly description = 'Orchestrates high-fidelity execution flow tracing across the graph.';
+
   constructor(private readonly graph: ConducksAdjacencyList) {}
 
   /**

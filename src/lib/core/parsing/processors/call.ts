@@ -1,6 +1,7 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
+import { isBuiltIn, getGlobalId } from "../built-ins.js";
 
 /**
  * Conducks — Call Processor
@@ -14,19 +15,31 @@ export class CallProcessor {
   public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: AnalyzeContext): void {
     if (!target) return;
 
-    let targetName = target;
+    let targetId = target.toLowerCase();
+    const langId = spectrum.metadata.language || 'typescript';
 
-    // Conducks.6: Perform Cross-Module Symbol Resolution (The Great Binding)
-    if (context) {
-      const resolvedPath = context.resolveLocalBinding(target);
+    // Conducks.6: Deterministic Symbol Resolution (The Great Binding)
+    if (context && context.isResolutionMode()) {
+      const lowTarget = target.toLowerCase();
+      
+      // 1. Resolve Local Bindings (Imports/Aliases)
+      const resolvedPath = context.resolveLocalBinding(lowTarget);
       if (resolvedPath) {
-        targetName = `${resolvedPath}::${target}`;
+        targetId = `${resolvedPath}::${lowTarget}`;
+      } 
+      // 2. Resolve Global Atmosphere (Built-ins like 'process', 'os')
+      else if (isBuiltIn(target, langId)) {
+        targetId = getGlobalId(target);
+      }
+      // 3. Fallback to Local/Naked Symbol (Will be qualified in graph ingestion)
+      else {
+        targetId = lowTarget;
       }
     }
 
     spectrum.relationships.push({
-      sourceName: source || 'UNIT',
-      targetName: targetName,
+      sourceName: (source || 'unit').toLowerCase(),
+      targetName: targetId,
       type: type,
       confidence: 0.85,
       metadata: { arguments: args, original: target }

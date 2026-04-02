@@ -34,7 +34,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
 
   /**
    * Orchestrates a high-fidelity structural analysis on the provided files.
-   * Standardized naming: analyze()
+   * Universal Two-Pass Resolution Architecture (Discovery -> Induction)
    */
   public async analyze(files: Array<{ path: string, source: string }>): Promise<string> {
     this.context.reset();
@@ -49,56 +49,53 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       logger.info(`Structural Ignore: Excluding ${files.length - activeFiles.length} units from the structural wave.`);
     }
 
-    // Path Normalization & Canonical Identity
-    // We preserve casing for Linux compatibility while resolving relative paths
-    const normalizedFiles = activeFiles.map(f => {
-      if (!f || !f.path) {
-        throw new Error(`[Conducks] Structural integrity failure: Received null or undefined file path during analyze.`);
-      }
-      return { path: path.resolve(f.path), source: f.source };
-    });
-    
+    const normalizedFiles = activeFiles.map(f => ({ path: path.resolve(f.path), source: f.source }));
     const allPaths = normalizedFiles.map(f => f.path);
     const spectra = new Map<string, any>();
-    const pulseErrors: string[] = [];
 
     // Adaptive Memory Pressure Calculation
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
     const isLargeProject = normalizedFiles.length > 100;
     const useShallowMode = memoryUsage > 1000 || isLargeProject;
 
-    if (useShallowMode) {
-      logger.info(`Adaptive Scaling: Engaging Shallow Internalization (RAM: ${Math.round(memoryUsage)}MB, Files: ${normalizedFiles.length})`);
-    }
-
-    // Step 1: Pre-Pulse Discovery & Single-Pass Reflection
-    let indexCount = 0;
+    // === Pass 1: Global Discovery Pulse ===
+    // We traverse all units to identify Definitions and populate the Symbol Registry.
+    logger.info(`[Phase 1] Structural Discovery: Mapping ${normalizedFiles.length} units...`);
+    context.setDiscoveryMode(true);
+    let discoveryCount = 0;
     for (const file of normalizedFiles) {
       try {
-        indexCount++;
-        // Periodic Milestone Log: Providing structural visibility for large projects.
-        if (indexCount % 100 === 0 || indexCount === normalizedFiles.length) {
-          logger.info(`Structural Analysis: Reflecting unit ${indexCount}/${normalizedFiles.length} (${Math.round((indexCount / normalizedFiles.length) * 100)}%)...`);
-        }
+        discoveryCount++;
+        const provider = this.registry.getProvider(file.path);
+        if (!provider) continue;
+        await this.reflector.reflect(file, provider, context, allPaths);
+        if (discoveryCount % 100 === 0) logger.info(`Discovery Pulse: ${discoveryCount}/${normalizedFiles.length}...`);
+      } catch (err) {
+        logger.warn(`Discovery Warning: Failed to discover ${file.path}. Symbol table may be incomplete for this unit.`);
+      }
+    }
 
-        // Filename-Aware Provider Mapping
+    // === Pass 2: Structural Induction (Resolution) ===
+    // We re-traverse units toEstablish relationships against the Global Registry.
+    logger.info(`[Phase 2] Structural Induction: Establishing referential integrity...`);
+    context.setDiscoveryMode(false);
+    let inductionCount = 0;
+    for (const file of normalizedFiles) {
+      try {
+        inductionCount++;
         const provider = this.registry.getProvider(file.path);
         if (!provider) continue;
 
         const spectrum = await this.reflector.reflect(file, provider, context, allPaths);
         
-        // Streaming Persistence
-        // We write the 'Meat' to disk immediately to free up RAM if needed
         if (this.persistence && useShallowMode) {
           await this.persistence.saveSpectrum(file.path, spectrum);
         }
 
         spectra.set(file.path, spectrum);
+        if (inductionCount % 100 === 0) logger.info(`Induction Pulse: ${inductionCount}/${normalizedFiles.length}...`);
       } catch (err: any) {
-        pulseErrors.push(`${file.path}: ${err.message}`);
-        logger.warn(`Pulse Warning: Failed to reflect ${file.path}. Structural unit may be missing from this wave.`, err);
-        
-        // Materialize a "Broken Unit" node to prevent total structural collapse
+        logger.warn(`Induction Warning: Failed to induce ${file.path}. Structural unit may be missing.`, err);
         this.graph.ingestSpectrum(file.path, {
           nodes: [{
             name: 'CORRUPT_UNIT',
@@ -113,10 +110,8 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       }
     }
 
-    // Step 2: Topological Leveling
+    // Step 3: Topological Leveling & Batch Ingestion
     const levels = ConducksPipeline.topologicalSort(context.getImportMap(), allPaths);
-
-    // Step 3: Batch-Parallel Ingestion
     for (const level of levels) {
       const tasks = level.map(async (filePath) => {
         const spectrum = spectra.get(filePath);
@@ -126,7 +121,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       await Promise.all(tasks);
     }
 
-    // Step 4: Final Resonance
+    // Step 4: Final Resonance (Pruning and Resonance Gravity)
     this.resonate();
 
     const head = (this.graph.getGraph() as any).getMetadata('head') || Date.now().toString();

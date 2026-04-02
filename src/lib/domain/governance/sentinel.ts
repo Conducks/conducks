@@ -26,7 +26,12 @@ export interface SentinelReport {
   coverage?: Record<string, number>; // Summary of framework usage
 }
 
-export class ConducksSentinel {
+import { ConducksComponent } from "@/registry/types.js";
+
+export class ConducksSentinel implements ConducksComponent {
+  public readonly id = 'structural-sentinel';
+  public readonly type = 'analyzer';
+  public readonly description = 'A logic-based structural validator that enforces architectural governance.';
   constructor(private readonly fileSystem: any = fs) { }
   /**
    * Validates a graph against a set of structural policies.

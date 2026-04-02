@@ -1,4 +1,5 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksComponent } from "@/registry/types.js";
 
 export interface Finding {
   type: 'ORPHAN' | 'UNUSED_EXPORT' | 'UNREACHABLE_LOGIC' | 'STALE_IMPORT';
@@ -13,7 +14,10 @@ export interface Finding {
  * Logic for identifying unused, orphaned, and unreachable 
  * structural elements across the Synapse.
  */
-export class DeadCodeAnalyzer {
+export class DeadCodeAnalyzer implements ConducksComponent {
+  public readonly id = 'dead-code-analyzer';
+  public readonly type = 'analyzer';
+  public readonly description = 'Identifiers unused, orphaned, and unreachable structural elements.';
   /**
    * Scans the entire graph for structural dead weight.
    */

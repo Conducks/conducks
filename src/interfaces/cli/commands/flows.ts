@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Flows Command (Behavioral Processes)
@@ -10,8 +9,10 @@ export class FlowsCommand implements ConducksCommand {
   public description = "List behavioral processes across the Synapse";
   public usage = "registry flows";
 
-  public async execute(_args: string[], persistence: SynapsePersistence): Promise<void> {
-    await persistence.load(registry.query.graph.getGraph());
+  public async execute(_args: string[], registry: Registry): Promise<void> {
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    
     const processes = registry.kinetic.getProcesses();
     console.log("\x1b[1m--- 🌊 Behavioral Processes ---\x1b[0m");
     

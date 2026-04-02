@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { registry } from "@/registry/index.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import type { Registry } from "@/registry/index.js";
 
 /**
  * Conducks — Trace (Lineage) Command
@@ -12,7 +11,7 @@ export class TraceCommand implements ConducksCommand {
   public description = "Trace structural dependencies (use --flow for data lineage)";
   public usage = "conducks trace <symbol_id> [--flow]";
 
-  public async execute(args: string[], persistence: SynapsePersistence): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const isFlow = args.includes('--flow');
     const symbolInput = args.filter(a => a !== '--flow')[0];
 
@@ -21,7 +20,8 @@ export class TraceCommand implements ConducksCommand {
       return;
     }
 
-    await persistence.load(registry.query.graph.getGraph());
+    // Structural Sync via Registry Bridge
+    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     let symbolId = symbolInput;
     if (!registry.query.graph.getGraph().getNode(symbolInput)) {
