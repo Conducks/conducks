@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conducks — Professional Command Center</title>
+  
+  <script src="https://unpkg.com/d3@7"></script>
+  <script src="https://unpkg.com/force-graph"></script>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="spinner mb-6"></div>
+    <div class="text-blue text-xs uppercase tracking-widest animate-pulse">Synchronizing Resonance</div>
+    <div class="text-dim text-[9px] uppercase tracking-widest mt-4">Structural Intelligence v1.6.1</div>
+  </div>
+
+  <div id="focus-indicator">
+    <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style="width: 8px; height: 8px;"></div>
+    <span id="focus-text">PATH ISOLATION ACTIVE — CLICK TO RESET</span>
+  </div>
+
+  <div class="command-sidebar">
+    <header class="panel-header">
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="uppercase tracking-widest" style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text);">Command Center</h1>
+        <span class="badge text-blue" style="border-color: var(--blue); color: var(--blue); background: rgba(47, 129, 247, 0.1); box-shadow: 0 0 10px rgba(47, 129, 247, 0.2);">V1.7.0</span>
+      </div>
+      <p class="text-dim text-[9px] uppercase tracking-widest font-semibold" style="opacity: 0.7;">Architectural Governance Node</p>
+    </header>
+    
+    <div class="panel-content custom-scrollbar">
+      <!-- RESONANCE ENGINE (v1.7.0) -->
+      <section class="glass-card">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xs uppercase tracking-widest font-bold text-blue">Resonance Engine</h2>
+          <div class="flex gap-2">
+             <button id="btn-resonance-pulse" class="action-btn" title="Trigger Structural Pulse" style="padding: 4px 8px; font-size: 9px;">PULSE</button>
+          </div>
+        </div>
+        
+        <p class="text-[10px] text-dim mb-3 uppercase tracking-wider font-semibold">Isolation Mode Physics</p>
+        <div class="mb-4">
+          <select id="trace-direction" class="trace-control">
+            <option value="downstream">TRACE IMPACT (DOWNSTREAM)</option>
+            <option value="upstream">TRACE LINEAGE (UPSTREAM)</option>
+            <option value="direct">DIRECT NEIGHBORS (HUB VIEW)</option>
+            <option value="bidirectional">FULL CIRCUIT (BI-DIRECTIONAL)</option>
+          </select>
+        </div>
+
+        <button id="btn-clear-isolation" class="action-btn secondary w-full" style="width: 100%;">
+          CLEAR ISOLATION FILTER
+        </button>
+      </section>
+
+      <!-- PHYSICS CONTROLLER (v1.6.2) ⚙️ -->
+      <div class="panel-header" style="padding: 16px 0; border-bottom: none;">
+        <div class="flex items-center gap-3">
+          <div class="spinner" id="status-pulse" style="width: 10px; height: 10px; border-width: 1px; animation: none;"></div>
+          <h1 style="font-size: 14px; font-weight: 600; color: var(--blue); margin: 0;">Conducks Mirror</h1>
+        </div>
+      </div>
+      
+      <!-- DISCOVERY -->
+      <div class="glass-card">
+        <div class="mb-3 text-[11px] font-semibold text-blue">Structural Discovery</div>
+        <input type="text" id="origin-search" placeholder="Search symbols (fuzzy)..." autocomplete="off">
+      </div>
+
+      <!-- PHYSICS CONTROLLER (v1.7.5) ⚙️ -->
+      <section class="glass-card">
+        <div class="field-header">
+           <span>Structural Field</span>
+           <button id="btn-reset-physics" class="action-btn secondary" style="padding: 2px 8px; font-size: 8px;">RESET STASIS</button>
+        </div>
+
+        <!-- Group A: Relation Tension -->
+        <div class="structural-field">
+          <div class="flex justify-between items-center mb-1">
+            <span class="monitor-label">Repulsion Force</span>
+            <span id="label-repulsion" class="monitor-value">-4477</span>
+          </div>
+          <input type="range" id="ctrl-repulsion" class="physics-slider" min="-8000" max="-200" value="-4477">
+        </div>
+
+        <div class="structural-field">
+          <div class="flex justify-between items-center mb-1">
+            <span class="monitor-label">Relational Tension</span>
+            <span id="label-tension" class="monitor-value">20</span>
+          </div>
+          <input type="range" id="ctrl-tension" class="physics-slider" min="5" max="500" value="20">
+        </div>
+
+        <div class="structural-field">
+          <div class="flex justify-between items-center mb-1">
+            <span class="monitor-label">Structural Stiffness</span>
+            <span id="label-stiffness" class="monitor-value">0.9</span>
+          </div>
+          <input type="range" id="ctrl-stiffness" class="physics-slider" min="0.1" max="2.0" step="0.1" value="0.9">
+        </div>
+
+        <!-- Group B: Arena Geometry -->
+        <div class="structural-field mt-4">
+          <div class="flex justify-between items-center mb-1">
+            <span class="monitor-label">Cluster Gravity</span>
+            <span id="label-gravity" class="monitor-value">0.15</span>
+          </div>
+          <input type="range" id="ctrl-gravity" class="physics-slider" min="0.05" max="1.0" step="0.05" value="0.15">
+        </div>
+
+        <div class="structural-field">
+          <div class="flex justify-between items-center mb-1">
+            <span class="monitor-label">Collision Buffer</span>
+            <span id="label-buffer" class="monitor-value">10</span>
+          </div>
+          <input type="range" id="ctrl-buffer" class="physics-slider" min="0" max="100" value="10">
+        </div>
+
+        <div class="structural-field">
+          <div class="flex justify-between items-center mb-1">
+            <span class="monitor-label">Arena Spread</span>
+            <span id="label-spread" class="monitor-value">1200</span>
+          </div>
+          <input type="range" id="ctrl-spread" class="physics-slider" min="500" max="10000" step="100" value="1200">
+        </div>
+        
+        <div class="structural-field">
+          <div class="flex justify-between items-center mb-1">
+            <span class="monitor-label">Edge Curvature</span>
+            <span id="label-curvature" class="monitor-value">0</span>
+          </div>
+          <input type="range" id="ctrl-curvature" class="physics-slider" min="0" max="1.0" step="0.05" value="0">
+        </div>
+      </section>
+
+      <!-- OPTIMIZER -->
+      <div class="glass-card">
+        <div class="mb-4 text-[11px] font-semibold text-blue">Layout Optimizer</div>
+        
+        <button id="btn-untangle" class="trace-control mb-4" style="border-color: var(--blue); color: var(--blue); background: transparent; font-weight: 600;">
+          UNTANGLE LAYOUT (ALPHA PULSE)
+        </button>
+
+        <div class="mb-3">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[11px] text-muted">Simulation Fluidity</span>
+            <span id="label-fluidity" class="text-[10px] font-mono text-blue">0.90</span>
+          </div>
+          <input type="range" id="ctrl-fluidity" class="physics-slider" min="0.1" max="0.9" step="0.05" value="0.9">
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[11px] text-muted">Cooldown Rate</span>
+            <span id="label-cooldown" class="text-[10px] font-mono text-blue">0.020</span>
+          </div>
+          <input type="range" id="ctrl-cooldown" class="physics-slider" min="0.001" max="0.1" step="0.001" value="0.02">
+        </div>
+      </div>
+
+      <!-- LAYERS -->
+      <div class="glass-card">
+        <div class="mb-4 text-[11px] font-semibold text-blue">Resonance Layers</div>
+        <div id="layer-filters" class="flex flex-col gap-3"></div>
+      </div>
+      
+      <!-- CLUSTERS -->
+      <div class="glass-card">
+        <div class="mb-4 text-[11px] font-semibold text-blue">Origin Clusters</div>
+        <div id="cluster-filters" class="flex flex-col gap-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="graph-container"></div>
+  
+  <div id="node-inspector">
+    <div class="flex justify-between items-start mb-6">
+      <div style="max-width: 300px;">
+        <h3 id="ins-name" style="margin: 0; font-size: 20px; font-weight: 600;">Symbol</h3>
+        <p id="ins-type" class="text-blue text-xs font-mono uppercase tracking-widest mt-1">KIND</p>
+      </div>
+      <div id="ins-level" class="badge">L2</div>
+    </div>
+    
+    <div class="flex flex-col gap-4">
+      <div style="padding-left: 12px; border-left: 3px solid var(--blue);">
+        <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Architectural Anchor</p>
+        <span id="ins-cluster" class="text-blue font-mono text-[11px] inspector-path">namespace::core</span>
+      </div>
+      
+      <div class="flex gap-4 items-center pt-4 border-t border-white/5">
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Degree</p>
+          <span id="ins-degree" class="font-mono text-white text-md">0</span>
+        </div>
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Mass</p>
+          <span id="ins-mass" class="font-mono text-white text-md">1.00</span>
+        </div>
+      </div>
+
+      <!-- HYDRATED MEAT (v1.6.5) -->
+      <div id="ins-meat" class="flex gap-4 items-center pt-4 border-t border-white/5 opacity-0 transition-opacity">
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Complexity</p>
+          <span id="ins-complexity" class="font-mono text-blue-400 text-xs">-</span>
+        </div>
+        <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Diversity</p>
+          <span id="ins-entropy" class="font-mono text-purple-400 text-xs">-</span>
+        </div>
+         <div style="flex: 1;">
+          <p class="text-dim text-[9px] uppercase tracking-widest mb-1">Churn</p>
+          <span id="ins-resonance" class="font-mono text-orange-400 text-xs">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="resonance.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
