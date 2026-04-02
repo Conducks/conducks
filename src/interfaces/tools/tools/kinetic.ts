@@ -5,10 +5,10 @@ import fs from "fs-extra";
 /**
  * Conducks — Behavioral Intelligence Tools (Standardized Taxonomy)
  * 
- * These 5 tools form the behavioral and mutational core of the Conducks MCP suite.
+ * These 4 tools form the behavioral and mutational core of the Conducks MCP suite.
  * They provide tracing, impact analysis, historical diffing, and graph-verified renaming.
  * 
- * CRITICAL RULE 10/13: Exactly 9 Unified Conducks MCP Tools mandated.
+ * CRITICAL RULE 9: Exactly 9 Unified Conducks MCP Tools mandated.
  */
 export const kineticTools: Record<string, Tool> = {
 
@@ -164,34 +164,6 @@ WARNING: This is a mutational tool. It modifies the source code.`,
         return { result, dryRun };
       } catch (err: any) {
         return { error: `Rename Failed: ${err.message}` };
-      }
-    }
-  },
-
-  conducks_mirror: {
-    id: "conducks-mirror",
-    name: "conducks_mirror",
-    type: "tool",
-    version: "2.1.0",
-    description: `Generates granular architectural graph data (Nodes, Edges, Clusters).
-Provides visual wave data for external graph visualization engines.
-
-WHEN TO USE: Generating visual documentation or exploring structural clusters.`,
-    inputSchema: {
-      type: "object",
-      properties: {
-        layers: { type: "array", items: { type: "number" }, description: "Optional: Specific structural layers to mirror." },
-        path: { type: "string", description: "Optional: The absolute project root." }
-      }
-    },
-    formatter: (res: any) => JSON.stringify(res, null, 2),
-    handler: async ({ layers, path: customPath }: any) => {
-      try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-        const wave = await (registry.mirror as any).getVisualWave(layers);
-        return { ...wave, indexStaleness: registry.audit.status().staleness.stale };
-      } catch (err: any) {
-        return { error: `Mirror Wave Generation Failed: ${err.message}` };
       }
     }
   }

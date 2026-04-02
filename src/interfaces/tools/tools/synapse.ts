@@ -160,7 +160,15 @@ Modes:
         
         const audit = registry.audit.audit();
         return {
-          violations: audit.violations.slice(0, 10).map((v: any) => ({ id: v.nodeId, rule: v.ruleId })),
+          violations: audit.violations.slice(0, 10).map((v: any) => {
+            if (typeof v === 'string') return { summary: v };
+            return { 
+              id: v.nodeId || v.id, 
+              rule: v.ruleId || v.type,
+              summary: v.message || 'Structural violation detected.'
+            };
+          }),
+          totalViolations: audit.violations.length,
           indexStaleness: registry.audit.status().staleness.stale
         };
       } catch (err: any) {

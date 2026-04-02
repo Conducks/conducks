@@ -62,11 +62,10 @@ export class ConducksMCPServer {
       this.registry.register(tool);
     }
 
-    // Rule 10/13 EVOLUTION: 10 Unified Conducks MCP Tools (Oracle Addition).
-    const MANDATED_TOOL_COUNT = 10;
+    const MANDATED_TOOL_COUNT = 9;
     if (tools.length !== MANDATED_TOOL_COUNT) {
       console.error(
-        `[Conducks MCP] ⚠️ Rule 10/13 VIOLATION: Expected ${MANDATED_TOOL_COUNT} tools, ` +
+        `[Conducks MCP] ⚠️ Rule 9 VIOLATION: Expected ${MANDATED_TOOL_COUNT} tools, ` +
         `found ${tools.length}. Tools: ${tools.map(t => t.name).join(', ')}`
       );
     }

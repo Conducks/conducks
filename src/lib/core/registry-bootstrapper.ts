@@ -35,16 +35,15 @@ export class RegistryBootstrapper {
     for (const start of searchPaths) {
       let current = path.resolve(start);
       while (current !== path.parse(current).root) {
-        if (IgnoreManager.hasConfig(current)) {
-          if (!forbiddenArtifacts.includes(path.basename(current))) {
-            return current;
-          }
+        const isForbidden = forbiddenArtifacts.includes(path.basename(current));
+
+        if (IgnoreManager.hasConfig(current) && !isForbidden) {
+          return current;
         }
         
         // Prevent escaping to global home directory if we are in a project
-        if (IgnoreManager.hasPackageJson(current) || fsSync.existsSync(path.join(current, ".git"))) {
-          // If we find a project marker, stop searching UP for .conducks.
-          // This keeps us anchored to the nearest project.
+        // Guard: Only recognize package.json/.git if NOT in a forbidden artifact folder
+        if (!isForbidden && (IgnoreManager.hasPackageJson(current) || fsSync.existsSync(path.join(current, ".git")))) {
           return current;
         }
 

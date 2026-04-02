@@ -47,10 +47,10 @@ synapseRegistry.registerProvider('.tsx', TYPESCRIPT_SUITE.provider);
 synapseRegistry.registerProvider('.js', TYPESCRIPT_SUITE.provider);
 synapseRegistry.registerProvider('.jsx', TYPESCRIPT_SUITE.provider);
 
-// 3. Domain Component Instantiation
-const search = new ConducksSearch(graph.getGraph());
+// 3. Domain Component Instantiation (Lazy/Updatable)
+let search = new ConducksSearch(graph.getGraph());
 const gql = new GQLParser();
-const federation = new FederatedLinker(workspaceRoot);
+let federation = new FederatedLinker(workspaceRoot);
 const advisor = new ConducksAdvisor();
 const sentinel = new ConducksSentinel();
 const deadCode = new DeadCodeAnalyzer();
@@ -61,16 +61,16 @@ const manifestEngine = new ManifestEngine();
 const contextGenerator = new ContextGenerator();
 const blueprint = new BlueprintGenerator();
 const oracle = new GuidanceOracle();
-const mirrorEngine = new MirrorEngine(graph.getGraph());
+let mirrorEngine = new MirrorEngine(graph.getGraph());
 
 // 4. Domain Facade Consolidation (Service Layer)
-const orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
-const analysis = new AnalysisService(orchestrator, graph, persistence, contextGenerator);
-const kinetic = new KineticService(graph.getGraph());
-const metrics = new MetricsService(graph, deadCode, resonance, aligner);
-const governance = new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint);
-const intelligence = new IntelligenceService(graph, search, gql, federation);
-const evolution = new EvolutionService(graph, persistence);
+let orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
+let analysis = new AnalysisService(orchestrator, graph, persistence, contextGenerator);
+let kinetic = new KineticService(graph.getGraph());
+let metrics = new MetricsService(graph, deadCode, resonance, aligner);
+let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint);
+let intelligence = new IntelligenceService(graph, search, gql, federation);
+let evolution = new EvolutionService(graph, persistence);
 const manifest = new ManifestService(manifestEngine);
 
 // 5. Lifecycle Management
@@ -82,13 +82,26 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
       persistence,
       ignoreManager,
       federation,
-      updatePersistence: (p) => { persistence = p; },
+      updatePersistence: (p) => { 
+        persistence = p; 
+        // Propagate to services
+        (orchestrator as any).persistence = p;
+        (analysis as any).persistence = p;
+        (evolution as any).persistence = p;
+        (governance as any).persistence = p;
+      },
       updateIgnoreManager: (i) => { 
         ignoreManager = i;
         (orchestrator as any).ignoreManager = i;
       }
     }
   );
+
+  // Sync Federation and Search after bootstrapper update
+  const effectiveRoot = chronicle.getProjectDir();
+  federation = new FederatedLinker(effectiveRoot);
+  search = new ConducksSearch(graph.getGraph());
+  intelligence = new IntelligenceService(graph, search, gql, federation);
 }
 
 /**

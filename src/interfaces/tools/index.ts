@@ -19,6 +19,15 @@ export async function main() {
   const logger = new Logger("Synapse Tools");
   logger.info(`Starting MCP Server (CWD: ${process.cwd()})`);
 
+  // Conducks: Late-Binding Registry Initialization
+  // Ensures the structural synapse is anchored before tools are registered.
+  try {
+    await registry.initialize(true);
+    logger.success(`Structural Synapse Anchored @ ${registry.infrastructure.chronicle.getProjectDir()}`);
+  } catch (err: any) {
+    logger.error(`Failed to anchor Synapse: ${err.message}`);
+  }
+
   // Dynamic import ensures that the ConducksMCPServer (and its dependencies)
   // are only loaded AFTER console.log has been silenced.
   const { ConducksMCPServer } = await import("./server.js");
