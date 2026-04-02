@@ -153,24 +153,39 @@ export class ConducksReflector implements ConducksComponent {
            }
 
            if (!nodeCache.has(scopedId)) {
+             // Conducks: Dynamic Kind Resolution
+             const defCapture = match.captures.find((c: any) => c.name.startsWith('is') && c.name !== 'isImport' && c.name !== 'isExported');
+             let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
+             
+             // Architectural Promotion: Elevate specific structural shapes to INFRA or ATOM
+             if (initialKind === 'variable' && (name.endsWith('Service') || name.endsWith('Router') || name.endsWith('Controller'))) {
+               initialKind = 'infra';
+             }
+
              const isScoped = match.captures.some((c: any) => c.name === 'isFunction' || c.name === 'isClass' || c.name === 'isMethod');
              let rangeNode = matchNameCap.node;
              if (isScoped && matchNameCap.node.parent) {
                rangeNode = matchNameCap.node.parent;
              }
 
+             const canonical = mapToCanonical(initialKind);
              nodeCache.set(scopedId, {
                name,
-               kind: 'variable',
-               canonicalKind: mapToCanonical('variable').kind,
-               canonicalRank: mapToCanonical('variable').rank,
+               kind: initialKind as any,
+               canonicalKind: canonical.kind,
+               canonicalRank: canonical.rank,
                range: {
                  start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
                  end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
                },
                filePath: file.path,
                isExport: false,
-               metadata: { isTest: isTestFile, isExport: false }
+               metadata: { 
+                 isTest: isTestFile, 
+                 isExport: false,
+                 canonicalKind: canonical.kind,
+                 canonicalRank: canonical.rank
+               }
              });
            }
         }

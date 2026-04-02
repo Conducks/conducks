@@ -1,5 +1,14 @@
 export const TYPESCRIPT_QUERIES = `
-  ;; --- Definitions ---
+  ;; --- Atoms (L6: Persistence & State) ---
+  ;; Module-level Variables (Architectural Atoms)
+  (program (lexical_declaration (variable_declarator name: (identifier) @name))) @isVariable
+  (program (variable_declaration (variable_declarator name: (identifier) @name))) @isVariable
+  (export_statement (lexical_declaration (variable_declarator name: (identifier) @name))) @isVariable
+
+  ;; Class Properties (Stateful Atoms)
+  (public_field_definition name: (property_identifier) @name) @isProperty
+
+  ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (export_statement (class_declaration name: (type_identifier) @name (class_heritage [(extends_clause value: (_) @heritage) (implements_clause (_) @heritage)])? @heritage_clause) @isClass) @isExported
   (class_declaration name: (type_identifier) @name (class_heritage [(extends_clause value: (_) @heritage) (implements_clause (_) @heritage)])? @heritage_clause) @isClass
 
@@ -18,6 +27,19 @@ export const TYPESCRIPT_QUERIES = `
   ;; Methods
   (method_definition name: (property_identifier) @name) @isMethod
   (public_field_definition name: (property_identifier) @name value: (arrow_function)) @isMethod
+
+  ;; --- Infrastructure (L3: Entry Points & Routers) ---
+  ;; Generic Route Heuristic: object.verb('/path', handler)
+  (call_expression
+    function: (member_expression
+      property: (property_identifier) @route_method (#match? @route_method "^(get|post|put|delete|patch|use|all)$"))
+    arguments: (arguments (string) @name . [(function_declaration) (arrow_function) (function_expression) (identifier)])) @isInfra
+
+  ;; Decorator-based Infra (NestJS/TSOA)
+  (decorator
+    (call_expression
+      function: (identifier) @decorator_name (#match? @decorator_name "^(Get|Post|Put|Delete|Patch|Controller|Authorized|Injectable|Tool|Action)$")
+      arguments: (arguments (string)? @name))) @isInfra
 
   ;; --- Imports & Bindings ---
   (import_statement 
@@ -40,34 +62,13 @@ export const TYPESCRIPT_QUERIES = `
   ;; Qualified Constructor: new ns.X()
   (new_expression constructor: (member_expression object: (_) @kinesis_object property: (property_identifier) @kinesis_target))
 
-  ;; --- Phase 2.1: Logical Entry Points (Express/Fastify/Nest) ---
-  ;; app.get('/path', handler)
-  (call_expression
-    function: (member_expression
-      object: (identifier) @req_receiver
-      property: (property_identifier) @route_method (#match? @route_method "^(get|post|put|delete|patch|use|all)$"))
-    arguments: (arguments (string) @kinesis_route_path . (_) @kinesis_route))
-
-  ;; router.get('/path', handler)
-  (call_expression
-    function: (member_expression
-      object: (identifier) @req_receiver (#match? @req_receiver "^(router|route|api)$")
-      property: (property_identifier) @route_method (#match? @route_method "^(get|post|put|delete|patch)$"))
-    arguments: (arguments (string) @kinesis_route_path . (_) @kinesis_route))
-
-  ;; Decorators: @Get('/path')
-  (decorator
-    (call_expression
-      function: (identifier) @decorator_name (#match? @decorator_name "^(Get|Post|Put|Delete|Patch|Controller|Authorized)$")
-      arguments: (arguments (string)? @kinesis_route_path))) @kinesis_route
-
   ;; --- Pulse Flow (Assignments) ---
   (variable_declarator name: (identifier) @pulse_assignment_name value: (_) @pulse_assignment_value)
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
 
-  ;; --- Type Captures (Phase 3.5: GVR High-Fidelity) ---
+  ;; --- Type Captures ---
   (type_identifier) @pulse_type_target
 
-  ;; --- Phase 3.2: Debt Markers ---
+  ;; --- Debt Markers ---
   (comment) @comment
 `;

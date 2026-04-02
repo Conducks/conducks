@@ -36,8 +36,8 @@ window.MirrorState = {
 
 async function refreshSynapse() {
   try {
-    // v1.7.0: Pre-Hydrate all core layers (0-5) for non-destructive filtering.
-    const layers = "0,1,2,3,4,5";
+    // v1.7.0: Pre-Hydrate all core layers (0-6) for non-destructive filtering.
+    const layers = "0,1,2,3,4,5,6";
     const spread = document.getElementById('ctrl-spread')?.value || '1200';
     const res = await fetch(`/api/synapse?layers=${layers}&spread=${spread}`);
     if (!res.ok) throw new Error('Synapse Hydration Failed');
