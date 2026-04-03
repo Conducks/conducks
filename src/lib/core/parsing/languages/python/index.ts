@@ -6,16 +6,17 @@ import { PythonExtractor } from "./extractor.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 
 /**
- * Conducks — High-Fidelity Python Provider (Suite v1) 💎 🐍
+ * Conducks — High-Fidelity Python Language Provider (Suite v3) 🏺 🟦 🐍
+ * 
+ * Maps Python structural DNA (Decorators, Docstrings, Type Hints, MRO) to the 8-layer taxonomy.
  */
 export class PythonProvider extends WasmProvider {
   public readonly id = "python-provider";
-  public readonly version = "2.0.0";
+  public readonly version = "3.0.0";
   public readonly extensions = [".py"];
   public readonly langId = "python";
   public readonly importSemantics: ImportSemantics = 'namespace';
 
-  // Specialized Components
   private resolver = new PythonResolver();
   private bindings = new PythonBindings();
   private extractor = new PythonExtractor();
@@ -39,7 +40,7 @@ export class PythonProvider extends WasmProvider {
 
   /**
    * Conducks — Structural Complexity
-   * Counts logical regions within a scope (functions/classes).
+   * Calculates branch complexity, including Python 3.10 match/case.
    */
   public calculateComplexity(node: any): number {
     return this.extractor.calculateComplexity(node);
@@ -47,17 +48,31 @@ export class PythonProvider extends WasmProvider {
 
   /**
    * Conducks — Technical Debt Signals
-   * Extracts markers (TODO, FIXME, etc.) from comments.
    */
   public extractDebt(node: any): string[] {
     return this.extractor.extractDebt(node);
   }
 
   /**
+   * Conducks — Behavioral Documentation (Docstrings)
+   */
+  public extractDocs(node: any): string | undefined {
+    return this.extractor.extractDocs(node);
+  }
+
+  /**
+   * Conducks — Visibility Heuristic
+   */
+  public getVisibility(node: any): 'public' | 'private' | 'protected' {
+    const nameNode = node.childForFieldName('name') || node;
+    const name = nameNode.text || '';
+    return this.extractor.getVisibility(name);
+  }
+
+  /**
    * Normalizes heritage names for Python's MRO.
    */
   public normalizeHeritage(name: string): string {
-    // Basic normalization for Python class-level heritage
     return name;
   }
 }

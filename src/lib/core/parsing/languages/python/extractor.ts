@@ -8,10 +8,27 @@ import * as Parser from "web-tree-sitter";
 
 export class PythonExtractor {
   /**
+   * Conducks — Behavioral Documentation (Docstrings)
+   * 
+   * Extracts PEP 257 docstrings from class/function bodies.
+   */
+  public extractDocs(node: any): string | undefined {
+    // python-tree-sitter: the docstring is typically the first child of the body
+    const body = node.childForFieldName('body');
+    if (body) {
+      const firstExpr = body.child(0);
+      if (firstExpr && firstExpr.type === 'expression_statement') {
+        const stringNode = firstExpr.child(0);
+        if (stringNode && stringNode.type === 'string') {
+          return stringNode.text;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
     * Returns the visibility of a Python member based on its name.
-    * __name -> private
-    * _name -> protected
-    * others -> public
     */
   public getVisibility(name: string): 'public' | 'private' | 'protected' {
     if (name.startsWith('__') && !name.endsWith('__')) return 'private';
@@ -20,30 +37,9 @@ export class PythonExtractor {
   }
 
   /**
-   * Extracts fields from a Python class/function assignment.
-   */
-  public extractFields(node: any): Array<{ name: string; type?: string; visibility: string }> {
-    const fields: Array<{ name: string; type?: string; visibility: string }> = [];
-
-    // 1. Annotated Assignment: name: str = "val"
-    if (node.type === 'assignment') {
-      const left = node.childForFieldName('left');
-      if (left?.type === 'identifier') {
-        fields.push({
-          name: left.text,
-          visibility: this.getVisibility(left.text)
-        });
-      }
-    }
-
-    return fields;
-  }
-
-  /**
-   * Conducks — Structural Complexity
+   * Calculates structural complexity (Cyclomatic-lite).
    * 
-   * Calculates the branch complexity (Cyclomatic-lite) of a Python node 
-   * by counting logical branch points.
+   * Counts branch points, loops, and async transitions.
    */
   public calculateComplexity(node: any): number {
     let complexity = 1; // Base complexity
@@ -56,7 +52,11 @@ export class PythonExtractor {
       'try_statement',
       'except_clause',
       'with_statement',
-      'conditional_expression' // x if y else z
+      'match_statement', // Python 3.10+
+      'case_clause',
+      'conditional_expression', // x if y else z
+      'boolean_operator',        // and, or
+      'lambda'
     ]);
 
     const traverse = (n: any) => {
@@ -74,11 +74,9 @@ export class PythonExtractor {
 
   /**
    * Conducks — Technical Debt Signals
-   * 
-   * Extracts debt markers (TODO, FIXME, etc.) from a node's text.
    */
   public extractDebt(node: any): string[] {
-    const text = node.text;
+    const text = node.text || '';
     const markers = ['TODO', 'FIXME', 'HACK', 'BUG', 'REFACTOR', 'DEPRECATED', 'XXX'];
     const found: string[] = [];
 

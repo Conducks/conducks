@@ -121,6 +121,62 @@ export class AnalyzeContext {
     this.localBindings.clear();
   }
 
+
+  /**
+   * Universal State Export: Capture registry, imports, and packages for worker-to-main reduction.
+   */
+  public exportState(): any {
+    return {
+      registry: Object.fromEntries(this.registry),
+      externalPackages: Array.from(this.externalPackages),
+      importMap: Object.fromEntries(
+        Array.from(this.importMap.entries()).map(([k, v]) => [k, Array.from(v)])
+      ),
+      framework: this.framework
+    };
+  }
+
+  /**
+   * Master Registry Merge: Consolidate worker results into the global context.
+   */
+  public mergeState(state: any): void {
+    if (!state) return;
+
+    if (state.registry) {
+      for (const [id, sym] of Object.entries(state.registry)) {
+        this.registry.set(id.toLowerCase(), sym);
+      }
+    }
+
+    if (state.externalPackages) {
+      for (const pkg of state.externalPackages) {
+        this.externalPackages.add(pkg);
+      }
+    }
+
+    if (state.importMap) {
+      for (const [caller, targets] of Object.entries(state.importMap)) {
+        if (!this.importMap.has(caller)) this.importMap.set(caller, new Set());
+        for (const t of (targets as string[])) {
+          this.importMap.get(caller)!.add(t);
+        }
+      }
+    }
+
+    if (state.framework && !this.framework) {
+      this.framework = state.framework;
+    }
+  }
+
+  /**
+   * Batch sets global symbols (used to sync workers with master registry).
+   */
+  public setRegisteredSymbols(symbols: Record<string, any>): void {
+    for (const [id, sym] of Object.entries(symbols)) {
+      this.registry.set(id.toLowerCase(), sym);
+    }
+  }
+
   /**
    * Resets the context for a fresh pulse.
    */

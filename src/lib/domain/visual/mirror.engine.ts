@@ -39,14 +39,17 @@ export class MirrorEngine implements ConducksComponent {
     const nvpMap = new Map<string, string | null>();
     const nodeMap = new Map(allNodes.map(n => [n.id, n]));
 
-    const findNVP = (nodeId: string): string | null => {
+    const findNVP = (nodeId: string, visited: Set<string> = new Set()): string | null => {
+      if (visited.has(nodeId)) return null;
+      visited.add(nodeId);
+      
       const n = nodeMap.get(nodeId);
       if (!n) return null;
       const rank = n.properties.canonicalRank !== undefined ? n.properties.canonicalRank : 4;
       if (layerSet.has(rank)) return nodeId;
       const incoming = this.graph.getNeighbors(nodeId, 'upstream');
       const parentLink = incoming.find(e => e.type === 'CONTAINS' || e.type === 'MEMBER_OF');
-      return parentLink ? findNVP(parentLink.sourceId) : null;
+      return parentLink ? findNVP(parentLink.sourceId, visited) : null;
     };
     allNodes.forEach(n => nvpMap.set(n.id, findNVP(n.id)));
 

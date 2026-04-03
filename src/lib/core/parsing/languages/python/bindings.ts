@@ -37,14 +37,12 @@ export class PythonBindings {
 
     // 2. import numpy as np
     if (node.type === 'import_statement') {
-      for (let i = 0; i < node.namedChildCount; i++) {
-        const child = node.namedChild(i);
-        if (child?.type === 'aliased_import') {
-          const original = child.childForFieldName('name')?.text;
-          const alias = child.childForFieldName('alias')?.text;
-          if (original && alias) {
-            bindings.push({ local: alias, exported: original, isModuleAlias: true });
-          }
+      const aliasNodes = node.children.filter((n: any) => n.type === 'aliased_import');
+      for (const child of aliasNodes) {
+        const original = child.childForFieldName('name')?.text;
+        const alias = child.childForFieldName('alias')?.text;
+        if (original && alias) {
+          bindings.push({ local: alias, exported: original, isModuleAlias: true });
         }
       }
     }

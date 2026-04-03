@@ -2,7 +2,8 @@ const duckdb = require('duckdb');
 const path = require('node:path');
 
 async function runLayerAudit() {
-  const dbPath = path.resolve(".conducks/conducks-synapse.db");
+  const targetDir = process.argv[2] || process.cwd();
+  const dbPath = path.resolve(targetDir, ".conducks/conducks-synapse.db");
   console.log(`🔍 Auditing Database at: ${dbPath}\n`);
   
   const db = new duckdb.Database(dbPath);

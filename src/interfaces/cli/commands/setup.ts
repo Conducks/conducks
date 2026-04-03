@@ -3,6 +3,7 @@ import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js
 import { MCPConfigurator } from "@/lib/domain/federation/mcp-configurator.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
+import fs from "fs-extra";
 
 /**
  * Conducks — Setup Command
@@ -28,7 +29,6 @@ export class SetupCommand implements ConducksCommand {
 
     // 3. Harden Environment (.conducksignore)
     console.log("\x1b[35m[Conducks Setup] Hardening Environment...\x1b[0m");
-    const fs = await import("fs-extra");
     const ignorePath = path.join(process.cwd(), ".conducksignore");
     if (!fs.existsSync(ignorePath)) {
       const defaults = [

@@ -16,9 +16,22 @@ export class IgnoreManager {
     "**/.git/**",
     "**/venv/**",
     "**/.venv/**",
-    "**/target/**", // Rust
-    "**/bin/**",
-    "**/obj/**",
+    "**/target/**", // Rust / Java
+    "**/vendor/**", // PHP / Go
+    "**/Gems/**",   // Ruby
+    "**/.bundle/**", // Ruby
+    "**/Pods/**",    // iOS
+    "**/.build/**",  // Swift
+    "**/.swiftpm/**", // Swift
+    "**/bin/**",     // .NET / Systems
+    "**/obj/**",     // .NET
+    "**/out/**",     // Java
+    "**/.gradle/**", // Java
+    "**/.mvn/**",    // Java
+    "**/Debug/**",   // Systems
+    "**/Release/**", // Systems
+    "**/x64/**",     // Systems
+    "**/ipch/**",    // Systems (VC++)
     "**/*.d.ts",
     "**/*.map",
     "**/*.db",

@@ -6,7 +6,8 @@
  */
 
 export enum CanonicalKind {
-  ECOSYSTEM = 'ECOSYSTEM',     // External Deps, Monorepos
+  ECOSYSTEM = 'ECOSYSTEM',     // External Deps, Multi-Project Context
+  REPOSITORY = 'REPOSITORY',   // Individual Project, Repo, or Microservice
   NAMESPACE = 'NAMESPACE',     // Folders, Packages, Namespaces
   UNIT = 'UNIT',               // Files, Modules
   INFRA = 'INFRA',             // Routers, Controllers, Decorators
@@ -18,13 +19,14 @@ export enum CanonicalKind {
 
 export const CanonicalRank: Record<CanonicalKind, number> = {
   [CanonicalKind.ECOSYSTEM]: 0,
-  [CanonicalKind.NAMESPACE]: 1,
-  [CanonicalKind.UNIT]: 2,
-  [CanonicalKind.INFRA]: 3,
-  [CanonicalKind.STRUCTURE]: 4,
-  [CanonicalKind.BEHAVIOR]: 5,
-  [CanonicalKind.ATOM]: 6,
-  [CanonicalKind.DATA]: 7
+  [CanonicalKind.REPOSITORY]: 1,
+  [CanonicalKind.NAMESPACE]: 2,
+  [CanonicalKind.UNIT]: 3,
+  [CanonicalKind.INFRA]: 4,
+  [CanonicalKind.STRUCTURE]: 5,
+  [CanonicalKind.BEHAVIOR]: 6,
+  [CanonicalKind.ATOM]: 7,
+  [CanonicalKind.DATA]: 8
 };
 
 /**
@@ -35,14 +37,15 @@ export function mapToCanonical(kind: string): { kind: CanonicalKind, rank: numbe
   
   let ck = CanonicalKind.ATOM;
 
-  if (k === 'module' || k === 'package' || k === 'namespace') ck = CanonicalKind.NAMESPACE;
+  if (k === 'external_dependency') ck = CanonicalKind.ECOSYSTEM;
+  else if (k === 'repository' || k === 'project' || k === 'repo') ck = CanonicalKind.REPOSITORY;
+  else if (k === 'module' || k === 'package' || k === 'namespace') ck = CanonicalKind.NAMESPACE;
   else if (k === 'file' || k === 'unit') ck = CanonicalKind.UNIT;
-  else if (k === 'class' || k === 'interface' || k === 'type' || k === 'struct' || k === 'enum') ck = CanonicalKind.STRUCTURE;
+  else if (k === 'class' || k === 'interface' || k === 'type' || k === 'struct' || k === 'enum' || k === 'generic' || k === 'heritage') ck = CanonicalKind.STRUCTURE;
   else if (k === 'function' || k === 'method' || k === 'constructor') ck = CanonicalKind.BEHAVIOR;
   else if (k === 'variable' || k === 'property' || k === 'const' || k === 'field' || k === 'export') ck = CanonicalKind.ATOM;
   else if (k === 'parameter' || k === 'argument' || k === 'literal') ck = CanonicalKind.DATA;
-  else if (k === 'route' || k === 'controller' || k === 'infra') ck = CanonicalKind.INFRA;
-  else if (k === 'external_dependency') ck = CanonicalKind.ECOSYSTEM;
+  else if (k === 'route' || k === 'controller' || k === 'infra' || k === 'macro') ck = CanonicalKind.INFRA;
 
   return { kind: ck, rank: CanonicalRank[ck] };
 }

@@ -1,46 +1,42 @@
 /**
- * Conducks — High-Fidelity Python SCM Query 💎 ( Parity)
+ * Conducks — High-Fidelity Python SCM Query 🏺 🟦 (Omni-Detail)
+ * 
+ * Captures Decorators, Type Hints, and Class Heritage.
  */
 export const PYTHON_QUERIES = `
-  (class_definition name: (identifier) @name) @isClass
+  ;; --- Atoms (L6: Persistence & State) ---
+  ;; Variables with Type Hints: x: str = "..."
+  (typed_parameter (identifier) @name (_) @metadata) @isVariable
+  (typed_default_parameter (identifier) @name (_) @metadata) @isVariable
+  
+  (assignment
+    (expression_list (attribute (identifier) (identifier) @name)) @isVariable)
+  (attribute (identifier) (identifier) @name) @isProperty
+  
+  ;; --- Definitions (L4-L5: Structure & Behavior) ---
+  (class_definition name: (identifier) @name) @isStruct
   (function_definition name: (identifier) @name) @isFunction
-  (decorated_definition (class_definition name: (identifier) @name)) @isClass
-  (decorated_definition (function_definition name: (identifier) @name)) @isFunction
   
-  (import_statement name: (dotted_name) @source) @isImport
-  (import_from_statement module_name: (dotted_name) @source) @isImport
-  (import_from_statement module_name: (relative_import) @source) @isImport
+  ;; Heritage: class Child(Parent):
+  (class_definition 
+    superclasses: (argument_list (identifier) @heritage))
   
-  (aliased_import name: (dotted_name) @source alias: (identifier) @alias) @isBinding
-  
-  ;; Simple function call: do1()
-  (call function: (identifier) @kinesis_target arguments: (argument_list (_) @kinesis_arg)*)
-  ;; Attribute call: hub.main()
-  (call function: (attribute) @kinesis_qualified_target arguments: (argument_list (_) @kinesis_arg)*)
+  ;; --- Infrastructure (L3-L4: Entry Points) ---
+  ;; Decorators: @app.get('/'), @classmethod
+  (decorator
+    [(call
+        function: [(identifier) (attribute)] @infra_method (#match? @infra_method "^(get|post|put|delete|patch|route)$")
+        arguments: (argument_list (string) @kinesis_route_path))
+     (identifier) @infra_method (#match? @infra_method "^(classmethod|staticmethod|property|abstractmethod|wrapper|wraps)$")
+     (attribute attribute: (identifier) @infra_method (#match? @infra_method "^(get|post|put|delete|patch|route)$"))]) @isInfra
 
-
-  ;; ── Phase 2: Pulse Flow & Intelligence ──
-  
-  ;; Assignments (Variable Handover)
+  ;; --- Pulse Flow (Assignments) ---
   (assignment left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
-  (augmented_assignment left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
-
-  ;; HTTP Route Definitions (API Endpoints)
-  (decorator 
-    (call 
-      function: (attribute object: (identifier) @route_receiver attribute: (identifier) @route_method)
-      arguments: (argument_list (string (string_content) @kinesis_route_path)))) @kinesis_route
-
-  ;; HTTP Client Requests (Outgoing)
-  (call
-    function: (attribute object: (_) @req_receiver attribute: (identifier) @req_method)
-    arguments: (argument_list (string (string_content) @kinesis_request_url))) @kinesis_request
-
-  ;; Heritage
-  (class_definition name: (identifier) @name
-    (argument_list (identifier) @heritage)) @isClass
-
-  ;; Phase 3.2: Debt Markers
-  (comment) @comment
+  
+  ;; --- Kinesis (Execution Flow) ---
+  (call function: [(identifier) (attribute)] @kinesis_target)
+  
+  ;; --- Metadata & Debt ---
+  (expression_statement (string) @docs) ; Docstrings
+  (comment) @docs
 `;
-

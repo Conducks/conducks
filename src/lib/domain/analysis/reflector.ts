@@ -53,7 +53,7 @@ export class ConducksReflector implements ConducksComponent {
     if (!parser) throw new Error(`[Conducks] Engine failure for: ${provider.langId}`);
 
     const tree = parser.parse(file.source);
-    const query = new (Parser as any).Query(lang, provider.queryScm);
+    const query = grammars.createQuery(lang, provider.queryScm);
     const matches = query.matches(tree.rootNode);
 
     const nodeCache = new Map<string, SpectrumNode>();

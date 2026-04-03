@@ -74,10 +74,10 @@ export class PythonResolver {
    */
   private tryExtensions(target: string, allFiles: string[]): string | undefined {
     // PEP 451: package (__init__.py) before module (.py)
-    const init = path.join(target, "__init__.py");
+    const init = path.join(target, "__init__.py").toLowerCase();
     if (allFiles.includes(init)) return init;
 
-    const py = target + ".py";
+    const py = (target + ".py").toLowerCase();
     if (allFiles.includes(py)) return py;
 
     return undefined;

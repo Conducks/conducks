@@ -27,6 +27,33 @@ export const GLOBAL_ATMOSPHERE: Record<string, string[]> = {
     'sum', 'min', 'max', 'abs', 'round', 'pow', 'int', 'float', 'str', 'list',
     'dict', 'set', 'tuple', 'bool', 'type', 'object', 'None', 'True', 'False',
     'self', 'cls', 'super', 'import', 'from', 'as', 'def', 'class', 'lambda'
+  ],
+  go: [
+    'fmt', 'os', 'io', 'net', 'http', 'sync', 'errors', 'time', 'context', 'bytes', 'json', 'math', 'sort', 'strings', 'strconv', 'reflect', 'runtime', 'testing'
+  ],
+  rust: [
+    'std', 'core', 'alloc', 'panic', 'println', 'print', 'vec', 'string', 'option', 'result', 'box', 'rc', 'arc', 'mutex', 'rwlock', 'thread', 'clone', 'copy', 'debug', 'default', 'hash', 'ord', 'partialord', 'eq', 'partialeq'
+  ],
+  cpp: [
+    'std', 'printf', 'malloc', 'free', 'cout', 'cin', 'vector', 'string', 'map', 'set', 'list', 'deque', 'stack', 'queue', 'algorithm', 'iostream', 'fstream', 'ostream', 'istream', 'memory', 'shared_ptr', 'unique_ptr', 'weak_ptr', 'exception'
+  ],
+  c: [
+    'printf', 'malloc', 'free', 'scanf', 'fopen', 'fclose', 'fread', 'fwrite', 'strlen', 'strcpy', 'strcat', 'strcmp', 'memcpy', 'memset', 'exit', 'NULL', 'size_t', 'int8_t', 'int16_t', 'int32_t', 'int64_t', 'uint8_t', 'uint16_t', 'uint32_t', 'uint64_t'
+  ],
+  csharp: [
+    'System', 'Microsoft', 'Console', 'String', 'Int32', 'Task', 'IEnumerable', 'List', 'Dictionary', 'Linq', 'Object', 'Boolean', 'DateTime', 'Guid', 'Exception', 'Attribute', 'Type', 'Method'
+  ],
+  java: [
+    'java', 'javax', 'System', 'String', 'ArrayList', 'HashMap', 'Integer', 'Exception', 'RuntimeException', 'Error', 'Thread', 'Runnable', 'Object', 'Class', 'Interface', 'Annotation', 'Collections', 'Arrays', 'Math', 'Boolean'
+  ],
+  php: [
+    'PHP_VERSION', 'PDO', 'DateTime', 'Exception', 'ArrayIterator', 'strlen', 'count', 'isset', 'empty', 'unset', 'die', 'exit', 'echo', 'print', 'var_dump', 'json_encode', 'json_decode', 'array_merge', 'array_filter', 'array_map'
+  ],
+  ruby: [
+    'Kernel', 'Enumerable', 'Object', 'Module', 'String', 'Array', 'Hash', 'puts', 'p', 'print', 'require', 'require_relative', 'include', 'extend', 'prepend', 'attr_accessor', 'attr_reader', 'attr_writer', 'raise', 'begin', 'rescue', 'ensure'
+  ],
+  swift: [
+    'Swift', 'Foundation', 'UIKit', 'AppKit', 'Combine', 'SwiftUI', 'print', 'guard', 'defer', 'fatalError', 'precondition', 'assert', 'map', 'filter', 'compactMap', 'flatMap', 'Result', 'Option', 'Any', 'AnyObject'
   ]
 };
 

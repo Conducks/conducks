@@ -64,8 +64,12 @@ export class AnalysisService implements ConducksComponent {
       allUnits.push(...batch);
     }
 
-    // Execute the core analysis wave
-    await this.orchestrator.analyze(allUnits);
+    // 2.5 Discover Sub-Repositories for Multi-Project Resonance
+    const bootstrapper = (this as any).registry?.bootstrapper || (this.orchestrator as any).registry?.bootstrapper;
+    const projectRoots = bootstrapper ? bootstrapper.discoverProjects(targetPath) : [targetPath];
+
+    // Execute the core analysis wave with project context
+    await (this.orchestrator as any).analyze(allUnits, { projectRoots, workspaceRoot: targetPath });
 
     // 3. Significance Analysis & Federated Linkage
     // We delegate the metadata enrichment to the domain service

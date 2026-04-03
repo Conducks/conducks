@@ -55,6 +55,7 @@ function findNearestVault(startDir: string): string {
 export interface SynapsePersistence {
   save(graph: ConducksAdjacencyList): Promise<string>;
   saveSpectrum(filePath: string, spectrum: any): Promise<void>;
+  saveBatchSpectrum(entries: Array<{ filePath: string, spectrum: any }>): Promise<void>;
   load(graph: ConducksAdjacencyList): Promise<boolean>;
   fetchNodeMeat(nodeId: string): Promise<any | null>;
   clear(): Promise<void>;
@@ -250,6 +251,10 @@ export class DuckDbPersistence implements SynapsePersistence {
   }
 
   public async saveSpectrum(filePath: string, spectrum: any): Promise<void> {
+    return this.saveBatchSpectrum([{ filePath, spectrum }]);
+  }
+
+  public async saveBatchSpectrum(entries: Array<{ filePath: string, spectrum: any }>): Promise<void> {
     const db = await this.connect();
     if (!db) return;
     const pulseId = `stream_${Date.now()}`;
@@ -257,10 +262,18 @@ export class DuckDbPersistence implements SynapsePersistence {
       db.exec("BEGIN TRANSACTION", async (err: any) => {
         if (err) return reject(err);
         try {
-          const nodeStmt = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, kind, name, file, gravity, kineticEnergy, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-          for (const metaNode of spectrum.nodes) {
-            const nodeId = `${filePath.toLowerCase()}::${metaNode.name.toLowerCase()}`;
-            await new Promise<void>((r, j) => nodeStmt.run(nodeId, pulseId, metaNode.kind || 'unknown', metaNode.name || 'unknown', filePath.toLowerCase(), 0, 0, JSON.stringify({ ...metaNode.metadata, name: metaNode.name, range: metaNode.range }), (e: any) => e ? j(e) : r()));
+          const nodeStmt = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, kind, name, file, gravity, kineticEnergy, canonicalKind, canonicalRank, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          for (const entry of entries) {
+            for (const metaNode of entry.spectrum.nodes) {
+              const nodeId = `${entry.filePath.toLowerCase()}::${metaNode.name.toLowerCase()}`;
+              await new Promise<void>((r, j) => nodeStmt.run(
+                nodeId, pulseId, metaNode.kind || 'unknown', metaNode.name || 'unknown', 
+                entry.filePath.toLowerCase(), 0, 0, 
+                metaNode.canonicalKind || null, metaNode.canonicalRank || 0,
+                JSON.stringify({ ...metaNode.metadata, name: metaNode.name, range: metaNode.range }), 
+                (e: any) => e ? j(e) : r()
+              ));
+            }
           }
           nodeStmt.finalize();
           db.exec("COMMIT", (err2: any) => err2 ? reject(err2) : resolve());

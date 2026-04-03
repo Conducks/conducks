@@ -45,8 +45,13 @@ describe('Conducks CLI Integration', () => {
     const srcDir = path.join(testRepo, 'src');
     if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir);
     fs.writeFileSync(path.join(srcDir, 'feature.ts'), 'export const start = () => console.log("Init");');
+    
+    // Add a file clearly in the ignore list to trigger the log message
+    const ignoreDir = path.join(testRepo, 'node_modules');
+    if (!fs.existsSync(ignoreDir)) fs.mkdirSync(ignoreDir);
+    fs.writeFileSync(path.join(ignoreDir, 'ignored.ts'), 'export const x = 1;');
 
-    const output = execSync(`node ${cliPath} analyze`, { cwd: testRepo }).toString();
+    const output = execSync(`node ${cliPath} analyze 2>&1`, { cwd: testRepo }).toString();
     
     // Check for the core structural milestones (Shield emoji indicates pulse initiation)
     expect(output).toContain('🛡️ [Conducks] Structural Ignore');

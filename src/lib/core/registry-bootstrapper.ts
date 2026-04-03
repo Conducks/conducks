@@ -31,29 +31,63 @@ export class RegistryBootstrapper {
     const searchPaths = [startPath, binaryAnchor];
     const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
 
-    // Phase 1: High-Fidelity Vault Search (.conducks) 🏺 🧬
     for (const start of searchPaths) {
       let current = path.resolve(start);
       while (current !== path.parse(current).root) {
         const isForbidden = forbiddenArtifacts.includes(path.basename(current));
 
-        if (IgnoreManager.hasConfig(current) && !isForbidden) {
-          return current;
-        }
-        
-        // Prevent escaping to global home directory if we are in a project
-        // Guard: Only recognize package.json/.git if NOT in a forbidden artifact folder
-        if (!isForbidden && (IgnoreManager.hasPackageJson(current) || fsSync.existsSync(path.join(current, ".git")))) {
-          return current;
-        }
+        if (IgnoreManager.hasConfig(current) && !isForbidden) return current;
+        if (!isForbidden && (IgnoreManager.hasPackageJson(current) || fsSync.existsSync(path.join(current, ".git")))) return current;
 
         const parent = path.dirname(current);
         if (parent === current) break;
         current = parent;
       }
     }
-    
     return startPath;
+  }
+
+  /**
+   * Recursively discovers all sub-projects/repositories within a workspace.
+   */
+  public discoverProjects(workspaceRoot: string): string[] {
+    const projects: string[] = [];
+    const forbiddenDirs = ['node_modules', 'build', 'dist', 'out', '.git', 'venv', '__pycache__'];
+
+    const scan = (current: string) => {
+      const stats = fsSync.statSync(current);
+      if (!stats.isDirectory()) return;
+
+      const items = fsSync.readdirSync(current, { withFileTypes: true });
+      let isProject = false;
+
+      // 1. Check for project markers in current dir
+      for (const item of items) {
+        if (item.name === '.conducks' || item.name === 'package.json' || item.name === '.git' || item.name === 'pyproject.toml') {
+          isProject = true;
+          break;
+        }
+      }
+
+      if (isProject) {
+        projects.push(path.resolve(current));
+        // Note: For now, we continue scanning indoors to find sub-projects/submodules
+      }
+
+      for (const item of items) {
+        if (item.isDirectory() && !forbiddenDirs.includes(item.name)) {
+          try {
+            scan(path.join(current, item.name));
+          } catch { /* Permission denied or similar */ }
+        }
+      }
+    };
+
+    try {
+      scan(workspaceRoot);
+    } catch { /* Root access fail */ }
+
+    return projects.length > 0 ? Array.from(new Set(projects)) : [workspaceRoot];
   }
 
   /**
@@ -75,9 +109,19 @@ export class RegistryBootstrapper {
 
     if (!this.isGrammarInitialized) {
       console.error(`🛡️ [Conducks Bootstrapper] Initializing Grammar Engine...`);
-      await grammars.init();
+      await grammars.init({ resourceDir: resourcesDir });
       await grammars.loadLanguage('python', path.join(resourcesDir, 'tree-sitter-python.wasm'));
       await grammars.loadLanguage('typescript', path.join(resourcesDir, 'tree-sitter-typescript.wasm'));
+      await grammars.loadLanguage('go', path.join(resourcesDir, 'tree-sitter-go.wasm'));
+      await grammars.loadLanguage('rust', path.join(resourcesDir, 'tree-sitter-rust.wasm'));
+      await grammars.loadLanguage('java', path.join(resourcesDir, 'tree-sitter-java.wasm'));
+      await grammars.loadLanguage('c_sharp', path.join(resourcesDir, 'tree-sitter-csharp.wasm'));
+      await grammars.loadLanguage('cpp', path.join(resourcesDir, 'tree-sitter-cpp.wasm'));
+      await grammars.loadLanguage('php', path.join(resourcesDir, 'tree-sitter-php.wasm'));
+      await grammars.loadLanguage('javascript', path.join(resourcesDir, 'tree-sitter-javascript.wasm'));
+      await grammars.loadLanguage('ruby', path.join(resourcesDir, 'tree-sitter-ruby.wasm'));
+      await grammars.loadLanguage('swift', path.join(resourcesDir, 'tree-sitter-swift.wasm'));
+      await grammars.loadLanguage('c', path.join(resourcesDir, 'tree-sitter-c.wasm'));
       this.isGrammarInitialized = true;
       console.error(`🛡️ [Conducks Bootstrapper] Grammar Engine Ready.`);
     }

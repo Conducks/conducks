@@ -1,5 +1,10 @@
 import * as Parser from 'web-tree-sitter';
 import path from 'node:path';
+import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Conducks — WASM Grammar Registry
@@ -12,14 +17,16 @@ export class GrammarRegistry {
   private isInitialized = false;
   private languages: Map<string, Parser.Language> = new Map();
   private unifiedParser: any | undefined;
+  private parserClass: any | undefined;
 
   private constructor() {}
 
   /**
-   * Provides the Query constructor for structural analysis.
+   * Creates a structural query for a given language.
+   * This uses the modern language.query(source) API for 0.24.x compatibility.
    */
-  public getQueryConstructor(): any {
-    return Parser.Query;
+  public createQuery(language: any, source: string): any {
+    return language.query(source);
   }
 
   public static getInstance(): GrammarRegistry {
@@ -30,19 +37,30 @@ export class GrammarRegistry {
   }
 
   /**
-   * Initializes the WASM parser engine.
+   * Initializes the tree-sitter engine.
+   * Universal WASM Localization: Uses 'locateFile' to ensure the core 'tree-sitter.wasm'
+   * is found in our synchronized resource directory across parent and worker threads.
    */
-  public async init(): Promise<void> {
+  public async init(options?: { resourceDir?: string }): Promise<void> {
     if (this.isInitialized) return;
     
-    // Explicitly access the Parser class from the namespace
-    const ParserClass = (Parser as any).default || (Parser as any).Parser || Parser;
-    
-    if (typeof ParserClass.init === 'function') {
-      await ParserClass.init();
+    this.parserClass = (Parser as any).default || (Parser as any).Parser || Parser;
+    if (typeof this.parserClass.init === 'function') {
+      const initOptions: any = {};
+      
+      if (options?.resourceDir) {
+        initOptions.locateFile = (file: string) => {
+          if (file === 'tree-sitter.wasm') {
+            return path.join(options.resourceDir!, 'tree-sitter.wasm');
+          }
+          return file;
+        };
+      }
+      
+      await this.parserClass.init(initOptions);
     }
     
-    this.unifiedParser = new (ParserClass as any)();
+    this.unifiedParser = new (this.parserClass as any)();
     this.isInitialized = true;
     this.log('[Conducks Parser] WASM Engine initialized.');
   }
@@ -52,8 +70,20 @@ export class GrammarRegistry {
    */
   public async loadLanguage(langId: string, wasmPath: string): Promise<void> {
     await this.init();
+    if (!existsSync(wasmPath)) {
+      this.log(`[Conducks Parser] WASM Missing: ${langId} -> ${wasmPath}`);
+      return;
+    }
     try {
-      const lang = await (Parser as any).Language.load(wasmPath);
+      // Robust buffer-based loading to bypass path resolution issues
+      const uint8 = new Uint8Array(readFileSync(wasmPath));
+      
+      if (!this.parserClass) {
+        await this.init();
+      }
+      
+      const lang = await this.parserClass.Language.load(uint8);
+      
       this.languages.set(langId, lang);
       this.log(`[Conducks Parser] Loaded grammar: ${langId}`);
     } catch (err) {

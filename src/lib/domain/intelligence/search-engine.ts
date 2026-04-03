@@ -32,11 +32,16 @@ export class ConducksSearch implements ConducksComponent {
 
       // 1. Direct Term Match (Higher Weight)
       const nodePath = (node.properties?.filePath || '').toLowerCase();
+      const canonicalKind = (node.properties?.canonicalKind || '').toLowerCase();
+      const canonicalRank = (node.properties?.canonicalRank?.toString() || '');
+
       for (const token of tokens) {
         if (nodeName === token) score += 100;
         else if (nodeName.includes(token)) score += 20;
         if (nodeLabel.includes(token)) score += 5;
         if (nodePath.includes(token)) score += 10;
+        if (canonicalKind === token) score += 50; 
+        if (canonicalRank === token) score += 10;
       }
 
       if (score > 0) {

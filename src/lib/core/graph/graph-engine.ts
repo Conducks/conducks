@@ -181,7 +181,7 @@ export class ConducksGraph {
    * Conducks — Ingests a reflected spectrum into the Synapse Graph.
    * If shallow is true, only 'Skeleton' properties are retained in RAM.
    */
-  public ingestSpectrum(rawPath: string, spectrum: any, shallow: boolean = false): void {
+  public ingestSpectrum(rawPath: string, spectrum: any, shallow: boolean = false, projectRoot?: string): void {
     // Conducks: Canonical ID Unification (v1.3.5)
     // Enforce lowercase absolute IDs to prevent L1 duplication across macOS/Windows
     const filePath = rawPath.toLowerCase();
@@ -194,7 +194,7 @@ export class ConducksGraph {
       this.graph.addNode({
         id: `${filePath.toLowerCase()}::${metaNode.name.toLowerCase()}`,
         label: metaNode.kind,
-        isShallow: shallow, // Pass mode to AdjacencyList
+        isShallow: shallow, 
         properties: { 
           ...metaNode.metadata, 
           filePath, 
@@ -202,18 +202,19 @@ export class ConducksGraph {
           range: metaNode.range, 
           isExport: metaNode.isExport,
           canonicalKind: metaNode.canonicalKind,
-          canonicalRank: metaNode.canonicalRank
+          canonicalRank: metaNode.canonicalRank // Ranks are now pre-shifted by taxonomy.ts
         }
       });
     }
 
-    // New: Recursive Namespace (Folder) Ingestion
-    const parts = filePath.split(/[/\\]/); // Cross-platform path splitting
+    // New: Recursive Namespace (Folder) Ingestion with Repository Anchoring
+    const parts = filePath.split(/[/\\]/); 
     let currentPath = '';
     const isAbsolute = filePath.startsWith('/') || /^[a-zA-Z]:\\/.test(filePath);
     
-    // Conducks: Dynamic Project Root (L0/L1 Transition)
-    const projectRootLabel = 'conducks'.toUpperCase(); 
+    // Find highest-level parent (Repository or Ecosystem)
+    let lastParentId = projectRoot ? `REPOSITORY::${projectRoot.toLowerCase()}` : "ECOSYSTEM::GLOBAL";
+    if (!this.graph.getNode(lastParentId)) lastParentId = "ECOSYSTEM::GLOBAL";
 
     for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i];
@@ -222,40 +223,36 @@ export class ConducksGraph {
             continue;
         }
 
-        const folderName = part || projectRootLabel;
         const parentPath = currentPath;
-        
-        // Conducks: Strict Path Joining
         if (currentPath === '/' || currentPath.endsWith('\\')) {
             currentPath = `${currentPath}${part}`;
         } else {
             currentPath = currentPath ? `${currentPath}/${part}` : part;
         }
 
-        // Canonical ID Unification (Lowercase Identity)
         const folderId = `NAMESPACE::${currentPath.toLowerCase()}`;
-        if (!this.graph.getNode(folderId)) {
-            const node: any = {
-              id: folderId,
-              label: 'NAMESPACE',
-              properties: {
-                name: part || projectRootLabel,
-                canonicalKind: 'NAMESPACE',
-                canonicalRank: 1, 
-                isVirtual: true,
-                summary: `Namespace: ${part || projectRootLabel}`
-              }
-            };
-            this.graph.addNode(node);
-            
-            // Link to parent folder if applicable
-            if (parentPath && parentPath !== currentPath) {
-                const parentId = `NAMESPACE::${parentPath.toLowerCase()}`;
-                const edgeId = `CONTAINS::${parentId}->${folderId}`;
-                if (this.graph.getNode(parentId) && !this.graph.hasEdge(edgeId)) {
+        
+        // Only start creating NAMESPACE nodes if we are WITHIN the projectRoot (or if no root specified)
+        if (!projectRoot || currentPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
+            if (!this.graph.getNode(folderId)) {
+                this.graph.addNode({
+                    id: folderId,
+                    label: 'NAMESPACE',
+                    properties: {
+                        name: part,
+                        filePath: currentPath,
+                        canonicalKind: 'NAMESPACE',
+                        canonicalRank: 2, 
+                        isVirtual: true
+                    } as any
+                });
+
+                // Link to parent (Previous Folder or Repository)
+                const edgeId = `CONTAINS::${lastParentId}->${folderId}`;
+                if (!this.graph.hasEdge(edgeId)) {
                     this.graph.addEdge({
                         id: edgeId,
-                        sourceId: parentId,
+                        sourceId: lastParentId,
                         targetId: folderId,
                         type: 'CONTAINS' as any,
                         confidence: 1.0,
@@ -263,25 +260,23 @@ export class ConducksGraph {
                     });
                 }
             }
+            lastParentId = folderId; // Narrow the parent for the next level
         }
     }
 
-    // Link the file (unit) to its immediate parent folder
-    const finalFolderId = `NAMESPACE::${currentPath.toLowerCase()}`;
+    // Link the file (unit) to its immediate parent folder or repository
     const fileNodeId = `${filePath}::unit`.toLowerCase();
-    
     const fileNode = this.graph.getNode(fileNodeId);
+    
     if (fileNode) {
         fileNode.properties.name = path.basename(filePath);
         fileNode.properties.displayName = path.basename(filePath);
-    }
-    
-    if (fileNode && this.graph.getNode(finalFolderId)) {
-        const edgeId = `CONTAINS::${finalFolderId}->${fileNodeId}`;
+        
+        const edgeId = `CONTAINS::${lastParentId}->${fileNodeId}`;
         if (!this.graph.hasEdge(edgeId)) {
             this.graph.addEdge({
                 id: edgeId,
-                sourceId: finalFolderId,
+                sourceId: lastParentId,
                 targetId: fileNodeId,
                 type: 'CONTAINS' as any,
                 confidence: 1.0,

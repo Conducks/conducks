@@ -6,6 +6,20 @@
 
 export class TypeScriptExtractor {
   /**
+   * Conducks — Behavioral Documentation (JSDoc)
+   * 
+   * Extracts intent and metadata from doc-blocks.
+   */
+  public extractDocs(node: any): string | undefined {
+    // Traverse up or find contiguous comment nodes
+    const comment = node.previousSibling;
+    if (comment && comment.type === 'comment' && comment.text.startsWith('/**')) {
+      return comment.text;
+    }
+    return undefined;
+  }
+
+  /**
    * Returns visibility based on keywords or prefix.
    */
   public getVisibility(node: any): 'public' | 'private' | 'protected' {
@@ -18,7 +32,7 @@ export class TypeScriptExtractor {
   /**
    * Calculates structural complexity (Cyclomatic-lite).
    * 
-   * Counts branch points, loops, and async transitions.
+   * Counts branch points, loops, and effects.
    */
   public calculateComplexity(node: any): number {
     let complexity = 1;
@@ -34,12 +48,17 @@ export class TypeScriptExtractor {
       'conditional_expression', // x ? y : z
       'binary_expression',      // &&, ||
       'optional_chaining',      // ?.
-      'nullish_coalescing'      // ??
+      'nullish_coalescing',     // ??
+      'arrow_function'
     ]);
 
     const traverse = (n: any) => {
       if (branchNodes.has(n.type)) {
         complexity++;
+      }
+      // Special case: React Effects/Hooks
+      if (n.type === 'call_expression' && n.text?.startsWith('use')) {
+        complexity += 0.5; // Contextual complexity
       }
       for (let i = 0; i < n.childCount; i++) {
         traverse(n.child(i));
@@ -47,7 +66,7 @@ export class TypeScriptExtractor {
     };
 
     traverse(node);
-    return complexity;
+    return Math.ceil(complexity);
   }
 
   /**
