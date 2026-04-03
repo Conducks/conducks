@@ -1,4 +1,4 @@
-import * as Parser from "web-tree-sitter";
+import Parser from "tree-sitter";
 
 /**
  * Conducks — Go Field and Complexity Extractor 🏺 🟦
@@ -87,7 +87,7 @@ export class GoExtractor {
     
     // 1. := and =
     if (node.type === 'short_variable_declaration' || node.type === 'assignment_statement') {
-      const left = node.childForFieldName('left');
+      const left = node.childByFieldName('left');
       if (left) {
         const findIdentifiers = (n: any) => {
           if (n.type === 'identifier') {
@@ -103,12 +103,12 @@ export class GoExtractor {
 
     // 2. Keyed composite literals: User{Name: "Said"}
     if (node.type === 'composite_literal') {
-      const body = node.childForFieldName('body');
+      const body = node.childByFieldName('body');
       if (body) {
         for (let i = 0; i < body.childCount; i++) {
           const child = body.child(i);
           if (child.type === 'keyed_element') {
-            const key = child.childForFieldName('key');
+            const key = child.childByFieldName('key');
             if (key) {
               bindings.push({ name: key.text });
             }

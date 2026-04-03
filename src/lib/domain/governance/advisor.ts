@@ -147,7 +147,59 @@ export class ConducksAdvisor implements ConducksComponent {
       }
     }
 
+    // 8. Modular Cohesion & SplitScore (Phase 7)
+    const splitCandidates = nodes
+      .filter(n => ['struct', 'class', 'module', 'package'].includes(n.label))
+      .map(node => {
+        const split = this.calculateSplitScore(node, graph);
+        return { node, split };
+      })
+      .filter(entry => entry.split.score > 0.6) // Threshold for modularity hotspots
+      .sort((a, b) => b.split.score - a.split.score)
+      .slice(0, 5);
+
+    if (splitCandidates.length > 0) {
+      advice.push({
+        level: 'WARNING',
+        type: 'STABILITY_RISK',
+        message: `Split Candidates: These units have low cohesion and high external entropy.`,
+        nodes: splitCandidates.map(entry => {
+          const s = entry.split;
+          return `${entry.node.properties.name} — SplitScore: ${s.score.toFixed(2)}
+    ├── cohesion:    ${s.cohesion.toFixed(2)} (Internal / Total)
+    ├── entropy:     ${s.entropy.toFixed(2)}
+    ├── coupling:    ${s.coupling.toFixed(2)}
+    └── action:      CONSIDER SPLITTING INTO ${Math.ceil(1 / s.cohesion)} INDEPENDENT UNITS`;
+        })
+      });
+    }
+
     return advice;
+  }
+
+  /**
+   * Conducks — SplitScore(M) = Betweenness(M) + Entropy(M) + Churn(M) - Cohesion(M)
+   */
+  public calculateSplitScore(node: ConducksNode, graph: ConducksAdjacencyList) {
+    const internalEdges = graph.getNeighbors(node.id, 'downstream').filter(n => n.properties.filePath === node.properties.filePath).length;
+    const totalEdges = graph.getNeighbors(node.id, 'downstream').length;
+    
+    // Cohesion(M) = Internal / Total (Proxy for modularity)
+    const cohesion = totalEdges > 0 ? internalEdges / totalEdges : 1.0;
+    
+    const entropy = node.properties.entropy || 0;
+    const churn = (node.properties.resonance || 0) / 100;
+    const gravity = node.properties.rank || 0; // PageRank as a proxy for Betweenness
+    
+    // Formula: High gravity/entropy + Low cohesion = High SplitScore
+    const score = (gravity * 0.4) + (entropy * 0.3) + (churn * 0.2) - (cohesion * 0.5) + 0.5;
+    
+    return {
+      score: Math.max(0, Math.min(1.0, score)),
+      cohesion,
+      entropy,
+      coupling: 1.0 - cohesion
+    };
   }
 
   public calculateRiskBreakdown(node: ConducksNode, graph: ConducksAdjacencyList) {

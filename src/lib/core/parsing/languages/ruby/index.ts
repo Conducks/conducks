@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { RUBY_QUERIES } from "./queries.js";
 import { RubyResolver } from "./resolver.js";
 import { RubyExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { RubyExtractor } from "./extractor.js";
  * 
  * Maps Ruby structural DNA (Classes, Modules, Mixins, Rails Resources) to the 8-layer taxonomy.
  */
-export class RubyProvider extends WasmProvider {
+export class RubyProvider extends NativeProvider {
   public readonly id = "ruby-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".rb", ".rake", "Rakefile", "Gemfile"];

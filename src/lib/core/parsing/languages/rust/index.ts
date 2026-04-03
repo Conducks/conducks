@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { RUST_QUERIES } from "./queries.js";
 import { RustResolver } from "./resolver.js";
 import { RustExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { RustExtractor } from "./extractor.js";
  * 
  * Maps Rust structural DNA (Traits, Mods, Impls, Attributes) to the 8-layer taxonomy.
  */
-export class RustProvider extends WasmProvider {
+export class RustProvider extends NativeProvider {
   public readonly id = "rust-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".rs"];

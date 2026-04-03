@@ -108,22 +108,22 @@ export class RegistryBootstrapper {
     const { graph, persistence, ignoreManager, federation, updatePersistence, updateIgnoreManager } = context;
 
     if (!this.isGrammarInitialized) {
-      console.error(`🛡️ [Conducks Bootstrapper] Initializing Grammar Engine...`);
-      await grammars.init({ resourceDir: resourcesDir });
-      await grammars.loadLanguage('python', path.join(resourcesDir, 'tree-sitter-python.wasm'));
-      await grammars.loadLanguage('typescript', path.join(resourcesDir, 'tree-sitter-typescript.wasm'));
-      await grammars.loadLanguage('go', path.join(resourcesDir, 'tree-sitter-go.wasm'));
-      await grammars.loadLanguage('rust', path.join(resourcesDir, 'tree-sitter-rust.wasm'));
-      await grammars.loadLanguage('java', path.join(resourcesDir, 'tree-sitter-java.wasm'));
-      await grammars.loadLanguage('c_sharp', path.join(resourcesDir, 'tree-sitter-csharp.wasm'));
-      await grammars.loadLanguage('cpp', path.join(resourcesDir, 'tree-sitter-cpp.wasm'));
-      await grammars.loadLanguage('php', path.join(resourcesDir, 'tree-sitter-php.wasm'));
-      await grammars.loadLanguage('javascript', path.join(resourcesDir, 'tree-sitter-javascript.wasm'));
-      await grammars.loadLanguage('ruby', path.join(resourcesDir, 'tree-sitter-ruby.wasm'));
-      await grammars.loadLanguage('swift', path.join(resourcesDir, 'tree-sitter-swift.wasm'));
-      await grammars.loadLanguage('c', path.join(resourcesDir, 'tree-sitter-c.wasm'));
+      console.error(`🛡️ [Conducks Bootstrapper] Initializing Native Grammar Engine...`);
+      await grammars.init();
+      await grammars.loadLanguage('python');
+      await grammars.loadLanguage('typescript');
+      await grammars.loadLanguage('go');
+      await grammars.loadLanguage('rust');
+      await grammars.loadLanguage('java');
+      await grammars.loadLanguage('csharp');
+      await grammars.loadLanguage('cpp');
+      await grammars.loadLanguage('php');
+      await grammars.loadLanguage('javascript');
+      await grammars.loadLanguage('ruby');
+      await grammars.loadLanguage('swift');
+      await grammars.loadLanguage('c');
       this.isGrammarInitialized = true;
-      console.error(`🛡️ [Conducks Bootstrapper] Grammar Engine Ready.`);
+      console.error(`🛡️ [Conducks Bootstrapper] Native Grammar Engine Ready.`);
     }
 
     const baseRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();

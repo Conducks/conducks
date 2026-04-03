@@ -1,4 +1,4 @@
-import * as Parser from "web-tree-sitter";
+import Parser from "tree-sitter";
 
 /**
  * Conducks — Rust Field and Complexity Extractor 🏺 🟦

@@ -1,4 +1,4 @@
-import * as Parser from "web-tree-sitter";
+import Parser from "tree-sitter";
 
 /**
  * Conducks — Python Binding Extractor 🐍
@@ -20,14 +20,14 @@ export class PythonBindings {
         if (!child) continue;
 
         if (child.type === 'aliased_import') {
-          const original = child.childForFieldName('name')?.text;
-          const alias = child.childForFieldName('alias')?.text;
+          const original = child.childByFieldName('name')?.text;
+          const alias = child.childByFieldName('alias')?.text;
           if (original && alias) {
             bindings.push({ local: alias, exported: original });
           }
         } else if (child.type === 'identifier' || child.type === 'dotted_name') {
           // Skip the module name itself (the first dotted_name) if it matches the 'module_name' field
-          const moduleName = node.childForFieldName('module_name');
+          const moduleName = node.childByFieldName('module_name');
           if (child.id !== moduleName?.id) {
             bindings.push({ local: child.text, exported: child.text });
           }
@@ -39,8 +39,8 @@ export class PythonBindings {
     if (node.type === 'import_statement') {
       const aliasNodes = node.children.filter((n: any) => n.type === 'aliased_import');
       for (const child of aliasNodes) {
-        const original = child.childForFieldName('name')?.text;
-        const alias = child.childForFieldName('alias')?.text;
+        const original = child.childByFieldName('name')?.text;
+        const alias = child.childByFieldName('alias')?.text;
         if (original && alias) {
           bindings.push({ local: alias, exported: original, isModuleAlias: true });
         }

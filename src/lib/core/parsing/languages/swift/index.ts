@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { SWIFT_QUERIES } from "./queries.js";
 import { SwiftResolver } from "./resolver.js";
 import { SwiftExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { SwiftExtractor } from "./extractor.js";
  * 
  * Maps Swift structural DNA (Classes, Protocols, Extensions, SwiftUI) to the 8-layer taxonomy.
  */
-export class SwiftProvider extends WasmProvider {
+export class SwiftProvider extends NativeProvider {
   public readonly id = "swift-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".swift"];

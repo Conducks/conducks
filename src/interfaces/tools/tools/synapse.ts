@@ -141,18 +141,26 @@ AFTER THIS: Use conducks_explain to analyze why a symbol is flagged.
 
 Modes:
 - scan (default): Full integrity audit for circularities and god objects.
-- advice: Professional structural improvement recommendations.`,
+- advice: Professional structural improvement recommendations.
+- archeology: Longitudinal historical analysis of structural decay over time (Window: 5 pulses).`,
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["scan", "advice"], default: "scan" },
+        mode: { type: "string", enum: ["scan", "advice", "archeology"], default: "scan" },
+        window: { type: "number", default: 5, description: "Historical window size (for archeology mode)." },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
     formatter: (res: any) => JSON.stringify(res, null, 2),
-    handler: async ({ mode, path: customPath }: any) => {
+    handler: async ({ mode, window, path: customPath }: any) => {
       try {
         const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        
+        if (mode === "archeology") {
+          const result = await registry.evolution.audit(window || 5);
+          return { ...result, indexStaleness: registry.audit.status().staleness.stale };
+        }
+
         if (mode === "advice") {
           const advice = await registry.audit.advise();
           return { advice, indexStaleness: registry.audit.status().staleness.stale };
@@ -173,6 +181,40 @@ Modes:
         };
       } catch (err: any) {
         return { error: `Audit Failed: ${err.message}` };
+      }
+    }
+  },
+
+  conducks_guard: {
+    id: "conducks-guard",
+    name: "conducks_guard",
+    type: "tool",
+    version: "2.1.0",
+    description: `Defensive structural regression guard. Blocks if structural risk exceeds threshold.
+Designed for use in pre-commit hooks or automated CI/CD audits.
+
+WHEN TO USE: Enforcing architectural standards before a pull request.
+AFTER THIS: If blocked, use conducks_audit --mode archeology to investigate hotspots.
+
+Returns:
+- block: Boolean (True if risk exceeds threshold)
+- risk: Current structural entropy delta
+- hotspots: Symbols contributing most to the regression`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        threshold: { type: "number", default: 0.1, description: "Max allowed decay (Default: 0.1)." },
+        path: { type: "string", description: "Optional: The absolute project root." }
+      }
+    },
+    formatter: (res: any) => JSON.stringify(res, null, 2),
+    handler: async ({ threshold, path: customPath }: any) => {
+      try {
+        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        const result = await registry.audit.guard(threshold || 0.1);
+        return { ...result, indexStaleness: registry.audit.status().staleness.stale };
+      } catch (err: any) {
+        return { error: `Guard Check Failed: ${err.message}` };
       }
     }
   },

@@ -4,7 +4,7 @@ import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { AnalysisService, AnalyzeOrchestrator } from "@/lib/domain/analysis/index.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
-import { GovernanceService, ConducksAdvisor, ConducksSentinel, ContextGenerator, BlueprintGenerator, GuidanceOracle } from "@/lib/domain/governance/index.js";
+import { GovernanceService, ConducksAdvisor, ConducksSentinel, ContextGenerator, BlueprintGenerator, GuidanceOracle, RegressionGuard } from "@/lib/domain/governance/index.js";
 import { IntelligenceService, ConducksSearch, GQLParser, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { ManifestService, ManifestEngine } from "@/lib/domain/manifest/index.js";
@@ -90,7 +90,7 @@ let orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, aligner, pers
 let analysis = new AnalysisService(orchestrator, graph, persistence, contextGenerator);
 let kinetic = new KineticService(graph.getGraph());
 let metrics = new MetricsService(graph, deadCode, resonance, aligner);
-let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint);
+let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint, persistence);
 let intelligence = new IntelligenceService(graph, search, gql, federation);
 let evolution = new EvolutionService(graph, persistence);
 const manifest = new ManifestService(manifestEngine);
@@ -111,6 +111,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
         (analysis as any).persistence = p;
         (evolution as any).persistence = p;
         (governance as any).persistence = p;
+        (governance as any).guard = new RegressionGuard(p as any);
       },
       updateIgnoreManager: (i) => { 
         ignoreManager = i;
@@ -183,7 +184,8 @@ export const registry = {
     context: () => governance.generateContext(persistence),
     contextFile: () => governance.generateManifest(persistence),
     blueprint: () => governance.generateBlueprint(),
-    status: () => governance.status()
+    status: () => governance.status(),
+    guard: (threshold?: number) => governance.shouldBlock(threshold)
   },
   oracle: {
     bootstrap: () => oracle.bootstrap(),
@@ -198,6 +200,12 @@ export const registry = {
   },
   mirror: {
     getVisualWave: (layers?: number[], clusters?: string[], spread?: number) => (mirrorEngine as any).getVisualWave(layers, clusters, spread)
+  },
+  evolution: {
+    rename: (symbolId: string, newName: string, dryRun?: boolean) => evolution.rename(symbolId, newName, dryRun),
+    compare: (prevPulseId?: string) => evolution.compare(prevPulseId),
+    audit: (window?: number) => evolution.audit(window),
+    get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); }
   },
   initialize: initializeRegistry
 };

@@ -22,44 +22,9 @@ import fs from 'node:fs';
  * High-performance structural reflection off-thread.
  */
 
-async function runWorker() {
-  const { units, allPaths, discoveryMode, globalSymbols, resourceDir } = workerData;
+async function runWorker(data: any, isFork: boolean = false) {
+  const { units, allPaths, discoveryMode, globalSymbols, resourceDir } = data;
 
-  // Primal Bootstrapping: Load Polyglot Grammars
-  if (resourceDir) {
-    await grammars.init({ resourceDir });
-    const log = (...args: any[]) => {
-      if (process.env.CONDUCKS_DEBUG === '1') console.error(`[Worker ${process.pid}]`, ...args);
-    };
-
-    log(`Initializing structural engine with resourceDir: ${resourceDir}`);
-
-    const languages = [
-      { id: 'typescript', file: 'tree-sitter-typescript.wasm' },
-      { id: 'python', file: 'tree-sitter-python.wasm' },
-      { id: 'go', file: 'tree-sitter-go.wasm' },
-      { id: 'rust', file: 'tree-sitter-rust.wasm' },
-      { id: 'java', file: 'tree-sitter-java.wasm' },
-      { id: 'csharp', file: 'tree-sitter-csharp.wasm' },
-      { id: 'cpp', file: 'tree-sitter-cpp.wasm' },
-      { id: 'php', file: 'tree-sitter-php.wasm' },
-      { id: 'ruby', file: 'tree-sitter-ruby.wasm' },
-      { id: 'swift', file: 'tree-sitter-swift.wasm' },
-      { id: 'c', file: 'tree-sitter-c.wasm' },
-      { id: 'javascript', file: 'tree-sitter-javascript.wasm' }
-    ];
-
-    for (const lang of languages) {
-      const wasmPath = path.join(resourceDir, lang.file);
-      await grammars.loadLanguage(lang.id, wasmPath);
-      const isLoaded = !!grammars.getLanguage(lang.id);
-      log(`Grammar status: ${lang.id} -> ${isLoaded ? 'LOADED' : 'FAILED'}`);
-      
-      if (!isLoaded) {
-        fs.appendFileSync('/tmp/conducks_pulse_debug.txt', `[Worker ${process.pid}] FAILED to load ${lang.id} from ${wasmPath}\n`);
-      }
-    }
-  }
   const reflector = new ConducksReflector();
   const context = new AnalyzeContext();
   
@@ -71,11 +36,12 @@ async function runWorker() {
     }
   }
 
+  // Structural Mapping: File Extension -> Provider
   const providers = new Map<string, any>([
     [".py", new PythonProvider()],
     [".ts", new TypeScriptProvider()],
     [".tsx", new TypeScriptProvider()],
-    [".js", new TypeScriptProvider()], // Falls back to TS provider for now if no specific JS logic
+    [".js", new TypeScriptProvider()],
     [".jsx", new TypeScriptProvider()],
     [".go", new GoProvider()],
     [".rs", new RustProvider()],
@@ -92,12 +58,51 @@ async function runWorker() {
     [".c", new CProvider()]
   ]);
 
+  // Structural Mapping: File Extension -> Grammar Metadata
+  const extensionToGrammar = new Map<string, { id: string, file: string }>([
+    [".ts", { id: 'typescript', file: 'tree-sitter-typescript.wasm' }],
+    [".tsx", { id: 'typescript', file: 'tree-sitter-typescript.wasm' }],
+    [".js", { id: 'javascript', file: 'tree-sitter-javascript.wasm' }],
+    [".jsx", { id: 'javascript', file: 'tree-sitter-javascript.wasm' }],
+    [".py", { id: 'python', file: 'tree-sitter-python.wasm' }],
+    [".go", { id: 'go', file: 'tree-sitter-go.wasm' }],
+    [".rs", { id: 'rust', file: 'tree-sitter-rust.wasm' }],
+    [".java", { id: 'java', file: 'tree-sitter-java.wasm' }],
+    [".cs", { id: 'csharp', file: 'tree-sitter-csharp.wasm' }],
+    [".cpp", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
+    [".hpp", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
+    [".cc", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
+    [".h", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
+    [".php", { id: 'php', file: 'tree-sitter-php.wasm' }],
+    [".rb", { id: 'ruby', file: 'tree-sitter-ruby.wasm' }],
+    [".rake", { id: 'ruby', file: 'tree-sitter-ruby.wasm' }],
+    [".swift", { id: 'swift', file: 'tree-sitter-swift.wasm' }],
+    [".c", { id: 'c', file: 'tree-sitter-c.wasm' }]
+  ]);
+
   const results = [];
+  const loadedGrammars = new Set<string>();
 
   for (const unit of units) {
     const ext = path.extname(unit.path);
     const provider = providers.get(ext);
     if (!provider) continue;
+
+    // Phase 1: Omni-Repo Native Grammar Induction 🛡️ 🔨
+    const langId = provider.langId;
+    if (langId && !loadedGrammars.has(langId)) {
+      try {
+        await grammars.loadLanguage(langId);
+        loadedGrammars.add(langId);
+      } catch (err) {
+        results.push({ 
+          path: unit.path, 
+          error: `Native Grammar Induction Failed: ${(err as Error).message}`,
+          success: false
+        });
+        continue;
+      }
+    }
 
     try {
       const spectrum = await reflector.reflect(unit, provider, context, allPaths);
@@ -112,6 +117,7 @@ async function runWorker() {
         success: true 
       });
     } catch (err) {
+      // Apostolic Resilience: Handle Degraded Induction (e.g. grammar mismatch)
       results.push({ 
         path: unit.path, 
         error: (err as Error).message,
@@ -120,10 +126,29 @@ async function runWorker() {
     }
   }
 
-  parentPort?.postMessage(results);
+  if (isFork) {
+    process.send?.({ type: 'SUCCESS', results });
+    process.exit(0);
+  } else {
+    parentPort?.postMessage(results);
+  }
 }
 
-runWorker().catch(err => {
-  console.error(`[Conducks Pulse Worker] Fatal Error:`, err);
-  process.exit(1);
-});
+// Bootstrap Protocol: Fork vs Worker Detection 🏺
+if (process.env.CONDUCKS_FORK_MODE === '1') {
+  process.on('message', async (msg: any) => {
+    if (msg.type === 'START') {
+      try {
+        await runWorker(msg.data, true);
+      } catch (err) {
+        process.send?.({ type: 'ERROR', error: (err as Error).message });
+        process.exit(1);
+      }
+    }
+  });
+} else {
+  runWorker(workerData).catch(err => {
+    console.error(`[Conducks Pulse Worker] Fatal Error:`, err);
+    process.exit(1);
+  });
+}

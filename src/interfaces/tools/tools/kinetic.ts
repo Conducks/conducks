@@ -110,7 +110,7 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["uncommitted", "historical"], default: "uncommitted" },
+        mode: { type: "string", enum: ["uncommitted", "historical", "drift"], default: "uncommitted" },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
@@ -118,11 +118,21 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
     handler: async ({ mode, path: customPath }: any) => {
       try {
         const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        
+        if (mode === "drift") {
+          const result = await registry.evolution.compare();
+          return {
+            status: result.status,
+            message: result.message,
+            hotspots: result.hotspots,
+            summary: result.summary,
+            indexStaleness: registry.audit.status().staleness.stale
+          };
+        }
+
         const diffEngine = registry.query.diff;
-        // For uncommitted diff in MCP, we compare current against current (placeholder for now)
-        // In a real scenario, we'd compare against a 'previous' snapshot
         const currentGraph = registry.query.graph.getGraph();
-        const results = diffEngine.diff(currentGraph, currentGraph); // Placeholder logic
+        const results = diffEngine.diff(currentGraph, currentGraph); // Placeholder for uncommitted/historical comparison logic
         
         return {
           addedSymbols: results.nodes.list.added.slice(0, 10),

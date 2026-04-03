@@ -3,6 +3,7 @@ import type { Advice } from "@/types/domain.js";
 import { ConducksSentinel } from "./sentinel.js";
 import { ContextGenerator } from "./context-generator.js";
 import { BlueprintGenerator } from "./blueprint-generator.js";
+import { RegressionGuard } from "./guard.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
@@ -18,14 +19,20 @@ export class GovernanceService implements ConducksComponent {
   public readonly id = 'governance-service';
   public readonly type = 'analyzer';
   public readonly description = 'Orchestrates architectural auditing and structural advice.';
+  private guard: RegressionGuard | null = null;
 
   constructor(
     private graph: ConducksAdjacencyList,
     private advisor: ConducksAdvisor,
     private sentinel: ConducksSentinel,
     private contextGenerator: ContextGenerator,
-    private blueprint: BlueprintGenerator
-  ) {}
+    private blueprint: BlueprintGenerator,
+    private persistence?: SynapsePersistence
+  ) {
+    if (persistence) {
+      this.guard = new RegressionGuard(persistence as any);
+    }
+  }
 
   /**
    * Performs an architectural audit (Cycles, God Objects, HUBs).
@@ -42,6 +49,14 @@ export class GovernanceService implements ConducksComponent {
    */
   public async advise(): Promise<Advice[]> {
     return this.advisor.analyze(this.graph);
+  }
+
+  /**
+   * Evaluates structural regression against a threshold.
+   */
+  public async shouldBlock(threshold?: number) {
+    if (!this.guard) throw new Error("Regression guard requires persistence layer.");
+    return this.guard.shouldBlock(threshold);
   }
 
   /**
@@ -98,3 +113,4 @@ export { ConducksSentinel } from "./sentinel.js";
 export { ContextGenerator } from "./context-generator.js";
 export { BlueprintGenerator } from "./blueprint-generator.js";
 export { GuidanceOracle } from "./oracle.js";
+export { RegressionGuard } from "./guard.js";

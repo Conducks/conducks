@@ -1,4 +1,4 @@
-import * as Parser from "web-tree-sitter";
+import Parser from "tree-sitter";
 import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";

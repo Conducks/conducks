@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { GO_QUERIES } from "./queries.js";
 import { GoResolver } from "./resolver.js";
 import { GoExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { GoExtractor } from "./extractor.js";
  * 
  * Maps Go structural DNA (Generics, Contracts, Sync-Nodes) to the 8-layer taxonomy.
  */
-export class GoProvider extends WasmProvider {
+export class GoProvider extends NativeProvider {
   public readonly id = "go-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".go"];

@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { JAVA_QUERIES } from "./queries.js";
 import { JavaResolver } from "./resolver.js";
 import { JavaExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { JavaExtractor } from "./extractor.js";
  * 
  * Maps Java structural DNA (Classes, Records, Spring Annotations) to the 8-layer taxonomy.
  */
-export class JavaProvider extends WasmProvider {
+export class JavaProvider extends NativeProvider {
   public readonly id = "java-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".java"];

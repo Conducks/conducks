@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { PHP_QUERIES } from "./queries.js";
 import { PHPResolver } from "./resolver.js";
 import { PHPExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { PHPExtractor } from "./extractor.js";
  * 
  * Maps PHP structural DNA (Classes, Traits, Attributes, Namespaces) to the 8-layer taxonomy.
  */
-export class PHPProvider extends WasmProvider {
+export class PHPProvider extends NativeProvider {
   public readonly id = "php-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".php"];

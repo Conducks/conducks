@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { PYTHON_QUERIES } from "./queries.js";
 import { PythonResolver } from "./resolver.js";
 import { PythonBindings } from "./bindings.js";
@@ -10,7 +10,7 @@ import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
  * 
  * Maps Python structural DNA (Decorators, Docstrings, Type Hints, MRO) to the 8-layer taxonomy.
  */
-export class PythonProvider extends WasmProvider {
+export class PythonProvider extends NativeProvider {
   public readonly id = "python-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".py"];
@@ -64,7 +64,7 @@ export class PythonProvider extends WasmProvider {
    * Conducks — Visibility Heuristic
    */
   public getVisibility(node: any): 'public' | 'private' | 'protected' {
-    const nameNode = node.childForFieldName('name') || node;
+    const nameNode = node.childByFieldName('name') || node;
     const name = nameNode.text || '';
     return this.extractor.getVisibility(name);
   }

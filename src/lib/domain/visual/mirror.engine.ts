@@ -76,9 +76,21 @@ export class MirrorEngine implements ConducksComponent {
       });
     });
 
-    // 4. Final Visible Nodes with Constraint Awareness
+    // 4. Final Visible Nodes with Constraint Awareness (v1.8.0 High-Density LOD)
+    const MAX_VISUAL_NODES = 12000;
+    const isHighDensity = allNodes.length > MAX_VISUAL_NODES;
+
     let visualNodes = allNodes
       .filter(n => layerSet.has(n.properties.canonicalRank !== undefined ? n.properties.canonicalRank : 4))
+      .filter(n => {
+        // High-Density LOD: If the graph is massive, skip low-gravity/low-resonance atoms
+        if (isHighDensity && (n.properties.canonicalRank || 0) > 3) {
+          const rank = n.properties.rank || 0;
+          const resonance = n.properties.resonance || 0;
+          return rank > 0.0005 || resonance > 50; 
+        }
+        return true;
+      })
       .map((n: any) => {
         const level = n.properties.canonicalRank !== undefined ? n.properties.canonicalRank : 4;
         const incoming = this.graph.getNeighbors(n.id, 'upstream');

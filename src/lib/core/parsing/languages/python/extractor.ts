@@ -1,4 +1,4 @@
-import * as Parser from "web-tree-sitter";
+import Parser from "tree-sitter";
 
 /**
  * Conducks — Python Field and Visibility Extractor 🐍
@@ -14,7 +14,7 @@ export class PythonExtractor {
    */
   public extractDocs(node: any): string | undefined {
     // python-tree-sitter: the docstring is typically the first child of the body
-    const body = node.childForFieldName('body');
+    const body = node.childByFieldName('body');
     if (body) {
       const firstExpr = body.child(0);
       if (firstExpr && firstExpr.type === 'expression_statement') {

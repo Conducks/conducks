@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { TYPESCRIPT_QUERIES } from "./queries.js";
 import { TypeScriptResolver } from "./resolver.js";
 import { TypeScriptExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { TypeScriptExtractor } from "./extractor.js";
  * 
  * Maps TS/JS structural DNA (Decorators, JSDoc, Hooks, Interfaces) to the 8-layer taxonomy.
  */
-export class TypeScriptProvider extends WasmProvider {
+export class TypeScriptProvider extends NativeProvider {
   public readonly id = "typescript-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".ts", ".tsx", ".js", ".jsx"];
@@ -64,8 +64,8 @@ export class TypeScriptProvider extends WasmProvider {
 
     const findSpecifiers = (node: any) => {
       if (node.type === 'import_specifier') {
-        const nameNode = node.childForFieldName('name');
-        const aliasNode = node.childForFieldName('alias');
+        const nameNode = node.childByFieldName('name');
+        const aliasNode = node.childByFieldName('alias');
         if (nameNode) {
           bindings.push({
             name: nameNode.text,

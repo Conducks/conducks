@@ -1,14 +1,13 @@
-import * as Parser from "web-tree-sitter";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 
 /**
- * Conducks — Language Provider Registry (Parity with  v14 Spec)
+ * Conducks — Language Provider Registry (Parity with v14 Spec)
  */
 
 export type ImportSemantics = 'named' | 'wildcard' | 'namespace';
 
 export interface ConducksProvider {
-  /** Unqiue ID (e.g. 'typescript-provider') */
+  /** Unique ID (e.g. 'typescript-provider') */
   readonly id: string;
   /** Version string */
   readonly version: string;
@@ -60,9 +59,9 @@ export interface ConducksProvider {
 }
 
 /**
- * Base class for all Wasm-based Conducks Providers.
+ * Base class for all Native-based Conducks Providers.
  */
-export abstract class WasmProvider implements ConducksProvider {
+export abstract class NativeProvider implements ConducksProvider {
   public abstract readonly id: string;
   public abstract readonly version: string;
   public abstract readonly extensions: string[];

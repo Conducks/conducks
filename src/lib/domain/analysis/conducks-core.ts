@@ -98,7 +98,7 @@ export class Conducks implements ConducksComponent {
     }
 
     console.error(`[ConducksCore] Loading grammar: ${wasmPath}`);
-    await grammars.loadLanguage("python", wasmPath);
+    await grammars.loadLanguage("python");
     console.error(`[ConducksCore] Grammar loaded.`);
 
     // Conducks: Kinetic Root Alignment

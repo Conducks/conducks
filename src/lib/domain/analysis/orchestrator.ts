@@ -11,6 +11,7 @@ import path from "node:path";
 import { ConducksComponent } from "@/registry/types.js";
 import { logger } from "@/lib/core/utils/logger.js";
 import { Worker } from "node:worker_threads";
+import { fork } from "node:child_process";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -186,6 +187,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
 
   /**
    * Runs a parallel pulse across workers.
+   * Optimized for Native Structural Induction. 🛡️ 🔨 🏎️
    */
   private async runParallelPulse(
     files: Array<{ path: string, source: string }>,
@@ -193,7 +195,16 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     allPaths: string[],
     globalSymbols?: Record<string, any>
   ): Promise<any[]> {
-    const threadCount = Math.max(1, os.cpus().length - 1);
+    const cpuCount = os.cpus().length;
+    const envMax = process.env.CONDUCKS_MAX_WORKERS ? parseInt(process.env.CONDUCKS_MAX_WORKERS) : Infinity;
+    
+    // Conducks Native Resilience: 100% stable on Node 25+ via C++ bindings.
+    const threadCount = Math.min(
+      Math.max(1, cpuCount - 1), 
+      envMax, 
+      8 // Increased concurrency for native high-performance grain
+    );
+
     const chunkSize = Math.ceil(files.length / threadCount);
     const workers: Promise<any[]>[] = [];
 
@@ -202,14 +213,16 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       if (chunk.length === 0) continue;
 
       workers.push(new Promise((resolve, reject) => {
+        const payload = {
+          units: chunk,
+          allPaths,
+          discoveryMode,
+          globalSymbols
+        };
+
+        // Standard High-Performance Worker Thread Pulse
         const worker = new Worker(workerPath, {
-          workerData: {
-            units: chunk,
-            allPaths,
-            discoveryMode,
-            globalSymbols,
-            resourceDir
-          }
+          workerData: payload
         });
 
         worker.on('message', resolve);

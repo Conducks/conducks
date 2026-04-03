@@ -1,17 +1,17 @@
 # Architecture Context — conducks
-Generated: 2026-04-03T09:00:56.448Z | Pulse: pulse_1775206856277_z3o3b
+Generated: 2026-04-03T19:50:41.120Z | Pulse: pulse_1775245839603_uqnvh
 
 ## Entry Points (top 10 by gravity)
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/dummy-route.ts::controller` [function, gravity: 0.2619, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/dummy-route.ts::get` [function, gravity: 0.2619, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::computedirectionalsubgraph` [function, gravity: 0.0940, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::applyforces` [function, gravity: 0.0679, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::focussubgraph` [function, gravity: 0.0643, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::resetfocus` [function, gravity: 0.0643, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::hideoverlay` [function, gravity: 0.0595, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::refreshsynapse` [function, gravity: 0.0476, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::initui` [function, gravity: 0.0393, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/app.js::configuregraph` [function, gravity: 0.0393, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/test-go-nodes.js::printnode` [function, gravity: 0.1115, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/test-py-nodes.js::printnode` [function, gravity: 0.1115, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/test-rs-nodes.js::printnode` [function, gravity: 0.1115, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/audit_swift_class.js::dump` [function, gravity: 0.1115, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/audit_swift_tree.js::dump` [function, gravity: 0.1115, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/resonance.js::computedirectionalsubgraph` [function, gravity: 0.0200, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/resonance.js::applyforces` [function, gravity: 0.0129, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/resonance.js::focussubgraph` [function, gravity: 0.0129, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/resonance.js::resetfocus` [function, gravity: 0.0129, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/resonance.js::hideoverlay` [function, gravity: 0.0129, risk: 0.0000]
 
 ## Structural Hotspots (top 10 by risk)
 

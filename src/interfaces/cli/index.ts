@@ -12,6 +12,7 @@ import { CleanCommand } from "./commands/clean.js";
 import { ContextGenCommand } from "./commands/context-gen.js";
 import { BlueprintCommand } from "./commands/blueprint.js";
 import { SetupCommand } from "./commands/setup.js";
+import { GuardCommand } from "./commands/guard.js";
 import { ListCommand } from "./commands/list.js";
 import { EntropyCommand } from "./commands/entropy.js";
 import { CohesionCommand } from "./commands/cohesion.js";
@@ -23,6 +24,7 @@ import { RenameCommand } from "./commands/rename.js";
 import { ResonanceCommand } from "./commands/resonance.js";
 import { PruneCommand } from "./commands/prune.js";
 import { AdviseCommand } from "./commands/advise.js";
+import { DriftCommand } from "./commands/drift.js";
 import { WatchCommand } from "./commands/watch.js";
 import { MirrorCommand } from "./commands/mirror.js";
 import { VisualizeCommand } from "./commands/visualize.js";
@@ -89,8 +91,9 @@ export async function main() {
     new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
     new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
-    new AdviseCommand(), new PruneCommand(), new BlueprintCommand(), new MirrorCommand(),
+    new AdviseCommand(), new DriftCommand(), new PruneCommand(), new BlueprintCommand(), new MirrorCommand(),
     new ContextGenCommand(), new LinkCommand(), new VisualizeCommand(),
+    new GuardCommand(),
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new EntryCommand(), new McpCommand(),
     new BootstrapDocsCommand(), new RecordCommand()

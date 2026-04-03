@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { CSHARP_QUERIES } from "./queries.js";
 import { CSharpResolver } from "./resolver.js";
 import { CSharpExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { CSharpExtractor } from "./extractor.js";
  * 
  * Maps C# structural DNA (Classes, Namespaces, ASP.NET Attributes) to the 8-layer taxonomy.
  */
-export class CSharpProvider extends WasmProvider {
+export class CSharpProvider extends NativeProvider {
   public readonly id = "csharp-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".cs"];

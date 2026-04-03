@@ -1,4 +1,4 @@
-import * as Parser from "web-tree-sitter";
+import Parser from "tree-sitter";
 import { PrismSpectrum, SpectrumNode } from "@/lib/core/persistence/prism-core.js";
 import { ConducksProvider } from "@/lib/core/parsing/providers/base.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
@@ -13,16 +13,18 @@ import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algori
 import { mapToCanonical, CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 import path from "node:path";
 
-
 import { ConducksComponent } from "@/registry/types.js";
 
 /**
- * Conducks — Structural Reflector
+ * Conducks — Native Structural Reflector 🛡️ 🔨
+ * 
+ * High-performance structural induction via native Node.js bindings.
+ * Eliminates the V8 Turboshaft WASM compiler bottleneck. 🏎️
  */
 export class ConducksReflector implements ConducksComponent {
-  public readonly id = 'structural-reflector';
-  public readonly type = 'analyzer';
-  public readonly description = 'Analyzes source code units and reflects their structure into a Synapse graph.';
+  public id = 'structural-reflector';
+  public type = 'analyzer' as any;
+  public description = 'Analyzes source code units and reflects their structure into a Synapse graph.';
   private imports = new ImportProcessor();
   private bindings = new BindingProcessor();
   private calls = new CallProcessor();
@@ -46,24 +48,10 @@ export class ConducksReflector implements ConducksComponent {
 
     const isTestFile = file.path.includes("test_") || file.path.includes("/tests/") || file.path.includes(".test.");
 
-    const lang = grammars.getLanguage(provider.langId);
-    if (!lang) throw new Error(`[Conducks] Missing grammar: ${provider.langId}`);
-
-    const parser = grammars.getUnifiedParser(provider.langId);
-    if (!parser) throw new Error(`[Conducks] Engine failure for: ${provider.langId}`);
-
-    const tree = parser.parse(file.source);
-    const query = grammars.createQuery(lang, provider.queryScm);
-    const matches = query.matches(tree.rootNode);
-
-    const nodeCache = new Map<string, SpectrumNode>();
-
     const fileMeta = mapToCanonical('file');
     const canonicalPath = file.path.toLowerCase();
     const fileId = `${canonicalPath}::unit`;
-    const fileName = path.basename(file.path);
-    
-    nodeCache.set(fileId, {
+    const unitNode: SpectrumNode = {
       name: 'UNIT',
       kind: 'file' as any,
       canonicalKind: fileMeta.kind,
@@ -71,17 +59,34 @@ export class ConducksReflector implements ConducksComponent {
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: file.path,
       isExport: true,
-      metadata: { 
-        isGlobalNode: true, 
+      metadata: {
+        isGlobalNode: true,
         isTest: isTestFile,
         displayName: path.basename(file.path),
         canonicalRank: 2,
         canonicalKind: 'UNIT'
       }
-    });
+    };
 
+    const lang = grammars.getLanguage(provider.langId);
+    if (!lang) throw new Error(`[Conducks] Missing native grammar: ${provider.langId}`);
 
-    // Conducks.6: Clinical Scope Initialization
+    const parser = grammars.getUnifiedParser(provider.langId);
+    if (!parser) {
+      spectrum.nodes.push(unitNode);
+      return spectrum;
+    }
+
+    const tree = parser.parse(file.source);
+    const query = grammars.createQuery(lang, provider.queryScm);
+    
+    // Native Matching Protocol 🧬
+    const matches = query.matches(tree.rootNode);
+
+    const nodeCache = new Map<string, SpectrumNode>();
+
+    nodeCache.set(fileId, unitNode);
+
     context.clearLocalBindings();
 
     // === Pass 1: Build Scope Map ===
@@ -110,9 +115,7 @@ export class ConducksReflector implements ConducksComponent {
       }
     }
 
-    // Helper: get enclosing scope name for a given row position
     const getScopeAt = (row: number, excludeName?: string): string => {
-      // Find the innermost scope containing this row
       let best: ScopeEntry | undefined;
       for (const s of scopeMap) {
         if (excludeName && s.name === excludeName) continue;
@@ -125,11 +128,14 @@ export class ConducksReflector implements ConducksComponent {
       return best ? best.name : '';
     };
 
-    // === Pass 2: Semantic Pulse (Implementation & Binding) ===
+    // === Pass 2: Semantic Pulse ===
     for (const match of matches) {
-      if (!match || !match.captures) continue;
+      if (!match || !match.captures || match.captures.length === 0) continue;
 
-      const currentMatchRow = match.captures[0].node.startPosition.row;
+      const firstCapture = match.captures[0];
+      if (!firstCapture || !firstCapture.node) continue;
+
+      const currentMatchRow = firstCapture.node.startPosition.row;
       const matchNameCap = match.captures.find((c: any) => c.name === 'name' || c.name === 'pulse_assignment_name');
       
       let node: any;
@@ -139,7 +145,6 @@ export class ConducksReflector implements ConducksComponent {
         const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
         const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
         
-        // Conducks.5: Identity Isolation (Lazy-init only for actual Definitions)
         const isDefinition = match.captures.some((c: any) => 
           c.name.startsWith('is') && 
           c.name !== 'isImport' && 
@@ -147,17 +152,14 @@ export class ConducksReflector implements ConducksComponent {
         );
 
         if (isDefinition) {
-           // Pass 1: Global Discovery
            if (context.isDiscoveryMode()) {
              context.registerGlobalSymbol(scopedId, { name, kind: 'unknown', filePath: file.path });
            }
 
            if (!nodeCache.has(scopedId)) {
-             // Conducks: Dynamic Kind Resolution
              const defCapture = match.captures.find((c: any) => c.name.startsWith('is') && c.name !== 'isImport' && c.name !== 'isExported');
              let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
              
-             // Architectural Promotion: Elevate specific structural shapes to INFRA or ATOM
              if (initialKind === 'variable' && (name.endsWith('Service') || name.endsWith('Router') || name.endsWith('Controller'))) {
                initialKind = 'infra';
              }
@@ -192,10 +194,8 @@ export class ConducksReflector implements ConducksComponent {
         node = nodeCache.get(scopedId);
       }
 
-      // If we are only in Discovery Mode, we skip relationship establishment
       if (context.isDiscoveryMode()) continue;
       
-      // Conducks.4: Identity Elevation - Capture export status from pass
       if (node && match.captures.some((c: any) => c.name === 'isExported')) {
         node.isExport = true;
         node.metadata.isExport = true;
@@ -204,7 +204,7 @@ export class ConducksReflector implements ConducksComponent {
       const captureMap: Record<string, string> = {};
       const args: string[] = [];
 
-      match.captures.forEach((c: Parser.QueryCapture) => {
+      match.captures.forEach((c: any) => {
         captureMap[c.name] = c.node.text;
         if (c.name === 'kinesis_arg') args.push(c.node.text);
       });
@@ -213,29 +213,25 @@ export class ConducksReflector implements ConducksComponent {
         const cName = capture.name;
         const cText = capture.node.text;
 
-        // 1. Definition Dispatch
         if (cName.startsWith('is')) {
           const kind = cName.slice(2).toLowerCase();
           
-          // Conducks.6: Synchronized Import Binding (The Great Binding)
           if (kind === 'import') {
             const sourceCap = match.captures.find((c: any) => c.name === 'source');
-            if (sourceCap) {
+            if (sourceCap && sourceCap.node) {
               const sourceText = sourceCap.node.text;
               const resolved = this.imports.resolve(sourceText, file.path.toLowerCase(), allPaths, provider, context);
               if (resolved) {
-                // Register ALL named bindings in this match
                 for (let i = 0; i < match.captures.length; i++) {
                   const cap = match.captures[i];
-                  if (cap.name === 'name') {
+                  if (cap.name === 'name' && cap.node) {
                     const aliasCap = (i + 1 < match.captures.length && match.captures[i+1].name === 'alias') 
                       ? match.captures[i+1] : undefined;
                     const bindingName = cap.node.text.toLowerCase();
-                    const aliasName = aliasCap ? aliasCap.node.text.toLowerCase() : bindingName;
+                    const aliasName = (aliasCap && aliasCap.node) ? aliasCap.node.text.toLowerCase() : bindingName;
                     this.imports.processBinding(resolved as string, bindingName, aliasName, spectrum, context);
                   }
                 }
-                // Also process the file-level import edge
                 this.imports.process(sourceText, file.path.toLowerCase(), allPaths, spectrum, provider, context);
               }
             }
@@ -245,31 +241,26 @@ export class ConducksReflector implements ConducksComponent {
             node.kind = kind as any;
             node.metadata[cName] = true;
             
-            // Conducks.4: Calibrate Canonical Taxonomy
             const canonical = mapToCanonical(kind);
             node.canonicalKind = canonical.kind;
             node.canonicalRank = canonical.rank;
             node.metadata.canonicalKind = canonical.kind;
             node.metadata.canonicalRank = canonical.rank;
-            node.metadata.displayName = node.name; // Preserve for UI
+            node.metadata.displayName = node.name;
 
-            // Update Registry with the discovered kind for better resolution
             const scope = getScopeAt(currentMatchRow, node.name);
             const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
             const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${node.name.toLowerCase()}`;
             const registryEntry = context.getGlobalSymbol(scopedId);
             if (registryEntry) registryEntry.kind = kind;
 
-            // Conducks: Structural Complexity Signal
             if (provider.calculateComplexity && (kind === 'function' || kind === 'method' || kind === 'class')) {
               const comp = provider.calculateComplexity(capture.node);
               node.metadata.complexity = comp;
-              (node as any).complexity = comp; // For convenience during persistence
+              (node as any).complexity = comp;
             }
           }
         }
-
-        // 2. Semantic Dispatch
         else if (cName === 'heritage' && node) {
           this.heritage.process(cText, node.name, spectrum);
         }
@@ -279,7 +270,6 @@ export class ConducksReflector implements ConducksComponent {
         else if (cName === 'kinesis_target' || cName === 'kinesis_qualified_target') {
           const scope = getScopeAt(currentMatchRow);
           
-          // Conducks.6: Qualified Resolve (Object.Property)
           let finalTarget = cText;
           if (captureMap['kinesis_object']) {
             finalTarget = `${captureMap['kinesis_object']}.${cText}`;
@@ -288,21 +278,17 @@ export class ConducksReflector implements ConducksComponent {
           const type = this.calls.isConstructor(finalTarget, provider) ? 'CONSTRUCTS' : 'CALLS';
           this.calls.process(finalTarget, scope, type, spectrum, args, context);
         }
-
-
-        // 3. Phase 2: Flow Dispatch
         else if (cName === 'pulse_assignment_name') {
           const val = captureMap['pulse_assignment_value'] ?? 'unknown';
           const scopeName = getScopeAt(currentMatchRow);
           this.flow.processAssignment(cText, val, scopeName, spectrum);
         }
         else if (cName === 'kinesis_route') {
-          const path = captureMap['kinesis_route_path'] ?? '/';
+          const pathReg = captureMap['kinesis_route_path'] ?? '/';
           const method = captureMap['route_method'] ?? 'GET';
           const scopeName = getScopeAt(currentMatchRow);
-          this.flow.processRoute(path, method, scopeName, spectrum, context.getFramework());
+          this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework());
 
-          // Conducks: Promote Logical Routes to Active Entry Points
           const scope = getScopeAt(currentMatchRow);
           const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
           const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scopePrefix}${scope ? scope.toLowerCase() : 'unit'}`);
@@ -320,8 +306,6 @@ export class ConducksReflector implements ConducksComponent {
           const scope = getScopeAt(currentMatchRow);
           this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum, [], context);
         }
-
-        // 4. Phase 3.2: Debt Dispatch
         else if (cName === 'comment' && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
@@ -361,9 +345,9 @@ export class ConducksReflector implements ConducksComponent {
 
     // Conducks: Ingest Kinetic Git Signals (Only in Resolution Mode)
     if (!context.isDiscoveryMode()) {
-      const resonance = await chronicle.getCommitResonance(file.path);
-      const distribution = await chronicle.getAuthorDistribution(file.path);
-      const blameData = await chronicle.getBlameData(file.path);
+      const resonance = (await chronicle.getCommitResonance(file.path)) || { count: 0 };
+      const distribution = (await chronicle.getAuthorDistribution(file.path)) || {};
+      const blameData = (await chronicle.getBlameData(file.path)) || [];
       const entropyRaw = calculateShannonEntropy(distribution);
       const entropyRisk = normalizeEntropyRisk(entropyRaw, Object.keys(distribution).length);
       const now = Math.floor(Date.now() / 1000);

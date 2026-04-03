@@ -1,6 +1,8 @@
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { GVREngine, RefactorResult } from "./gvr-engine.js";
 import { ConducksWatcher } from "./watcher.js";
+import { DriftEngine, DriftResult } from "./drift-engine.js";
+import { AuditService, AuditResult } from "./audit-service.js";
 import { ConducksComponent } from "@/registry/types.js";
 
 /**
@@ -11,12 +13,17 @@ export class EvolutionService implements ConducksComponent {
   public readonly type = 'analyzer';
   public readonly description = 'Orchestrates structural evolution, atomic refactoring (GVR), and real-time monitoring.';
   private _watcher: ConducksWatcher | null = null;
+  public readonly drift: DriftEngine;
+  public readonly auditService: AuditService;
 
   constructor(
     private readonly graph: any,
     private readonly persistence: any,
     public readonly gvr: GVREngine = new GVREngine()
-  ) {}
+  ) {
+    this.drift = new DriftEngine(this.persistence);
+    this.auditService = new AuditService(this.persistence);
+  }
 
   /**
    * Initializes or retrieves the singleton structural watcher.
@@ -37,8 +44,24 @@ export class EvolutionService implements ConducksComponent {
   public async rename(symbolId: string, newName: string, dryRun: boolean = false): Promise<RefactorResult> {
     return this.gvr.renameSymbol(this.graph.getGraph(), symbolId as any, newName, dryRun);
   }
+
+  /**
+   * Compares the current structural state against a historical baseline.
+   */
+  public async compare(prevPulseId?: string): Promise<DriftResult> {
+    return this.drift.compare(prevPulseId);
+  }
+
+  /**
+   * Performs an architectural audit over a window of pulses.
+   */
+  public async audit(window: number = 5): Promise<AuditResult> {
+    return this.auditService.audit(window);
+  }
 }
 
-export type { RefactorResult };
+export type { RefactorResult, DriftResult, AuditResult };
 export { GVREngine } from "./gvr-engine.js";
 export { ConducksWatcher } from "./watcher.js";
+export { DriftEngine } from "./drift-engine.js";
+export { AuditService } from "./audit-service.js";

@@ -33,10 +33,10 @@ export class MetricsService implements ConducksComponent {
     const node = g.getNode(symbolId);
     if (!node || !node.properties.filePath) return { entropy: 0, risk: 0 };
 
-    const distribution = await chronicle.getAuthorDistribution(node.properties.filePath);
+    const distribution = (await chronicle.getAuthorDistribution(node.properties.filePath)) || {};
     const authors = Object.keys(distribution);
     const entropy = calculateShannonEntropy(distribution);
-    const risk = normalizeEntropyRisk(entropy, authors.length);
+    const risk = normalizeEntropyRisk(entropy, authors.length || 1);
 
     return { entropy, risk, authorCount: authors.length };
   }

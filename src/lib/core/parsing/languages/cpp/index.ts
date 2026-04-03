@@ -1,4 +1,4 @@
-import { WasmProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
 import { CPP_QUERIES } from "./queries.js";
 import { CPPResolver } from "./resolver.js";
 import { CPPExtractor } from "./extractor.js";
@@ -8,7 +8,7 @@ import { CPPExtractor } from "./extractor.js";
  * 
  * Maps C++ structural DNA (Classes, Templates, Namespaces) to the 8-layer taxonomy.
  */
-export class CPPProvider extends WasmProvider {
+export class CPPProvider extends NativeProvider {
   public readonly id = "cpp-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".h"];
