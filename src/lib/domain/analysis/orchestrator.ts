@@ -10,6 +10,7 @@ import path from "node:path";
 
 import { ConducksComponent } from "@/registry/types.js";
 import { logger } from "@/lib/core/utils/logger.js";
+import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
 import { Worker } from "node:worker_threads";
 import { fork } from "node:child_process";
 import os from "node:os";
@@ -17,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const workerPath = path.resolve(__dirname, "../../core/parsing/pulse-worker.js");
+const workerPath = path.resolve(__dirname, "../../core/parsing/pulse-worker.ts");
 const resourceDir = path.resolve(__dirname, "../../../resources/grammars");
 
 /**
@@ -41,13 +42,18 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     private ignoreManager?: IgnoreManager
   ) { }
 
-  /**
+   /**
    * Orchestrates a high-fidelity structural analysis on the provided files.
    * Universal Two-Pass Resolution Architecture (Discovery -> Induction)
    */
-  public async analyze(files: Array<{ path: string, source: string }>): Promise<string> {
+  public async analyze(
+    files: Array<{ path: string, source: string }>, 
+    options: { workspaceRoot?: string, projectRoots?: string[] } = {}
+  ): Promise<{ pulseId: string, nodeCount: number, edgeCount: number }> {
     this.context.reset();
     const context = this.context;
+    const pulseId = `pulse_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    this.graph.getGraph().setMetadata('targetPulseId', pulseId);
 
     // Structural Exclusion Guard
     const activeFiles = this.ignoreManager ? 
@@ -63,12 +69,14 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     const spectra = new Map<string, any>();
 
     // Phase 0: Multi-Project Hierarchy Mapping 🏺 🧬
-    const projectRoots: string[] = (arguments[1] as any)?.projectRoots || [path.resolve(process.cwd())];
-    const workspaceRoot: string = (arguments[1] as any)?.workspaceRoot || path.resolve(process.cwd());
+    const cliProjectRoots = options.projectRoots || [];
+    const workspaceRoot: string = options.workspaceRoot || path.resolve(process.cwd());
+    const projectRoots: string[] = cliProjectRoots.length > 0 ? cliProjectRoots.map((r: string) => path.resolve(r)) : [workspaceRoot];
 
-    // 1. Create the Unified ECOSYSTEM Node (Rank 0)
+    // 1. Create the Unified ecosystem Node (Rank 0)
+    const ecosystemId = "ecosystem::global";
     this.graph.getGraph().addNode({
-      id: "ECOSYSTEM::GLOBAL",
+      id: ecosystemId,
       label: "Ecosystem",
       properties: {
         name: path.basename(workspaceRoot),
@@ -78,10 +86,11 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       } as any
     });
 
-    // 2. Create REPOSITORY Nodes (Rank 1)
+    // 2. Create repository Nodes (Rank 1)
     const projectMap = new Map<string, string>(); // filePath -> projectRoot
     for (const root of projectRoots) {
-      const repoId = `REPOSITORY::${root.toLowerCase()}`;
+      const rootId = path.basename(root).toLowerCase();
+      const repoId = `repository::${rootId}`;
       this.graph.getGraph().addNode({
         id: repoId,
         label: "Repository",
@@ -89,25 +98,24 @@ export class AnalyzeOrchestrator implements ConducksComponent {
           name: path.basename(root),
           filePath: root,
           canonicalKind: 'REPOSITORY',
-          canonicalRank: 1
+          canonicalRank: 1,
+          parentId: ecosystemId // Oracle DNA: Hierarchical Link
         } as any
       });
 
-      // Link Repo to Ecosystem
+      // Materialize Ecosystem -> Repository Link
       this.graph.getGraph().addEdge({
-        id: `ECOSYSTEM::GLOBAL::${repoId}::CONTAINS`,
-        sourceId: "ECOSYSTEM::GLOBAL",
-        targetId: repoId,
-        type: 'CONTAINS',
+        id: `member::${repoId}->${ecosystemId}`,
+        sourceId: repoId,
+        targetId: ecosystemId,
+        type: 'MEMBER_OF',
         confidence: 1.0,
         properties: {}
       });
 
       // Populate Project Map for Unit assignment
       for (const file of normalizedFiles) {
-        if (file.path.startsWith(root + path.sep) || file.path === root) {
-          // If a file belongs to multiple roots (e.g. monorepo root vs submodule), 
-          // we pick the deepest (longest) path as the primary project.
+        if (file.path.startsWith(root) || file.path === root) {
           const existing = projectMap.get(file.path);
           if (!existing || root.length > existing.length) {
             projectMap.set(file.path, root);
@@ -115,74 +123,234 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         }
       }
     }
+ 
+    // === Phase 0.1: Recursive Directory Population 🏺 ===
+    const directoryIds = new Set<string>();
+    for (const file of normalizedFiles) {
+      let currentDir = path.dirname(file.path);
+      const root = projectMap.get(file.path) || workspaceRoot;
+      const rootId = path.basename(root).toLowerCase();
+      
+      while (currentDir.startsWith(root) && currentDir !== root) {
+        const canonicalDir = canonicalize(currentDir);
+        if (directoryIds.has(canonicalDir)) break;
+        
+        const dirId = `directory::${canonicalDir}`;
+        const parentDir = path.dirname(currentDir);
+        const parentId = parentDir.startsWith(root) && parentDir !== root ? 
+          `directory::${canonicalize(parentDir)}` : 
+          `repository::${rootId}`;
+
+        this.graph.getGraph().addNode({
+          id: dirId,
+          label: "Directory",
+          properties: {
+            name: path.basename(currentDir),
+            filePath: canonicalDir,
+            canonicalKind: 'DIRECTORY',
+            canonicalRank: 1.5,
+            parentId
+          } as any
+        });
+
+        // Materialize Directory -> Parent Link
+        this.graph.getGraph().addEdge({
+          id: `member::${dirId}->${parentId}`,
+          sourceId: dirId,
+          targetId: parentId,
+          type: 'MEMBER_OF',
+          confidence: 1.0,
+          properties: {}
+        });
+        
+        directoryIds.add(canonicalDir);
+        currentDir = parentDir;
+      }
+    }
+
+    // Phase 0.2: Legendary Anchor (Taxonomy Guide) 🏺
+    const layers = [
+      { id: 'L0', name: 'ECOSYSTEM', rank: 0 },
+      { id: 'L1', name: 'REPOSITORY', rank: 1 },
+      { id: 'L2', name: 'DIRECTORY', rank: 2 },
+      { id: 'L3', name: 'UNIT', rank: 3 },
+      { id: 'L4', name: 'INFRA', rank: 4 },
+      { id: 'L5', name: 'STRUCTURE', rank: 5 },
+      { id: 'L6', name: 'BEHAVIOR', rank: 6 },
+      { id: 'L7', name: 'ATOM', rank: 7 },
+      { id: 'L8', name: 'DATA', rank: 8 }
+    ];
+
+    for (const layer of layers) {
+      this.graph.getGraph().addNode({
+        id: `taxonomy::${layer.id.toLowerCase()}`,
+        label: 'Taxonomy',
+        properties: {
+          name: layer.name,
+          canonicalKind: layer.name,
+          canonicalRank: layer.rank,
+          parentId: 'ecosystem::legend'
+        } as any
+      });
+      this.graph.getGraph().addEdge({
+        id: `member::taxonomy::${layer.id.toLowerCase()}->legend`,
+        sourceId: `taxonomy::${layer.id.toLowerCase()}`,
+        targetId: 'ecosystem::legend',
+        type: 'MEMBER_OF',
+        confidence: 1.0,
+        properties: {}
+      });
+    }
+
+    this.graph.getGraph().addNode({
+      id: 'ecosystem::legend',
+      label: 'Legend',
+      properties: {
+        name: 'Structural Legend',
+        canonicalKind: 'ECOSYSTEM',
+        canonicalRank: -1,
+        parentId: 'ecosystem::global'
+      } as any
+    });
+    this.graph.getGraph().addEdge({
+      id: 'member::legend->global',
+      sourceId: 'ecosystem::legend',
+      targetId: 'ecosystem::global',
+      type: 'MEMBER_OF',
+      confidence: 1.0,
+      properties: {}
+    });
 
     // Adaptive Memory Pressure Calculation
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
     const isLargeProject = normalizedFiles.length > 100;
     const useShallowMode = memoryUsage > 1000 || isLargeProject;
 
-    // === Pass 1: Global Discovery Pulse (PARALLEL) ===
-    logger.info(`🛡️ [Conducks] [Phase 1] Structural Discovery: Mapping ${normalizedFiles.length} units (Parallel)...`);
-    const discoveryResults = await this.runParallelPulse(normalizedFiles, true, allPaths);
-    
-    // Merge Discoveries into Global Context
-    for (const res of discoveryResults) {
-      if (res.state) {
-        context.mergeState(res.state);
-      }
-    }
-
-    // === Pass 2: Structural Induction (Resolution) (PARALLEL) ===
-    logger.info(`🛡️ [Conducks] [Phase 2] Structural Induction: Establishing referential integrity (Parallel)...`);
-    const inductionResults = await this.runParallelPulse(normalizedFiles, false, allPaths, context.exportState().registry);
-
-    // Batch Save Spectra to Disk
-    if (this.persistence && useShallowMode) {
-      const batchEntries = inductionResults
-        .filter(r => r.success && r.spectrum)
-        .map(r => ({ filePath: r.path, spectrum: r.spectrum }));
+    // === Pass 1: Global Identity Discovery 🏺 ===
+    // We build the entire containment graph before induction.
+    logger.info(`🛡️ [Conducks] [Pass 1] Structural Discovery: Mapping ${normalizedFiles.length} units (Parallel)...`);
       
-      await this.persistence.saveBatchSpectrum(batchEntries);
+    for (const file of normalizedFiles) {
+        const filePath = canonicalize(file.path);
+        const unitId = `${filePath}::unit`;
+        const projectRoot = projectMap.get(file.path) || workspaceRoot;
+        const rootName = path.basename(projectRoot).toLowerCase();
+        
+        // File -> Parent Directory link
+        const fileDir = path.dirname(file.path);
+        const relativeDir = path.relative(projectRoot, fileDir);
+        const parentId = relativeDir === '' || relativeDir === '.' ? 
+           `repository::${rootName}` : 
+           `directory::${canonicalize(fileDir)}`;
+
+       this.graph.getGraph().addNode({
+         id: unitId,
+         label: "File",
+         properties: {
+           name: path.basename(file.path),
+           filePath: filePath,
+           rawPath: file.path, 
+           projectRelativePath: getProjectRelativePath(file.path, workspaceRoot),
+           canonicalKind: 'UNIT',
+           canonicalRank: 2,
+           parentId,
+           rootId: `repository::${rootName}`
+         } as any
+       });
+
+        // Materialize Unit -> Directory/Repository Link
+        this.graph.getGraph().addEdge({
+          id: `member::${unitId}->${parentId}`,
+          sourceId: unitId,
+          targetId: parentId,
+          type: 'MEMBER_OF',
+          confidence: 1.0,
+          properties: {}
+        });
     }
 
-    // Populate memory spectra for final ingestion
-    for (const res of inductionResults) {
-      if (res.success && res.spectrum) {
-        spectra.set(res.path, res.spectrum);
-      } else if (!res.success) {
-        logger.warn(`Induction Failure: ${res.path} -> ${res.error}`);
-        // Ingest dummy error node
-        this.graph.ingestSpectrum(res.path, {
-          nodes: [{
-            name: 'CORRUPT_UNIT',
-            kind: 'file' as any,
-            canonicalKind: 'UNIT',
-            canonicalRank: 2,
-            range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
-            metadata: { isError: true, error: res.error, displayName: path.basename(res.path) }
-          }],
-          relationships: []
-        });
+    let totalNodes = 0;
+    let totalEdges = 0;
+
+    // Flush Discovery Pass to clear RAM for Induction
+    if (this.persistence) {
+      logger.info(`🛡️ [Conducks] [Pass 1.5] Flushing structural hierarchy to vault...`);
+      const { nodeCount, edgeCount } = await (this.graph as any).flushAndClear(this.persistence, pulseId);
+      totalNodes += nodeCount;
+      totalEdges += edgeCount;
+    }
+
+    // === Pass 2 & 3: Apostolic Streaming Induction & Binding 🏺 ===
+    logger.info(`🛡️ [Conducks] [Pass 2/3] Streaming Resonance: Reflecting ${normalizedFiles.length} units in throttled waves...`);
+    
+    const CHUNK_SIZE = 500;
+    const totalBatches = Math.ceil(normalizedFiles.length / CHUNK_SIZE);
+
+    for (let i = 0; i < normalizedFiles.length; i += CHUNK_SIZE) {
+      const chunk = normalizedFiles.slice(i, i + CHUNK_SIZE);
+      const batchNum = Math.floor(i / CHUNK_SIZE) + 1;
+      
+      logger.info(`🛡️ [Conducks] Wave ${batchNum}/${totalBatches}: Inducing ${chunk.length} units...`);
+      const inductionResults = await this.runParallelPulse(chunk, false, allPaths, context.exportState().registry);
+
+      for (const res of inductionResults) {
+        if (!res.success || !res.spectrum) continue;
+        
+        const filePath = canonicalize(res.path);
+        const unitId = `${filePath}::unit`;
+        const projectRoot = projectMap.get(res.path) || workspaceRoot;
+        const rootId = `repository::${path.basename(projectRoot).toLowerCase()}`;
+
+        // 3.1 Local Induction (Symbols)
+        this.graph.ingestSpectrum(res.path, res.spectrum, useShallowMode, unitId, rootId);
+
+        // 3.2 Global Neural Binding (Imports -> Units)
+        for (const rel of res.spectrum.relationships) {
+          if (rel.type === 'IMPORTS' && (rel.metadata as any)?.isRaw) {
+            const specifier = (rel.metadata as any).specifier;
+            const linkage = this.reflector.imports.link(specifier, res.path, allPaths, undefined, context);
+            if (linkage) {
+              this.graph.getGraph().addEdge({
+                id: `NEURAL::${unitId}->${linkage.targetId}`,
+                sourceId: unitId,
+                targetId: linkage.targetId.includes('::') ? linkage.targetId : `${linkage.targetId}::unit`,
+                type: linkage.type,
+                confidence: 1.0,
+                properties: { specifier }
+              });
+            }
+          }
+        }
+      }
+
+      // Flush Chunk to Vault & Clear RAM
+      if (this.persistence) {
+        logger.info(`🛡️ [Conducks] [Wave ${batchNum}] Flushing structural delta to vault...`);
+        const { nodeCount, edgeCount } = await (this.graph as any).flushAndClear(this.persistence, pulseId);
+        totalNodes += nodeCount;
+        totalEdges += edgeCount;
+        
+        // Recover Heap
+        if (global.gc) {
+          global.gc();
+        }
       }
     }
 
-    // Step 3: Topological Leveling & Batch Ingestion
-    const levels = ConducksPipeline.topologicalSort(context.getImportMap(), allPaths);
-    for (const level of levels) {
-      const tasks = level.map(async (filePath) => {
-        const spectrum = spectra.get(filePath);
-        if (!spectrum) return;
-        const projectRoot = projectMap.get(filePath);
-        this.graph.ingestSpectrum(filePath, spectrum, useShallowMode, projectRoot);
-      });
-      await Promise.all(tasks);
+    // Phase 4: Final Metadata Sync
+    if (this.persistence) {
+      await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
+      
+      // Apostolic Pulse Hardening: Ensure pulse record knows total count.
+      await this.persistence.run(
+        "INSERT OR REPLACE INTO pulses (id, timestamp, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?)",
+        [pulseId, Date.now(), totalNodes, totalEdges, JSON.stringify({ totalUnits: normalizedFiles.length })]
+      );
     }
 
-    // Step 4: Final Resonance (Pruning and Resonance Gravity)
-    this.resonate();
-
-    const head = (this.graph.getGraph() as any).getMetadata('head') || Date.now().toString();
-    return head;
+    logger.info(`🛡️ [Conducks] Structural Resonance Complete. Pulse ${pulseId} is now frozen in the vault.`);
+    logger.info(`🛡️ [Conducks] Synapse Reflection: ${totalNodes} Nodes, ${totalEdges} Edges across ${totalBatches} induction waves.`);
+    return { pulseId, nodeCount: totalNodes, edgeCount: totalEdges };
   }
 
   /**
@@ -195,46 +363,44 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     allPaths: string[],
     globalSymbols?: Record<string, any>
   ): Promise<any[]> {
-    const cpuCount = os.cpus().length;
-    const envMax = process.env.CONDUCKS_MAX_WORKERS ? parseInt(process.env.CONDUCKS_MAX_WORKERS) : Infinity;
-    
-    // Conducks Native Resilience: 100% stable on Node 25+ via C++ bindings.
-    const threadCount = Math.min(
-      Math.max(1, cpuCount - 1), 
-      envMax, 
-      8 // Increased concurrency for native high-performance grain
-    );
+    // DEV STABILITY: Sequential execution in main thread to bypass worker resolution hell.
+    // In production, this shifts to a compiled worker pool.
+    logger.info(`🛡️ [Conducks] [Main Thread] Pulse Wave: Processing ${files.length} units...`);
 
-    const chunkSize = Math.ceil(files.length / threadCount);
-    const workers: Promise<any[]>[] = [];
-
-    for (let i = 0; i < threadCount; i++) {
-      const chunk = files.slice(i * chunkSize, (i + 1) * chunkSize);
-      if (chunk.length === 0) continue;
-
-      workers.push(new Promise((resolve, reject) => {
-        const payload = {
-          units: chunk,
-          allPaths,
-          discoveryMode,
-          globalSymbols
-        };
-
-        // Standard High-Performance Worker Thread Pulse
-        const worker = new Worker(workerPath, {
-          workerData: payload
-        });
-
-        worker.on('message', resolve);
-        worker.on('error', reject);
-        worker.on('exit', (code) => {
-          if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
-        });
-      }));
+    const results = [];
+    const context = new AnalyzeContext();
+    if (discoveryMode) context.setDiscoveryMode(true);
+    if (globalSymbols) {
+       for (const [id, sym] of Object.entries(globalSymbols)) {
+         context.registerGlobalSymbol(id, sym as any);
+       }
     }
 
-    const chunks = await Promise.all(workers);
-    return chunks.flat();
+    const providerMap = new Map<string, any>();
+    const { PythonProvider } = await import("../../core/parsing/languages/python/index.js");
+    const { TypeScriptProvider } = await import("../../core/parsing/languages/typescript/index.js");
+    const { grammars } = await import("../../core/parsing/grammar-registry.js");
+
+    for (const unit of files) {
+      const ext = path.extname(unit.path);
+      let provider = providerMap.get(ext);
+      if (!provider) {
+        if (ext === '.py') provider = new PythonProvider();
+        else if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) provider = new TypeScriptProvider();
+        if (provider) providerMap.set(ext, provider);
+      }
+      
+      if (!provider) continue;
+
+      try {
+        await grammars.loadLanguage(provider.langId);
+        const spectrum = await this.reflector.reflect(unit, provider, context, allPaths);
+        results.push({ path: unit.path, spectrum, state: context.exportState(), success: true });
+      } catch (err) {
+        results.push({ path: unit.path, error: (err as Error).message, success: false });
+      }
+    }
+    return results;
   }
 
   /**

@@ -9,6 +9,22 @@ import { registry } from "@/registry/index.js";
  * 
  * CRITICAL RULE 10/13: Exactly 9 Unified Conducks MCP Tools mandated.
  */
+
+/**
+ * [Apostolic Anchor Check] 🏺
+ * Ensures the structural registry is aligned to the correct workspace root
+ * before executing any tool. This prevents "Detached Root" errors when
+ * the MCP server is launched from an arbitrary directory.
+ */
+async function ensureAnchor(customPath?: string) {
+  const root = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
+  
+  if (root && root !== currentAnchor && root !== '/') {
+    await registry.initialize(true, root);
+  }
+}
+
 export const synapseTools: Record<string, Tool> = {
 
   conducks_query: {
@@ -17,14 +33,14 @@ export const synapseTools: Record<string, Tool> = {
     type: "tool",
     version: "2.1.0",
     description: `Search the structural graph for symbols and concepts by name or pattern.
-Foundational tool for codebase discovery. Finds matching symbols ranked by structural importance.
+Foundational tool for codebase discovery. Supports Fuzzy search, Oracle templates, and Filters.
 
-WHEN TO USE: Finding specific functions, classes, or modules.
+WHEN TO USE: Finding specific functions, classes, or modules; analyzing usage or dead code.
 AFTER THIS: Use conducks_explain to analyze risk or conducks_trace to trace execution.
 
 Modes:
 - fuzzy (default): Natural language or partial name matching.
-- regex: Precision regular expression search.
+- template: Execute named Oracle Standard SQL templates (e.g., 'find_usages', 'hotspots', 'dead_code').
 
 Returns:
 - symbols: matching nodes ranked by gravity with entry points prioritized
@@ -32,37 +48,56 @@ Returns:
     inputSchema: {
       type: "object",
       properties: {
-        q: { type: "string", description: "Symbol name, pattern, or search concept." },
+        q: { type: "string", description: "Symbol name, pattern, or search concept (for fuzzy mode)." },
+        mode: { type: "string", enum: ["fuzzy", "template"], default: "fuzzy", description: "Query modality." },
+        template: { type: "string", description: "The named Oracle template to execute (for template mode)." },
+        params: { type: "object", description: "Parameters for the Oracle template (as a JSON object)." },
         limit: { type: "number", default: 10, description: "Max results to return (Max: 10)." },
         path: { type: "string", description: "Optional: The absolute project root." }
-      },
-      required: ["q"]
+      }
     },
     formatter: (res: any) => JSON.stringify(res, null, 2),
-    handler: async ({ q, limit, path: customPath }: any) => {
+    handler: async ({ q, mode, template, params, limit, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-        const results = await registry.query.query(q, limit || 10);
+        await ensureAnchor(customPath);
+        
+        // 1. [Mode: Templates] Discovery - Lists available Oracle queries
+        if (mode === 'template' && !template) {
+          const templates = (registry.analyze.query as any).listTemplates();
+          return { 
+            message: "Conducks Oracle Standard Library Active.",
+            available_templates: templates 
+          };
+        }
+
+        // 2. [Mode: Template] Structural Analysis - Executes a named query
+        if (mode === 'template' && template) {
+          const rawParams = Array.isArray(params) ? params : (params ? Object.values(params) : []);
+          const results = await registry.analyze.query.execute(template as any, rawParams);
+          return { template, total: results.length, symbols: results };
+        }
+
+        // 3. [Mode: Fuzzy] Discovery - Default name/pattern search
+        const pattern = `%${q || ''}%`;
+        const results = await registry.analyze.query.execute('search', [pattern, pattern, limit || 10]);
         
         const standardize = (n: any) => ({
           id: n.id,
-          kind: n.label,
-          file: n.properties.filePath,
-          name: n.properties.name,
-          risk: n.properties.risk || 0,
-          gravity: n.properties.rank || 0
+          name: n.name,
+          kind: n.canonicalKind,
+          rank: n.canonicalRank,
+          location: {
+            file: n.file,
+            namespace: n.namespaceName,
+            parent: n.parentName
+          },
+          risk: n.risk || 0,
+          gravity: n.gravity || 0
         });
 
-        const ranked = results
-          .filter((n: any) => n !== undefined)
-          .sort((a: any, b: any) => {
-            if (a.properties.isEntryPoint && !b.properties.isEntryPoint) return -1;
-            if (!a.properties.isEntryPoint && b.properties.isEntryPoint) return 1;
-            return (b.properties.rank || 0) - (a.properties.rank || 0);
-          }).slice(0, Math.min(limit || 10, 10));
-
         return {
-          symbols: ranked.map(standardize),
+          q,
+          symbols: results.map(standardize),
           total: results.length,
           indexStaleness: registry.audit.status().staleness.stale
         };
@@ -85,11 +120,7 @@ AFTER THIS: Use conducks_query to find specific symbols.
 Modes:
 - health (default): Summary of symbols, edges, and index staleness.
 - map: Lists the primary entry points and structural hotspots.
-- manifest: Generates an LLM-optimized technical summary of the codebase.
-
-Returns:
-- stats: node/edge counts and health status
-- hotspots: ranked list of critical symbols (for 'map' mode)`,
+- manifest: Generates an LLM-optimized technical summary of the codebase.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -100,16 +131,11 @@ Returns:
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ mode, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await ensureAnchor(customPath);
         const status = registry.audit.status();
         
         if (mode === "map") {
-          const graph = registry.query.graph.getGraph();
-          const hotspots = Array.from(graph.getAllNodes())
-            .sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0))
-            .slice(0, 10)
-            .map((n: any) => ({ id: n.id, name: n.properties.name, risk: n.properties.risk || 0 }));
-          
+          const hotspots = await registry.analyze.query.execute('hotspots', ['$pulseId', 10]);
           return { stats: status.stats, staleness: status.staleness, hotspots };
         }
 
@@ -125,6 +151,8 @@ Returns:
         };
       } catch (err: any) {
         return { error: `Status Request Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   },
@@ -142,20 +170,27 @@ AFTER THIS: Use conducks_explain to analyze why a symbol is flagged.
 Modes:
 - scan (default): Full integrity audit for circularities and god objects.
 - advice: Professional structural improvement recommendations.
+- guard: Defensive regression check. Blocks if risk exceeds threshold.
 - archeology: Longitudinal historical analysis of structural decay over time (Window: 5 pulses).`,
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["scan", "advice", "archeology"], default: "scan" },
+        mode: { type: "string", enum: ["scan", "advice", "guard", "archeology"], default: "scan" },
+        threshold: { type: "number", default: 0.1, description: "Max allowed decay (for guard mode)." },
         window: { type: "number", default: 5, description: "Historical window size (for archeology mode)." },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
     formatter: (res: any) => JSON.stringify(res, null, 2),
-    handler: async ({ mode, window, path: customPath }: any) => {
+    handler: async ({ mode, threshold, window, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await ensureAnchor(customPath);
         
+        if (mode === "guard") {
+          const result = await registry.audit.guard(threshold || 0.1);
+          return { block: result.block, risk: result.risk, hotspots: result.hotspots, indexStaleness: registry.audit.status().staleness.stale };
+        }
+
         if (mode === "archeology") {
           const result = await registry.evolution.audit(window || 5);
           return { ...result, indexStaleness: registry.audit.status().staleness.stale };
@@ -168,53 +203,18 @@ Modes:
         
         const audit = registry.audit.audit();
         return {
-          violations: audit.violations.slice(0, 10).map((v: any) => {
-            if (typeof v === 'string') return { summary: v };
-            return { 
-              id: v.nodeId || v.id, 
-              rule: v.ruleId || v.type,
-              summary: v.message || 'Structural violation detected.'
-            };
-          }),
+          violations: audit.violations.slice(0, 10).map((v: any) => ({
+            id: v.nodeId || v.id, 
+            rule: v.ruleId || v.type,
+            summary: v.message || 'Structural violation detected.'
+          })),
           totalViolations: audit.violations.length,
           indexStaleness: registry.audit.status().staleness.stale
         };
       } catch (err: any) {
         return { error: `Audit Failed: ${err.message}` };
-      }
-    }
-  },
-
-  conducks_guard: {
-    id: "conducks-guard",
-    name: "conducks_guard",
-    type: "tool",
-    version: "2.1.0",
-    description: `Defensive structural regression guard. Blocks if structural risk exceeds threshold.
-Designed for use in pre-commit hooks or automated CI/CD audits.
-
-WHEN TO USE: Enforcing architectural standards before a pull request.
-AFTER THIS: If blocked, use conducks_audit --mode archeology to investigate hotspots.
-
-Returns:
-- block: Boolean (True if risk exceeds threshold)
-- risk: Current structural entropy delta
-- hotspots: Symbols contributing most to the regression`,
-    inputSchema: {
-      type: "object",
-      properties: {
-        threshold: { type: "number", default: 0.1, description: "Max allowed decay (Default: 0.1)." },
-        path: { type: "string", description: "Optional: The absolute project root." }
-      }
-    },
-    formatter: (res: any) => JSON.stringify(res, null, 2),
-    handler: async ({ threshold, path: customPath }: any) => {
-      try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-        const result = await registry.audit.guard(threshold || 0.1);
-        return { ...result, indexStaleness: registry.audit.status().staleness.stale };
-      } catch (err: any) {
-        return { error: `Guard Check Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   },
@@ -228,11 +228,7 @@ Returns:
 Quantifies gravity, entropy, churn, and complexity.
 
 WHEN TO USE: Understanding why a symbol is high risk or structuraly complex.
-AFTER THIS: Use conducks_trace to see how data flows through this symbol.
-
-Returns:
-- breakdown: 6-signal risk scores
-- summary: overall technical debt assessment`,
+AFTER THIS: Use conducks_trace to see how data flows through this symbol.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -244,11 +240,27 @@ Returns:
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await ensureAnchor(customPath);
         const risk = await registry.explain.calculateCompositeRisk(symbol);
-        return { ...risk, indexStaleness: registry.audit.status().staleness.stale };
+        const ancestry = await registry.analyze.query.execute('full_ancestry', [symbol, '$pulseId']);
+        const node = ancestry.length > 0 ? ancestry[0] : null;
+
+        return { 
+          ...risk, 
+          context: node ? {
+            name: node.name,
+            file: node.file,
+            parent: node.parentName,
+            container: node.className || node.namespaceName,
+            kind: node.canonicalKind,
+            rank: node.canonicalRank
+          } : undefined,
+          indexStaleness: registry.audit.status().staleness.stale 
+        };
       } catch (err: any) {
         return { error: `Explanation Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   },
@@ -261,10 +273,7 @@ Returns:
     description: `Access the dynamic architectural guidance library. Serves engineering standards and rules.
 
 WHEN TO USE: You need specific guidance on UI, Backend, Security, or Project Structure.
-AFTER THIS: Apply the provided rules to your implementation.
-
-No Arguments: Returns the list of all available guidance modules.
-'skill' Argument: Returns the specific markdown content for a module (e.g., 'frontend/tools/color').`,
+AFTER THIS: Apply the provided rules to your implementation.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -275,26 +284,23 @@ No Arguments: Returns the list of all available guidance modules.
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ skill, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-        
-        // Ensure Oracle is bootstrapped (lazy load)
+        await ensureAnchor(customPath);
         await (registry.oracle as any).bootstrap();
 
         if (skill) {
           const detail = registry.oracle.get(skill);
-          if (!detail) {
-            return { error: `Skill '${skill}' not found in the Oracle.`, available: registry.oracle.list().map(s => s.id) };
-          }
+          if (!detail) return { error: `Skill '${skill}' not found.`, available: registry.oracle.list().map(s => s.id) };
           return { skill: detail.id, name: detail.name, content: detail.content };
         }
 
-        const list = registry.oracle.list();
         return {
           message: "Conducks Dynamic Guidance Library Active.",
-          available_modules: list.map(s => ({ id: s.id, name: s.name, description: s.description }))
+          available_modules: registry.oracle.list().map(s => ({ id: s.id, name: s.name, description: s.description }))
         };
       } catch (err: any) {
         return { error: `Oracle Request Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   }

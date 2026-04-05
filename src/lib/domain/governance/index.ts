@@ -35,13 +35,53 @@ export class GovernanceService implements ConducksComponent {
   }
 
   /**
-   * Performs an architectural audit (Cycles, God Objects, HUBs).
+   * Performs an architectural audit (Cycles, God Objects, Orphans).
    */
   public audit() {
     const violations: string[] = [];
+    
+    // 1. Circular Dependency Detection
     const cycles = this.graph.detectCycles();
-    for (const cycle of cycles) violations.push(`ARCH-3: Circular: ${cycle.join(" -> ")}`);
-    return { success: violations.length === 0, violations };
+    for (const cycle of cycles) {
+      violations.push(`ARCH-3: Circular: ${cycle.join(" -> ")}`);
+    }
+
+    // 2. Orphaned Edge Detection (Refactoring Alerts) 🏺
+    // [Apostolic State-Sync] We scan the global synapse for dangling links.
+    const allEdges = this.graph.getAllEdges();
+    const orphanedEdges = allEdges.filter(e => {
+      // Ignore virtual or metadata edges if they exist, focus on structural
+      if (e.type === 'MEMBER_OF') return false; 
+      return !this.graph.hasNode(e.targetId);
+    });
+
+    let internalOrphans = 0;
+    let externalOrphans = 0;
+
+    for (const orphan of orphanedEdges) {
+      const sourceNode = this.graph.getNode(orphan.sourceId);
+      const sourceName = sourceNode ? sourceNode.properties.name : orphan.sourceId;
+      
+      const isExternalId = orphan.targetId.includes('::') && !orphan.targetId.startsWith('/');
+      if (isExternalId) {
+        externalOrphans++;
+        // We report them but with a lower priority label
+        violations.push(`ECOSYSTEM-1: Unresolved Library Symbol: [${sourceName}] -> [${orphan.targetId}]`);
+      } else {
+        internalOrphans++;
+        violations.push(`REFACTOR-1: Orphaned Edge: [${sourceName}] -> [${orphan.targetId}] (Broken Link)`);
+      }
+    }
+
+    return { 
+      success: internalOrphans === 0, 
+      violations,
+      stats: {
+        cycles: cycles.length,
+        orphans: internalOrphans,
+        ecosystem_dangling: externalOrphans
+      }
+    };
   }
 
   /**

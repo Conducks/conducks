@@ -224,6 +224,3 @@ window.updateClusterUI = updateClusterUI;
 initUI();
 configureGraph();
 refreshSynapse();
-
-const sse = new EventSource('/api/pulse');
-sse.onmessage = () => refreshSynapse();

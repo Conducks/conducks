@@ -7,6 +7,10 @@ import path from 'node:path';
 async function verify() {
   const persistence = new DuckDbPersistence();
   const db = await persistence.getRawConnection();
+  if (!db) {
+    console.error("Failed to establish raw structural connection.");
+    return;
+  }
   
   const pulseRows: any[] = await new Promise((res) => 
     db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => res(rows || []))

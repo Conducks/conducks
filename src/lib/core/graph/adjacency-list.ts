@@ -23,8 +23,25 @@ export interface ConducksNode<T = any> {
     isExport?: boolean;
     canonicalKind: string;    // Conducks: Canonical Taxonomy Layer (STRUCTURE, BEHAVIOR, etc.)
     canonicalRank: number;    // Conducks: Architectural Rank (0-7)
+    
+    // Universal Structural DNA (Oracle Standard)
+    fingerprint?: string;     // SHA256 of structural identity
+    parentId?: string;        // Explicit hierarchical parent
+    unitId?: string;          // Source file unit ID
+    namespaceId?: string;     // Logical namespace container
+    structureId?: string;     // Primary structure container
+    layer_path?: string;      // Materialized path (e.g. L0/L1/L2)
+    depth?: number;           // Hierarchy depth
+    risk?: number;            // 0-1 complexity risk
+    gravity?: number;         // PageRank importance
+    complexity?: number;      // Cyclomatic/Halstead composite
+    
+    // Rich DNA Blocks (JSON)
+    dna?: any;
+    kinetic?: any;
+    signature?: any;
+
     // Meat (Metadata - only present if not shallow)
-    complexity?: number;
     debtMarkers?: string[];
     resonance?: number;
     entropy?: number;
@@ -98,7 +115,22 @@ export class ConducksAdjacencyList {
         isEntryPoint: node.properties.isEntryPoint,
         isExport: node.properties.isExport,
         canonicalKind: node.properties.canonicalKind,
-        canonicalRank: node.properties.canonicalRank
+        canonicalRank: node.properties.canonicalRank,
+        // DNA Columns (Oracle Skeleton)
+        fingerprint: node.properties.fingerprint,
+        parentId: node.properties.parentId,
+        unitId: node.properties.unitId,
+        rootId: node.properties.rootId,
+        namespaceId: node.properties.namespaceId,
+        structureId: node.properties.structureId,
+        layer_path: node.properties.layer_path,
+        depth: node.properties.depth,
+        risk: node.properties.risk,
+        gravity: node.properties.gravity,
+        complexity: node.properties.complexity,
+        dna: node.properties.dna,
+        kinetic: node.properties.kinetic,
+        signature: node.properties.signature
       } as any
     };
 
@@ -365,6 +397,19 @@ export class ConducksAdjacencyList {
 
   public getAllMetadata(): Map<string, string> {
     return this.metadata;
+  }
+
+  /**
+   * Conducks — Structural Synapse Retrieval
+   * 
+   * Fetches the complete set of edges from the Synapse Graph.
+   */
+  public getAllEdges(): ConducksEdge[] {
+    const edges: ConducksEdge[] = [];
+    for (const edgeSet of this.outEdges.values()) {
+      edges.push(...Array.from(edgeSet));
+    }
+    return edges;
   }
 
   /**

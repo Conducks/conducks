@@ -43,7 +43,7 @@ async function main() {
 
 		// 3. Sample Nodes (Focusing on Hierarchy/Gravity)
 		console.log('\n\x1b[36m--- NODE SAMPLE (TOP GRAVITY) ---\x1b[0m');
-		const nodes = await all(db, 'SELECT id, kind, name, gravity, isEntryPoint FROM nodes WHERE pulseId = ? ORDER BY gravity DESC LIMIT 10', [latestPulse]);
+		const nodes = await all(db, 'SELECT id, canonicalKind, name, gravity, isEntryPoint FROM nodes WHERE pulseId = ? ORDER BY gravity DESC LIMIT 10', [latestPulse]);
 		console.table(nodes);
 
 		// 4. Sample Edges
@@ -53,7 +53,7 @@ async function main() {
 
 		// 5. Audit L2 Orphans
 		console.log('\n\x1b[36m--- L2 ORPHAN AUDIT (::UNIT) ---\x1b[0m');
-		const unitNodes = await all(db, "SELECT id FROM nodes WHERE pulseId = ? AND id LIKE '%::UNIT'", [latestPulse]);
+		const unitNodes = await all(db, "SELECT id FROM nodes WHERE pulseId = ? AND id LIKE '%::unit'", [latestPulse]);
 		const orphanUnits = [];
 		for (const unit of unitNodes) {
 			const parents = await all(db, "SELECT sourceId FROM edges WHERE pulseId = ? AND targetId = ? AND type = 'CONTAINS'", [latestPulse, unit.id]);

@@ -112,14 +112,29 @@ export async function main() {
    * The guard below ensures close() is skipped for persistent commands,
    * allowing the watcher/mcp event loop to remain alive.
    */
-  const persistentCommands = new Set(['watch', 'mcp']);
+  // Mirror, Watch, and MCP must NOT have their persistence layer closed
+  // by the CLI's finally block if they are intended to stay alive,
+  // but with Lazy Persistence (v2.1), they will auto-close their DB handle anyway.
+  const persistentCommands = new Set(['watch', 'mcp', 'mirror']);
   const isPersistent = persistentCommands.has(commandId);
 
   if (command) {
     try {
-      console.log(`[CLI] Initializing registry (readOnly: ${isReadOnly}, root: ${targetPath})...`);
+      if (!isMcpCommand) {
+        console.log(`[CLI] Initializing registry (readOnly: ${isReadOnly}, root: ${targetPath})...`);
+      }
+      
+      // 🛡️ [Root Safety Guard] Prevent accidental initialization at system root
+      if (targetPath === '/' || targetPath === '/root' || targetPath === '/Users') {
+        if (!isMcpCommand) {
+          throw new Error("Cannot anchor Conducks to the system root. Please specify a valid workspace path.");
+        }
+      }
+
       await registry.initialize(isReadOnly, targetPath);
-      console.log(`[CLI] Registry initialized. Executing command: ${commandId}...`);
+      if (!isMcpCommand) {
+        console.log(`[CLI] Registry initialized. Executing command: ${commandId}...`);
+      }
       const persistence = registry.infrastructure.persistence;
 
       if (!isStalenessBypass && !isMcpCommand) {
@@ -137,11 +152,17 @@ export async function main() {
       console.error(`\x1b[31m[Conducks CLI] Execution Error:\x1b[0m`, err);
       process.exit(1);
     } finally {
-      // FIX 2: Only close persistence for short-lived commands.
-      // Persistent commands (watch, mcp) manage their own lifecycle
-      // and rely on the DB connection staying open until SIGINT/SIGTERM.
+      // 🛡️ [Final Pulse] Ensure persistence is released.
+      // For persistent commands (watch, mcp, mirror), we keep it open ONLY if it's healthy.
+      // But we always attempt a soft release of the handle if the command has 'yielded'.
       if (!isPersistent) {
         await registry.infrastructure.persistence.close();
+      } else {
+        // If it's persistent, we still want to close the DB after the initial load
+        // so the Mirror/MCP doesn't block a foreground 'analyze' writer.
+        if (isReadOnly) {
+            await registry.infrastructure.persistence.close();
+        }
       }
     }
   } else {

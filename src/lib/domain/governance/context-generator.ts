@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { ConducksComponent } from "@/registry/types.js";
@@ -12,61 +12,45 @@ export class ContextGenerator implements ConducksComponent {
   public readonly description = 'Generates LLM-optimized architectural summaries and localized structural context.';
   private readonly TOKEN_CAP_CHARS = 15000; // Roughly 4000 tokens
 
-  private async getLatestPulseId(db: any): Promise<string | null> {
-    if (!db) return null;
-    return new Promise((res) => {
-      db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => {
-        res(err || !rows || rows.length === 0 ? null : rows[0].id);
-      });
-    });
+  private async getLatestPulseId(persistence: SynapsePersistence): Promise<string | null> {
+    const rows = await persistence.query("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1");
+    return rows && rows.length > 0 ? (rows[0] as any).id : null;
   }
 
-  private async queryNodes(db: any, pulseId: string, orderBy: string, limit: number = 10): Promise<any[]> {
-    if (!db) return [];
-    return new Promise((res) => {
-      db.all(`SELECT * FROM nodes WHERE pulseId = ? ORDER BY ${orderBy} LIMIT ?`, pulseId, limit, (err: any, rows: any[]) => {
-        res(err || !rows ? [] : rows.map((r: any) => ({
-          id: r.id,
-          kind: r.kind,
-          file: r.file,
-          name: r.name,
-          risk: r.risk || 0,
-          gravity: r.gravity || 0,
-          summary: `${r.kind} in ${r.file}`
-        })));
-      });
-    });
+  private async queryNodes(persistence: SynapsePersistence, pulseId: string, orderBy: string, limit: number = 10): Promise<any[]> {
+    const rows = await persistence.query(`SELECT * FROM nodes WHERE pulseId = ? ORDER BY ${orderBy} LIMIT ?`, [pulseId, limit]);
+    return rows.map((r: any) => ({
+      id: r.id,
+      kind: r.canonicalKind || r.kind,
+      file: r.file,
+      name: r.name,
+      risk: r.risk || 0,
+      gravity: r.gravity || 0,
+      summary: `${r.canonicalKind || r.kind} in ${r.file}`
+    }));
   }
 
-  public async generateTop10Context(persistence: any): Promise<any> {
-    const db = await persistence.getRawConnection();
-    if (!db) return { error: "No structural pulse found (Database connection failed)." };
-
-    const pulseId = await this.getLatestPulseId(db);
+  public async generateTop10Context(persistence: SynapsePersistence): Promise<any> {
+    const pulseId = await this.getLatestPulseId(persistence);
     if (!pulseId) return { error: "No structural pulse found." };
 
-    const entryPoints = await this.queryNodes(db, pulseId, "gravity DESC", 10);
-    const hotspots = await this.queryNodes(db, pulseId, "risk DESC", 10);
+    const entryPoints = await this.queryNodes(persistence, pulseId, "gravity DESC", 10);
+    const hotspots = await this.queryNodes(persistence, pulseId, "risk DESC", 10);
 
-    const cycles: any[] = await new Promise((res) => {
-      if (!db) return res([]);
-      db.all("SELECT * FROM nodes WHERE pulseId = ? AND anomaly = 'cycle' LIMIT 10", pulseId, (err: any, rows: any[]) => {
-        res(err || !rows ? [] : rows);
-      });
-    });
+    // [Sentinel Scan]
+    const cycles = await persistence.query("SELECT * FROM nodes WHERE pulseId = ? AND risk > 0.8 LIMIT 10", [pulseId]);
 
     return {
       entryPoints,
       hotspots,
-      violations: cycles.map(c => ({ id: c.id, type: 'CYCLE' })),
+      violations: cycles.map((c: any) => ({ id: c.id, type: 'RISK_HOTSPOT' })),
       truncated: true,
       totalCount: entryPoints.length + hotspots.length + cycles.length
     };
   }
 
-  public async generateFileSummary(persistence: any): Promise<string> {
-    const db = await persistence.getRawConnection();
-    const pulseId = await this.getLatestPulseId(db);
+  public async generateFileSummary(persistence: SynapsePersistence): Promise<string> {
+    const pulseId = await this.getLatestPulseId(persistence);
     if (!pulseId) return "# Architecture Context — Error\nNo pulse data found.";
 
     const context = await this.generateTop10Context(persistence);
@@ -95,11 +79,8 @@ export class ContextGenerator implements ConducksComponent {
     md += `\n`;
 
     md += `## Framework\n`;
-    const frameworkRows: any[] = await new Promise((res) => {
-      if (!db) return res([]);
-      db.all("SELECT value FROM metadata WHERE key = 'framework'", (err: any, rows: any[]) => res(rows || []));
-    });
-    const framework = frameworkRows.length > 0 ? frameworkRows[0].value : 'generic';
+    const frameworkRows = await persistence.query("SELECT value FROM metadata WHERE key = 'framework'");
+    const framework = frameworkRows.length > 0 ? (frameworkRows[0] as any).value : 'generic';
     md += `- Detected: ${framework}\n`;
 
     if (md.length > this.TOKEN_CAP_CHARS) {

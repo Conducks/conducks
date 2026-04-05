@@ -1,19 +1,20 @@
 import Parser from "tree-sitter";
-import { PrismSpectrum, SpectrumNode } from "@/lib/core/persistence/prism-core.js";
-import { ConducksProvider } from "@/lib/core/parsing/providers/base.js";
-import { grammars } from "@/lib/core/parsing/grammar-registry.js";
-import { ImportProcessor } from "@/lib/core/parsing/processors/import.js";
-import { BindingProcessor } from "@/lib/core/parsing/processors/binding.js";
-import { CallProcessor } from "@/lib/core/parsing/processors/call.js";
-import { HeritageProcessor } from "@/lib/core/parsing/processors/heritage.js";
-import { FlowProcessor } from "@/lib/core/parsing/processors/flow.js";
-import { AnalyzeContext } from "@/lib/core/parsing/context.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
-import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
-import { mapToCanonical, CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
+import { PrismSpectrum, SpectrumNode } from "../../core/persistence/prism-core.js";
+import { ConducksProvider } from "../../core/parsing/providers/base.js";
+import { grammars } from "../../core/parsing/grammar-registry.js";
+import { ImportProcessor } from "../../core/parsing/processors/import.js";
+import { BindingProcessor } from "../../core/parsing/processors/binding.js";
+import { CallProcessor } from "../../core/parsing/processors/call.js";
+import { HeritageProcessor } from "../../core/parsing/processors/heritage.js";
+import { FlowProcessor } from "../../core/parsing/processors/flow.js";
+import { AnalyzeContext } from "../../core/parsing/context.js";
+import { chronicle } from "../../core/git/chronicle-interface.js";
+import { calculateShannonEntropy, normalizeEntropyRisk } from "../../core/algorithms/entropy.js";
+import { mapToCanonical, CanonicalKind, CanonicalRank } from "../../core/parsing/taxonomy.js";
 import path from "node:path";
+import crypto from "node:crypto";
 
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "../../../registry/types.js";
 
 /**
  * Conducks — Native Structural Reflector 🛡️ 🔨
@@ -25,7 +26,7 @@ export class ConducksReflector implements ConducksComponent {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
   public description = 'Analyzes source code units and reflects their structure into a Synapse graph.';
-  private imports = new ImportProcessor();
+  public readonly imports = new ImportProcessor();
   private bindings = new BindingProcessor();
   private calls = new CallProcessor();
   private heritage = new HeritageProcessor();
@@ -50,12 +51,20 @@ export class ConducksReflector implements ConducksComponent {
 
     const fileMeta = mapToCanonical('file');
     const canonicalPath = file.path.toLowerCase();
+    const projectRoot = chronicle.getProjectDir()?.toLowerCase() || '';
+    const relativePath = path.relative(projectRoot, file.path).toLowerCase();
+    
+    // Namespace calculation
+    const rootName = path.basename(projectRoot).toLowerCase();
+    const namespacePath = path.dirname(relativePath);
+    const namespaceId = namespacePath === '.' ? `repository::${rootName}` : `directory::${path.join(projectRoot, namespacePath).toLowerCase()}`;
+    
     const fileId = `${canonicalPath}::unit`;
     const unitNode: SpectrumNode = {
-      name: 'UNIT',
+      name: path.basename(file.path),
       kind: 'file' as any,
       canonicalKind: fileMeta.kind,
-      canonicalRank: fileMeta.rank,
+      canonicalRank: fileMeta.rank, // Rank 3
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: file.path,
       isExport: true,
@@ -63,8 +72,13 @@ export class ConducksReflector implements ConducksComponent {
         isGlobalNode: true,
         isTest: isTestFile,
         displayName: path.basename(file.path),
-        canonicalRank: 2,
-        canonicalKind: 'UNIT'
+        canonicalRank: fileMeta.rank,
+        canonicalKind: 'UNIT',
+        unitId: fileId,
+        namespaceId: namespaceId,
+        rootId: `repository::${rootName}`,
+        layer_path: relativePath,
+        depth: 3
       }
     };
 
@@ -171,6 +185,23 @@ export class ConducksReflector implements ConducksComponent {
              }
 
              const canonical = mapToCanonical(initialKind);
+             const parentScopeName = getScopeAt(currentMatchRow, name);
+             const parentScopePrefix = parentScopeName ? `${parentScopeName.toLowerCase()}.` : '';
+             const parentId = parentScopeName 
+               ? `${file.path.toLowerCase()}::${parentScopePrefix.toLowerCase()}`.slice(0, -1)
+               : fileId;
+
+             const dna = {
+               isAsync: match.captures.some((c: any) => c.name === 'isAsync'),
+               isAbstract: match.captures.some((c: any) => c.name === 'isAbstract'),
+               isExported: match.captures.some((c: any) => c.name === 'isExported'),
+               isStatic: match.captures.some((c: any) => c.name === 'isStatic'),
+               params: [],
+               returns: 'void'
+             };
+
+             const fingerprint = crypto.createHash('sha256').update(`${file.path}|${name}|${JSON.stringify(dna)}`).digest('hex');
+
              nodeCache.set(scopedId, {
                name,
                kind: initialKind as any,
@@ -180,19 +211,54 @@ export class ConducksReflector implements ConducksComponent {
                  start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
                  end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
                },
+               label: (canonical as any).kind,
+               isShallow: false,
+               properties: {
+                 filePath: file.path,
+                 name: name,
+                 range: {
+                   start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
+                   end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
+                 },
+                 isExport: false,
+                 canonicalKind: canonical.kind,
+                 canonicalRank: canonical.rank,
+                 parentId,
+                 unitId: fileId,
+                 namespaceId: unitNode.metadata.namespaceId,
+                 rootId: unitNode.metadata.rootId,
+                 structureId: parentScopeName ? parentId : null,
+                 layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
+                 depth: canonical.rank,
+                 fingerprint,
+                 dna,
+                 signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
+                 kinetic: {}
+               },
                filePath: file.path,
                isExport: false,
                metadata: { 
                  isTest: isTestFile, 
                  isExport: false,
                  canonicalKind: canonical.kind,
-                 canonicalRank: canonical.rank
+                 canonicalRank: canonical.rank,
+                 parentId,
+                 unitId: fileId,
+                 namespaceId: unitNode.metadata.namespaceId,
+                 rootId: unitNode.metadata.rootId,
+                 structureId: parentScopeName ? parentId : null,
+                 layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
+                 depth: canonical.rank,
+                 fingerprint,
+                 dna,
+                 signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
+                 kinetic: {}
                }
-             });
+             } as any);
            }
-        }
-        node = nodeCache.get(scopedId);
-      }
+         }
+         node = nodeCache.get(scopedId);
+       }
 
       if (context.isDiscoveryMode()) continue;
       
@@ -219,20 +285,29 @@ export class ConducksReflector implements ConducksComponent {
           if (kind === 'import') {
             const sourceCap = match.captures.find((c: any) => c.name === 'source');
             if (sourceCap && sourceCap.node) {
-              const sourceText = sourceCap.node.text;
-              const resolved = this.imports.resolve(sourceText, file.path.toLowerCase(), allPaths, provider, context);
-              if (resolved) {
-                for (let i = 0; i < match.captures.length; i++) {
-                  const cap = match.captures[i];
-                  if (cap.name === 'name' && cap.node) {
-                    const aliasCap = (i + 1 < match.captures.length && match.captures[i+1].name === 'alias') 
-                      ? match.captures[i+1] : undefined;
-                    const bindingName = cap.node.text.toLowerCase();
-                    const aliasName = (aliasCap && aliasCap.node) ? aliasCap.node.text.toLowerCase() : bindingName;
-                    this.imports.processBinding(resolved as string, bindingName, aliasName, spectrum, context);
-                  }
+              const specifier = sourceCap.node.text;
+              
+              // Seed the Spectrum with the RAW SPECIFIER for later resolution 🏺
+              spectrum.relationships.push({
+                sourceName: 'unit',
+                targetName: specifier,
+                type: 'IMPORTS' as any,
+                confidence: 1.0,
+                metadata: { specifier, isRaw: true }
+              });
+
+              for (let i = 0; i < match.captures.length; i++) {
+                const cap = match.captures[i];
+                if (cap.name === 'name' && cap.node) {
+                   const aliasCap = (i + 1 < match.captures.length && match.captures[i+1].name === 'alias') 
+                     ? match.captures[i+1] : undefined;
+                   const bindingName = cap.node.text;
+                   const aliasName = (aliasCap && aliasCap.node) ? aliasCap.node.text : bindingName;
+                   
+                   if (context) {
+                     context.registerLocalBinding(aliasName, specifier);
+                   }
                 }
-                this.imports.process(sourceText, file.path.toLowerCase(), allPaths, spectrum, provider, context);
               }
             }
           }
@@ -326,22 +401,9 @@ export class ConducksReflector implements ConducksComponent {
 
     spectrum.nodes = [...spectrum.nodes, ...nodeCache.values()];
 
-    // Conducks.5: Structural Membership Binding (Parent -> Child)
-    if (!context.isDiscoveryMode()) {
-      const fileAnchorName = path.basename(file.path);
-      for (const node of nodeCache.values()) {
-        if (node.name === fileAnchorName || node.name === 'UNIT') continue;
-        const scope = getScopeAt(node.range.start.line - 1, node.name);
-        
-        // Conducks: Hierarchical Unification (L2-L7 Parentage)
-        spectrum.relationships.push({
-          sourceName: scope || 'unit',
-          targetName: node.name,
-          type: 'MEMBER_OF',
-          confidence: 1.0
-        });
-      }
-    }
+    // Conducks: Hierarchical Unification (L2-L7 Parentage)
+    // [Apostolic Rule] MEMBER_OF edges are no longer persisted as structural scaffolding.
+    // All containment is now column-based (parentId, unitId, structureId, etc.). 🏺
 
     // Conducks: Ingest Kinetic Git Signals (Only in Resolution Mode)
     if (!context.isDiscoveryMode()) {
@@ -353,13 +415,7 @@ export class ConducksReflector implements ConducksComponent {
       const now = Math.floor(Date.now() / 1000);
 
       for (const n of spectrum.nodes) {
-        // 1. File-level Kinetic Signals
-        n.metadata.resonance = resonance.count;
-        n.metadata.entropy = entropyRisk;
-        (n as any).resonance = resonance.count;
-        (n as any).entropy = entropyRisk;
-
-        // 2. Symbol-level Blame Attribution
+        // Blame Attribution
         const startLine = n.range.start.line;
         const endLine = n.range.end.line;
         const authors: Record<string, number> = {};
@@ -376,23 +432,36 @@ export class ConducksReflector implements ConducksComponent {
         }
 
         const authorEntries = Object.entries(authors);
-        if (authorEntries.length > 0) {
-          authorEntries.sort((a, b) => b[1] - a[1]);
-          const primary = authorEntries[0][0];
-          const count = authorEntries.length;
-          const tenure = Math.floor((now - earliestTime) / 86400);
+        const primary = authorEntries.length > 0 ? authorEntries.sort((a, b) => b[1] - a[1])[0][0] : '';
+        const count = authorEntries.length;
+        const tenure = Math.floor((now - earliestTime) / 86400);
 
-          n.metadata.primaryAuthor = primary;
-          n.metadata.authorCount = count;
-          n.metadata.lastModified = latestTime;
-          n.metadata.tenureDays = tenure > 0 ? tenure : 0;
-
-          // Legacy/Aliased support for persistence
-          (n as any).primaryAuthor = primary;
-          (n as any).authorCount = count;
-          (n as any).lastModified = latestTime;
-          (n as any).tenureDays = n.metadata.tenureDays;
-        }
+        n.metadata.kinetic = {
+          resonance: resonance.count,
+          entropy: entropyRisk,
+          primaryAuthor: primary,
+          authorCount: count,
+          lastModified: latestTime,
+          tenureDays: tenure > 0 ? tenure : 0,
+          debtMarkers: n.metadata.debtMarkers || [],
+          coveredBy: []
+        };
+        
+        // Sync with top-level properties for persistence mapping
+        (n as any).risk = n.metadata.risk || 0;
+        (n as any).gravity = n.metadata.gravity || 0;
+        (n as any).complexity = n.metadata.complexity || 0;
+        (n as any).kinetic = n.metadata.kinetic;
+        (n as any).dna = n.metadata.dna;
+        (n as any).signature = n.metadata.signature;
+        (n as any).fingerprint = n.metadata.fingerprint;
+        (n as any).layer_path = n.metadata.layer_path;
+        (n as any).depth = n.metadata.depth;
+        (n as any).parentId = n.metadata.parentId;
+        (n as any).unitId = n.metadata.unitId;
+        (n as any).namespaceId = n.metadata.namespaceId;
+        (n as any).rootId = n.metadata.rootId;
+        (n as any).structureId = n.metadata.structureId;
       }
     }
 

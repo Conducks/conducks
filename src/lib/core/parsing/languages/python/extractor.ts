@@ -1,7 +1,7 @@
 import Parser from "tree-sitter";
 
 /**
- * Conducks — Python Field and Visibility Extractor 🐍
+ * Conducks — Python Field and Visibility Extractor (Suite v3) 🐍
  * 
  * Handles Python's unique visibility heuristics and field extraction.
  */
@@ -17,10 +17,10 @@ export class PythonExtractor {
     const body = node.childByFieldName('body');
     if (body) {
       const firstExpr = body.child(0);
-      if (firstExpr && firstExpr.type === 'expression_statement') {
-        const stringNode = firstExpr.child(0);
+      if (firstExpr && (firstExpr.type === 'expression_statement' || firstExpr.type === 'string')) {
+        const stringNode = firstExpr.type === 'string' ? firstExpr : firstExpr.child(0);
         if (stringNode && stringNode.type === 'string') {
-          return stringNode.text;
+          return stringNode.text.replace(/['"]+/g, '').trim();
         }
       }
     }
@@ -56,7 +56,10 @@ export class PythonExtractor {
       'case_clause',
       'conditional_expression', // x if y else z
       'boolean_operator',        // and, or
-      'lambda'
+      'lambda',
+      'await',                   // Async complexity
+      'yield',                   // Generator complexity
+      'raise_statement'          // Error flow complexity
     ]);
 
     const traverse = (n: any) => {

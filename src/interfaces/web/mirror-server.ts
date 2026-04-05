@@ -2,32 +2,40 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ConducksGraph } from '@/lib/core/graph/graph-engine.js';
-import { registry } from '@/registry/index.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { GatewayService } from '@/lib/domain/analysis/gateway-service.js';
+import { chronicle } from '@/lib/core/git/chronicle-interface.js';
+import { Logger } from '@/lib/core/utils/logger.js';
+import http from 'node:http';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const logger = new Logger("MirrorServer");
 
 /**
- * Conducks — Professional Command Center (v1.6.1) 💎
- * 
- * High-fidelity structural dashboard with adaptive naming and path focusing.
- * 
- * v1.6.1 Evolution: Directional Resonance (Lineage vs Impact).
+ * Conducks — High-Fidelity Apostolic Command Center (v2.0.0) 💎
  */
 export class MirrorServer {
   private app = express();
-  private clients: any[] = [];
+  private clients: http.ServerResponse[] = [];
+  private server: http.Server | null = null;
 
-  constructor(private graph: ConducksGraph, private persistence: SynapsePersistence) {
+  constructor(private gateway: GatewayService) {
     this.setupRoutes();
+    this.setupReactivity();
+  }
+
+  private setupReactivity() {
+    // [Apostolic Heartbeat] 🏺
+    // We watch the structural synapse (DuckDB vault) for real-time resonance.
+    this.gateway.watchSynapse((pulse) => {
+      logger.info(`🛡️ [Synapse Heartbeat] Broadcasting pulse to ${this.clients.length} mirrors.`);
+      this.broadcastPulse(pulse);
+    });
   }
 
   private setupRoutes() {
     this.app.use(cors());
 
-    // v1.7.0: Modular Asset Serving
     const staticPath = path.resolve(__dirname, '../../resources/mirror');
     this.app.use(express.static(staticPath));
 
@@ -35,45 +43,37 @@ export class MirrorServer {
       res.sendFile(path.join(staticPath, 'index.html'));
     });
 
+    // v2.0.0 Gateway: Unified Synapse Exploration
     this.app.get('/api/synapse', (req, res) => {
-      const layersParam = req.query.layers as string;
-      const clustersParam = (req.query.clusters as string) || '';
-      const spreadParam = (req.query.spread as string) || '1200';
-      const layers = layersParam ? layersParam.split(',').map(n => parseInt(n, 10)) : [0, 1, 2, 3, 4, 5];
-      const clusters = clustersParam ? clustersParam.split(',') : [];
-      const spread = parseInt(spreadParam, 10) || 1200;
+      const { layers, clusters, spread } = req.query;
+      const l = layers ? (layers as string).split(',').map(n => parseInt(n, 10)) : undefined;
+      const c = clusters ? (clusters as string).split(',') : undefined;
+      const s = spread ? parseInt(spread as string, 10) : undefined;
       
-      const wave = (registry.mirror as any).getVisualWave(layers, clusters, spread);
+      const wave = this.gateway.getWave(l, c, s);
       res.json(wave);
     });
 
-    // Conducks: On-Demand Hydration (v1.6.5)
+    // v2.0.0 Gateway: Reactive Hydration
     this.app.get('/api/node/:id', async (req, res) => {
-      const id = req.params.id;
-      const g = this.graph.getGraph();
-      const node = g.getNode(id);
-      
-      if (!node) {
-        return res.status(404).json({ error: 'Node not found in current synapse.' });
+      const id = decodeURIComponent(req.params.id);
+      try {
+        const hydratedNode = await this.gateway.hydrateNode(id);
+        if (!hydratedNode) return res.status(404).json({ error: 'Node context missing.' });
+        res.json(hydratedNode);
+      } catch (err) {
+        res.status(500).json({ error: 'Structural Hydration Failure.' });
       }
-
-      // If shallow, hydrate meat from persistence
-      if (node.isShallow) {
-        const meat = await this.persistence.fetchNodeMeat(id);
-        if (meat) {
-          return res.json({ ...node.properties, ...meat, isShallow: false });
-        }
-      }
-
-      res.json(node.properties);
     });
 
+    // Apostolic SSE Heartbeat
     this.app.get('/api/pulse', (req, res) => {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders();
-      this.clients.push(res);
+      
+      this.clients.push(res as any);
       req.on('close', () => {
         this.clients = this.clients.filter(c => c !== res);
       });
@@ -86,15 +86,36 @@ export class MirrorServer {
     });
   }
 
-  public start(port: number = 3333) {
-    this.app.listen(port, () => {
-      console.error(`[Mirror Server] Structural Resonance Active at http://localhost:${port}`);
+  /**
+   * Resonate: Start the server with adaptive port discovery.
+   */
+  public start(port: number = 3333): Promise<number> {
+    return new Promise((resolve) => {
+      const tryPort = (p: number) => {
+        this.server = this.app.listen(p, () => {
+          logger.info(`💎 [Apostolic Gateway] Structural Resonance Active at http://localhost:${p}`);
+          resolve(p);
+        }).on('error', (err: any) => {
+          if (err.code === 'EADDRINUSE') {
+            logger.warn(`Port ${p} in use. Seeking next frequency...`);
+            tryPort(p + 1);
+          } else {
+            logger.error("Failed to start gateway server.", err);
+          }
+        });
+      };
+      tryPort(port);
     });
+  }
+
+  public stop() {
+    this.gateway.stop();
+    if (this.server) this.server.close();
   }
 }
 
 export let globalMirror: MirrorServer | null = null;
-export function initGlobalMirror(graph: ConducksGraph, persistence: SynapsePersistence) {
-  globalMirror = new MirrorServer(graph, persistence);
+export function initGlobalMirror(gateway: GatewayService) {
+  globalMirror = new MirrorServer(gateway);
   return globalMirror;
 }

@@ -37,10 +37,10 @@ export class RegressionGuard {
     }
 
     // 1. Calculate the Global Risk of the Pulse
-    // We average the velocity of all significantly decaying hotspots
-    const hotspots = drift.hotspots || [];
-    const totalVelocity = hotspots.reduce((sum, h) => sum + h.velocity, 0);
-    const avgRisk = hotspots.length > 0 ? (totalVelocity / hotspots.length) : 0;
+    // We average the velocity of all significant deltas
+    const deltas = drift.deltas || [];
+    const totalVelocity = deltas.reduce((sum: number, d: any) => sum + (d.velocity || 0), 0);
+    const avgRisk = deltas.length > 0 ? (totalVelocity / deltas.length) : 0;
 
     // 2. Decision Logic
     const isBlocking = avgRisk > threshold;
@@ -51,7 +51,7 @@ export class RegressionGuard {
       message: isBlocking 
         ? `🔥 ARCHITECTURAL REGRESSION: Global risk (${avgRisk.toFixed(3)}) exceeds threshold (${threshold}).`
         : `✅ Stability acceptable: Global risk (${avgRisk.toFixed(3)}) within limits.`,
-      hotspots
+      hotspots: deltas
     };
   }
 }

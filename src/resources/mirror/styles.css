@@ -470,3 +470,32 @@ input:checked+.slider:before {
     opacity: .5;
   }
 }
+
+.sync-badge {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  transition: all 0.3s;
+}
+
+.sync-badge.live {
+  background: rgba(46, 160, 67, 0.15);
+  border-color: #2ea043;
+  color: #3fb950;
+  box-shadow: 0 0 10px rgba(46, 160, 67, 0.3);
+}
+
+.sync-pulse {
+  animation: sync-bloom 0.8s ease-out;
+}
+
+@keyframes sync-bloom {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.05); filter: brightness(1.5); }
+  100% { transform: scale(1); filter: brightness(1); }
+}

@@ -12,7 +12,7 @@ import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
  */
 export class PythonProvider extends NativeProvider {
   public readonly id = "python-provider";
-  public readonly version = "3.0.0";
+  public readonly version = "3.2.0"; // Upgraded for Super-Detail Induction
   public readonly extensions = [".py"];
   public readonly langId = "python";
   public readonly importSemantics: ImportSemantics = 'namespace';

@@ -1,52 +1,42 @@
-import Parser from "tree-sitter";
-
 /**
- * Conducks — Python Binding Extractor 🐍
+ * Conducks — Python Named Binding Extractor (Suite v3) 🐍
  * 
- * Handles aliasing and named bindings for Python imports.
+ * Extracts local and exported names from Python imports.
  */
 
 export class PythonBindings {
   /**
-   * Extracts aliased bindings from a Python import node.
+   * Extracts bindings from a tree-sitter node.
+   * Supports: from x import y, from x import y as z
    */
-  public extract(node: any): Array<{ local: string; exported: string; isModuleAlias?: boolean }> {
-    const bindings: Array<{ local: string; exported: string; isModuleAlias?: boolean }> = [];
+  public extract(node: any): Array<{ local: string; exported: string }> {
+    const bindings: Array<{ local: string; exported: string }> = [];
 
-    // 1. from x import User, Repo as R
-    if (node.type === 'import_from_statement') {
-      for (let i = 0; i < node.namedChildCount; i++) {
-        const child = node.namedChild(i);
-        if (!child) continue;
-
-        if (child.type === 'aliased_import') {
-          const original = child.childByFieldName('name')?.text;
-          const alias = child.childByFieldName('alias')?.text;
-          if (original && alias) {
-            bindings.push({ local: alias, exported: original });
-          }
-        } else if (child.type === 'identifier' || child.type === 'dotted_name') {
-          // Skip the module name itself (the first dotted_name) if it matches the 'module_name' field
-          const moduleName = node.childByFieldName('module_name');
-          if (child.id !== moduleName?.id) {
-            bindings.push({ local: child.text, exported: child.text });
-          }
+    // 'from_import_statement' often has aliased_import children
+    const traverse = (n: any) => {
+      if (n.type === 'aliased_import') {
+        const exportedNode = n.childByFieldName('name');
+        const localNode = n.childByFieldName('alias');
+        if (exportedNode && localNode) {
+          bindings.push({
+            local: localNode.text,
+            exported: exportedNode.text
+          });
         }
+      } else if (n.type === 'dotted_name' && n.parent?.type === 'import_from_statement') {
+        // Simple case: from x import y
+        bindings.push({
+          local: n.text,
+          exported: n.text
+        });
       }
-    }
 
-    // 2. import numpy as np
-    if (node.type === 'import_statement') {
-      const aliasNodes = node.children.filter((n: any) => n.type === 'aliased_import');
-      for (const child of aliasNodes) {
-        const original = child.childByFieldName('name')?.text;
-        const alias = child.childByFieldName('alias')?.text;
-        if (original && alias) {
-          bindings.push({ local: alias, exported: original, isModuleAlias: true });
-        }
+      for (let i = 0; i < n.childCount; i++) {
+        traverse(n.child(i));
       }
-    }
+    };
 
+    traverse(node);
     return bindings;
   }
 }

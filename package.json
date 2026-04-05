@@ -36,18 +36,18 @@
 		"marked": "^5.1.2",
 		"slugify": "^1.6.6",
 		"tree-sitter": "^0.21.1",
-		"tree-sitter-typescript": "0.23.2",
-		"tree-sitter-javascript": "0.25.0",
-		"tree-sitter-python": "0.25.0",
-		"tree-sitter-go": "0.25.0",
-		"tree-sitter-rust": "0.24.0",
-		"tree-sitter-java": "0.23.5",
+		"tree-sitter-c": "0.24.1",
 		"tree-sitter-c-sharp": "0.23.1",
 		"tree-sitter-cpp": "0.23.4",
+		"tree-sitter-go": "0.25.0",
+		"tree-sitter-java": "0.23.5",
+		"tree-sitter-javascript": "0.25.0",
 		"tree-sitter-php": "0.24.2",
+		"tree-sitter-python": "0.25.0",
 		"tree-sitter-ruby": "0.23.1",
+		"tree-sitter-rust": "0.24.0",
 		"tree-sitter-swift": "0.7.1",
-		"tree-sitter-c": "0.24.1"
+		"tree-sitter-typescript": "0.23.2"
 	},
 	"optionalDependencies": {
 		"ajv": "^8.12.0"
@@ -64,6 +64,7 @@
 		"ts-jest": "^29.4.6",
 		"ts-node": "^10.9.2",
 		"tsc-alias": "^1.8.16",
+		"tsx": "^4.21.0",
 		"typescript": "^5.3.3",
 		"vitest": "^4.1.2"
 	}

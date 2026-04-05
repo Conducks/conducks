@@ -25,6 +25,7 @@ import { SwiftProvider } from "@/lib/core/parsing/languages/swift/index.js";
 import { CProvider } from "@/lib/core/parsing/languages/c/index.js";
 import { Logger } from "@/lib/core/utils/logger.js";
 import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
+import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -41,12 +42,16 @@ const resourcesDir = path.resolve(__dirname, "../resources/grammars");
  * composition point that wires 8 domain facades into a unified bridge.
  */
 
-// 1. Core Capability Layer (Infrastructure)
-const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+const events = new EventEmitter();
+events.setMaxListeners(50); // High-fidelity resonance support
+
+// 1. Core Capability Layer (Infrastructure - Lazy Anchor)
 const bootstrapper = new RegistryBootstrapper();
 const graph = new ConducksGraph();
-let persistence: SynapsePersistence = new DuckDbPersistence(workspaceRoot);
-let ignoreManager = new IgnoreManager(workspaceRoot);
+
+// These will be firmed up during initializeRegistry() call.
+let persistence: SynapsePersistence = new DuckDbPersistence(":memory:", true);
+let ignoreManager = new IgnoreManager(process.cwd());
 
 // 2. Bridge Layer (Registry Infrastructure)
 const synapseRegistry = new SynapseRegistry();
@@ -72,7 +77,7 @@ synapseRegistry.registerProvider('.c', new CProvider());
 // 3. Domain Component Instantiation (Lazy/Updatable)
 let search = new ConducksSearch(graph.getGraph());
 const gql = new GQLParser();
-let federation = new FederatedLinker(workspaceRoot);
+let federation = new FederatedLinker(process.cwd());
 const advisor = new ConducksAdvisor();
 const sentinel = new ConducksSentinel();
 const deadCode = new DeadCodeAnalyzer();
@@ -109,6 +114,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
         // Propagate to services
         (orchestrator as any).persistence = p;
         (analysis as any).persistence = p;
+        (analysis.query as any).persistence = p;
         (evolution as any).persistence = p;
         (governance as any).persistence = p;
         (governance as any).guard = new RegressionGuard(p as any);
@@ -134,6 +140,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
  * The Unified Registry Singleton (Conducks Production Standard)
  */
 export const registry = {
+  events: events,
   status: {
     bootstrap: (root: string, name: string) => manifest.bootstrap(root, name),
     record: (root: string, name: string, type: string, content: string) => manifest.record(root, name, type, content),
@@ -149,7 +156,8 @@ export const registry = {
       (orchestrator as any).persistence = persistence;
       (orchestrator as any).ignoreManager = ignoreManager;
       return analysis.analyze(options);
-    }
+    },
+    get query() { return analysis.query; }
   },
   kinetic: {
     trace: (symbolId: string, depth?: number) => kinetic.trace(symbolId, depth),

@@ -1,6 +1,8 @@
 import { ConducksCommand } from "../command.js";
 import { main as startMcpServer } from "../../tools/index.js";
 import type { Registry } from "@/registry/index.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * Conducks — MCP Command
@@ -15,19 +17,16 @@ export class McpCommand implements ConducksCommand {
   
   public async execute(args: string[], registry: Registry): Promise<void> {
     const rootIdx = args.indexOf("--root");
-    let rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-    
-    if (rootIdx !== -1 && args[rootIdx + 1]) {
-      rootPath = args[rootIdx + 1];
-      process.env.CONDUCKS_WORKSPACE_ROOT = rootPath;
-      
-      /**
-       * If root is explicitly provided via CLI, re-initialize the 
-       * structural synapse to the new anchor.
-       */
-      console.error(`🛡️ [McpCommand] Re-anchoring structural registry @ ${rootPath}...`);
-      await registry.initialize(true, rootPath);
+    let rootPath = (rootIdx !== -1 && args[rootIdx + 1]) || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+
+    // 🛡️ [Root Detachment Check]
+    if (rootPath === '/' || rootPath === '/root' || rootPath === '/Users') {
+      console.error("⚠️  [McpCommand] Detached root detected. Attempting to anchor to executable directory...");
+      rootPath = path.dirname(fileURLToPath(import.meta.url));
     }
+    
+    process.env.CONDUCKS_WORKSPACE_ROOT = rootPath;
+    await registry.initialize(true, rootPath);
     
     // Pass original process.argv flags or custom args if needed
     await startMcpServer();

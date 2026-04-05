@@ -81,7 +81,7 @@ export class EssenceLens {
 
         // Link the manifest file to the dependency
         spectrum.relationships.push({
-          sourceName: 'global',
+          sourceName: 'unit',
           targetName: name, // Will be resolved during Neural Binding or via special lookup
           type: 'DEPENDS_ON' as any,
           confidence: 1.0,
@@ -124,7 +124,7 @@ export class EssenceLens {
         });
 
         spectrum.relationships.push({
-          sourceName: 'UNIT',
+          sourceName: 'unit',
           targetName: name,
           type: 'DEPENDS_ON' as any,
           confidence: 1.0,

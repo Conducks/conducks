@@ -1,18 +1,26 @@
+// @ts-ignore: Node.js 20+ register API used for dynamic tsx loading in workers
+import { register } from 'node:module';
+try {
+  register('tsx', import.meta.url);
+} catch (e) {
+  // Fallback for older Node versions or environments where register is unavailable
+}
+
 import { parentPort, workerData } from 'node:worker_threads';
-import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
-import { AnalyzeContext } from "@/lib/core/parsing/context.js";
+import { ConducksReflector } from "../../domain/analysis/reflector.js";
+import { AnalyzeContext } from "./context.js";
 import { grammars } from "./grammar-registry.js";
-import { PythonProvider } from "@/lib/core/parsing/languages/python/index.js";
-import { TypeScriptProvider } from "@/lib/core/parsing/languages/typescript/index.js";
-import { GoProvider } from "@/lib/core/parsing/languages/go/index.js";
-import { RustProvider } from "@/lib/core/parsing/languages/rust/index.js";
-import { JavaProvider } from "@/lib/core/parsing/languages/java/index.js";
-import { CSharpProvider } from "@/lib/core/parsing/languages/csharp/index.js";
-import { CPPProvider } from "@/lib/core/parsing/languages/cpp/index.js";
-import { PHPProvider } from "@/lib/core/parsing/languages/php/index.js";
-import { RubyProvider } from "@/lib/core/parsing/languages/ruby/index.js";
-import { SwiftProvider } from "@/lib/core/parsing/languages/swift/index.js";
-import { CProvider } from "@/lib/core/parsing/languages/c/index.js";
+import { PythonProvider } from "./languages/python/index.js";
+import { TypeScriptProvider } from "./languages/typescript/index.js";
+import { GoProvider } from "./languages/go/index.js";
+import { RustProvider } from "./languages/rust/index.js";
+import { JavaProvider } from "./languages/java/index.js";
+import { CSharpProvider } from "./languages/csharp/index.js";
+import { CPPProvider } from "./languages/cpp/index.js";
+import { PHPProvider } from "./languages/php/index.js";
+import { RubyProvider } from "./languages/ruby/index.js";
+import { SwiftProvider } from "./languages/swift/index.js";
+import { CProvider } from "./languages/c/index.js";
 import path from 'node:path';
 import fs from 'node:fs';
 

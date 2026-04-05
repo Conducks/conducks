@@ -1,360 +1,498 @@
-import fs from 'node:fs/promises';
-import { ConducksAdjacencyList, ConducksNode, ConducksEdge } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksNode, ConducksEdge, ConducksAdjacencyList, NodeId } from "../graph/adjacency-list.js";
+import { chronicle } from "../../core/git/chronicle-interface.js";
+import { logger } from "../utils/logger.js";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import fs from "node:fs/promises";
 import duckdb from "duckdb";
-import { logger } from "@/lib/core/utils/logger.js";
-import os from "node:os";
-import fsSync from "node:fs";
 
 /**
- * Conducks — Structural Anchor Discovery
+ * Conducks — Synapse Vault (DuckDB Persistence) 🛡️ 🏺
  * 
- * Locates the nearest structural vault (.conducks) or project root (package.json).
- * This enforces a "Project Boundary" check to prevent Home Folder Leakage.
+ * High-performance structural storage for the Architectural Mirror.
+ * Uses a columnar DNA schema for sub-millisecond graph queries.
  */
-function findNearestVault(startDir: string): string {
-  const binaryAnchor = path.dirname(fileURLToPath(import.meta.url));
-  const searchPaths = [startDir, binaryAnchor];
-  const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
-  const homeDir = os.homedir();
-
-  // Unified Discovery Pulse: Resolve the absolute Project Boundary
-  for (const start of searchPaths) {
-    let current = path.resolve(start);
-    while (current !== path.parse(current).root) {
-       // Stop Discovery if we hit a forbidden artifact folder
-       if (forbiddenArtifacts.includes(path.basename(current))) break;
-
-       const hasVault = fsSync.existsSync(path.join(current, ".conducks"));
-       const hasManifest = fsSync.existsSync(path.join(current, "package.json"));
-
-       // Priority 1: Current Project Root (Package Manifest + Vault existence check)
-       if (hasVault || hasManifest) {
-         // Security Guard: We never automatically anchor to the User Home Root
-         // unless we are explicitly in the Home directory to begin with.
-         if (current === homeDir && start !== homeDir) {
-            // Leakage detected! Stop and anchor to the startDir instead.
-            break; 
-         }
-         return current;
-       }
-
-       const parent = path.dirname(current);
-       if (parent === current) break;
-       current = parent;
-    }
-  }
-  
-  return startDir;
-}
-
-/**
- * Conducks — Synapse Persistence Interface
- */
-export interface SynapsePersistence {
-  save(graph: ConducksAdjacencyList): Promise<string>;
-  saveSpectrum(filePath: string, spectrum: any): Promise<void>;
-  saveBatchSpectrum(entries: Array<{ filePath: string, spectrum: any }>): Promise<void>;
-  load(graph: ConducksAdjacencyList): Promise<boolean>;
-  fetchNodeMeat(nodeId: string): Promise<any | null>;
-  clear(): Promise<void>;
-  close(): Promise<void>;
-  isConnected(): boolean;
-}
-
-/**
- * Conducks — High-Performance DuckDB Persistence (Conducks Stability)
- */
-export class DuckDbPersistence implements SynapsePersistence {
+export class SynapsePersistence {
+  private db: duckdb.Database | null = null;
   private cacheDir: string;
   private dbPath: string;
-  private db: any = null;
-  private readOnly: boolean;
-  private connectingPromise: Promise<any> | null = null;
 
-  constructor(baseDir?: string, readOnly: boolean = false) {
-    this.readOnly = readOnly;
-    let projectRoot = baseDir || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-
-    if (projectRoot === ":memory:") {
-      this.dbPath = ":memory:";
-      this.cacheDir = "";
-    } else {
-      projectRoot = path.resolve(projectRoot);
-      if (projectRoot === '/' || projectRoot === '\\') {
-        projectRoot = path.join(os.homedir(), '.conducks', 'synapses', 'root-fallback');
-      } else {
-        // 🧬 Standardize Structural Anchor (v1.12.5)
-        projectRoot = findNearestVault(projectRoot);
-      }
-
-      this.cacheDir = path.join(projectRoot, '.conducks');
-      this.dbPath = path.join(this.cacheDir, 'conducks-synapse.db');
-      logger.info(`Persistence Initialized at: ${projectRoot}`);
-    }
+  constructor(root?: string, private readOnly: boolean = true) {
+    const projectRoot = root || chronicle.getProjectDir() || process.cwd();
+    this.cacheDir = path.join(projectRoot, ".conducks");
+    this.dbPath = path.join(this.cacheDir, "conducks-synapse.db");
   }
 
-  private async connect(): Promise<any> {
+  private async connect(retries: number = 5): Promise<duckdb.Database | null> {
     if (this.db) return this.db;
-    if (this.connectingPromise) return this.connectingPromise;
 
-    this.connectingPromise = this._doConnect();
     try {
-      this.db = await this.connectingPromise;
-      return this.db;
+      if (!this.readOnly) {
+        await fs.mkdir(this.cacheDir, { recursive: true });
+      } else {
+        try {
+          await fs.access(this.dbPath);
+        } catch {
+          return null;
+        }
+      }
+
+      // 🛡️ [Vault Hardening] Connection Pulse with Jittered Retry logic
+      // Mode 1: OPEN_READONLY (v2.1.0) — Explicit configuration object for ARM architecture
+      const config = this.readOnly 
+        ? { access_mode: 'READ_ONLY', max_memory: '12GB', threads: '4' } 
+        : { access_mode: 'READ_WRITE', max_memory: '16GB', threads: '8' };
+
+      return await new Promise((resolve, reject) => {
+        const attempt = (count: number) => {
+          // Use config object instead of bitwise flags for higher stability in ARM/Node environments
+          const db = new duckdb.Database(this.dbPath, config, (err) => {
+            if (err) {
+              if (count < retries) {
+                const jitter = Math.random() * 200;
+                const backoff = (500 * Math.pow(2, count)) + jitter;
+                logger.warn(`🛡️ [Persistence] Vault Locked (Attempt ${count+1}/${retries}). Retrying in ${Math.round(backoff)}ms...`);
+                setTimeout(() => attempt(count + 1), backoff);
+              } else {
+                logger.error("Failed to connect to structural synapse after multiple pulses.", err);
+                resolve(null);
+              }
+            } else {
+              this.db = db;
+              this.initSchema().then(() => resolve(db)).catch(reject);
+            }
+          });
+        };
+        attempt(0);
+      });
     } catch (err) {
-      this.connectingPromise = null;
-      throw err;
-    } finally {
-      this.connectingPromise = null;
+      logger.error("Vault Connection Fatal Error.", err);
+      return null;
     }
   }
 
-  private async _doConnect(): Promise<any> {
-    if (this.dbPath !== ":memory:") {
-      await fs.mkdir(this.cacheDir, { recursive: true });
+  /**
+   * Apostolic Guard: Ensures the structural vault is open and healthy.
+   * Prevents catastrophic native DuckDB crashes (NULL pointer dereference).
+   */
+  private async ensureVaultOpen(): Promise<duckdb.Database> {
+    const db = await this.connect();
+    if (!db) {
+        throw new Error("❌ Structural Synapse is LOCKED. (DuckDB File Lock or Permission Error). Please check for other running Conducks processes.");
     }
-
-    const isExisting = await fs.stat(this.dbPath).then(() => true).catch(() => false);
-    if (this.readOnly && !isExisting && this.dbPath !== ":memory:") return null;
-
-    const dbOptions = (this.readOnly && this.dbPath !== ":memory:") ? duckdb.OPEN_READONLY : undefined;
-
-    let db: any = null;
-    let attempts = 0;
-    const maxAttempts = 6;
-
-    const isLockError = (msg: string) => 
-      msg.includes('busy') || msg.includes('locked') || msg.includes('Conflicting lock') || 
-      msg.includes('Permission denied') || msg.includes('IO Error: Could not set lock');
-
-    while (attempts < maxAttempts) {
-      try {
-        db = await new Promise<any>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error(`Database Connection Timeout: ${this.dbPath}`));
-          }, 6000);
-
-          const instance = dbOptions 
-            ? new duckdb.Database(this.dbPath, dbOptions, (err) => {
-                clearTimeout(timeout);
-                if (err) return reject(err);
-                resolve(instance);
-              })
-            : new duckdb.Database(this.dbPath, (err) => {
-                clearTimeout(timeout);
-                if (err) return reject(err);
-                resolve(instance);
-              });
-        });
-        break;
-      } catch (err: any) {
-        attempts++;
-        if (isLockError(err.message || '') && attempts < maxAttempts) {
-          const waitTime = Math.pow(2, attempts) * 500;
-          const role = this.readOnly ? 'Reader' : 'Writer';
-          console.error(`🛡️ [Conducks Persistence] Structural Vault Locked. Role: ${role}. Conflicting process detected. Retrying in ${waitTime}ms...`);
-          await new Promise(res => setTimeout(res, waitTime));
-          continue;
-        }
-        throw new Error(`[Conducks Persistence] Structural Vault Lock Contention: ${err.message}. (Attempt ${attempts}/${maxAttempts})`);
-      }
-    }
-
-    if (!db) return null;
-
-    const run = (sql: string): Promise<void> =>
-      new Promise((res, rej) => db.run(sql, (e: any) => (e ? rej(e) : res())));
-
-    if (!this.readOnly) {
-      await run("INSTALL json;");
-      await run("LOAD json;");
-
-      await run(`CREATE TABLE IF NOT EXISTS pulses (id VARCHAR PRIMARY KEY, timestamp BIGINT, metadata VARCHAR);`);
-      await run(`CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT);`);
-      await run(`CREATE TABLE IF NOT EXISTS nodes (
-        id TEXT, pulseId VARCHAR, kind TEXT, name TEXT, file VARCHAR, gravity DOUBLE, 
-        kineticEnergy DOUBLE, frameworks VARCHAR, isTest BOOLEAN, complexity INTEGER, 
-        debtMarkers VARCHAR, resonance INTEGER, entropy DOUBLE, primaryAuthor VARCHAR, 
-        authorCount INTEGER, lastModified INTEGER, tenureDays INTEGER, coveredBy VARCHAR, 
-        anomaly VARCHAR, isEntryPoint BOOLEAN, ecosystem VARCHAR, version VARCHAR, 
-        canonicalKind VARCHAR, canonicalRank INTEGER, metadata VARCHAR,
-        PRIMARY KEY (id, pulseId)
-      );`);
-      await run(`CREATE TABLE IF NOT EXISTS edges (
-        id TEXT, pulseId VARCHAR, sourceId TEXT, targetId TEXT, type TEXT, 
-        confidence DOUBLE, properties VARCHAR
-      );`);
-    }
-
     return db;
   }
 
-  public async save(graph: ConducksAdjacencyList): Promise<string> {
-    const db = await this.connect();
-    if (!db) throw new Error("Structural Vault is Locked.");
+  private async initSchema(): Promise<void> {
+    const db = this.db;
+    if (!db || this.readOnly) return;
+    const run = (sql: string) => new Promise((res, rej) => db.run(sql, (err) => err ? rej(err) : res(true)));
+    
+    // 🛡️ [Vault Tuning] Synapse Hardening v2.0 (Apostolic Streaming) 🏺
+    await run("PRAGMA memory_limit='12GB';");
+    await run("PRAGMA threads=2;");
+    await run("SET preserve_insertion_order=false;");
+    await run("INSTALL json;");
+    await run("LOAD json;");
+    
+    await run(`CREATE TABLE IF NOT EXISTS pulses (id TEXT PRIMARY KEY, timestamp BIGINT, commitHash TEXT, nodeCount INTEGER, edgeCount INTEGER, metadata JSON);`);
+    await run(`CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT);`);
+    await run(`CREATE TABLE IF NOT EXISTS nodes (id TEXT PRIMARY KEY, pulseId VARCHAR, fingerprint VARCHAR, canonicalKind VARCHAR, canonicalRank INTEGER, semantic_kind VARCHAR, name TEXT, file VARCHAR, lineStart INTEGER, lineEnd INTEGER, parentId TEXT, rootId TEXT, namespaceId TEXT, unitId TEXT, structureId TEXT, layer_path VARCHAR, depth INTEGER, risk REAL, gravity REAL, complexity INTEGER, isEntryPoint BOOLEAN, visibility VARCHAR, dna JSON, signature JSON, kinetic JSON, metadata JSON);`);
+    await run(`CREATE TABLE IF NOT EXISTS edges (id TEXT PRIMARY KEY, pulseId VARCHAR, sourceId TEXT, targetId TEXT, category VARCHAR, type TEXT, weight REAL, confidence REAL, lineNumber INTEGER, properties JSON);`);
+    await run(`CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, pulseId VARCHAR, filePath VARCHAR, kind VARCHAR, title VARCHAR, sections JSON, symbols_referenced TEXT[], last_modified BIGINT);`);
+    
+    // Apostolic Schema Guard (Auto-Migration) 🏺
+    const ensureColumn = async (table: string, column: string, type: string) => {
+      const cols = await this.query(`PRAGMA table_info(${table})`);
+      if (!cols.find((c: any) => c.name === column)) {
+        logger.info(`🛡️ [Persistence] Apostolic Migration: Adding ${column} to ${table}...`);
+        await run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type};`);
+      }
+    };
 
-    const nodes = Array.from((graph as any).nodes.values()) as ConducksNode[];
-    const allEdges = this.serializeEdges(graph);
-    const pulseId = `pulse_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-    return new Promise((resolve, reject) => {
-      // Manual transaction because DuckDB doesn't serve db.serialize
-      db.exec("BEGIN TRANSACTION", async (err: any) => {
-        if (err) return reject(err);
-        try {
-          // Clear metadata and re-insert
-          await new Promise<void>((r, j) => db.run("DELETE FROM metadata", (e: any) => e ? j(e) : r()));
-          const metaStmt = db.prepare("INSERT INTO metadata (key, value) VALUES (?, ?)");
-          for (const [key, val] of graph.getAllMetadata().entries()) {
-            await new Promise<void>((r, j) => metaStmt.run(key, val, (e: any) => e ? j(e) : r()));
-          }
-          metaStmt.finalize();
-
-          // Insert Pulse
-          await new Promise<void>((r, j) => db.run("INSERT INTO pulses (id, timestamp, metadata) VALUES (?, ?, ?)", pulseId, Date.now(), JSON.stringify({ nodeCount: nodes.length }), (e: any) => e ? j(e) : r()));
-
-          // Insert Nodes
-          const nodeStmt = db.prepare(`INSERT INTO nodes (id, pulseId, kind, name, file, gravity, kineticEnergy, frameworks, isTest, complexity, debtMarkers, resonance, entropy, primaryAuthor, authorCount, lastModified, tenureDays, coveredBy, anomaly, isEntryPoint, ecosystem, version, canonicalKind, canonicalRank, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-          for (const node of nodes) {
-            await new Promise<void>((r, j) => nodeStmt.run(
-              node.id, pulseId, node.label || 'unknown', node.properties.name || 'unknown', 
-              node.properties.filePath || null, node.properties.rank || 0,
-              node.properties.kineticEnergy || 0, JSON.stringify(node.properties.frameworks || []),
-              node.properties.isTest ? true : false, node.properties.complexity || 1,
-              JSON.stringify(node.properties.debtMarkers || []), node.properties.resonance || 0,
-              node.properties.entropy || 0, node.properties.primaryAuthor || '',
-              node.properties.authorCount || 0, node.properties.lastModified || 0,
-              node.properties.tenureDays || 0, JSON.stringify(node.properties.coveredBy || []),
-              node.properties.anomaly || null, node.properties.isEntryPoint ? true : false,
-              node.properties.ecosystem || null, node.properties.version || null,
-              node.properties.canonicalKind || null, node.properties.canonicalRank || 0,
-              JSON.stringify(node.properties || {}), (e: any) => e ? j(e) : r()
-            ));
-          }
-          nodeStmt.finalize();
-
-          // Insert Edges
-          const edgeStmt = db.prepare("INSERT INTO edges (id, pulseId, sourceId, targetId, type, confidence, properties) VALUES (?, ?, ?, ?, ?, ?, ?)");
-          for (const e of allEdges) {
-            await new Promise<void>((r, j) => edgeStmt.run(e.id, pulseId, e.sourceId, e.targetId, e.type, e.confidence, JSON.stringify(e.properties || {}), (e2: any) => e2 ? j(e2) : r()));
-          }
-          edgeStmt.finalize();
-
-          db.exec("COMMIT", (err2: any) => err2 ? reject(err2) : resolve(pulseId));
-        } catch (fail: any) {
-          db.exec("ROLLBACK", () => reject(fail));
+    const ensurePrimaryKey = async (table: string, columns: string[], createSql: string) => {
+      const info = await this.query(`PRAGMA table_info(${table})`);
+      const currentPk = info.filter((c: any) => c.pk > 0).map((c: any) => c.name).sort();
+      const targetPk = [...columns].sort();
+      
+      if (currentPk.join(',') !== targetPk.join(',')) {
+        logger.warn(`🛡️ [Persistence] Apostolic Table Resurrection: ${table} is missing Primary Key ${columns.join(',')}. Rebuilding...`);
+        
+        // 1. Drop Indexes (prevents Dependency Error) 🏺
+        const indexList = await this.query(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = '${table}'`);
+        for (const idx of indexList) {
+          await run(`DROP INDEX IF EXISTS ${idx.name};`);
         }
-      });
+
+        // 2. Rename and Rebuild
+        await run(`ALTER TABLE ${table} RENAME TO ${table}_stale_legacy;`);
+        await run(createSql);
+        
+        // 3. Apostolic Batched Migration (Memory Optimized) 🏺
+        try {
+          const commonCols = info.map((c: any) => c.name).join(', ');
+          const totalRowsResult = await this.query(`SELECT COUNT(*) as count FROM ${table}_stale_legacy`);
+          const totalRows = (totalRowsResult[0] as any).count;
+          const batchSize = 1000;
+
+          logger.info(`🛡️ [Persistence] Streaming Data Migration for ${table} (${totalRows} units)...`);
+          
+          for (let offset = 0; offset < totalRows; offset += batchSize) {
+            await run(`INSERT OR IGNORE INTO ${table} (${commonCols}) SELECT ${commonCols} FROM ${table}_stale_legacy LIMIT ${batchSize} OFFSET ${offset};`);
+            if (offset % 5000 === 0 && offset > 0) {
+              logger.info(`🛡️ [Persistence] Migration Pulse: ${offset}/${totalRows} rows reflected.`);
+            }
+          }
+          
+          await run(`DROP TABLE ${table}_stale_legacy;`);
+          logger.info(`🛡️ [Persistence] Table Resurrection Complete: ${table}.`);
+        } catch (e) {
+          logger.error(`🛡️ [Persistence] Table Resurrection Migration Failed for ${table}. Using fresh table.`, e);
+        }
+      }
+    };
+
+    // 1. Total Structural Resurrection 🏺
+    const nodesSql = `CREATE TABLE IF NOT EXISTS nodes (id TEXT PRIMARY KEY, pulseId VARCHAR, fingerprint VARCHAR, canonicalKind VARCHAR, canonicalRank INTEGER, semantic_kind VARCHAR, name TEXT, file VARCHAR, lineStart INTEGER, lineEnd INTEGER, parentId TEXT, rootId TEXT, namespaceId TEXT, unitId TEXT, structureId TEXT, layer_path VARCHAR, depth INTEGER, risk REAL, gravity REAL, complexity INTEGER, isEntryPoint BOOLEAN, visibility VARCHAR, dna JSON, signature JSON, kinetic JSON, metadata JSON);`;
+    const edgesSql = `CREATE TABLE IF NOT EXISTS edges (id TEXT PRIMARY KEY, pulseId VARCHAR, sourceId TEXT, targetId TEXT, category VARCHAR, type TEXT, weight REAL, confidence REAL, lineNumber INTEGER, properties JSON);`;
+    const pulsesSql = `CREATE TABLE IF NOT EXISTS pulses (id TEXT PRIMARY KEY, timestamp BIGINT, commitHash TEXT, nodeCount INTEGER, edgeCount INTEGER, metadata JSON);`;
+    const metaSql = `CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT);`;
+
+    await run(nodesSql);
+    await run(edgesSql);
+    await run(pulsesSql);
+    await run(metaSql);
+
+    await ensurePrimaryKey('nodes', ['id'], nodesSql);
+    await ensurePrimaryKey('edges', ['id'], edgesSql);
+    await ensurePrimaryKey('pulses', ['id'], pulsesSql);
+    await ensurePrimaryKey('metadata', ['key'], metaSql);
+
+    // 2. Column-Level Hardening (for incremental updates)
+    const nodesCols = [
+      ['fingerprint', 'VARCHAR'], ['canonicalKind', 'VARCHAR'], ['canonicalRank', 'INTEGER'],
+      ['semantic_kind', 'VARCHAR'], ['name', 'TEXT'], ['file', 'VARCHAR'],
+      ['lineStart', 'INTEGER'], ['lineEnd', 'INTEGER'], ['parentId', 'TEXT'],
+      ['rootId', 'TEXT'], ['namespaceId', 'TEXT'], ['unitId', 'TEXT'],
+      ['structureId', 'TEXT'], ['layer_path', 'VARCHAR'], ['depth', 'INTEGER'],
+      ['risk', 'REAL'], ['gravity', 'REAL'], ['complexity', 'INTEGER'],
+      ['isEntryPoint', 'BOOLEAN'], ['visibility', 'VARCHAR'], ['dna', 'JSON'],
+      ['signature', 'JSON'], ['kinetic', 'JSON'], ['metadata', 'JSON']
+    ];
+
+    for (const [col, type] of nodesCols) {
+      await ensureColumn('nodes', col as string, type as string);
+    }
+
+    const edgesCols = [
+      ['category', 'VARCHAR'], ['weight', 'REAL'], ['confidence', 'REAL'],
+      ['lineNumber', 'INTEGER'], ['properties', 'JSON']
+    ];
+
+    for (const [col, type] of edgesCols) {
+      await ensureColumn('edges', col as string, type as string);
+    }
+
+    const pulsesCols = [
+      ['timestamp', 'BIGINT'], ['commitHash', 'TEXT'], ['nodeCount', 'INTEGER'],
+      ['edgeCount', 'INTEGER'], ['metadata', 'JSON']
+    ];
+
+    for (const [col, type] of pulsesCols) {
+      await ensureColumn('pulses', col as string, type as string);
+    }
+
+    // 3. Structural Performance Indexing (Oracle Standard) 🏺
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_id ON nodes(id);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_pulse ON nodes(pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_parentId ON nodes(parentId, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_unitId ON nodes(unitId, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_structureId ON nodes(structureId, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_namespaceId ON nodes(namespaceId, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_layer ON nodes(layer_path, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_rank ON nodes(canonicalRank, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(canonicalKind, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_semantic ON nodes(semantic_kind, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_risk ON nodes(risk DESC, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_nodes_gravity ON nodes(gravity DESC, pulseId);`);
+    
+    await run(`CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(sourceId, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(targetId, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_edges_type ON edges(type, pulseId);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_edges_category ON edges(category, pulseId);`);
+    
+    await run(`CREATE INDEX IF NOT EXISTS idx_docs_filepath ON documents(filePath, pulseId);`);
+  }
+
+  public async run(sql: string, params: any[] = []): Promise<void> {
+    const db = await this.ensureVaultOpen();
+    return await new Promise((res, rej) => {
+      db.run(sql, ...params, (err) => err ? rej(err) : res());
     });
+  }
+
+  public async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+    const db = await this.ensureVaultOpen();
+    return await new Promise((res, rej) => {
+      db.all(sql, ...params, (err, rows) => err ? rej(err) : res(rows as T[]));
+    });
+  }
+
+  public async save(graph: ConducksAdjacencyList, options: { append?: boolean, nodeCount?: number, edgeCount?: number } = {}): Promise<string> {
+    const db = await this.ensureVaultOpen();
+    const rawNodes = Array.from(graph.getAllNodes());
+    const allEdges = this.serializeEdges(graph);
+    const pulseId = (graph as any).getMetadata('targetPulseId') || `pulse_${Date.now()}`;
+    const nodeMap = new Map<string, ConducksNode>();
+    for (const n of rawNodes) nodeMap.set(n.id.toLowerCase(), n);
+    const nodes = Array.from(nodeMap.values());
+
+    try {
+      await this.run("BEGIN TRANSACTION");
+      await this.run("DELETE FROM metadata");
+      const metaStmt = db.prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)");
+      for (const [k, v] of graph.getAllMetadata().entries()) {
+        await new Promise<void>((r, j) => metaStmt.run(k, String(v), (e) => e ? j(e) : r()));
+      }
+      metaStmt.finalize();
+
+      if (!options.append) {
+        // [Unit-Centric Realignment] By default, we no longer delete all nodes for a pulse.
+        // We rely on INSERT OR REPLACE at the node/unit level.
+        // However, if append is false (Legacy Full Sync), we still clear metadata.
+        await this.run("DELETE FROM metadata");
+      }
+
+      const finalNodeCount = options.nodeCount ?? nodes.length;
+      const finalEdgeCount = options.edgeCount ?? allEdges.length;
+
+      await this.run("INSERT OR REPLACE INTO pulses (id, timestamp, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?)", [
+        pulseId, Date.now(), finalNodeCount, finalEdgeCount, JSON.stringify({ project: chronicle.getProjectDir() })
+      ]);
+      await this.run("COMMIT");
+
+      // Apostolic Streaming: Delegated Reflection 🏺
+      await this.saveNodes(nodes, pulseId);
+      await this.saveEdges(allEdges, pulseId);
+
+      return pulseId;
+    } catch (fail) {
+      logger.error("Vault Steam Error. Attempting Apostolic Rollback...", fail);
+      try { await this.run("ROLLBACK"); } catch { /* Ignore rollback failure if no tx was open */ }
+      throw fail;
+    }
+  }
+
+  /**
+   * Apostolic Streaming: High-performance Batched Node Reflection 🏺
+   */
+  public async saveNodes(nodes: ConducksNode[], pulseId: string): Promise<void> {
+    const db = await this.ensureVaultOpen();
+    const batchSize = 2500;
+    
+    for (let i = 0; i < nodes.length; i += batchSize) {
+      const batch = nodes.slice(i, i + batchSize);
+      await this.run("BEGIN TRANSACTION");
+      
+      const ns = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, fingerprint, canonicalKind, canonicalRank, semantic_kind, name, file, lineStart, lineEnd, parentId, rootId, namespaceId, unitId, structureId, layer_path, depth, risk, gravity, complexity, isEntryPoint, visibility, dna, signature, kinetic, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      
+      for (const node of batch) {
+        const p = node.properties;
+        const nid = node.id.toLowerCase();
+        let parentId = p.parentId ? p.parentId.toLowerCase() : null;
+        let layerPath = p.layer_path;
+        const pid = pulseId.toLowerCase();
+        const nodeId = nid.toLowerCase();
+        const parent = parentId ? parentId.toLowerCase() : null;
+        const unit = p.unitId ? p.unitId.toLowerCase() : (p.filePath ? `${p.filePath.toLowerCase()}::unit` : null);
+        const root = p.rootId ? p.rootId.toLowerCase() : null;
+
+        const params = [
+          nodeId, pid, p.fingerprint || null, p.canonicalKind || node.label, p.canonicalRank || 0,
+          p.semantic_kind || 'unknown', p.name || 'unknown', p.filePath ? p.filePath.toLowerCase() : null,
+          p.lineStart || 0, p.lineEnd || 0, parent, root, p.namespaceId ? p.namespaceId.toLowerCase() : null,
+          unit, p.structureId ? p.structureId.toLowerCase() : (parent), layerPath || null,
+          p.depth || 0, p.risk || 0, p.gravity || 0, p.complexity || 1, p.isEntryPoint || false,
+          p.visibility || 'public', JSON.stringify(p.dna || {}), JSON.stringify(p.signature || {}),
+          JSON.stringify(p.kinetic || {}), JSON.stringify({ ...p, id: nodeId, parentId: parent, unitId: unit, rootId: root, layer_path: layerPath })
+        ];
+        
+        await new Promise<void>((r, j) => ns.run(...params, (e) => e ? j(e) : r()));
+      }
+      
+      ns.finalize();
+      await this.run("COMMIT");
+      if (i > 0) logger.info(`🛡️ [Persistence] Structural Bloom: ${i}/${nodes.length} nodes reflected.`);
+    }
+  }
+
+  /**
+   * Apostolic Streaming: High-performance Batched Edge Reflection 🏺
+   */
+  public async saveEdges(edges: ConducksEdge[], pulseId: string): Promise<void> {
+    const db = await this.ensureVaultOpen();
+    const batchSize = 5000;
+    
+    for (let i = 0; i < edges.length; i += batchSize) {
+      const batch = edges.slice(i, i + batchSize);
+      await this.run("BEGIN TRANSACTION");
+      
+      const es = db.prepare(`INSERT OR REPLACE INTO edges (id, pulseId, sourceId, targetId, category, type, weight, confidence, lineNumber, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      
+      for (const e of batch) {
+        await new Promise<void>((r, j) => es.run(
+          e.id.toLowerCase(), pulseId.toLowerCase(), 
+          e.sourceId.toLowerCase(), e.targetId.toLowerCase(), 
+          e.properties?.category || 'STRUCTURAL', e.type, 
+          e.properties?.weight || 1.0, e.confidence || 1.0, 
+          e.properties?.lineNumber || 0, JSON.stringify(e.properties || {}), 
+          (err) => err ? j(err) : r()
+        ));
+      }
+      
+      es.finalize();
+      await this.run("COMMIT");
+    }
   }
 
   public async saveSpectrum(filePath: string, spectrum: any): Promise<void> {
     return this.saveBatchSpectrum([{ filePath, spectrum }]);
   }
 
-  public async saveBatchSpectrum(entries: Array<{ filePath: string, spectrum: any }>): Promise<void> {
-    const db = await this.connect();
-    if (!db) return;
-    const pulseId = `stream_${Date.now()}`;
-    return new Promise((resolve, reject) => {
-      db.exec("BEGIN TRANSACTION", async (err: any) => {
-        if (err) return reject(err);
-        try {
-          const nodeStmt = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, kind, name, file, gravity, kineticEnergy, canonicalKind, canonicalRank, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-          for (const entry of entries) {
-            for (const metaNode of entry.spectrum.nodes) {
-              const nodeId = `${entry.filePath.toLowerCase()}::${metaNode.name.toLowerCase()}`;
-              await new Promise<void>((r, j) => nodeStmt.run(
-                nodeId, pulseId, metaNode.kind || 'unknown', metaNode.name || 'unknown', 
-                entry.filePath.toLowerCase(), 0, 0, 
-                metaNode.canonicalKind || null, metaNode.canonicalRank || 0,
-                JSON.stringify({ ...metaNode.metadata, name: metaNode.name, range: metaNode.range }), 
-                (e: any) => e ? j(e) : r()
-              ));
+  public async saveBatchSpectrum(entries: Array<{ filePath: string, spectrum: any }>, pulseIdOverride?: string): Promise<void> {
+    const db = await this.ensureVaultOpen();
+    const pid = pulseIdOverride || `stream_${Date.now()}`;
+    return new Promise(async (resolve, reject) => {
+      try {
+        const exec = (sql: string) => new Promise<void>((r, j) => db.exec(sql, (e) => e ? j(e) : r()));
+        const pid = pulseIdOverride || `stream_${Date.now()}`;
+        const batchSize = 1000;
+
+        for (let i = 0; i < entries.length; i += batchSize) {
+          const chunk = entries.slice(i, i + batchSize);
+          await exec("BEGIN TRANSACTION");
+          const ns = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, fingerprint, canonicalKind, canonicalRank, semantic_kind, name, file, lineStart, lineEnd, parentId, rootId, namespaceId, unitId, structureId, layer_path, depth, risk, gravity, complexity, isEntryPoint, visibility, dna, signature, kinetic, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          const es = db.prepare(`INSERT OR REPLACE INTO edges (id, pulseId, sourceId, targetId, category, type, weight, confidence, lineNumber, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+          for (const entry of chunk) {
+            const rawFilePath = entry.filePath.toLowerCase();
+            for (const n of entry.spectrum.nodes) {
+              const m = n.metadata || {};
+              const id = m.id ? m.id.toLowerCase() : `${rawFilePath}::${n.name.toLowerCase()}`;
+              const parentId = m.parentId ? m.parentId.toLowerCase() : `${rawFilePath}::unit`;
+              const unitId = m.unitId ? m.unitId.toLowerCase() : `${rawFilePath}::unit`;
+              const rootId = m.rootId ? m.rootId.toLowerCase() : null;
+              await new Promise<void>((r, j) => ns.run(id, pid, m.fingerprint || null, m.canonicalKind || n.canonicalKind, n.canonicalRank || 0, n.kind || 'unknown', n.name || 'unknown', rawFilePath, n.range?.start.line || 0, n.range?.end.line || 0, parentId, rootId, m.namespaceId ? m.namespaceId.toLowerCase() : null, unitId, m.structureId ? m.structureId.toLowerCase() : null, m.layer_path || null, m.depth || 0, n.risk || 0, n.gravity || 0, n.complexity || 1, m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(n.dna || {}), JSON.stringify(n.signature || {}), JSON.stringify(n.kinetic || {}), JSON.stringify({ ...m, id, name: n.name, range: n.range, parentId, unitId, rootId }), (e) => e ? j(e) : r()));
+              // [Apostolic Rule] MEMBER_OF edges are no longer persisted. 🏺
+              // Containment is now explicitly column-based (parentId, unitId, etc.)
             }
           }
-          nodeStmt.finalize();
-          db.exec("COMMIT", (err2: any) => err2 ? reject(err2) : resolve());
+          ns.finalize();
+          es.finalize();
+          await exec("COMMIT");
+        }
+        resolve();
+      } catch (fail) {
+        logger.error("Spectrum Stream Error.", fail);
+        reject(fail);
+      }
+    });
+  }
+
+  public async load(graph: ConducksAdjacencyList, append: boolean = false): Promise<boolean> {
+    const db = await this.connect();
+    if (!db) return false;
+    try {
+      // 🛡️ [Apostolic State-Sync] We now load the entire structural constellation.
+      // Since 'id' is the PK, we always get the latest version of every symbol.
+      const nodes: any[] = await this.query("SELECT * FROM nodes");
+      const edges: any[] = await this.query("SELECT * FROM edges");
+      if (nodes.length === 0) return false;
+
+      if (!append) (graph as any).clear();
+      
+      nodes.forEach(n => {
+        const props = { ...JSON.parse(n.metadata || '{}'), ...n, dna: JSON.parse(n.dna || '{}'), signature: JSON.parse(n.signature || '{}'), kinetic: JSON.parse(n.kinetic || '{}') };
+        graph.addNode({ id: n.id, label: n.canonicalKind, properties: props });
+      });
+      edges.forEach(e => graph.addEdge({ id: e.id, sourceId: e.sourceId, targetId: e.targetId, type: e.type, confidence: e.confidence, properties: JSON.parse(e.properties || '{}') }));
+      
+      return true;
+    } catch (err) { 
+      logger.error("Vault Load Error", err);
+      return false; 
+    }
+  }
+
+  public async fetchNodeMeat(id: string): Promise<any> {
+    const db = await this.connect(); if (!db) return null;
+    try {
+      const row: any = await this.query("SELECT metadata FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1", [id.toLowerCase()]);
+      const result = row && row[0] ? JSON.parse(row[0].metadata) : null;
+      return result;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  public async clean(pulseIdToKeep?: string): Promise<void> {
+    const db = await this.connect();
+    if (!db) return;
+    return new Promise<void>((resolve) => {
+      db.exec("BEGIN TRANSACTION", async () => {
+        const run = (sql: string, params: any[] = []) => new Promise<void>((r, j) => db.run(sql, params, (e) => e ? j(e) : r()));
+        try {
+          if (pulseIdToKeep) {
+            await run("DELETE FROM nodes WHERE pulseId != ?", [pulseIdToKeep]);
+            await run("DELETE FROM edges WHERE pulseId != ?", [pulseIdToKeep]);
+            await run("DELETE FROM pulses WHERE id != ?", [pulseIdToKeep]);
+          } else {
+            await run("DELETE FROM nodes");
+            await run("DELETE FROM edges");
+            await run("DELETE FROM pulses");
+            await run("DELETE FROM metadata");
+          }
+          db.exec("COMMIT", () => resolve());
         } catch (fail) {
-          db.exec("ROLLBACK", () => reject(fail));
+          db.exec("ROLLBACK", () => resolve());
         }
       });
     });
   }
 
-  public async load(graph: ConducksAdjacencyList, append: boolean = false): Promise<boolean> {
-    try {
-      const db = await this.connect();
-      if (!db) return false;
+  public async clear(): Promise<void> { return this.clean(); }
+  public async getRawConnection(): Promise<duckdb.Database | null> { return this.connect(); }
+  public async close(): Promise<void> { if (this.db) { await new Promise(r => this.db!.close(r)); this.db = null; } }
+  public isConnected(): boolean { return !!this.db; }
 
-      const pulseRows: any[] = await new Promise((res) => db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => res(err ? [] : rows)));
-      if (pulseRows.length === 0) return false;
-      const latestPulseId = pulseRows[0].id;
+  /**
+   * Apostolic Purge: Explicitly removes structural DNA for specific units.
+   * Use this before re-inducting a modified file to ensure no dangling symbols.
+   */
+  public async purgeUnits(unitIds: string[]): Promise<void> {
+    if (unitIds.length === 0) return;
+    const db = await this.ensureVaultOpen();
+    const batchSize = 1000;
+    
+    for (let i = 0; i < unitIds.length; i += batchSize) {
+      const batch = unitIds.slice(i, i + batchSize).map(id => id.toLowerCase());
+      const placeholders = batch.map(() => '?').join(',');
+      
+      // Apostolic Rule: Delete edges first, then nodes.
+      // This ensures that the JOIN/SELECT for edges still finds the node IDs while they exist.
+      await this.run(`
+        DELETE FROM edges 
+        WHERE sourceId IN (SELECT id FROM nodes WHERE unitId IN (${placeholders}))
+           OR targetId IN (SELECT id FROM nodes WHERE unitId IN (${placeholders}))
+      `, [...batch, ...batch]);
 
-      const metaRows: any[] = await new Promise((res) => db.all("SELECT * FROM metadata", (err: any, rows: any[]) => res(err ? [] : rows)));
-      metaRows.forEach(row => graph.setMetadata(row.key, row.value));
-
-      const nodes: any[] = await new Promise((res) => db.all("SELECT * FROM nodes WHERE pulseId = ?", [latestPulseId], (err: any, rows: any[]) => res(err ? [] : rows)));
-      const edges: any[] = await new Promise((res) => db.all("SELECT * FROM edges WHERE pulseId = ?", [latestPulseId], (err: any, rows: any[]) => res(err ? [] : rows)));
-
-      if (!append) {
-        (graph as any).nodes.clear();
-        (graph as any).outEdges.clear();
-        (graph as any).inEdges.clear();
-      }
-
-      nodes.forEach(row => {
-        try {
-          graph.addNode({ id: row.id, label: row.kind, properties: { ...(row.metadata ? JSON.parse(row.metadata) : {}), name: row.name, filePath: row.file, rank: row.gravity, kineticEnergy: row.kineticEnergy, isEntryPoint: !!row.isEntryPoint } });
-        } catch (e) { console.error(e); }
-      });
-      edges.forEach(row => graph.addEdge({ id: row.id, sourceId: row.sourceId, targetId: row.targetId, type: row.type, confidence: row.confidence, properties: row.properties ? JSON.parse(row.properties) : {} }));
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
-    } finally {
-      // FIX 5: Release structural vault handle for passive readers to enable concurrency
-      if (this.readOnly) await this.close();
+      await this.run(`DELETE FROM nodes WHERE unitId IN (${placeholders})`, batch);
     }
   }
-
-  public async getRawConnection(): Promise<any> { return this.connect(); }
-
-  public async fetchNodeMeat(nodeId: string): Promise<any | null> {
-    try {
-      const db = await this.connect();
-      if (!db) return null;
-      const pulseRows: any[] = await new Promise((res) => db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => res(err ? [] : rows)));
-      if (pulseRows.length === 0) return null;
-      const rows: any[] = await new Promise((res) => db.all("SELECT metadata FROM nodes WHERE id = ? AND pulseId = ?", [nodeId, pulseRows[0].id], (err: any, rows: any[]) => res(err ? [] : rows)));
-      return (rows.length > 0 && rows[0].metadata) ? JSON.parse(rows[0].metadata) : null;
-    } finally {
-      // FIX 5: Release handle after tool call
-      if (this.readOnly) await this.close();
-    }
-  }
-
-  public async close(): Promise<void> {
-    if (this.db) {
-      return new Promise((res) => this.db.close(() => { this.db = null; res(); }));
-    }
-  }
-
-  public async clear(): Promise<void> {
-    if (this.dbPath !== ":memory:") await fs.rm(this.cacheDir, { recursive: true, force: true });
-  }
-
-  public isConnected(): boolean { return this.db !== null; }
 
   private serializeEdges(graph: ConducksAdjacencyList): ConducksEdge[] {
-    const allEdges: ConducksEdge[] = [];
-    const outEdges = (graph as any).outEdges as Map<string, Set<ConducksEdge>>;
-    for (const edgeSet of outEdges.values()) allEdges.push(...Array.from(edgeSet));
-    return allEdges;
+    return graph.getAllEdges();
   }
 }
 
-export const GraphPersistence = DuckDbPersistence;
+export class DuckDbPersistence extends SynapsePersistence {}
+export class GraphPersistence extends SynapsePersistence {}

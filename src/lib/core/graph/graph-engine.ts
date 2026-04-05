@@ -1,4 +1,7 @@
-import { ConducksNode, ConducksEdge, ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksNode, ConducksEdge, ConducksAdjacencyList } from "./adjacency-list.js";
+import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
+import { canonicalize } from "@/lib/core/utils/path-utils.js";
+import { Logger } from "../utils/logger.js";
 import { PrismRequest } from "@/lib/core/persistence/prism-core.js";
 import { Worker } from "node:worker_threads";
 import os from "node:os";
@@ -9,13 +12,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Conducks — Technical Graph Engine
+ * Conducks — Technical Graph Engine 🛡️ 🧬
  * 
  * Logic for reflecting the technical structure into the graph.
- * Features the Conducks "Universal Workspace Resolver" for cross-package binding.
+ * Implements the Apostolic Two-Pass Identity Model.
  */
 export class ConducksGraph {
   private graph = new ConducksAdjacencyList();
+  private logger = new Logger("ConducksGraph");
+
+  /**
+   * Provides the current Synapse Structural Adjacency List.
+   */
+  public getGraph(): ConducksAdjacencyList {
+    return this.graph;
+  }
 
   /**
    * Pulses the structural stream into the technical graph.
@@ -23,14 +34,14 @@ export class ConducksGraph {
    */
   public async pulseStructuralStream(stream: PrismRequest[]): Promise<void> {
     const unitCount = stream.length;
-    this.log(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
+    this.logger.info(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
 
     if (unitCount === 0) return;
 
     const coreCount = Math.max(1, os.cpus().length - 1);
     const chunkSize = Math.ceil(unitCount / coreCount);
     const grammarDir = path.resolve(__dirname, "../../../resources/grammars");
-    const workerScript = path.resolve(__dirname, "../parsing/pulse-worker.js");
+    const workerScript = path.resolve(__dirname, "../parsing/pulse-worker.ts");
 
     const workerPromises = [];
 
@@ -39,13 +50,14 @@ export class ConducksGraph {
 
       const p = new Promise<void>((resolve, reject) => {
         const worker = new Worker(workerScript, {
-          workerData: { units: chunk, grammarDir }
+          workerData: { units: chunk, grammarDir },
+          execArgv: ["--import", "tsx"]
         });
 
         worker.on('message', (results: any[]) => {
           for (const res of results) {
             if (res.error) {
-              this.log(`[Conducks Synapse] Worker failure in ${res.path}: ${res.error}`);
+              this.logger.error(`[Conducks Synapse] Worker failure in ${res.path}: ${res.error}`);
               continue;
             }
             this.ingestSpectrum(res.path, res.spectrum);
@@ -64,21 +76,17 @@ export class ConducksGraph {
     await Promise.all(workerPromises);
 
     // Phase 2: Neural Binding (Universal Workspace Resolution)
-    this.bindNeuralCircuits();
-
-    this.log(`[Conducks Synapse] Pulse complete: ${this.graph.stats.nodeCount} Neurons active.`);
+    this.resonate();
+    this.logger.info(`[Conducks Synapse] Pulse complete: ${this.graph.stats.nodeCount} Neurons active.`);
   }
 
   /**
    * Conducks — Structural Resonance
    * 
-   * Triggers the full structural intelligence pipeline: 
-   * 1. Neural Binding (Universal Workspace Resolution)
-   * 2. Route Binding (Cross-Service Resonance)
-   * 3. Gravity Recalculation (PageRank)
+   * Triggers the full structural intelligence pipeline.
    */
   public resonate(): void {
-    this.log(`[Conducks Synapse] Pushing Structural Resonance Flow...`);
+    this.logger.info(`[Conducks Synapse] Pushing Structural Resonance Flow...`);
     this.bindNeuralCircuits();
     this.bindRouteCircuits();
     this.bindPulseCircuits();
@@ -87,9 +95,6 @@ export class ConducksGraph {
 
   /**
    * Conducks — Pulse Binding (Variable Handover)
-   * 
-   * Traces data flow within a scope by linking call arguments
-   * to their preceding assignments.
    */
   private bindPulseCircuits(): void {
     const allNodes = Array.from(this.graph.getAllNodes());
@@ -100,33 +105,26 @@ export class ConducksGraph {
       const calls = outgoing.filter(e => e.type === 'CALLS' && !e.properties.isResonance);
 
       for (const call of calls) {
-        const args = call.properties.arguments as string[] || [];
+        const args = (call.properties.arguments as string[]) || [];
         for (const arg of args) {
-          // Look for a preceding assignment to this 'arg' name in the same scope
           const producer = assignments.find(a => a.targetId.split('::').pop() === arg);
           if (producer) {
-            // Link the call to the assignment source (The "Pulse Origin")
-            const edge: ConducksEdge = {
+            this.graph.addEdge({
               id: `PULSE::${producer.targetId}->${call.id}`,
-              sourceId: producer.targetId, // The variable node
-              targetId: call.targetId,     // The target function node
+              sourceId: producer.targetId,
+              targetId: call.targetId,
               type: 'PULSES_TO' as any,
               confidence: 0.7,
               properties: { reason: 'handover', variable: arg }
-            };
-            this.graph.addEdge(edge);
+            });
           }
         }
       }
     }
   }
 
-
   /**
    * Conducks — Route Binding (Microservice Bridge)
-   * 
-   * Identifies HTTP requests and links them to matching API routes
-   * across the entire Synapse.
    */
   private bindRouteCircuits(): void {
     const allNodes = Array.from(this.graph.getAllNodes());
@@ -141,201 +139,119 @@ export class ConducksGraph {
         const routePath = route.properties.path;
         const routeMethod = route.properties.method;
 
-        // Conducks: Heuristic URL Matcher (Exact match for Phase 2)
         if (reqMethod === routeMethod && this.isUrlMatch(reqUrl, routePath)) {
-          const edge: ConducksEdge = {
+          this.graph.addEdge({
             id: `RESONANCE::${req.id}->${route.id}`,
             sourceId: req.id,
             targetId: route.id,
-            type: 'CALLS' as any, // In v6, resonance is a high-level CALL
+            type: 'CALLS' as any,
             confidence: 0.9,
             properties: { isResonance: true, url: reqUrl }
-          };
-          this.graph.addEdge(edge);
+          });
         }
       }
     }
   }
 
-  /**
-   * Heuristic URL Matcher
-   */
   private isUrlMatch(reqUrl: string, routePath: string): boolean {
-    // Normalize: strip trailing slashes, handle basic prefix matching
-    const normReq = reqUrl.replace(/\/$/, "");
-    const normRoute = routePath.replace(/\/$/, "");
-
-    // Exact match
+    const normReq = reqUrl?.replace(/\/$/, "") || "";
+    const normRoute = routePath?.replace(/\/$/, "") || "";
     if (normReq === normRoute) return true;
-
-    // Path parameter match (basic: /user/123 matches /user/{id})
-    // Replace {param} or :param with regex wildcard
     const regexPattern = normRoute.replace(/\{[^}]+\}/g, "[^/]+").replace(/:[^\/]+/g, "[^/]+");
-    const regex = new RegExp(`^${regexPattern}$`);
-
-    return regex.test(normReq);
+    return new RegExp(`^${regexPattern}$`).test(normReq);
   }
-
 
   /**
    * Conducks — Ingests a reflected spectrum into the Synapse Graph.
-   * If shallow is true, only 'Skeleton' properties are retained in RAM.
+   * Apostolic Induction: Focus on local symbol ingestion and membership anchoring.
    */
-  public ingestSpectrum(rawPath: string, spectrum: any, shallow: boolean = false, projectRoot?: string): void {
-    // Conducks: Canonical ID Unification (v1.3.5)
-    // Enforce lowercase absolute IDs to prevent L1 duplication across macOS/Windows
-    const filePath = rawPath.toLowerCase();
-
-    // Conducks: Idempotent Ingestion (Clear structural footprint before refresh)
-    this.graph.clearFile(filePath);
-
-    // Populate Synapse Nodes (Symbols)
+  public ingestSpectrum(rawPath: string, spectrum: PrismSpectrum, shallow: boolean = false, unitId?: string, rootId?: string): void {
+    const filePath = canonicalize(rawPath);
+    
+    // Pass 1: Ingest Semantic Nodes (Symbols)
     for (const metaNode of spectrum.nodes) {
+      const m = metaNode.metadata || {};
+      const nodeId = m.id ? m.id.toLowerCase() : `${filePath}::${metaNode.name.toLowerCase()}`;
+      const parentId = m.parentId ? m.parentId.toLowerCase() : (unitId || null);
+      
       this.graph.addNode({
-        id: `${filePath.toLowerCase()}::${metaNode.name.toLowerCase()}`,
-        label: metaNode.kind,
+        id: nodeId,
+        label: (metaNode as any).canonicalKind || 'UNIT',
         isShallow: shallow, 
         properties: { 
-          ...metaNode.metadata, 
+          ...metaNode, 
+          ...m, 
           filePath, 
           name: metaNode.name, 
           range: metaNode.range, 
-          isExport: metaNode.isExport,
-          canonicalKind: metaNode.canonicalKind,
-          canonicalRank: metaNode.canonicalRank // Ranks are now pre-shifted by taxonomy.ts
-        }
+          isExport: metaNode.isExport || m.isExport,
+          canonicalKind: (metaNode as any).canonicalKind || 'UNIT',
+          canonicalRank: (metaNode as any).canonicalRank || 2,
+          parentId: parentId,
+          unitId: unitId || null,
+          rootId: rootId || null
+        } as any
       });
+
+      // Structural Membership Edge
+      if (parentId) {
+        this.graph.addEdge({
+          id: `MEMBER::${nodeId}->${parentId}`,
+          sourceId: nodeId,
+          targetId: parentId,
+          type: 'MEMBER_OF',
+          confidence: 1.0,
+          properties: {}
+        });
+      }
     }
 
-    // New: Recursive Namespace (Folder) Ingestion with Repository Anchoring
-    const parts = filePath.split(/[/\\]/); 
-    let currentPath = '';
-    const isAbsolute = filePath.startsWith('/') || /^[a-zA-Z]:\\/.test(filePath);
-    
-    // Find highest-level parent (Repository or Ecosystem)
-    let lastParentId = projectRoot ? `REPOSITORY::${projectRoot.toLowerCase()}` : "ECOSYSTEM::GLOBAL";
-    if (!this.graph.getNode(lastParentId)) lastParentId = "ECOSYSTEM::GLOBAL";
-
-    for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        if (i === 0 && isAbsolute && (part === '' || part.endsWith(':'))) {
-            currentPath = part === '' ? '/' : part + '\\';
-            continue;
-        }
-
-        const parentPath = currentPath;
-        if (currentPath === '/' || currentPath.endsWith('\\')) {
-            currentPath = `${currentPath}${part}`;
-        } else {
-            currentPath = currentPath ? `${currentPath}/${part}` : part;
-        }
-
-        const folderId = `NAMESPACE::${currentPath.toLowerCase()}`;
-        
-        // Only start creating NAMESPACE nodes if we are WITHIN the projectRoot (or if no root specified)
-        if (!projectRoot || currentPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
-            if (!this.graph.getNode(folderId)) {
-                this.graph.addNode({
-                    id: folderId,
-                    label: 'NAMESPACE',
-                    properties: {
-                        name: part,
-                        filePath: currentPath,
-                        canonicalKind: 'NAMESPACE',
-                        canonicalRank: 2, 
-                        isVirtual: true
-                    } as any
-                });
-
-                // Link to parent (Previous Folder or Repository)
-                const edgeId = `CONTAINS::${lastParentId}->${folderId}`;
-                if (!this.graph.hasEdge(edgeId)) {
-                    this.graph.addEdge({
-                        id: edgeId,
-                        sourceId: lastParentId,
-                        targetId: folderId,
-                        type: 'CONTAINS' as any,
-                        confidence: 1.0,
-                        properties: {}
-                    });
-                }
-            }
-            lastParentId = folderId; // Narrow the parent for the next level
-        }
-    }
-
-    // Link the file (unit) to its immediate parent folder or repository
-    const fileNodeId = `${filePath}::unit`.toLowerCase();
-    const fileNode = this.graph.getNode(fileNodeId);
-    
-    if (fileNode) {
-        fileNode.properties.name = path.basename(filePath);
-        fileNode.properties.displayName = path.basename(filePath);
-        
-        const edgeId = `CONTAINS::${lastParentId}->${fileNodeId}`;
-        if (!this.graph.hasEdge(edgeId)) {
-            this.graph.addEdge({
-                id: edgeId,
-                sourceId: lastParentId,
-                targetId: fileNodeId,
-                type: 'CONTAINS' as any,
-                confidence: 1.0,
-                properties: { reason: 'structural_ancestry' }
-            });
-        }
-    }
-
-    // Process relationships with Canonical Identity Awareness
+    // Pass 2: Ingest Local Relationships (Semantic Logic)
     for (const rel of spectrum.relationships) {
-      const isAbsolute = rel.targetName.includes('::');
-      const isFileRef = rel.type === 'IMPORTS';
+      // IMPORTS are skipped here; handled by Pass 3 in Orchestrator for high-fidelity resolution.
+      if (rel.type === 'IMPORTS') continue; 
+      if (rel.type === 'MEMBER_OF') continue; 
+
+      const sourceId = `${filePath}::${(rel.sourceName || 'unit').toLowerCase()}`;
       
-      let targetId: string;
-      if (isAbsolute) {
-        targetId = rel.targetName.toLowerCase();
-        // Ensure unit suffixes are correctly applied if missing from FQN
-        if (!targetId.includes('::')) targetId = `${targetId}::unit`;
-      } else if (isFileRef) {
-        targetId = `${rel.targetName.toLowerCase()}::unit`;
-      } else {
-        // Local Reference: Default to current file scope
-        targetId = `${filePath.toLowerCase()}::${rel.targetName.toLowerCase()}`;
+      // Conducks: Smart Resolution v1.9.1
+      // We only prefix if it's a known local symbol. 
+      // If it's already prefixed but missing, we strip it to allow virtual induction.
+      let targetId = rel.targetName.toLowerCase();
+      if (!targetId.includes('::')) {
+        const localCandidate = `${filePath}::${targetId}`;
+        if (this.graph.hasNode(localCandidate)) {
+          targetId = localCandidate;
+        }
+      } else if (targetId.startsWith('/') || targetId.includes('\\')) {
+        // It's a local-prefixed ID. If it doesn't exist, it's a "Ghost Local".
+        if (!this.graph.hasNode(targetId)) {
+          targetId = targetId.split('::').pop()!;
+        }
       }
 
-      // Canonical Source Resolution (Default to 'unit')
-      const sourceId = `${filePath.toLowerCase()}::${(rel.sourceName || 'unit').toLowerCase()}`;
-
       this.graph.addEdge({
-        id: `${sourceId}->${targetId}::${rel.type.toLowerCase()}`,
+        id: `SEMANTIC::${sourceId}->${targetId}::${rel.type.toLowerCase()}`,
         sourceId,
         targetId,
         type: rel.type as any,
-        confidence: rel.confidence,
-        properties: { rawTarget: rel.targetName, ...rel.metadata }
+        confidence: rel.confidence || 1.0,
+        properties: rel.metadata || {}
       });
     }
   }
 
   /**
-   * Conducks — Neural Binding (Simplified)
-   * 
-   * In the Two-Pass architecture, most symbols are resolved during Induction.
-   * This pass remains as a safety net for any remaining dynamic or cross-file
-   * ambiguities that weren't captured by the Symbol Registry.
+   * Conducks — Neural Binding
+   * Dynamic fallback resolution for local ambiguities.
    */
   private bindNeuralCircuits(): void {
     const allNodes = Array.from(this.graph.getAllNodes());
-
     for (const node of allNodes) {
       const outgoing = this.graph.getNeighbors(node.id, 'downstream');
-
       for (const edge of outgoing) {
-        if (edge.type === 'CALLS' || edge.type === 'ACCESSES' || edge.type === 'CONSTRUCTS' || edge.type === 'TYPE_REFERENCE') {
-          const rawTarget = edge.properties.rawTarget;
-          if (!rawTarget || edge.targetId.includes('::')) continue; // Already resolved
-
-          // Attempt local file resolution fallback
-          const localId = `${node.properties.filePath}::${rawTarget.toLowerCase()}`;
+        if (!edge.targetId.includes('::') && edge.properties.rawTarget) {
+          const localId = `${node.properties.filePath}::${edge.properties.rawTarget.toLowerCase()}`;
           if (this.graph.getNode(localId)) {
             edge.targetId = localId;
           }
@@ -344,17 +260,29 @@ export class ConducksGraph {
     }
   }
 
-
   /**
-   * Provides the current Synapse Structural Graph.
+   * Apostolic Streaming: Synapse-to-Vault Flush 🏺
+   * 
+   * Moves all current in-memory nodes/edges to the structural vault 
+   * and purges the RAM to allow for the next wave of induction.
    */
-  public getGraph(): ConducksAdjacencyList {
-    return this.graph;
-  }
+  public async flushAndClear(persistence: any, pulseId: string): Promise<{ nodeCount: number, edgeCount: number }> {
+    const nodes = Array.from(this.graph.getAllNodes());
+    const edges = this.graph.getAllEdges();
 
-  private log(...args: unknown[]): void {
-    if (process.env.CONDUCKS_DEBUG === '1') {
-      console.error(...args);
+    const stats = { nodeCount: nodes.length, edgeCount: edges.length };
+
+    if (nodes.length > 0) {
+      this.logger.info(`🛡️ [Conducks Synapse] Flushing ${nodes.length} nodes to vault...`);
+      await persistence.saveNodes(nodes, pulseId);
     }
+
+    if (edges.length > 0) {
+      this.logger.info(`🛡️ [Conducks Synapse] Flushing ${edges.length} edges to vault...`);
+      await persistence.saveEdges(edges, pulseId);
+    }
+
+    this.graph.clear();
+    return stats;
   }
 }

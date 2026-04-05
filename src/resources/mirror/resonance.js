@@ -31,6 +31,16 @@ window.MirrorState = {
     curvature: 0,
     fluidity: 0.9,
     cooldown: 0.02
+  },
+  edgeColors: {
+    'MEMBER_OF': '#484f58aa',
+    'CONTAINS': '#484f58aa',
+    'CALL': '#3b82f6',
+    'EXTENDS': '#a855f7',
+    'IMPLEMENTS': '#8b5cf6',
+    'REFERENCES': '#10b981',
+    'DEPENDS_ON': '#f59e0b',
+    'UNKNOWN': '#6b7280'
   }
 };
 
@@ -52,16 +62,53 @@ async function refreshSynapse() {
     Graph.graphData(window.MirrorState.activeWave);
     applyForces();
 
+    // v2.0.0: Apostolic Bloom effect
+    const container = document.getElementById('graph-container');
+    container.classList.add('sync-pulse');
+    setTimeout(() => container.classList.remove('sync-pulse'), 800);
+
+    const status = document.getElementById('sync-status');
+    if (status) {
+      status.innerText = 'LIVE SYNC';
+      status.classList.add('live');
+    }
+
     // v1.6.7: Reactive Structural Bloom. 
     if (Graph.d3Alpha) {
       Graph.d3Alpha(1).restart();
     }
   } catch (err) {
     console.error("[Mirror] Structural Refresh Error:", err);
+    const status = document.getElementById('sync-status');
+    if (status) {
+      status.innerText = 'OFFLINE';
+      status.classList.remove('live');
+    }
   } finally {
     hideOverlay();
   }
 }
+
+// v2.0.0: Reactive Pulse Integration
+let syncTimeout = null;
+const sse = new EventSource('/api/pulse');
+sse.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === 'PULSE') {
+    console.log("🛡️ [Synapse Gateway] Received structural heartbeat. Re-resonating...");
+    // Debounce to prevent stuttering on batch file saves
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => refreshSynapse(), 300);
+  }
+};
+
+sse.onerror = () => {
+  const status = document.getElementById('sync-status');
+  if (status) {
+    status.innerText = 'RECONNECTING...';
+    status.classList.remove('live');
+  }
+};
 
 function applyForces() {
   if (typeof d3 === 'undefined') return;
@@ -126,52 +173,69 @@ function configureGraph() {
     .backgroundColor('#010409')
     .nodeId('id')
     .nodeRelSize(4)
-    .linkCurvature(0.1)
+    .linkCurvature(link => {
+      if (link.category === 'LINEAGE') return 0;
+      
+      // v2.4.0: Deterministic "Edge Repulsion" Hash 🏺
+      // We calculate a unique bend for every link to prevent Overlap Contention.
+      const id = link.id || "";
+      let hash = 0;
+      for (let i = 0; i < id.length; i++) {
+          hash = ((hash << 5) - hash) + id.charCodeAt(i);
+          hash |= 0;
+      }
+      const bend = 0.1 + (Math.abs(hash % 100) / 100) * 0.4;
+      return bend;
+    })
     .linkWidth(link => {
-      if (window.MirrorState.focusLinks.size > 0) return window.MirrorState.focusLinks.has(link) ? 3 : 0.05;
-      return link.isTransitive ? 0.4 : 1.2;
+      const isFocused = window.MirrorState.focusLinks.has(link);
+      if (window.MirrorState.focusLinks.size > 0) return isFocused ? 3 : 0.02;
+      return link.category === 'LINEAGE' ? 1.0 : 0.2; // Call links are thin by default
     })
     .linkColor(link => {
-      // v1.7.7: Robust Link Hiding
       const s = typeof link.source === 'object' ? link.source : { level: -1 };
       const t = typeof link.target === 'object' ? link.target : { level: -1 };
 
       if (s.level !== -1 && t.level !== -1) {
         const sVis = window.MirrorState.selectedLayers.includes(s.level);
         const tVis = window.MirrorState.selectedLayers.includes(t.level);
-        // User Preference: Don't hide edges if they connect to a hidden layer, ONLY if both are hidden!
-        // To prevent floating edges, we'll hide them if EITHER is hidden, but make it explicit.
         if (!sVis || !tVis) return 'transparent';
       }
 
-      if (window.MirrorState.focusLinks.size > 0) return window.MirrorState.focusLinks.has(link) ? '#00d2ff' : 'rgba(255,255,255,0.01)';
-
-      let alpha = link.isTransitive ? '33' : '66';
-      if (window.MirrorState.selectedClusters.length > 0) {
-        const inFocus = window.MirrorState.selectedClusters.includes(link.source.clusterId) || window.MirrorState.selectedClusters.includes(link.target.clusterId);
-        if (!inFocus) alpha = '05'; // Super dim for context
+      const isFocused = window.MirrorState.focusLinks.has(link);
+      const edgeColors = window.MirrorState.edgeColors || {};
+      
+      // v2.2.0: High-Frequency Chromatic Resonance 🏺
+      if (window.MirrorState.focusLinks.size > 0) {
+        if (isFocused) {
+          return edgeColors[link.type] || '#00d2ff';
+        }
+        return 'rgba(255,255,255,0.01)';
       }
 
-      const base = link.isTransitive ? '#484f58' : (link.source.clusterColor || '#3b82f6');
-      return base + alpha;
+      // Default State: Lineage is stable, Kinesis is Ghostly
+      if (link.category === 'LINEAGE') return edgeColors[link.type] || '#484f5866';
+      
+      // Multi-Colored Ghostly Arcs (High Fidelity, Low Noise)
+      const baseColor = edgeColors[link.type] || '#3b82f6';
+      return baseColor + '03'; // v2.2: Ultra-low alpha (0.01) for clean tree visualization
     })
-    .linkDirectionalParticles(link => window.MirrorState.focusLinks.has(link) ? 6 : 0)
-    .linkDirectionalParticleSpeed(0.015)
-    .linkDirectionalParticleWidth(4)
+    .linkDirectionalParticles(link => {
+      if (window.MirrorState.focusLinks.has(link)) return 6;
+      return 0; // No particles unless resonating (saves CPU & reduces mess)
+    })
+    .linkDirectionalParticleSpeed(0.02) // Increased speed for visibility (0.01 -> 0.02)
+    .linkDirectionalParticleWidth(3) // Increased width for visibility (2 -> 3)
     .nodeCanvasObject((node, ctx, globalScale) => {
       const size = Math.max((node.rank || 0.1) * 24, 6);
       const color = node.clusterColor || '#9ca3af';
 
-      // v1.7.0: Professional Structural Highlighting & Ghosting
       const isLayerVisible = window.MirrorState.selectedLayers.includes(node.level);
-      
-      if (!isLayerVisible) {
-        return; // Completely hidden (do not poison ctx.globalAlpha!)
-      }
+      if (!isLayerVisible) return;
 
       let alpha = 1.0;
       if (window.MirrorState.selectedClusters.length > 0 && !window.MirrorState.selectedClusters.includes(node.clusterId)) {
-        alpha = 0.05; // Ghosted context
+        alpha = 0.05;
       }
 
       const isDimmedByFocus = window.MirrorState.focusNodes.size > 0 && !window.MirrorState.focusNodes.has(node.id);
@@ -179,7 +243,8 @@ function configureGraph() {
 
       ctx.globalAlpha = alpha;
 
-      if (node.level <= 1 && !isDimmedByFocus && alpha === 1.0) {
+      // Outer Glow for Hubs
+      if (node.degree > 10 && !isDimmedByFocus) {
         ctx.shadowBlur = 15 / globalScale;
         ctx.shadowColor = color;
       }
@@ -188,6 +253,13 @@ function configureGraph() {
       ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
       ctx.fillStyle = color;
       ctx.fill();
+
+      // Inner Core for Atoms
+      if (node.level >= 5) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1 / globalScale;
+        ctx.stroke();
+      }
 
       ctx.shadowBlur = 0;
 
@@ -211,12 +283,25 @@ function configureGraph() {
     .onLinkClick(link => focusSubgraph(link.source))
     .onBackgroundClick(() => resetFocus());
 
-  Graph.d3Force('charge').strength(-4477);
-  Graph.d3Force('center', d3.forceCenter(0, 0).strength(0.01));
-  Graph.d3Force('link').distance(20).strength(0.9);
-  Graph.d3VelocityDecay(0.1); // 1 - Fluidity(0.9)
-  Graph.d3AlphaDecay(0.02);   // v1.6.7: Smoother Bloom
-  Graph.linkCurvature(0);
+  // v2.3.0: Relational Softness Simulation (Waterfall Tree) 🏺
+  Graph.d3Force('charge').strength(-1500); // Reduced repulsion for closer parent-child affinity
+  Graph.d3Force('center', d3.forceCenter(0, 0).strength(0.05));
+  
+  // High-Contrast Force Mapping
+  Graph.d3Force('link')
+    .distance(l => l.category === 'LINEAGE' ? 30 : 600) // Lineage is compact, Kinesis is distant
+    .strength(l => l.category === 'LINEAGE' ? 1.2 : 0.005); // Lineage is absolute, Kinesis is barely felt
+  
+  // Custom Forces for Waterfall Seeding (Gravity Sync)
+  Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(1.0)); // Strict horizontal grouping
+  Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(1.0)); // Strict vertical waterfall
+  
+  // v2.3.0: Removed strict 'layer' force to prevent grid-fighting 🏺
+
+  Graph.d3VelocityDecay(0.4); // v2.2.0: High friction to eliminate jitter
+  Graph.d3AlphaDecay(0.05);  // v2.2.0: Fast cooling for instant resonance settlement
+  
+  // v2.2.0: Removed manual restart from configureGraph to prevent race condition with refreshSynapse
 }
 
 function focusSubgraph(node) {

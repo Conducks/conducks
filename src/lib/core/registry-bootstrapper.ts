@@ -36,8 +36,22 @@ export class RegistryBootstrapper {
       while (current !== path.parse(current).root) {
         const isForbidden = forbiddenArtifacts.includes(path.basename(current));
 
-        if (IgnoreManager.hasConfig(current) && !isForbidden) return current;
-        if (!isForbidden && (IgnoreManager.hasPackageJson(current) || fsSync.existsSync(path.join(current, ".git")))) return current;
+        if (isForbidden) {
+          const parent = path.dirname(current);
+          if (parent === current) break;
+          current = parent;
+          continue;
+        }
+
+        // 🛡️ [Apostolic Priority] Structural Vault FIRST 🏺
+        if (fsSync.existsSync(path.join(current, ".conducks"))) return current;
+
+        // 🛡️ [Project Markers] Fallback to Repository markers
+        const localMarkers = ['package.json', 'requirements.txt', 'pyproject.toml', 'tsconfig.json', 'go.mod', 'Cargo.toml', 'composer.json'];
+        const hasMarker = localMarkers.some(m => fsSync.existsSync(path.join(current, m)));
+
+        if (IgnoreManager.hasConfig(current)) return current;
+        if (hasMarker || fsSync.existsSync(path.join(current, ".git"))) return current;
 
         const parent = path.dirname(current);
         if (parent === current) break;

@@ -114,6 +114,10 @@ export class DiffCommand implements ConducksCommand {
 
     // Load Base
     const rawDb = await db.getRawConnection();
+    if (!rawDb) {
+      console.error("Failed to establish raw structural connection.");
+      return;
+    }
     const baseNodes: any[] = await new Promise((res) => rawDb.all("SELECT * FROM nodes WHERE pulseId = ?", [baseId], (err: any, rows: any[]) => res(rows || [])));
     const baseEdges: any[] = await new Promise((res) => rawDb.all("SELECT * FROM edges WHERE pulseId = ?", [baseId], (err: any, rows: any[]) => res(rows || [])));
     console.log(`[DEBUG] Loaded Base: ${baseNodes.length} nodes, ${baseEdges.length} edges`);

@@ -10,6 +10,19 @@ import fs from "fs-extra";
  * 
  * CRITICAL RULE 9: Exactly 9 Unified Conducks MCP Tools mandated.
  */
+/**
+ * [Apostolic Anchor Check] 🏺
+ * Ensures the structural registry is aligned to the correct workspace root.
+ */
+async function ensureAnchor(customPath?: string) {
+  const root = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
+  
+  if (root && root !== currentAnchor && root !== '/') {
+    await registry.initialize(true, root);
+  }
+}
+
 export const kineticTools: Record<string, Tool> = {
 
   conducks_impact: {
@@ -38,7 +51,7 @@ Modes:
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, direction, depth, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await ensureAnchor(customPath);
         const results = await registry.kinetic.getImpact(symbol, direction as any, depth || 5);
         
         // Final Production Alignment: ImpactService returns a complex object
@@ -84,7 +97,7 @@ AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, target, mode, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await ensureAnchor(customPath);
         if (mode === "path" && target) {
           const pathResults = await registry.kinetic.findPath(symbol, target);
           return { steps: pathResults, indexStaleness: registry.audit.status().staleness.stale };
@@ -117,14 +130,21 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ mode, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await ensureAnchor(customPath);
         
         if (mode === "drift") {
           const result = await registry.evolution.compare();
           return {
             status: result.status,
             message: result.message,
-            hotspots: result.hotspots,
+            deltas: result.deltas.slice(0, 10).map(d => ({
+              id: d.id,
+              name: d.name,
+              file: d.file,
+              velocity: d.velocity,
+              isModified: d.isModified
+            })),
+            moves: result.moves,
             summary: result.summary,
             indexStaleness: registry.audit.status().staleness.stale
           };
@@ -169,7 +189,7 @@ WARNING: This is a mutational tool. It modifies the source code.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, newName, dryRun, path: customPath }: any) => {
       try {
-        const rootPath = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        await ensureAnchor(customPath);
         const result = await registry.rename.rename(symbol, newName, dryRun);
         return { result, dryRun };
       } catch (err: any) {

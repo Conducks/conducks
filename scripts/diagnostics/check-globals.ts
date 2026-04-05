@@ -1,9 +1,13 @@
-import { DuckDbPersistence } from "./src/lib/core/persistence/persistence.js";
+import { DuckDbPersistence } from "../../src/lib/core/persistence/persistence.js";
 import path from "node:path";
 
 async function checkGlobals() {
   const persistence = new DuckDbPersistence(process.cwd());
   const db = await persistence.getRawConnection();
+  if (!db) {
+    console.error("Failed to establish raw structural connection.");
+    return;
+  }
   
   console.log("--- Nodes with name 'global' or canonicalRank 2 ---");
   db.all("SELECT id, name, file, canonicalKind, canonicalRank, metadata FROM nodes WHERE name = 'global' OR canonicalRank = 2 LIMIT 20", (err: any, rows: any[]) => {
