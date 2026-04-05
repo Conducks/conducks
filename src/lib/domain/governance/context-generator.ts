@@ -11,9 +11,19 @@ export class ContextGenerator implements ConducksComponent {
   public readonly type = 'analyzer';
   public readonly description = 'Generates LLM-optimized architectural summaries and localized structural context.';
   private readonly TOKEN_CAP_CHARS = 15000; // Roughly 4000 tokens
+  private persistence: SynapsePersistence | null = null;
 
-  private async getLatestPulseId(persistence: SynapsePersistence): Promise<string | null> {
-    const rows = await persistence.query("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1");
+  /**
+   * Apostolic Re-Anchoring 🏺
+   */
+  public setPersistence(persistence: SynapsePersistence) {
+    this.persistence = persistence;
+  }
+
+  private async getLatestPulseId(persistence?: SynapsePersistence): Promise<string | null> {
+    const p = persistence || this.persistence;
+    if (!p) return null;
+    const rows = await p.query("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1");
     return rows && rows.length > 0 ? (rows[0] as any).id : null;
   }
 
@@ -30,20 +40,27 @@ export class ContextGenerator implements ConducksComponent {
     }));
   }
 
-  public async generateTop10Context(persistence: SynapsePersistence): Promise<any> {
-    const pulseId = await this.getLatestPulseId(persistence);
+  public async generateTop10Context(persistence?: SynapsePersistence): Promise<any> {
+    const p = persistence || this.persistence;
+    if (!p) return { error: "Persistence layer not anchored." };
+
+    const pulseId = await this.getLatestPulseId(p);
     if (!pulseId) return { error: "No structural pulse found." };
 
-    const entryPoints = await this.queryNodes(persistence, pulseId, "gravity DESC", 10);
-    const hotspots = await this.queryNodes(persistence, pulseId, "risk DESC", 10);
+    const entryPoints = await this.queryNodes(p, pulseId, "gravity DESC", 10);
+    const hotspots = await this.queryNodes(p, pulseId, "risk DESC", 10);
 
-    // [Sentinel Scan]
-    const cycles = await persistence.query("SELECT * FROM nodes WHERE pulseId = ? AND risk > 0.8 LIMIT 10", [pulseId]);
+    // [Sentinel Scan] — High complexity + high churn + high risk
+    const cycles = await p.query("SELECT * FROM nodes WHERE pulseId = ? AND risk > 0.8 LIMIT 10", [pulseId]);
 
     return {
       entryPoints,
       hotspots,
-      violations: cycles.map((c: any) => ({ id: c.id, type: 'RISK_HOTSPOT' })),
+      violations: cycles.map((c: any) => ({ 
+        id: c.id, 
+        type: 'RISK_HOTSPOT', 
+        factors: JSON.parse(c.metadata || '{}').factors || [] 
+      })),
       truncated: true,
       totalCount: entryPoints.length + hotspots.length + cycles.length
     };
@@ -74,7 +91,8 @@ export class ContextGenerator implements ConducksComponent {
 
     md += `## Active Violations (${context.violations.length})\n`;
     for (const v of context.violations) {
-      md += `- ${v.type}: ${v.id}\n`;
+      const factors = v.factors && v.factors.length > 0 ? ` [Factors: ${v.factors.join(', ')}]` : '';
+      md += `- ${v.type}: \`${v.id}\`${factors}\n`;
     }
     md += `\n`;
 

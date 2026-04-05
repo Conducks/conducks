@@ -42,6 +42,14 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     private ignoreManager?: IgnoreManager
   ) { }
 
+  /**
+   * Apostolic Re-Anchoring 🏺
+   * Re-wires the orchestrator to a new structural vault handle.
+   */
+  public setPersistence(persistence: SynapsePersistence) {
+    this.persistence = persistence;
+  }
+
    /**
    * Orchestrates a high-fidelity structural analysis on the provided files.
    * Universal Two-Pass Resolution Architecture (Discovery -> Induction)

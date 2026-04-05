@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import chalk from "chalk";
 
 /**
  * Conducks — Impact Command
@@ -29,7 +30,14 @@ export class ImpactCommand implements ConducksCommand {
     try {
       // Registry Alignment: kinetic.getImpact + metrics.calculateCompositeRisk
       const impact = registry.kinetic.getImpact(symbolId, direction);
-      const composite = await registry.explain.calculateCompositeRisk(symbolId);
+      const composite: any = await registry.explain.calculateCompositeRisk(symbolId);
+      
+      console.log(`\n${chalk.bold.blue('Structural Diagnostic Summary:')}`);
+      console.log(`${chalk.dim('Node ID:')} ${symbolId}`);
+      console.log(`${chalk.dim('Composite Risk Score:')} ${(composite.score * 10).toFixed(1)} / 10.0`);
+      if (composite.factors && composite.factors.length > 0) {
+        composite.factors.forEach((f: string) => console.log(`  ${chalk.yellow('⚠')} ${f}`));
+      }
 
       console.log(`\n\x1b[1m--- Conducks ${direction.toUpperCase()} Impact Report: ${symbolId} ---\x1b[0m`);
       console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${impact.affectedCount} Symbols affected`);

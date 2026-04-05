@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import chalk from "chalk";
 
 /**
  * Conducks — Explain Command (Signal Decomposition)
@@ -37,20 +38,23 @@ export class ExplainCommand implements ConducksCommand {
     }
 
     const entropyRes = await registry.explain.calculateEntropy(node.id);
-    const riskData = registry.explain.calculateCompositeRisk(node.id);
+    const riskData: any = await registry.explain.calculateCompositeRisk(node.id);
 
     if (!riskData) {
       console.error(`Error: Could not calculate risk for "${symbolId}".`);
       return;
     }
 
-    const { score, breakdown } = riskData;
+    const { score, factors, breakdown } = riskData;
 
     console.log(`\n\x1b[1m--- 🛡️ Conducks Structural Explanation ---\x1b[0m`);
     console.log(`Symbol: \x1b[35m${node.properties.name}\x1b[0m (${node.label})`);
     console.log(`Path:   ${node.properties.filePath}`);
-    console.log(`\nComposite Risk: \x1b[1m${(score * 10).toFixed(2)}\x1b[0m / 10.0`);
-
+    console.log(`${chalk.blue('Composite Risk Rating')}: ${(score * 10).toFixed(1)} / 10.0`);
+    if (factors && factors.length > 0) {
+      factors.forEach((f: string) => console.log(`  ${chalk.yellow('⚠')} ${f}`));
+    }
+    console.log();
     console.log(`\x1b[1mSignal Decomposition:\x1b[0m`);
     console.log(`  ├── \x1b[36mgravity:\x1b[0m     ${(breakdown.gravity.value * 10).toFixed(2)}  (centrality rank: ${node.properties.rank?.toFixed(4) || 0})`);
     console.log(`  ├── \x1b[36mfan-out:\x1b[0m     ${(breakdown.fanOut.value * 10).toFixed(2)}  (outgoing structural dependencies)`);

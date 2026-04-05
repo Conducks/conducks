@@ -45,7 +45,7 @@ export class MetricsService implements ConducksComponent {
    * Computes a multi-signal risk score (0.0 to 10.0).
    * Signal Weights: Gravity (40%), Entropy (30%), Churn (20%), Fan-out (10%).
    */
-  public calculateCompositeRisk(nodeId: string) {
+  public async calculateCompositeRisk(nodeId: string) {
     const g = this.graph.getGraph();
     const node = g.getNode(nodeId);
     if (!node) return null;
@@ -54,9 +54,20 @@ export class MetricsService implements ConducksComponent {
     const entropy = node.properties.entropy || 0;
     const res = node.properties.resonance || 0;
     const outgoing = g.getNeighbors(nodeId, 'downstream').length;
+    const complexity = node.properties.complexity || 1;
+
+    const factors: string[] = [];
+    if (rank > 0.7) factors.push("High Structural Gravity (Core system bridge)");
+    if (entropy > 0.6) factors.push("Unstable Ownership (High author entropy)");
+    if (res > 50) factors.push("High Kinetic Churn (Frequent modifications)");
+    if (outgoing > 8) factors.push("God Object Candidate (High fan-out)");
+    if (complexity > 50) factors.push("Critical Complexity (Difficult to maintain)");
+
+    const score = (rank * 0.4) + (entropy * 0.3) + (Math.min(res / 100, 1.0) * 0.2) + (Math.min(outgoing / 10, 1.0) * 0.1);
 
     return {
-      score: (rank * 0.4) + (entropy * 0.3) + (Math.min(res / 100, 1.0) * 0.2) + (Math.min(outgoing / 10, 1.0) * 0.1),
+      score,
+      factors,
       breakdown: {
         gravity: { value: rank, weight: 0.4 },
         entropy: { value: entropy, weight: 0.3 },

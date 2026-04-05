@@ -309,23 +309,76 @@ export class QueryService {
       `
     },
 
-    search: {
-      description: "Multi-dimensional structural search with full containment context",
-      params: ["query", "query", "$pulseId", "limit"],
+    find_by_name: {
+      description: "Find symbols by name, optionally scoped to namespace or kind",
+      params: ["query", "namespaceId", "canonicalKind", "$pulseId", "limit"],
       sql: `
         SELECT
-          n.id, n.name, n.file, n.canonicalKind, n.canonicalRank, n.risk, n.gravity,
-          parent.name as parentName,
-          unit.name as fileName,
-          ns.name as namespaceName
-        FROM nodes n
-        LEFT JOIN nodes parent ON n.parentId = parent.id AND n.pulseId = parent.pulseId
-        LEFT JOIN nodes unit ON n.unitId = unit.id AND n.pulseId = unit.pulseId
-        LEFT JOIN nodes ns ON n.namespaceId = ns.id AND n.pulseId = ns.pulseId
-        WHERE (n.name LIKE ? OR n.id LIKE ?)
-        AND n.pulseId = ?
-        ORDER BY n.gravity DESC
+          id, name, file, risk, gravity, complexity,
+          canonicalKind, semantic_kind, structureId, namespaceId
+        FROM nodes
+        WHERE (name = CAST(? AS TEXT) OR name LIKE ('%' || CAST(? AS TEXT) || '%'))
+        AND (CAST(? AS TEXT) = '' OR namespaceId LIKE ('%' || CAST(? AS TEXT) || '%'))
+        AND (CAST(? AS TEXT) = '' OR canonicalKind = CAST(? AS TEXT))
+        AND pulseId = ?
+        ORDER BY gravity DESC
         LIMIT ?
+      `
+    },
+
+    cross_namespace_coupling: {
+      description: "Find unexpected dependencies between namespaces — architectural lie detector",
+      params: ["$pulseId", "limit"],
+      sql: `
+        SELECT
+          source.namespaceId AS fromNamespace,
+          target.namespaceId AS toNamespace,
+          COUNT(*)           AS edgeCount,
+          AVG(e.weight)      AS avgCoupling,
+          MAX(source.risk)   AS maxSourceRisk
+        FROM edges e
+        JOIN nodes source ON e.sourceId = source.id AND e.pulseId = source.pulseId
+        JOIN nodes target ON e.targetId = target.id AND e.pulseId = target.pulseId
+        WHERE source.namespaceId != target.namespaceId
+        AND source.namespaceId IS NOT NULL
+        AND target.namespaceId IS NOT NULL
+        AND e.pulseId = ?
+        GROUP BY source.namespaceId, target.namespaceId
+        ORDER BY edgeCount DESC
+        LIMIT ?
+      `
+    },
+
+    cycles: {
+      description: "Find all circular dependency groups — Tarjan SCC results",
+      params: ["$pulseId", "limit"],
+      sql: `
+        SELECT
+          n.id, n.name, n.file, n.risk, n.namespaceId,
+          json_extract_string(n.metadata, '$.anomaly') AS anomaly
+        FROM nodes n
+        WHERE json_extract_string(n.metadata, '$.anomaly') = 'cycle'
+        AND n.pulseId = ?
+        ORDER BY n.risk DESC
+        LIMIT ?
+      `
+    },
+
+    layer_distribution: {
+      description: "Architectural layer breakdown — how many symbols at each level",
+      params: ["$pulseId"],
+      sql: `
+        SELECT
+          canonicalRank,
+          canonicalKind,
+          COUNT(*)   AS symbolCount,
+          AVG(risk)  AS avgRisk,
+          AVG(gravity) AS avgGravity,
+          SUM(CASE WHEN isEntryPoint THEN 1 ELSE 0 END) AS entryPointCount
+        FROM nodes
+        WHERE pulseId = ?
+        GROUP BY canonicalRank, canonicalKind
+        ORDER BY canonicalRank
       `
     }
   };
@@ -337,9 +390,17 @@ export class QueryService {
   }
 
   /**
+   * Apostolic Re-Anchoring 🏺
+   * Re-wires the service to a new structural vault handle.
+   */
+  public setPersistence(persistence: SynapsePersistence) {
+    this.persistence = persistence;
+  }
+
+  /**
    * Universal Structural Query Execution
    */
-  public async execute<T = any>(templateId: string, userParams: any[] = []): Promise<T[]> {
+  public async execute<T = any>(templateId: string, userParams: any[] = [], limit?: number): Promise<T[]> {
     const template = this.QUERIES[templateId];
     if (!template) {
       throw new Error(`Architectural Query Template '${templateId}' not found.`);
@@ -352,11 +413,36 @@ export class QueryService {
       return [];
     }
 
-    // 2. Inject PulseID where needed in params (Logical Mapping)
-    const finalParams = template.params.map((p: string) => {
-      if (p === '$pulseId') return latestPulseId;
-      return userParams.shift();
+    // 2. Refined Parameter Mapping 🏺
+    const finalParams: any[] = [];
+    const sanitizedUserParams = [...userParams.filter(p => !['$pulseId', '$limit'].includes(p))];
+    const finalLimit = limit || 10;
+    
+    const logicalValues = new Map<string, any>();
+    template.params.forEach((p: string) => {
+      if (p === '$pulseId') {
+        logicalValues.set(p, latestPulseId);
+      } else if (p === 'limit') {
+        logicalValues.set(p, finalLimit);
+      } else {
+        const val = sanitizedUserParams.shift();
+        logicalValues.set(p, val === undefined ? '' : val);
+      }
     });
+
+    // Final mapping based on physical expectations of the specific query
+    if (templateId === 'find_by_name') {
+       const q = logicalValues.get('query');
+       const ns = logicalValues.get('namespaceId');
+       const k = logicalValues.get('canonicalKind');
+       finalParams.push(q, q, ns, ns, k, k, latestPulseId, finalLimit);
+    } else {
+       template.params.forEach((p: string) => {
+         if (p === '$pulseId') finalParams.push(latestPulseId);
+         else if (p === 'limit') finalParams.push(finalLimit);
+         else finalParams.push(logicalValues.get(p));
+       });
+    }
 
     logger.info(`Oracle Request: ${templateId} | Enriched Params: ${JSON.stringify(finalParams)}`);
     

@@ -49,9 +49,9 @@ export class AuditCommand implements ConducksCommand {
       console.log(`\n\x1b[31m💣 [Refactoring Alert] ${auditData.stats.orphans} Orphaned Synapses Detected:\x1b[0m`);
       // Display first 10 for brevity, user can use GQL for more
       auditData.violations
-        .filter((v: string) => v.includes('REFACTOR-1'))
+        .filter((v: any) => v.type === 'REFACTOR')
         .slice(0, 10)
-        .forEach((v: string) => console.log(`  - ${v}`));
+        .forEach((v: any) => console.log(`  - ${v.message}`));
       if (auditData.stats.orphans > 10) console.log(`  ... and ${auditData.stats.orphans - 10} more.`);
     }
 
@@ -59,8 +59,8 @@ export class AuditCommand implements ConducksCommand {
     if (auditData.stats.cycles > 0) {
       console.log(`\n\x1b[31m🔄 [Architectural Alert] ${auditData.stats.cycles} Circular Dependencies Detected:\x1b[0m`);
       auditData.violations
-        .filter((v: string) => v.includes('ARCH-3'))
-        .forEach((v: string) => console.log(`  - ${v}`));
+        .filter((v: any) => v.type === 'CIRCULAR')
+        .forEach((v: any) => console.log(`  - ${v.message}`));
     }
 
     // 3. Sentinel Static Governance (Rule-based)

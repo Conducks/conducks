@@ -32,7 +32,13 @@ export class RegistryBootstrapper {
     const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
 
     for (const start of searchPaths) {
-      let current = path.resolve(start);
+      let current = start ? path.resolve(start) : process.cwd();
+      
+      // Safety check: ensure we don't start at root
+      if (current === '/' || current === '\\') {
+        continue;
+      }
+
       while (current !== path.parse(current).root) {
         const isForbidden = forbiddenArtifacts.includes(path.basename(current));
 
@@ -58,7 +64,10 @@ export class RegistryBootstrapper {
         current = parent;
       }
     }
-    return startPath;
+    
+    // If we've reached the system root without finding a marker, 
+    // fallback to process.cwd() to avoid anchoring at '/'
+    return process.cwd();
   }
 
   /**

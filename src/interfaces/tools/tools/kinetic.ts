@@ -14,12 +14,12 @@ import fs from "fs-extra";
  * [Apostolic Anchor Check] 🏺
  * Ensures the structural registry is aligned to the correct workspace root.
  */
-async function ensureAnchor(customPath?: string) {
+async function ensureAnchor(customPath?: string, readOnly: boolean = true) {
   const root = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
   const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
   
   if (root && root !== currentAnchor && root !== '/') {
-    await registry.initialize(true, root);
+    await registry.initialize(readOnly, root);
   }
 }
 
@@ -97,7 +97,7 @@ AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, target, mode, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
+        await ensureAnchor(customPath, true);
         if (mode === "path" && target) {
           const pathResults = await registry.kinetic.findPath(symbol, target);
           return { steps: pathResults, indexStaleness: registry.audit.status().staleness.stale };
@@ -106,6 +106,8 @@ AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.`,
         return { steps: traceResults.slice(0, 10), indexStaleness: registry.audit.status().staleness.stale };
       } catch (err: any) {
         return { error: `Trace Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   },
@@ -130,7 +132,7 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ mode, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
+        await ensureAnchor(customPath, true);
         
         if (mode === "drift") {
           const result = await registry.evolution.compare();
@@ -161,6 +163,8 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
         };
       } catch (err: any) {
         return { error: `Diff Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   },
@@ -189,11 +193,13 @@ WARNING: This is a mutational tool. It modifies the source code.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, newName, dryRun, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
+        await ensureAnchor(customPath, false); // Mutation typically triggers re-analysis or write-ops
         const result = await registry.rename.rename(symbol, newName, dryRun);
         return { result, dryRun };
       } catch (err: any) {
         return { error: `Rename Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   }

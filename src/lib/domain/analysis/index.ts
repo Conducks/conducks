@@ -37,6 +37,17 @@ export class AnalysisService implements ConducksComponent {
   }
 
   /**
+   * Apostolic Re-Anchoring 🏺
+   * Re-wires the service to a new structural vault handle.
+   */
+  public setPersistence(persistence: SynapsePersistence) {
+    this.persistence = persistence;
+    this.query.setPersistence(persistence);
+    (this.orchestrator as any).persistence = persistence;
+    (this.graph as any).persistence = persistence;
+  }
+
+  /**
    * Performs a high-fidelity structural analysis on the project (or a scoped subdirectory).
    * Consolidates discovery, batch reflection, gravity resonance, and persistence.
    */

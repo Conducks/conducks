@@ -17,12 +17,25 @@ export class EvolutionService implements ConducksComponent {
   public readonly auditService: AuditService;
 
   constructor(
-    private readonly graph: any,
-    private readonly persistence: any,
+    private graph: any,
+    private persistence: any,
     public readonly gvr: GVREngine = new GVREngine()
   ) {
     this.drift = new DriftEngine(this.persistence);
     this.auditService = new AuditService(this.persistence);
+  }
+
+  /**
+   * Apostolic Re-Anchoring 🏺
+   * Re-wires the service to a new structural vault handle.
+   */
+  public setPersistence(persistence: any) {
+    (this as any).persistence = persistence;
+    (this.drift as any).persistence = persistence;
+    (this.auditService as any).persistence = persistence;
+    if (this._watcher) {
+      (this._watcher as any).options.persistence = persistence;
+    }
   }
 
   /**

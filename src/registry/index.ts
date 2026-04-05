@@ -2,6 +2,7 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { DuckDbPersistence, SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { AnalysisService, AnalyzeOrchestrator } from "@/lib/domain/analysis/index.js";
+import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, ContextGenerator, BlueprintGenerator, GuidanceOracle, RegressionGuard } from "@/lib/domain/governance/index.js";
@@ -92,6 +93,7 @@ let mirrorEngine = new MirrorEngine(graph.getGraph());
 
 // 4. Domain Facade Consolidation (Service Layer)
 let orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
+let microPulse = new MicroPulseService(synapseRegistry, persistence);
 let analysis = new AnalysisService(orchestrator, graph, persistence, contextGenerator);
 let kinetic = new KineticService(graph.getGraph());
 let metrics = new MetricsService(graph, deadCode, resonance, aligner);
@@ -109,15 +111,14 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
       persistence,
       ignoreManager,
       federation,
-      updatePersistence: (p) => { 
+      updatePersistence: (p: SynapsePersistence) => { 
         persistence = p; 
-        // Propagate to services
-        (orchestrator as any).persistence = p;
-        (analysis as any).persistence = p;
-        (analysis.query as any).persistence = p;
-        (evolution as any).persistence = p;
-        (governance as any).persistence = p;
-        (governance as any).guard = new RegressionGuard(p as any);
+        // Apostolic Re-Anchoring 🏺 (Rule 11: Standardized Injection)
+        orchestrator.setPersistence(p);
+        microPulse.setPersistence(p);
+        analysis.setPersistence(p);
+        evolution.setPersistence(p);
+        governance.setPersistence(p);
       },
       updateIgnoreManager: (i) => { 
         ignoreManager = i;
@@ -157,6 +158,7 @@ export const registry = {
       (orchestrator as any).ignoreManager = ignoreManager;
       return analysis.analyze(options);
     },
+    resonate: (filePath: string) => microPulse.resonate(filePath),
     get query() { return analysis.query; }
   },
   kinetic: {

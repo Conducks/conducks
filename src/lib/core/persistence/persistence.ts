@@ -16,44 +16,52 @@ export class SynapsePersistence {
   private cacheDir: string;
   private dbPath: string;
 
-  constructor(root?: string, private readOnly: boolean = true) {
+  constructor(root?: string, public readOnly: boolean = true) {
     const projectRoot = root || chronicle.getProjectDir() || process.cwd();
     this.cacheDir = path.join(projectRoot, ".conducks");
     this.dbPath = path.join(this.cacheDir, "conducks-synapse.db");
   }
 
-  private async connect(retries: number = 5): Promise<duckdb.Database | null> {
+  private async connect(retries: number = 8): Promise<duckdb.Database | null> {
     if (this.db) return this.db;
 
     try {
-      if (!this.readOnly) {
-        await fs.mkdir(this.cacheDir, { recursive: true });
-      } else {
-        try {
-          await fs.access(this.dbPath);
-        } catch {
-          return null;
-        }
+      const dbExists = await fs.access(this.dbPath).then(() => true).catch(() => false);
+      
+      if (this.readOnly && !dbExists) {
+        logger.warn(`🛡️ [Persistence] Structural Synapse not found at ${this.dbPath}. Standing by for first pulse...`);
+        return null;
       }
 
-      // 🛡️ [Vault Hardening] Connection Pulse with Jittered Retry logic
-      // Mode 1: OPEN_READONLY (v2.1.0) — Explicit configuration object for ARM architecture
+      if (!this.readOnly && !dbExists) {
+        await fs.mkdir(this.cacheDir, { recursive: true });
+      }
+
+      // 🛡️ [Vault Hardening] Apostolic Connection Isolation
+      // Mode: READ_ONLY (v2.1.0) — Multiple processes can read if no one is writing.
+      // Mode: READ_WRITE — Exclusive lock required.
       const config = this.readOnly 
-        ? { access_mode: 'READ_ONLY', max_memory: '12GB', threads: '4' } 
+        ? { access_mode: 'READ_ONLY', max_memory: '8GB', threads: '2' } 
         : { access_mode: 'READ_WRITE', max_memory: '16GB', threads: '8' };
 
       return await new Promise((resolve, reject) => {
         const attempt = (count: number) => {
-          // Use config object instead of bitwise flags for higher stability in ARM/Node environments
           const db = new duckdb.Database(this.dbPath, config, (err) => {
             if (err) {
-              if (count < retries) {
-                const jitter = Math.random() * 200;
-                const backoff = (500 * Math.pow(2, count)) + jitter;
-                logger.warn(`🛡️ [Persistence] Vault Locked (Attempt ${count+1}/${retries}). Retrying in ${Math.round(backoff)}ms...`);
+              const isLocked = err.message.includes("lock") || err.message.includes("permission");
+              
+              if (isLocked && count < retries) {
+                const jitter = Math.random() * 300;
+                const backoff = (400 * Math.pow(1.5, count)) + jitter;
+                logger.warn(`🛡️ [Persistence] Vault Busy (${count+1}/${retries}). Retrying in ${Math.round(backoff)}ms...`);
                 setTimeout(() => attempt(count + 1), backoff);
               } else {
-                logger.error("Failed to connect to structural synapse after multiple pulses.", err);
+                if (this.readOnly) {
+                  // Fallback for ReadOnly: If locked, we might be able to try again later or fail gracefully
+                  logger.error("🛡️ [Persistence] Vault remains locked for Read-Only access. Check for active exclusive pulses.", err);
+                } else {
+                  logger.error("🛡️ [Persistence] Fatal: Could not acquire exclusive write lock on Structural Synapse.", err);
+                }
                 resolve(null);
               }
             } else {

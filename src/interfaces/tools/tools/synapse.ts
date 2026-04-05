@@ -16,12 +16,12 @@ import { registry } from "@/registry/index.js";
  * before executing any tool. This prevents "Detached Root" errors when
  * the MCP server is launched from an arbitrary directory.
  */
-async function ensureAnchor(customPath?: string) {
+async function ensureAnchor(customPath?: string, readOnly: boolean = true) {
   const root = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
   const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
   
   if (root && root !== currentAnchor && root !== '/') {
-    await registry.initialize(true, root);
+    await registry.initialize(readOnly, root);
   }
 }
 
@@ -59,7 +59,7 @@ Returns:
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ q, mode, template, params, limit, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
+        await ensureAnchor(customPath, true);
         
         // 1. [Mode: Templates] Discovery - Lists available Oracle queries
         if (mode === 'template' && !template) {
@@ -103,6 +103,8 @@ Returns:
         };
       } catch (err: any) {
         return { error: `Query Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   },
@@ -120,28 +122,36 @@ AFTER THIS: Use conducks_query to find specific symbols.
 Modes:
 - health (default): Summary of symbols, edges, and index staleness.
 - map: Lists the primary entry points and structural hotspots.
-- manifest: Generates an LLM-optimized technical summary of the codebase.`,
+- manifest: Generates an LLM-optimized technical summary of the codebase.
+- pulse: Triggers a micro-pulse for a specific file to update the live map.`,
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["health", "map", "manifest"], default: "health" },
+        mode: { type: "string", enum: ["health", "map", "manifest", "pulse"], default: "health" },
+        file: { type: "string", description: "The relative or absolute path of the file to pulse (for 'pulse' mode)." },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
     formatter: (res: any) => JSON.stringify(res, null, 2),
-    handler: async ({ mode, path: customPath }: any) => {
+    handler: async ({ mode, file, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
+        await ensureAnchor(customPath, mode !== 'pulse');
         const status = registry.audit.status();
         
         if (mode === "map") {
-          const hotspots = await registry.analyze.query.execute('hotspots', ['$pulseId', 10]);
+          const hotspots = await registry.analyze.query.execute('hotspots', [10]);
           return { stats: status.stats, staleness: status.staleness, hotspots };
         }
 
         if (mode === "manifest") {
           const manifest = await registry.audit.contextFile();
           return { manifest, stats: status.stats };
+        }
+
+        if (mode === "pulse") {
+          if (!file) return { error: "Mode 'pulse' requires a 'file' parameter." };
+          const result = await (registry.analyze as any).resonate(file);
+          return result;
         }
 
         return { 
@@ -184,11 +194,11 @@ Modes:
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ mode, threshold, window, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
+        await ensureAnchor(customPath, true);
         
         if (mode === "guard") {
           const result = await registry.audit.guard(threshold || 0.1);
-          return { block: result.block, risk: result.risk, hotspots: result.hotspots, indexStaleness: registry.audit.status().staleness.stale };
+          return { block: result.block, risk: result.risk, factors: result.factors, hotspots: result.hotspots, indexStaleness: registry.audit.status().staleness.stale };
         }
 
         if (mode === "archeology") {
@@ -203,12 +213,12 @@ Modes:
         
         const audit = registry.audit.audit();
         return {
-          violations: audit.violations.slice(0, 10).map((v: any) => ({
-            id: v.nodeId || v.id, 
-            rule: v.ruleId || v.type,
-            summary: v.message || 'Structural violation detected.'
-          })),
+          success: audit.success,
+          violations: audit.violations,
           totalViolations: audit.violations.length,
+          discoveriesSummary: `Identified ${audit.stats.ecosystem_dangling} external library symbols (Information only).`,
+          discoveries: audit.discoveries,
+          stats: audit.stats,
           indexStaleness: registry.audit.status().staleness.stale
         };
       } catch (err: any) {
@@ -240,9 +250,9 @@ AFTER THIS: Use conducks_trace to see how data flows through this symbol.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
-        const risk = await registry.explain.calculateCompositeRisk(symbol);
-        const ancestry = await registry.analyze.query.execute('full_ancestry', [symbol, '$pulseId']);
+        await ensureAnchor(customPath, true);
+        const risk: any = await registry.explain.calculateCompositeRisk(symbol);
+        const ancestry = await registry.analyze.query.execute('full_ancestry', [symbol]);
         const node = ancestry.length > 0 ? ancestry[0] : null;
 
         return { 
@@ -284,7 +294,7 @@ AFTER THIS: Apply the provided rules to your implementation.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ skill, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath);
+        await ensureAnchor(customPath, true);
         await (registry.oracle as any).bootstrap();
 
         if (skill) {

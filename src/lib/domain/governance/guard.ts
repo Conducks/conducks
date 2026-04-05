@@ -23,7 +23,8 @@ export class RegressionGuard {
     block: boolean, 
     risk: number, 
     message: string, 
-    hotspots: any[] 
+    hotspots: any[],
+    factors: string[]
   }> {
     const drift: DriftResult = await this.driftEngine.compare();
 
@@ -32,17 +33,27 @@ export class RegressionGuard {
         block: false, 
         risk: 0, 
         message: 'Structural resonance is stable. No regression detected.', 
-        hotspots: [] 
+        hotspots: [],
+        factors: []
       };
     }
 
     // 1. Calculate the Global Risk of the Pulse
-    // We average the velocity of all significant deltas
     const deltas = drift.deltas || [];
     const totalVelocity = deltas.reduce((sum: number, d: any) => sum + (d.velocity || 0), 0);
     const avgRisk = deltas.length > 0 ? (totalVelocity / deltas.length) : 0;
 
-    // 2. Decision Logic
+    // 2. Identify Semantic Factors (The "Why")
+    const factors: string[] = [];
+    const highDriftCount = deltas.filter(d => d.velocity > (threshold * 1.5)).length;
+    const complexityBloat = deltas.some(d => d.complexity_delta > 10);
+    
+    if (highDriftCount > 0) factors.push(`${highDriftCount} units exceeded the critical drift velocity.`);
+    if (complexityBloat) factors.push("Significant complexity bloat detected in core symbols.");
+    if (totalVelocity > (threshold * 5)) factors.push("Major architectural footprint expansion detected.");
+    if (drift.moves && drift.moves.length > 0) factors.push(`${drift.moves.length} structural renames detected in this pulse.`);
+
+    // 3. Decision Logic
     const isBlocking = avgRisk > threshold;
 
     return {
@@ -51,7 +62,8 @@ export class RegressionGuard {
       message: isBlocking 
         ? `🔥 ARCHITECTURAL REGRESSION: Global risk (${avgRisk.toFixed(3)}) exceeds threshold (${threshold}).`
         : `✅ Stability acceptable: Global risk (${avgRisk.toFixed(3)}) within limits.`,
-      hotspots: deltas
+      hotspots: deltas,
+      factors
     };
   }
 }
