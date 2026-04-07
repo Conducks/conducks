@@ -18,8 +18,14 @@ export class ConducksAdvisor implements ConducksComponent {
     const nodes = Array.from(graph.getAllNodes());
 
     // 1. Detect Circular Dependencies (Fatal Logic - Non-Exit)
-    const cycles = graph.detectCycles();
-    cycles.forEach(cycle => {
+    const cycles = (graph as any).detectCycles({ ignoreTypes: ['MEMBER_OF', 'CONTAINS'] });
+    const architecturalCycles = (cycles as NodeId[][]).filter(cycle => {
+      // Filter out purely internal file cycles (Implementation Detail vs Architectural Sin)
+      const filePaths = new Set(cycle.map(id => graph.getNode(id)?.properties.filePath).filter(Boolean));
+      return filePaths.size > 1; // Genuine architectural circularity spans multiple units
+    });
+
+    architecturalCycles.forEach(cycle => {
       cycle.forEach(nodeId => {
         const node = graph.getNode(nodeId);
         if (node) node.properties.anomaly = 'cycle';

@@ -11,7 +11,7 @@ async function debug() {
   );
   console.log(`Edges for this pulse: ${edgeCount[0].count}`);
 
-  const targetId = `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/conducks-core.ts::this.graph.getgraph`;
+  const targetId = path.join(projectRoot, 'src/lib/domain/analysis/conducks-core.ts::this.graph.getgraph').toLowerCase();
   const callers = await registry.infrastructure.persistence.query(
     "SELECT sourceId FROM edges WHERE targetId = ? AND pulseId = ?",
     [targetId, pulseId]

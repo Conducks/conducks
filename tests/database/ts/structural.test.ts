@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { DuckDbPersistence } from '@/lib/core/persistence/persistence.js';
 import path from 'node:path';
 

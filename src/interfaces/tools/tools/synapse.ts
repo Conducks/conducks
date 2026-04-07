@@ -78,8 +78,7 @@ Returns:
         }
 
         // 3. [Mode: Fuzzy] Discovery - Default name/pattern search
-        const pattern = `%${q || ''}%`;
-        const results = await registry.analyze.query.execute('search', [pattern, pattern, limit || 10]);
+        const results = await registry.analyze.query.execute('find_by_name', [q || '', '', ''], limit || 10);
         
         const standardize = (n: any) => ({
           id: n.id,

@@ -56,8 +56,23 @@ export class GovernanceService implements ConducksComponent {
     const projectRoot = chronicle.getProjectDir() || process.cwd();
     
     // 1. Circular Dependency Detection (Apostolic Filtering) 🏺
-    // Only flag multi-node cycles. Self-loops on units/files are common but not "decay".
-    const cycles = this.graph.detectCycles().filter(c => c.length > 1);
+    // Only flag multi-node cycles that are NOT purely hierarchical (no MEMBER_OF edges).
+    const cycles = this.graph.detectCycles().filter(c => {
+      if (c.length <= 1) return false;
+      
+      // Check if any edge in the cycle is a MEMBER_OF edge.
+      // If so, it's a hierarchical "Unit Noise" cycle, not an architectural violation.
+      for (let i = 0; i < c.length; i++) {
+        const sourceId = c[i];
+        const targetId = c[(i + 1) % c.length];
+        const edges = this.graph.getNeighbors(sourceId, 'downstream');
+        if (edges.some(e => e.targetId === targetId && e.type === 'MEMBER_OF')) {
+          return false;
+        }
+      }
+      return true;
+    });
+
     for (const cycle of cycles) {
       violations.push({
         id: cycle[0],

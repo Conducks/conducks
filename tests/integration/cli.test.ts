@@ -34,7 +34,7 @@ describe('Conducks CLI Integration', () => {
 
   it('should show status', () => {
     const output = execSync(`node ${cliPath} status`).toString();
-    expect(output).toContain('🏺 Graph Status');
+    expect(output).toContain('🏺 Structural Synapse Status');
   });
 
   it('should run analyze (pulse)', () => {
@@ -55,7 +55,7 @@ describe('Conducks CLI Integration', () => {
     
     // Check for the core structural milestones (Shield emoji indicates pulse initiation)
     expect(output).toContain('🛡️ [Conducks] Structural Ignore');
-    expect(output).toContain('analyze.execute() completed.');
+    expect(output).toContain('🛡️ [Conducks] Structural Resonance Complete.');
   });
 
   it('should run entropy analysis', () => {

@@ -36,7 +36,9 @@ export class IgnoreManager {
     "**/*.map",
     "**/*.db",
     "**/*.sqlite",
-    "**/*.log"
+    "**/*.log",
+    "ARCHITECTURE.md",
+    "**/.conducks/**"
   ];
 
   constructor(private rootDir: string) {

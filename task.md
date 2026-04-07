@@ -1,9 +1,0 @@
-- [/] Sentinel Governance Hardening
-    - [ ] Update `config/sentinel.json` (Universal Domain Contract)
-    - [ ] Perform Compliance Audit (`conducks audit`)
-    - [ ] Formalize Domain Services (`ConducksComponent` implementations)
-        - [ ] `AnalysisService`
-        - [ ] `GovernanceService`
-        - [ ] `EvolutionService`
-        - [ ] `MetricsService` (and others)
-- [ ] Final Verification (Zero-Violation Audit)

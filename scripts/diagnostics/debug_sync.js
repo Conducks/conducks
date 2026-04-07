@@ -1,7 +1,8 @@
-import { registry } from "./build/src/registry/index.js";
+import path from 'node:path';
+import { registry } from "../../build/src/registry/index.js";
 
 async function debug() {
-  const root = "/Users/saidmustafasaid/Documents/Gospel_Of_Technology/orchestrator/application";
+  const root = path.join(process.cwd(), "../archive/orchestrator/application");
   console.log(`🛡️ [Debug] Initializing for: ${root}`);
   await registry.initialize(true, root);
   const status = registry.governance.status();

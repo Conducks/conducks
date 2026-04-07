@@ -117,7 +117,7 @@ export class RegistryBootstrapper {
    * High-fidelity initialization wave.
    */
   public async initialize(
-    options: { readOnly: boolean; root?: string },
+    options: { readOnly: boolean; root?: string; lazy?: boolean },
     context: {
       graph: ConducksGraph;
       persistence: SynapsePersistence;
@@ -127,7 +127,7 @@ export class RegistryBootstrapper {
       updateIgnoreManager: (i: IgnoreManager) => void;
     }
   ): Promise<void> {
-    const { readOnly, root } = options;
+    const { readOnly, root, lazy } = options;
     const { graph, persistence, ignoreManager, federation, updatePersistence, updateIgnoreManager } = context;
 
     if (!this.isGrammarInitialized) {
@@ -171,7 +171,7 @@ export class RegistryBootstrapper {
         graph.getGraph().clear();
       }
 
-      const newPersistence = new DuckDbPersistence(effectiveRoot, readOnly);
+      const newPersistence = new DuckDbPersistence(effectiveRoot, readOnly, lazy || false);
       updatePersistence(newPersistence);
       chronicle.setProjectDir(effectiveRoot);
       

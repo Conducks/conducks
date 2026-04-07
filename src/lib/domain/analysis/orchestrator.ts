@@ -18,7 +18,8 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const workerPath = path.resolve(__dirname, "../../core/parsing/pulse-worker.ts");
+const isTs = __filename.endsWith('.ts');
+const workerPath = path.resolve(__dirname, `../../core/parsing/pulse-worker.${isTs ? 'ts' : 'js'}`);
 const resourceDir = path.resolve(__dirname, "../../../resources/grammars");
 
 /**
@@ -67,10 +68,6 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     const activeFiles = this.ignoreManager ? 
       files.filter(f => !this.ignoreManager!.isIgnored(f.path)) : 
       files;
-
-    if (this.ignoreManager && activeFiles.length < files.length) {
-      logger.info(`🛡️ [Conducks] Structural Ignore: Excluding ${files.length - activeFiles.length} units from the structural wave.`);
-    }
 
     const normalizedFiles = activeFiles.map(f => ({ path: path.resolve(f.path), source: f.source }));
     const allPaths = normalizedFiles.map(f => f.path);
@@ -371,11 +368,32 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     allPaths: string[],
     globalSymbols?: Record<string, any>
   ): Promise<any[]> {
-    // DEV STABILITY: Sequential execution in main thread to bypass worker resolution hell.
-    // In production, this shifts to a compiled worker pool.
-    logger.info(`🛡️ [Conducks] [Main Thread] Pulse Wave: Processing ${files.length} units...`);
+    const unitCount = files.length;
+    if (unitCount === 0) return [];
 
-    const results = [];
+    const isTs = __filename.endsWith('.ts');
+    const workerScript = path.resolve(__dirname, `../../core/parsing/pulse-worker.${isTs ? 'ts' : 'js'}`);
+    const resourceDir = path.resolve(__dirname, "../../../resources/grammars");
+
+    const coreCount = Math.max(1, os.cpus().length - 1);
+    const chunkSize = Math.ceil(unitCount / coreCount);
+    const workerPromises = [];
+
+    for (let i = 0; i < unitCount; i += chunkSize) {
+      const chunk = files.slice(i, i + chunkSize);
+
+      const p = new Promise<any[]>((resolve) => {
+        const worker = new Worker(workerScript, {
+          workerData: { units: chunk, grammarDir: resourceDir },
+          execArgv: isTs ? ["--import", "tsx"] : []
+        });
+        worker.on('message', resolve);
+        worker.on('error', () => resolve([]));
+      });
+      workerPromises.push(p);
+    }
+
+    const results = (await Promise.all(workerPromises)).flat();
     const context = new AnalyzeContext();
     if (discoveryMode) context.setDiscoveryMode(true);
     if (globalSymbols) {

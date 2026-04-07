@@ -7,7 +7,8 @@ import { ConducksAdjacencyList, NodeId } from "../adjacency-list.js";
  * Linear time complexity: O(V + E).
  */
 export class CycleDetector {
-  public static detect(graph: ConducksAdjacencyList): NodeId[][] {
+  public static detect(graph: ConducksAdjacencyList, options: { ignoreTypes?: string[] } = {}): NodeId[][] {
+    const ignoreTypes = options.ignoreTypes || [];
     const cycles: NodeId[][] = [];
     let index = 0;
     const stack: NodeId[] = [];
@@ -24,6 +25,8 @@ export class CycleDetector {
 
       const neighbors = graph.getNeighbors(nodeId, 'downstream');
       for (const edge of neighbors) {
+        if (ignoreTypes.includes(edge.type)) continue;
+
         if (!indices.has(edge.targetId)) {
           strongconnect(edge.targetId);
           lowlink.set(nodeId, Math.min(lowlink.get(nodeId)!, lowlink.get(edge.targetId)!));

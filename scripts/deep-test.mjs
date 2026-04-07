@@ -9,7 +9,7 @@ async function test() {
   const queryService = registry.analyze.query;
 
   // Target: SynapsePersistence (The core of the system)
-  const targetId = `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/conducks-core.ts::this.graph.getgraph`;
+  const targetId = path.join(projectRoot, 'src/lib/domain/analysis/conducks-core.ts::this.graph.getgraph').toLowerCase();
   
   const nodeExists = await registry.infrastructure.persistence.query(
     "SELECT name FROM nodes WHERE id = ?",

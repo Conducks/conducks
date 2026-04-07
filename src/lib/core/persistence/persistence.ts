@@ -16,7 +16,7 @@ export class SynapsePersistence {
   private cacheDir: string;
   private dbPath: string;
 
-  constructor(root?: string, public readOnly: boolean = true) {
+  constructor(root?: string, public readOnly: boolean = true, public lazy: boolean = false) {
     const projectRoot = root || chronicle.getProjectDir() || process.cwd();
     this.cacheDir = path.join(projectRoot, ".conducks");
     this.dbPath = path.join(this.cacheDir, "conducks-synapse.db");
@@ -38,17 +38,17 @@ export class SynapsePersistence {
       }
 
       // 🛡️ [Vault Hardening] Apostolic Connection Isolation
-      // Mode: READ_ONLY (v2.1.0) — Multiple processes can read if no one is writing.
-      // Mode: READ_WRITE — Exclusive lock required.
+      // Mode: READ_ONLY — Allows multiple processes if no writer is active.
+      // Mode: READ_WRITE — Standard exclusive lock behavior.
       const config = this.readOnly 
-        ? { access_mode: 'READ_ONLY', max_memory: '8GB', threads: '2' } 
+        ? { access_mode: 'READ_ONLY', max_memory: '4GB', threads: '2' } 
         : { access_mode: 'READ_WRITE', max_memory: '16GB', threads: '8' };
 
       return await new Promise((resolve, reject) => {
         const attempt = (count: number) => {
-          const db = new duckdb.Database(this.dbPath, config, (err) => {
+          const db = new duckdb.Database(this.dbPath, config, async (err) => {
             if (err) {
-              const isLocked = err.message.includes("lock") || err.message.includes("permission");
+              const isLocked = err.message.includes("lock") || err.message.includes("permission") || err.message.includes("Busy");
               
               if (isLocked && count < retries) {
                 const jitter = Math.random() * 300;
@@ -57,16 +57,21 @@ export class SynapsePersistence {
                 setTimeout(() => attempt(count + 1), backoff);
               } else {
                 if (this.readOnly) {
-                  // Fallback for ReadOnly: If locked, we might be able to try again later or fail gracefully
                   logger.error("🛡️ [Persistence] Vault remains locked for Read-Only access. Check for active exclusive pulses.", err);
                 } else {
-                  logger.error("🛡️ [Persistence] Fatal: Could not acquire exclusive write lock on Structural Synapse.", err);
+                  logger.error("🛡️ [Persistence] Fatal: Could not acquire write lock. Another process is holding the Vault.", err);
                 }
                 resolve(null);
               }
             } else {
               this.db = db;
-              this.initSchema().then(() => resolve(db)).catch(reject);
+              try {
+                // [Vault Tuning] Synapse Hardening v2.3.0 🏺
+                await this.initSchema();
+                resolve(db);
+              } catch (e) {
+                reject(e);
+              }
             }
           });
         };
@@ -98,6 +103,7 @@ export class SynapsePersistence {
     // 🛡️ [Vault Tuning] Synapse Hardening v2.0 (Apostolic Streaming) 🏺
     await run("PRAGMA memory_limit='12GB';");
     await run("PRAGMA threads=2;");
+    await run("PRAGMA checkpoint_threshold='1GB';");
     await run("SET preserve_insertion_order=false;");
     await run("INSTALL json;");
     await run("LOAD json;");
@@ -240,9 +246,17 @@ export class SynapsePersistence {
 
   public async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
     const db = await this.ensureVaultOpen();
-    return await new Promise((res, rej) => {
-      db.all(sql, ...params, (err, rows) => err ? rej(err) : res(rows as T[]));
-    });
+    try {
+      const rows = await new Promise<T[]>((res, rej) => {
+        db.all(sql, ...params, (err, rows) => err ? rej(err) : res(rows as T[]));
+      });
+      return rows;
+    } finally {
+      // 🛡️ [Apostolic Lazy Persistence] Explicit lock release for non-writers.
+      if (this.lazy && this.readOnly) {
+        await this.close();
+      }
+    }
   }
 
   public async save(graph: ConducksAdjacencyList, options: { append?: boolean, nodeCount?: number, edgeCount?: number } = {}): Promise<string> {
@@ -428,6 +442,11 @@ export class SynapsePersistence {
     } catch (err) { 
       logger.error("Vault Load Error", err);
       return false; 
+    } finally {
+       // 🛡️ [Apostolic Lazy Persistence] Explicit lock release for non-writers.
+       if (this.lazy && this.readOnly) {
+        await this.close();
+      }
     }
   }
 

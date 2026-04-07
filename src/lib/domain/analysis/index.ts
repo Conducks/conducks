@@ -74,17 +74,32 @@ export class AnalysisService implements ConducksComponent {
     // We filter the discovery set to only include "Dirty Units" (changed since last synapse)
     const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses ORDER BY timestamp DESC LIMIT 1");
     const lastSyncTime = lastPulse.length > 0 ? Number(lastPulse[0].timestamp) : 0;
+    const ignoreManager = (this.orchestrator as any).ignoreManager;
     
-    let dirtyFiles = files;
+    let filteredFiles = files;
+    if (ignoreManager) {
+        filteredFiles = files.filter(f => !ignoreManager.isIgnored(f));
+        
+        if (filteredFiles.length < files.length) {
+            logger.info(`🛡️ [Conducks] Structural Ignore: Excluding ${files.length - filteredFiles.length} units from the structural wave.`);
+        }
+    }
+
+    let dirtyFiles = filteredFiles;
     if (!options.staged && lastSyncTime > 0) {
-      const statsPromises = files.map(async f => {
+      const statsPromises = filteredFiles.map(async f => {
         try {
           const s = await fs.stat(f);
           return s.mtimeMs > lastSyncTime ? f : null;
         } catch { return null; }
       });
       dirtyFiles = (await Promise.all(statsPromises)).filter(f => f !== null) as string[];
-      logger.info(`🛡️ [Sovereiorn Discovery] Found ${dirtyFiles.length} dirty units since last pulse.`);
+
+      if (dirtyFiles.length > 0) {
+          logger.info(`🛡️ [Sovereiorn Discovery] Found ${dirtyFiles.length} dirty units since last pulse.`);
+          dirtyFiles.slice(0, 5).forEach(f => logger.info(`  - ${path.basename(f)}`));
+          if (dirtyFiles.length > 5) logger.info(`  ... and ${dirtyFiles.length - 5} more.`);
+      }
     }
 
     // Apostolic Filter: Scoped Discovery 🏺
@@ -98,6 +113,11 @@ export class AnalysisService implements ConducksComponent {
     }
 
     logger.info(`Analyzing ${dirtyFiles.length} units...`);
+
+    // [Apostolic Incremental Hardening] 🏺
+    // Clear the in-memory graph before analysis to ensure only the DELTA is flushed.
+    // The bootstrapper pre-loads the full graph, which would cause a redundant full-flush.
+    this.graph.getGraph().clear();
 
     // 2. Reflecting structural stream
     const allUnits = [];
@@ -161,8 +181,9 @@ export class AnalysisService implements ConducksComponent {
       logger.error("Failed to regenerate ARCHITECTURE.md", err);
     }
 
-    logger.info(`Pulse Complete. Indexed ${this.graph.getGraph().stats.nodeCount} nodes.`);
-    registry.events.emit('SYNAPSE_PULSED', { pulseId, nodes: nodeCount, edges: edgeCount });
+    // 6. Apostolic Re-Hydration
+    // Since we cleared the graph to ensure an incremental flush, we now reload for resonance.
+    await this.persistence.load(this.graph.getGraph());
 
     return { success: true, files: files.length };
   }

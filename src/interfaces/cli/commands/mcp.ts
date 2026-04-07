@@ -26,7 +26,7 @@ export class McpCommand implements ConducksCommand {
     }
     
     process.env.CONDUCKS_WORKSPACE_ROOT = rootPath;
-    await registry.initialize(true, rootPath);
+    await registry.initialize(true, rootPath, true);
     
     // Pass original process.argv flags or custom args if needed
     await startMcpServer();

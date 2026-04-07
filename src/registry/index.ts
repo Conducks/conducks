@@ -103,9 +103,9 @@ let evolution = new EvolutionService(graph, persistence);
 const manifest = new ManifestService(manifestEngine);
 
 // 5. Lifecycle Management
-export async function initializeRegistry(readOnly: boolean = true, root?: string) {
+export async function initializeRegistry(readOnly: boolean = true, root?: string, lazy: boolean = readOnly) {
   await bootstrapper.initialize(
-    { readOnly, root },
+    { readOnly, root, lazy },
     {
       graph,
       persistence,

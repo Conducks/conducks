@@ -6,8 +6,8 @@ async function checkRelationships() {
   const db = new duckdb.Database(dbPath);
   const conn = db.connect();
   
-  const file1 = '/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/languages/python/index.ts';
-  const file2 = '/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/languages/python/extractor.ts';
+  const file1 = path.join(process.cwd(), 'src/lib/core/parsing/languages/python/index.ts');
+  const file2 = path.join(process.cwd(), 'src/lib/core/parsing/languages/python/extractor.ts');
 
   console.log(`Checking relationships between:\n1. ${file1}\n2. ${file2}`);
 

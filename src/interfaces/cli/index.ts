@@ -91,7 +91,7 @@ export async function main() {
   if (command) {
     try {
       // Lazy load heavy dependencies (WASM, grammars) only upon execution
-      await registry.initialize(isReadCommand, targetPath);
+      await registry.initialize(isReadCommand, targetPath, isReadCommand);
       
       if (!isStalenessBypass) {
         await persistence.load(registry.query.graph.getGraph());

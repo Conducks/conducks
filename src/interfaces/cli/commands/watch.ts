@@ -12,17 +12,24 @@ export class WatchCommand implements ConducksCommand {
   public usage = "conducks watch";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
-    console.log('[Watch] Step 1: loading graph...');
-    // Structural Sync via Registry Bridge
+    const isPulse = args.includes('--pulse');
+    const rootPath = process.cwd();
+
+    // Structural Sync via Registry Bridge (Writer mode if --pulse)
+    await (registry as any).initialize(!isPulse, rootPath, true);
     await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     console.log('[Watch] Step 2: getting watcher instance...');
-    const watcher = registry.rename.watcher;
+    const watcher = (registry.evolution as any).watcher;
 
     console.log('[Watch] Step 3: watcher =', watcher ? 'OK' : 'NULL');
     if (!watcher) {
-      console.error("[Conducks Watch] Could not initialize watcher — invalid project root: " + process.cwd());
-      return; // FIX 5: Early return — don't hang the process if watcher is unavailable
+      console.error("[Conducks Watch] Could not initialize watcher — invalid project root: " + rootPath);
+      return; 
+    }
+
+    if (isPulse && watcher) {
+        (watcher as any).enableAutoPulse(true);
     }
 
     console.log('[Watch] Step 4: calling watcher.init()...');

@@ -46,6 +46,7 @@ export class ConducksWatcher implements ConducksComponent {
   private impactAnalyzer = new BlastRadiusAnalyzer();
   private ignoreManager: IgnoreManager;
   private isInitialized = false;
+  private autoPulse = false;
 
   constructor(
     private rootDir: string,
@@ -53,6 +54,13 @@ export class ConducksWatcher implements ConducksComponent {
     private options: WatcherOptions = {}
   ) { 
     this.ignoreManager = new IgnoreManager(this.rootDir);
+  }
+
+  /**
+   * Enables or disables automatic structural pulsing to the database.
+   */
+  public enableAutoPulse(enabled: boolean): void {
+    this.autoPulse = enabled;
   }
 
   /**
@@ -181,8 +189,11 @@ export class ConducksWatcher implements ConducksComponent {
         }
       }
 
-      // 5. Structural Persistence Update (Only if Writer)
-      if (this.options.persistence && !(this.options.persistence as any).readOnly) {
+      // 5. Structural Persistence Update (Only if Writer or Auto-Pulse)
+      if (this.autoPulse && this.options.persistence && !(this.options.persistence as any).readOnly) {
+        console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
+        await this.options.persistence.save(this.graph.getGraph(), { append: true });
+      } else if (this.options.persistence && !(this.options.persistence as any).readOnly) {
         await this.options.persistence.save(this.graph.getGraph());
       }
 

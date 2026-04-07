@@ -1,7 +1,16 @@
 {
 	"name": "conducks",
 	"version": "0.7.7",
-	"description": "A documentation-driven governance engine for AI agents, providing structured engineering standards via the Model Context Protocol (MCP).",
+	"description": "High-fidelity structural intelligence and automated governance for AI agents. Transform your code into a living Synapse Graph.",
+	"keywords": [
+		"mcp",
+		"static-analysis",
+		"governance",
+		"architecture",
+		"dependency-graph",
+		"ai-agents",
+		"codebase-mapping"
+	],
 	"author": "Conducks Team <contact@conducks.com>",
 	"license": "Apache-2.0",
 	"type": "module",
@@ -9,10 +18,16 @@
 		"conducks": "./build/src/interfaces/cli/index.js"
 	},
 	"files": [
-		"build"
+		"build",
+		"config",
+		"docs",
+		"LICENSE",
+		"README.md"
 	],
 	"scripts": {
 		"build": "tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/lib/core/parsing/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/interfaces/cli/",
+		"start": "node ./build/src/interfaces/cli/index.js mirror",
+		"demo": "npm run build && npm run start",
 		"clean": "rm -rf build data .conducks",
 		"prepare": "npm run build",
 		"watch": "tsc --watch",

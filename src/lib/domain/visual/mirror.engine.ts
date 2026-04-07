@@ -182,7 +182,7 @@ export class MirrorEngine implements ConducksComponent {
         // 5.1 CLIP: Hide links that are stretched for "no reason" (Threshold: 5)
         if (totalTransitivity > 5) continue;
 
-        const category = edge.type === 'MEMBER_OF' || edge.type === 'CONTAINS' ? 'LINEAGE' : 'KINESIS';
+        const category = edge.type === 'MEMBER_OF' || edge.type === 'CONTAINS' || edge.category === 'STRUCTURAL' ? 'LINEAGE' : 'KINESIS';
         const key = `${vSrcData.id}->${vTgtData.id}->${category}`;
         
         if (!linkCheck.has(key)) {
