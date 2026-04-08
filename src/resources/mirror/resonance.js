@@ -36,9 +36,13 @@ window.MirrorState = {
 
 async function refreshSynapse() {
   try {
+    // v3.0: Zero-Restart Context Sync. 
+    // We fetch ALL layers permanently to allow for instantaneous client-side filtering.
     const layers = "0,1,2,3,4,5,6";
     const spread = document.getElementById('ctrl-spread')?.value || '1200';
-    const res = await fetch(`/api/synapse?layers=${layers}&spread=${spread}`);
+    let url = `/api/synapse?layers=${layers}&spread=${spread}`;
+
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Synapse Hydration Failed');
 
     const wave = await res.json();
@@ -51,23 +55,25 @@ async function refreshSynapse() {
     Graph.graphData(window.MirrorState.activeWave);
     applyForces();
 
-    // v2.7.0: Direct Sync Status (Rule UI-42)
     const status = document.getElementById('sync-status');
-    if (status) {
-      status.innerText = `Synced`;
-      status.style.color = '#3fb950';
-      status.style.borderColor = 'rgba(63, 185, 80, 0.3)';
-    }
+    if (status) status.innerText = `Synced`;
 
-    if (Graph.d3Alpha) {
-      Graph.d3Alpha(0.3).restart();
-    }
+    if (Graph.d3Alpha) Graph.d3Alpha(0.3).restart();
   } catch (err) {
     console.error("[Mirror] Structural Refresh Error:", err);
   } finally {
     hideOverlay();
   }
 }
+
+// v3.1: Zero-Restart Redraw Mechanic 🏺
+window.requestRedraw = () => {
+   // Increased energy pulse to guarantee frame re-render across all engines
+   if (Graph.d3AlphaTarget) {
+     Graph.d3AlphaTarget(0.1).restart();
+     setTimeout(() => Graph.d3AlphaTarget(0), 400); // 400ms duration for stability
+   }
+};
 
 // v2.5.0: Reactive Pulse Integration
 let syncTimeout = null;
@@ -87,6 +93,7 @@ function applyForces() {
   Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(gravity));
   Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(gravity));
   Graph.d3Force('collide', d3.forceCollide(node => {
+     // Respect visibility for collision? No, stay stable.
      const size = Math.max((node.rank || 0.1) * 32, 8);
      return size * 1.6;
   }).strength(1));
@@ -108,33 +115,66 @@ function configureGraph() {
        return 0.1 + (Math.abs(hash % 100) / 100) * 0.3;
     })
     .linkWidth(link => {
-       const category = link.category || 'STRUCTURAL'; // v2.5.6 Compatibility
+       const category = link.category || 'STRUCTURAL';
        return (category === 'LINEAGE' || category === 'STRUCTURAL') ? 1.0 : 0.4;
     })
     .linkColor(link => {
+       // 🕵️ DYNAMIC LINK SHADOWING (v3.1)
+       const sNode = typeof link.source === 'object' ? link.source : null;
+       const tNode = typeof link.target === 'object' ? link.target : null;
+       
+       let isShadowed = false;
+       if (sNode && tNode) {
+         const sSelected = window.MirrorState.selectedLayers.includes(Number(sNode.level));
+         const tSelected = window.MirrorState.selectedLayers.includes(Number(tNode.level));
+         isShadowed = !sSelected || !tSelected;
+       }
+
+       const baseAlpha = isShadowed ? '10' : '60'; // Dim to 0.06 if bridged by shadow layer
        const category = link.category || 'STRUCTURAL';
-       if (category === 'LINEAGE' || category === 'STRUCTURAL') return 'rgba(139, 148, 158, 0.4)';
+       
+       if (category === 'LINEAGE' || category === 'STRUCTURAL') return `rgba(139, 148, 158, ${isShadowed ? 0.08 : 0.4})`;
        
        const edgeColors = window.MirrorState.edgeColors || {};
        const baseColor = edgeColors[link.type] || '#2f81f7';
-       return baseColor + '15'; // Ghostly alpha (0.08)
+       return baseColor + (isShadowed ? '08' : '30'); 
     })
-    .linkDirectionalParticles(link => window.MirrorState.focusLinks.has(link) ? 6 : 0)
+    .linkDirectionalParticles(link => window.MirrorState.focusLinks.size > 0 && window.MirrorState.focusLinks.has(link) ? 6 : 0)
     .linkDirectionalParticleSpeed(0.01)
     .linkDirectionalParticleWidth(3)
     .nodeCanvasObject((node, ctx, globalScale) => {
+      // 🕵️ STRUCTURAL DISCOVERY (Pure Highlight Model) 🏺
+      // v3.1: Defensive type conversion for layer IDs
+      const nodeLevelValue = Number(node.level);
+      const isLayerSelected = window.MirrorState.selectedLayers.includes(nodeLevelValue);
+      const isClusterSelected = window.MirrorState.selectedClusters.includes(node.clusterId);
+      const isTraceFocus = window.MirrorState.focusNodes.size > 0 && window.MirrorState.focusNodes.has(node.id);
+      
       const size = Math.max((node.rank || 0.1) * 28, 6);
       const color = node.clusterColor || '#9ca3af';
-      const isDimmed = window.MirrorState.focusNodes.size > 0 && !window.MirrorState.focusNodes.has(node.id);
       
-      ctx.globalAlpha = isDimmed ? 0.05 : 1.0;
+      // All nodes stay visible, unselected layers become 'Shadows'
+      ctx.globalAlpha = isLayerSelected ? 1.0 : 0.1;
 
-      // 💎 GEOMETRIC SEMANTICS (v2.5.0)
+      // 🌟 LUMINESCENT GLOW (Behind the node)
+      if (isClusterSelected || isTraceFocus) {
+        ctx.beginPath();
+        const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, size * 3.5);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(0.2, color + '66');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.arc(node.x, node.y, size * 4, 0, 2 * Math.PI, false);
+        ctx.fill();
+        ctx.globalAlpha = 1.0; // Highlighted nodes ignore layer shadows
+      }
+
+      // 💎 GEOMETRIC SEMANTICS
       ctx.beginPath();
-      if (node.level === 2) { // File / Unit
+      if (nodeLevelValue === 2) { // File / Unit
         const r = 4;
         ctx.roundRect(node.x - size, node.y - size/1.5, size*2, size*1.3, r);
-      } else if (node.level === 4) { // Structure / Class
+      } else if (nodeLevelValue === 4) { // Structure / Class
         ctx.moveTo(node.x, node.y - size);
         ctx.lineTo(node.x + size, node.y);
         ctx.lineTo(node.x, node.y + size);
@@ -144,36 +184,32 @@ function configureGraph() {
         ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
       }
 
-      // Hub Glow
-      if (node.degree > 12 && !isDimmed) {
-        const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, size * 2);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(1, 'transparent');
-        ctx.fillStyle = gradient;
-        ctx.globalAlpha = 0.3;
-        ctx.arc(node.x, node.y, size * 2.5, 0, 2 * Math.PI, false);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-      }
-
       ctx.fillStyle = color;
       ctx.fill();
       
-      // Node Border
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = 1 / globalScale;
-      ctx.stroke();
+      // 💎 HIGH-CONTRAST BORDER
+      if (isClusterSelected || isTraceFocus) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3 / globalScale;
+        ctx.stroke();
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 / globalScale;
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = `rgba(255,255,255, ${isLayerSelected ? 0.4 : 0.1})`;
+        ctx.lineWidth = 1 / globalScale;
+        ctx.stroke();
+      }
 
       // Adaptive Labels
       const baseFontSize = 12;
       const adaptiveSize = baseFontSize / globalScale;
       let showText = globalScale > 1.2 || (node.degree > 8 && globalScale > 0.4);
       
-      if (showText && !isDimmed) {
+      if (showText) {
         ctx.font = `600 ${adaptiveSize}px var(--font)`;
-        ctx.fillStyle = 'rgba(201, 209, 217, 0.8)';
+        ctx.fillStyle = (isClusterSelected || isTraceFocus) ? '#fff' : `rgba(201, 209, 217, ${isLayerSelected ? 0.8 : 0.2})`;
         ctx.textAlign = 'center';
         ctx.fillText(node.name, node.x, node.y + size + adaptiveSize + 4);
       }
@@ -190,7 +226,6 @@ function focusSubgraph(node) {
   window.MirrorState.lastSelectedNode = node;
   const mode = document.getElementById('trace-direction')?.value || 'downstream';
   
-  // v2.7.0: Mandatory Loading Skeleton (UI-10) 🏺
   if (typeof window.toggleSkeleton === 'function') {
     window.toggleSkeleton(true);
   }

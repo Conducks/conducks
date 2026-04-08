@@ -20,106 +20,128 @@
     <div class="text-dim text-xs uppercase tracking-[0.3em] font-light mt-8">Establishing Synapse</div>
   </div>
 
-  <!-- 🕹️ FLOATING DOCK -->
-  <nav class="primary-dock">
-    <div class="dock-item active" id="dock-graph" title="Graph View">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M3 9V5a2 2 0 0 1 2-2h4"></path><path d="M15 3h4a2 2 0 0 1 2 2v4"></path><path d="M21 15v4a2 2 0 0 1-2 2h-4"></path><path d="M3 15v4a2 2 0 0 0 2 2h4"></path></svg>
-    </div>
-    <div class="dock-item" id="dock-physics" title="Forces">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-    </div>
-    <div class="dock-item" id="dock-trace" title="Trace">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
-    </div>
-  </nav>
+  <!-- 🎮 UNIFIED COMMAND DECK (Apostolic v3.0) -->
+  <aside id="command-deck" class="command-deck">
+    <nav class="deck-rail">
+      <button class="dock-item active" id="dock-discovery" title="Discovery">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+      </button>
+      <button class="dock-item" id="dock-physics" title="Forces">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+      </button>
+      <button class="dock-item" id="dock-trace" title="Trace">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      </button>
+      <div class="rail-spacer"></div>
+      <button class="dock-item" id="btn-settings" title="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1V15a2 2 0 0 1-2-2 2 2 0 0 1 2-2v-.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </nav>
 
-  <!-- 📂 VIEWPORT -->
-  <aside id="command-viewport" class="command-viewport custom-scrollbar">
-    <!-- DISCOVERY -->
-    <div id="slate-discovery" class="slate-active">
-      <header class="slate-header">
-        <h2 class="uppercase tracking-[0.2em] text-[10px] font-bold text-dim">Discovery</h2>
-        <div class="mt-6">
-          <input type="text" id="origin-search" style="width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: var(--radius-inner); padding: 14px; color: white; font-size: 13px; outline: none; transition: border-color 0.3s;" placeholder="Filter symbols..." autocomplete="off">
-        </div>
-      </header>
-
-      <div class="slate-content">
-        <section class="glass-card">
-          <p class="text-[9px] text-dim uppercase tracking-[0.2em] mb-5 font-bold">Layers</p>
-          <div id="layer-filters" class="flex flex-col gap-5"></div>
-        </section>
-
-        <section class="glass-card">
-          <p class="text-[9px] text-dim uppercase tracking-[0.2em] mb-5 font-bold">Clusters</p>
-          <div id="cluster-filters" class="flex flex-col gap-5"></div>
-        </section>
-      </div>
-    </div>
-
-    <!-- FORCES -->
-    <div id="slate-physics" style="display: none;">
-      <header class="slate-header">
-        <div class="flex justify-between items-center">
-          <h2 class="uppercase tracking-[0.2em] text-[10px] font-bold text-dim">Forces</h2>
-          <button id="btn-reset-physics" class="badge">Reset</button>
-        </div>
-      </header>
-      <div class="slate-content">
-         <section class="glass-card">
-            <p class="text-[10px] text-dim uppercase font-bold mb-4">Presets</p>
-            <div class="flex flex-col gap-2">
-              <button class="action-btn-hd text-[10px] bg-white/5 border border-white/10" style="padding: 10px;">Hubs focus</button>
-              <button class="action-btn-hd text-[10px] bg-white/5 border border-white/10" style="padding: 10px;">Depth focus</button>
-              <button class="action-btn-hd text-[10px] bg-white/5 border border-white/10" style="padding: 10px;">Atomic focus</button>
-            </div>
-         </section>
-
-         <section class="glass-card">
-           <div class="mb-6">
-             <div class="flex justify-between items-center mb-1">
-               <span class="text-[10px] text-dim uppercase font-bold">Repulsion</span>
-               <span id="label-repulsion" class="text-blue font-mono text-[11px]">-2000</span>
-             </div>
-             <input type="range" id="ctrl-repulsion" class="physics-slider-hd" min="-8000" max="-200" value="-2000">
-           </div>
-           
-           <div class="mb-2">
-            <div class="flex justify-between items-center mb-1">
-              <span class="text-[10px] text-dim uppercase font-bold">Arena spread</span>
-              <span id="label-spread" class="text-blue font-mono text-[11px]">2000</span>
-            </div>
-            <input type="range" id="ctrl-spread" class="physics-slider-hd" min="500" max="10000" step="100" value="2000">
+    <div class="deck-content custom-scrollbar">
+      <!-- DISCOVERY -->
+      <div id="slate-discovery" class="slate-active">
+        <header class="slate-header">
+          <div class="search-shield">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="origin-search" placeholder="Search Symbols..." autocomplete="off">
+            <button id="btn-clear-search" class="search-clear-btn" style="display: none;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <kbd class="search-kbd">/</kbd>
           </div>
-         </section>
-      </div>
-    </div>
+        </header>
 
-    <!-- TRACE -->
-    <div id="slate-trace" style="display: none;">
-      <header class="slate-header">
-        <h2 class="uppercase tracking-[0.2em] text-[10px] font-bold text-dim">Trace</h2>
-      </header>
-      <div class="slate-content">
-        <section class="glass-card">
-          <p class="text-[10px] text-dim mb-4 uppercase tracking-wider font-bold">Direction</p>
-          <select id="trace-direction" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); border-radius: var(--radius-inner); padding: 12px; color: white; font-size: 11px; appearance: none; cursor: pointer;">
-            <option value="downstream">Impact flow</option>
-            <option value="upstream">Lineage path</option>
-            <option value="bidirectional">Full circuit</option>
-          </select>
-          <button id="btn-clear-isolation" class="action-btn-hd mt-6 bg-white/5 border border-white/10">Clear Filter</button>
-        </section>
+        <div class="slate-body">
+          <section class="deck-section">
+            <div class="section-header">
+              <span class="section-title">Structural Layers</span>
+              <div class="section-badge" id="layer-count">7</div>
+            </div>
+            <div id="layer-filters" class="filter-grid"></div>
+          </section>
+
+          <section class="deck-section">
+            <div class="section-header">
+              <span class="section-title">Active Clusters</span>
+              <div class="section-badge" id="cluster-count">...</div>
+            </div>
+            <div id="cluster-filters" class="cluster-stack"></div>
+          </section>
+        </div>
+      </div>
+
+      <!-- FORCES -->
+      <div id="slate-physics" style="display: none;">
+        <header class="slate-header">
+          <h2 class="slate-title">Energy Distribution</h2>
+        </header>
+        <div class="slate-body">
+           <section class="deck-section">
+              <p class="text-[9px] text-dim uppercase font-bold tracking-[0.2em] mb-4">Apostolic Presets</p>
+              <div class="preset-grid">
+                <button class="preset-btn" data-preset="hubs">Hubs</button>
+                <button class="preset-btn" data-preset="depth">Depth</button>
+                <button class="preset-btn" data-preset="atomic">Atomic</button>
+              </div>
+           </section>
+
+           <section class="deck-section">
+             <div class="control-row">
+               <div class="control-meta">
+                 <span class="control-label">Repulsion</span>
+                 <span id="label-repulsion" class="control-value">-2000</span>
+               </div>
+               <input type="range" id="ctrl-repulsion" class="deck-slider" min="-8000" max="-200" value="-2000">
+             </div>
+             
+             <div class="control-row">
+              <div class="control-meta">
+                <span class="control-label">Arena Spread</span>
+                <span id="label-spread" class="control-value">2000</span>
+              </div>
+              <input type="range" id="ctrl-spread" class="deck-slider" min="500" max="10000" step="100" value="2000">
+            </div>
+           </section>
+        </div>
+      </div>
+
+      <!-- TRACE -->
+      <div id="slate-trace" style="display: none;">
+        <header class="slate-header">
+          <h2 class="slate-title">Behavioral Trace</h2>
+        </header>
+        <div class="slate-body">
+          <section class="deck-section">
+            <p class="text-[10px] text-dim mb-4 uppercase tracking-wider font-bold">Resonance Direction</p>
+            <div class="shield-select">
+              <select id="trace-direction">
+                <option value="downstream">Impact flow (Downstream)</option>
+                <option value="upstream">Lineage path (Upstream)</option>
+                <option value="bidirectional">Full Circuit</option>
+              </select>
+              <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <button id="btn-clear-isolation" class="action-btn-primary mt-8">Clear Structural isolation</button>
+          </section>
+        </div>
       </div>
     </div>
   </aside>
 
-  <!-- 🕹️ STATUS METER -->
-  <div style="position: absolute; bottom: var(--spacing-air); left: 88px; z-index: 200;">
-    <div class="flex items-center gap-3">
-       <span id="sync-status" class="badge bg-emerald-500/10 border-emerald-500/20 text-emerald-400">Synced</span>
+  <div class="fixed-bottom-status">
+    <div class="flex items-center gap-4">
+       <div class="status-pill">
+         <div class="pulse-dot"></div>
+         <span id="sync-status" class="uppercase tracking-wider">Synced</span>
+       </div>
        <span class="text-[9px] text-white/20 uppercase tracking-[0.3em] font-bold">Apostolic 3.0</span>
     </div>
+  </div>
+
+  <div id="focus-indicator" class="focus-indicator" style="display: none;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    <span class="text-[10px] font-bold uppercase tracking-widest">Active Focus</span>
   </div>
 
   <!-- 🧊 MAIN GRAPH -->
