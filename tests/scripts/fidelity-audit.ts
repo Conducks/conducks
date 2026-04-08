@@ -7,7 +7,7 @@ async function runAudit() {
     process.env.CONDUCKS_WORKSPACE_ROOT = path.join(process.cwd(), '../archive/TargetedCV');
     const targetRoot = path.join(process.cwd(), '../archive/TargetedCV');
     
-    console.log("🏺 [Apostolic Structural Audit] Initializing Fidelity Pulse...");
+    console.log("🏺 [Conducks Structural Audit] Initializing Fidelity Pulse...");
     await registry.initialize(true, targetRoot);
     
     const submodules = [
@@ -53,7 +53,7 @@ async function runAudit() {
         console.log(`| ${sub} | ${diskFolders} | ${sFolders} | ${diskFiles} | ${sUnits} | ${totalFidelity.toFixed(1)}% |`);
     }
 
-    console.log("\n🧪 [Apostolic Structural Audit] Fidelity Pulse Complete.");
+    console.log("\n🧪 [Conducks Structural Audit] Fidelity Pulse Complete.");
     process.exit(0);
 }
 

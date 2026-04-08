@@ -25,9 +25,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 /**
- * Conducks — Generalized Pulse Worker 💎 🐍 🟦
+ * Conducks — Pulse Worker 🛡️ 🧬 🏎️
  * 
- * High-performance structural reflection off-thread.
+ * High-performance structural induction worker thread.
  */
 
 async function runWorker(data: any, isFork: boolean = false) {
@@ -125,7 +125,7 @@ async function runWorker(data: any, isFork: boolean = false) {
         success: true 
       });
     } catch (err) {
-      // Apostolic Resilience: Handle Degraded Induction (e.g. grammar mismatch)
+      // Conducks Resilience: Handle Degraded Induction (e.g. grammar mismatch)
       results.push({ 
         path: unit.path, 
         error: (err as Error).message,

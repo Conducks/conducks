@@ -44,7 +44,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
   ) { }
 
   /**
-   * Apostolic Re-Anchoring 🏺
+   * Conducks Re-Anchoring 🛡️
    * Re-wires the orchestrator to a new structural vault handle.
    */
   public setPersistence(persistence: SynapsePersistence) {
@@ -73,7 +73,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     const allPaths = normalizedFiles.map(f => f.path);
     const spectra = new Map<string, any>();
 
-    // Phase 0: Multi-Project Hierarchy Mapping 🏺 🧬
+    // Phase 0: Multi-Project Hierarchy Mapping 🛡️ 🧬
     const cliProjectRoots = options.projectRoots || [];
     const workspaceRoot: string = options.workspaceRoot || path.resolve(process.cwd());
     const projectRoots: string[] = cliProjectRoots.length > 0 ? cliProjectRoots.map((r: string) => path.resolve(r)) : [workspaceRoot];
@@ -285,7 +285,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       totalEdges += edgeCount;
     }
 
-    // === Pass 2 & 3: Apostolic Streaming Induction & Binding 🏺 ===
+    // === Pass 2 & 3: Conducks Streaming Induction & Binding 🛡️ ===
     logger.info(`🛡️ [Conducks] [Pass 2/3] Streaming Resonance: Reflecting ${normalizedFiles.length} units in throttled waves...`);
     
     const CHUNK_SIZE = 500;
@@ -346,7 +346,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     if (this.persistence) {
       await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
       
-      // Apostolic Pulse Hardening: Ensure pulse record knows total count.
+      // Conducks Pulse Hardening: Ensure pulse record knows total count.
       await this.persistence.run(
         "INSERT OR REPLACE INTO pulses (id, timestamp, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?)",
         [pulseId, Date.now(), totalNodes, totalEdges, JSON.stringify({ totalUnits: normalizedFiles.length })]

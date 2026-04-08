@@ -5,14 +5,14 @@ import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { ConducksProvider } from "@/lib/core/parsing/providers/base.js";
 
 /**
- * Conducks — Structural Resolver (Apostolic Resolution) 🛡️ 🧬
+ * Conducks — Structural Resolver (Unified Resolution) 🛡️ 🧬
  * 
  * High-fidelity module resolution. Resolves raw specifiers into 
  * absolute file paths using production-grade logic.
  */
 export class ImportProcessor {
   /**
-   * Apostolic Resolution Algorithm:
+   * Conducks Resolution Algorithm:
    * 1. Resolve specifier relative to importer.
    * 2. Infer extensions/index files.
    * 3. Return Absolute Target Path.
@@ -41,7 +41,7 @@ export class ImportProcessor {
 
     const dir = path.dirname(importerPath);
 
-    // 3. Apostolic Resolution Engine (Relative -> Absolute)
+    // 3. Conducks Resolution Engine (Relative -> Absolute)
     if (specifier.startsWith('.')) {
       const absoluteBase = path.resolve(dir, specifier);
       

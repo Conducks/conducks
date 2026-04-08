@@ -6,12 +6,12 @@ import { AuditService, AuditResult } from "./audit-service.js";
 import { ConducksComponent } from "@/registry/types.js";
 
 /**
- * Conducks — Evolution Service
+ * Conducks — Structural Evolution Service 🧬
  */
 export class EvolutionService implements ConducksComponent {
   public readonly id = 'evolution-service';
   public readonly type = 'analyzer';
-  public readonly description = 'Orchestrates structural evolution, atomic refactoring (GVR), and real-time monitoring.';
+  public readonly description = 'Tracks structural velocity and chronoscopic structural drift pulses.';
   private _watcher: ConducksWatcher | null = null;
   public readonly drift: DriftEngine;
   public readonly auditService: AuditService;
@@ -26,7 +26,7 @@ export class EvolutionService implements ConducksComponent {
   }
 
   /**
-   * Apostolic Re-Anchoring 🏺
+   * Synapse Re-Anchoring 🛡️
    * Re-wires the service to a new structural vault handle.
    */
   public setPersistence(persistence: any) {

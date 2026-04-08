@@ -17,10 +17,10 @@ import crypto from "node:crypto";
 import { ConducksComponent } from "../../../registry/types.js";
 
 /**
- * Conducks — Native Structural Reflector 🛡️ 🔨
+ * Conducks — Structural Reflector
  * 
- * High-performance structural induction via native Node.js bindings.
- * Eliminates the V8 Turboshaft WASM compiler bottleneck. 🏎️
+ * Orchestrates the induction wave and ensures the synapse resonance
+ * is broadcast to the Mirror visual interface.
  */
 export class ConducksReflector implements ConducksComponent {
   public id = 'structural-reflector';
@@ -402,7 +402,7 @@ export class ConducksReflector implements ConducksComponent {
     spectrum.nodes = [...spectrum.nodes, ...nodeCache.values()];
 
     // Conducks: Hierarchical Unification (L2-L7 Parentage)
-    // [Apostolic Rule] MEMBER_OF edges are no longer persisted as structural scaffolding.
+    // [Conducks Rule] MEMBER_OF edges are no longer persisted as structural scaffolding.
     // All containment is now column-based (parentId, unitId, structureId, etc.). 🏺
 
     // Conducks: Ingest Kinetic Git Signals (Only in Resolution Mode)

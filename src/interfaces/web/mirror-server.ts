@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const logger = new Logger("MirrorServer");
 
 /**
- * Conducks — High-Fidelity Apostolic Command Center (v2.0.0) 💎
+ * Conducks — High-Fidelity Command Center (v2.0.0) 💎
  */
 export class MirrorServer {
   private app = express();
@@ -25,7 +25,7 @@ export class MirrorServer {
   }
 
   private setupReactivity() {
-    // [Apostolic Heartbeat] 🏺
+    // [Conducks Heartbeat] 🏺
     // We watch the structural synapse (DuckDB vault) for real-time resonance.
     this.gateway.watchSynapse((pulse) => {
       logger.info(`🛡️ [Synapse Heartbeat] Broadcasting pulse to ${this.clients.length} mirrors.`);
@@ -66,7 +66,7 @@ export class MirrorServer {
       }
     });
 
-    // Apostolic SSE Heartbeat
+    // Conducks SSE Heartbeat
     this.app.get('/api/pulse', (req, res) => {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -93,7 +93,7 @@ export class MirrorServer {
     return new Promise((resolve) => {
       const tryPort = (p: number) => {
         this.server = this.app.listen(p, () => {
-          logger.info(`💎 [Apostolic Gateway] Structural Resonance Active at http://localhost:${p}`);
+          logger.info(`💎 [Conducks Gateway] Structural Resonance Active at http://localhost:${p}`);
           resolve(p);
         }).on('error', (err: any) => {
           if (err.code === 'EADDRINUSE') {

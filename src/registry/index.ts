@@ -113,7 +113,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
       federation,
       updatePersistence: (p: SynapsePersistence) => { 
         persistence = p; 
-        // Apostolic Re-Anchoring 🏺 (Rule 11: Standardized Injection)
+        // Conducks Re-Anchoring 🏺 (Rule 11: Standardized Injection)
         orchestrator.setPersistence(p);
         microPulse.setPersistence(p);
         analysis.setPersistence(p);

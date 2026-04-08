@@ -14,7 +14,7 @@ export class ContextGenerator implements ConducksComponent {
   private persistence: SynapsePersistence | null = null;
 
   /**
-   * Apostolic Re-Anchoring 🏺
+   * Conducks Re-Anchoring 🏺
    */
   public setPersistence(persistence: SynapsePersistence) {
     this.persistence = persistence;

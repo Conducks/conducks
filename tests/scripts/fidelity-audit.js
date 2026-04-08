@@ -10,7 +10,7 @@ async function runAudit() {
     const targetRoot = path.join(process.cwd(), "../archive/TargetedCV");
     const persistence = new DuckDbPersistence(targetRoot);
     
-    console.log("🏺 [Apostolic Structural Audit] Initializing Fidelity Pulse...");
+    console.log("🏺 [Conducks Structural Audit] Initializing Fidelity Pulse...");
     
     // Get submodules (filtering out system folders)
     const submodules = fs.readdirSync(targetRoot)
@@ -52,7 +52,7 @@ async function runAudit() {
         console.log(`| ${sub} | ${diskFolders} | ${sFolders} | ${diskFiles} | ${sUnits} | ${totalFidelity.toFixed(1)}% |`);
     }
 
-    console.log("\n🧪 [Apostolic Structural Audit] Fidelity Pulse Complete.");
+    console.log("\n🧪 [Conducks Structural Audit] Fidelity Pulse Complete.");
     await persistence.close();
 }
 

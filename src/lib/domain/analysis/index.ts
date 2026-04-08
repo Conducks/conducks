@@ -37,7 +37,7 @@ export class AnalysisService implements ConducksComponent {
   }
 
   /**
-   * Apostolic Re-Anchoring 🏺
+   * Conducks Re-Anchoring 🏺
    * Re-wires the service to a new structural vault handle.
    */
   public setPersistence(persistence: SynapsePersistence) {
@@ -70,7 +70,7 @@ export class AnalysisService implements ConducksComponent {
     const voyager = chronicle;
     let files = await voyager.discoverFiles(options.staged);
 
-    // [Apostolic State-Sync] Change Detection & Incremental Targeting 🏺
+    // [Conducks State-Sync] Change Detection & Incremental Targeting 🏺
     // We filter the discovery set to only include "Dirty Units" (changed since last synapse)
     const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses ORDER BY timestamp DESC LIMIT 1");
     const lastSyncTime = lastPulse.length > 0 ? Number(lastPulse[0].timestamp) : 0;
@@ -102,7 +102,7 @@ export class AnalysisService implements ConducksComponent {
       }
     }
 
-    // Apostolic Filter: Scoped Discovery 🏺
+    // Conducks Filter: Scoped Discovery 🏺
     if (targetRoot !== projectRoot) {
       dirtyFiles = dirtyFiles.filter(f => f.startsWith(targetRoot));
     }
@@ -114,7 +114,7 @@ export class AnalysisService implements ConducksComponent {
 
     logger.info(`Analyzing ${dirtyFiles.length} units...`);
 
-    // [Apostolic Incremental Hardening] 🏺
+    // [Conducks Incremental Hardening] 🏺
     // Clear the in-memory graph before analysis to ensure only the DELTA is flushed.
     // The bootstrapper pre-loads the full graph, which would cause a redundant full-flush.
     this.graph.getGraph().clear();
@@ -125,7 +125,7 @@ export class AnalysisService implements ConducksComponent {
       allUnits.push(...batch);
     }
 
-    // 2.2 Apostolic Purge: Remove old structural DNA for these units
+    // 2.2 Conducks Purge: Remove old structural DNA for these units
     logger.info(`🛡️ [Persistence] Purging structural DNA for ${dirtyFiles.length} units...`);
     const unitIds = dirtyFiles.map(f => `${f.toLowerCase()}::unit`);
     await this.persistence.purgeUnits(unitIds);
@@ -162,7 +162,7 @@ export class AnalysisService implements ConducksComponent {
 
     this.graph.getGraph().setMetadata('targetPulseId', pulseId);
 
-    // 4.5 [Apostolic Virtual Induction] 🏺
+    // 4.5 [Conducks Virtual Induction] 🏺
     // We induce missing library nodes to ensure the synapse reflects the complete ecosystem.
     await this.induceVirtualLibraries(this.graph.getGraph());
 
@@ -181,7 +181,7 @@ export class AnalysisService implements ConducksComponent {
       logger.error("Failed to regenerate ARCHITECTURE.md", err);
     }
 
-    // 6. Apostolic Re-Hydration
+    // 6. Conducks Re-Hydration
     // Since we cleared the graph to ensure an incremental flush, we now reload for resonance.
     await this.persistence.load(this.graph.getGraph());
 
@@ -257,14 +257,14 @@ export class AnalysisService implements ConducksComponent {
           }
         });
 
-        // 3. Bind to Library (Apostolic Rule: Columnar Hierarchy Only) 🏺
+        // 3. Bind to Library (Conducks Rule: Columnar Hierarchy Only) 🏺
         // We no longer persist MEMBER_OF edges; containment is in node.properties.parentId
         inducedCount++;
       }
     }
 
     if (inducedCount > 0) {
-      logger.info(`🛡️ [Apostolic Induction] Resonated with ${inducedCount} virtual ecosystem symbols.`);
+      logger.info(`🛡️ [Conducks Induction] Resonated with ${inducedCount} virtual ecosystem symbols.`);
     }
   }
 }

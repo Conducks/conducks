@@ -24,7 +24,6 @@ export class MicroPulseService {
   ) {}
 
   /**
-   * Apostolic Re-Anchoring 🏺
    * Re-wires the service to a new structural vault handle.
    */
   public setPersistence(persistence: SynapsePersistence) {
@@ -33,7 +32,6 @@ export class MicroPulseService {
 
   /**
    * Resonates a single file unit into the Structural Synapse.
-   * Purges the stale version and resurrects the new structural DNA.
    */
   public async resonate(filePath: string): Promise<{ success: boolean; error?: string; nodes?: number }> {
     try {
@@ -64,7 +62,7 @@ export class MicroPulseService {
         allPaths
       );
 
-      // 5. Apostolic Purge & Resurrection 🏺
+      // 5. Conducks Purge & Resurrection 🛡️
       // We explicitly purge the unit and its stale relationships.
       const unitId = `${absolutePath.toLowerCase()}::unit`;
       

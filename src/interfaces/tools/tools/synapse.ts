@@ -2,7 +2,7 @@ import { Tool } from "@/registry/types.js";
 import { registry } from "@/registry/index.js";
 
 /**
- * Conducks — Structural Intelligence Tools (Standardized Taxonomy)
+ * Conducks — Structural Intelligence Tools (Unified Taxonomy)
  * 
  * These 4 tools form the analytical core of the Conducks MCP suite.
  * They provide discovery, structural health, governance, and precision metrics.
@@ -11,7 +11,7 @@ import { registry } from "@/registry/index.js";
  */
 
 /**
- * [Apostolic Anchor Check] 🏺
+ * [Conducks Anchor Check] 🏺
  * Ensures the structural registry is aligned to the correct workspace root
  * before executing any tool. This prevents "Detached Root" errors when
  * the MCP server is launched from an arbitrary directory.

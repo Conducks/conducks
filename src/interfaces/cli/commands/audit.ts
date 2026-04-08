@@ -44,7 +44,7 @@ export class AuditCommand implements ConducksCommand {
 
     const auditData = await (registry.audit as any).audit();
     
-    // 1. Structural Orphans (Apostolic Refactoring Alerts) 🏺
+    // 1. Structural Orphans (Conducks Refactoring Alerts) 🏺
     if (auditData.stats.orphans > 0) {
       console.log(`\n\x1b[31m💣 [Refactoring Alert] ${auditData.stats.orphans} Orphaned Synapses Detected:\x1b[0m`);
       // Display first 10 for brevity, user can use GQL for more
@@ -70,7 +70,7 @@ export class AuditCommand implements ConducksCommand {
     const report = await sentinel.validate(registry.query.graph.getGraph() as any, rules);
 
     if (report.success && auditData.success) {
-      console.log("\n\x1b[32m✅ Apostolic Governance confirmed. No structural regressions found.\x1b[0m");
+      console.log("\n\x1b[32m✅ Conducks Governance confirmed. No structural regressions found.\x1b[0m");
     } else if (!report.success) {
       console.log("\x1b[31m❌ [Sentinel] Custom Governance Violations:\x1b[0m");
       report.violations.forEach((v: any) => console.log(`  - [${v.ruleId}] ${v.nodeId}: ${v.message}`));

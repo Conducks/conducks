@@ -6,10 +6,9 @@ import fs from "node:fs/promises";
 import duckdb from "duckdb";
 
 /**
- * Conducks — Synapse Vault (DuckDB Persistence) 🛡️ 🏺
+ * Conducks — DuckDB Persistence Engine 🛡️ 🟦
  * 
- * High-performance structural storage for the Architectural Mirror.
- * Uses a columnar DNA schema for sub-millisecond graph queries.
+ * Native storage layer for the High-Fidelity Synapse Graph.
  */
 export class SynapsePersistence {
   private db: duckdb.Database | null = null;
@@ -37,7 +36,7 @@ export class SynapsePersistence {
         await fs.mkdir(this.cacheDir, { recursive: true });
       }
 
-      // 🛡️ [Vault Hardening] Apostolic Connection Isolation
+      // 🛡️ [Vault Hardening] Conducks Connection Isolation
       // Mode: READ_ONLY — Allows multiple processes if no writer is active.
       // Mode: READ_WRITE — Standard exclusive lock behavior.
       const config = this.readOnly 
@@ -84,7 +83,7 @@ export class SynapsePersistence {
   }
 
   /**
-   * Apostolic Guard: Ensures the structural vault is open and healthy.
+   * Conducks Guard: Ensures the structural vault is open and healthy.
    * Prevents catastrophic native DuckDB crashes (NULL pointer dereference).
    */
   private async ensureVaultOpen(): Promise<duckdb.Database> {
@@ -100,7 +99,7 @@ export class SynapsePersistence {
     if (!db || this.readOnly) return;
     const run = (sql: string) => new Promise((res, rej) => db.run(sql, (err) => err ? rej(err) : res(true)));
     
-    // 🛡️ [Vault Tuning] Synapse Hardening v2.0 (Apostolic Streaming) 🏺
+    // 🛡️ [Vault Tuning] Synapse Hardening v2.0 (Conducks Streaming) 🏺
     await run("PRAGMA memory_limit='12GB';");
     await run("PRAGMA threads=2;");
     await run("PRAGMA checkpoint_threshold='1GB';");
@@ -114,11 +113,11 @@ export class SynapsePersistence {
     await run(`CREATE TABLE IF NOT EXISTS edges (id TEXT PRIMARY KEY, pulseId VARCHAR, sourceId TEXT, targetId TEXT, category VARCHAR, type TEXT, weight REAL, confidence REAL, lineNumber INTEGER, properties JSON);`);
     await run(`CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, pulseId VARCHAR, filePath VARCHAR, kind VARCHAR, title VARCHAR, sections JSON, symbols_referenced TEXT[], last_modified BIGINT);`);
     
-    // Apostolic Schema Guard (Auto-Migration) 🏺
+    // Conducks Schema Guard (Auto-Migration) 🏺
     const ensureColumn = async (table: string, column: string, type: string) => {
       const cols = await this.query(`PRAGMA table_info(${table})`);
       if (!cols.find((c: any) => c.name === column)) {
-        logger.info(`🛡️ [Persistence] Apostolic Migration: Adding ${column} to ${table}...`);
+        logger.info(`🛡️ [Persistence] Conducks Migration: Adding ${column} to ${table}...`);
         await run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type};`);
       }
     };
@@ -129,7 +128,7 @@ export class SynapsePersistence {
       const targetPk = [...columns].sort();
       
       if (currentPk.join(',') !== targetPk.join(',')) {
-        logger.warn(`🛡️ [Persistence] Apostolic Table Resurrection: ${table} is missing Primary Key ${columns.join(',')}. Rebuilding...`);
+        logger.warn(`🛡️ [Persistence] Conducks Table Resurrection: ${table} is missing Primary Key ${columns.join(',')}. Rebuilding...`);
         
         // 1. Drop Indexes (prevents Dependency Error) 🏺
         const indexList = await this.query(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = '${table}'`);
@@ -141,7 +140,7 @@ export class SynapsePersistence {
         await run(`ALTER TABLE ${table} RENAME TO ${table}_stale_legacy;`);
         await run(createSql);
         
-        // 3. Apostolic Batched Migration (Memory Optimized) 🏺
+        // 3. Conducks Batched Migration (Memory Optimized) 🏺
         try {
           const commonCols = info.map((c: any) => c.name).join(', ');
           const totalRowsResult = await this.query(`SELECT COUNT(*) as count FROM ${table}_stale_legacy`);
@@ -252,7 +251,7 @@ export class SynapsePersistence {
       });
       return rows;
     } finally {
-      // 🛡️ [Apostolic Lazy Persistence] Explicit lock release for non-writers.
+      // 🛡️ [Conducks Lazy Persistence] Explicit lock release for non-writers.
       if (this.lazy && this.readOnly) {
         await this.close();
       }
@@ -292,20 +291,20 @@ export class SynapsePersistence {
       ]);
       await this.run("COMMIT");
 
-      // Apostolic Streaming: Delegated Reflection 🏺
+      // Conducks Streaming: Delegated Reflection 🏺
       await this.saveNodes(nodes, pulseId);
       await this.saveEdges(allEdges, pulseId);
 
       return pulseId;
     } catch (fail) {
-      logger.error("Vault Steam Error. Attempting Apostolic Rollback...", fail);
+      logger.error("Vault Steam Error. Attempting Conducks Rollback...", fail);
       try { await this.run("ROLLBACK"); } catch { /* Ignore rollback failure if no tx was open */ }
       throw fail;
     }
   }
 
   /**
-   * Apostolic Streaming: High-performance Batched Node Reflection 🏺
+   * Conducks Streaming: High-performance Batched Node Reflection 🏺
    */
   public async saveNodes(nodes: ConducksNode[], pulseId: string): Promise<void> {
     const db = await this.ensureVaultOpen();
@@ -348,7 +347,7 @@ export class SynapsePersistence {
   }
 
   /**
-   * Apostolic Streaming: High-performance Batched Edge Reflection 🏺
+   * Conducks Streaming: High-performance Batched Edge Reflection 🏺
    */
   public async saveEdges(edges: ConducksEdge[], pulseId: string): Promise<void> {
     const db = await this.ensureVaultOpen();
@@ -404,7 +403,7 @@ export class SynapsePersistence {
               const unitId = m.unitId ? m.unitId.toLowerCase() : `${rawFilePath}::unit`;
               const rootId = m.rootId ? m.rootId.toLowerCase() : null;
               await new Promise<void>((r, j) => ns.run(id, pid, m.fingerprint || null, m.canonicalKind || n.canonicalKind, n.canonicalRank || 0, n.kind || 'unknown', n.name || 'unknown', rawFilePath, n.range?.start.line || 0, n.range?.end.line || 0, parentId, rootId, m.namespaceId ? m.namespaceId.toLowerCase() : null, unitId, m.structureId ? m.structureId.toLowerCase() : null, m.layer_path || null, m.depth || 0, n.risk || 0, n.gravity || 0, n.complexity || 1, m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(n.dna || {}), JSON.stringify(n.signature || {}), JSON.stringify(n.kinetic || {}), JSON.stringify({ ...m, id, name: n.name, range: n.range, parentId, unitId, rootId }), (e) => e ? j(e) : r()));
-              // [Apostolic Rule] MEMBER_OF edges are no longer persisted. 🏺
+              // [Conducks Rule] MEMBER_OF edges are no longer persisted. 🏺
               // Containment is now explicitly column-based (parentId, unitId, etc.)
             }
           }
@@ -424,7 +423,7 @@ export class SynapsePersistence {
     const db = await this.connect();
     if (!db) return false;
     try {
-      // 🛡️ [Apostolic State-Sync] We now load the entire structural constellation.
+      // 🛡️ [Conducks State-Sync] We now load the entire structural constellation.
       // Since 'id' is the PK, we always get the latest version of every symbol.
       const nodes: any[] = await this.query("SELECT * FROM nodes");
       const edges: any[] = await this.query("SELECT * FROM edges");
@@ -443,7 +442,7 @@ export class SynapsePersistence {
       logger.error("Vault Load Error", err);
       return false; 
     } finally {
-       // 🛡️ [Apostolic Lazy Persistence] Explicit lock release for non-writers.
+       // 🛡️ [Conducks Lazy Persistence] Explicit lock release for non-writers.
        if (this.lazy && this.readOnly) {
         await this.close();
       }
@@ -492,7 +491,7 @@ export class SynapsePersistence {
   public isConnected(): boolean { return !!this.db; }
 
   /**
-   * Apostolic Purge: Explicitly removes structural DNA for specific units.
+   * Conducks Purge: Explicitly removes structural DNA for specific units.
    * Use this before re-inducting a modified file to ensure no dangling symbols.
    */
   public async purgeUnits(unitIds: string[]): Promise<void> {
@@ -504,7 +503,7 @@ export class SynapsePersistence {
       const batch = unitIds.slice(i, i + batchSize).map(id => id.toLowerCase());
       const placeholders = batch.map(() => '?').join(',');
       
-      // Apostolic Rule: Delete edges first, then nodes.
+      // Conducks Rule: Delete edges first, then nodes.
       // This ensures that the JOIN/SELECT for edges still finds the node IDs while they exist.
       await this.run(`
         DELETE FROM edges 

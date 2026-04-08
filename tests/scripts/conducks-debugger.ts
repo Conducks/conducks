@@ -3,7 +3,7 @@ import { chronicle } from "../../src/lib/core/git/chronicle-interface.js";
 import path from "node:path";
 
 async function debugSync() {
-    console.log("🛡️ [Apostolic Debugger] Initializing Structural Synapse...");
+    console.log("🛡️ [Conducks Debugger] Initializing Structural Synapse...");
     const targetRoot = path.join(process.cwd(), '../archive/TargetedCV');
     
     // Force Anchor
@@ -11,11 +11,11 @@ async function debugSync() {
     
     await registry.initialize(true, targetRoot);
     
-    console.log(`🛡️ [Apostolic Debugger] Anchored at: ${targetRoot}`);
-    console.log(`🛡️ [Apostolic Debugger] Vault Stats: ${registry.query.graph.getGraph().stats.nodeCount} nodes`);
+    console.log(`🛡️ [Conducks Debugger] Anchored at: ${targetRoot}`);
+    console.log(`🛡️ [Conducks Debugger] Vault Stats: ${registry.query.graph.getGraph().stats.nodeCount} nodes`);
     
     const query = "application/src/lib/core";
-    console.log(`🛡️ [Apostolic Debugger] Searching for: ${query}`);
+    console.log(`🛡️ [Conducks Debugger] Searching for: ${query}`);
     
     const results = await registry.analyze.query.execute('find_by_name', [query, '', ''], 20);
     
@@ -25,7 +25,7 @@ async function debugSync() {
         // Let's check why - is it in the graph but not in the query?
         const allNodes = Array.from(registry.query.graph.getGraph().getAllNodes());
         const appNodes = allNodes.filter((n: any) => n.properties.filePath?.toLowerCase().includes("application"));
-        console.log(`🛡️ [Apostolic Debugger] Found ${appNodes.length} symbols containing 'application' in the graph.`);
+        console.log(`🛡️ [Conducks Debugger] Found ${appNodes.length} symbols containing 'application' in the graph.`);
         
         if (appNodes.length > 0) {
             console.log("Sample Application Nodes:");

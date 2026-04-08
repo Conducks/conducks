@@ -50,7 +50,7 @@ presentation tool=motion     → what moves, what doesn't, timing rules
 
 ---
 
-## Apostolic Intelligence (The Engine)
+## Conducks Intelligence (The Engine)
 
 These tools provide active structural and behavioral intelligence by querying the **Synapse Graph**.
 

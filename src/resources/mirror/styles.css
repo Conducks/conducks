@@ -1,5 +1,5 @@
 :root {
-  /* Void Space — Exclusive Glass v3.0 🏺 💎 🛰️ */
+  /* Conducks — Structural Intelligence Presets v3.0 🛡️ 💎 🛰️ */
   --bg: #010409;
   
   /* Optic Glass Slabs */
@@ -42,7 +42,7 @@ body {
   z-index: 1;
 }
 
-/* 🎮 UNIFIED COMMAND DECK (Apostolic v3.0) 🏺 💎 */
+/* 🎮 UNIFIED COMMAND DECK (Conducks v3.0) 🏺 💎 */
 .command-deck {
   position: absolute;
   top: var(--spacing-air);
@@ -480,7 +480,7 @@ input:checked + .slider:before {
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* 🧬 CUSTOM TOGGLE (Apostolic Pill) */
+/* 🧬 CUSTOM TOGGLE (Conducks Pill) */
 .switch {
   position: relative;
   display: inline-block;

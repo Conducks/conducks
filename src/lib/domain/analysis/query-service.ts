@@ -390,7 +390,7 @@ export class QueryService {
   }
 
   /**
-   * Apostolic Re-Anchoring 🏺
+   * Conducks Re-Anchoring 🏺
    * Re-wires the service to a new structural vault handle.
    */
   public setPersistence(persistence: SynapsePersistence) {

@@ -1,126 +1,133 @@
-# 🏺 CONDUCKS — Open Source Code Architecture Intelligence & Graph Synapse
+# 🏺 CONDUCKS — Deterministic Structural Intelligence & Graph Synapse
 
-> [!TIP]
-> **🚀 Visual Quick-Start (Instagram/Social Preview)**
-> Want to see the code in action?
-> ### 🔭 Real-Time Monitoring
-> The **Synapse Watcher** provides interactive structural reflection:
-> ```bash
-> # Start a live, read-only structural mirror
-> conducks watch
-> 
-> # Start in Auto-Pulse mode (Automatic database persistence on change)
-> conducks watch --pulse
-> ```
-> *Note: The structural graph now uses a **Delta-Only Flush** model, writing only changed units to the vault (~150 nodes vs full-repo snapshots).*
-> 
-> ### 🛡️ Governance & Audit
-> Ensure your code follows the **Apostolic structural laws**:
-> ```bash
-> conducks audit
-> ```
-
-**Conducks** is a high-fidelity, Git-native architectural observation platform. It transforms raw source code into a living **Synapse Graph**, enabling real-time structural audits, behavioral tracing, and automated governance for human developers and **AI-Native Coding Agents**.
+> [!IMPORTANT]
+> **Git-Native, Zero-Hallucination Architectural Observation.**
+> Conducks is a high-fidelity structural intelligence platform that transforms raw source code into a living **Synapse Graph**. It replaces probabilistic AI guesses with deterministic **Graph Theory** and **Wasm-powered Parsing**, enabling real-time structural audits and behavioral tracing for both human architects and AI-Native agents.
 
 ---
 
-## 🧬 Interface Spectrum (CLI & MCP)
-Conducks is a unified structural engine designed for both **Senior Software Architects** and **Autonomous AI Agents** (Antigravity). By sharing a common Synapse Graph, it ensures that your code standards are maintained regardless of who is modifying the project.
+## 🏛️ 1. The 8-Layer Structural Taxonomy
+To achieve total architectural clarity, Conducks organizes every code symbol into a deterministic 8-layer hierarchy (Ranks 0–7).
 
-- **💻 Terminal CLI**: Optimized for developer experience with rich terminal output, interactive dashboards, and rapid architectural feedback.
-- **🤖 MCP Server**: A high-fidelity Model Context Protocol interface that allows AI Agents to perform deep-dives, trace execution, and verify structural integrity before proposing changes.
-
----
-
-## 🌍 Polyglot Structural Resonance — Supported Languages
-Conducks uses a specialized multi-language induction wave. Every language is mapped to the **Apostolic 8-Layer Taxonomy**, allowing for cross-language intelligence across massive monorepos.
-
-| Language | Tier | Fidelity | Extracted Features |
-| :--- | :--- | :--- | :--- |
-| **Python** | Tier 1 | Master | Classes, Methods, Decorators, Imports, Dynamic Calls |
-| **TypeScript / JS** | Tier 1 | Master | Interfaces, Types, Modules, Functions, Prototypes |
-| **Go** | Tier 1 | Master | Structs, Interfaces, Methods, Packages, Channels |
-| **Rust** | Tier 2 | High | Traits, Structs, Enums, Macros, Modules |
-| **Java / C#** | Tier 2 | High | Classes, Interfaces, Namespaces, Attributes, Heritage |
-| **C++ / C** | Tier 2 | High | Classes, Headers, Structs, Functions, Macros |
-| **PHP / Ruby** | Tier 2 | High | Classes, Traits, Modules, Methods, Required Files |
-| **Swift** | Tier 2 | High | Structs, Protocols, Extensions, Enums, Classes |
+| Layer | Kind | Architectural Role |
+|---|---|---|
+| **L0** | `ECOSYSTEM` | External dependencies and third-party library relationships. |
+| **L1** | `REPOSITORY` | Logical project boundaries and repository clusters. |
+| **L2** | `NAMESPACE` | Directory-level grouping and architectural pillars. |
+| **L3** | `UNIT` | Technical files (The "Physical Layer" of structural reflection). |
+| **L4** | `INFRA` | Routes, handlers, and framework-level entry points. |
+| **L5** | `STRUCTURE` | Classes, Objects, and complex Type definitions. |
+| **L6** | `LOGIC` | Methods and Functions (The functional "Cerebral Circuits"). |
+| **L7** | `ATOM` | Variables, Constants, and fundamental Primitive exports. |
 
 ---
 
-## 🚀 Main Features — The Kinetic Suite
+## 🌍 2. Polyglot Structural Lattice — 11 Native Species
+Conducks uses parallelized **Prism Lenses** (Tree-sitter Wasm) to extract architectural DNA across the most critical development stacks.
 
-### 🌊 Core Structural Pulse
-- **`analyze`**: Full structural induction of the codebase into a Synapse Graph. (Wasm-Tree-Sitter).
-- **`status`**: High-level structural health check. Identifies **Dependency Pillars** and **Hotspots**.
-- **`list`**: Paginated listing of all identified symbols across the 8-layer taxonomy.
-
-### 🔍 Searchable Code Intelligence
-- **`query`**: Topological search across the synapse using pattern matching. (Zero-Hallucination).
-- **`explain`**: Deep-dive risk-scoring for any symbol. (Physics-driven Risk vs Gravity).
-- **`impact`**: Recursive **Blast Radius** calculation for proposed changes.
-- **`trace`**: Step-by-step execution flow visualization using Risk-Weighted Dijkstra.
-
----
-
-## 🏗️ Atomic Induction Pipeline — The Technical Core
-Conducks achieves sub-millisecond graph traversal at scale via a hardened data engineering stack:
-
-1.  **Induction (Wasm-Tree-Sitter)**: Every file is parsed using parallelized, native-bindings Tree-sitter parsers to extract "Spectra" (Structural DNA).
-2.  **Persistence (DuckDB Vault)**: The graph is stored in a vectorized DuckDB instance for ultra-high-speed SQL-powered topological queries.
-3.  **Physics (Kinetic Engine)**: Physical metrics (Gravity, Entropy) are calculated in Real-Time to provide architectural heatmaps.
-
----
-
-## 🛡️ Deterministic Structural Audit — Sentinel Governance
-
-**Sentinel** is the core architectural enforcement engine of Conducks. It allows you to transform architectural best practices into **Deterministic Laws** (MVC, Onion, Clean Architecture, etc.) to prevent architectural drift.
-
-### 📜 Rule Catalog & Professional Laws
-| Type | Scientific Description | Impact |
+| Language | Tier | Fidelity Level |
 | :--- | :--- | :--- |
-| `require_heritage` | Proves that a class implements a specific interface or extends a base. | Enforcing Layer standards. |
-| `max_fans` | Limits the number of incoming dependencies (Fan-In). | **God Object Prevention**. |
-| `require_caller` | Prohibits calls from unauthorized parent layers. | Enforcing **Layer Isolation**. |
+| **TypeScript / JS (ESM/CJS)** | Tier 1 | Master (Scoped Identity + Neural Binding) |
+| **Python (PEP-aware)** | Tier 1 | Master (Cross-Module Resolution + Decorators) |
+| **Go** | Tier 1 | Master (Packages, Interfaces, Receivers) |
+| **Rust / C++ / C** | Tier 2 | High (Traits, Structs, Enums, Macros, Headers) |
+| **Java / C#** | Tier 2 | High (Namespaces, Heritage, Attributes) |
+| **PHP / Ruby / Swift** | Tier 2 | High (Traits, Modules, Protocols, Extensions) |
 
 ---
 
-## 🔧 Installation & Setup
+## 🚀 3. The 32-Command Functional Suite
+The Conducks CLI is a unified command center for deep structural exploration and project governance.
+
+### 🔍 Discovery & Landscape
+*   **`analyze`**: Full structural induction wave into the Synapse Graph.
+*   **`status`**: Generates a health manifest identifying **Pillars** and **Hotspots**.
+*   **`query`**: Fuzzy and Regex symbol lookup with PageRank-based ranking.
+*   **`list`**: Paginated manifest of symbols across all 8 taxonomic layers.
+*   **`blueprint`**: Auto-generates `BLUEPRINT.md` from the current graph topology.
+
+### ⚡ Behavioral & Kinetic Intelligence
+*   **`trace`**: Risk-Weighted Dijkstra pathfinding between functional symbols.
+*   **`impact`**: Bidirectional **Blast Radius** analysis (Upstream/Downstream).
+*   **`flows`**: Map high-level structural circuits and data handover.
+*   **`resonance`**: Calculate architectural similarity between disjoint modules.
+
+### 🛡️ Conducks Governance & Risk
+*   **`audit`**: Detect "Structural Sins" (Circularities, God Objects, Orphans).
+*   **`guard`**: Regression check to block commits exceeding risk thresholds.
+*   **`explain`**: 6-signal risk decomposition (Gravity, Entropy, Complexity, Churn, etc.).
+*   **`cohesion`**: Measure internal vs external coupling density.
+
+---
+
+## 🦾 4. AI Orchestration — Model Context Protocol (MCP)
+Conducks is an **Agent-First** platform. It provides a native **MCP Server** that allows AI agents (like Claude or Antigravity) to navigate your codebase with 100% deterministic accuracy.
+
+### 🚀 Starting the MCP Server
+Launch the server directly from the CLI to bridge your current structural context to your AI assistant:
+```bash
+conducks mcp --root .
+```
+
+### 🛠️ Agent Integration (Claude Desktop)
+To give your AI agent access to the Conducks 9-Tool suite, add the following to your `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "conducks": {
+      "command": "conducks",
+      "args": ["mcp", "--root", "/path/to/your/project"]
+    }
+  }
+}
+```
+
+### 🛠️ The 9-Tool Agent Suite
+- `conducks_query` | `conducks_status` | `conducks_audit`
+- `conducks_explain` | `conducks_impact` | `conducks_trace`
+- `conducks_diff` | `conducks_rename` | `conducks_guide`
+
+---
+
+## 🧬 5. Cerebral Mathematics (The Brain)
+Conducks' intelligence is deterministic, not probabilistic. Every insight is backed by proven algorithms:
+*   **PageRank Gravity**: Determining structural centrality and symbol "Anchors."
+*   **Tarjan’s SCC**: Identifying complex circular cycles at $O(V+E)$ speed.
+*   **Shannon Entropy**: Calculating code uncertainty and bus-factor risks.
+*   **Risk-Weighted Dijkstra**: Finding execution paths via architectural bridge weighting.
+
+---
+
+## 🪞 6. Conducks Mirror — Real-Time Discovery
+The **Conducks Mirror** on port `3333` offers an interactive, zero-restart graphical exploration of the synapse.
+
+- **Pure Highlight Mode**: Preserves 100% of the graph context; toggling layers dims them to "Shadows" without restarting the simulation.
+- **Luminescent Spotlights**: Real-time visual focus on chosen clusters and trace routes.
+- **Photon Pulse**: Interactive visual pathing along functional execution chains.
+
+---
+
+## 🔧 7. Quick Start: Anchoring the Synapse
 
 ```bash
-# Clone the repository
-git clone https://github.com/gospel-of-technology/conducks.git && cd conducks
-npm install && npm run build
+# 1. Initialize the project vault
+conducks setup
 
-# Anchor the Synapse
-conducks setup           # Anchor the vault
-conducks analyze full    # Reflect structure
-conducks status --map    # Verify entry points
+# 2. Reflect the structural DNA
+conducks analyze
+
+# 3. Launch the visual discovery dashboard
+conducks mirror
 ```
 
 ---
 
-## 🪞 Structural Mirror — High-Fidelity Visualization
-The **Conducks Mirror** is a high-fidelity visual exploration dashboard that provides a real-time graphical representation of your codebase.
-
-- **Command**: `conducks mirror`
-- **Dashboard**: `http://localhost:3333`
-
----
-
-## 🤖 The AI-Native Edge — Eliminating Hallucinations
-Traditional AI coding tools rely on **Probabilistic Searching** (guessing). 
-**Conducks is Deterministic.** 
-By providing a 100% proven structural map via the MCP server, Conducks eliminates AI hallucinations and ensures that agents like Antigravity operate with absolute technical resonance.
+## 🫂 8. Documentation Standards (Manifest Engine)
+Conducks enforces a 7-file project documentation standard (Vision, Architecture, Implementation, Handover, Conventions, Todo, Memory).
+*   **Command**: `conducks bootstrap-docs [projectName]`
+*   **Location**: `docs/project/[projectName]/`
 
 ---
-
-## 🫂 Community & Structural Contributions
-Conducks is an open-source project under the **Apache-2.0** license. We welcome contributions to our structural engine and language providers.
-
-- **[CONTRIBUTING.md](file:///Users/saidmustafasaid/Documents/Gospel_Of_Technology/CONDUCKS/conducks/CONTRIBUTING.md)**: Learn how to build your own Structural Provider.
-- **[CODE_OF_CONDUCT.md](file:///Users/saidmustafasaid/Documents/Gospel_Of_Technology/CONDUCKS/conducks/CODE_OF_CONDUCT.md)**: Join our community with respect and meritocracy.
-
----
-© 2026 Gospel of Technology. Structural Resonance Confirmed.
+*Manifest v0.8.0 | Conducks Architecture Group*
 🏺💎🛡️
+

@@ -9,7 +9,7 @@ import path from "node:path";
 
 /**
  * Canonicalizes a path for structural ID and equality checks.
- * Apostolic Standard: path.normalize(p).replace(/\\/g, "/").toLowerCase()
+ * Conducks Standard: path.normalize(p).replace(/\\/g, "/").toLowerCase()
  */
 export function canonicalize(p: string): string {
   if (!p) return '';

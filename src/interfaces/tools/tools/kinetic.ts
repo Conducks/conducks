@@ -11,7 +11,7 @@ import fs from "fs-extra";
  * CRITICAL RULE 9: Exactly 9 Unified Conducks MCP Tools mandated.
  */
 /**
- * [Apostolic Anchor Check] 🏺
+ * [Conducks Anchor Check] 🏺
  * Ensures the structural registry is aligned to the correct workspace root.
  */
 async function ensureAnchor(customPath?: string, readOnly: boolean = true) {

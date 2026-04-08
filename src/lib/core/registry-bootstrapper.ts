@@ -49,7 +49,7 @@ export class RegistryBootstrapper {
           continue;
         }
 
-        // 🛡️ [Apostolic Priority] Structural Vault FIRST 🏺
+        // 🛡️ [Conducks Priority] Structural Vault FIRST 🏺
         if (fsSync.existsSync(path.join(current, ".conducks"))) return current;
 
         // 🛡️ [Project Markers] Fallback to Repository markers

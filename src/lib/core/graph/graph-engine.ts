@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
  * Conducks — Technical Graph Engine 🛡️ 🧬
  * 
  * Logic for reflecting the technical structure into the graph.
- * Implements the Apostolic Two-Pass Identity Model.
+ * Implements the Conducks Two-Pass Identity Model.
  */
 export class ConducksGraph {
   private graph = new ConducksAdjacencyList();
@@ -163,7 +163,7 @@ export class ConducksGraph {
 
   /**
    * Conducks — Ingests a reflected spectrum into the Synapse Graph.
-   * Apostolic Induction: Focus on local symbol ingestion and membership anchoring.
+   * Conducks Induction: Focus on local symbol ingestion and membership anchoring.
    */
   public ingestSpectrum(rawPath: string, spectrum: PrismSpectrum, shallow: boolean = false, unitId?: string, rootId?: string): void {
     const filePath = canonicalize(rawPath);
@@ -261,7 +261,7 @@ export class ConducksGraph {
   }
 
   /**
-   * Apostolic Streaming: Synapse-to-Vault Flush 🏺
+   * Conducks Streaming: Synapse-to-Vault Flush 🏺
    * 
    * Moves all current in-memory nodes/edges to the structural vault 
    * and purges the RAM to allow for the next wave of induction.

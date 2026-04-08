@@ -29,9 +29,9 @@ export class StatusCommand implements ConducksCommand {
     chronicle.setProjectDir(targetPath);
 
     try {
-      // 2. Mode: Pulse (Lazy Incremental Induction)
+      // 5. Conducks Purge & Resurrection 🛡️(Lazy Incremental Induction)
       if (isPulse && fileArg) {
-        console.log(`🛡️  [Apostolic Pulse] Resonating structural unit: ${chalk.cyan(fileArg)}`);
+        console.log(`🛡️  [Conducks Pulse] Resonating structural unit: ${chalk.cyan(fileArg)}`);
         const result = await (registry.analyze as any).resonate(fileArg);
         if (result.success) {
           console.log(chalk.green(`Success: ${fileArg} resurrected into the synapse (${result.nodes} nodes).`));
@@ -41,9 +41,9 @@ export class StatusCommand implements ConducksCommand {
         return;
       }
 
-      // 2.5 Mode: Manifest (Apostolic Context) 🏺
+      // 2.5 Mode: Manifest (Conducks Context) 🛡️
       if (args.includes('--manifest') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'manifest')) {
-        console.log(`🛡️  [Apostolic Manifest] Generating architectural context...`);
+        console.log(`🛡️  [Conducks Manifest] Generating architectural context...`);
         const manifest = await registry.audit.contextFile();
         console.log("\n" + manifest);
         return;
@@ -51,9 +51,9 @@ export class StatusCommand implements ConducksCommand {
 
       // 2.6 Mode: Blueprint (Structural Integrity)
       if (args.includes('--blueprint') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'blueprint')) {
-          console.log(`🛡️  [Apostolic Blueprint] Mapping structural integrity...`);
+          console.log(`🛡️  [Conducks Blueprint] Mapping structural integrity...`);
           const audit = await registry.audit.audit();
-          console.log(chalk.bold("\n--- 🏺 Structural Integrity Blueprint ---"));
+          console.log(chalk.bold("\n--- 🏺 Conducks Integrity Blueprint ---"));
           console.log(`- Cycles:   ${chalk.red(audit.stats.cycles)}`);
           console.log(`- Orphans:  ${chalk.red(audit.stats.orphans)}`);
           console.log(`- Resonance: ${chalk.green(audit.success ? "100%" : "ST structural drift detected")}`);

@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Fixed 🛡️
 - **Structural Connectivity Restoration**: Resolved a critical category mismatch between the Synapse vault (`STRUCTURAL`) and the Mirror engine (`LINEAGE`), restoring missing edge visibility.
-- **Apostolic UI Realignment**: Stripped out all forbidden 'vibe-coded' marketing copy and replaced it with direct, technical terminology across the entire dashboard.
+- **Conducks UI Realignment**: Stripped out all forbidden 'vibe-coded' marketing copy and replaced it with direct, technical terminology across the entire dashboard.
 - **Banned Interaction Removal**: Eliminated all illegal hover transforms (Rule UI-102) to ensure architectural stability.
 - **Graph Purification**: Purged temporary diagnostic scripts from the structural induction path to ensure 100% core signal.
 
@@ -30,16 +30,16 @@ All notable changes to this project will be documented in this file. The format 
 ---
 
 ## [1.0.0] - 2026-04-05
-### 🎉 The Apostolic Release (Production-Ready)
+### 🎉 The Conducks Release (Production-Ready)
 This milestone marks the transition from "Experimental Tool" to "Industrial Structural Intelligence Platform."
 
 ### Added 🏺
 - **Atomic Induction Engine**: Full support for 11+ languages (Polyglot Resonance) using Wasm-Tree-Sitter.
 - **The Kinetic Mirror**: High-fidelity, real-time visual structural explorer at `port 3333`.
 - **Sentinel Governance**: Deterministic architectural enforcement via `sentinel.json`.
-- **Apostolic MCP Server**: Standardized 10-tool suite for autonomous agent integration (Antigravity).
+- **Conducks MCP Server**: Standardized 10-tool suite for autonomous agent integration (Antigravity).
 - **DuckDB Persistence**: Vectorized vault for sub-millisecond graph traversal across massive monorepos.
-- **Apostolic 8-Layer Taxonomy**: Standardized structural hierarchy from Ecosystem down to Data.
+- **Conducks 8-Layer Taxonomy**: Standardized structural hierarchy from Ecosystem down to Data.
 
 ### Fixed 🛡️
 - Resolved Persistent database lock contention in concurrent analyzing/mirroring sessions.

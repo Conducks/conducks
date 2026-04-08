@@ -37,7 +37,7 @@ export class GovernanceService implements ConducksComponent {
   }
 
   /**
-   * Apostolic Re-Anchoring 🏺
+   * Conducks Re-Anchoring 🛡️
    * Re-wires the service to a new structural vault handle.
    */
   public setPersistence(persistence: SynapsePersistence) {
@@ -55,7 +55,7 @@ export class GovernanceService implements ConducksComponent {
     const discoveries: any[] = [];
     const projectRoot = chronicle.getProjectDir() || process.cwd();
     
-    // 1. Circular Dependency Detection (Apostolic Filtering) 🏺
+    // 1. Circular Dependency Detection (Conducks Filtering) 🛡️
     // Only flag multi-node cycles that are NOT purely hierarchical (no MEMBER_OF edges).
     const cycles = this.graph.detectCycles().filter(c => {
       if (c.length <= 1) return false;
@@ -95,7 +95,7 @@ export class GovernanceService implements ConducksComponent {
       const sourceNode = this.graph.getNode(orphan.sourceId);
       const sourceName = sourceNode ? sourceNode.properties.name : orphan.sourceId;
       
-      // Apostolic Rule: Standard Libraries and node_modules are Discoveries, not Violations.
+      // Conducks Rule: Standard Libraries and node_modules are Discoveries, not Violations.
       const isNodeBuiltin = orphan.targetId.startsWith('node:');
       
       // Precision Check: Does it start with an absolute path or relative path?

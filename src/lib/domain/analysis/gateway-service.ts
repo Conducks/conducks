@@ -9,10 +9,9 @@ import path from "node:path";
 const logger = new Logger("GatewayService");
 
 /**
- * Conducks — Apostolic Gateway Service 🏺
+ * Conducks — Unified Synapse Gateway
  * 
- * Centralized communication layer for the Mirror (Visual Dashboard).
- * Handles real-time reactivity, visual wave generation, and on-demand hydration.
+ * High-performance access layer for the Mirror visual dashboard.
  */
 export class GatewayService {
   private watcher: fs.FSWatcher | null = null;
@@ -37,6 +36,8 @@ export class GatewayService {
 
     try {
       if (fs.existsSync(dbPath)) {
+        // [Conducks Consistency Check] 🛡️
+        console.error("🛡️ [Conducks Graph] Re-initializing structural synapse...");
         logger.info(`🛡️ [Synapse Watcher] Monitoring vault for structural heartbeats: ${dbPath}`);
         this.watcher = fs.watch(dbPath, (eventType) => {
           if (eventType === 'change') {

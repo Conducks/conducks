@@ -35,7 +35,7 @@ export class MirrorEngine implements ConducksComponent {
       }
     }
 
-    // 2. Nearest Visible Parent (NVP) Map with Transitive Depth 🏺
+    // 2. Nearest Visible Parent (NVP) Map with Transitive Depth 🛡️
     const nvpMap = new Map<string, { id: string, depth: number } | null>();
     const nodeMap = new Map(allNodes.map(n => [n.id, n]));
 
@@ -54,7 +54,7 @@ export class MirrorEngine implements ConducksComponent {
     };
     allNodes.forEach(n => nvpMap.set(n.id, findNVP(n.id)));
 
-    // 3. Cluster Centers & Hierarchical Seeding (v2.0.0 Layout Resonance) 🏺
+    // 3. Cluster Centers & Hierarchical Seeding (v2.0.0 Layout Resonance) 🛡️
     const clusters = allNodes.filter(n => 
       n.properties.canonicalKind === 'NAMESPACE' || 
       n.properties.canonicalKind === 'DIRECTORY' || 
@@ -88,7 +88,7 @@ export class MirrorEngine implements ConducksComponent {
         y = radius * Math.sin(angle);
         topLevelIndex++;
       } else {
-        // Vertical Bloom (Tree-Down Waterfall) 🏺
+        // Vertical Bloom (Tree-Down Waterfall) 🛡️
         const childIndex = (clusterCenters.size % 10);
         const horizontalSpread = (childIndex - 5) * 120; // Increased spacing (60 -> 120)
         x = parentCenter.x + horizontalSpread;
@@ -102,7 +102,7 @@ export class MirrorEngine implements ConducksComponent {
       });
     });
 
-    // 4. Final Visible Nodes with Hierarchical Seeding (Geometric Order) 🏺
+    // 4. Final Visible Nodes with Hierarchical Seeding (Geometric Order) 🛡️
     const clusterNodeCounts = new Map<string, number>();
     const clusterIndices = new Map<string, number>();
 
@@ -131,7 +131,7 @@ export class MirrorEngine implements ConducksComponent {
       const clusterInfo = clusterCenters.get(clusterId) || { x: 0, y: 0, color: '#9ca3af' };
       const degree = degreeMap.get(n.id) || 0;
 
-      // Concentric Orbit Logic 🏺
+      // Concentric Orbit Logic 🛡️
       // We place nodes in orbits based on their index in the cluster
       const index = clusterIndices.get(clusterId) || 0;
       clusterIndices.set(clusterId, index + 1);
@@ -163,7 +163,7 @@ export class MirrorEngine implements ConducksComponent {
       };
     });
 
-    // 5. Apostolic Edge Promotion (Category-Diverse Bridging v3) 🧬 🏺
+    // 5. Conducks Edge Promotion (Category-Diverse Bridging v3) 🧬 🛡️
     const links = [];
     const linkCheck = new Set<string>();
     const visualNodeIds = new Set(visualNodes.map(n => n.id));

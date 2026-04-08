@@ -109,7 +109,7 @@ export class GrammarRegistry {
     } catch (err) {
       this.unavailableLanguages.add(langId);
       if (process.env.CONDUCKS_DEBUG === '1') {
-        console.error(`[Conducks Registry] Apostolic Resilience: Native binding failure for ${langId}. Transitioning to Blackbox Mode.`, err);
+        console.error(`[Conducks Registry] Conducks Resilience: Native binding failure for ${langId}. Transitioning to Blackbox Mode.`, err);
       }
       return undefined; // Signal to caller to use Degraded Induction
     }

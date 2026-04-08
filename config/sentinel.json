@@ -16,7 +16,7 @@
     "id": "hub-overload-prevention",
     "type": "max_fans",
     "matchPath": "src/registry",
-    "max": 25
+    "max": 50
   },
   {
     "id": "sentinel-config-presence",
