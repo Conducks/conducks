@@ -99,6 +99,7 @@ Conducks' intelligence is deterministic, not probabilistic. Every insight is bac
 ---
 
 ## 🪞 6. Conducks Mirror — Real-Time Discovery
+![Conducks Mirror](assets/arch.png)
 The **Conducks Mirror** on port `3333` offers an interactive, zero-restart graphical exploration of the synapse.
 
 - **Pure Highlight Mode**: Preserves 100% of the graph context; toggling layers dims them to "Shadows" without restarting the simulation.
