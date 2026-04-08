@@ -20,6 +20,7 @@ export default {
 	},
 	testMatch: ['**/tests/**/*.test.ts'],
 	testPathIgnorePatterns: ['<rootDir>/tests/legacy/archived-tests/'],
+	modulePathIgnorePatterns: ['<rootDir>/build/'],
 	collectCoverageFrom: [
 		'src/**/*.ts',
 		'!src/**/*.d.ts',

@@ -14,8 +14,12 @@ describe('Synapse Structural Layer Audit', () => {
   let latestPulseId: string;
 
   beforeAll(async () => {
-    persistence = new DuckDbPersistence();
+    persistence = new DuckDbPersistence(undefined, false); // Allow DB creation on fresh runners
     db = await persistence.getRawConnection();
+
+    if (!db) {
+      throw new Error("❌ Structural Synapse is LOCKED or not initialized. Skipping Database Integrity Audit.");
+    }
     
     const pulseRows: any[] = await new Promise((res) => 
       db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => {
@@ -23,8 +27,14 @@ describe('Synapse Structural Layer Audit', () => {
         res(rows || []);
       })
     );
+    
     latestPulseId = pulseRows[0]?.id;
-    console.log(`[Audit] Target Pulse ID: ${latestPulseId}`);
+
+    if (!latestPulseId) {
+      console.warn("⚠️  [Audit] No structural pulse found in the vault. Integrity checks will be restricted.");
+    } else {
+      console.log(`[Audit] Target Pulse ID: ${latestPulseId}`);
+    }
   });
 
   afterAll(async () => {
