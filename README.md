@@ -1,134 +1,196 @@
-# 🏺 CONDUCKS — Deterministic Structural Intelligence & Graph Synapse
+# 🏺 Conducks
 
-> [!IMPORTANT]
-> **Git-Native, Zero-Hallucination Architectural Observation.**
-> Conducks is a high-fidelity structural intelligence platform that transforms raw source code into a living **Synapse Graph**. It replaces probabilistic AI guesses with deterministic **Graph Theory** and **Wasm-powered Parsing**, enabling real-time structural audits and behavioral tracing for both human architects and AI-Native agents.
+> **Maps your entire codebase into a queryable graph. No embeddings, no guessing.**
 
----
-
-## 🏛️ 1. The 8-Layer Structural Taxonomy
-To achieve total architectural clarity, Conducks organizes every code symbol into a deterministic 8-layer hierarchy (Ranks 0–7).
-
-| Layer | Kind | Architectural Role |
-|---|---|---|
-| **L0** | `ECOSYSTEM` | External dependencies and third-party library relationships. |
-| **L1** | `REPOSITORY` | Logical project boundaries and repository clusters. |
-| **L2** | `NAMESPACE` | Directory-level grouping and architectural pillars. |
-| **L3** | `UNIT` | Technical files (The "Physical Layer" of structural reflection). |
-| **L4** | `INFRA` | Routes, handlers, and framework-level entry points. |
-| **L5** | `STRUCTURE` | Classes, Objects, and complex Type definitions. |
-| **L6** | `LOGIC` | Methods and Functions (The functional "Cerebral Circuits"). |
-| **L7** | `ATOM` | Variables, Constants, and fundamental Primitive exports. |
+Conducks parses your source code with Tree-sitter, extracts every symbol (functions, classes, routes, variables), and stores everything in a local DuckDB graph that stays in sync with your repo. Any AI agent or developer can then ask precise questions about your codebase and get exact, graph-verified answers.
 
 ---
 
-## 🌍 2. Polyglot Structural Lattice — 11 Native Species
-Conducks uses parallelized **Prism Lenses** (Tree-sitter Wasm) to extract architectural DNA across the most critical development stacks.
+## What problem does it solve?
 
-| Language | Tier | Fidelity Level |
-| :--- | :--- | :--- |
-| **TypeScript / JS (ESM/CJS)** | Tier 1 | Master (Scoped Identity + Neural Binding) |
-| **Python (PEP-aware)** | Tier 1 | Master (Cross-Module Resolution + Decorators) |
-| **Go** | Tier 1 | Master (Packages, Interfaces, Receivers) |
-| **Rust / C++ / C** | Tier 2 | High (Traits, Structs, Enums, Macros, Headers) |
-| **Java / C#** | Tier 2 | High (Namespaces, Heritage, Attributes) |
-| **PHP / Ruby / Swift** | Tier 2 | High (Traits, Modules, Protocols, Extensions) |
+AI coding assistants like Copilot or Claude typically use vector embeddings to find relevant code. That works fine most of the time, but it breaks down when you need precision: wrong file returned, symbol doesn't exist, circular dependency missed.
 
----
+Conducks replaces that fuzzy search with a real static analysis graph built from your actual AST. Think of it as giving your AI agent a proper architectural map instead of a rough sketch.
 
-## 🚀 3. The 32-Command Functional Suite
-The Conducks CLI is a unified command center for deep structural exploration and project governance.
-
-### 🔍 Discovery & Landscape
-*   **`analyze`**: Full structural induction wave into the Synapse Graph.
-*   **`status`**: Generates a health manifest identifying **Pillars** and **Hotspots**.
-*   **`query`**: Fuzzy and Regex symbol lookup with PageRank-based ranking.
-*   **`list`**: Paginated manifest of symbols across all 8 taxonomic layers.
-*   **`blueprint`**: Auto-generates `BLUEPRINT.md` from the current graph topology.
-
-### ⚡ Behavioral & Kinetic Intelligence
-*   **`trace`**: Risk-Weighted Dijkstra pathfinding between functional symbols.
-*   **`impact`**: Bidirectional **Blast Radius** analysis (Upstream/Downstream).
-*   **`flows`**: Map high-level structural circuits and data handover.
-*   **`resonance`**: Calculate architectural similarity between disjoint modules.
-
-### 🛡️ Conducks Governance & Risk
-*   **`audit`**: Detect "Structural Sins" (Circularities, God Objects, Orphans).
-*   **`guard`**: Regression check to block commits exceeding risk thresholds.
-*   **`explain`**: 6-signal risk decomposition (Gravity, Entropy, Complexity, Churn, etc.).
-*   **`cohesion`**: Measure internal vs external coupling density.
-
----
-
-## 🦾 4. AI Orchestration — Model Context Protocol (MCP)
-Conducks is an **Agent-First** platform. It provides a native **MCP Server** that allows AI agents (like Claude or Antigravity) to navigate your codebase with 100% deterministic accuracy.
-
-### 🚀 Starting the MCP Server
-Launch the server directly from the CLI to bridge your current structural context to your AI assistant:
-```bash
-conducks mcp --root .
+```
+Without Conducks:  "I think getUserById is somewhere in services..."
+With Conducks:     getUserById at src/services/user.ts line 42, called by 7 places, risk score 0.31
 ```
 
-### 🛠️ Agent Integration (Claude Desktop)
-To give your AI agent access to the Conducks 9-Tool suite, add the following to your `claude_desktop_config.json`:
+---
+
+## Who is it for?
+
+| User | How they use it |
+|---|---|
+| **AI agents** (Claude, Antigravity, etc.) | Query symbols, trace call paths, detect regressions via MCP |
+| **Developers** | Explore and understand unfamiliar codebases without reading every file |
+| **Teams** | Enforce architectural rules before merging PRs |
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 18 or higher
+- Git
+
+### 1. Clone and build
+
+```bash
+git clone https://github.com/conducks/conducks
+cd conducks
+npm install && npm run build
+npm link
+```
+
+After `npm link`, the `conducks` command is available globally. The built entry point is at `build/src/interfaces/cli/index.js` inside the repo folder — you'll need that path for the MCP config below.
+
+### 2. Index your project
+
+Go into the project you want to analyze and run:
+
+```bash
+cd /path/to/your/project
+conducks setup
+conducks analyze
+```
+
+This creates a `.conducks/` folder with the structural graph. From here you can use the CLI directly or connect it to an AI agent via MCP.
+
+### 3a. Use the CLI
+
+```bash
+conducks query <name>     # Find a symbol by name
+conducks explain <id>     # Risk breakdown for a symbol
+conducks impact <id>      # What breaks if I change this?
+conducks trace <id>       # Trace execution from a symbol
+conducks audit            # Detect circular deps, god objects, orphans
+conducks status           # Project health summary
+conducks mirror           # Open the visual graph dashboard on port 3333
+```
+
+![Conducks Mirror dashboard](assets/arch.png)
+
+### 3b. Use it with an AI agent (MCP)
+
+Add the following to your agent's MCP config. Replace `/absolute/path/to/conducks` with the path where you cloned the repo (run `pwd` inside the folder to get it).
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
 ```json
 {
   "mcpServers": {
     "conducks": {
-      "command": "conducks",
-      "args": ["mcp", "--root", "/path/to/your/project"]
+      "command": "node",
+      "args": [
+        "/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
+        "mcp"
+      ],
+      "env": {
+        "CONDUCKS_FORCE_RELOAD": "true"
+      },
+      "disabled": false
     }
   }
 }
 ```
 
-### 🛠️ The 9-Tool Agent Suite
-- `conducks_query` | `conducks_status` | `conducks_audit`
-- `conducks_explain` | `conducks_impact` | `conducks_trace`
-- `conducks_diff` | `conducks_rename` | `conducks_guide`
+**Antigravity** (`~/.gemini/antigravity/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "conducks": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
+        "mcp"
+      ],
+      "env": {
+        "CONDUCKS_FORCE_RELOAD": "true"
+      },
+      "disabled": false
+    }
+  }
+}
+```
+
+The agent will now have access to these tools:
+
+| Tool | What it does |
+|---|---|
+| `conducks_query` | Find any symbol by name or pattern |
+| `conducks_status` | Project health summary and entry points |
+| `conducks_explain` | Risk breakdown for a specific symbol |
+| `conducks_impact` | See what breaks if you change a symbol |
+| `conducks_trace` | Trace execution between two symbols |
+| `conducks_audit` | Detect circular deps, god objects, orphans |
+| `conducks_diff` | Structural diff of uncommitted changes |
+| `conducks_rename` | Graph-verified safe rename across the codebase |
+| `conducks_guide` | Architectural guidance and standards |
 
 ---
 
-## 🧬 5. Cerebral Mathematics (The Brain)
-Conducks' intelligence is deterministic, not probabilistic. Every insight is backed by proven algorithms:
-*   **PageRank Gravity**: Determining structural centrality and symbol "Anchors."
-*   **Tarjan’s SCC**: Identifying complex circular cycles at $O(V+E)$ speed.
-*   **Shannon Entropy**: Calculating code uncertainty and bus-factor risks.
-*   **Risk-Weighted Dijkstra**: Finding execution paths via architectural bridge weighting.
-
----
-
-## 🪞 6. Conducks Mirror — Real-Time Discovery
-![Conducks Mirror](assets/arch.png)
-The **Conducks Mirror** on port `3333` offers an interactive, zero-restart graphical exploration of the synapse.
-
-- **Pure Highlight Mode**: Preserves 100% of the graph context; toggling layers dims them to "Shadows" without restarting the simulation.
-- **Luminescent Spotlights**: Real-time visual focus on chosen clusters and trace routes.
-- **Photon Pulse**: Interactive visual pathing along functional execution chains.
-
----
-
-## 🔧 7. Quick Start: Anchoring the Synapse
+## CLI reference
 
 ```bash
-# 1. Initialize the project vault
-conducks setup
-
-# 2. Reflect the structural DNA
-conducks analyze
-
-# 3. Launch the visual discovery dashboard
-conducks mirror
+conducks setup                    # Initialize Conducks in a project
+conducks analyze                  # Parse and index the codebase
+conducks watch                    # Auto-reindex on file changes while you work
+conducks query <name>             # Find a symbol by name
+conducks list                     # List all indexed symbols
+conducks status                   # Project health summary
+conducks explain <id>             # Risk breakdown for a symbol
+conducks impact <id>              # What breaks if I change this?
+conducks trace <id>               # Trace execution from a symbol
+conducks audit                    # Detect circular deps, god objects, orphans
+conducks advise                   # Refactor suggestions based on the graph
+conducks diff                     # Structural diff of uncommitted changes
+conducks rename <id> <new-name>   # Graph-verified safe rename
+conducks guard                    # Block commits if risk threshold exceeded
+conducks blueprint                # Generate BLUEPRINT.md from the graph
+conducks bootstrap-docs <name>    # Scaffold project documentation
+conducks mirror                   # Open the visual graph dashboard
+conducks mcp                      # Start the MCP server
 ```
 
 ---
 
-## 🫂 8. Documentation Standards (Manifest Engine)
-Conducks enforces a 7-file project documentation standard (Vision, Architecture, Implementation, Handover, Conventions, Todo, Memory).
-*   **Command**: `conducks bootstrap-docs [projectName]`
-*   **Location**: `docs/project/[projectName]/`
+## Supported languages
+
+
+| Language | Support level |
+|---|---|
+| TypeScript / JavaScript | Full |
+| Python | Full |
+| Go | Full |
+| Rust / C++ / C | High |
+| Java / C# | High |
+| PHP / Ruby / Swift | High |
 
 ---
-*Manifest v0.8.0 | Conducks Architecture Group*
-🏺💎🛡️
 
+## How it works
+
+1. Conducks uses Tree-sitter to parse every file into an AST
+2. Symbols get extracted and grouped into layers (files, namespaces, classes, functions, variables)
+3. Import and call relationships are resolved to connect the graph
+4. Everything is stored in a local DuckDB database inside `.conducks/`
+5. The CLI, MCP server, and Mirror dashboard all read from the same graph
+6. A file watcher keeps the graph updated as you work
+
+All analysis runs locally. No data leaves your machine.
+
+---
+
+## Docs
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Internal design and layer taxonomy
+- [CHANGELOG.md](./CHANGELOG.md) - Release history
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - How to contribute
+
+---
+
+*v0.8.0 | Apache 2.0 | [conducks.com](https://conducks.com)*
