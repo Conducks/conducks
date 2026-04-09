@@ -193,4 +193,4 @@ All analysis runs locally. No data leaves your machine.
 
 ---
 
-*v0.8.0 | Apache 2.0 | [conducks.com](https://conducks.com)*
+*v0.8.0 | Apache 2.0 |*
