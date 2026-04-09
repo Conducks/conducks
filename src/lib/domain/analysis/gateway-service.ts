@@ -42,7 +42,8 @@ export class GatewayService {
         this.watcher = fs.watch(dbPath, (eventType) => {
           if (eventType === 'change') {
             logger.info("🛡️ [Synapse Watcher] Vault heartbeat detected. Re-resonating graph...");
-            // We delay slightly to allow DuckDB to release any write locks
+            // [Conducks Consistency Check] v2.5.0
+            // We increase the window to 1000ms to ensure complex write transactions are finalized.
             setTimeout(async () => {
               try {
                 await this.persistence.load(this.graph.getGraph());
@@ -50,7 +51,7 @@ export class GatewayService {
               } catch (err) {
                 logger.error("Failed to reload graph on vault change", err);
               }
-            }, 500);
+            }, 1000);
           }
         });
       }
@@ -67,17 +68,17 @@ export class GatewayService {
   }
 
   /**
-   * Hydrates a shallow node with deep metadata (complexity, entropy, resonance).
+   * Hydrates a shallow node with deep structural DNA (complexity, entropy, resonance).
    */
   public async hydrateNode(nodeId: string) {
-    const meat = await this.persistence.fetchNodeMeat(nodeId);
-    if (!meat) return null;
+    const deep = await this.persistence.fetchNodeDeep(nodeId);
+    if (!deep) return null;
     
     // Merge with any in-memory properties if needed
     const node = this.graph.getGraph().getNode(nodeId);
     return {
       ...(node?.properties || {}),
-      ...meat,
+      ...deep,
       isShallow: false
     };
   }

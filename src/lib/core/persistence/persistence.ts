@@ -40,8 +40,8 @@ export class SynapsePersistence {
       // Mode: READ_ONLY — Allows multiple processes if no writer is active.
       // Mode: READ_WRITE — Standard exclusive lock behavior.
       const config = this.readOnly 
-        ? { access_mode: 'READ_ONLY', max_memory: '4GB', threads: '2' } 
-        : { access_mode: 'READ_WRITE', max_memory: '16GB', threads: '8' };
+        ? { access_mode: 'READ_ONLY', max_memory: '512MB', threads: '2' } 
+        : { access_mode: 'READ_WRITE', max_memory: '2GB', threads: '4' };
 
       return await new Promise((resolve, reject) => {
         const attempt = (count: number) => {
@@ -423,19 +423,32 @@ export class SynapsePersistence {
     const db = await this.connect();
     if (!db) return false;
     try {
-      // 🛡️ [Conducks State-Sync] We now load the entire structural constellation.
-      // Since 'id' is the PK, we always get the latest version of every symbol.
-      const nodes: any[] = await this.query("SELECT * FROM nodes");
-      const edges: any[] = await this.query("SELECT * FROM edges");
+      // 🛡️ [Conducks Shallow Sync] v2.5.0 🏺
+      // We only load the structural "Shell" into memory. 
+      // Heavy JSON columns (dna, kinetic, metadata) are excluded to preserve RAM.
+      const shallowCols = "id, pulseId, canonicalKind, canonicalRank, semantic_kind, name, file, lineStart, lineEnd, parentId, rootId, namespaceId, unitId, structureId, layer_path, depth, risk, gravity, complexity, isEntryPoint, visibility";
+      
+      const nodes: any[] = await this.query(`SELECT ${shallowCols} FROM nodes`);
+      const edges: any[] = await this.query("SELECT id, pulseId, sourceId, targetId, category, type, weight, confidence, lineNumber FROM edges");
+      
       if (nodes.length === 0) return false;
 
       if (!append) (graph as any).clear();
       
       nodes.forEach(n => {
-        const props = { ...JSON.parse(n.metadata || '{}'), ...n, dna: JSON.parse(n.dna || '{}'), signature: JSON.parse(n.signature || '{}'), kinetic: JSON.parse(n.kinetic || '{}') };
+        // Conducks Rule: Nodes start 'Shallow'. Deep properties are fetched on demand.
+        const props = { ...n, isShallow: true };
         graph.addNode({ id: n.id, label: n.canonicalKind, properties: props });
       });
-      edges.forEach(e => graph.addEdge({ id: e.id, sourceId: e.sourceId, targetId: e.targetId, type: e.type, confidence: e.confidence, properties: JSON.parse(e.properties || '{}') }));
+      edges.forEach(e => graph.addEdge({ 
+        id: e.id, 
+        sourceId: e.sourceId, 
+        targetId: e.targetId, 
+        type: e.type, 
+        confidence: e.confidence, 
+        category: e.category, 
+        properties: {} 
+      } as any));
       
       return true;
     } catch (err) { 
@@ -449,12 +462,23 @@ export class SynapsePersistence {
     }
   }
 
-  public async fetchNodeMeat(id: string): Promise<any> {
+  public async fetchNodeDeep(id: string): Promise<any> {
     const db = await this.connect(); if (!db) return null;
     try {
-      const row: any = await this.query("SELECT metadata FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1", [id.toLowerCase()]);
-      const result = row && row[0] ? JSON.parse(row[0].metadata) : null;
-      return result;
+      // 🛡️ [Conducks Deep Hydration] 🏺
+      // Fetches the full structural DNA and kinetic blame logs for a single symbol.
+      const row: any = await this.query("SELECT * FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1", [id.toLowerCase()]);
+      if (!row || !row[0]) return null;
+      
+      const n = row[0];
+      return { 
+        ...n, 
+        dna: JSON.parse(n.dna || '{}'), 
+        signature: JSON.parse(n.signature || '{}'), 
+        kinetic: JSON.parse(n.kinetic || '{}'),
+        metadata: JSON.parse(n.metadata || '{}'),
+        isShallow: false 
+      };
     } catch (err) {
       return null;
     }
