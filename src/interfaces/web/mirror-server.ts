@@ -44,14 +44,19 @@ export class MirrorServer {
     });
 
     // v2.0.0 Gateway: Unified Synapse Exploration
-    this.app.get('/api/synapse', (req, res) => {
-      const { layers, clusters, spread } = req.query;
+    this.app.get('/api/synapse', async (req, res) => {
+      const { layers, clusters, spread, compact } = req.query;
       const l = layers ? (layers as string).split(',').map(n => parseInt(n, 10)) : undefined;
       const c = clusters ? (clusters as string).split(',') : undefined;
       const s = spread ? parseInt(spread as string, 10) : undefined;
-      
-      const wave = this.gateway.getWave(l, c, s);
-      res.json(wave);
+      const compactFlag = compact === '1' || compact === 'true' || compact === 'yes';
+
+      try {
+        const wave = await this.gateway.getWave(l, c, s, compactFlag);
+        res.json(wave);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to build wave.' });
+      }
     });
 
     // v2.0.0 Gateway: Reactive Hydration

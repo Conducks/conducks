@@ -63,7 +63,17 @@ export class GatewayService {
   /**
    * Generates a high-fidelity visual wave for the dashboard.
    */
-  public getWave(layers?: number[], clusters?: string[], spread?: number) {
+  public async getWave(layers?: number[], clusters?: string[], spread?: number, compact: boolean = false) {
+    if (compact) {
+      // Bypass heavy in-memory engine and return a compact DB-driven wave
+      try {
+        return await (this.persistence as any).getCompactWave(layers, clusters, spread);
+      } catch (err) {
+        logger.error('Failed to build compact wave', err);
+        return { nodes: [], edges: [] };
+      }
+    }
+
     return this.mirrorEngine.getVisualWave(layers, clusters, spread);
   }
 

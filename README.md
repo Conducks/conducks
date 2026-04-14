@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # 🏺 Conducks
 
 > **Maps your entire codebase into a queryable graph. No embeddings, no guessing.**
@@ -21,11 +23,11 @@ With Conducks:     getUserById at src/services/user.ts line 42, called by 7 plac
 
 ## Who is it for?
 
-| User | How they use it |
-|---|---|
-| **AI agents** (Claude, Antigravity, etc.) | Query symbols, trace call paths, detect regressions via MCP |
-| **Developers** | Explore and understand unfamiliar codebases without reading every file |
-| **Teams** | Enforce architectural rules before merging PRs |
+| User                                      | How they use it                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| **AI agents** (Claude, Antigravity, etc.) | Query symbols, trace call paths, detect regressions via MCP            |
+| **Developers**                            | Explore and understand unfamiliar codebases without reading every file |
+| **Teams**                                 | Enforce architectural rules before merging PRs                         |
 
 ---
 
@@ -81,19 +83,19 @@ Add the following to your agent's MCP config. Replace `/absolute/path/to/conduck
 
 ```json
 {
-  "mcpServers": {
-    "conducks": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
-        "mcp"
-      ],
-      "env": {
-        "CONDUCKS_FORCE_RELOAD": "true"
-      },
-      "disabled": false
-    }
-  }
+	"mcpServers": {
+		"conducks": {
+			"command": "node",
+			"args": [
+				"/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
+				"mcp"
+			],
+			"env": {
+				"CONDUCKS_FORCE_RELOAD": "true"
+			},
+			"disabled": false
+		}
+	}
 }
 ```
 
@@ -101,35 +103,35 @@ Add the following to your agent's MCP config. Replace `/absolute/path/to/conduck
 
 ```json
 {
-  "mcpServers": {
-    "conducks": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
-        "mcp"
-      ],
-      "env": {
-        "CONDUCKS_FORCE_RELOAD": "true"
-      },
-      "disabled": false
-    }
-  }
+	"mcpServers": {
+		"conducks": {
+			"command": "node",
+			"args": [
+				"/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
+				"mcp"
+			],
+			"env": {
+				"CONDUCKS_FORCE_RELOAD": "true"
+			},
+			"disabled": false
+		}
+	}
 }
 ```
 
 The agent will now have access to these tools:
 
-| Tool | What it does |
-|---|---|
-| `conducks_query` | Find any symbol by name or pattern |
-| `conducks_status` | Project health summary and entry points |
-| `conducks_explain` | Risk breakdown for a specific symbol |
-| `conducks_impact` | See what breaks if you change a symbol |
-| `conducks_trace` | Trace execution between two symbols |
-| `conducks_audit` | Detect circular deps, god objects, orphans |
-| `conducks_diff` | Structural diff of uncommitted changes |
-| `conducks_rename` | Graph-verified safe rename across the codebase |
-| `conducks_guide` | Architectural guidance and standards |
+| Tool               | What it does                                   |
+| ------------------ | ---------------------------------------------- |
+| `conducks_query`   | Find any symbol by name or pattern             |
+| `conducks_status`  | Project health summary and entry points        |
+| `conducks_explain` | Risk breakdown for a specific symbol           |
+| `conducks_impact`  | See what breaks if you change a symbol         |
+| `conducks_trace`   | Trace execution between two symbols            |
+| `conducks_audit`   | Detect circular deps, god objects, orphans     |
+| `conducks_diff`    | Structural diff of uncommitted changes         |
+| `conducks_rename`  | Graph-verified safe rename across the codebase |
+| `conducks_guide`   | Architectural guidance and standards           |
 
 ---
 
@@ -160,17 +162,26 @@ conducks mcp                      # Start the MCP server
 
 ## Supported languages
 
-
-| Language | Support level |
-|---|---|
-| TypeScript / JavaScript | Full |
-| Python | Full |
-| Go | Full |
-| Rust / C++ / C | High |
-| Java / C# | High |
-| PHP / Ruby / Swift | High |
+| Language                | Support level |
+| ----------------------- | ------------- |
+| TypeScript / JavaScript | Full          |
+| Python                  | Full          |
+| Go                      | Full          |
+| Rust / C++ / C          | High          |
+| Java / C#               | High          |
+| PHP / Ruby / Swift      | High          |
 
 ---
+
+## Language analysis feature matrix
+
+This table shows the core analysis features supported per language. A check (✓) indicates the capability is implemented for the given language.
+
+| Language   | Imports | Named Bindings | Exports | Heritage | Type Annotations | Constructor Inference | Config | Frameworks | Entry Points |
+| ---------- | ------: | -------------: | ------: | -------: | ---------------: | --------------------: | -----: | ---------: | -----------: |
+| TypeScript |       ✓ |              ✓ |       ✓ |        ✓ |                ✓ |                     ✓ |      ✓ |          ✓ |            ✓ |
+
+Further detail and a machine-readable feature matrix for TypeScript are available in `docs/analysis/ts-feature-matrix.json`.
 
 ## How it works
 
@@ -193,4 +204,4 @@ All analysis runs locally. No data leaves your machine.
 
 ---
 
-*v0.8.0 | Apache 2.0 |*
+_v0.8.0 | Apache 2.0 |_

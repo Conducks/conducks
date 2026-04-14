@@ -2,6 +2,7 @@ import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/ba
 import { TYPESCRIPT_QUERIES } from "./queries.js";
 import { TypeScriptResolver } from "./resolver.js";
 import { TypeScriptExtractor } from "./extractor.js";
+import { TypeScriptBindings } from "./bindings.js";
 
 /**
  * Conducks — High-Fidelity TypeScript & JavaScript Language Provider (Suite v3) 🏺 🟦
@@ -17,6 +18,7 @@ export class TypeScriptProvider extends NativeProvider {
 
   private resolver = new TypeScriptResolver();
   private extractor = new TypeScriptExtractor();
+  private bindings = new TypeScriptBindings();
 
   public readonly queryScm = TYPESCRIPT_QUERIES;
 
@@ -57,29 +59,11 @@ export class TypeScriptProvider extends NativeProvider {
   }
 
   /**
-   * Extracts specific named bindings from an import statement.
+   * Extracts specific named bindings from an import or export node.
    */
-  public extractNamedBindings(node: any): Array<{ name: string; alias?: string }> {
-    const bindings: Array<{ name: string; alias?: string }> = [];
-
-    const findSpecifiers = (node: any) => {
-      if (node.type === 'import_specifier') {
-        const nameNode = node.childByFieldName('name');
-        const aliasNode = node.childByFieldName('alias');
-        if (nameNode) {
-          bindings.push({
-            name: nameNode.text,
-            alias: aliasNode ? aliasNode.text : nameNode.text
-          });
-        }
-      }
-      for (let i = 0; i < node.childCount; i++) {
-        findSpecifiers(node.child(i));
-      }
-    };
-
-    findSpecifiers(node);
-    return bindings;
+  public extractNamedBindings(node: any): Array<{ name: string; alias?: string; from?: string }> {
+    const raw = this.bindings.extract(node);
+    return raw.map(b => ({ name: b.exported, alias: b.local === b.exported ? undefined : b.local, from: (b as any).from }));
   }
 }
 

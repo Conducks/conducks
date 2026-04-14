@@ -55,18 +55,23 @@ export class ConducksRegistry {
       // Conducks Lazy Resonance: Wrap tool handler to ensure database connection yields
       const originalHandler = tool.handler;
       tool.handler = async (args: any) => {
-        // Conducks Self-Aware Resonance: Resolve root relative to script if process.cwd() is root
-        let rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-        if (rootPath === "/" || !rootPath || !fs.existsSync(path.join(rootPath, "package.json"))) {
-          rootPath = path.resolve(__dirname, "../../../../");
-          console.error(`[Conducks] CWD is root or invalid. Auto-resolving to script-relative root: ${rootPath}`);
-        }
+        // Conducks: Dynamic Root Discovery
+        // We prioritize the 'path' argument from the tool call, then the environment, then CWD.
+        const requestPath = args.path || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+        
         try {
-          // Conducks Lazy Resonance: Handlers now rely on the persistent CLI-level initialization
+          // Conducks High-Fidelity Pivot: Re-anchor the structural synapse to the requested path.
+          // The RegistryBootstrapper ensures this is a no-op if we are already anchored correctly.
+          await registry.initialize(true, requestPath);
+          
           return await originalHandler(args);
         } catch (err: any) {
           console.error(`[Conducks] Tool Handler Error: ${err.message}`);
           throw err;
+        } finally {
+          // 🛡️ [Vault Hardening] Always close the synapse connection after a tool call.
+          // This prevents DB locking when the user tries to run CLI commands concurrently.
+          await (registry.infrastructure.persistence as any).close();
         }
       };
     }

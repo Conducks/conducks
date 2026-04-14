@@ -86,7 +86,8 @@ export async function main() {
   commands.push(new HelpCommand(commands));
 
   const command = commands.find(c => c.id === commandId);
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean'].includes(commandId);
+  // Mirror is a live visualizer and should avoid forcing a full structural load.
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'mirror'].includes(commandId);
 
   if (command) {
     try {

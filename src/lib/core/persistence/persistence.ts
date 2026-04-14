@@ -484,6 +484,40 @@ export class SynapsePersistence {
     }
   }
 
+  /**
+   * Returns a compact visual wave optimized for the Mirror UI.
+   * Nodes are returned with a numeric index to drastically reduce memory
+   * usage when building client-side graphs. Edges are returned as
+   * numeric pairs {s,t} referencing the node indices.
+   */
+  public async getCompactWave(layers?: number[], clusters?: string[], spread?: number): Promise<any> {
+    const db = await this.connect();
+    if (!db) return { nodes: [], edges: [] };
+
+    // Fetch shallow node list (only what we need for visualization)
+    const rows: any[] = await this.query(`SELECT id, name, canonicalKind FROM nodes`);
+
+    const idIndex = new Map<string, number>();
+    const nodes = rows.map((r, idx) => {
+      const id = (r.id || '').toString();
+      idIndex.set(id, idx);
+      return { idx, id, name: r.name || '', kind: r.canonicalKind || '' };
+    });
+
+    // Fetch edges and convert to numeric indices
+    const edgeRows: any[] = await this.query(`SELECT sourceId, targetId FROM edges`);
+    const edges: Array<{ s: number; t: number }> = [];
+    for (const e of edgeRows) {
+      const sId = (e.sourceId || '').toString();
+      const tId = (e.targetId || '').toString();
+      const s = idIndex.get(sId);
+      const t = idIndex.get(tId);
+      if (s !== undefined && t !== undefined) edges.push({ s, t });
+    }
+
+    return { nodes, edges };
+  }
+
   public async clean(pulseIdToKeep?: string): Promise<void> {
     const db = await this.connect();
     if (!db) return;

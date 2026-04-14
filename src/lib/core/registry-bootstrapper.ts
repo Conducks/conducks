@@ -27,8 +27,7 @@ export class RegistryBootstrapper {
    * Autonomously resolves the nearest project root.
    */
   public discoverRoot(startPath: string): string {
-    const binaryAnchor = path.dirname(__filename);
-    const searchPaths = [startPath, binaryAnchor];
+    const searchPaths = [startPath];
     const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
 
     for (const start of searchPaths) {
@@ -66,8 +65,8 @@ export class RegistryBootstrapper {
     }
     
     // If we've reached the system root without finding a marker, 
-    // fallback to process.cwd() to avoid anchoring at '/'
-    return process.cwd();
+    // fallback to the explicitly requested startPath or process.cwd()
+    return startPath ? path.resolve(startPath) : process.cwd();
   }
 
   /**
