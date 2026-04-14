@@ -65,7 +65,11 @@ export async function main() {
   const pathArg = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
   const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
-  const isReadCommand = ['diff', 'explain', 'status', 'list', 'context', 'audit', 'mcp', 'guard'].includes(commandId);
+  const isReadCommand = [
+    'diff', 'explain', 'status', 'list', 'context', 'audit', 'mcp', 'guard', 
+    'mirror', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows', 
+    'query', 'visualize', 'blueprint', 'context-gen', 'drift', 'entry'
+  ].includes(commandId);
   const persistence = new GraphPersistence(targetPath, isReadCommand);
   
   chronicle.setProjectDir(targetPath);
