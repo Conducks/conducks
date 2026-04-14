@@ -19,7 +19,7 @@ export class MirrorEngine implements ConducksComponent {
    * 
    * v1.5.0: Professional Command Center & Adaptive Scaling.
    */
-  public getVisualWave(visibleLayers: number[] = [0, 1, 2, 3, 4, 5], visibleClusters: string[] = [], spread: number = 1200) {
+  public getVisualWave(visibleLayers: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8], visibleClusters: string[] = [], spread: number = 1200) {
     const g = this.graph as any;
     const layerSet = new Set(visibleLayers);
     const clusterSet = new Set(visibleClusters);
@@ -144,6 +144,14 @@ export class MirrorEngine implements ConducksComponent {
       const orbitRadius = orbitLayer * 60; // 60px between orbits
       const angle = (indexInOrbit / nodesInThisOrbit) * 2 * Math.PI;
 
+      const isNoiseHub = n.id && (
+        n.id.includes('typing.py') || 
+        n.id.includes('logging') ||
+        n.id.includes('builtins') || 
+        n.id.includes('__init__.py') ||
+        n.id.includes('node_modules')
+      );
+
       return {
         id: n.id,
         name: n.properties.displayName || n.properties.name || n.id.split('::').pop(),
@@ -155,7 +163,7 @@ export class MirrorEngine implements ConducksComponent {
         clusterX: clusterInfo.x,
         clusterY: clusterInfo.y,
         degree,
-        mass: 1 + (degree / 10),
+        mass: isNoiseHub ? 0.01 : 1 + (degree / 10),
         // Seeding (Initial State)
         x: (clusterInfo.x || 0) + orbitRadius * Math.cos(angle),
         y: (clusterInfo.y || 0) + orbitRadius * Math.sin(angle),
@@ -209,7 +217,11 @@ export class MirrorEngine implements ConducksComponent {
     return { 
       nodes: visualNodes, 
       links, 
-      clusters: Array.from(clusterCenters.keys()).map(id => ({ id, ...clusterCenters.get(id) })) 
+      clusters: Array.from(clusterCenters.keys()).map(id => ({ 
+        id, 
+        count: clusterNodeCounts.get(id) || 0,
+        ...clusterCenters.get(id) 
+      })) 
     };
   }
 

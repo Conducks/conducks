@@ -40,8 +40,12 @@ export const TYPESCRIPT_QUERIES = `
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
   
   ;; --- Kinesis (Execution Flow) ---
-  (call_expression function: [(identifier) (member_expression) (super)] @kinesis_target)
-  (new_expression constructor: (identifier) @kinesis_target)
+  (call_expression 
+    function: [(identifier) (member_expression) (super)] @kinesis_target
+    arguments: (arguments (_) @kinesis_arg))
+  (new_expression 
+    constructor: (identifier) @kinesis_target
+    arguments: (arguments (_) @kinesis_arg))
   
   ;; --- Metadata & Debt ---
   (comment) @docs

@@ -4,23 +4,26 @@
  */
 
 const Graph = ForceGraph()(document.getElementById('graph-container'));
+let hoverNode = null;
 
 // v2.5.0: High-Definition Shared Structural State
 window.MirrorState = {
   activeWave: null,
-  selectedLayers: [0, 1, 2, 3, 4, 5, 6],
+  selectedLayers: [0, 1, 2, 3, 4, 5, 6, 7, 8],
   selectedClusters: [],
   focusNodes: new Set(),
   focusLinks: new Set(),
   lastSelectedNode: null,
   layers: [
     { id: 0, name: 'Ecosystem', color: '#60a5fa' },
-    { id: 1, name: 'Namespaces', color: '#818cf8' },
-    { id: 2, name: 'Units (Files)', color: '#22d3ee' },
-    { id: 3, name: 'Infrastructure', color: '#fcd34d' },
-    { id: 4, name: 'Structures', color: '#c084fc' },
-    { id: 5, name: 'Behaviors', color: '#4ade80' },
-    { id: 6, name: 'Atoms', color: '#fb923c' }
+    { id: 1, name: 'Repositories', color: '#3b82f6' },
+    { id: 2, name: 'Namespaces', color: '#818cf8' },
+    { id: 3, name: 'Units (Files)', color: '#22d3ee' },
+    { id: 4, name: 'Infrastructure', color: '#fcd34d' },
+    { id: 5, name: 'Structures', color: '#c084fc' },
+    { id: 6, name: 'Behaviors', color: '#4ade80' },
+    { id: 7, name: 'Atoms', color: '#fb923c' },
+    { id: 8, name: 'Data', color: '#f43f5e' }
   ],
   edgeColors: {
     'MEMBER_OF': '#484f5866',
@@ -36,9 +39,10 @@ window.MirrorState = {
 
 async function refreshSynapse() {
   try {
-    // v3.0: Zero-Restart Context Sync. 
-    // We fetch ALL layers permanently to allow for instantaneous client-side filtering.
-    const layers = "0,1,2,3,4,5,6";
+    // True Structural Contraction: Send exact visible layers to the NVP engine
+    const layers = window.MirrorState.selectedLayers.length > 0 
+      ? window.MirrorState.selectedLayers.join(',') 
+      : "0,1,2,3,4,5,6,7,8";
     const spread = document.getElementById('ctrl-spread')?.value || '1200';
     let url = `/api/synapse?layers=${layers}&spread=${spread}`;
 
@@ -93,9 +97,18 @@ function applyForces() {
   Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(gravity));
   Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(gravity));
   Graph.d3Force('collide', d3.forceCollide(node => {
-     // Respect visibility for collision? No, stay stable.
-     const size = Math.max((node.rank || 0.1) * 32, 8);
-     return size * 1.6;
+     const level = Number(node.level);
+     let size = 6;
+     if (level === 0) size = 42;
+     else if (level === 1) size = 36;
+     else if (level === 2) size = 32;
+     else if (level === 3) size = 26;
+     else if (level === 4) size = 20;
+     else if (level === 5) size = 16;
+     else if (level === 6) size = 12;
+     else if (level === 7) size = 8;
+     else if (level === 8) size = 6;
+     return size * 1.4;
   }).strength(1));
 }
 
@@ -115,29 +128,45 @@ function configureGraph() {
        return 0.1 + (Math.abs(hash % 100) / 100) * 0.3;
     })
     .linkWidth(link => {
+       const sNode = typeof link.source === 'object' ? link.source : null;
+       const tNode = typeof link.target === 'object' ? link.target : null;
+       const isHighlighted = hoverNode && (sNode?.id === hoverNode.id || tNode?.id === hoverNode.id);
+
+       if (isHighlighted) return 2.0;
+
        const category = link.category || 'STRUCTURAL';
        return (category === 'LINEAGE' || category === 'STRUCTURAL') ? 1.0 : 0.4;
     })
     .linkColor(link => {
-       // 🕵️ DYNAMIC LINK SHADOWING (v3.1)
+       // 🕵️ DYNAMIC LINK SHADOWING & HOVERING
        const sNode = typeof link.source === 'object' ? link.source : null;
        const tNode = typeof link.target === 'object' ? link.target : null;
        
        let isShadowed = false;
+       let isHoveredEdge = false;
+
        if (sNode && tNode) {
          const sSelected = window.MirrorState.selectedLayers.includes(Number(sNode.level));
          const tSelected = window.MirrorState.selectedLayers.includes(Number(tNode.level));
          isShadowed = !sSelected || !tSelected;
+         
+         if (hoverNode && (sNode.id === hoverNode.id || tNode.id === hoverNode.id)) {
+           isHoveredEdge = true;
+         }
        }
 
-       const baseAlpha = isShadowed ? '10' : '60'; // Dim to 0.06 if bridged by shadow layer
-       const category = link.category || 'STRUCTURAL';
-       
-       if (category === 'LINEAGE' || category === 'STRUCTURAL') return `rgba(139, 148, 158, ${isShadowed ? 0.08 : 0.4})`;
+       if (isHoveredEdge) {
+         return '#ffffffcc'; // Bright white highlight for hovered edges
+       }
+
+       const category = link.category || 'STRUCTURAL';     
+       if (category === 'LINEAGE' || category === 'STRUCTURAL') {
+         return `rgba(139, 148, 158, ${isShadowed ? 0.05 : 0.15})`; // Low un-hovered opacity
+       }
        
        const edgeColors = window.MirrorState.edgeColors || {};
        const baseColor = edgeColors[link.type] || '#2f81f7';
-       return baseColor + (isShadowed ? '08' : '30'); 
+       return baseColor + (isShadowed ? '05' : '15'); 
     })
     .linkDirectionalParticles(link => window.MirrorState.focusLinks.size > 0 && window.MirrorState.focusLinks.has(link) ? 6 : 0)
     .linkDirectionalParticleSpeed(0.01)
@@ -149,15 +178,29 @@ function configureGraph() {
       const isLayerSelected = window.MirrorState.selectedLayers.includes(nodeLevelValue);
       const isClusterSelected = window.MirrorState.selectedClusters.includes(node.clusterId);
       const isTraceFocus = window.MirrorState.focusNodes.size > 0 && window.MirrorState.focusNodes.has(node.id);
+      const isHovered = hoverNode && hoverNode.id === node.id;
       
-      const size = Math.max((node.rank || 0.1) * 28, 6);
-      const color = node.clusterColor || '#9ca3af';
+      // 📐 EXPLICIT LAYER SIZING
+      let size = 6;
+      if (nodeLevelValue === 0) size = 42; // Ecosystem
+      else if (nodeLevelValue === 1) size = 36; // Repo
+      else if (nodeLevelValue === 2) size = 32; // Namespace
+      else if (nodeLevelValue === 3) size = 26; // Unit
+      else if (nodeLevelValue === 4) size = 20; // Infra
+      else if (nodeLevelValue === 5) size = 16; // Structure
+      else if (nodeLevelValue === 6) size = 12; // Behavior
+      else if (nodeLevelValue === 7) size = 8;  // Atom
+      else if (nodeLevelValue === 8) size = 6;  // Data
+      
+      // 🎨 EXPLICIT LAYER COLORING
+      const layerConfig = window.MirrorState.layers.find(l => l.id === nodeLevelValue);
+      const color = layerConfig ? layerConfig.color : '#9ca3af';
       
       // All nodes stay visible, unselected layers become 'Shadows'
-      ctx.globalAlpha = isLayerSelected ? 1.0 : 0.1;
+      ctx.globalAlpha = isLayerSelected ? (isHovered ? 1.0 : 0.9) : 0.1;
 
       // 🌟 LUMINESCENT GLOW (Behind the node)
-      if (isClusterSelected || isTraceFocus) {
+      if (isClusterSelected || isTraceFocus || isHovered) {
         ctx.beginPath();
         const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, size * 3.5);
         gradient.addColorStop(0, color);
@@ -188,7 +231,7 @@ function configureGraph() {
       ctx.fill();
       
       // 💎 HIGH-CONTRAST BORDER
-      if (isClusterSelected || isTraceFocus) {
+      if (isClusterSelected || isTraceFocus || isHovered) {
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 3 / globalScale;
         ctx.stroke();
@@ -207,19 +250,64 @@ function configureGraph() {
       const adaptiveSize = baseFontSize / globalScale;
       let showText = globalScale > 1.2 || (node.degree > 8 && globalScale > 0.4);
       
-      if (showText) {
+      if (showText || isHovered) {
         ctx.font = `600 ${adaptiveSize}px var(--font)`;
-        ctx.fillStyle = (isClusterSelected || isTraceFocus) ? '#fff' : `rgba(201, 209, 217, ${isLayerSelected ? 0.8 : 0.2})`;
+        ctx.fillStyle = (isClusterSelected || isTraceFocus || isHovered) ? '#fff' : `rgba(201, 209, 217, ${isLayerSelected ? 0.8 : 0.2})`;
         ctx.textAlign = 'center';
         ctx.fillText(node.name, node.x, node.y + size + adaptiveSize + 4);
       }
     })
     .onNodeClick(node => focusSubgraph(node))
+    .onNodeHover(node => {
+      if ((!node && !hoverNode) || (node && hoverNode && node.id === hoverNode.id)) return;
+      hoverNode = node;
+      
+      // Force refresh of link styles to apply highlighting
+      Graph.linkWidth(Graph.linkWidth());
+      Graph.linkColor(Graph.linkColor());
+
+      // Pulse redraw to apply hover styles instantly
+      if (Graph.d3AlphaTarget) {
+        Graph.d3AlphaTarget(0.1).restart();
+        setTimeout(() => Graph.d3AlphaTarget(0), 100);
+      }
+    })
     .onBackgroundClick(() => resetFocus());
 
-  Graph.d3Force('charge').strength(-2000);
-  Graph.d3Force('link').distance(l => l.category === 'LINEAGE' ? 40 : 150).strength(0.8);
-  Graph.d3VelocityDecay(0.45);
+  const linkForce = Graph.d3Force('link');
+  if (linkForce) {
+    linkForce
+      .distance(l => {
+        const type = l.type || 'UNKNOWN';
+        if (type === 'MEMBER_OF' || type === 'CONTAINS') return 40;
+        if (type === 'IMPORTS' || type === 'CALLS') return 350;
+        return 150;
+      })
+      .strength(l => {
+        const type = l.type || 'UNKNOWN';
+        const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+        const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+        
+        // 🛡️ NOISE HUB DAMPING (The typing.py Savior)
+        const isNoiseHub = (id) => id && (
+          id.includes('typing.py') || 
+          id.includes('logging') ||
+          id.includes('builtins') || 
+          id.includes('__init__.py') ||
+          id.includes('node_modules') ||
+          id.includes('json')
+        );
+
+        if (isNoiseHub(targetId) || isNoiseHub(sourceId)) return 0.005; // Dropped from 0.01 to 0.005
+        
+        if (type === 'MEMBER_OF' || type === 'CONTAINS') return 1.0; // Stiff structural spine
+        if (type === 'IMPORTS' || type === 'CALLS') return 0.02; // Dropped from 0.05 to 0.02
+        return 0.1;
+      });
+  }
+
+  Graph.d3Force('charge').strength(-5000); // Increased from -3000
+  Graph.d3VelocityDecay(0.35); // Dropped decay to allow more movement for unbraiding
 }
 
 function focusSubgraph(node) {

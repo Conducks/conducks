@@ -114,6 +114,9 @@ async function runWorker(data: any, isFork: boolean = false) {
 
     try {
       const spectrum = await reflector.reflect(unit, provider, context, allPaths);
+      if (process.env.CONDUCKS_DEBUG === '1') {
+        console.log(`🛡️ [PulseWorker] ${path.basename(unit.path)} structural emission: ${spectrum.nodes.length} symbols.`);
+      }
       
       // Return captured state for worker-to-main reduction
       const state = context.exportState();

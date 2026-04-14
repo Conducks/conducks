@@ -62,6 +62,10 @@ body {
   transition: var(--transition-smooth);
 }
 
+.command-deck.collapsed {
+  width: 64px;
+}
+
 /* 🧬 DECK RAIL (Internal Nav) */
 .deck-rail {
   width: 64px;
@@ -72,6 +76,13 @@ body {
   align-items: center;
   padding: var(--spacing-air) 0;
   gap: 12px;
+}
+
+.rail-divider {
+  width: 20px;
+  height: 1px;
+  background: var(--glass-border);
+  margin: 4px 0;
 }
 
 .rail-spacer {
@@ -123,6 +134,20 @@ body {
   flex-direction: column;
   overflow-y: auto;
   position: relative;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.command-deck.collapsed .deck-content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.command-deck.collapsed #btn-collapse svg {
+  transform: rotate(180deg);
+}
+
+#btn-collapse svg {
+  transition: var(--transition-smooth);
 }
 
 .slate-header {

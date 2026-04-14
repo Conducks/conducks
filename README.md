@@ -2,17 +2,17 @@
 
 # 🏺 Conducks
 
-> **Maps your entire codebase into a queryable graph. No embeddings, no guessing.**
+> **The 9-Layer Architectural Intelligence Map for your codebase. No embeddings, no guessing.**
 
-Conducks parses your source code with Tree-sitter, extracts every symbol (functions, classes, routes, variables), and stores everything in a local DuckDB graph that stays in sync with your repo. Any AI agent or developer can then ask precise questions about your codebase and get exact, graph-verified answers.
+Conducks parses your source code with Tree-sitter and its evolution-grade **Gnosis Resilience Engine**, extracting every symbol from the **Ecosystem** down to the **Data** layer. It stores everything in a local DuckDB structural vault that stays in sync with your repo. Any AI agent or developer can then ask precise questions about your codebase and get exact, graph-verified answers.
 
 ---
 
 ## What problem does it solve?
 
-AI coding assistants like Copilot or Claude typically use vector embeddings to find relevant code. That works fine most of the time, but it breaks down when you need precision: wrong file returned, symbol doesn't exist, circular dependency missed.
+AI coding assistants typically use vector embeddings to find relevant code. That works fine for general snippets, but it breaks down when you need **Architectural Fidelity**: wrong file returned, symbol doesn't exist, or deep call-chains are missed.
 
-Conducks replaces that fuzzy search with a real static analysis graph built from your actual AST. Think of it as giving your AI agent a proper architectural map instead of a rough sketch.
+Conducks replaces that fuzzy search with a deterministic structural graph built from your actual AST. By using the **Gnosis Resilience Bridge**, Conducks extracts semantic behavior (CALLS, IMPORTS) even in unstable environments where native parsers might fail. Think of it as giving your AI agent a high-resolution orbital map of your system instead of a rough sketch.
 
 ```
 Without Conducks:  "I think getUserById is somewhere in services..."
@@ -125,12 +125,13 @@ The agent will now have access to these tools:
 | ------------------ | ---------------------------------------------- |
 | `conducks_query`   | Find any symbol by name or pattern             |
 | `conducks_status`  | Project health summary and entry points        |
-| `conducks_explain` | Risk breakdown for a specific symbol           |
+| `conducks_explain` | 6-Signal Risk breakdown for a specific symbol   |
 | `conducks_impact`  | See what breaks if you change a symbol         |
 | `conducks_trace`   | Trace execution between two symbols            |
 | `conducks_audit`   | Detect circular deps, god objects, orphans     |
 | `conducks_diff`    | Structural diff of uncommitted changes         |
 | `conducks_rename`  | Graph-verified safe rename across the codebase |
+| `conducks_guard`   | Block commits if structural risk is too high   |
 | `conducks_guide`   | Architectural guidance and standards           |
 
 ---
@@ -180,17 +181,36 @@ This table shows the core analysis features supported per language. A check (✓
 | Language   | Imports | Named Bindings | Exports | Heritage | Type Annotations | Constructor Inference | Config | Frameworks | Entry Points |
 | ---------- | ------: | -------------: | ------: | -------: | ---------------: | --------------------: | -----: | ---------: | -----------: |
 | TypeScript |       ✓ |              ✓ |       ✓ |        ✓ |                ✓ |                     ✓ |      ✓ |          ✓ |            ✓ |
+| Python     |       ✓ |              ✓ |       ✓ |        ✓ |                ✓ |                     ✓ |      ✓ |          ✓ |            ✓ |
+| Go         |       ✓ |              ✓ |       ✓ |        ✓ |                ✓ |                     ✓ |      ✓ |          ✓ |            ✓ |
 
 Further detail and a machine-readable feature matrix for TypeScript are available in `docs/analysis/ts-feature-matrix.json`.
 
+## The 9-Layer Canonical Taxonomy
+
+Conducks organizes your codebase into 9 distinct levels of architectural depth:
+
+| Rank | Kind | Description |
+| :--- | :--- | :--- |
+| **0** | **ECOSYSTEM** | Cross-repo dependencies and third-party packages |
+| **1** | **REPOSITORY** | The current project or microservice boundary |
+| **2** | **NAMESPACE** | Folders, modules, and logical groupings |
+| **3** | **UNIT** | Individual source files |
+| **4** | **INFRA** | Key architectural hubs (Services, Runners, Routers) |
+| **5** | **STRUCTURE** | Standard classes, models, and data types |
+| **6** | **BEHAVIOR** | Methods, functions, and execution logic |
+| **7** | **ATOM** | Variables, constants, and atomic literals |
+| **8** | **DATA** | Persistent records and data-store interactions |
+
+---
+
 ## How it works
 
-1. Conducks uses Tree-sitter to parse every file into an AST
-2. Symbols get extracted and grouped into layers (files, namespaces, classes, functions, variables)
-3. Import and call relationships are resolved to connect the graph
-4. Everything is stored in a local DuckDB database inside `.conducks/`
-5. The CLI, MCP server, and Mirror dashboard all read from the same graph
-6. A file watcher keeps the graph updated as you work
+1. **Topological Pulse**: Conducks uses Tree-sitter and the **Gnosis Regex Engine** to parse every file.
+2. **Taxonomic Extraction**: Symbols are extracted and grouped into the 9-layer canonical ranks.
+3. **The Great Binding**: Import and call relationships are resolved to connect the global graph.
+4. **Resonance Vault**: Everything is stored in a local DuckDB vault inside `.conducks/`.
+5. **Visual Mirror**: CLI, MCP, and the Mirror dashboard all provide safe, read-only access to the graph.
 
 All analysis runs locally. No data leaves your machine.
 
@@ -204,4 +224,4 @@ All analysis runs locally. No data leaves your machine.
 
 ---
 
-_v0.8.0 | Apache 2.0 |_
+_v1.0.1 | Apache 2.0 |_

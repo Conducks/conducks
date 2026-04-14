@@ -13,6 +13,7 @@ import { calculateShannonEntropy, normalizeEntropyRisk } from "../../core/algori
 import { mapToCanonical, CanonicalKind, CanonicalRank } from "../../core/parsing/taxonomy.js";
 import path from "node:path";
 import crypto from "node:crypto";
+import fs from "node:fs";
 
 import { ConducksComponent } from "../../../registry/types.js";
 
@@ -53,12 +54,12 @@ export class ConducksReflector implements ConducksComponent {
     const canonicalPath = file.path.toLowerCase();
     const projectRoot = chronicle.getProjectDir()?.toLowerCase() || '';
     const relativePath = path.relative(projectRoot, file.path).toLowerCase();
-    
+
     // Namespace calculation
     const rootName = path.basename(projectRoot).toLowerCase();
     const namespacePath = path.dirname(relativePath);
     const namespaceId = namespacePath === '.' ? `repository::${rootName}` : `directory::${path.join(projectRoot, namespacePath).toLowerCase()}`;
-    
+
     const fileId = `${canonicalPath}::unit`;
     const unitNode: SpectrumNode = {
       name: path.basename(file.path),
@@ -69,6 +70,7 @@ export class ConducksReflector implements ConducksComponent {
       filePath: file.path,
       isExport: true,
       metadata: {
+        id: fileId,
         isGlobalNode: true,
         isTest: isTestFile,
         displayName: path.basename(file.path),
@@ -82,20 +84,134 @@ export class ConducksReflector implements ConducksComponent {
       }
     };
 
-    const lang = grammars.getLanguage(provider.langId);
-    if (!lang) throw new Error(`[Conducks] Missing native grammar: ${provider.langId}`);
+    spectrum.nodes.push(unitNode);
 
     const parser = grammars.getUnifiedParser(provider.langId);
+
     if (!parser) {
-      spectrum.nodes.push(unitNode);
+      // 🛡️ [Gnosis Resilience Fallback] 🧬
+      // If the native parser is unavailable (buggy bindings), we use a high-fidelity Regex scan
+      // to ensure the user still gets a functional structural map.
+      if (provider.langId === 'python' || provider.langId === 'typescript') {
+        const text = fs.readFileSync(file.path, 'utf8');
+        const lines = text.split('\n');
+
+        const classMeta = mapToCanonical('class');
+        const funcMeta = mapToCanonical('function');
+
+        let currentClassName: string | undefined;
+        let currentClassId: string | undefined;
+        let classIndentation = -1;
+        let currentScopeName: string | undefined;
+
+        if (process.env.CONDUCKS_DEBUG === '1') {
+          console.log(`🛡️ [Gnosis] Fallback Pulsing: ${file.path} (${lines.length} lines)`);
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const classMatch = line.match(/^(\s*)(?:export\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+          const funcMatch = line.match(/^(\s*)(?:export\s+)?(?:async\s+)?(?:def|function)\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+          const pyImportMatch = line.match(/^(?:from\s+([a-zA-Z0-9_\.]+)\s+)?import\s+([a-zA-Z0-9_,\s]+)/);
+          const tsImportMatch = line.match(/^import\s+.*from\s+['"]([^'"]+)['"]/);
+          const callMatches = [...line.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_\.]*)\s*\(/g)];
+
+          const indent = line.search(/\S/);
+          if (indent === -1) continue;
+
+          if (classMatch) {
+            const name = classMatch[2];
+            const id = `${fileId}::${name}`;
+            const infraSuffixes = ['Service', 'Router', 'Controller', 'Registry', 'Store', 'Runner', 'Manager', 'Engine', 'Writer', 'Reporter', 'Provider', 'Client'];
+            const isInfra = infraSuffixes.some(s => name.endsWith(s));
+            const activeKind = isInfra ? 'infra' : 'class';
+            const activeMeta = mapToCanonical(activeKind);
+
+            if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isInfra ? 'Infra' : 'Class'}: ${name}`);
+
+            spectrum.nodes.push({
+              name,
+              kind: (isInfra ? 'INFRA' : 'STRUCTURE') as any,
+              canonicalKind: activeMeta.kind,
+              canonicalRank: activeMeta.rank,
+              metadata: { id, isStruct: !isInfra, isInfra, lineStart: i + 1, unitId: fileId }
+            } as any);
+            currentClassName = name;
+            currentClassId = id;
+            classIndentation = indent;
+            currentScopeName = name;
+          } else if (funcMatch) {
+            const name = funcMatch[2];
+            const id = `${fileId}::${name}`;
+            const isMethod = currentClassId !== undefined && indent > classIndentation;
+            const displayName = isMethod ? `${currentClassName}.${name}` : name;
+
+            if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isMethod ? 'Method' : 'Func'}: ${displayName} (Parent: ${currentClassId})`);
+
+            spectrum.nodes.push({
+              name: displayName,
+              kind: 'BEHAVIOR' as any,
+              canonicalKind: funcMeta.kind,
+              canonicalRank: funcMeta.rank,
+              metadata: {
+                id: isMethod ? `${currentClassId}.${name}` : id,
+                parentId: isMethod ? currentClassId : fileId,
+                isFunction: true,
+                lineStart: i + 1,
+                unitId: fileId
+              }
+            } as any);
+            currentScopeName = displayName;
+          } else if (indent <= classIndentation && classIndentation !== -1) {
+            // Left the class scope
+            currentClassId = undefined;
+            currentClassName = undefined;
+            classIndentation = -1;
+            currentScopeName = undefined;
+          }
+
+          // Semantic Edge Extraction
+          const specifier = pyImportMatch ? (pyImportMatch[1] || pyImportMatch[2].split(',')[0].trim()) : (tsImportMatch ? tsImportMatch[1] : null);
+          if (specifier) {
+            spectrum.relationships.push({
+              sourceName: 'unit',
+              targetName: specifier,
+              type: 'IMPORTS' as any,
+              confidence: 1.0,
+              metadata: { specifier, isRaw: true }
+            });
+          }
+
+          if (callMatches.length > 0) {
+            for (const match of callMatches) {
+              const target = match[1];
+              if (['if', 'elif', 'def', 'while', 'for', 'return', 'class', 'import', 'from', 'await', 'switch', 'catch', 'function'].includes(target)) continue;
+
+              spectrum.relationships.push({
+                sourceName: currentScopeName || 'unit',
+                targetName: target,
+                type: 'CALLS' as any,
+                confidence: 0.8,
+                metadata: { target, isRaw: true, isGnosis: true }
+              });
+            }
+          }
+        }
+        return spectrum;
+      }
       return spectrum;
     }
 
+    const lang = grammars.getLanguage(provider.langId);
+    if (!lang) throw new Error(`[Conducks] Missing native grammar: ${provider.langId}`);
+
     const tree = parser.parse(file.source);
     const query = grammars.createQuery(lang, provider.queryScm);
-    
+
     // Native Matching Protocol 🧬
     const matches = query.matches(tree.rootNode);
+    if (process.env.CONDUCKS_DEBUG === '1') {
+      console.log(`🛡️ [Reflector] ${path.basename(file.path)} matches: ${matches.length}`);
+    }
 
     const nodeCache = new Map<string, SpectrumNode>();
 
@@ -108,11 +224,13 @@ export class ConducksReflector implements ConducksComponent {
     const scopeMap: ScopeEntry[] = [];
 
     for (const match of matches) {
-      const isScoped = match.captures.some((c: any) => 
-        c.name === 'isFunction' || 
-        c.name === 'isClass' || 
-        c.name === 'isMethod' || 
-        c.name === 'isInterface' || 
+      const isScoped = match.captures.some((c: any) =>
+        c.name === 'isFunction' ||
+        c.name === 'isClass' ||
+        c.name === 'isStruct' ||
+        c.name === 'isMethod' ||
+        c.name === 'isInterface' ||
+        c.name === 'isInfra' ||
         c.name === 'isEnum'
       );
       if (isScoped) {
@@ -120,10 +238,10 @@ export class ConducksReflector implements ConducksComponent {
         if (nameCap && nameCap.node) {
           const name = nameCap.node.text;
           const rangeNode = nameCap.node.parent || nameCap.node;
-          scopeMap.push({ 
-            name, 
-            startRow: rangeNode.startPosition.row, 
-            endRow: rangeNode.endPosition.row 
+          scopeMap.push({
+            name,
+            startRow: rangeNode.startPosition.row,
+            endRow: rangeNode.endPosition.row
           });
         }
       }
@@ -151,117 +269,119 @@ export class ConducksReflector implements ConducksComponent {
 
       const currentMatchRow = firstCapture.node.startPosition.row;
       const matchNameCap = match.captures.find((c: any) => c.name === 'name' || c.name === 'pulse_assignment_name');
-      
+
       let node: any;
       if (matchNameCap && matchNameCap.node) {
         const name = matchNameCap.node.text;
         const scope = getScopeAt(currentMatchRow, name);
         const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
         const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
-        
-        const isDefinition = match.captures.some((c: any) => 
-          c.name.startsWith('is') && 
-          c.name !== 'isImport' && 
+
+        const isDefinition = match.captures.some((c: any) =>
+          c.name.startsWith('is') &&
+          c.name !== 'isImport' &&
           c.name !== 'isExported'
         );
 
         if (isDefinition) {
-           if (context.isDiscoveryMode()) {
-             context.registerGlobalSymbol(scopedId, { name, kind: 'unknown', filePath: file.path });
-           }
+          if (context.isDiscoveryMode()) {
+            context.registerGlobalSymbol(scopedId, { name, kind: 'unknown', filePath: file.path });
+          }
 
-           if (!nodeCache.has(scopedId)) {
-             const defCapture = match.captures.find((c: any) => c.name.startsWith('is') && c.name !== 'isImport' && c.name !== 'isExported');
-             let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
-             
-             if (initialKind === 'variable' && (name.endsWith('Service') || name.endsWith('Router') || name.endsWith('Controller'))) {
-               initialKind = 'infra';
-             }
+          if (!nodeCache.has(scopedId)) {
+            const defCapture = match.captures.find((c: any) => c.name.startsWith('is') && c.name !== 'isImport' && c.name !== 'isExported');
+            let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
 
-             const isScoped = match.captures.some((c: any) => c.name === 'isFunction' || c.name === 'isClass' || c.name === 'isMethod');
-             let rangeNode = matchNameCap.node;
-             if (isScoped && matchNameCap.node.parent) {
-               rangeNode = matchNameCap.node.parent;
-             }
+            const infraSuffixes = ['Service', 'Router', 'Controller', 'Registry', 'Store', 'Runner', 'Manager', 'Engine', 'Writer', 'Reporter', 'Provider', 'Client'];
+            if (infraSuffixes.some(s => name.endsWith(s))) {
+              initialKind = 'infra';
+            }
 
-             const canonical = mapToCanonical(initialKind);
-             const parentScopeName = getScopeAt(currentMatchRow, name);
-             const parentScopePrefix = parentScopeName ? `${parentScopeName.toLowerCase()}.` : '';
-             const parentId = parentScopeName 
-               ? `${file.path.toLowerCase()}::${parentScopePrefix.toLowerCase()}`.slice(0, -1)
-               : fileId;
+            const isScoped = match.captures.some((c: any) => c.name === 'isFunction' || c.name === 'isClass' || c.name === 'isStruct' || c.name === 'isMethod');
+            let rangeNode = matchNameCap.node;
+            if (isScoped && matchNameCap.node.parent) {
+              rangeNode = matchNameCap.node.parent;
+            }
 
-             const dna = {
-               isAsync: match.captures.some((c: any) => c.name === 'isAsync'),
-               isAbstract: match.captures.some((c: any) => c.name === 'isAbstract'),
-               isExported: match.captures.some((c: any) => c.name === 'isExported'),
-               isStatic: match.captures.some((c: any) => c.name === 'isStatic'),
-               params: [],
-               returns: 'void'
-             };
+            const canonical = mapToCanonical(initialKind);
+            const parentScopeName = getScopeAt(currentMatchRow, name);
+            const parentScopePrefix = parentScopeName ? `${parentScopeName.toLowerCase()}.` : '';
+            const parentId = parentScopeName
+              ? `${file.path.toLowerCase()}::${parentScopePrefix.toLowerCase()}`.slice(0, -1)
+              : fileId;
 
-             const fingerprint = crypto.createHash('sha256').update(`${file.path}|${name}|${JSON.stringify(dna)}`).digest('hex');
+            const dna = {
+              isAsync: match.captures.some((c: any) => c.name === 'isAsync'),
+              isAbstract: match.captures.some((c: any) => c.name === 'isAbstract'),
+              isExported: match.captures.some((c: any) => c.name === 'isExported'),
+              isStatic: match.captures.some((c: any) => c.name === 'isStatic'),
+              params: [],
+              returns: 'void'
+            };
 
-             nodeCache.set(scopedId, {
-               name,
-               kind: initialKind as any,
-               canonicalKind: canonical.kind,
-               canonicalRank: canonical.rank,
-               range: {
-                 start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
-                 end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
-               },
-               label: (canonical as any).kind,
-               isShallow: false,
-               properties: {
-                 filePath: file.path,
-                 name: name,
-                 range: {
-                   start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
-                   end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
-                 },
-                 isExport: false,
-                 canonicalKind: canonical.kind,
-                 canonicalRank: canonical.rank,
-                 parentId,
-                 unitId: fileId,
-                 namespaceId: unitNode.metadata.namespaceId,
-                 rootId: unitNode.metadata.rootId,
-                 structureId: parentScopeName ? parentId : null,
-                 layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
-                 depth: canonical.rank,
-                 fingerprint,
-                 dna,
-                 signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
-                 kinetic: {}
-               },
-               filePath: file.path,
-               isExport: false,
-               metadata: { 
-                 isTest: isTestFile, 
-                 isExport: false,
-                 canonicalKind: canonical.kind,
-                 canonicalRank: canonical.rank,
-                 parentId,
-                 unitId: fileId,
-                 namespaceId: unitNode.metadata.namespaceId,
-                 rootId: unitNode.metadata.rootId,
-                 structureId: parentScopeName ? parentId : null,
-                 layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
-                 depth: canonical.rank,
-                 fingerprint,
-                 dna,
-                 signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
-                 kinetic: {}
-               }
-             } as any);
-           }
-         }
-         node = nodeCache.get(scopedId);
-       }
+            const fingerprint = crypto.createHash('sha256').update(`${file.path}|${name}|${JSON.stringify(dna)}`).digest('hex');
+
+            nodeCache.set(scopedId, {
+              name,
+              kind: initialKind as any,
+              canonicalKind: canonical.kind,
+              canonicalRank: canonical.rank,
+              range: {
+                start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
+                end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
+              },
+              label: (canonical as any).kind,
+              isShallow: false,
+              properties: {
+                filePath: file.path,
+                name: name,
+                range: {
+                  start: { line: rangeNode.startPosition.row + 1, column: rangeNode.startPosition.column },
+                  end: { line: rangeNode.endPosition.row + 1, column: rangeNode.endPosition.column }
+                },
+                isExport: false,
+                canonicalKind: canonical.kind,
+                canonicalRank: canonical.rank,
+                parentId,
+                unitId: fileId,
+                namespaceId: unitNode.metadata.namespaceId,
+                rootId: unitNode.metadata.rootId,
+                structureId: parentScopeName ? parentId : null,
+                layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
+                depth: canonical.rank,
+                fingerprint,
+                dna,
+                signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
+                kinetic: {}
+              },
+              filePath: file.path,
+              isExport: false,
+              metadata: {
+                id: scopedId,
+                isTest: isTestFile,
+                isExport: false,
+                canonicalKind: canonical.kind,
+                canonicalRank: canonical.rank,
+                parentId,
+                unitId: fileId,
+                namespaceId: unitNode.metadata.namespaceId,
+                rootId: unitNode.metadata.rootId,
+                structureId: parentScopeName ? parentId : null,
+                layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
+                depth: canonical.rank,
+                fingerprint,
+                dna,
+                signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
+                kinetic: {}
+              }
+            } as any);
+          }
+        }
+        node = nodeCache.get(scopedId);
+      }
 
       if (context.isDiscoveryMode()) continue;
-      
+
       if (node && match.captures.some((c: any) => c.name === 'isExported')) {
         node.isExport = true;
         node.metadata.isExport = true;
@@ -281,12 +401,12 @@ export class ConducksReflector implements ConducksComponent {
 
         if (cName.startsWith('is')) {
           const kind = cName.slice(2).toLowerCase();
-          
+
           if (kind === 'import') {
             const sourceCap = match.captures.find((c: any) => c.name === 'source');
             if (sourceCap && sourceCap.node) {
               const specifier = sourceCap.node.text;
-              
+
               // Seed the Spectrum with the RAW SPECIFIER for later resolution 🏺
               spectrum.relationships.push({
                 sourceName: 'unit',
@@ -299,14 +419,14 @@ export class ConducksReflector implements ConducksComponent {
               for (let i = 0; i < match.captures.length; i++) {
                 const cap = match.captures[i];
                 if (cap.name === 'name' && cap.node) {
-                   const aliasCap = (i + 1 < match.captures.length && match.captures[i+1].name === 'alias') 
-                     ? match.captures[i+1] : undefined;
-                   const bindingName = cap.node.text;
-                   const aliasName = (aliasCap && aliasCap.node) ? aliasCap.node.text : bindingName;
-                   
-                   if (context) {
-                     context.registerLocalBinding(aliasName, specifier);
-                   }
+                  const aliasCap = (i + 1 < match.captures.length && match.captures[i + 1].name === 'alias')
+                    ? match.captures[i + 1] : undefined;
+                  const bindingName = cap.node.text;
+                  const aliasName = (aliasCap && aliasCap.node) ? aliasCap.node.text : bindingName;
+
+                  if (context) {
+                    context.registerLocalBinding(aliasName, specifier);
+                  }
                 }
               }
             }
@@ -315,7 +435,7 @@ export class ConducksReflector implements ConducksComponent {
           if (node) {
             node.kind = kind as any;
             node.metadata[cName] = true;
-            
+
             const canonical = mapToCanonical(kind);
             node.canonicalKind = canonical.kind;
             node.canonicalRank = canonical.rank;
@@ -344,7 +464,7 @@ export class ConducksReflector implements ConducksComponent {
         }
         else if (cName === 'kinesis_target' || cName === 'kinesis_qualified_target') {
           const scope = getScopeAt(currentMatchRow);
-          
+
           let finalTarget = cText;
           if (captureMap['kinesis_object']) {
             finalTarget = `${captureMap['kinesis_object']}.${cText}`;
@@ -446,7 +566,7 @@ export class ConducksReflector implements ConducksComponent {
           debtMarkers: n.metadata.debtMarkers || [],
           coveredBy: []
         };
-        
+
         // Sync with top-level properties for persistence mapping
         (n as any).risk = n.metadata.risk || 0;
         (n as any).gravity = n.metadata.gravity || 0;
@@ -467,9 +587,9 @@ export class ConducksReflector implements ConducksComponent {
 
     // Seed Import Map (Only in Discovery Mode)
     if (context.isDiscoveryMode()) {
-       spectrum.relationships.filter(r => r.type === 'IMPORTS').forEach(r => {
-         context.registerImport(file.path.toLowerCase(), r.targetName.toLowerCase());
-       });
+      spectrum.relationships.filter(r => r.type === 'IMPORTS').forEach(r => {
+        context.registerImport(file.path.toLowerCase(), r.targetName.toLowerCase());
+      });
     }
 
     return spectrum;

@@ -9,11 +9,12 @@ import type { Registry } from "@/registry/index.js";
 export class AnalyzeCommand implements ConducksCommand {
   public id = "analyze";
   public description = "Index and analyze repository structure";
-  public usage = "conducks analyze [--staged] [--verbose]";
+  public usage = "conducks analyze [--staged] [--verbose] [--force]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const isVerbose = args.includes('--verbose');
     const isStaged = args.includes('--staged');
+    const isForce = args.includes('--force');
     
     // Support positional path: conducks analyze <path>
     const targetPath = args.find(a => !a.startsWith('-')) || process.cwd();
@@ -23,7 +24,8 @@ export class AnalyzeCommand implements ConducksCommand {
       await (registry.analyze as any).full({ 
         root: targetPath,
         staged: isStaged, 
-        verbose: isVerbose 
+        verbose: isVerbose,
+        force: isForce
       });
     } catch (err: any) {
       if (err.message?.includes("LOCKED")) {

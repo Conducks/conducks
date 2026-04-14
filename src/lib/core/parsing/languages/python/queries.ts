@@ -44,10 +44,17 @@ export const PYTHON_QUERIES = `
     ]) @isVariable
 
   ;; --- Pulse Flow (Assignments) ---
-  (assignment left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
+  (assignment
+    left: [
+      (identifier) @pulse_assignment_name
+      (attribute (identifier) (identifier) @pulse_assignment_name)
+    ]
+    right: (_) @pulse_assignment_value)
 
   ;; --- Kinetic Flow (L6: Behavior & Logic) ---
-  (call function: [(identifier) (attribute)] @kinesis_target)
+  (call 
+    function: [(identifier) (attribute)] @kinesis_target
+    arguments: (argument_list (_) @kinesis_arg))
   (raise_statement) @isKinetic
   (try_statement) @isKinetic
   (assert_statement) @isKinetic

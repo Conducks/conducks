@@ -29,8 +29,8 @@ export class DeadCodeAnalyzer implements ConducksComponent {
       const incoming = graph.getNeighbors(node.id, 'upstream');
       
       // 1. Orphaned Symbol (No callers/importers)
-      // Only flag if it's a "Significant" symbol (Function, Class, Method)
-      const isSignificant = ['function_declaration', 'class_declaration', 'method_definition', 'variable_declarator'].includes(node.label);
+      // Only flag if it's a "Significant" symbol (Hierarchy Rank >= 5: Structure, Behavior, Atom)
+      const isSignificant = ['STRUCTURE', 'BEHAVIOR', 'ATOM', 'INFRA'].includes(node.label);
       if (isSignificant && incoming.length === 0 && !this.isEntryPoint(node)) {
         findings.push({
           type: 'ORPHAN',

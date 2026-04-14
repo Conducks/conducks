@@ -43,6 +43,7 @@ export class SynapsePersistence {
         ? { access_mode: 'READ_ONLY', max_memory: '512MB', threads: '2' } 
         : { access_mode: 'READ_WRITE', max_memory: '2GB', threads: '4' };
 
+      const retries = 50; // High-latency resilience pulse 🏺 (Supports up to 120s of lock contention)
       return await new Promise((resolve, reject) => {
         const attempt = (count: number) => {
           const db = new duckdb.Database(this.dbPath, config, async (err) => {
@@ -279,7 +280,8 @@ export class SynapsePersistence {
       if (!options.append) {
         // [Unit-Centric Realignment] By default, we no longer delete all nodes for a pulse.
         // We rely on INSERT OR REPLACE at the node/unit level.
-        // However, if append is false (Legacy Full Sync), we still clear metadata.
+        // If append is false (Full Sync), we clear metadata but NOT the entire node table.
+        // This prevents accidental wipes during multi-wave pulses.
         await this.run("DELETE FROM metadata");
       }
 

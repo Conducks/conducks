@@ -51,7 +51,7 @@ export class AnalysisService implements ConducksComponent {
    * Performs a high-fidelity structural analysis on the project (or a scoped subdirectory).
    * Consolidates discovery, batch reflection, gravity resonance, and persistence.
    */
-  public async analyze(options: { root?: string, staged?: boolean, verbose?: boolean } = {}): Promise<{ success: boolean, files: number }> {
+  public async analyze(options: { root?: string, staged?: boolean, verbose?: boolean, force?: boolean } = {}): Promise<{ success: boolean, files: number }> {
     const projectRoot = chronicle.getProjectDir();
     const targetRoot = options.root ? path.resolve(options.root) : projectRoot;
 
@@ -107,9 +107,14 @@ export class AnalysisService implements ConducksComponent {
       dirtyFiles = dirtyFiles.filter(f => f.startsWith(targetRoot));
     }
 
-    if (dirtyFiles.length === 0) {
+    if (dirtyFiles.length === 0 && !options.force) {
       logger.warn("No changes detected. Structural Synapse is already at 100% resonance.");
       return { success: true, files: 0 };
+    }
+
+    if (options.force) {
+      logger.info(`🛡️ [Force Resonance] Forcing re-induction of all ${filteredFiles.length} units.`);
+      dirtyFiles = filteredFiles;
     }
 
     logger.info(`Analyzing ${dirtyFiles.length} units...`);

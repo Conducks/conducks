@@ -153,7 +153,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
             name: path.basename(currentDir),
             filePath: canonicalDir,
             canonicalKind: 'DIRECTORY',
-            canonicalRank: 1.5,
+            canonicalRank: 2,
             parentId
           } as any
         });
@@ -257,7 +257,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
            rawPath: file.path, 
            projectRelativePath: getProjectRelativePath(file.path, workspaceRoot),
            canonicalKind: 'UNIT',
-           canonicalRank: 2,
+           canonicalRank: 3,
            parentId,
            rootId: `repository::${rootName}`
          } as any
@@ -393,37 +393,43 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       workerPromises.push(p);
     }
 
-    const results = (await Promise.all(workerPromises)).flat();
-    const context = new AnalyzeContext();
-    if (discoveryMode) context.setDiscoveryMode(true);
-    if (globalSymbols) {
-       for (const [id, sym] of Object.entries(globalSymbols)) {
-         context.registerGlobalSymbol(id, sym as any);
-       }
-    }
+    const workerResults = await Promise.all(workerPromises);
+    const results = workerResults.flat();
 
-    const providerMap = new Map<string, any>();
-    const { PythonProvider } = await import("../../core/parsing/languages/python/index.js");
-    const { TypeScriptProvider } = await import("../../core/parsing/languages/typescript/index.js");
-    const { grammars } = await import("../../core/parsing/grammar-registry.js");
-
-    for (const unit of files) {
-      const ext = path.extname(unit.path);
-      let provider = providerMap.get(ext);
-      if (!provider) {
-        if (ext === '.py') provider = new PythonProvider();
-        else if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) provider = new TypeScriptProvider();
-        if (provider) providerMap.set(ext, provider);
+    // If no workers were started or all failed (unlikely), fallback to main thread induction 
+    if (results.length === 0 && files.length > 0) {
+      logger.warn(`🛡️ [Conducks] Parallel induction failed or skipped. Falling back to sequential main-thread induction.`);
+      const context = new AnalyzeContext();
+      if (discoveryMode) context.setDiscoveryMode(true);
+      if (globalSymbols) {
+        for (const [id, sym] of Object.entries(globalSymbols)) {
+          context.registerGlobalSymbol(id, sym as any);
+        }
       }
-      
-      if (!provider) continue;
 
-      try {
-        await grammars.loadLanguage(provider.langId);
-        const spectrum = await this.reflector.reflect(unit, provider, context, allPaths);
-        results.push({ path: unit.path, spectrum, state: context.exportState(), success: true });
-      } catch (err) {
-        results.push({ path: unit.path, error: (err as Error).message, success: false });
+      const providerMap = new Map<string, any>();
+      const { PythonProvider } = await import("../../core/parsing/languages/python/index.js");
+      const { TypeScriptProvider } = await import("../../core/parsing/languages/typescript/index.js");
+      const { grammars } = await import("../../core/parsing/grammar-registry.js");
+
+      for (const unit of files) {
+        const ext = path.extname(unit.path);
+        let provider = providerMap.get(ext);
+        if (!provider) {
+          if (ext === '.py') provider = new PythonProvider();
+          else if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) provider = new TypeScriptProvider();
+          if (provider) providerMap.set(ext, provider);
+        }
+        
+        if (!provider) continue;
+
+        try {
+          await grammars.loadLanguage(provider.langId);
+          const spectrum = await this.reflector.reflect(unit, provider, context, allPaths);
+          results.push({ path: unit.path, spectrum, state: context.exportState(), success: true });
+        } catch (err) {
+          results.push({ path: unit.path, error: (err as Error).message, success: false });
+        }
       }
     }
     return results;

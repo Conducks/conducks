@@ -1,4 +1,13 @@
 function initUI() {
+  // 0. 🧬 COLLAPSE LOGIC
+  const collapseBtn = document.getElementById('btn-collapse');
+  const commandDeck = document.getElementById('command-deck');
+  if (collapseBtn && commandDeck) {
+    collapseBtn.addEventListener('click', () => {
+      commandDeck.classList.toggle('collapsed');
+    });
+  }
+
   // 1. 🧬 DECK NAVIGATION
   const dockItems = document.querySelectorAll('.dock-item');
   dockItems.forEach(item => {
@@ -51,8 +60,8 @@ function initUI() {
         } else {
           window.MirrorState.selectedLayers = window.MirrorState.selectedLayers.filter(l => l !== id);
         }
-        // v3.0: Instant Zero-Restart Refresh
-        window.requestRedraw();
+        // The Magic: Re-run Transitive Structural Contraction on the backend
+        window.refreshSynapse();
       }
     });
   }
