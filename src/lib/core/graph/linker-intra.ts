@@ -1,5 +1,6 @@
 import { ConducksAdjacencyList } from './adjacency-list.js';
 import { logger } from '@/lib/core/utils/logger.js';
+import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js';
 
 /**
  * Conducks — Intra-Project Symbol Linker 🏺
@@ -21,6 +22,8 @@ export class IntraLinker {
   private static readonly RESOLVABLE_TYPES = new Set([
     'CALLS', 'CONSTRUCTS', 'TYPE_REFERENCE', 'ACCESSES'
   ]);
+
+  private resolver = new TypeScriptResolver();
 
   /**
    * Resolves unresolved edge targets in the graph.
@@ -46,17 +49,34 @@ export class IntraLinker {
       if (!fileMap.has(name)) fileMap.set(name, node.id);
     }
 
+    // Strip ::unit to give the resolver raw absolute paths
+    const allFilePaths = Array.from(unitSymbols.keys()).map(u => u.split('::')[0]);
+
     // ── 2. Build sourceUnitId → importedUnitIds from IMPORTS edges ──────────
     const unitImports = new Map<string, string[]>();
 
     for (const edge of graph.getAllEdges()) {
       if (edge.type !== 'IMPORTS') continue;
-      const list = unitImports.get(edge.sourceId);
-      if (list) {
-        list.push(edge.targetId);
-      } else {
-        unitImports.set(edge.sourceId, [edge.targetId]);
+
+      let targetUnit = edge.targetId;
+      // If the target is a raw specifier (no ::), resolve it!
+      if (!targetUnit.includes('::')) {
+        const sourceNode = graph.getNode(edge.sourceId);
+        const sourceFile = sourceNode?.properties?.filePath || edge.sourceId.split('::')[0];
+        const resolved = this.resolver.resolve(targetUnit, sourceFile, allFilePaths);
+        if (resolved) {
+          targetUnit = `${resolved}::unit`;
+        }
       }
+
+      const sourceUnitId = edge.sourceId.toLowerCase();
+      const list = unitImports.get(sourceUnitId);
+      if (list) {
+        list.push(targetUnit);
+      } else {
+        unitImports.set(sourceUnitId, [targetUnit]);
+      }
+      logger.info(`🛡️ [IntraLinker] Edge ${sourceUnitId} imports ${targetUnit}`);
     }
 
     // ── 3. Resolve unresolved edges ─────────────────────────────────────────
@@ -81,16 +101,7 @@ export class IntraLinker {
 
       // 3b. Check each file the source imports.
       if (!resolvedId) {
-        const imports = unitImports.get(sourceUnitId);
-        if (imports) {
-          for (const importedUnit of imports) {
-            const candidate = unitSymbols.get(importedUnit)?.get(bareName);
-            if (candidate) {
-              resolvedId = candidate;
-              break;
-            }
-          }
-        }
+        resolvedId = this.resolveSymbol(bareName, sourceUnitId, unitImports, unitSymbols);
       }
 
       if (resolvedId) {
@@ -104,5 +115,21 @@ export class IntraLinker {
     }
 
     return resolved;
+  }
+
+  private resolveSymbol(targetId: string, sourceUnitId: string, imports: Map<string, string[]>, symbols: Map<string, Map<string, string>>): string | null {
+    const lowerName = targetId.toLowerCase();
+    const importedUnits = imports.get(sourceUnitId) || [];
+
+    for (const unitId of importedUnits) {
+      const candidates = symbols.get(unitId);
+      if (!candidates) continue;
+
+      const resolvedNodeId = candidates.get(lowerName);
+      if (resolvedNodeId) {
+        return resolvedNodeId;
+      }
+    }
+    return null;
   }
 }

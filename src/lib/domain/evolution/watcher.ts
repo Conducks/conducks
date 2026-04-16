@@ -3,7 +3,7 @@ import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { GlobalSymbolLinker } from "@/lib/core/graph/linker.js";
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { globalMirror } from "@/interfaces/web/mirror-server.js";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -28,7 +28,7 @@ import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 
 interface WatcherOptions {
   ignored?: string[];
-  persistence?: DuckDbPersistence;
+  persistence?: SynapsePersistence;
   watcher?: FSWatcher;
 }
 
@@ -196,7 +196,7 @@ export class ConducksWatcher implements ConducksComponent {
       // 5. Structural Persistence Update (Only if Writer or Auto-Pulse)
       if (this.autoPulse && this.options.persistence && !(this.options.persistence as any).readOnly) {
         console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
-        await this.options.persistence.save(this.graph.getGraph(), { append: true });
+        await this.options.persistence.save(this.graph.getGraph());
       } else if (this.options.persistence && !(this.options.persistence as any).readOnly) {
         await this.options.persistence.save(this.graph.getGraph());
       }

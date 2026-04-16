@@ -1,11 +1,3 @@
-// @ts-ignore: Node.js 20+ register API used for dynamic tsx loading in workers
-import { register } from 'node:module';
-try {
-  register('tsx', import.meta.url);
-} catch (e) {
-  // Fallback for older Node versions or environments where register is unavailable
-}
-
 import { parentPort, workerData } from 'node:worker_threads';
 import { ConducksReflector } from "../../domain/analysis/reflector.js";
 import { AnalyzeContext } from "./context.js";
@@ -30,7 +22,7 @@ import fs from 'node:fs';
  * High-performance structural induction worker thread.
  */
 
-async function runWorker(data: any, isFork: boolean = false) {
+async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = false) {
   const { units, allPaths, discoveryMode, globalSymbols, resourceDir } = data;
 
   const reflector = new ConducksReflector();
@@ -92,39 +84,28 @@ async function runWorker(data: any, isFork: boolean = false) {
   const loadedGrammars = new Set<string>();
 
   for (const unit of units) {
-    const ext = path.extname(unit.path);
-    const provider = providers.get(ext);
-    if (!provider) continue;
+    try {
+      const ext = path.extname(unit.path);
+      const provider = providers.get(ext);
+      if (!provider) continue;
 
-    // Phase 1: Omni-Repo Native Grammar Induction 🛡️ 🔨
-    const langId = provider.langId;
-    if (langId && !loadedGrammars.has(langId)) {
-      try {
+      // Phase 1: Omni-Repo Native Grammar Induction 🛡️ 🔨
+      const langId = provider.langId;
+      if (langId && !loadedGrammars.has(langId)) {
         await grammars.loadLanguage(langId);
         loadedGrammars.add(langId);
-      } catch (err) {
-        results.push({ 
-          path: unit.path, 
-          error: `Native Grammar Induction Failed: ${(err as Error).message}`,
-          success: false
-        });
-        continue;
       }
-    }
 
-    try {
-      const spectrum = await reflector.reflect(unit, provider, context, allPaths);
-      if (process.env.CONDUCKS_DEBUG === '1') {
-        console.log(`🛡️ [PulseWorker] ${path.basename(unit.path)} structural emission: ${spectrum.nodes.length} symbols.`);
-      }
-      
-      // Return captured state for worker-to-main reduction
-      const state = context.exportState();
+      const spectrum = await reflector.reflect(
+        { path: unit.path, source: fs.readFileSync(unit.path, 'utf8') },
+        provider,
+        context,
+        allPaths
+      );
 
       results.push({ 
         path: unit.path, 
-        spectrum,
-        state,
+        spectrum, 
         success: true 
       });
     } catch (err) {
@@ -137,16 +118,33 @@ async function runWorker(data: any, isFork: boolean = false) {
     }
   }
 
-  if (isFork) {
+  if (isSpawn) {
+    return results;
+  } else if (isFork) {
     process.send?.({ type: 'SUCCESS', results });
     process.exit(0);
   } else {
     parentPort?.postMessage(results);
   }
+  return results;
 }
 
-// Bootstrap Protocol: Fork vs Worker Detection 🏺
-if (process.env.CONDUCKS_FORK_MODE === '1') {
+// Bootstrap Protocol: Worker vs Spawn vs Fork Detection 🏺
+if (process.env.CONDUCKS_WORKER_MODE === 'spawn') {
+  try {
+    const inputPath = process.argv[2];
+    const data = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
+    const results = await runWorker(data, false, true);
+    if (data.tempOutputFile) {
+      const payload = results && Array.isArray(results) ? results : [];
+      fs.writeFileSync(data.tempOutputFile, JSON.stringify(payload));
+    }
+    process.exit(0);
+    } catch (e: any) {
+      console.error(`🛡️ [Conducks Synapse] Persistence Failure during flush:`, e.message);
+    process.exit(1);
+  }
+} else if (process.env.CONDUCKS_FORK_MODE === '1') {
   process.on('message', async (msg: any) => {
     if (msg.type === 'START') {
       try {

@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { logger } from "@/lib/core/utils/logger.js";
 
 /**
@@ -8,7 +8,7 @@ import { logger } from "@/lib/core/utils/logger.js";
  * Performance Optimized: Uses in-database Window Functions (LAG) for Phase 9.1.
  */
 export class AuditService {
-  constructor(private readonly persistence: DuckDbPersistence) {}
+  constructor(private readonly persistence: SynapsePersistence) {}
 
   /**
    * Performs a high-performance longitudinal audit over the last N pulses.

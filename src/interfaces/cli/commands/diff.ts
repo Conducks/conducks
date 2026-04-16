@@ -97,13 +97,13 @@ export class DiffCommand implements ConducksCommand {
   private async executeChronoscopicDiff(baseId: string, headId: string | null, registry: Registry): Promise<void> {
     const { ConducksAdjacencyList } = await import("@/lib/core/graph/adjacency-list.js");
     const { ConducksDiffEngine } = await import("@/lib/core/graph/diff-engine.js");
-    const { DuckDbPersistence } = await import("@/lib/core/persistence/persistence.js");
+    const { SynapsePersistence } = await import("@/lib/core/persistence/persistence.js");
 
     const baseGraph = new ConducksAdjacencyList();
     const headGraph = new ConducksAdjacencyList();
 
     const db = registry.infrastructure.persistence;
-    if (!(db instanceof DuckDbPersistence)) {
+    if (!(db instanceof SynapsePersistence)) {
       console.error("Chronoscopic diff requires DuckDB persistence.");
       return;
     }

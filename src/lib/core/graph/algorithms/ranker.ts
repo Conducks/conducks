@@ -82,7 +82,7 @@ export class StructuralRanker {
       let isEntry = false;
 
       // 1. Explicit Framework Routes (Detected during refraction)
-      if (node.label === 'route' || node.label.includes('route') || props.kind?.includes('route')) {
+      if (node.label === 'route' || node.label?.includes('route') || props?.kind?.includes('route')) {
         isEntry = true;
       }
 

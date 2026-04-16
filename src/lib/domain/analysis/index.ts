@@ -167,7 +167,7 @@ export class AnalysisService implements ConducksComponent {
       id: n.id,
       gravity: (n.properties.gravity as number) || 0
     }));
-    await this.persistence.updateRanks(gravityValues, pulseId);
+    await this.persistence.updateRanks(gravityValues);
 
     // 4.2 Intra-Project Symbol Resolution
     // Resolves bare cross-file targetIds (e.g. "synapsepersistence") to fully-qualified

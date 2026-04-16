@@ -107,7 +107,10 @@ export class ConducksReflector implements ConducksComponent {
 
     let query: any;
     try {
-      query = grammars.createQuery(provider.langId, provider.queryScm);
+      const lang = grammars.getLanguage(provider.langId);
+      if (!lang) return this.reflectGnosis(file, provider, context);
+      query = grammars.createQuery(lang, provider.queryScm);
+
     } catch (err) {
       if (process.env.CONDUCKS_DEBUG === '1') {
         console.error(`🛡️ [Conducks Reflector] Native Query Creation Failure: ${file.path}. Falling back to Gnosis.`, err);
@@ -193,6 +196,7 @@ export class ConducksReflector implements ConducksComponent {
         const scope = getScopeAt(currentMatchRow, name);
         const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
         const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
+        
 
         const isDefinition = match.captures.some((c: any) =>
           c.name.startsWith('is') &&
@@ -501,6 +505,14 @@ export class ConducksReflector implements ConducksComponent {
         (n as any).structureId = n.metadata.structureId;
       }
     }
+    
+    // Final Flush: Project captured high-fidelity nodes into the spectrum 🏺
+    nodeCache.forEach(n => {
+      // Avoid duplicates if any were manually added (e.g. unitNode)
+      if (!spectrum.nodes.some(existing => existing.metadata.id === n.metadata.id)) {
+        spectrum.nodes.push(n);
+      }
+    });
 
     // Seed Import Map (Only in Discovery Mode)
     if (context.isDiscoveryMode()) {

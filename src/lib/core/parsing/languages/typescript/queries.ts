@@ -20,7 +20,7 @@ export const TYPESCRIPT_QUERIES = `
   (enum_declaration name: (identifier) @name) @isStruct
   
   (function_declaration name: (identifier) @name) @isFunction
-  (method_definition name: (property_identifier) @name) @isMethod
+  (method_definition name: (_) @name) @isMethod
   
   ;; Heritage: extends/implements
   (class_heritage (extends_clause (_) @heritage))

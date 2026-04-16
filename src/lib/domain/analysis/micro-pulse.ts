@@ -65,14 +65,18 @@ export class MicroPulseService {
       );
 
       // 5. Conducks Purge & Resurrection 🛡️
-      if (!this.persistence.readOnly) {
+      if (!(this.persistence as any).readOnly) {
         const unitId = `${absolutePath.toLowerCase()}::unit`;
         await this.persistence.purgeUnits([unitId]);
         
-        await this.persistence.saveBatchSpectrum([{
-          filePath: absolutePath,
-          spectrum
-        }], `micro_${Date.now()}`);
+        // Flush spectrum nodes to vault directly
+        const nodes = spectrum.nodes.map((n: any) => ({
+          id: n.metadata?.id || `${absolutePath}::${n.name}`,
+          name: n.name,
+          label: n.canonicalKind || 'UNIT',
+          properties: { ...n.metadata, ...n }
+        }));
+        await this.persistence.saveNodes(nodes, `micro_${Date.now()}`);
       }
 
       logger.success(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} resurrected (${spectrum.nodes.length} nodes).`);

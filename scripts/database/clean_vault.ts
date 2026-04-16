@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "../../src/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "../../src/lib/core/persistence/persistence.js";
 import { logger } from "../../src/lib/core/utils/logger.js";
 import path from "node:path";
 
@@ -12,11 +12,11 @@ async function runPurge() {
   logger.info("🛡️ [Conducks] Initializing Structural Vault Purge...");
   
   const projectRoot = process.cwd();
-  const persistence = new DuckDbPersistence(projectRoot);
+  const persistence = new SynapsePersistence(projectRoot);
 
   try {
     // Deep Reset: Purge EVERYTHING
-    await persistence.clean();
+    await persistence.clear();
     logger.info("✨ [Conducks] Structural Vault Restored to Ground State (0 Nodes).");
   } catch (fail) {
     logger.error("🛑 [Conducks] Purge Failed. Structural Debris Remains.", fail);

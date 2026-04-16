@@ -1,5 +1,5 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
-import { DuckDbPersistence, SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { AnalysisService, AnalyzeOrchestrator, Conducks } from "@/lib/domain/analysis/index.js";
 import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
@@ -51,7 +51,7 @@ const bootstrapper = new RegistryBootstrapper();
 const graph = new ConducksGraph();
 
 // These will be firmed up during initializeRegistry() call.
-let persistence: SynapsePersistence = new DuckDbPersistence(":memory:", true);
+let persistence: SynapsePersistence = new SynapsePersistence(":memory:", true);
 let ignoreManager = new IgnoreManager(process.cwd());
 
 // 2. Bridge Layer (Registry Infrastructure)

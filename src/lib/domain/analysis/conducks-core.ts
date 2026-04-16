@@ -9,7 +9,7 @@ import { GlobalSymbolLinker } from "@/lib/core/graph/linker.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { ConducksSearch } from "@/lib/domain/intelligence/search-engine.js";
 import { ConducksFlowEngine } from "@/lib/domain/kinetic/flow-engine.js";
-import { GraphPersistence, SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { GVREngine } from "@/lib/domain/evolution/gvr-engine.js";
 import { GQLParser } from "@/lib/domain/intelligence/gql-parser.js";
@@ -52,13 +52,11 @@ export class Conducks implements ConducksComponent {
 
   private orchestrator: AnalyzeOrchestrator;
   private registry = new SynapseRegistry<ConducksComponent>();
-  private persistence: SynapsePersistence = new GraphPersistence();
+  private persistence: SynapsePersistence;
   private linker = new GlobalSymbolLinker();
 
   constructor(options?: { baseDir?: string }) {
-    if (options?.baseDir) {
-      this.persistence = new GraphPersistence(options.baseDir);
-    }
+    this.persistence = new SynapsePersistence(options?.baseDir || chronicle.getProjectDir() || process.cwd());
     this.orchestrator = new AnalyzeOrchestrator(this.registry, this.graph, this.aligner, this.persistence);
     this.setupDefaults();
   }
@@ -153,7 +151,9 @@ export class Conducks implements ConducksComponent {
       console.error(`[ConducksCore] Metadata set. Current metadata:`, Array.from(this.graph.getGraph().getAllMetadata().entries()));
     }
 
-    return await this.persistence.save(this.graph.getGraph());
+    const result = await this.orchestrator.analyze(files);
+    await this.persistence.save(this.graph.getGraph(), { nodeCount: result.nodeCount, edgeCount: result.edgeCount });
+    return result.pulseId;
   }
 
   public query(query: string, options: { gql?: boolean } = {}) {
@@ -181,9 +181,8 @@ export class Conducks implements ConducksComponent {
 
   public async compare(otherPath: string): Promise<any> {
     const otherGraph = new ConducksGraph();
-    const otherPersistence = new GraphPersistence(otherPath);
-    const success = await otherPersistence.load(otherGraph.getGraph());
-    if (!success) throw new Error(`[Conducks] Failed to load structural signature for: ${otherPath}`);
+    const otherPersistence = new SynapsePersistence(otherPath);
+    await otherPersistence.load(otherGraph.getGraph());
     return this.resonance.analyzeResonance(this.graph.getGraph(), otherGraph.getGraph());
   }
 

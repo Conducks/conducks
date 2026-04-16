@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs";
@@ -65,11 +65,18 @@ export async function main() {
   const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows'].includes(commandId);
   const pathArg = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
-  const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
+  let targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
+  
+  // 🛡️ [Root Detachment Check]
+  // Standard MCP runners execute global binaries from detached roots (/).
+  // If we identify a detached root, fallback to CONDUCKS_WORKSPACE_ROOT or anchor to absolute project path via import.meta.url
+  if (targetPath === '/' || targetPath === '/root' || targetPath === '/Users' || targetPath === '/usr') {
+    targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../");
+  }
   // Only 'analyze' writes to the vault. 'clean' is a destructive wipe (also needs write access).
   // Every other command is strictly read-only.
   const isReadCommand = !['analyze', 'clean'].includes(commandId);
-  const persistence = new GraphPersistence(targetPath, isReadCommand);
+  const persistence = new SynapsePersistence(targetPath, isReadCommand);
   
   chronicle.setProjectDir(targetPath);
 
@@ -81,15 +88,16 @@ export async function main() {
     new AdviseCommand(), new PruneCommand(), new BlueprintCommand(), new ContextGenCommand(),
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
-    new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(),
+    new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(), new MirrorCommand(),
     new BootstrapDocsCommand()
   ];
 
   commands.push(new HelpCommand(commands));
 
   const command = commands.find(c => c.id === commandId);
+  
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'mirror', 'fallback', 'watch', 'record'].includes(commandId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp'].includes(commandId);
 
   if (command) {
     try {

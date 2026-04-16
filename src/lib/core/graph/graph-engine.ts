@@ -3,6 +3,7 @@ import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { Logger } from "../utils/logger.js";
 import { PrismRequest } from "@/lib/core/persistence/prism-core.js";
+import { StructuralRanker } from "../../core/graph/algorithms/ranker.js";
 import { Worker } from "node:worker_threads";
 import os from "node:os";
 import path from "node:path";
@@ -90,7 +91,7 @@ export class ConducksGraph {
     this.bindNeuralCircuits();
     this.bindRouteCircuits();
     this.bindPulseCircuits();
-    this.graph.globalRecalculateGravity();
+    StructuralRanker.calculateGravity(this.graph);
   }
 
   /**
@@ -101,11 +102,11 @@ export class ConducksGraph {
 
     for (const node of allNodes) {
       const outgoing = this.graph.getNeighbors(node.id, 'downstream');
-      const assignments = outgoing.filter(e => e.properties.reason === 'assignment');
-      const calls = outgoing.filter(e => e.type === 'CALLS' && !e.properties.isResonance);
+      const assignments = outgoing.filter(e => e.properties?.reason === 'assignment');
+      const calls = outgoing.filter(e => e.type === 'CALLS' && !e.properties?.isResonance);
 
       for (const call of calls) {
-        const args = (call.properties.arguments as string[]) || [];
+        const args = (call.properties?.arguments as string[]) || [];
         for (const arg of args) {
           const producer = assignments.find(a => a.targetId.split('::').pop() === arg);
           if (producer) {
@@ -250,7 +251,7 @@ export class ConducksGraph {
     for (const node of allNodes) {
       const outgoing = this.graph.getNeighbors(node.id, 'downstream');
       for (const edge of outgoing) {
-        if (!edge.targetId.includes('::') && edge.properties.rawTarget) {
+        if (!edge.targetId.includes('::') && edge.properties?.rawTarget) {
           const localId = `${node.properties.filePath}::${edge.properties.rawTarget.toLowerCase()}`;
           if (this.graph.getNode(localId)) {
             edge.targetId = localId;

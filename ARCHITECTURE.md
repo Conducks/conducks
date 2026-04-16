@@ -1,31 +1,31 @@
 # Architecture Context — conducks
-Generated: 2026-04-16T00:57:24.599Z | Pulse: pulse_1776301040714_l9m3r
+Generated: 2026-04-16T02:09:43.333Z | Pulse: pulse_1776305350548_2fa8a
 
 ## Entry Points (top 10 by gravity)
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/debug_queries.js::unit::mapperrunner` [INFRA, gravity: 0.0081, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/final_python_test.js::unit::mapperrunner` [INFRA, gravity: 0.0081, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/test_reflector.js::unit::mapperrunner` [INFRA, gravity: 0.0081, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/debug_queries.js::unit::test` [BEHAVIOR, gravity: 0.0044, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/debug_queries.js::unit::explore` [BEHAVIOR, gravity: 0.0044, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/final_python_test.js::unit::test` [BEHAVIOR, gravity: 0.0044, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/final_python_test.js::unit::explore` [BEHAVIOR, gravity: 0.0044, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/test_reflector.js::unit::test` [BEHAVIOR, gravity: 0.0044, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch/test_reflector.js::unit::explore` [BEHAVIOR, gravity: 0.0044, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scripts/database/clean_vault.ts::unit::runpurge` [BEHAVIOR, gravity: 0.0044, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/adjacency-list.ts::conducksadjacencylist` [STRUCTURE, gravity: 0.0151, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/persistence/persistence.ts::synapsepersistence` [STRUCTURE, gravity: 0.0136, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0131, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/git/chronicle-interface.ts::chronicleinterface` [STRUCTURE, gravity: 0.0122, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/grammar-registry.ts::grammarregistry` [STRUCTURE, gravity: 0.0076, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/graph-engine.ts::conducksgraph` [STRUCTURE, gravity: 0.0066, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/federation/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0066, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/index.ts::governanceservice` [STRUCTURE, gravity: 0.0066, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/fallback-detector.ts::fallbackdetector` [STRUCTURE, gravity: 0.0060, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/registry/dynamic-loader.ts::dynamictoolloader` [STRUCTURE, gravity: 0.0060, risk: 0.0000]
 
 ## Structural Hotspots (top 10 by risk)
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.github/workflows/main.yml::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.gitignore::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/changelog.md::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/code_of_conduct.md::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/contributing.md::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/license::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/readme.md::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/security.md::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets/arch.png::unit` [risk: 0.0000, gravity: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets/logo/official/1.png::unit` [risk: 0.0000, gravity: 0.0000]
+- `ecosystem::global` [risk: 0.0000, gravity: 0.0000]
+- `repository::conducks` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.github/workflows` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.github` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets/logo/official` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets/logo` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/config` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scratch` [risk: 0.0000, gravity: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/scripts/database` [risk: 0.0000, gravity: 0.0000]
 
 ## Active Violations (0)
 
 ## Framework
-- Detected: generic
+- Detected: express

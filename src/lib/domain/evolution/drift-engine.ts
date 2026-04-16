@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { logger } from "@/lib/core/utils/logger.js";
 
 /**
@@ -8,7 +8,7 @@ import { logger } from "@/lib/core/utils/logger.js";
  * PageRank velocity, complexity bloat, and coupling entropy.
  */
 export class DriftEngine {
-  constructor(private readonly persistence: DuckDbPersistence) {}
+  constructor(private readonly persistence: SynapsePersistence) {}
 
   /**
    * Compares the current pulse against a previous one.

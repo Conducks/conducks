@@ -1,7 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
-import type { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
 
 /**
@@ -22,11 +21,12 @@ export class EntryCommand implements ConducksCommand {
     // When a specific external path is provided, scope persistence to that project.
     // Otherwise use the injected persistence.
     const persistence: SynapsePersistence = pathArg
-      ? new GraphPersistence(targetPath, true)
+      ? new SynapsePersistence(targetPath, true)
       : registry.infrastructure.persistence;
 
     try {
-      const success = await persistence.load(registry.query.graph.getGraph());
+      await persistence.load(registry.query.graph.getGraph());
+      const success = registry.query.graph.getGraph().stats.nodeCount > 0;
       if (!success) {
         console.error(`\x1b[31m[Conducks CLI] Error: No structural index found at ${targetPath}. Run 'conducks analyze' first.\x1b[0m`);
         return;

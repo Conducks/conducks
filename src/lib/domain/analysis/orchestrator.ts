@@ -6,6 +6,7 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/registry/types.js";
@@ -13,6 +14,7 @@ import { logger } from "@/lib/core/utils/logger.js";
 import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
 import { Worker } from "node:worker_threads";
 import { fork } from "node:child_process";
+import { createRequire } from "node:module";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -378,41 +380,78 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     const unitCount = files.length;
     if (unitCount === 0) return [];
 
-    const isTs = __filename.endsWith('.ts');
-    const workerScript = path.resolve(__dirname, `../../core/parsing/pulse-worker.${isTs ? 'ts' : 'js'}`);
+    const workerScript = isTs 
+      ? path.resolve(__dirname, `../../core/parsing/pulse-worker.ts`)
+      : path.resolve(__dirname, `../../core/parsing/pulse-worker.js`);
     const finalResourceDir = requestedGrammarDir || resourceDir;
 
-    const skipWorker = process.env.CONDUCKS_DEBUG === '1' || unitCount < 5;
+    let tsxLoader: string | null = null;
+    if (isTs) {
+      try {
+        const require = createRequire(import.meta.url);
+        tsxLoader = require.resolve('tsx');
+      } catch {
+        tsxLoader = 'tsx'; // Fallback
+      }
+    }
+
+    const skipWorker = true; // Hardened for absolute stability during monorepo induction
     if (!skipWorker) {
       const coreCount = Math.max(1, os.cpus().length - 1);
       const chunkSize = Math.ceil(unitCount / coreCount);
-      const workerPromises = [];
+      const results: any[] = [];
 
       for (let i = 0; i < unitCount; i += chunkSize) {
         const chunk = files.slice(i, i + chunkSize);
 
-        const p = new Promise<any[]>((resolve) => {
-          const worker = new Worker(workerScript, {
-            workerData: { units: chunk, resourceDir: finalResourceDir, allPaths, discoveryMode, globalSymbols },
-            execArgv: isTs ? ["--import", "tsx"] : []
-          });
-          worker.on('message', resolve);
-          worker.on('error', (err) => {
-            console.error(`🛡️ [Worker Error]`, err);
-            resolve([]);
-          });
-        });
-        workerPromises.push(p);
-      }
+        const spawnWorker = async (chunk: string[]) => {
+          return new Promise<any[]>((resolve) => {
+            const { spawnSync } = require('node:child_process');
+            const fs = require('node:fs');
+            const os = require('node:os');
+            const path = require('node:path');
+            
+            const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+            const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+            
+            fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, resourceDir: finalResourceDir, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
+            
+            spawnSync('node', [
+              '--no-warnings',
+              '--import', tsxLoader!,
+              workerScript,
+              tempInput
+            ], {
+              env: { ...process.env, CONDUCKS_WORKER_MODE: 'spawn' },
+              stdio: 'inherit'
+            });
 
-      const results = await Promise.all(workerPromises);
-      return results.flat();
+            if (fs.existsSync(tempOutput)) {
+              try {
+                const results = JSON.parse(fs.readFileSync(tempOutput, 'utf8'));
+                fs.unlinkSync(tempInput);
+                fs.unlinkSync(tempOutput);
+                resolve(results);
+              } catch (e) {
+                resolve([]);
+              }
+            } else {
+              resolve([]);
+            }
+          });
+        };
+
+        const resultChunk = await spawnWorker(chunk as any);
+        results.push(...resultChunk);
+      }
+      return results;
     }
 
     // Main thread fallback for debug or small batches
     const reflector = new ConducksReflector();
     const results = [];
     const providerMap = new Map<string, any>();
+    const loadedGrammars = new Set<string>();
     
     for (const file of files) {
       try {
@@ -426,6 +465,13 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         if (!provider) {
           results.push({ success: false, path: file.path });
           continue;
+        }
+
+        // Load native grammar if not already loaded for this langId
+        const langId = provider.langId;
+        if (langId && !loadedGrammars.has(langId)) {
+          await grammars.loadLanguage(langId);
+          loadedGrammars.add(langId);
         }
 
         const context = new AnalyzeContext();

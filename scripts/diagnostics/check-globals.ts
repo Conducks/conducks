@@ -1,8 +1,8 @@
-import { DuckDbPersistence } from "../../src/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "../../src/lib/core/persistence/persistence.js";
 import path from "node:path";
 
 async function checkGlobals() {
-  const persistence = new DuckDbPersistence(process.cwd());
+  const persistence = new SynapsePersistence(process.cwd());
   const db = await persistence.getRawConnection();
   if (!db) {
     console.error("Failed to establish raw structural connection.");

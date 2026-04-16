@@ -1,5 +1,5 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
-import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { DeadCodeAnalyzer, Finding } from "../evolution/dead-code.js";
 import { ResonanceAnalyzer } from "./resonance.js";
 import { TestAligner } from "./test-aligner.js";
@@ -105,9 +105,8 @@ export class MetricsService implements ConducksComponent {
    */
   public async compare(otherPath: string) {
     const otherGraph = new ConducksGraph();
-    const otherPersistence = new GraphPersistence(otherPath, true);
-    const success = await otherPersistence.load(otherGraph.getGraph());
-    if (!success) throw new Error(`[Metrics] Failed to load structural resonance signature: ${otherPath}`);
+    const otherPersistence = new SynapsePersistence(otherPath, true);
+    await otherPersistence.load(otherGraph.getGraph());
     
     return this.resonance.analyzeResonance(this.graph.getGraph(), otherGraph.getGraph());
   }

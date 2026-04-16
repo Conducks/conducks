@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "../../src/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "../../src/lib/core/persistence/persistence.js";
 import { Logger } from "../../src/lib/core/utils/logger.js";
 
 const logger = new Logger("StructuralHealth");
@@ -6,7 +6,7 @@ const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
 
 async function runHealthCheck() {
   logger.info(`🛡️ Starting High-Fidelity Structural Health Audit @ ${workspaceRoot}`);
-  const persistence = new DuckDbPersistence(workspaceRoot);
+  const persistence = new SynapsePersistence(workspaceRoot);
   
   try {
     const pulseRows = await persistence.query("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1");
@@ -94,7 +94,7 @@ async function runHealthCheck() {
     `, [pulseId]);
     console.log(`${collisions.length === 0 ? "✅" : "❌"} ID Collisions: ${collisions.length}`);
     if (collisions.length > 0) {
-        collisions.slice(0, 5).forEach(c => console.log(`  - Collision: ${c.id} (${c.count} instances)`));
+        collisions.slice(0, 5).forEach((c: any) => console.log(`  - Collision: ${c.id} (${c.count} instances)`));
     }
 
     console.log("\n--- 🚩 FINAL ARCHITECTURAL STATUS ---");
