@@ -6,6 +6,7 @@ import { SynapseRegistry } from "../../../registry/synapse-registry.js";
 import { SynapsePersistence } from "../../core/persistence/persistence.js";
 import { Logger } from "../../core/utils/logger.js";
 import { grammars } from "../../core/parsing/grammar-registry.js";
+import { chronicle } from "../../core/git/chronicle-interface.js";
 
 const logger = new Logger("MicroPulse");
 
@@ -35,7 +36,8 @@ export class MicroPulseService {
    */
   public async resonate(filePath: string): Promise<{ success: boolean; error?: string; nodes?: number }> {
     try {
-      const absolutePath = path.resolve(filePath);
+      const root = chronicle.getProjectDir();
+      const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(root, filePath);
       const provider = this.registry.getProvider(absolutePath);
       
       if (!provider) {
@@ -63,17 +65,15 @@ export class MicroPulseService {
       );
 
       // 5. Conducks Purge & Resurrection 🛡️
-      // We explicitly purge the unit and its stale relationships.
-      const unitId = `${absolutePath.toLowerCase()}::unit`;
-      
-      // Use the existing SynapsePersistence hardening
-      await this.persistence.purgeUnits([unitId]);
-      
-      // Save the fresh spectrum
-      await this.persistence.saveBatchSpectrum([{
-        filePath: absolutePath,
-        spectrum
-      }], `micro_${Date.now()}`);
+      if (!this.persistence.readOnly) {
+        const unitId = `${absolutePath.toLowerCase()}::unit`;
+        await this.persistence.purgeUnits([unitId]);
+        
+        await this.persistence.saveBatchSpectrum([{
+          filePath: absolutePath,
+          spectrum
+        }], `micro_${Date.now()}`);
+      }
 
       logger.success(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} resurrected (${spectrum.nodes.length} nodes).`);
       

@@ -238,6 +238,9 @@ export class SynapsePersistence {
   }
 
   public async run(sql: string, params: any[] = []): Promise<void> {
+    if (this.readOnly) {
+      throw new Error(`🛡️ [Persistence] WRITE BLOCKED: Attempted to execute mutational SQL on a Read-Only vault connection.`);
+    }
     const db = await this.ensureVaultOpen();
     return await new Promise((res, rej) => {
       db.run(sql, ...params, (err) => err ? rej(err) : res());
@@ -259,31 +262,29 @@ export class SynapsePersistence {
     }
   }
 
-  public async save(graph: ConducksAdjacencyList, options: { append?: boolean, nodeCount?: number, edgeCount?: number } = {}): Promise<string> {
-    const db = await this.ensureVaultOpen();
-    const rawNodes = Array.from(graph.getAllNodes());
-    const allEdges = this.serializeEdges(graph);
+  public async save(graph: ConducksAdjacencyList, options: { append?: boolean, nodeCount?: number, edgeCount?: number, metadataOnly?: boolean } = {}): Promise<string> {
+    if (this.readOnly) {
+      logger.warn("🛡️ [Persistence] SAVE SKIPPED: Graph resonance updated in memory, but vault is Read-Only.");
+      return (graph as any).getMetadata('targetPulseId') || 'read_only_pulse';
+    }
     const pulseId = (graph as any).getMetadata('targetPulseId') || `pulse_${Date.now()}`;
-    const nodeMap = new Map<string, ConducksNode>();
-    for (const n of rawNodes) nodeMap.set(n.id.toLowerCase(), n);
-    const nodes = Array.from(nodeMap.values());
 
     try {
       await this.run("BEGIN TRANSACTION");
+      // Sync all graph metadata keys into the metadata table.
       await this.run("DELETE FROM metadata");
+      const db = await this.ensureVaultOpen();
       const metaStmt = db.prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)");
       for (const [k, v] of graph.getAllMetadata().entries()) {
         await new Promise<void>((r, j) => metaStmt.run(k, String(v), (e) => e ? j(e) : r()));
       }
       metaStmt.finalize();
 
-      if (!options.append) {
-        // [Unit-Centric Realignment] By default, we no longer delete all nodes for a pulse.
-        // We rely on INSERT OR REPLACE at the node/unit level.
-        // If append is false (Full Sync), we clear metadata but NOT the entire node table.
-        // This prevents accidental wipes during multi-wave pulses.
-        await this.run("DELETE FROM metadata");
-      }
+      const rawNodes = options.metadataOnly ? [] : Array.from(graph.getAllNodes());
+      const nodeMap = new Map<string, ConducksNode>();
+      for (const n of rawNodes) nodeMap.set(n.id.toLowerCase(), n);
+      const nodes = Array.from(nodeMap.values());
+      const allEdges = options.metadataOnly ? [] : this.serializeEdges(graph);
 
       const finalNodeCount = options.nodeCount ?? nodes.length;
       const finalEdgeCount = options.edgeCount ?? allEdges.length;
@@ -293,9 +294,11 @@ export class SynapsePersistence {
       ]);
       await this.run("COMMIT");
 
-      // Conducks Streaming: Delegated Reflection 🏺
-      await this.saveNodes(nodes, pulseId);
-      await this.saveEdges(allEdges, pulseId);
+      // Skip node/edge writes when caller wants only metadata updated (e.g. after gravity pass).
+      if (!options.metadataOnly) {
+        await this.saveNodes(nodes, pulseId);
+        await this.saveEdges(allEdges, pulseId);
+      }
 
       return pulseId;
     } catch (fail) {
@@ -309,6 +312,7 @@ export class SynapsePersistence {
    * Conducks Streaming: High-performance Batched Node Reflection 🏺
    */
   public async saveNodes(nodes: ConducksNode[], pulseId: string): Promise<void> {
+    if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     const batchSize = 2500;
     
@@ -352,6 +356,7 @@ export class SynapsePersistence {
    * Conducks Streaming: High-performance Batched Edge Reflection 🏺
    */
   public async saveEdges(edges: ConducksEdge[], pulseId: string): Promise<void> {
+    if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     const batchSize = 5000;
     
@@ -378,10 +383,12 @@ export class SynapsePersistence {
   }
 
   public async saveSpectrum(filePath: string, spectrum: any): Promise<void> {
+    if (this.readOnly) return;
     return this.saveBatchSpectrum([{ filePath, spectrum }]);
   }
 
   public async saveBatchSpectrum(entries: Array<{ filePath: string, spectrum: any }>, pulseIdOverride?: string): Promise<void> {
+    if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     const pid = pulseIdOverride || `stream_${Date.now()}`;
     return new Promise(async (resolve, reject) => {
@@ -521,6 +528,9 @@ export class SynapsePersistence {
   }
 
   public async clean(pulseIdToKeep?: string): Promise<void> {
+    if (this.readOnly) {
+      throw new Error(`🛡️ [Persistence] WRITE BLOCKED: Cannot clean vault in Read-Only mode.`);
+    }
     const db = await this.connect();
     if (!db) return;
     return new Promise<void>((resolve) => {
@@ -549,6 +559,57 @@ export class SynapsePersistence {
   public async getRawConnection(): Promise<duckdb.Database | null> { return this.connect(); }
   public async close(): Promise<void> { if (this.db) { await new Promise(r => this.db!.close(r)); this.db = null; } }
   public isConnected(): boolean { return !!this.db; }
+
+  /**
+   * Conducks — Targeted Gravity Commit 🏺
+   *
+   * Updates ONLY the gravity column for a batch of nodes after PageRank converges.
+   * This is surgical — it does not touch any other column (dna, kinetic, etc.),
+   * so it is safe to call after a shallow load.
+   */
+  public async updateRanks(items: Array<{ id: string; gravity: number }>, pulseId: string): Promise<void> {
+    if (this.readOnly) return;
+    if (items.length === 0) return;
+    const db = await this.ensureVaultOpen();
+    const batchSize = 2500;
+
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      await this.run("BEGIN TRANSACTION");
+      const stmt = db.prepare("UPDATE nodes SET gravity = ? WHERE id = ? AND pulseId = ?");
+      for (const item of batch) {
+        await new Promise<void>((r, j) =>
+          stmt.run(item.gravity, item.id.toLowerCase(), pulseId.toLowerCase(), (e: any) => e ? j(e) : r())
+        );
+      }
+      stmt.finalize();
+      await this.run("COMMIT");
+    }
+  }
+
+  /**
+   * Conducks Surgical Rebinding: Updates edge targetIds after intra-project symbol resolution.
+   * Only touches the targetId column — all other edge data is preserved.
+   */
+  public async updateEdgeTargets(updates: Array<{ id: string; newTargetId: string }>): Promise<void> {
+    if (this.readOnly) return;
+    if (updates.length === 0) return;
+    const db = await this.ensureVaultOpen();
+    const batchSize = 2500;
+
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize);
+      await this.run("BEGIN TRANSACTION");
+      const stmt = db.prepare("UPDATE edges SET targetId = ? WHERE id = ?");
+      for (const u of batch) {
+        await new Promise<void>((r, j) =>
+          stmt.run(u.newTargetId.toLowerCase(), u.id.toLowerCase(), (e: any) => e ? j(e) : r())
+        );
+      }
+      stmt.finalize();
+      await this.run("COMMIT");
+    }
+  }
 
   /**
    * Conducks Purge: Explicitly removes structural DNA for specific units.

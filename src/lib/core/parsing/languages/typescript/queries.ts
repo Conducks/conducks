@@ -4,6 +4,10 @@
  * Captures Decorators, Interfaces, Type Aliases, and Heritage.
  */
 export const TYPESCRIPT_QUERIES = `
+  ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
+  (import_statement (string) @source) @isImport
+  (export_statement (string) @source) @isImport
+
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
   (public_field_definition name: (property_identifier) @name) @isProperty

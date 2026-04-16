@@ -89,126 +89,43 @@ export class ConducksReflector implements ConducksComponent {
     const parser = grammars.getUnifiedParser(provider.langId);
 
     if (!parser) {
-      // 🛡️ [Gnosis Resilience Fallback] 🧬
-      // If the native parser is unavailable (buggy bindings), we use a high-fidelity Regex scan
-      // to ensure the user still gets a functional structural map.
-      if (provider.langId === 'python' || provider.langId === 'typescript') {
-        const text = fs.readFileSync(file.path, 'utf8');
-        const lines = text.split('\n');
-
-        const classMeta = mapToCanonical('class');
-        const funcMeta = mapToCanonical('function');
-
-        let currentClassName: string | undefined;
-        let currentClassId: string | undefined;
-        let classIndentation = -1;
-        let currentScopeName: string | undefined;
-
-        if (process.env.CONDUCKS_DEBUG === '1') {
-          console.log(`🛡️ [Gnosis] Fallback Pulsing: ${file.path} (${lines.length} lines)`);
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const classMatch = line.match(/^(\s*)(?:export\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
-          const funcMatch = line.match(/^(\s*)(?:export\s+)?(?:async\s+)?(?:def|function)\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
-          const pyImportMatch = line.match(/^(?:from\s+([a-zA-Z0-9_\.]+)\s+)?import\s+([a-zA-Z0-9_,\s]+)/);
-          const tsImportMatch = line.match(/^import\s+.*from\s+['"]([^'"]+)['"]/);
-          const callMatches = [...line.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_\.]*)\s*\(/g)];
-
-          const indent = line.search(/\S/);
-          if (indent === -1) continue;
-
-          if (classMatch) {
-            const name = classMatch[2];
-            const id = `${fileId}::${name}`;
-            const infraSuffixes = ['Service', 'Router', 'Controller', 'Registry', 'Store', 'Runner', 'Manager', 'Engine', 'Writer', 'Reporter', 'Provider', 'Client'];
-            const isInfra = infraSuffixes.some(s => name.endsWith(s));
-            const activeKind = isInfra ? 'infra' : 'class';
-            const activeMeta = mapToCanonical(activeKind);
-
-            if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isInfra ? 'Infra' : 'Class'}: ${name}`);
-
-            spectrum.nodes.push({
-              name,
-              kind: (isInfra ? 'INFRA' : 'STRUCTURE') as any,
-              canonicalKind: activeMeta.kind,
-              canonicalRank: activeMeta.rank,
-              metadata: { id, isStruct: !isInfra, isInfra, lineStart: i + 1, unitId: fileId }
-            } as any);
-            currentClassName = name;
-            currentClassId = id;
-            classIndentation = indent;
-            currentScopeName = name;
-          } else if (funcMatch) {
-            const name = funcMatch[2];
-            const id = `${fileId}::${name}`;
-            const isMethod = currentClassId !== undefined && indent > classIndentation;
-            const displayName = isMethod ? `${currentClassName}.${name}` : name;
-
-            if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isMethod ? 'Method' : 'Func'}: ${displayName} (Parent: ${currentClassId})`);
-
-            spectrum.nodes.push({
-              name: displayName,
-              kind: 'BEHAVIOR' as any,
-              canonicalKind: funcMeta.kind,
-              canonicalRank: funcMeta.rank,
-              metadata: {
-                id: isMethod ? `${currentClassId}.${name}` : id,
-                parentId: isMethod ? currentClassId : fileId,
-                isFunction: true,
-                lineStart: i + 1,
-                unitId: fileId
-              }
-            } as any);
-            currentScopeName = displayName;
-          } else if (indent <= classIndentation && classIndentation !== -1) {
-            // Left the class scope
-            currentClassId = undefined;
-            currentClassName = undefined;
-            classIndentation = -1;
-            currentScopeName = undefined;
-          }
-
-          // Semantic Edge Extraction
-          const specifier = pyImportMatch ? (pyImportMatch[1] || pyImportMatch[2].split(',')[0].trim()) : (tsImportMatch ? tsImportMatch[1] : null);
-          if (specifier) {
-            spectrum.relationships.push({
-              sourceName: 'unit',
-              targetName: specifier,
-              type: 'IMPORTS' as any,
-              confidence: 1.0,
-              metadata: { specifier, isRaw: true }
-            });
-          }
-
-          if (callMatches.length > 0) {
-            for (const match of callMatches) {
-              const target = match[1];
-              if (['if', 'elif', 'def', 'while', 'for', 'return', 'class', 'import', 'from', 'await', 'switch', 'catch', 'function'].includes(target)) continue;
-
-              spectrum.relationships.push({
-                sourceName: currentScopeName || 'unit',
-                targetName: target,
-                type: 'CALLS' as any,
-                confidence: 0.8,
-                metadata: { target, isRaw: true, isGnosis: true }
-              });
-            }
-          }
-        }
-        return spectrum;
-      }
-      return spectrum;
+      return this.reflectGnosis(file, provider, context);
     }
 
     const lang = grammars.getLanguage(provider.langId);
     if (!lang) throw new Error(`[Conducks] Missing native grammar: ${provider.langId}`);
 
-    const tree = parser.parse(file.source);
-    const query = grammars.createQuery(lang, provider.queryScm);
+    let tree: any;
+    try {
+      tree = parser.parse(file.source);
+    } catch (err) {
+      if (process.env.CONDUCKS_DEBUG === '1') {
+        console.error(`🛡️ [Conducks Reflector] Native Parse Crash: ${file.path}. Falling back to Gnosis.`, err);
+      }
+      return this.reflectGnosis(file, provider, context);
+    }
 
-    // Native Matching Protocol 🧬
-    const matches = query.matches(tree.rootNode);
+    let query: any;
+    try {
+      query = grammars.createQuery(provider.langId, provider.queryScm);
+    } catch (err) {
+      if (process.env.CONDUCKS_DEBUG === '1') {
+        console.error(`🛡️ [Conducks Reflector] Native Query Creation Failure: ${file.path}. Falling back to Gnosis.`, err);
+      }
+      return this.reflectGnosis(file, provider, context);
+    }
+    
+    if (!query) return this.reflectGnosis(file, provider, context);
+
+    let matches = [];
+    try {
+      matches = query.matches(tree.rootNode);
+    } catch (err) {
+      if (process.env.CONDUCKS_DEBUG === '1') {
+        console.error(`🛡️ [Conducks Reflector] Native Query Crash: ${file.path}. Falling back to Gnosis.`, err);
+      }
+      return this.reflectGnosis(file, provider, context);
+    }
     if (process.env.CONDUCKS_DEBUG === '1') {
       console.log(`🛡️ [Reflector] ${path.basename(file.path)} matches: ${matches.length}`);
     }
@@ -594,4 +511,138 @@ export class ConducksReflector implements ConducksComponent {
 
     return spectrum;
   }
+  /**
+   * Conducks — Gnosis Dynamic Fallback extractor (Regex-based). 🧬
+   * 
+   * Activated when native bindings fail or are unavailable for a specific language.
+   */
+  private reflectGnosis(file: { path: string, source: string }, provider: ConducksProvider, context: AnalyzeContext): PrismSpectrum {
+    const projectRoot = chronicle.getProjectDir()?.toLowerCase() || '';
+    const fileId = `${file.path.toLowerCase()}::unit`;
+    const relativePath = path.relative(projectRoot, file.path).toLowerCase();
+    const rootName = path.basename(projectRoot).toLowerCase();
+
+    const spectrum: PrismSpectrum = {
+      nodes: [{
+        name: path.basename(file.path),
+        kind: 'FILE' as any,
+        canonicalKind: 'STRUCTURE',
+        canonicalRank: 1,
+        metadata: {
+          id: fileId,
+          filePath: file.path,
+          namespaceId: path.dirname(relativePath),
+          rootId: `repository::${rootName}`,
+          layer_path: relativePath,
+          depth: 3
+        },
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } },
+        filePath: file.path,
+        isExport: true
+      }],
+      relationships: [],
+      metadata: { language: provider.langId }
+    };
+
+    if (provider.langId !== 'python' && provider.langId !== 'typescript' && provider.langId !== 'javascript') return spectrum;
+
+    const lines = file.source.split('\n');
+    const classMeta = mapToCanonical('class');
+    const funcMeta = mapToCanonical('function');
+
+    let currentClassName: string | undefined;
+    let currentClassId: string | undefined;
+    let classIndentation = -1;
+    let currentScopeName: string | undefined;
+
+    if (process.env.CONDUCKS_DEBUG === '1') {
+      console.log(`🛡️ [Gnosis] Fallback Pulsing: ${file.path} (${lines.length} lines)`);
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const classMatch = line.match(/^(\s*)(?:export\s+)?(?:abstract\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      const funcMatch = line.match(/^(\s*)(?:export\s+)?(?:async\s+)?(?:def|function)\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      const pyImportMatch = line.match(/^(?:from\s+([a-zA-Z0-9_\.]+)\s+)?import\s+([a-zA-Z0-9_,\s]+)/);
+      const tsImportMatch = line.match(/^(?:import|export)\s+.*from\s+['"]([^'"]+)['"]/);
+      const callMatches = [...line.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_\.]*)\s*\(/g)];
+
+      const indent = line.search(/\S/);
+      if (indent === -1) continue;
+
+      if (classMatch) {
+        const name = classMatch[2];
+        const id = `${fileId}::${name}`;
+        const infraSuffixes = ['Service', 'Router', 'Controller', 'Registry', 'Store', 'Runner', 'Manager', 'Engine', 'Writer', 'Reporter', 'Provider', 'Client'];
+        const isInfra = infraSuffixes.some(s => name.endsWith(s));
+        const activeKind = isInfra ? 'infra' : 'class';
+        const activeMeta = mapToCanonical(activeKind);
+
+        if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isInfra ? 'Infra' : 'Class'}: ${name}`);
+
+        spectrum.nodes.push({
+          name,
+          kind: (isInfra ? 'INFRA' : 'STRUCTURE') as any,
+          canonicalKind: activeMeta.kind,
+          canonicalRank: activeMeta.rank,
+          metadata: { id, isStruct: !isInfra, isInfra, lineStart: i + 1, unitId: fileId },
+          range: { start: { line: i, column: indent }, end: { line: i, column: indent + name.length } },
+          filePath: file.path,
+          isExport: line.includes('export')
+        } as any);
+        currentClassName = name;
+        currentClassId = id;
+        classIndentation = indent;
+        currentScopeName = name;
+      } else if (funcMatch) {
+        const name = funcMatch[2];
+        const id = `${fileId}::${name}`;
+        const isMethod = currentClassId !== undefined && indent > classIndentation;
+        const displayName = isMethod ? `${currentClassName}.${name}` : name;
+
+        if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isMethod ? 'Method' : 'Func'}: ${displayName} (Parent: ${currentClassId})`);
+
+        spectrum.nodes.push({
+          name: displayName,
+          kind: (isMethod ? 'BEHAVIOR' : 'FUNCTION') as any,
+          canonicalKind: funcMeta.kind,
+          canonicalRank: funcMeta.rank,
+          metadata: { id, lineStart: i + 1, parentId: isMethod ? currentClassId : undefined, unitId: fileId },
+          range: { start: { line: i, column: indent }, end: { line: i, column: indent + name.length } },
+          filePath: file.path,
+          isExport: line.includes('export')
+        } as any);
+        currentScopeName = displayName;
+      }
+
+      // Semantic Edge Extraction
+      const specifier = pyImportMatch ? (pyImportMatch[1] || pyImportMatch[2].split(',')[0].trim()) : (tsImportMatch ? tsImportMatch[1] : null);
+      if (specifier) {
+        spectrum.relationships.push({
+          sourceName: 'unit',
+          targetName: specifier,
+          type: 'IMPORTS' as any,
+          confidence: 1.0,
+          metadata: { specifier, isRaw: true }
+        });
+      }
+
+      if (callMatches.length > 0) {
+        for (const match of callMatches) {
+          const target = match[1];
+          if (['if', 'elif', 'def', 'while', 'for', 'return', 'class', 'import', 'from', 'await', 'switch', 'catch', 'function'].includes(target)) continue;
+
+          spectrum.relationships.push({
+            sourceName: currentScopeName || 'unit',
+            targetName: target,
+            type: 'CALLS' as any,
+            confidence: 0.8,
+            metadata: { target, isRaw: true, isGnosis: true }
+          });
+        }
+      }
+    }
+    return spectrum;
+  }
 }
+

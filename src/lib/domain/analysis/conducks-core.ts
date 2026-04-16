@@ -14,6 +14,8 @@ import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { GVREngine } from "@/lib/domain/evolution/gvr-engine.js";
 import { GQLParser } from "@/lib/domain/intelligence/gql-parser.js";
 import { ResonanceAnalyzer } from "@/lib/domain/metrics/resonance.js";
+import { FallbackDetector } from "./fallback-detector.js";
+import { ConducksNode } from "@/lib/core/graph/adjacency-list.js";
 import { DeadCodeAnalyzer } from "@/lib/domain/evolution/dead-code.js";
 import { ConducksAdvisor } from "@/lib/domain/governance/advisor.js";
 import { CoChangeEngine } from "@/lib/core/algorithms/cochange-engine.js";
@@ -43,6 +45,7 @@ export class Conducks implements ConducksComponent {
   private gvr = new GVREngine();
   private gql = new GQLParser();
   private resonance = new ResonanceAnalyzer();
+  private fallbackDetector = new FallbackDetector();
   private death = new DeadCodeAnalyzer();
   private advisor = new ConducksAdvisor();
   private aligner = new TestAligner();
@@ -104,12 +107,18 @@ export class Conducks implements ConducksComponent {
     // Conducks: Kinetic Root Alignment
     if (files.length > 0) {
       const firstFile = files[0].path;
-      // Heuristic: find the last 'stress_test' or 'stress_test_git' or use the directory
-      const projectRoot = firstFile.includes('stress_test_git') ?
-        firstFile.split('stress_test_git')[0] + 'stress_test_git' :
-        firstFile.includes('stress_test') ?
-          firstFile.split('stress_test')[0] + 'stress_test' :
-          path.dirname(firstFile);
+      
+      // Improved Heuristic: Find the root containing .git or .conducks
+      let currentDir = path.dirname(path.resolve(firstFile));
+      let projectRoot = currentDir;
+      
+      while (currentDir !== path.parse(currentDir).root) {
+        if (fs.existsSync(path.join(currentDir, '.git')) || fs.existsSync(path.join(currentDir, '.conducks'))) {
+          projectRoot = currentDir;
+          break;
+        }
+        currentDir = path.dirname(currentDir);
+      }
 
       chronicle.setProjectDir(projectRoot);
     }
@@ -182,7 +191,9 @@ export class Conducks implements ConducksComponent {
 
   public async advise(): Promise<any[]> {
     let cochangeFindings: any[] = [];
-    if (typeof (this.persistence as any).getRawConnection === 'function') {
+    // CoChangeEngine creates TEMP tables — requires a read-write connection.
+    // Only run during analyze (write mode); skip in all read-only contexts (MCP tools, CLI reads).
+    if (!(this.persistence as any).readOnly && typeof (this.persistence as any).getRawConnection === 'function') {
       const db = await (this.persistence as any).getRawConnection();
       const engine = new CoChangeEngine();
       cochangeFindings = await engine.discoverHiddenCoupling(this.graph.getGraph(), db);
@@ -213,18 +224,74 @@ export class Conducks implements ConducksComponent {
     const fanOutRisk = Math.min(outgoing / 10, 1.0);
     const gravity = node.properties.rank || 0;
 
-    const score = (gravity * 0.25) + (complexityRisk * 0.35) + (entropyRisk * 0.1) + (churnRisk * 0.1) + (fanOutRisk * 0.15);
-    return { score, breakdown: { gravity, complexity: complexityRisk, entropy: entropyRisk, churn: churnRisk, fanOut: fanOutRisk } };
+    // Fallback pattern analysis
+    const fallbackAnalysis = this.fallbackDetector.detectFallbackPatterns(node, graph);
+    const fallbackRisk = this.calculateFallbackRisk(fallbackAnalysis, node);
+
+    // Adjust weights when fallback is detected
+    const isFallback = fallbackAnalysis.isFallback;
+    const weights = isFallback ?
+      { gravity: 0.15, complexity: 0.30, entropy: 0.10, churn: 0.10, fanOut: 0.10, fallback: 0.25 } :
+      { gravity: 0.25, complexity: 0.35, entropy: 0.10, churn: 0.10, fanOut: 0.15, fallback: 0.05 };
+
+    const score = (gravity * weights.gravity) +
+                 (complexityRisk * weights.complexity) +
+                 (entropyRisk * weights.entropy) +
+                 (churnRisk * weights.churn) +
+                 (fanOutRisk * weights.fanOut) +
+                 (fallbackRisk * weights.fallback);
+
+    return {
+      score,
+      breakdown: {
+        gravity,
+        complexity: complexityRisk,
+        entropy: entropyRisk,
+        churn: churnRisk,
+        fanOut: fanOutRisk,
+        fallback: fallbackRisk
+      },
+      fallbackAnalysis
+    };
+  }
+
+  /**
+   * Calculates fallback-specific risk factors
+   */
+  private calculateFallbackRisk(analysis: any, node: ConducksNode): number {
+    if (!analysis.isFallback) return 0;
+
+    let risk = 0;
+
+    // High confidence fallback with low usage = high risk
+    if (analysis.confidence > 0.7) {
+      const usageRatio = analysis.patterns.usageRatio.ratio;
+      risk += (1 - usageRatio) * 0.4; // Low usage increases risk
+    }
+
+    // Complex fallbacks are riskier to maintain
+    const complexity = node.properties.complexity || 1;
+    if (complexity > 10) {
+      risk += Math.min((complexity - 10) / 20, 0.3);
+    }
+
+    // Long-tenured fallbacks with legacy naming
+    const tenureDays = node.properties.tenureDays || 0;
+    const hasLegacyNaming = analysis.patterns.namingPatterns.score > 0.5;
+    if (tenureDays > 365 && hasLegacyNaming) {
+      risk += 0.3;
+    }
+
+    return Math.min(risk, 1.0);
   }
 
   public async resonate(): Promise<void> {
     console.error("[Conducks] Pushing Structural Resonance Flow...");
     this.graph.resonate();
-    await this.persistence.save(this.graph.getGraph());
   }
 
   public async recalculateGravity(): Promise<void> {
-    await this.resonate();
+    this.graph.resonate();
   }
 
 

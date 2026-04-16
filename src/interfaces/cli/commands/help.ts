@@ -19,7 +19,7 @@ export class HelpCommand implements ConducksCommand {
       "LANDSCAPE (Status)": ["status", "link", "resonance", "blueprint"],
       "BEHAVIORAL (Impact)": ["impact", "flows", "trace"],
       "METRICS (Explain)": ["explain", "entropy", "cohesion"],
-      "GOVERNANCE (Audit)": ["audit", "advise", "context", "guard", "drift"],
+      "GOVERNANCE (Audit)": ["audit", "fallback", "advise", "context", "guard", "drift"],
       "HISTORICAL (Diff)": ["diff", "record"],
       "MUTATIONAL (Rename)": ["rename", "prune", "clean"],
       "VISUAL (Mirror)": ["mirror", "visualize"],

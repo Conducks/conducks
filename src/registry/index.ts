@@ -1,7 +1,7 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { DuckDbPersistence, SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
-import { AnalysisService, AnalyzeOrchestrator } from "@/lib/domain/analysis/index.js";
+import { AnalysisService, AnalyzeOrchestrator, Conducks } from "@/lib/domain/analysis/index.js";
 import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
@@ -97,6 +97,10 @@ let microPulse = new MicroPulseService(synapseRegistry, persistence);
 let analysis = new AnalysisService(orchestrator, graph, persistence, contextGenerator);
 let kinetic = new KineticService(graph.getGraph());
 let metrics = new MetricsService(graph, deadCode, resonance, aligner);
+let conducksCore = new Conducks();
+(conducksCore as any).orchestrator = orchestrator;
+(conducksCore as any).graph = graph;
+(conducksCore as any).persistence = persistence;
 let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, contextGenerator, blueprint, persistence);
 let intelligence = new IntelligenceService(graph, search, gql, federation);
 let evolution = new EvolutionService(graph, persistence);
@@ -119,6 +123,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
         analysis.setPersistence(p);
         evolution.setPersistence(p);
         governance.setPersistence(p);
+        (conducksCore as any).persistence = p;
       },
       updateIgnoreManager: (i) => { 
         ignoreManager = i;
@@ -184,7 +189,7 @@ export const registry = {
   explain: {
     prune: () => metrics.prune(),
     calculateEntropy: (symbolId: string) => metrics.calculateEntropy(symbolId),
-    calculateCompositeRisk: (nodeId: string) => metrics.calculateCompositeRisk(nodeId),
+    calculateCompositeRisk: (nodeId: string) => conducksCore.calculateCompositeRisk(nodeId),
     getCohesionVector: (sourceId: string, targetId: string) => metrics.getLevelSimilarity(sourceId, targetId),
     compare: (otherPath: string) => metrics.compare(otherPath)
   },

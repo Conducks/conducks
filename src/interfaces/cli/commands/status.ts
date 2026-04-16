@@ -22,9 +22,9 @@ export class StatusCommand implements ConducksCommand {
     const pathArg = args.find(a => !a.startsWith('--') && a !== fileArg && a !== 'pulse');
     const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
 
-    // 1. Initial Structural Anchor & Resonance 🏺
+    // 1. Initial Structural Anchor & Resonance 🏺 (Read-Only: status never writes)
     if (pathArg || process.env.CONDUCKS_WORKSPACE_ROOT !== targetPath || isPulse) {
-      await registry.initialize(!isPulse, targetPath);
+      await registry.initialize(true, targetPath);
     }
     chronicle.setProjectDir(targetPath);
 

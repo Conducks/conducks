@@ -1,6 +1,7 @@
 import { Tool } from "@/registry/types.js";
 import { registry } from "@/registry/index.js";
 import fs from "fs-extra";
+import { execSync } from "node:child_process";
 
 /**
  * Conducks — Behavioral Intelligence Tools (Standardized Taxonomy)
@@ -17,8 +18,12 @@ import fs from "fs-extra";
 async function ensureAnchor(customPath?: string, readOnly: boolean = true) {
   const root = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
   const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
-  
-  if (root && root !== currentAnchor && root !== '/') {
+  const currentPersistence = (registry.infrastructure as any).persistence;
+
+  const rootChanged = root && root !== currentAnchor && root !== '/';
+  const modeChanged = currentPersistence && currentPersistence.readOnly !== readOnly;
+  // Disconnection is NOT a re-init trigger — lazy persistence reconnects on next query.
+  if (rootChanged || modeChanged) {
     await registry.initialize(readOnly, root);
   }
 }
@@ -70,6 +75,8 @@ Modes:
         };
       } catch (err: any) {
         return { error: `Impact Analysis Failed: ${err.message}` };
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
       }
     }
   },
@@ -152,13 +159,47 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
           };
         }
 
-        const diffEngine = registry.query.diff;
+        // Parse git diff to find changed lines and map them to structural symbols
+        let rawDiff = "";
+        try {
+          const cwd = (registry.infrastructure as any).chronicle?.getProjectDir() || process.cwd();
+          rawDiff = execSync('git diff -U0', { encoding: 'utf-8', cwd });
+        } catch {
+          return { error: "Git diff failed — is this a git repository?", indexStaleness: registry.audit.status().staleness.stale };
+        }
+
+        if (!rawDiff.trim()) {
+          return { message: "No uncommitted structural changes detected.", indexStaleness: registry.audit.status().staleness.stale };
+        }
+
         const currentGraph = registry.query.graph.getGraph();
-        const results = diffEngine.diff(currentGraph, currentGraph); // Placeholder for uncommitted/historical comparison logic
-        
+        const allNodes = Array.from(currentGraph.getAllNodes() as Iterable<any>);
+        const impactedSymbols: string[] = [];
+
+        let currentFile = "";
+        for (const line of rawDiff.split('\n')) {
+          if (line.startsWith('+++ b/')) {
+            currentFile = line.replace('+++ b/', '').toLowerCase();
+          } else if (line.startsWith('@@')) {
+            const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+            if (match && currentFile) {
+              const start = parseInt(match[1], 10);
+              const count = parseInt(match[2] || '1', 10);
+              for (let i = 0; i < count; i++) {
+                const changedLine = start + i;
+                const hit = allNodes.find(n =>
+                  (n.properties.file || n.properties.filePath || '').toLowerCase().endsWith(currentFile) &&
+                  n.properties.lineStart <= changedLine && n.properties.lineStart + (n.properties.complexity || 1) >= changedLine
+                );
+                if (hit && !impactedSymbols.includes(hit.id)) impactedSymbols.push(hit.id);
+              }
+            }
+          }
+        }
+
         return {
-          addedSymbols: results.nodes.list.added.slice(0, 10),
-          removedSymbols: results.nodes.list.removed.slice(0, 10),
+          impactedSymbols: impactedSymbols.slice(0, 15),
+          totalImpacted: impactedSymbols.length,
           indexStaleness: registry.audit.status().staleness.stale
         };
       } catch (err: any) {
@@ -193,7 +234,7 @@ WARNING: This is a mutational tool. It modifies the source code.`,
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ symbol, newName, dryRun, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath, false); // Mutation typically triggers re-analysis or write-ops
+        await ensureAnchor(customPath, true); // GVR is memory-safe and FS-verified. NO write lock needed for DNA.
         const result = await registry.rename.rename(symbol, newName, dryRun);
         return { result, dryRun };
       } catch (err: any) {

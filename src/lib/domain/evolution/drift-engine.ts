@@ -15,18 +15,20 @@ export class DriftEngine {
    * If pulseId is not provided, uses the two most recent pulses.
    */
   public async compare(prevPulseId?: string): Promise<DriftResult> {
-    const db = await this.persistence.getRawConnection();
-    if (!db) throw new Error("Persistence layer is offline.");
-
     // 1. Resolve Pulses
-    const pulses: any[] = await new Promise((res) => db.all("SELECT id, timestamp FROM pulses ORDER BY timestamp DESC LIMIT 2", (err: any, rows: any[]) => res(err ? [] : rows)));
-    
+    let pulses: any[] = [];
+    try {
+      pulses = await this.persistence.query("SELECT id, timestamp FROM pulses ORDER BY timestamp DESC LIMIT 2");
+    } catch (err: any) {
+      logger.error(`[DriftEngine] Failed to fetch pulses: ${err.message}`);
+    }
+
     if (pulses.length < 2 && !prevPulseId) {
-      return { 
-        status: 'STABLE', 
+      return {
+        status: 'STABLE',
         message: 'Insufficient historical data for drift analysis (Need at least 2 pulses).',
         deltas: [],
-        moves: [] 
+        moves: []
       };
     }
 
@@ -35,7 +37,7 @@ export class DriftEngine {
 
     // 2. Query Deltas (Exact Matches via ID)
     const exactDriftQuery = `
-      SELECT 
+      SELECT
         c.id, c.name, c.file, c.fingerprint as current_fingerprint,
         p.fingerprint as prev_fingerprint,
         c.gravity as current_gravity, p.gravity as prev_gravity,
@@ -47,7 +49,7 @@ export class DriftEngine {
 
     // 3. Query Structural "Moves" (Same DNA, Different ID)
     const moveQuery = `
-      SELECT 
+      SELECT
         c.id as current_id, p.id as prev_id, c.name, c.file,
         c.fingerprint, c.gravity as current_gravity, p.gravity as prev_gravity
       FROM nodes c
@@ -56,10 +58,19 @@ export class DriftEngine {
       AND c.id NOT IN (SELECT id FROM nodes WHERE pulseId = ?)
     `;
 
-    const [exactRows, moveRows] = await Promise.all([
-      new Promise<any[]>((res) => db.all(exactDriftQuery, [currentPulseId, targetPrevPulseId], (err: any, rows: any[]) => res(err ? [] : rows))),
-      new Promise<any[]>((res) => db.all(moveQuery, [currentPulseId, targetPrevPulseId, targetPrevPulseId], (err: any, rows: any[]) => res(err ? [] : rows)))
-    ]);
+    // Sequential queries — lazy persistence closes connection between calls
+    let exactRows: any[] = [];
+    let moveRows: any[] = [];
+    try {
+      exactRows = await this.persistence.query(exactDriftQuery, [currentPulseId, targetPrevPulseId]);
+    } catch (err: any) {
+      logger.error(`[DriftEngine] Exact drift query failed: ${err.message}`);
+    }
+    try {
+      moveRows = await this.persistence.query(moveQuery, [currentPulseId, targetPrevPulseId, targetPrevPulseId]);
+    } catch (err: any) {
+      logger.error(`[DriftEngine] Move query failed: ${err.message}`);
+    }
 
     const deltas = exactRows.map(row => {
       const gDelta = row.current_gravity - row.prev_gravity;

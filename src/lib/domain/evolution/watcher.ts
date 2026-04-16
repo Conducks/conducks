@@ -169,13 +169,17 @@ export class ConducksWatcher implements ConducksComponent {
             const downstreamNames = upstreamIds.slice(0, 5).map(id => id.split('::').pop() || id);
 
             // Get Baseline Risk from DB for Delta calculation
-            const db: any = await (this.options.persistence as any)?.getRawConnection();
             let riskDelta = 0;
-            if (db) {
-              const rows: any[] = await new Promise((res) => db.all("SELECT risk, complexity FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1", symbolId, (err: any, rows: any[]) => res(rows || [])));
-              const prevNode = rows[0];
-              if (prevNode) riskDelta = (node.properties.risk || 0) - prevNode.risk;
-            }
+            try {
+              const persistence: any = this.options.persistence;
+              if (persistence?.query) {
+                const rows: any[] = await persistence.query(
+                  "SELECT risk, complexity FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1",
+                  [symbolId]
+                );
+                if (rows[0]) riskDelta = (node.properties.risk || 0) - rows[0].risk;
+              }
+            } catch { /* baseline risk is supplementary — non-fatal */ }
 
             console.error(`\x1b[35m⚡ Change detected: \x1b[0m${path.relative(this.rootDir, filePath)}`);
             console.error(`   \x1b[1mModified symbol: \x1b[0m${node.properties.name}`);
