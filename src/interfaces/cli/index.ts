@@ -54,7 +54,7 @@ export async function main() {
   for (let i = 0; i < cmdArgs.length; i++) {
     const arg = cmdArgs[i];
     if (arg.startsWith('--')) {
-      if (['--base', '--head', '--symbol', '--id', '--q'].includes(arg)) {
+      if (['--base', '--head', '--symbol', '--id', '--q', '--mode', '--file', '--limit', '--direction'].includes(arg)) {
         i++; 
       }
       continue;
@@ -63,9 +63,15 @@ export async function main() {
   }
 
   const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows'].includes(commandId);
-  const pathArg = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
+  const pathCandidate = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
-  let targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
+  let targetPath = process.cwd();
+  if (pathCandidate) {
+    const resolvedCandidate = pathCandidate.startsWith('/') ? pathCandidate : path.resolve(process.cwd(), pathCandidate);
+    if (fs.existsSync(resolvedCandidate) && fs.lstatSync(resolvedCandidate).isDirectory()) {
+      targetPath = resolvedCandidate;
+    }
+  }
   
   // 🛡️ [Root Detachment Check]
   // Standard MCP runners execute global binaries from detached roots (/).

@@ -97,19 +97,22 @@ function applyForces() {
   Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(gravity));
   Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(gravity));
   Graph.d3Force('collide', d3.forceCollide(node => {
-     const level = Number(node.level);
-     let size = 6;
-     if (level === 0) size = 42;
-     else if (level === 1) size = 36;
-     else if (level === 2) size = 32;
-     else if (level === 3) size = 26;
-     else if (level === 4) size = 20;
-     else if (level === 5) size = 16;
-     else if (level === 6) size = 12;
-     else if (level === 7) size = 8;
-     else if (level === 8) size = 6;
-     return size * 1.4;
+     return getNodeSize(node) * 1.4; // Slightly tighter multiplier for Titan nodes
   }).strength(1));
+}
+
+function getNodeSize(node) {
+  const level = Number(node.level);
+  if (level === 0) return 240;      // Ecosystem
+  if (level === 1) return 192;      // Repo
+  if (level === 2) return 152;      // Namespace
+  if (level === 3) return 120;      // Unit
+  if (level === 4) return 96;       // Infra
+  if (level === 5) return 72;       // Structure
+  if (level === 6) return 48;       // Behavior
+  if (level === 7) return 32;       // Atom
+  if (level === 8) return 24;       // Data
+  return 24;
 }
 
 function configureGraph() {
@@ -132,10 +135,17 @@ function configureGraph() {
        const tNode = typeof link.target === 'object' ? link.target : null;
        const isHighlighted = hoverNode && (sNode?.id === hoverNode.id || tNode?.id === hoverNode.id);
 
-       if (isHighlighted) return 2.0;
-
        const category = link.category || 'STRUCTURAL';
-       return (category === 'LINEAGE' || category === 'STRUCTURAL') ? 1.0 : 0.4;
+       const type = link.type || 'UNKNOWN';
+       
+       let width = 0.3;
+       if (category === 'LINEAGE' || type === 'IMPORTS' || type === 'CALLS' || type === 'EXTENDS') {
+          width = 0.6;
+       } else if (category === 'KINESIS') {
+          width = 0.6;
+       }
+
+       return isHighlighted ? width * 1.5 : width; 
     })
     .linkColor(link => {
        // 🕵️ DYNAMIC LINK SHADOWING & HOVERING
@@ -159,14 +169,22 @@ function configureGraph() {
          return '#ffffffcc'; // Bright white highlight for hovered edges
        }
 
-       const category = link.category || 'STRUCTURAL';     
-       if (category === 'LINEAGE' || category === 'STRUCTURAL') {
-         return `rgba(139, 148, 158, ${isShadowed ? 0.05 : 0.15})`; // Low un-hovered opacity
+       const category = link.category || 'STRUCTURAL';
+       const type = link.type || 'UNKNOWN';
+
+       if (category === 'KINESIS' || type === 'IMPORTS' || type === 'CALLS' || type === 'EXTENDS') {
+          // Desaturated "Steel Blue" logical paths (Uniformly Dim)
+          return `rgba(71, 143, 255, ${isShadowed ? 0.03 : 0.18})`; // Dropped from 0.05 / 0.40
+       }
+       
+       if (category === 'LINEAGE' || category === 'STRUCTURAL' || type === 'MEMBER_OF' || type === 'CONTAINS') {
+          // Neutral "Cloud Gray" skeleton edges (Uniformly Dim)
+          return `rgba(139, 148, 158, ${isShadowed ? 0.03 : 0.15})`; // Dropped from 0.04 / 0.15
        }
        
        const edgeColors = window.MirrorState.edgeColors || {};
-       const baseColor = edgeColors[link.type] || '#2f81f7';
-       return baseColor + (isShadowed ? '05' : '15'); 
+       const baseColor = edgeColors[type] || '#2f81f7';
+       return baseColor + (isShadowed ? '05' : '20'); // Significant drop from 15/66
     })
     .linkDirectionalParticles(link => window.MirrorState.focusLinks.size > 0 && window.MirrorState.focusLinks.has(link) ? 6 : 0)
     .linkDirectionalParticleSpeed(0.01)
@@ -180,17 +198,8 @@ function configureGraph() {
       const isTraceFocus = window.MirrorState.focusNodes.size > 0 && window.MirrorState.focusNodes.has(node.id);
       const isHovered = hoverNode && hoverNode.id === node.id;
       
-      // 📐 EXPLICIT LAYER SIZING
-      let size = 6;
-      if (nodeLevelValue === 0) size = 42; // Ecosystem
-      else if (nodeLevelValue === 1) size = 36; // Repo
-      else if (nodeLevelValue === 2) size = 32; // Namespace
-      else if (nodeLevelValue === 3) size = 26; // Unit
-      else if (nodeLevelValue === 4) size = 20; // Infra
-      else if (nodeLevelValue === 5) size = 16; // Structure
-      else if (nodeLevelValue === 6) size = 12; // Behavior
-      else if (nodeLevelValue === 7) size = 8;  // Atom
-      else if (nodeLevelValue === 8) size = 6;  // Data
+      // 📐 EXPLICIT LAYER SIZING (Titan Scale - Centralized)
+      const size = getNodeSize(node);
       
       // 🎨 EXPLICIT LAYER COLORING
       const layerConfig = window.MirrorState.layers.find(l => l.id === nodeLevelValue);
@@ -246,9 +255,17 @@ function configureGraph() {
       }
 
       // Adaptive Labels
-      const baseFontSize = 12;
+      const baseFontSize = 10; // Reduced from 12
       const adaptiveSize = baseFontSize / globalScale;
-      let showText = globalScale > 1.2 || (node.degree > 8 && globalScale > 0.4);
+      
+      // Semantic zoom threshold: Units (3) and Repo (1) are always prioritized.
+      // Atoms (7) and Data (8) only appear when zoomed in (globalScale > 1.2)
+      let showText = false;
+      if (nodeLevelValue <= 3) {
+         showText = globalScale > 0.3; // High-level always visible unless zoomed way out
+      } else {
+         showText = globalScale > 1.2 || (node.degree > 10 && globalScale > 0.6); // Deep symbols need proximity
+      }
       
       if (showText || isHovered) {
         ctx.font = `600 ${adaptiveSize}px var(--font)`;
@@ -258,21 +275,26 @@ function configureGraph() {
       }
     })
     .onNodeClick(node => focusSubgraph(node))
+    .nodeVal(node => getNodeSize(node)) // SYNC MOUSE ENGINE WITH TITAN SIZING
+    .nodePointerAreaPaint((node, color, ctx) => {
+       // Expand hit-box margin for easier clicking
+       const size = getNodeSize(node);
+       ctx.fillStyle = color;
+       ctx.beginPath(); ctx.arc(node.x, node.y, size * 1.1, 0, 2 * Math.PI, false); ctx.fill();
+    })
     .onNodeHover(node => {
       if ((!node && !hoverNode) || (node && hoverNode && node.id === hoverNode.id)) return;
       hoverNode = node;
       
-      // Force refresh of link styles to apply highlighting
+      // OPTIMIZED: Redraw without restarting high-cost simulation
       Graph.linkWidth(Graph.linkWidth());
       Graph.linkColor(Graph.linkColor());
-
-      // Pulse redraw to apply hover styles instantly
-      if (Graph.d3AlphaTarget) {
-        Graph.d3AlphaTarget(0.1).restart();
-        setTimeout(() => Graph.d3AlphaTarget(0), 100);
-      }
     })
-    .onBackgroundClick(() => resetFocus());
+    .onBackgroundClick(evt => {
+      // Guard: Only reset if we're not actually hovering a node (Safety fallback)
+      if (hoverNode) return;
+      resetFocus();
+    });
 
   const linkForce = Graph.d3Force('link');
   if (linkForce) {
@@ -306,8 +328,8 @@ function configureGraph() {
       });
   }
 
-  Graph.d3Force('charge').strength(-5000); // Increased from -3000
-  Graph.d3VelocityDecay(0.35); // Dropped decay to allow more movement for unbraiding
+  Graph.d3Force('charge').strength(-30000); // Massive repulsion for Titan-scale symbols
+  Graph.d3VelocityDecay(0.4); // Increased decay to dampen the high-energy layout expansion
 }
 
 function focusSubgraph(node) {
@@ -335,8 +357,12 @@ function focusSubgraph(node) {
 
   document.getElementById('focus-indicator').style.display = 'flex';
   
-  Graph.centerAt(node.x, node.y, 800);
-  Graph.zoom(2.2, 800);
+  // PAUSE SIMULATION: Prevents 'drift' where node moves while camera centers
+  Graph.pauseAnimation();
+  Graph.d3Alpha(0); 
+  
+  // v3.2: Robust Bounding Box Zooming
+  Graph.zoomToFit(800, 100, n => nodes.has(n.id));
 
   // Async Hydration
   const meatPanel = document.getElementById('ins-meat');
@@ -350,14 +376,16 @@ function focusSubgraph(node) {
        document.getElementById('ins-entropy').innerText = (hydrated.entropy || 0).toFixed(2);
        document.getElementById('ins-resonance').innerText = hydrated.resonance || '0';
        
-       // Success — Transition from Skeleton to Data
-       if (typeof window.toggleSkeleton === 'function') {
-         window.toggleSkeleton(false);
-       }
        meatPanel.style.opacity = '1';
+       meatPanel.classList.add('opacity-100');
        node.isShallow = false;
     })
     .catch(() => {
+       // Graceful Fallback: Still show the panel but with 'N/A' for deep metrics
+       meatPanel.style.opacity = '1';
+       meatPanel.classList.add('opacity-100');
+    })
+    .finally(() => {
        if (typeof window.toggleSkeleton === 'function') {
          window.toggleSkeleton(false);
        }
@@ -404,7 +432,13 @@ function resetFocus() {
   window.MirrorState.focusLinks.clear();
   document.getElementById('focus-indicator').style.display = 'none';
   document.getElementById('node-inspector').classList.remove('active');
-  Graph.zoom(1, 800);
+  
+  // v3.2: Resume Animation & Global ZoomToFit
+  Graph.resumeAnimation();
+  Graph.zoomToFit(1000, 50);
+  
+  Graph.d3AlphaTarget(0.1).restart();
+  setTimeout(() => Graph.d3AlphaTarget(0), 500);
 }
 
 function hideOverlay() {
@@ -418,3 +452,6 @@ function hideOverlay() {
 // Initial resonance
 configureGraph();
 refreshSynapse();
+
+// Late Wiring for UI Elements
+document.getElementById('btn-reset-view-panel')?.addEventListener('click', () => resetFocus());

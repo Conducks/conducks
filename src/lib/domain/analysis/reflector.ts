@@ -168,16 +168,24 @@ export class ConducksReflector implements ConducksComponent {
     }
 
     const getScopeAt = (row: number, excludeName?: string): string => {
-      let best: ScopeEntry | undefined;
-      for (const s of scopeMap) {
-        if (excludeName && s.name === excludeName) continue;
-        if (row >= s.startRow && row <= s.endRow) {
-          if (!best || (s.endRow - s.startRow) < (best.endRow - best.startRow)) {
-            best = s;
-          }
-        }
+      // Find all scopes that organically encapsulate the row
+      const enclosing = scopeMap.filter(s => {
+        if (excludeName && s.name === excludeName) return false;
+        return row >= s.startRow && row <= s.endRow;
+      });
+
+      // Sort by absolute encapsulation (largest container first)
+      enclosing.sort((a, b) => {
+        if (a.startRow !== b.startRow) return a.startRow - b.startRow;
+        return b.endRow - a.endRow;
+      });
+
+      const names: string[] = [];
+      for (const s of enclosing) {
+        if (!names.includes(s.name)) names.push(s.name);
       }
-      return best ? best.name : '';
+
+      return names.join('.');
     };
 
     // === Pass 2: Semantic Pulse ===

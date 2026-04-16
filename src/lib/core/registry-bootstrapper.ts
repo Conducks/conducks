@@ -184,6 +184,8 @@ export class RegistryBootstrapper {
         await federation.hydrate(graph.getGraph());
       } catch (err: any) {
         console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
+      } finally {
+        if (readOnly) await newPersistence.close();
       }
       return; // Wave complete
     }
@@ -195,6 +197,8 @@ export class RegistryBootstrapper {
       await federation.hydrate(graph.getGraph());
     } catch (err: any) {
       console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
+    } finally {
+      if (readOnly) await persistence.close();
     }
   }
 }
