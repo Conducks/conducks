@@ -11,7 +11,7 @@
 All structural changes to the Synapse must follow the **Graph-Verified Refactoring (GVR)** protocol:
 
 ### 1. Blast Radius Analysis
-Before any rename or move, run **`synapse_impact`**. 
+Before any rename or move, run **`synapse_impact`**.
 - Identify **d1 dependencies** (Will break).
 - Identify **d2 dependencies** (Likely affected).
 - If the risk is **HIGH** (impact score > 15), do not proceed without an ADR or explicit user review of the plan.

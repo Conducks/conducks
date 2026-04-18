@@ -14,7 +14,7 @@ When a bug is reported or an error is thrown, follow this three-step protocol:
 Use **`kinetic_wave`** to search for the error signature or behavioral pattern. This finds similar logic across the entire Synapse, identifying if the bug is a systemic pattern or an isolated defect.
 
 ### 2. Path Tracing
-Identify the entry point (the "trigger neuron") and run **`kinetic_circuit`**. 
+Identify the entry point (the "trigger neuron") and run **`kinetic_circuit`**.
 - Follow the data mutation at every step.
 - Verify if the `lib/core` primitives are being used correctly by the `lib/product` service.
 - Flag any step that violates the downward dependency rule.
