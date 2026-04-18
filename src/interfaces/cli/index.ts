@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { GraphPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs";
@@ -27,6 +27,7 @@ import { WatchCommand } from "./commands/watch.js";
 import { MirrorCommand } from "./commands/mirror.js";
 import { TraceCommand } from "./commands/trace.js";
 import { ExplainCommand } from "./commands/explain.js";
+import { FallbackCommand } from "./commands/fallback.js";
 import { HelpCommand } from "./commands/help.js";
 import { EntryCommand } from "./commands/entry.js";
 import { McpCommand } from "./commands/mcp.js";
@@ -53,7 +54,7 @@ export async function main() {
   for (let i = 0; i < cmdArgs.length; i++) {
     const arg = cmdArgs[i];
     if (arg.startsWith('--')) {
-      if (['--base', '--head', '--symbol', '--id', '--q'].includes(arg)) {
+      if (['--base', '--head', '--symbol', '--id', '--q', '--mode', '--file', '--limit', '--direction'].includes(arg)) {
         i++; 
       }
       continue;
@@ -62,15 +63,26 @@ export async function main() {
   }
 
   const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows'].includes(commandId);
-  const pathArg = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
+  const pathCandidate = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
-  const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
-  const isReadCommand = [
-    'diff', 'explain', 'status', 'list', 'context', 'audit', 'mcp', 'guard', 
-    'mirror', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows', 
-    'query', 'visualize', 'blueprint', 'context-gen', 'drift', 'entry'
-  ].includes(commandId);
-  const persistence = new GraphPersistence(targetPath, isReadCommand);
+  let targetPath = process.cwd();
+  if (pathCandidate) {
+    const resolvedCandidate = pathCandidate.startsWith('/') ? pathCandidate : path.resolve(process.cwd(), pathCandidate);
+    if (fs.existsSync(resolvedCandidate) && fs.lstatSync(resolvedCandidate).isDirectory()) {
+      targetPath = resolvedCandidate;
+    }
+  }
+  
+  // 🛡️ [Root Detachment Check]
+  // Standard MCP runners execute global binaries from detached roots (/).
+  // If we identify a detached root, fallback to CONDUCKS_WORKSPACE_ROOT or anchor to absolute project path via import.meta.url
+  if (targetPath === '/' || targetPath === '/root' || targetPath === '/Users' || targetPath === '/usr') {
+    targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../");
+  }
+  // Only 'analyze' writes to the vault. 'clean' is a destructive wipe (also needs write access).
+  // Every other command is strictly read-only.
+  const isReadCommand = !['analyze', 'clean'].includes(commandId);
+  const persistence = new SynapsePersistence(targetPath, isReadCommand);
   
   chronicle.setProjectDir(targetPath);
 
@@ -79,19 +91,19 @@ export async function main() {
     new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
     new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
-    new AdviseCommand(), new PruneCommand(), new BlueprintCommand(), new MirrorCommand(),
-    new ContextGenCommand(),
+    new AdviseCommand(), new PruneCommand(), new BlueprintCommand(), new ContextGenCommand(),
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
-    new TraceCommand(), new ExplainCommand(), new EntryCommand(), new McpCommand(),
-    new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(),
+    new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
+    new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(), new MirrorCommand(),
     new BootstrapDocsCommand()
   ];
 
   commands.push(new HelpCommand(commands));
 
   const command = commands.find(c => c.id === commandId);
+  
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'mirror'].includes(commandId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp'].includes(commandId);
 
   if (command) {
     try {

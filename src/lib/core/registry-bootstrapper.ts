@@ -1,5 +1,5 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
-import { DuckDbPersistence, SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
@@ -170,7 +170,7 @@ export class RegistryBootstrapper {
         graph.getGraph().clear();
       }
 
-      const newPersistence = new DuckDbPersistence(effectiveRoot, readOnly, lazy || false);
+      const newPersistence = new SynapsePersistence(effectiveRoot, readOnly);
       updatePersistence(newPersistence);
       chronicle.setProjectDir(effectiveRoot);
       
@@ -179,26 +179,26 @@ export class RegistryBootstrapper {
       
       // FIX: Use the updated instance for the initial load
       try {
-        const loaded = await newPersistence.load(graph.getGraph());
-        if (loaded) {
-          console.error(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
-          await federation.hydrate(graph.getGraph());
-        }
+        await newPersistence.load(graph.getGraph());
+        console.error(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
+        await federation.hydrate(graph.getGraph());
       } catch (err: any) {
         console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
+      } finally {
+        if (readOnly) await newPersistence.close();
       }
       return; // Wave complete
     }
     
     // Fallback: Default load if no re-connection was needed
     try {
-      const loaded = await persistence.load(graph.getGraph());
-      if (loaded) {
-        console.error(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
-        await federation.hydrate(graph.getGraph());
-      }
+      await persistence.load(graph.getGraph());
+      console.error(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
+      await federation.hydrate(graph.getGraph());
     } catch (err: any) {
       console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
+    } finally {
+      if (readOnly) await persistence.close();
     }
   }
 }

@@ -43,15 +43,21 @@ export class GatewayService {
           if (eventType === 'change') {
             logger.info("🛡️ [Synapse Watcher] Vault heartbeat detected. Re-resonating graph...");
             // [Conducks Consistency Check] v2.5.0
-            // We increase the window to 1000ms to ensure complex write transactions are finalized.
+            // [Conducks Consistency Check] v3.1.0 🛡️
+            // We increase the window to 1250ms to ensure large multi-stage write transactions 
+            // from 'analyze --force' are fully flushed and the file handle is cold.
             setTimeout(async () => {
               try {
+                logger.info("🛡️ [Synapse Pulse] Structural resonance captured. Generating visual wave...");
                 await this.persistence.load(this.graph.getGraph());
                 callback({ type: 'PULSE', timestamp: Date.now() });
               } catch (err) {
-                logger.error("Failed to reload graph on vault change", err);
+                logger.error("Failed to reload graph on vault pulse", err);
+              } finally {
+                // 🛡️ Lock Release: Crucial for non-blocking analysis cycles
+                await this.persistence.close();
               }
-            }, 1000);
+            }, 1250);
           }
         });
       }
@@ -71,6 +77,9 @@ export class GatewayService {
       } catch (err) {
         logger.error('Failed to build compact wave', err);
         return { nodes: [], edges: [] };
+      } finally {
+        // 🛡️ Lock Release
+        await this.persistence.close();
       }
     }
 
@@ -81,16 +90,21 @@ export class GatewayService {
    * Hydrates a shallow node with deep structural DNA (complexity, entropy, resonance).
    */
   public async hydrateNode(nodeId: string) {
-    const deep = await this.persistence.fetchNodeDeep(nodeId);
-    if (!deep) return null;
-    
-    // Merge with any in-memory properties if needed
-    const node = this.graph.getGraph().getNode(nodeId);
-    return {
-      ...(node?.properties || {}),
-      ...deep,
-      isShallow: false
-    };
+    try {
+      const deep = await this.persistence.fetchNodeDeep(nodeId);
+      if (!deep) return null;
+      
+      // Merge with any in-memory properties if needed
+      const node = this.graph.getGraph().getNode(nodeId);
+      return {
+        ...(node?.properties || {}),
+        ...deep,
+        isShallow: false
+      };
+    } finally {
+      // 🛡️ Lock Release
+      await this.persistence.close();
+    }
   }
 
   public stop() {

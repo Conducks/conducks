@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { DuckDbPersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
 import path from 'node:path';
 
 /**
@@ -9,12 +9,12 @@ import path from 'node:path';
  * 'Structural Sins' (Disconnected Islets) across the Canonical Taxonomy.
  */
 describe('Synapse Structural Layer Audit', () => {
-  let persistence: DuckDbPersistence;
+  let persistence: SynapsePersistence;
   let db: any;
   let latestPulseId: string;
 
   beforeAll(async () => {
-    persistence = new DuckDbPersistence(undefined, false); // Allow DB creation on fresh runners
+    persistence = new SynapsePersistence(path.resolve(process.cwd())); // Allow DB creation on fresh runners
     db = await persistence.getRawConnection();
 
     if (!db) {

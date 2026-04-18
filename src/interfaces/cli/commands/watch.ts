@@ -15,8 +15,8 @@ export class WatchCommand implements ConducksCommand {
     const isPulse = args.includes('--pulse');
     const rootPath = process.cwd();
 
-    // Structural Sync via Registry Bridge (Writer mode if --pulse)
-    await (registry as any).initialize(!isPulse, rootPath, true);
+    // Read-Only: watcher observes structural shifts, only analyze writes
+    await (registry as any).initialize(true, rootPath, true);
     await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
 
     console.log('[Watch] Step 2: getting watcher instance...');

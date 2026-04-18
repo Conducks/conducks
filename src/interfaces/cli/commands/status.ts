@@ -19,14 +19,9 @@ export class StatusCommand implements ConducksCommand {
     const fileArgIdx = args.indexOf('--file');
     const fileArg = fileArgIdx !== -1 ? args[fileArgIdx + 1] : null;
     
-    const pathArg = args.find(a => !a.startsWith('--') && a !== fileArg && a !== 'pulse');
-    const targetPath = pathArg ? (pathArg.startsWith('/') ? pathArg : path.resolve(process.cwd(), pathArg)) : process.cwd();
-
-    // 1. Initial Structural Anchor & Resonance 🏺
-    if (pathArg || process.env.CONDUCKS_WORKSPACE_ROOT !== targetPath || isPulse) {
-      await registry.initialize(!isPulse, targetPath);
-    }
-    chronicle.setProjectDir(targetPath);
+    // 1. Initial Structural Anchor & Resonance 🏺 (Read-Only: status never writes)
+    // Deprecated: Already handled by the CLI entry orchestrator.
+    
 
     try {
       // 5. Conducks Purge & Resurrection 🛡️(Lazy Incremental Induction)

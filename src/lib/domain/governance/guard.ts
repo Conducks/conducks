@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { DriftEngine, DriftResult } from "@/lib/domain/evolution/drift-engine.js";
 import { logger } from "@/lib/core/utils/logger.js";
 
@@ -11,7 +11,7 @@ import { logger } from "@/lib/core/utils/logger.js";
 export class RegressionGuard {
   private driftEngine: DriftEngine;
 
-  constructor(private readonly persistence: DuckDbPersistence) {
+  constructor(private readonly persistence: SynapsePersistence) {
     this.driftEngine = new DriftEngine(persistence);
   }
 

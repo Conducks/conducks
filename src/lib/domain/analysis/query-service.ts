@@ -9,10 +9,21 @@ const logger = new Logger("QueryService");
  * Formal parameterised SQL library for high-speed structural intelligence.
  * These templates replace expensive graph traversals with indexed SQL scans.
  */
+/** Numeric defaults for named params — used when the caller provides no value. */
+const PARAM_DEFAULTS: Record<string, number | string> = {
+  minTenureDays: 0,
+  minRisk: 0,
+  minComplexity: 1,
+  minConfidence: 0,
+  maxDepth: 5,
+  depth: 5,
+  limit: 10,
+};
+
 export class QueryService {
   /**
    * Conducks — Architectural Query Templates (Oracle Standard)
-   * 
+   *
    * Formal parameterised SQL library for high-speed structural intelligence.
    * These templates replace expensive graph traversals with indexed SQL scans.
    */
@@ -380,6 +391,30 @@ export class QueryService {
         GROUP BY canonicalRank, canonicalKind
         ORDER BY canonicalRank
       `
+    },
+
+    suspicious_fallbacks: {
+      description: "Find functions that appear to be legacy fallbacks based on structural patterns",
+      params: ["minConfidence", "minTenureDays", "$pulseId", "limit"],
+      sql: `
+        SELECT
+          n.id, n.name, n.file, n.risk, n.gravity, n.complexity,
+          n.canonicalKind, n.canonicalRank,
+          json_extract_string(n.kinetic, '$.tenureDays') AS tenureDays,
+          json_extract_string(n.dna, '$.fallbackAnalysis.confidence') AS fallbackConfidence,
+          json_extract_string(n.dna, '$.fallbackAnalysis.patterns.usageRatio.ratio') AS fallbackRatio,
+          json_extract_string(n.dna, '$.fallbackAnalysis.patterns.namingPatterns.score') AS namingScore
+        FROM nodes n
+        WHERE json_extract(n.dna, '$.fallbackAnalysis.isFallback') = true
+        AND CAST(json_extract_string(n.dna, '$.fallbackAnalysis.confidence') AS REAL) >= ?
+        AND CAST(json_extract_string(n.kinetic, '$.tenureDays') AS INTEGER) >= ?
+        AND n.canonicalKind IN ('BEHAVIOR', 'STRUCTURE')
+        AND n.pulseId = ?
+        ORDER BY
+          CAST(json_extract_string(n.dna, '$.fallbackAnalysis.confidence') AS REAL) DESC,
+          n.risk DESC
+        LIMIT ?
+      `
     }
   };
 
@@ -426,7 +461,8 @@ export class QueryService {
         logicalValues.set(p, finalLimit);
       } else {
         const val = sanitizedUserParams.shift();
-        logicalValues.set(p, val === undefined ? '' : val);
+        const resolved = val === undefined || val === '' ? (PARAM_DEFAULTS[p] ?? '') : val;
+        logicalValues.set(p, resolved);
       }
     });
 

@@ -1,5 +1,6 @@
 import { Tool } from "@/registry/types.js";
 import { registry } from "@/registry/index.js";
+import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
@@ -19,8 +20,14 @@ import { registry } from "@/registry/index.js";
 async function ensureAnchor(customPath?: string, readOnly: boolean = true) {
   const root = customPath || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
   const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
-  
-  if (root && root !== currentAnchor && root !== '/') {
+  const currentPersistence = (registry.infrastructure as any).persistence;
+
+  const rootChanged = root && root !== currentAnchor && root !== '/';
+  const modeChanged = currentPersistence && currentPersistence.readOnly !== readOnly;
+  // Disconnection is NOT a re-init trigger — the lazy connection reopens on next query.
+  // Re-initializing the registry just because the connection was closed between tool calls
+  // is expensive and unnecessary; the existing persistence object handles reconnection.
+  if (rootChanged || modeChanged) {
     await registry.initialize(readOnly, root);
   }
 }
@@ -134,7 +141,7 @@ Modes:
     formatter: (res: any) => JSON.stringify(res, null, 2),
     handler: async ({ mode, file, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath, mode !== 'pulse');
+        await ensureAnchor(customPath, true);
         const status = registry.audit.status();
         
         if (mode === "map") {
@@ -150,7 +157,11 @@ Modes:
         if (mode === "pulse") {
           if (!file) return { error: "Mode 'pulse' requires a 'file' parameter." };
           const result = await (registry.analyze as any).resonate(file);
-          return result;
+          return { 
+            ...result, 
+            analysis: "Shallow Resurrection (Read-Only)",
+            persistence: "Database write skipped as per Conducks MCPServer policy."
+          };
         }
 
         return { 
@@ -180,11 +191,12 @@ Modes:
 - scan (default): Full integrity audit for circularities and god objects.
 - advice: Professional structural improvement recommendations.
 - guard: Defensive regression check. Blocks if risk exceeds threshold.
-- archeology: Longitudinal historical analysis of structural decay over time (Window: 5 pulses).`,
+- archeology: Longitudinal historical analysis of structural decay over time (Window: 5 pulses).
+- fallback: Analyze fallback patterns and identify legacy fallbacks vs legitimate ones.`,
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["scan", "advice", "guard", "archeology"], default: "scan" },
+        mode: { type: "string", enum: ["scan", "advice", "guard", "archeology", "fallback"], default: "scan" },
         threshold: { type: "number", default: 0.1, description: "Max allowed decay (for guard mode)." },
         window: { type: "number", default: 5, description: "Historical window size (for archeology mode)." },
         path: { type: "string", description: "Optional: The absolute project root." }
@@ -209,7 +221,45 @@ Modes:
           const advice = await registry.audit.advise();
           return { advice, indexStaleness: registry.audit.status().staleness.stale };
         }
-        
+
+        if (mode === "fallback") {
+          const detector = new FallbackDetector();
+          const graph = registry.infrastructure.graphEngine.getGraph();
+          const allNodes = Array.from(graph.getAllNodes());
+
+          // Find all functions that appear to be fallbacks
+          const fallbackCandidates = allNodes
+            .filter(node => node.properties.canonicalKind === 'BEHAVIOR')
+            .map(node => {
+              const analysis = detector.detectFallbackPatterns(node, graph);
+              return {
+                id: node.id,
+                name: node.properties.name,
+                file: node.properties.filePath,
+                isFallback: analysis.isFallback,
+                confidence: analysis.confidence,
+                patterns: analysis.patterns
+              };
+            })
+            .filter(candidate => candidate.isFallback)
+            .sort((a, b) => b.confidence - a.confidence)
+            .slice(0, 20); // Top 20 most suspicious
+
+          return {
+            fallbackCandidates,
+            totalCandidates: fallbackCandidates.length,
+            recommendations: fallbackCandidates.map(candidate => ({
+              symbol: candidate.name,
+              file: candidate.file,
+              confidence: candidate.confidence,
+              recommendation: candidate.confidence > 0.8 ? 'HIGH PRIORITY: Remove legacy fallback' :
+                            candidate.confidence > 0.6 ? 'MEDIUM PRIORITY: Review fallback necessity' :
+                            'LOW PRIORITY: Monitor fallback usage'
+            })),
+            indexStaleness: registry.audit.status().staleness.stale
+          };
+        }
+
         const audit = registry.audit.audit();
         return {
           success: audit.success,
@@ -281,7 +331,7 @@ AFTER THIS: Use conducks_trace to see how data flows through this symbol.`,
     version: "2.1.0",
     description: `Access the dynamic architectural guidance library. Serves engineering standards and rules.
 
-WHEN TO USE: You need specific guidance on UI, Backend, Security, or Project Structure.
+WHEN TO USE: You need specific guidance on UI, Backend, Security, Project Structure, or Fallback Patterns.
 AFTER THIS: Apply the provided rules to your implementation.`,
     inputSchema: {
       type: "object",

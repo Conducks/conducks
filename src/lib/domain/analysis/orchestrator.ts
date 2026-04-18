@@ -6,6 +6,7 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/registry/types.js";
@@ -13,6 +14,7 @@ import { logger } from "@/lib/core/utils/logger.js";
 import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
 import { Worker } from "node:worker_threads";
 import { fork } from "node:child_process";
+import { createRequire } from "node:module";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -296,7 +298,13 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       const batchNum = Math.floor(i / CHUNK_SIZE) + 1;
       
       logger.info(`🛡️ [Conducks] Wave ${batchNum}/${totalBatches}: Inducing ${chunk.length} units...`);
-      const inductionResults = await this.runParallelPulse(chunk, false, allPaths, context.exportState().registry);
+      const inductionResults = await this.runParallelPulse(
+        chunk, 
+        false, 
+        allPaths, 
+        context.exportState().registry,
+        resourceDir
+      );
 
       for (const res of inductionResults) {
         if (!res.success || !res.spectrum) continue;
@@ -366,70 +374,119 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     files: Array<{ path: string, source: string }>,
     discoveryMode: boolean,
     allPaths: string[],
-    globalSymbols?: Record<string, any>
+    globalSymbols?: Record<string, any>,
+    requestedGrammarDir?: string
   ): Promise<any[]> {
     const unitCount = files.length;
     if (unitCount === 0) return [];
 
-    const isTs = __filename.endsWith('.ts');
-    const workerScript = path.resolve(__dirname, `../../core/parsing/pulse-worker.${isTs ? 'ts' : 'js'}`);
-    const resourceDir = path.resolve(__dirname, "../../../resources/grammars");
+    const workerScript = isTs 
+      ? path.resolve(__dirname, `../../core/parsing/pulse-worker.ts`)
+      : path.resolve(__dirname, `../../core/parsing/pulse-worker.js`);
+    const finalResourceDir = requestedGrammarDir || resourceDir;
 
-    const coreCount = Math.max(1, os.cpus().length - 1);
-    const chunkSize = Math.ceil(unitCount / coreCount);
-    const workerPromises = [];
-
-    for (let i = 0; i < unitCount; i += chunkSize) {
-      const chunk = files.slice(i, i + chunkSize);
-
-      const p = new Promise<any[]>((resolve) => {
-        const worker = new Worker(workerScript, {
-          workerData: { units: chunk, grammarDir: resourceDir },
-          execArgv: isTs ? ["--import", "tsx"] : []
-        });
-        worker.on('message', resolve);
-        worker.on('error', () => resolve([]));
-      });
-      workerPromises.push(p);
+    let tsxLoader: string | null = null;
+    if (isTs) {
+      try {
+        const require = createRequire(import.meta.url);
+        tsxLoader = require.resolve('tsx');
+      } catch {
+        tsxLoader = 'tsx'; // Fallback
+      }
     }
 
-    const workerResults = await Promise.all(workerPromises);
-    const results = workerResults.flat();
+    const skipWorker = true; // Hardened for absolute stability during monorepo induction
+    if (!skipWorker) {
+      const coreCount = Math.max(1, os.cpus().length - 1);
+      const chunkSize = Math.ceil(unitCount / coreCount);
+      const results: any[] = [];
 
-    // If no workers were started or all failed (unlikely), fallback to main thread induction 
-    if (results.length === 0 && files.length > 0) {
-      logger.warn(`🛡️ [Conducks] Parallel induction failed or skipped. Falling back to sequential main-thread induction.`);
-      const context = new AnalyzeContext();
-      if (discoveryMode) context.setDiscoveryMode(true);
-      if (globalSymbols) {
-        for (const [id, sym] of Object.entries(globalSymbols)) {
-          context.registerGlobalSymbol(id, sym as any);
-        }
+      for (let i = 0; i < unitCount; i += chunkSize) {
+        const chunk = files.slice(i, i + chunkSize);
+
+        const spawnWorker = async (chunk: string[]) => {
+          return new Promise<any[]>((resolve) => {
+            const { spawnSync } = require('node:child_process');
+            const fs = require('node:fs');
+            const os = require('node:os');
+            const path = require('node:path');
+            
+            const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+            const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+            
+            fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, resourceDir: finalResourceDir, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
+            
+            spawnSync('node', [
+              '--no-warnings',
+              '--import', tsxLoader!,
+              workerScript,
+              tempInput
+            ], {
+              env: { ...process.env, CONDUCKS_WORKER_MODE: 'spawn' },
+              stdio: 'inherit'
+            });
+
+            if (fs.existsSync(tempOutput)) {
+              try {
+                const results = JSON.parse(fs.readFileSync(tempOutput, 'utf8'));
+                fs.unlinkSync(tempInput);
+                fs.unlinkSync(tempOutput);
+                resolve(results);
+              } catch (e) {
+                resolve([]);
+              }
+            } else {
+              resolve([]);
+            }
+          });
+        };
+
+        const resultChunk = await spawnWorker(chunk as any);
+        results.push(...resultChunk);
       }
+      return results;
+    }
 
-      const providerMap = new Map<string, any>();
-      const { PythonProvider } = await import("../../core/parsing/languages/python/index.js");
-      const { TypeScriptProvider } = await import("../../core/parsing/languages/typescript/index.js");
-      const { grammars } = await import("../../core/parsing/grammar-registry.js");
-
-      for (const unit of files) {
-        const ext = path.extname(unit.path);
+    // Main thread fallback for debug or small batches
+    const reflector = new ConducksReflector();
+    const results = [];
+    const providerMap = new Map<string, any>();
+    const loadedGrammars = new Set<string>();
+    
+    for (const file of files) {
+      try {
+        const ext = path.extname(file.path);
         let provider = providerMap.get(ext);
         if (!provider) {
-          if (ext === '.py') provider = new PythonProvider();
-          else if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) provider = new TypeScriptProvider();
+          provider = this.registry.getProvider(file.path);
           if (provider) providerMap.set(ext, provider);
         }
-        
-        if (!provider) continue;
 
-        try {
-          await grammars.loadLanguage(provider.langId);
-          const spectrum = await this.reflector.reflect(unit, provider, context, allPaths);
-          results.push({ path: unit.path, spectrum, state: context.exportState(), success: true });
-        } catch (err) {
-          results.push({ path: unit.path, error: (err as Error).message, success: false });
+        if (!provider) {
+          results.push({ success: false, path: file.path });
+          continue;
         }
+
+        // Load native grammar if not already loaded for this langId
+        const langId = provider.langId;
+        if (langId && !loadedGrammars.has(langId)) {
+          await grammars.loadLanguage(langId);
+          loadedGrammars.add(langId);
+        }
+
+        const context = new AnalyzeContext();
+        if (discoveryMode) context.setDiscoveryMode(true);
+        if (globalSymbols) {
+          for (const [id, sym] of Object.entries(globalSymbols)) {
+            context.registerGlobalSymbol(id, sym as any);
+          }
+        }
+
+        const res = await reflector.reflect(file, provider, context, allPaths);
+        results.push({ path: file.path, spectrum: res, state: context.exportState(), success: true });
+      } catch (err) {
+        console.error(`🛡️ [MainThread Error] ${file.path}:`, err);
+        results.push({ success: false, path: file.path });
       }
     }
     return results;

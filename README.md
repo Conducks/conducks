@@ -128,7 +128,7 @@ The agent will now have access to these tools:
 | `conducks_explain` | 6-Signal Risk breakdown for a specific symbol   |
 | `conducks_impact`  | See what breaks if you change a symbol         |
 | `conducks_trace`   | Trace execution between two symbols            |
-| `conducks_audit`   | Detect circular deps, god objects, orphans     |
+| `conducks_audit`   | Detect circular deps, god objects, orphans (modes: scan, advice, guard, archeology, fallback) |
 | `conducks_diff`    | Structural diff of uncommitted changes         |
 | `conducks_rename`  | Graph-verified safe rename across the codebase |
 | `conducks_guard`   | Block commits if structural risk is too high   |
@@ -149,6 +149,7 @@ conducks explain <id>             # Risk breakdown for a symbol
 conducks impact <id>              # What breaks if I change this?
 conducks trace <id>               # Trace execution from a symbol
 conducks audit                    # Detect circular deps, god objects, orphans
+conducks audit --fallback         # Analyze fallback patterns and legacy detection
 conducks advise                   # Refactor suggestions based on the graph
 conducks diff                     # Structural diff of uncommitted changes
 conducks rename <id> <new-name>   # Graph-verified safe rename

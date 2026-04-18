@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { ConducksSentinel } from "@/lib/domain/governance/sentinel.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -10,12 +11,18 @@ import path from "node:path";
  */
 export class AuditCommand implements ConducksCommand {
   public id = "audit";
-  public description = "Audit structural integrity and governance";
-  public usage = "conducks audit";
+  public description = "Audit structural integrity and governance (--fallback for legacy fallback analysis)";
+  public usage = "conducks audit [--fallback] [--history=<window>]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const historyArg = args.find(a => a.startsWith("--history"));
-    
+    const fallbackArg = args.find(a => a.startsWith("--fallback"));
+
+    if (fallbackArg) {
+      await this.runFallbackAnalysis(registry);
+      return;
+    }
+
     if (historyArg) {
       const windowStr = historyArg.includes("=") ? historyArg.split("=")[1] : "5";
       const window = parseInt(windowStr) || 5;
@@ -79,5 +86,54 @@ export class AuditCommand implements ConducksCommand {
       // Exit if core structural issues exist
       process.exit(1);
     }
+  }
+
+  private async runFallbackAnalysis(registry: Registry): Promise<void> {
+    console.log(`\x1b[35m[Conducks Audit] Analyzing fallback patterns...\x1b[0m`);
+
+    const detector = new FallbackDetector();
+    const graph = registry.infrastructure.graphEngine.getGraph();
+    const allNodes = Array.from(graph.getAllNodes());
+
+    // Find all functions that appear to be fallbacks
+    const fallbackCandidates = allNodes
+      .filter(node => node.properties.canonicalKind === 'BEHAVIOR')
+      .map(node => {
+        const analysis = detector.detectFallbackPatterns(node, graph);
+        return {
+          node,
+          analysis
+        };
+      })
+      .filter(item => item.analysis.isFallback)
+      .sort((a, b) => b.analysis.confidence - a.analysis.confidence)
+      .slice(0, 20); // Top 20 most suspicious
+
+    if (fallbackCandidates.length === 0) {
+      console.log("✅ No suspicious fallback patterns found.");
+      return;
+    }
+
+    console.log(`\n\x1b[31m🚨 Found ${fallbackCandidates.length} suspicious fallback patterns:\x1b[0m\n`);
+
+    fallbackCandidates.forEach(({ node, analysis }, index) => {
+      const confidence = (analysis.confidence * 100).toFixed(0);
+      const fallbackRatio = (analysis.patterns.usageRatio.ratio * 100).toFixed(0);
+
+      console.log(`${index + 1}. \x1b[33m${node.properties.name}\x1b[0m (${node.properties.canonicalKind})`);
+      console.log(`   📁 ${node.properties.filePath}`);
+      console.log(`   🎯 Fallback Confidence: ${confidence}%`);
+      console.log(`   📊 Fallback Usage Ratio: ${fallbackRatio}%`);
+      console.log(`   🏷️  Naming Score: ${(analysis.patterns.namingPatterns.score * 100).toFixed(0)}%`);
+
+      const recommendation = analysis.confidence > 0.8 ? 'HIGH PRIORITY: Remove legacy fallback' :
+                           analysis.confidence > 0.6 ? 'MEDIUM PRIORITY: Review fallback necessity' :
+                           'LOW PRIORITY: Monitor fallback usage';
+
+      console.log(`   💡 Recommendation: ${recommendation}`);
+      console.log();
+    });
+
+    console.log(`\x1b[2m💡 Tip: Use 'conducks explain <id>' for detailed risk breakdown\x1b[0m`);
   }
 }

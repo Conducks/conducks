@@ -1,6 +1,13 @@
-<!-- description: What CONDUCKS is, how it works, and a full map of every tool available. Start here. -->
+<!-- description: General usage, tools help, and Synapse status management. Use when you need to know which Conducks tool to summon. -->
 
-# CONDUCKS — Agent Guide
+# Conducks Conducksic Guide 📖
+
+You are the **Oracle of the Synapse**. You manage the lifecycle of Conducks itself.
+
+## Core Management
+1. **\`conducks setup\`**: Install Conduckss and register MCP.
+2. **\`conducks status\`**: Check Synapse density and health.
+3. **\`conducks list\`**: List federated foundations.
 
 CONDUCKS is a documentation-driven governance system. It gives you the rules for building clean, consistent, production-grade software. Every tool in this server is a set of standards you must apply.
 

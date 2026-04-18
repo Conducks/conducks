@@ -3,7 +3,7 @@ import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { GlobalSymbolLinker } from "@/lib/core/graph/linker.js";
-import { DuckDbPersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { globalMirror } from "@/interfaces/web/mirror-server.js";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -28,7 +28,7 @@ import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 
 interface WatcherOptions {
   ignored?: string[];
-  persistence?: DuckDbPersistence;
+  persistence?: SynapsePersistence;
   watcher?: FSWatcher;
 }
 
@@ -169,13 +169,17 @@ export class ConducksWatcher implements ConducksComponent {
             const downstreamNames = upstreamIds.slice(0, 5).map(id => id.split('::').pop() || id);
 
             // Get Baseline Risk from DB for Delta calculation
-            const db: any = await (this.options.persistence as any)?.getRawConnection();
             let riskDelta = 0;
-            if (db) {
-              const rows: any[] = await new Promise((res) => db.all("SELECT risk, complexity FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1", symbolId, (err: any, rows: any[]) => res(rows || [])));
-              const prevNode = rows[0];
-              if (prevNode) riskDelta = (node.properties.risk || 0) - prevNode.risk;
-            }
+            try {
+              const persistence: any = this.options.persistence;
+              if (persistence?.query) {
+                const rows: any[] = await persistence.query(
+                  "SELECT risk, complexity FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1",
+                  [symbolId]
+                );
+                if (rows[0]) riskDelta = (node.properties.risk || 0) - rows[0].risk;
+              }
+            } catch { /* baseline risk is supplementary — non-fatal */ }
 
             console.error(`\x1b[35m⚡ Change detected: \x1b[0m${path.relative(this.rootDir, filePath)}`);
             console.error(`   \x1b[1mModified symbol: \x1b[0m${node.properties.name}`);
@@ -192,7 +196,7 @@ export class ConducksWatcher implements ConducksComponent {
       // 5. Structural Persistence Update (Only if Writer or Auto-Pulse)
       if (this.autoPulse && this.options.persistence && !(this.options.persistence as any).readOnly) {
         console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
-        await this.options.persistence.save(this.graph.getGraph(), { append: true });
+        await this.options.persistence.save(this.graph.getGraph());
       } else if (this.options.persistence && !(this.options.persistence as any).readOnly) {
         await this.options.persistence.save(this.graph.getGraph());
       }

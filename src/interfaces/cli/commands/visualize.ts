@@ -30,28 +30,58 @@ export class VisualizeCommand implements ConducksCommand {
 
       const mermaidLines: string[] = ["graph TD"];
       const edges = new Set<string>();
+      const renderedNodes = new Set<string>();
 
-      // Pre-declare all top nodes as individual boxes
+      // Register a node definition Helper
+      const registerNode = (n: any) => {
+        if (!renderedNodes.has(n.id)) {
+          const sourceId = n.id.replace(/[^a-zA-Z0-9]/g, '_');
+          const sourceLabel = n.properties?.name || n.id;
+          mermaidLines.push(`  ${sourceId}["${sourceLabel}"]`);
+          renderedNodes.add(n.id);
+        }
+      };
+
+      // 1. Seed the core requested nodes
       for (const node of nodes) {
-        const sourceId = node.id.replace(/[^a-zA-Z0-9]/g, '_');
-        const sourceLabel = node.properties.name || node.id;
-        mermaidLines.push(`  ${sourceId}["${sourceLabel}"]`);
+        registerNode(node);
       }
 
+      // 2. Expand exactly 1 connection layer deep for the hubs
       for (const node of nodes) {
-        const neighbors = graph.getNeighbors(node.id, 'downstream');
-        for (const neighbor of (neighbors as any)) {
-          if (nodes.find((n: any) => n.id === neighbor.id)) {
-            const edgeKey = `${node.id}->${neighbor.id}`;
-            if (!edges.has(edgeKey)) {
-              // Sanitize IDs for Mermaid
-              const source = node.id.replace(/[^a-zA-Z0-9]/g, '_');
-              const target = neighbor.id.replace(/[^a-zA-Z0-9]/g, '_');
+        const outEdges = graph.getNeighbors(node.id, 'downstream') as any[];
+        const inEdges = graph.getNeighbors(node.id, 'upstream') as any[];
+        
+        // Handle Downstream (Node -> Target)
+        for (const edge of outEdges) {
+            const targetNode = graph.getNode(edge.targetId);
+            if (targetNode) {
+              registerNode(targetNode);
+              const sourceKey = node.id.replace(/[^a-zA-Z0-9]/g, '_');
+              const targetKey = targetNode.id.replace(/[^a-zA-Z0-9]/g, '_');
+              const edgeKey = `${sourceKey}->${targetKey}`;
               
-              mermaidLines.push(`  ${source} --> ${target}`);
-              edges.add(edgeKey);
+              if (!edges.has(edgeKey)) {
+                mermaidLines.push(`  ${sourceKey} --> ${targetKey}`);
+                edges.add(edgeKey);
+              }
             }
-          }
+        }
+        
+        // Handle Upstream (Source -> Node)
+        for (const edge of inEdges) {
+            const sourceNode = graph.getNode(edge.sourceId);
+            if (sourceNode) {
+              registerNode(sourceNode);
+              const sourceKey = sourceNode.id.replace(/[^a-zA-Z0-9]/g, '_');
+              const targetKey = node.id.replace(/[^a-zA-Z0-9]/g, '_');
+              const edgeKey = `${sourceKey}->${targetKey}`;
+              
+              if (!edges.has(edgeKey)) {
+                mermaidLines.push(`  ${sourceKey} --> ${targetKey}`);
+                edges.add(edgeKey);
+              }
+            }
         }
       }
 

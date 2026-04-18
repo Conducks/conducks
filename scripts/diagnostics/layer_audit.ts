@@ -1,4 +1,4 @@
-import { DuckDbPersistence } from "../../src/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "../../src/lib/core/persistence/persistence.js";
 import { Logger } from "../../src/lib/core/utils/logger.js";
 import path from "node:path";
 
@@ -7,7 +7,7 @@ const workspaceRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
 
 async function audit() {
   logger.info(`🛡️ Starting Universal Structural DNA Audit @ ${workspaceRoot}`);
-  const persistence = new DuckDbPersistence(workspaceRoot);
+  const persistence = new SynapsePersistence(workspaceRoot);
   
   try {
     const latestPulseIdRows = await persistence.query("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1");
@@ -58,7 +58,7 @@ async function audit() {
     console.log(`Broken Layer Paths: ${brokenPaths.length}`);
     
     console.log("\n--- Layer Distribution ---");
-    distribution.forEach(row => {
+    distribution.forEach((row: any) => {
       console.log(`L${row.canonicalRank} [${row.canonicalKind}]: ${row.count}`);
     });
 

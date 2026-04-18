@@ -97,13 +97,13 @@ export class DiffCommand implements ConducksCommand {
   private async executeChronoscopicDiff(baseId: string, headId: string | null, registry: Registry): Promise<void> {
     const { ConducksAdjacencyList } = await import("@/lib/core/graph/adjacency-list.js");
     const { ConducksDiffEngine } = await import("@/lib/core/graph/diff-engine.js");
-    const { DuckDbPersistence } = await import("@/lib/core/persistence/persistence.js");
+    const { SynapsePersistence } = await import("@/lib/core/persistence/persistence.js");
 
     const baseGraph = new ConducksAdjacencyList();
     const headGraph = new ConducksAdjacencyList();
 
     const db = registry.infrastructure.persistence;
-    if (!(db instanceof DuckDbPersistence)) {
+    if (!(db instanceof SynapsePersistence)) {
       console.error("Chronoscopic diff requires DuckDB persistence.");
       return;
     }
@@ -113,21 +113,16 @@ export class DiffCommand implements ConducksCommand {
     console.log(`Head: \x1b[33m${headId || 'Current Workspace'}\x1b[0m`);
 
     // Load Base
-    const rawDb = await db.getRawConnection();
-    if (!rawDb) {
-      console.error("Failed to establish raw structural connection.");
-      return;
-    }
-    const baseNodes: any[] = await new Promise((res) => rawDb.all("SELECT * FROM nodes WHERE pulseId = ?", [baseId], (err: any, rows: any[]) => res(rows || [])));
-    const baseEdges: any[] = await new Promise((res) => rawDb.all("SELECT * FROM edges WHERE pulseId = ?", [baseId], (err: any, rows: any[]) => res(rows || [])));
+    const baseNodes: any[] = await db.query("SELECT * FROM nodes WHERE pulseId = ?", [baseId]);
+    const baseEdges: any[] = await db.query("SELECT * FROM edges WHERE pulseId = ?", [baseId]);
     console.log(`[DEBUG] Loaded Base: ${baseNodes.length} nodes, ${baseEdges.length} edges`);
 
     this.reconstitute(baseGraph, baseNodes, baseEdges);
 
     // Load Head
     if (headId) {
-      const headNodes: any[] = await new Promise((res) => rawDb.all("SELECT * FROM nodes WHERE pulseId = ?", [headId], (err: any, rows: any[]) => res(rows || [])));
-      const headEdges: any[] = await new Promise((res) => rawDb.all("SELECT * FROM edges WHERE pulseId = ?", [headId], (err: any, rows: any[]) => res(rows || [])));
+      const headNodes: any[] = await db.query("SELECT * FROM nodes WHERE pulseId = ?", [headId]);
+      const headEdges: any[] = await db.query("SELECT * FROM edges WHERE pulseId = ?", [headId]);
       console.log(`[DEBUG] Loaded Head: ${headNodes.length} nodes, ${headEdges.length} edges`);
       this.reconstitute(headGraph, headNodes, headEdges);
     } else {

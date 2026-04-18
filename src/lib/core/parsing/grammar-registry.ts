@@ -83,7 +83,9 @@ export class GrammarRegistry {
       // and the JS wrapper (for nodeTypeNamesById).
       // Since native objects are often sealed, we use a hybrid approach in getUnifiedParser.
       this.languages.set(langId, lang);
+      if (packageName) this.attachNodeTypeInfo(lang, packageName, langId);
       this.log(`[Conducks Parser] Induced native grammar: ${langId}`);
+
     } catch (err) {
       this.unavailableLanguages.add(langId);
       this.log(`[Conducks Parser] Failed to induce native ${langId}:`, err);
@@ -112,13 +114,22 @@ export class GrammarRegistry {
 
     try {
       // 🛡️ Resilience: Native bindings for Python 0.25+ are often wrapped
-      parser.setLanguage((lang as any).language || lang);
+      const nativeLang = (lang as any).language || lang;
+      parser.setLanguage(nativeLang);
+      
+      // 🛡️ [Conducks Sanity Check] 🧬
+      // We perform a micro-parse to verify the native bridge is healthy.
+      // This prevents 'reading 166' type crashes from bubbling up.
+      const testTree = parser.parse(';');
+      if (!testTree || !testTree.rootNode) {
+        throw new Error('Native bridge returned invalid tree.');
+      }
+      
       return parser;
     } catch (err) {
       // 🛡️ [Ultimate Resilience Bridge] v3.0 🧬
       // High-stakes bypass: If the JS wrapper crashes (common in tree-sitter 0.25),
       // we extract the TRUE native setLanguage method and call it directly.
-      // This bypasses the buggy metadata initialization loop.
       try {
         const tsPath = path.dirname(this.require.resolve('tree-sitter/package.json'));
         const binding = this.require('node-gyp-build')(tsPath);
@@ -133,7 +144,7 @@ export class GrammarRegistry {
 
       this.unavailableLanguages.add(langId);
       if (process.env.CONDUCKS_DEBUG === '1') {
-        console.error(`[Conducks Registry] Conducks Resilience: Native binding failure for ${langId}. Transitioning to Blackbox Mode.`, err);
+        console.error(`[Conducks Registry] Conducks Resilience: Native binding failure for ${langId}. Transitioning to Gnosis Fallback.`, err);
       }
       return undefined;
     }
@@ -151,8 +162,27 @@ export class GrammarRegistry {
    * Creates a structural query for a given language.
    */
   public createQuery(lang: any, source: string): any {
-    return new Parser.Query(lang, source);
+    const nativeLang = (lang as any).language || lang;
+    // 🛡️ [Conducks Resilience Bridge] v4.0
+    // Parser.Query crashes with 'reading 166' on grammar ABI mismatches.
+    // Bypass the JS wrapper and use the native binding directly.
+    try {
+      return new Parser.Query(nativeLang, source);
+    } catch (err) {
+      try {
+        const tsPath = path.dirname(this.require.resolve('tree-sitter/package.json'));
+        const binding = this.require('node-gyp-build')(tsPath);
+        if (binding && binding.Query) {
+          return new binding.Query(nativeLang, source);
+        }
+      } catch (bypassErr) {
+        this.log(`[Conducks Registry] Query bypass failed:`, bypassErr);
+      }
+      throw err;
+    }
   }
+
+
 
   private attachNodeTypeInfo(lang: any, packageName: string, langId: string): void {
     try {

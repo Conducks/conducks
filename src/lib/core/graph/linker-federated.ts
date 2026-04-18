@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ConducksAdjacencyList } from './adjacency-list.js';
-import { DuckDbPersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
 
 /**
  * Conducks — Federated Linker
@@ -46,9 +46,10 @@ export class FederatedLinker {
   public async hydrate(mainGraph: ConducksAdjacencyList): Promise<void> {
     const links = await this.getLinks();
     for (const linkPath of links) {
-      const p = new DuckDbPersistence(linkPath, true); // Force READ_ONLY for federation neighbors
+      const p = new SynapsePersistence(linkPath); // Force READ_ONLY for federation neighbors
       const before = mainGraph.stats.nodeCount;
-      const success = await p.load(mainGraph, true);
+      await p.load(mainGraph);
+      const success = mainGraph.stats.nodeCount > before;
       if (success) {
         const added = mainGraph.stats.nodeCount - before;
         console.error(`[Federated Linker] Resonated with ${linkPath} (+${added} nodes).`);

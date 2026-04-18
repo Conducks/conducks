@@ -16,7 +16,8 @@ export class StructuralRanker {
     // 1. Identify Architectural Anchors
     const anchors = nodes.filter(node => {
       const p = node.properties;
-      return p.isClass || p.isFunction || p.isInterface || p.isType || p.isEnum || p.isMethod || p.isModule || node.label === 'module' || node.label === 'function';
+      const ck = p.canonicalKind;
+      return ck === 'STRUCTURE' || ck === 'FUNCTION' || ck === 'BEHAVIOR' || ck === 'INFRA' || p.isModule || node.label === 'module' || node.label === 'unit';
     });
 
     const AN = anchors.length;
@@ -56,8 +57,10 @@ export class StructuralRanker {
 
     // 3. Commit Gravity
     for (const node of nodes) {
-      node.properties.rank = ranks.get(node.id) || 0;
-      node.properties.kineticEnergy = (node.properties.rank || 0) * AN;
+      const rank = ranks.get(node.id) || 0;
+      node.properties.rank = rank;
+      node.properties.gravity = rank;
+      node.properties.kineticEnergy = rank * AN;
     }
 
     // 4. Conducks — Identify Entry Points after importance is known
@@ -79,7 +82,7 @@ export class StructuralRanker {
       let isEntry = false;
 
       // 1. Explicit Framework Routes (Detected during refraction)
-      if (node.label === 'route' || node.label.includes('route') || props.kind?.includes('route')) {
+      if (node.label === 'route' || node.label?.includes('route') || props?.kind?.includes('route')) {
         isEntry = true;
       }
 

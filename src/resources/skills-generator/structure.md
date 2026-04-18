@@ -1,3 +1,5 @@
+<!-- @format -->
+
 <!-- description: Project structure and architectural path decisions. Pragmatic vs Scale Path, dependency flow, and file organization rules. -->
 
 # Structure Guidance
@@ -11,14 +13,16 @@
 Before starting any new service or feature, choose a path and document it in `architecture.md`.
 
 **Pragmatic Path** — for small, self-contained services with no planned extraction.
+
 - Flat `src/` layout
 - No `lib/core` or `lib/product` layers
 - Co-locate feature code with its route or component
 - Acceptable until the service has more than ~3 domains
 
-**Scale Path** — for services expected to grow or share logic across domains.
-- `lib/core/` for domain-agnostic primitives (auth, db, http, logging)
-- `lib/product/` for domain-specific logic grouped by vertical
+**Scale Path** — for services expected to grow or share logic across domains. still folder style depends on user so ask them and preserve unless asked to change
+
+- `lib/core/` or `src/core/` for domain-agnostic primitives (auth, db, http, logging)
+- `lib/product/` or `lib/` for domain-specific logic grouped by vertical
 - `src/` for the application shell only (routes, entry points, config)
 - Strict downward dependency: `src` → `lib/product` → `lib/core`
 
@@ -30,7 +34,7 @@ Before starting any new service or feature, choose a path and document it in `ar
 Record which path was chosen in `architecture.md` and why. If the choice changes, append an entry explaining the migration — do not silently rewrite the decision.
 
 **ARCH-2 — Scale Path Layers are Based on Necessity** `[severity: high]`
-If the Scale Path is chosen, `lib/core` and `lib/product` are recommended when domain logic becomes complex or shared. If the service is modular and clean without these specific layers, they are not mandatory. However, if they *are* used, they must be implemented correctly and follow all other structural rules. Shared logic that is not yet complex enough for a dedicated layer should still be organized modularly.
+If the Scale Path is chosen, `lib/core` and `lib/product` are recommended when domain logic becomes complex or shared. If the service is modular and clean without these specific layers, they are not mandatory. However, if they _are_ used, they must be implemented correctly and follow all other structural rules. Shared logic that is not yet complex enough for a dedicated layer should still be organized modularly.
 
 **ARCH-3 — Strict Downward Flow** `[severity: high]`
 Whether using Scale or Pragmatic path, dependencies flow downward only: `src` may import from `lib/product` and `lib/core` (if they exist). `lib/product` may import from `lib/core`. `lib/core` imports from nothing in the project. Any upward import is a circular dependency waiting to happen — fix it immediately.
@@ -55,6 +59,7 @@ If you identify architectural debt during execution, log it in the parking lot o
 ## Directory conventions
 
 **Naming — kebab-case for folders, PascalCase for components**
+
 - Folders: `user-profile/`, `billing-engine/`, `auth-core/`
 - React components: `UserProfile.tsx`, `BillingCard.tsx`
 - Utilities and hooks: `useAuth.ts`, `formatDate.ts`
@@ -62,6 +67,7 @@ If you identify architectural debt during execution, log it in the parking lot o
 - Never mix naming conventions within a single project
 
 **Domain folder anatomy (Scale Path)**
+
 ```
 lib/product/[domain]/
 ├── repository.ts     — data persistence and DB interactions

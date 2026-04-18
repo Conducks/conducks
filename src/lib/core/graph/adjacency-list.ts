@@ -490,23 +490,6 @@ export class ConducksAdjacencyList {
     return nodesInFile.find(n => n.label === 'module');
   }
 
-  /**
-   * High-Fidelity PageRank Convergence
-   *
-   * Performs iterative power iteration to determine the true structural
-   * importance (Gravity) of every node in the Synapse.
-   */
-  public globalRecalculateGravity(iterations: number = 30, damping: number = 0.85): void {
-    StructuralRanker.calculateGravity(this, iterations, damping);
-  }
-
-  /**
-   * Conducks — Entry Point Intelligence
-   */
-  public detectEntryPoints(): void {
-    StructuralRanker.detectEntryPoints(this);
-  }
-
   public get stats() {
     const degrees = Array.from(this.outEdges.values()).map(s => s.size);
     degrees.sort((a, b) => a - b);

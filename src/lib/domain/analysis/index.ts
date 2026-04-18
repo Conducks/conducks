@@ -9,6 +9,7 @@ import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
 import { ConducksComponent } from "@/registry/types.js";
 
 import { QueryService } from "./query-service.js";
@@ -143,8 +144,7 @@ export class AnalysisService implements ConducksComponent {
     const pulseStats = await (this.orchestrator as any).analyze(allUnits, { projectRoots, workspaceRoot: projectRoot });
     const { pulseId, nodeCount, edgeCount } = pulseStats;
 
-    // 3. Significance Analysis & Federated Linkage
-    // We delegate the metadata enrichment to the domain service
+    // 3. Metadata enrichment that doesn't require the full in-memory graph
     for (const unit of allUnits) {
       const fw = essenceLens.detectFramework(path.basename(unit.path), unit.source);
       if (fw) this.graph.getGraph().setMetadata('framework', fw);
@@ -155,24 +155,43 @@ export class AnalysisService implements ConducksComponent {
       }
     }
 
+    // 4. Reload graph from vault so PageRank runs on the full node/edge set.
+    // The orchestrator flushed and cleared the in-memory graph during analysis,
+    // so we must reload before resonating or gravity will be 0 for everything.
+    await this.persistence.load(this.graph.getGraph());
+
     this.graph.resonate();
+
+    // 4.1 Commit computed gravity values back to the vault (targeted UPDATE, safe on shallow nodes).
+    const gravityValues = Array.from(this.graph.getGraph().getAllNodes()).map(n => ({
+      id: n.id,
+      gravity: (n.properties.gravity as number) || 0
+    }));
+    await this.persistence.updateRanks(gravityValues);
+
+    // 4.2 Intra-Project Symbol Resolution
+    // Resolves bare cross-file targetIds (e.g. "synapsepersistence") to fully-qualified
+    // node IDs (e.g. "…/persistence.ts::synapsepersistence") using IMPORTS adjacency.
+    // Must run after the full graph is in memory and gravity is committed.
+    const intraLinker = new IntraLinker();
+    const resolvedEdges = intraLinker.resolve(this.graph.getGraph());
+    await this.persistence.updateEdgeTargets(resolvedEdges);
+
     const linker = new FederatedLinker();
     await linker.hydrate(this.graph.getGraph());
 
-    // 4. Persistence & Sync Metadata
+    // 4.2 Sync metadata and pulse record (no node/edge rows — they are already in vault)
     const headHash = voyager.getHeadHash();
     if (headHash) {
       this.graph.getGraph().setMetadata('lastAnalyzedCommit', headHash);
     }
-
     this.graph.getGraph().setMetadata('targetPulseId', pulseId);
 
     // 4.5 [Conducks Virtual Induction] 🏺
-    // We induce missing library nodes to ensure the synapse reflects the complete ecosystem.
     await this.induceVirtualLibraries(this.graph.getGraph());
 
-    await this.persistence.save(this.graph.getGraph(), { 
-      append: true, 
+    await this.persistence.save(this.graph.getGraph(), {
+      metadataOnly: true,
       nodeCount,
       edgeCount
     });
@@ -185,10 +204,6 @@ export class AnalysisService implements ConducksComponent {
     } catch (err) {
       logger.error("Failed to regenerate ARCHITECTURE.md", err);
     }
-
-    // 6. Conducks Re-Hydration
-    // Since we cleared the graph to ensure an incremental flush, we now reload for resonance.
-    await this.persistence.load(this.graph.getGraph());
 
     return { success: true, files: files.length };
   }
@@ -276,3 +291,4 @@ export class AnalysisService implements ConducksComponent {
 
 export { AnalyzeOrchestrator } from "./orchestrator.js";
 export { ConducksReflector } from "./reflector.js";
+export { Conducks } from "./conducks-core.js";

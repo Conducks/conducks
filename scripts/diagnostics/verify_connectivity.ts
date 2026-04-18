@@ -1,11 +1,11 @@
-import { DuckDbPersistence } from '../../src/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from '../../src/lib/core/persistence/persistence.js';
 import path from 'node:path';
 
 /**
  * Conducks — Structural Connectivity Diagnostic 🧬
  */
 async function verify() {
-  const persistence = new DuckDbPersistence();
+  const persistence = new SynapsePersistence(path.resolve(process.cwd()));
   const db = await persistence.getRawConnection();
   if (!db) {
     console.error("Failed to establish raw structural connection.");
