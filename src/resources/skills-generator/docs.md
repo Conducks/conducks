@@ -20,8 +20,11 @@ For single applications, use `docs/` at the project root:
 | `implementation.md` | What was built — a running log | Only when user explicitly asks |
 | `handover.md` | Full session state for the next agent | Only when user explicitly asks |
 | `conventions.md` | Non-negotiable rules for this service | Agent detects and appends; user defines |
+| `styling.md` | High-fidelity source of truth for visual and interactive standards | At project start or when design tokens are defined |
+| `creative_brief.md` | Strategy for branding, marketing, and creative direction | On project start or when engaging designers |
 | `todo.md` | Phases and tasks with acceptance criteria | During plan phase, updated throughout |
 | `completed/` | Historical completed todos (todo1.md, todo2.md, etc.) | When todos are completed |
+| `legacy/` | Existing documentation that does not fit into the standard required files but must be preserved | When moving to the Conducks documentation standard |
 | `memory.md` | Critical agent-only notes that must survive sessions | Agent appends during execute and memory phases |
 
 ### Multi-Service Structure
@@ -85,6 +88,19 @@ When a `todo.md` is completed, move it to `completed/todo{N}.md` where N is the 
 **DOCS-10 — Features File Structure** `[severity: high]`
 Every project must have a `features.md` file (at `docs/features.md` for single apps, or per-service in multi-service projects) that follows the strict structure: Title headers for modules, detailed plain-text bullet points for capabilities, no formatting within bullets, immediate sync requirement, and source-of-truth status. Read `features.md` before making any changes to understand what capabilities exist.
 
+**DOCS-11 — Styling Guide Standards** `[severity: high]`
+`styling.md` must define design tokens, typography scales, and interactive affordances. It serves as the visual source of truth. Any UI change that breaks these tokens must either update the tokens or be reverted.
+
+**DOCS-12 — Creative Brief Integrity** `[severity: medium]`
+`creative_brief.md` is required for projects involving branding or external design. It must follow the standard 8-section structure to ensure alignment between business goals and creative execution.
+
+**DOCS-13 — Legacy Preservation** `[severity: low]`
+The `legacy/` folder is used for existing documentation that does not fit into the new primary required files but contains valuable context. Use this to house pre-migration docs, old implementation notes, or unique project documentation that must not be lost during the transition to the Conducks standard.
+
+
+
+
+
 ---
 
 ## Writing standards
@@ -98,9 +114,12 @@ Every project must have a `features.md` file (at `docs/features.md` for single a
 - A constraint from outside the codebase → `memory.md`
 - A rule the team follows → `conventions.md`
 - The story of what changed → `implementation.md`
+- Visual tokens and UI rules → `styling.md`
+- Creative and branding strategy → `creative_brief.md`
 - The current broken state → `handover.md`
 - What to do next → `todo.md`
 - What was completed → `completed/todo{N}.md`
+- Deprecated but important history → `legacy/`
 
 **What never belongs in docs:**
 - Marketing language or aspirational copy

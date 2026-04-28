@@ -1,0 +1,98 @@
+{
+	"language": "TypeScript",
+	"generatedAt": "2026-04-12T15:30:00Z",
+	"features": {
+		"Imports": {
+			"status": "implemented",
+			"files": ["src/lib/core/parsing/languages/typescript/resolver.ts"]
+		},
+		"NamedBindings": {
+			"status": "implemented",
+			"files": [
+				"src/lib/core/parsing/languages/typescript/bindings.ts",
+				"src/lib/core/parsing/languages/typescript/index.ts"
+			]
+		},
+		"Exports": {
+			"status": "implemented",
+			"files": ["src/lib/core/parsing/languages/typescript/bindings.ts"]
+		},
+		"Heritage": {
+			"status": "implemented",
+			"notes": "class extends/implements and basic inheritance extraction supported",
+			"files": ["src/lib/core/parsing/languages/typescript/extractor.ts"]
+		},
+		"TypeAnnotations": {
+			"status": "partial",
+			"notes": "Type annotation nodes are extracted; complex inference left to typechecker integration",
+			"files": ["src/lib/core/parsing/languages/typescript/extractor.ts"]
+		},
+		"ConstructorInference": {
+			"status": "partial",
+			"notes": "Constructor parameter properties and simple inference captured",
+			"files": ["src/lib/core/parsing/languages/typescript/extractor.ts"]
+		},
+		"Config": {
+			"status": "implemented",
+			"notes": "tsconfig baseUrl/paths/rootDirs mapping supported",
+			"files": ["src/lib/core/parsing/languages/typescript/resolver.ts"]
+		},
+		"Frameworks": {
+			"status": "basic",
+			"notes": "Patterns for React/Next/Vue detected heuristically; framework-specific enrichers limited",
+			"files": ["src/lib/core/parsing/languages/typescript/index.ts"]
+		},
+		"EntryPoints": {
+			"status": "implemented",
+			"notes": "Unit and package entry detection via pulses and package.json",
+			"files": [
+				"src/lib/core/persistence/persistence.ts",
+				"src/lib/core/parsing/languages/typescript/resolver.ts"
+			]
+		},
+
+		"PackageResolution": {
+			"status": "implemented",
+			"notes": "node_modules package.json exports/main/types resolution (basic)",
+			"files": ["src/lib/core/parsing/languages/typescript/resolver.ts"]
+		},
+		"ReExports": {
+			"status": "implemented",
+			"files": ["src/lib/core/parsing/languages/typescript/bindings.ts"]
+		},
+		"TypeOnlyImports": {
+			"status": "partial",
+			"notes": "`import type` recognized; full type-system integration not complete",
+			"files": ["src/lib/core/parsing/languages/typescript/index.ts"]
+		},
+		"DeclarationFiles": {
+			"status": "implemented",
+			"notes": ".d.ts precedence handled during resolution",
+			"files": ["src/lib/core/parsing/languages/typescript/resolver.ts"]
+		},
+		"ConditionalExports": {
+			"status": "partial",
+			"notes": "Simple exports map cases handled; complex conditional maps limited",
+			"files": ["src/lib/core/parsing/languages/typescript/resolver.ts"]
+		},
+		"TypesVersions": {
+			"status": "partial",
+			"notes": "Best-effort; full versions mapping not fully implemented",
+			"files": ["src/lib/core/parsing/languages/typescript/resolver.ts"]
+		},
+		"HydrationModel": {
+			"status": "implemented",
+			"notes": "Shallow vs deep node hydration; heavy JSON kept in DB and hydrated on demand",
+			"files": ["src/lib/core/persistence/persistence.ts"]
+		},
+		"CompactWaveAPI": {
+			"status": "implemented",
+			"notes": "/api/synapse?compact=1 returns numeric-indexed nodes and edges",
+			"files": [
+				"src/lib/core/persistence/persistence.ts",
+				"src/lib/domain/analysis/gateway-service.ts",
+				"src/interfaces/web/mirror-server.ts"
+			]
+		}
+	}
+}

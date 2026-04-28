@@ -23,7 +23,7 @@ tests/legacy
 *.swp
 *.swo
 *~
-docs/
+
 tests/fixtures/
 # Python
 .venv/
