@@ -345,8 +345,8 @@ export class SynapsePersistence {
     };
   }
 
-  public getRawConnection(): any {
-    return this.db;
+  public async getRawConnection(): Promise<any> {
+    return await this.ensureVaultOpen();
   }
 
   public async close(): Promise<void> {

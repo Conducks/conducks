@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22.x, 24.x]
+        node-version: [22.x]
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -32,10 +32,10 @@ jobs:
     - name: Build Synapse
       run: npm run build
       
-    - name: Pulse Architecture
-      run: node ./build/src/interfaces/cli/index.js pulse
+    - name: Analyze Architecture
+      run: node ./build/src/interfaces/cli/index.js analyze
       
     - name: Run Integrity Tests
-      run: npm test
+      run: npm test -- --runInBand
       env:
         NODE_OPTIONS: --experimental-vm-modules

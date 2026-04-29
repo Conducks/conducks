@@ -1,29 +1,29 @@
 # Architecture Context — conducks
-Generated: 2026-04-28T23:36:07.377Z | Pulse: pulse_1777419332853_ekj82
+Generated: 2026-04-29T12:17:39.838Z | Pulse: pulse_1777465058938_4pel3
 
 ## Entry Points (top 10 by gravity)
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/adjacency-list.ts::conducksadjacencylist` [STRUCTURE, gravity: 0.0161, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0140, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/persistence/persistence.ts::synapsepersistence` [STRUCTURE, gravity: 0.0140, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/git/chronicle-interface.ts::chronicleinterface` [STRUCTURE, gravity: 0.0126, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/grammar-registry.ts::grammarregistry` [STRUCTURE, gravity: 0.0078, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/graph-engine.ts::conducksgraph` [STRUCTURE, gravity: 0.0071, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/federation/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0071, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/index.ts::governanceservice` [STRUCTURE, gravity: 0.0071, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/fallback-detector.ts::fallbackdetector` [STRUCTURE, gravity: 0.0064, risk: 0.0000]
-- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/registry/dynamic-loader.ts::dynamictoolloader` [STRUCTURE, gravity: 0.0064, risk: 0.0000]
+- `taxonomy::l4` [INFRA, gravity: 0.0008, risk: 0.0000]
+- `taxonomy::l5` [STRUCTURE, gravity: 0.0008, risk: 0.0000]
+- `taxonomy::l6` [BEHAVIOR, gravity: 0.0008, risk: 0.0000]
+- `repository::conducks` [REPOSITORY, gravity: 0.0000, risk: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.github/workflows` [DIRECTORY, gravity: 0.0000, risk: 0.0000]
+- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.github` [DIRECTORY, gravity: 0.0000, risk: 0.0000]
+- `taxonomy::l0` [ECOSYSTEM, gravity: 0.0000, risk: 0.0000]
+- `taxonomy::l1` [REPOSITORY, gravity: 0.0000, risk: 0.0000]
+- `taxonomy::l2` [DIRECTORY, gravity: 0.0000, risk: 0.0000]
+- `taxonomy::l3` [UNIT, gravity: 0.0000, risk: 0.0000]
 
 ## Structural Hotspots (top 10 by risk)
 - `ecosystem::global` [risk: 0.0000, gravity: 0.0000]
 - `repository::conducks` [risk: 0.0000, gravity: 0.0000]
 - `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.github/workflows` [risk: 0.0000, gravity: 0.0000]
 - `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/.github` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets/logo/official` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/assets/logo` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/config` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/docs` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/docs/completed` [risk: 0.0000, gravity: 0.0000]
+- `taxonomy::l0` [risk: 0.0000, gravity: 0.0000]
+- `taxonomy::l1` [risk: 0.0000, gravity: 0.0000]
+- `taxonomy::l2` [risk: 0.0000, gravity: 0.0000]
+- `taxonomy::l3` [risk: 0.0000, gravity: 0.0000]
+- `taxonomy::l4` [risk: 0.0000, gravity: 0.0008]
+- `taxonomy::l5` [risk: 0.0000, gravity: 0.0008]
 
 ## Active Violations (0)
 
