@@ -32,11 +32,6 @@ describe('Conducks CLI Integration', () => {
     expect(output).toContain('analyze');
   });
 
-  it('should show status', () => {
-    const output = execSync(`node ${cliPath} status`).toString();
-    expect(output).toContain('🏺 Structural Synapse Status');
-  });
-
   it('should run analyze (pulse)', () => {
     // skip if git repo wasn't initialized correctly
     if (!fs.existsSync(path.join(testRepo, '.git'))) return;
@@ -58,8 +53,13 @@ describe('Conducks CLI Integration', () => {
     expect(output).toContain('🛡️ [Conducks] Structural Resonance Complete.');
   });
 
+  it('show status', () => {
+    const output = execSync(`node ${cliPath} status`, { cwd: testRepo }).toString();
+    expect(output).toContain('🏺 Structural Synapse Status');
+  });
+
   it('should run entropy analysis', () => {
-    const output = execSync(`node ${cliPath} entropy some::symbol`).toString();
+    const output = execSync(`node ${cliPath} entropy some::symbol`, { cwd: testRepo }).toString();
     expect(output).toContain('Structural Entropy');
   });
 });
