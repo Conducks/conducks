@@ -11,7 +11,10 @@ Source of truth for all product capabilities. Read this before making any change
 - `--force`: Force full re-pulse regardless of staleness.
 - `--verbose`: Fires real-time anomaly detection output during ingestion.
 
-**conducks status** — Structural health manifest. Aggregates: hotspots (risk × gravity top symbols), entry points (REST routes, mains, CLI handlers), structural pillars, god object detection, anomaly summary, staleness ranking. Sub-command `--staleness` shows symbols by commits since last change.
+**conducks status** — Structural health manifest. Aggregates: hotspots (risk × gravity top symbols), entry points (REST routes, mains, CLI handlers), structural pillars, god object detection, anomaly summary, staleness ranking. Sub-command `--staleness` shows symbols by active tenure (commits since last change).
+
+**Staleness Sensor** (`src/lib/domain/federation/context.ts`) — Verification engine that compares the last pulsed Git commit hash against the current `HEAD`. Calculates precise "commits behind" counts to detect if the graph is out of sync. Powers `conducks status` and `conducks context`.
+
 
 **conducks watch** — Real-time FS monitoring. Delegates to `MicroPulseService` for sub-second structural resurrection of modified units. Auto-syncs graph on file change. Stabilized for macOS APFS case-sensitivity. Prevents persistence deadlocks via lazy connection lifecycle.
 
@@ -78,13 +81,24 @@ Source of truth for all product capabilities. Read this before making any change
 ## 5. Governance Domain
 
 **conducks audit** — Sentinel integrity checks via `sentinel.ts`.
-- ARCH-3: Circular dependency detection (Tarjan SCC).
+- ARCH-3: Circular dependency detection (Tarjan SCC). Distinguishes between internal file cycles and genuine architectural circularity spanning multiple units.
 - God object detection: symbols exceeding fanout threshold.
 - Orphan exports: symbols with no incoming edges.
 - Reads custom rules from `sentinel.json` at project root.
+- **Advanced Sentinel Rules**: Supports `require_heritage` (enforce base classes), `require_caller` (enforce call-wrappers), `framework_check` (validate decorators), and `require_file` (foundation file checks).
+- **Framework Coverage**: Aggregates usage statistics to show project-level adoption of detected frameworks (e.g., Next.js vs Express).
 - `--mode archeology`: Longitudinal audit via `AuditService` — tracks structural velocity and decay trends across all historical pulses using windowed SQL (`LAG + AVG OVER PARTITION`).
 
-**conducks advise** — Proactive structural improvement via `advisor.ts`. Heuristic recommendations: split candidates for high-complexity functions, hidden coupling surfaced from co-change matrix, dead code removal opportunities, suggested namespace restructuring.
+**conducks fallback** — Specialized reporting on "Suspicious Fallback Patterns." Identifies legacy or obsolete fallbacks using a 5-signal confidence score. Reports: Fallback Confidence, Usage Ratio, Naming Score, and Tenure (days since creation). Provides prioritized removal recommendations.
+
+
+**conducks advise** — Proactive structural improvement via `advisor.ts`. Heuristic recommendations:
+- **Split Candidates**: Identified via `SplitScore(M)` (Betweenness + Entropy + Churn - Cohesion).
+- **Hidden Coupling**: Surfaced from Git co-change matrix (Architectural Lies).
+- **Structural Intuition**: Detects possible implicit links where string literals match symbol names.
+- **Dependency Health**: Flags unpinned dependencies (`latest`, `*`, `^`) and heavy external coupling.
+- **Dead Code**: Removal opportunities for orphaned exports.
+
 
 **conducks verify** — Policy compliance verification. Checks all CONDUCKS-* structural laws against the current graph state.
 
@@ -147,7 +161,8 @@ Source of truth for all product capabilities. Read this before making any change
 
 **conducks context-gen** — Generates `ARCHITECTURE.md`: LLM-optimized architecture context (≤4000 tokens). Covers layer distribution, hotspots, entry points, and structural risk summary. Written to the project root.
 
-**Mirror Engine** (`src/lib/domain/visual/mirror.engine.ts`) — Server-side graph rendering layer. Applies NVP logic (Nearest Visible Parent) for structural contraction. Promotes technical edges between filtered-out nodes to their visible ancestors. Powers the Mirror dashboard.
+**Mirror Engine** (`src/lib/domain/visual/mirror.engine.ts`) — Server-side graph rendering layer. Implements **Nearest Visible Parent (NVP)** logic for structural contraction, promoting technical edges between filtered nodes to their visible ancestors. Powers the Mirror dashboard.
+
 
 ---
 
@@ -169,7 +184,10 @@ Source of truth for all product capabilities. Read this before making any change
 
 **conducks record** — Records a structural pulse snapshot with a named label for chronoscopic analysis.
 
-**conducks link** — Federated linking across multiple repositories via `FederatedLinker`. Performs additive hydration (append mode) — loads a second synapse into the current graph without overwriting. Resolves cross-synapse edges via post-pulse alignment. Verified: 5,000 foundation nodes merged into 1,624-node scraper synapse (6,624 total federated).
+**conducks link** — Federated linking across multiple repositories via `FederatedLinker`. Performs **Additive Hydration** (append mode) — loads a second synapse into the current graph without overwriting. Resolves cross-synapse edges via post-pulse alignment. Verified: 5,000 foundation nodes merged into 1,624-node scraper synapse (6,624 total federated).
+
+**conducks help** — Professional Structural Help Engine. Groups the 33 CLI commands into 9 distinct functional domains: Discovery, Landscape, Behavioral, Metrics, Governance, Historical, Mutational, Visual, and System.
+
 
 **conducks context** — Displays the current workspace context: vault path, pulse ID, node/edge counts, staleness state.
 

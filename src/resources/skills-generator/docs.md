@@ -27,6 +27,8 @@ For single applications, use `docs/` at the project root:
 | `legacy/` | Existing documentation that does not fit into the standard required files but must be preserved | When moving to the Conducks documentation standard |
 | `memory.md` | Critical agent-only notes that must survive sessions | Agent appends during execute and memory phases |
 
+> **Note:** Not every project needs every file. Create only the files relevant to the project's actual scope. A marketing website does not need `business_plan.md` if strategy lives elsewhere. A CLI tool with no UI does not need `styling.md`. Never create a file just to satisfy the table above — only create it when there is real content to record.
+
 ### Multi-Service Structure
 For multi-service projects, each service has its own `docs/` directory:
 
@@ -90,6 +92,8 @@ Every project must have a `features.md` file (at `docs/features.md` for single a
 
 **DOCS-11 — Styling Guide Standards** `[severity: high]`
 `styling.md` must define design tokens, typography scales, and interactive affordances. It serves as the visual source of truth. Any UI change that breaks these tokens must either update the tokens or be reverted.
+
+- Use `ResizeObserver` on the container element for any component whose rendering depends on available width (charts, conditional layouts, responsive tables). Do not use `window` resize events — flex and grid containers resize independently of the viewport.
 
 **DOCS-12 — Creative Brief Integrity** `[severity: medium]`
 `creative_brief.md` is required for projects involving branding or external design. It must follow the standard 8-section structure to ensure alignment between business goals and creative execution.

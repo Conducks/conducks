@@ -119,3 +119,4 @@ High-fidelity source of truth for all visual and interactive design standards in
 - Namespace clusters maintain `structuralSpread` spacing (minimum `2x` node diameter).
 - Labels fade in progressively: namespace labels always visible, file labels at zoom ≥ 0.6, symbol labels at zoom ≥ 1.2.
 - No overlapping clusters — force simulation must resolve within 300ms on 3,500 nodes.
+- **Responsive sizing uses `ResizeObserver`, not `window.resize`.** Watch the container element directly — grab `contentRect.width` from the first entry and redraw on every size change. `window.resize` misses layout shifts from sidebars, flex containers, and panel resizes. Required for any chart, graph, or canvas that must fill its container.
