@@ -2,7 +2,6 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { MirrorEngine } from "@/lib/domain/visual/mirror.engine.js";
 import { Logger } from "@/lib/core/utils/logger.js";
-import { registry } from "@/registry/index.js";
 import fs from "node:fs";
 import path from "node:path";
 

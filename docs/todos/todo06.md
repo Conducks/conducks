@@ -8,15 +8,17 @@ Status: doing
 - [x] verify: core→registry 8→2, domain→registry 82→18 (measured via self-analysis)
 
 ## Phase 2 — fix remaining real violations
-- [ ] relocate generic registry containers (SynapseRegistry, base, tool-registry, dynamic-loader)
-      out of registry/ down to core-level infra — fixes core→registry (persistence.ts imports SynapseRegistry)
-- [ ] inject deps into the 4 domain Service-Locator leaks (domain→registry/index.js):
-      evolution/watcher.ts, analysis/index.ts, analysis/gateway-service.ts, federation/conducks-installer.ts
-      — pass dependencies in at the composition root instead of pulling the global `registry`
-- [ ] move initGlobalMirror (web server bootstrap) to composition so `cli mirror` → composition, not cli→web
-- [ ] NOTE: cli→mcp is a FALSE POSITIVE — clean.ts has a string path, not an import (conducks counts string refs as edges)
+- [x] relocate SynapseRegistry → lib/core/registry/ — fixes core→registry (8→0). tool-registry stays (pulls composition+MCP, not core)
+- [x] eliminate domain Service-Locator leaks (domain→registry 82→0): 2 dead imports removed, installer oracle-injected, watcher false positive
+- [x] cli→web (mirror launcher) kept as allowed edge — launcher, not logic coupling (holds ground: moving express into composition is worse)
+- [x] confirmed cli→mcp is a FALSE POSITIVE (clean.ts string path, not import)
 
 ## Phase 3 — guard the table
-- [ ] encode the layer contract as conducks guard rules: contracts(leaf) ← core ← domain ← composition ← interfaces{cli,mcp,web siblings}
-- [ ] wire guard into docs-lint / CI so a new cross-layer violation fails the build
-- [ ] write ADR 0005 — the layer contract (the table)
+- [x] layer_boundaries sentinel rule + ALLOWED_DEPENDENCIES table (contracts←core←domain←composition←interfaces)
+- [x] wire the never-run sentinel evaluator into `conducks guard`; verified fires on injected violation, clean when passing
+- [x] ADR 0005 — the layer contract
+
+## Phase 4 — discovered while wiring guard (pre-existing, NOT layer regressions)
+- [ ] no_cycles: 1 import cycle exposed (was never enforced — sentinel rules ran nowhere before)
+- [ ] rank_violations: 37 symbol-rank inversions (severity warning) — surfaced by guard, tracked
+- [ ] dead code flagged: registry/base.ts, registry/dynamic-loader.ts (0 importers)

@@ -9,7 +9,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { ConducksComponent } from "@/contracts/types.js";
 import path from "node:path";
-import { loadSentinelRules, type SentinelRule } from "./sentinel-rules.js";
+import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type SentinelRule } from "./sentinel-rules.js";
 
 /**
  * Conducks — Governance Domain Service
@@ -253,6 +253,39 @@ export class GovernanceService implements ConducksComponent {
                 ruleId: rule.id,
                 severity: rule.severity,
                 message: `[${rule.name}] Rank inversion: [${src.properties.name}](rank ${srcRank}) -> [${tgt.properties.name}](rank ${tgtRank})`,
+              });
+            }
+          }
+          break;
+        }
+
+        case 'layer_boundaries': {
+          // Clean-Architecture guard (ADR 0005): an import edge from layer A to layer B is legal
+          // only if B ∈ ALLOWED_DEPENDENCIES[A]. Same-layer edges are always legal.
+          const layerOf = (file: string): string | null => {
+            if (!file) return null;
+            const f = file.toLowerCase();
+            for (const [name, frag] of LAYER_FRAGMENTS) if (f.includes(frag)) return name; // order matters
+            return null;
+          };
+          const seen = new Set<string>();
+          for (const edge of this.graph.getAllEdges()) {
+            if (edge.type === 'MEMBER_OF') continue;
+            const src = this.graph.getNode(edge.sourceId);
+            const tgt = this.graph.getNode(edge.targetId);
+            if (!src || !tgt) continue;
+            const s = layerOf(String(src.properties.filePath || src.properties.file || ''));
+            const t = layerOf(String(tgt.properties.filePath || tgt.properties.file || ''));
+            if (!s || !t || s === t) continue;
+            if (!(ALLOWED_DEPENDENCIES[s] || []).includes(t)) {
+              const key = `${s}->${t}`;
+              if (seen.has(key)) continue; // one violation per illegal layer-pair, not per edge
+              seen.add(key);
+              violations.push({
+                id: edge.sourceId,
+                ruleId: rule.id,
+                severity: rule.severity,
+                message: `[${rule.name}] Illegal layer dependency: ${s} → ${t} (e.g. ${src.properties.name} → ${tgt.properties.name})`,
               });
             }
           }

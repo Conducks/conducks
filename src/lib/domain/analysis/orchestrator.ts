@@ -1,7 +1,7 @@
 import { ConducksPipeline } from "@/lib/core/parsing/pipeline.js";
 import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
-import { SynapseRegistry } from "@/registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { sameFamily } from "@/lib/core/graph/import-resolver.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";

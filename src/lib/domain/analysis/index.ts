@@ -5,7 +5,6 @@ import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
 import { ContextGenerator } from "@/lib/domain/governance/context-generator.js";
 import { Logger } from "@/lib/core/utils/logger.js";
-import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";

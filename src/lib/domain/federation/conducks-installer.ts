@@ -3,7 +3,13 @@ import path from "node:path";
 import os from "node:os";
 
 import { ConducksComponent } from "@/contracts/types.js";
-import { registry } from "@/registry/index.js";
+
+/** Minimal oracle contract the installer needs — injected, not pulled from the composition root. */
+export interface OracleLike {
+  bootstrap(): Promise<void> | void;
+  listSkills(): Array<{ id: string; description: string }>;
+  getSkill(id: string): { content: string } | null | undefined;
+}
 
 /**
  * The Conducks Installer
@@ -17,6 +23,7 @@ export class ConducksInstaller implements ConducksComponent {
 
   constructor(
     workspaceRoot: string,
+    private readonly oracle: OracleLike,
     private readonly fileSystem: any = fs
   ) {
     this.globalSkillsDir = path.join(os.homedir(), ".gemini", "antigravity", "skills");
@@ -28,7 +35,7 @@ export class ConducksInstaller implements ConducksComponent {
    */
   public async sync(): Promise<{ global: string[], workspace: string[] }> {
     // Initialize the oracle to load skills dynamically
-    await (registry.oracle as any).bootstrap();
+    await this.oracle.bootstrap();
 
     const skills = this.getDynamicSkillTemplates();
     const installedGlobal: string[] = [];
@@ -53,7 +60,7 @@ export class ConducksInstaller implements ConducksComponent {
 
   private getDynamicSkillTemplates(): Record<string, string> {
     const skills: Record<string, string> = {};
-    const skillList = (registry.oracle as any).listSkills();
+    const skillList = this.oracle.listSkills();
 
     // Map skill IDs to the expected names used by the installer
     const skillIdMapping: Record<string, string> = {
@@ -67,7 +74,7 @@ export class ConducksInstaller implements ConducksComponent {
     };
 
     for (const skill of skillList) {
-      const detail = (registry.oracle as any).getSkill(skill.id);
+      const detail = this.oracle.getSkill(skill.id);
       if (detail && skillIdMapping[skill.id]) {
         const targetName = skillIdMapping[skill.id];
         skills[targetName] = `---

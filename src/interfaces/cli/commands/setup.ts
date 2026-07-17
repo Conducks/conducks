@@ -13,11 +13,11 @@ export class SetupCommand implements ConducksCommand {
   public description = "Configure MCP and install skills";
   public usage = "registry setup";
 
-  public async execute(_args: string[], _registry: Registry): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks Setup] Initializing Environment...\x1b[0m");
 
-    // 1. Sync Conduckss (Skills)
-    const installer = new ConducksInstaller(process.cwd());
+    // 1. Sync Conduckss (Skills) — inject the oracle from the composition root (no Service-Locator leak in domain)
+    const installer = new ConducksInstaller(process.cwd(), (registry as any).oracle);
     const skillResult = await installer.sync();
     console.log(`✅ Synced ${skillResult.global.length} Skills to Global.`);
     console.log(`✅ Synced ${skillResult.workspace.length} Skills to Workspace.`);

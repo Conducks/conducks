@@ -13,7 +13,8 @@ export type SentinelCondition =
   | 'rank_violation'
   | 'dead_code'
   | 'high_churn'
-  | 'deep_nesting';
+  | 'deep_nesting'
+  | 'layer_boundaries';
 
 export interface SentinelRule {
   id: string;
@@ -29,6 +30,34 @@ export interface SentinelRuleFile {
   version: 1;
   rules: SentinelRule[];
 }
+
+/**
+ * Conducks' own Clean-Architecture layer contract (ADR 0005), guarded by the
+ * `layer_boundaries` condition. Path fragments map a file to a layer; ORDER MATTERS —
+ * `/lib/core` must precede `/registry` so lib/core/registry/ classifies as core, not composition.
+ * An edge from layer A to layer B is legal iff B is in ALLOWED_DEPENDENCIES[A]. Same-layer edges
+ * are always legal. Hardcoded (not YAML) because the minimal sentinel parser has no nested maps,
+ * and this guards conducks itself; per-project layer config is a future enhancement.
+ */
+export const LAYER_FRAGMENTS: Array<[string, string]> = [
+  ['contracts', '/contracts'],
+  ['core', '/lib/core'],
+  ['domain', '/lib/domain'],
+  ['composition', '/registry'],
+  ['cli', '/interfaces/cli'],
+  ['mcp', '/interfaces/tools'],
+  ['web', '/interfaces/web'],
+];
+
+export const ALLOWED_DEPENDENCIES: Record<string, string[]> = {
+  contracts: [],                                  // leaf — imports nothing above
+  core: ['contracts'],
+  domain: ['core', 'contracts'],
+  composition: ['domain', 'core', 'contracts'],
+  cli: ['composition', 'contracts', 'web'],       // web = the `mirror` launcher edge (allowed)
+  mcp: ['composition', 'contracts'],
+  web: ['composition', 'domain', 'core', 'contracts'],
+};
 
 // ---------------------------------------------------------------------------
 // Minimal YAML parser — supports only the subset used in sentinel.yml:
