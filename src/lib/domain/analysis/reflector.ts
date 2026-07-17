@@ -247,7 +247,7 @@ export class ConducksReflector implements ConducksComponent {
               initialKind = 'infra';
             }
 
-            const isScoped = match.captures.some((c: any) => c.name === CaptureTags.IS_FUNCTION || c.name === CaptureTags.IS_CLASS || c.name === CaptureTags.IS_STRUCT || c.name === CaptureTags.IS_METHOD);
+            const isScoped = match.captures.some((c: any) => c.name === CaptureTags.IS_FUNCTION || c.name === CaptureTags.IS_CLASS || c.name === CaptureTags.IS_STRUCT || c.name === CaptureTags.IS_METHOD || c.name === CaptureTags.IS_INTERFACE || c.name === CaptureTags.IS_ENUM);
             let rangeNode = matchNameCap.node;
             if (isScoped && matchNameCap.node.parent) {
               rangeNode = matchNameCap.node.parent;
