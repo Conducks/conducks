@@ -19,6 +19,6 @@ Status: doing
 - [x] ADR 0005 — the layer contract
 
 ## Phase 4 — discovered while wiring guard (pre-existing, NOT layer regressions)
-- [ ] no_cycles: 1 import cycle exposed (was never enforced — sentinel rules ran nowhere before)
+- [x] no_cycles: 0 — the 1 exposed cycle was a singleton intra-file false positive; fixed the DETECTOR (skip same-file cycles), not the code (singleton is correct)
 - [ ] rank_violations: 37 symbol-rank inversions (severity warning) — surfaced by guard, tracked
 - [ ] dead code flagged: registry/base.ts, registry/dynamic-loader.ts (0 importers)
