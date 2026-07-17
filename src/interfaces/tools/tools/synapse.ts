@@ -538,52 +538,9 @@ Budget: nodes are scored and added highest-first until budget is exhausted or di
     }
   },
 
-  conducks_guide: {
-    id: "conducks-guide",
-    name: "conducks_guide",
-    type: "tool",
-    version: "2.1.0",
-    description: `Access the dynamic architectural guidance library. Serves engineering standards and rules.
-
-WHEN TO USE: You need specific guidance on UI, Backend, Security, Project Structure, or Fallback Patterns.
-AFTER THIS: Apply the provided rules to your implementation.`,
-    // MCP2: tool annotations
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-    },
-    inputSchema: {
-      type: "object",
-      properties: {
-        skill: { type: "string", description: "Optional: The ID of the skill to retrieve (e.g., 'frontend/tools/color')." },
-        path: { type: "string", description: "Optional: The absolute project root." }
-      }
-    },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ skill, path: customPath }: any) => {
-      try {
-        await ensureAnchor(customPath, true);
-        await (registry.oracle as any).bootstrap();
-
-        if (skill) {
-          const detail = registry.oracle.get(skill);
-          if (!detail) return mcpErr('SKILL_NOT_FOUND', `Skill '${skill}' not found.`, `Available skills: ${registry.oracle.list().map((s: any) => s.id).join(', ')}`, false);
-          return mcpOk({ skill: detail.id, name: detail.name, content: detail.content });
-        }
-
-        return mcpOk({
-          message: "Conducks Dynamic Guidance Library Active.",
-          available_modules: registry.oracle.list().map((s: any) => ({ id: s.id, name: s.name, description: s.description }))
-        });
-      } catch (err: any) {
-        // MCP3: structured error
-        return mcpErr('ORACLE_FAILED', err.message, 'Check that the project has been analyzed first.', true);
-      } finally {
-        await (registry.infrastructure.persistence as any).close();
-      }
-    }
-  },
+  // conducks_guide REMOVED — it was a static file-reader (redundant with the installed Claude
+  // skills). Conducks-usage guidance now ships as native skills via `conducks setup`, from
+  // resources/skills/. See ADR 0006.
 
   // MCP4: Direct graph query tool (SELECT-only DuckDB access)
   conducks_graph_query: {

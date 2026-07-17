@@ -398,7 +398,6 @@ export { ConducksAdvisor } from "./advisor.js";
 export { ConducksSentinel } from "./sentinel.js";
 export { ContextGenerator } from "./context-generator.js";
 export { BlueprintGenerator } from "./blueprint-generator.js";
-export { GuidanceOracle } from "./oracle.js";
 export { RegressionGuard } from "./guard.js";
 export { loadSentinelRules, getDefaultRules } from "./sentinel-rules.js";
 export type { SentinelRule, SentinelCondition, SentinelRuleFile } from "./sentinel-rules.js";
