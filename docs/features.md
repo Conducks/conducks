@@ -1,281 +1,193 @@
-# Features — Conducks
-
-Source of truth for all product capabilities. Read this before making any changes.
-
----
-
-## 1. Analysis Domain
-
-**conducks analyze** — Full structural pulse. Discovers files via Git (`git cat-file --batch`) or recursive FS fallback for non-git projects. Parses with Wasm Tree-sitter, builds Synapse graph, runs PageRank + Tarjan SCC, persists to DuckDB atomically. Multi-core Map-Reduce architecture (CPU-parallelized worker threads). Two-pass: Discovery wave (parallel) → Induction wave (global). Performance: 9s for 9,230 nodes / 61,352 edges.
-- `--staged`: Incremental sync — only reflects staged files, not full repo.
-- `--force`: Force full re-pulse regardless of staleness.
-- `--verbose`: Fires real-time anomaly detection output during ingestion.
-
-**conducks status** — Structural health manifest. Aggregates: hotspots (risk × gravity top symbols), entry points (REST routes, mains, CLI handlers), structural pillars, god object detection, anomaly summary, staleness ranking. Sub-command `--staleness` shows symbols by active tenure (commits since last change).
-
-**Staleness Sensor** (`src/lib/domain/federation/context.ts`) — Verification engine that compares the last pulsed Git commit hash against the current `HEAD`. Calculates precise "commits behind" counts to detect if the graph is out of sync. Powers `conducks status` and `conducks context`.
-
-
-**conducks watch** — Real-time FS monitoring. Delegates to `MicroPulseService` for sub-second structural resurrection of modified units. Auto-syncs graph on file change. Stabilized for macOS APFS case-sensitivity. Prevents persistence deadlocks via lazy connection lifecycle.
-
-**MicroPulseService** (`src/lib/domain/analysis/micro-pulse.ts`) — Incremental single-file induction for the Mirror. Performs targeted `clearFile()` + re-reflect on a changed unit without a full pulse. Used by the watcher and the Mirror's GatewayService hot-reload.
-
-**GatewayService** (`src/lib/domain/analysis/gateway-service.ts`) — Unified synapse access layer for the Mirror dashboard. Watches the DuckDB vault for structural changes and pushes PULSE events to all connected Mirror clients over SSE.
-
-**FallbackDetector** (`src/lib/domain/analysis/fallback-detector.ts`) — Identifies fallback structural patterns via 5-signal analysis: pipeline position (called after primary fails), conditional execution context, error-handling nesting, naming pattern heuristics, and call ratio (primary vs fallback invocations). Tags nodes with `isFallback: boolean`.
-
----
-
-## 2. Discovery Domain
-
-**conducks query** — Symbol lookup by fuzzy match or regex against the Atom Map. Returns canonical FQN IDs (`path/to/file.ts::Class::method`). Supports namespace scoping to reduce noise in large codebases.
-
-**conducks list** — Lists all indexed symbols with canonical rank, kind, risk score, and gravity.
-
-**conducks entry** — Lists all detected entry points ranked by structural gravity. Entry point detection criteria: `__main__` blocks, framework-declared routes (FastAPI/Flask `@app.route`, Express `app.get()`), CLI command functions, NestJS/Angular decorators (`@Get()`, `@Controller()`), web server listeners.
-
-**GQL Parser** (`src/lib/domain/intelligence/gql-parser.ts`) — Internal Structural Query Language. Used by MCP tools to execute named queries against the DuckDB synapse. Agents never write SQL — they call templates by name; the GQL parser injects `pulseId` and validates params.
-
-**Search Engine** (`src/lib/domain/intelligence/search-engine.ts`) — Fuzzy and regex symbol search across the `name`, `file`, and `canonicalKind` columns. Returns ranked results with containment context (parent class, file, namespace).
-
----
-
-## 3. Behavioral Tracing Domain
-
-**conducks trace** — Weighted Dijkstra pathfinding. Finds the shortest functional bridge between two symbols. Edge weights: call=1.0, import=0.7, inheritance=1.2, db_write=1.5, pub_sub=1.3.
-- `--target <id>`: Point-to-point trace.
-- `flow`: Full downstream execution circuit from a symbol.
-- Cross-module and cross-service (via Universal Resonance route/request node bridging).
-
-**conducks impact** — Bidirectional blast radius analysis. Upstream: who calls this? Downstream: what does this call? Returns direct and transitive dependents with hop distance and risk score. Uses Weighted Dijkstra.
-
-**conducks flows** — Groups symbols into logical execution units via `PULSES_TO` edge traversal. Identifies data lineage — traces variable producers (assignments) through to consumers (function arguments). Uses `FlowProcessor` to build execution circuits.
-
-**FlowEngine** (`src/lib/domain/kinetic/flow-engine.ts`) — Core execution of `conducks flows` and `conducks trace flow`. Traverses `PULSES_TO` and `CALLS` edges to reconstruct data and execution pipelines.
-
-**KineticTrace** (`src/lib/domain/kinetic/trace.ts`) — Implements the Dijkstra path resolver used by `conducks trace`. Supports upstream-only, downstream-only, and bidirectional traversal. Returns the shortest risk-weighted path with intermediate symbols.
-
----
-
-## 4. Metrics Domain
-
-**conducks explain** — 6-signal composite risk decomposition for any symbol.
-- **Gravity**: PageRank structural centrality (0–1).
-- **Complexity**: Cyclomatic branch-count score.
-- **Entropy**: Shannon authorship concentration (single-author = high risk).
-- **Churn**: Git commit frequency — how often has this changed?
-- **FanOut**: Outbound edge count (too many dependencies).
-- **Debt**: Count of TODO/FIXME/HACK/XXX/REFACTOR/DEPRECATED/BUG markers.
-- Composite formula: `Risk = w1·Gravity + w2·Complexity + w3·FanOut + w4·Debt + w5·Churn + w6·Entropy`
-
-**conducks entropy** — Shannon entropy per-symbol and per-file. Aggregates authorship concentration. `entropy = -Σ(p_i · log2(p_i))` where p_i is each author's share of commits on the symbol.
-
-**conducks cohesion** — Structural similarity between two graph neighborhoods. Measures shared edge-type topology and structural overlap score. Used for refactoring target identification.
-
-**TestAligner** (`src/lib/domain/metrics/test-aligner.ts`) — BFS-based coverage mapping. Traces from test nodes (files in `/tests/`) downstream up to depth 5 to find all production symbols covered. Populates `coveredBy: string[]` on each node. Bidirectional: test forward-links to production, production back-links to covering tests.
-
-**Resonance Engine** (`src/lib/domain/metrics/resonance.ts`) — Project-level structural similarity. Computes topological signatures (layer distribution, edge density, gravity distribution) and similarity score between two synapses. Used by `conducks resonance`.
-
----
-
-## 5. Governance Domain
-
-**conducks audit** — Sentinel integrity checks via `sentinel.ts`.
-- ARCH-3: Circular dependency detection (Tarjan SCC). Distinguishes between internal file cycles and genuine architectural circularity spanning multiple units.
-- God object detection: symbols exceeding fanout threshold.
-- Orphan exports: symbols with no incoming edges.
-- Reads custom rules from `sentinel.json` at project root.
-- **Advanced Sentinel Rules**: Supports `require_heritage` (enforce base classes), `require_caller` (enforce call-wrappers), `framework_check` (validate decorators), and `require_file` (foundation file checks).
-- **Framework Coverage**: Aggregates usage statistics to show project-level adoption of detected frameworks (e.g., Next.js vs Express).
-- `--mode archeology`: Longitudinal audit via `AuditService` — tracks structural velocity and decay trends across all historical pulses using windowed SQL (`LAG + AVG OVER PARTITION`).
-
-**conducks fallback** — Specialized reporting on "Suspicious Fallback Patterns." Identifies legacy or obsolete fallbacks using a 5-signal confidence score. Reports: Fallback Confidence, Usage Ratio, Naming Score, and Tenure (days since creation). Provides prioritized removal recommendations.
-
-
-**conducks advise** — Proactive structural improvement via `advisor.ts`. Heuristic recommendations:
-- **Split Candidates**: Identified via `SplitScore(M)` (Betweenness + Entropy + Churn - Cohesion).
-- **Hidden Coupling**: Surfaced from Git co-change matrix (Architectural Lies).
-- **Structural Intuition**: Detects possible implicit links where string literals match symbol names.
-- **Dependency Health**: Flags unpinned dependencies (`latest`, `*`, `^`) and heavy external coupling.
-- **Dead Code**: Removal opportunities for orphaned exports.
-
-
-**conducks verify** — Policy compliance verification. Checks all CONDUCKS-* structural laws against the current graph state.
-
-**conducks guard** — CI/CD regression guard via `guard.ts`. Computes structural entropy delta between the current pulse and historical baseline. Returns Block/Pass verdict with signal breakdown. Enforces the `RegressionGuard` policy (user-defined entropy spike threshold).
-
-**Guidance Oracle** (`src/lib/domain/governance/oracle.ts`) — Dynamic knowledge base. Recursively scans `src/resources/skills-generator/` for `.md` skill files at startup. Exposes indexed engineering standards to the MCP server and CLI help system. Auto-updates when skill files change — no server restart required.
-
-**Config Detector** (`src/lib/domain/governance/config-detector.ts`) — Identifies project configuration patterns (build tools, test runners, linters) from the structural graph and file system, used to enrich context generation.
-
-**Audit Service** (`src/lib/domain/evolution/audit-service.ts`) — Longitudinal structural velocity tracking. Reads pulse history from DuckDB, computes per-pulse ΔComplexity, ΔRisk, ΔEntropy with windowed SQL aggregates. Powers `conducks guard` and `conducks audit --mode archeology`. Memory-efficient: delta capping at Top 100 prevents OOM on 10k+ node codebases.
-
----
-
-## 6. Evolution Domain
-
-**conducks rename** — Graph-Verified Refactoring (GVR). Atomically renames a symbol across all proven callers. Dry-run by default; `--confirm` to apply. Traverses IMPORTS + CALLS edges. Rollback on failure.
-- Known gap: `import type` edges are invisible — type-only references may be missed.
-
-**conducks prune** — Dead code detection. Identifies orphaned exports (exported, never imported), unused imports, unreachable functions. Known false positive: `import type` CLI exports appear as orphans — expected behavior.
-
-**conducks diff** — Chronoscopic structural diff between two pulse IDs. Reports: symbols added, removed, modified (by fingerprint hash comparison). Detects ΔComplexity, ΔGravity, ΔResonance. Uses `fingerprint = SHA256(file + name + dna)` for fast comparison.
-
-**conducks drift** — Longitudinal drift analysis. Tracks structural velocity and decay across multiple historical pulses. Reports trending risk, entropy spikes, and architectural drift direction.
-
-**GVR Engine** (`src/lib/core/algorithms/refactor/gvr-engine.ts`) — Core of `conducks rename`. Builds a blast radius from the target symbol via IMPORTS + CALLS traversal, then performs atomic multi-file string replacement with rollback on partial failure.
-
-**Dead Code Engine** (`src/lib/domain/evolution/dead-code.ts`) — Powers `conducks prune`. Performs left-join analysis on edges to find symbols with no incoming edges, excluding entry points and exported symbols that are externally accessible.
-
-**Watcher** (`src/lib/domain/evolution/watcher.ts`) — Powers `conducks watch`. Integrates with MicroPulseService for per-file re-induction. Resolved circular dependency (was a known stability issue), fixed persistence deadlocks via lazy lifecycle.
-
----
-
-## 7. Intelligence Domain
-
-**conducks query** (advanced) — Beyond basic symbol lookup:
-- Named template mode: `conducks_query({mode: 'template', template: 'find_usages', params: {...}})` — 19 pre-built SQL templates, `pulseId` always system-injected.
-- Filter mode: `conducks_query({mode: 'filter', filters: {canonicalKind, namespaceId, minRisk, ...}})` — typed filter builder, validated server-side (no raw SQL surface).
-
-**conducks resonance** — Cross-repo structural similarity. Computes topological signature for each repo and returns a similarity score. Fixed: NaN formatting and path normalization.
-
-**Co-Change Engine** (`src/lib/core/algorithms/cochange-engine.ts`) — Detects "Architectural Lies": files that change together in Git history but have no structural edge between them. Formula: `NCoChange(i,j) = Commits(i,j) / sqrt(Commits(i) · Commits(j))`. Surfaces hidden temporal coupling invisible to the structural graph.
-
-**DAAC Clustering** (`src/lib/core/algorithms/clustering/daac.ts`) — Directory-Aware Agglomerative Clustering. Groups files into functional communities (Auth, Billing, Core) by combining call-density graph relationships with directory proximity. Used by `conducks blueprint` to identify architectural modules.
-
----
-
-## 8. Visual Domain
-
-**conducks mirror** — Real-time Kinetic Mirror dashboard at port 3333. Force-directed graph with full 9-layer taxonomy. Features:
-- Adaptive semantic scaling: namespace labels always visible, file labels at zoom ≥ 0.6, symbol labels at zoom ≥ 1.2.
-- Photon Path focusing: click a connection → dims all other nodes to 5% opacity, pulses the active path.
-- Neon Glass sidebar: Namespace Search, Layer Toggles, Health Rings, Active Node Detail.
-- Nearest Visible Parent (NVP) edge promotion: hidden-node edges promoted to visible ancestors.
-- Skeleton & Meat: graph topology in RAM, full metadata streamed from DuckDB on-click.
-- Read-only connection — no persistence writes during visualization.
-
-**conducks visualize** — Generates `structural_mirror.md`: a static Mermaid diagram of the top-N gravity nodes (default: 30) with their 1-hop connections. Writes to `.conducks/structural_mirror.md`. Alternative to the live Mirror for agents or CI pipelines.
-
-**conducks blueprint** — Generates `BLUEPRINT.md`: structural summary with node/edge counts, DAAC community clusters, entry points, governance audit results. Token-optimized for LLM context windows.
-
-**conducks context-gen** — Generates `ARCHITECTURE.md`: LLM-optimized architecture context (≤4000 tokens). Covers layer distribution, hotspots, entry points, and structural risk summary. Written to the project root.
-
-**Mirror Engine** (`src/lib/domain/visual/mirror.engine.ts`) — Server-side graph rendering layer. Implements **Nearest Visible Parent (NVP)** logic for structural contraction, promoting technical edges between filtered nodes to their visible ancestors. Powers the Mirror dashboard.
-
-
----
-
-## 9. Documentation Domain
-
-**conducks bootstrap-docs** — Initializes the 7-file documentation standard for a project via `ManifestEngine`. Creates `docs/project/<name>/` with: `vision.md`, `architecture.md`, `implementation.md`, `handover.md`, `conventions.md`, `todo.md`, `memory.md`. Skips files that already exist.
-
-**ManifestEngine** (`src/lib/domain/manifest/manifest-engine.ts`) — Core of `conducks bootstrap-docs`. Creates each doc file with a structured template. Implements the Conducks documentation governance standard (DOCS-1).
-
----
-
-## 10. System & Federation Domain
-
-**conducks setup** — First-run installer via `conducks-installer.ts`. Configures `conducks.config.json`, creates `.conducks/` vault directory, validates Node.js version and WASM availability.
-
-**conducks mcp** — Starts the MCP JSON-RPC server. Serves the 9 unified tools via the HyperToon registry with dynamic tool description loading from `src/resources/skills-generator/`.
-
-**conducks clean** — Nuclear clean protocol. Drops the DuckDB vault, evicts zombie process handles (SIGKILL), removes lock files. Required before schema migrations or when lock contention is unresolvable.
-
-**conducks record** — Records a structural pulse snapshot with a named label for chronoscopic analysis.
-
-**conducks link** — Federated linking across multiple repositories via `FederatedLinker`. Performs **Additive Hydration** (append mode) — loads a second synapse into the current graph without overwriting. Resolves cross-synapse edges via post-pulse alignment. Verified: 5,000 foundation nodes merged into 1,624-node scraper synapse (6,624 total federated).
-
-**conducks help** — Professional Structural Help Engine. Groups the 33 CLI commands into 9 distinct functional domains: Discovery, Landscape, Behavioral, Metrics, Governance, Historical, Mutational, Visual, and System.
-
-
-**conducks context** — Displays the current workspace context: vault path, pulse ID, node/edge counts, staleness state.
-
-**MCP Configurator** (`src/lib/domain/federation/mcp-configurator.ts`) — Manages installation of Conducks into MCP hosts (Claude Desktop, Cursor, etc.). Writes the correct `conducks.config.json` entry to the host's settings file via Dependency Injection.
-
----
-
-## 11. Core Parsing Infrastructure
-
-**Essence Lens** (`src/lib/core/parsing/essence-lens.ts`) — Extracts project-level metadata from manifest files. Parses `package.json` (dependencies, framework detection) and `requirements.txt` (Python packages, framework detection). Detects: Next.js, Express, FastAPI, Flask, Django. Creates `ECOSYSTEM` and `DEPENDS_ON` nodes/edges in the graph.
-
-**Ignore Manager** (`src/lib/core/parsing/ignore-manager.ts`) — Manages structural exclusions. Default patterns: `node_modules/`, `dist/`, `build/`, `venv/`, `target/`, `vendor/`, `.git/`, and language-specific artifact dirs (Rust `target/`, Ruby `Gems/`, Swift `.build/`, .NET `bin/obj/`). Respects `.conducksignore` file at project root for custom exclusions.
-
-**Grammar Registry** (`src/lib/core/parsing/grammar-registry.ts`) — Manages Tree-sitter WASM grammar loading and caching per worker thread. 14 grammars available: TypeScript, TSX, Python, Go, C, C++, C#, Java, Rust, Ruby, Swift, PHP, plus the base `tree-sitter.wasm`.
-
-**Prism Processors** (`src/lib/core/parsing/processors/`) — Five specialized processors used by the Two-Pass Reflector:
-- `binding.ts` — Neural Binding: resolves qualified cross-module calls (`pkg.sub.func`) to their origin exports.
-- `call.ts` — CALLS edge extraction from function invocations.
-- `import.ts` — IMPORTS edge extraction and module path resolution (ESM extension stripping, PEP 328/451).
-- `flow.ts` — PULSES_TO edge extraction: links variable producers to consumers for data lineage.
-- `heritage.ts` — EXTENDS/IMPLEMENTS edge extraction for class inheritance chains.
-
----
-
-## 12. MCP Tools (9 Unified)
-
-| Tool | Domain | Capabilities |
-|:---|:---|:---|
-| `conducks_status` | Analysis | Hotspots, pillars, entry points, layer distribution, anomalies |
-| `conducks_query` | Discovery | Symbol lookup, namespace scoping, template mode, filter mode |
-| `conducks_explain` | Metrics | 6-signal risk decomposition, bus factor, staleness |
-| `conducks_impact` | Kinetic | Blast radius (upstream/downstream), hop distance, risk by path |
-| `conducks_trace` | Kinetic | Pathfinding, execution circuits, data flow chains |
-| `conducks_audit` | Governance | Sentinel checks, cycle detection, god objects, co-change lies, archeology mode |
-| `conducks_evolution` | Evolution | GVR rename, structural diff by pulse, drift analysis |
-| `conducks_system` | System | Architecture context, installer, multi-workspace federation |
-| `conducks_link` | Federation | Federated repo linking, cross-synapse edge resolution |
-
-HyperToon registry (`src/interfaces/tools/hypertoon.ts`) loads tool descriptions live from `src/resources/skills-generator/` markdown — updating docs auto-updates agent understanding without a server restart.
-
----
-
-## 13. Structural Taxonomy (9 Layers)
-
-| Rank | Kind | Language Examples |
-|:---|:---|:---|
-| L0 | ECOSYSTEM | Root project node, ecosystem package |
-| L1 | REPOSITORY | Monorepo sub-service boundary |
-| L2 | NAMESPACE | Folders, Python packages, Go packages |
-| L3 | UNIT | Source files |
-| L4 | INFRA | Routes (`@app.route`, `app.get()`), middleware, API handlers, CLI entry points |
-| L5 | STRUCTURE | Classes, interfaces (TS/Java/C#), structs (Go/Rust/C), protocols (Swift) |
-| L6 | BEHAVIOR | Functions, methods, goroutines (Go), closures |
-| L7 | ATOM | Variables, constants, class properties, struct fields |
-| L8 | DATA | Type aliases, interfaces (data shape), schemas, enums |
-
-All constructs across all languages map to this universal taxonomy. A Python class and a Go struct are both `STRUCTURE` at `canonicalRank 5`. Cross-language MCP queries work without language-specific branching.
-
----
-
-## 14. Language Support
-
-| Language | Status | Key Structural Features |
-|:---|:---|:---|
-| **Python** | Production | PEP 328/451 import resolution, FastAPI/Flask routes, decorators, middleware, `@app.middleware` GUARDS edges, Two-Pass Reflector |
-| **TypeScript / JS** | Production | ESM extension resolution, scoped `class.member` IDs, Next.js routes, Express/Fastify handlers, NestJS decorators, React components |
-| **Go** | Production (v1.0.0) | Packages, structs, interfaces, `func` methods, goroutines, method receivers |
-| **C** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-| **C++** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-| **C#** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-| **Java** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-| **PHP** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-| **Ruby** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-| **Rust** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-| **Swift** | Lens available | Grammar loaded; extractor, queries, resolver implemented |
-
-**Gnosis Fallback** — When Tree-sitter WASM crashes (e.g., C++ ABI mismatch on certain Node.js versions), the Gnosis semantic regex engine activates. Extracts CALLS, IMPORTS, and scope-aware mappings via multi-pass regex. Verified: restored edge connectivity from 248 to 6,814 edges (+2,600%) on affected environments.
-
----
-
-## Known Gaps
-
-| Gap | Priority |
-|:---|:---|
-| `import type` invisible to GVR blast radius — type-only refs have no runtime edges | High |
-| `prune` false positives for `import type` CLI exports | Low |
-| Query Template Library (19 named templates) not fully implemented | High |
-| Filter builder for `conducks_query` mode not built | High |
-| Dynamic dispatch — interface method calls can't resolve to concrete implementations | Low |
-| Deep traversal (`deep_impact` recursive CTE) slower than precomputed Dijkstra | Medium |
-| `0.00%` gravity/churn/entropy in `conducks impact` on fresh repos — needs `conducks analyze --force` after commits | Low |
+# Features — conducks
+
+## Full Structural Pulse
+- Purpose: Build the symbol graph for a codebase in one pass so every other command has something to query.
+- Intent: Repos this large make single-threaded, incremental-only parsing impractical — the pulse trades a one-time scan cost for near-instant queries afterward.
+
+## Structural Health Status
+- Purpose: One command that answers "what's wrong with this codebase right now" — hotspots, entry points, god objects, staleness — instead of making an agent assemble that picture from raw graph queries.
+- Intent: Cuts the number of round-trips an agent needs before it can start reasoning about a codebase.
+
+## Staleness Detection
+- Purpose: Tells the user or agent when the persisted graph no longer reflects the current git state, before they act on stale context.
+- Intent: Silent staleness is worse than an explicit warning — agents that reason over a drifted graph give confidently wrong answers.
+
+## Live Watch Mode
+- Purpose: Keeps the graph in sync automatically while a developer is actively editing, without re-running a full pulse per keystroke.
+- Intent: Full pulses are too slow to run on every save; only the changed file needs to be re-inducted.
+
+## Mirror Live Sync
+- Purpose: Pushes graph changes to connected dashboard clients as they happen.
+- Intent: A dashboard that requires manual refresh loses the value of live watch mode — the two are meant to be used together.
+
+## Fallback Pattern Detection
+- Purpose: Flags code that only exists to catch a primary path's failure, so it can be told apart from canonical logic during analysis.
+- Intent: Fallback code inflates apparent complexity and risk scores if treated as equally important as the primary path it backs up.
+
+## Symbol Query
+- Purpose: Locate a symbol by fuzzy match, regex, or structured filter, and get back a canonical, addressable ID.
+- Intent: Agents need a precise handle on "this exact symbol," not a text match — grep-style search can't disambiguate overloaded or shadowed names.
+
+## Symbol Listing
+- Purpose: Full inventory of indexed symbols ranked by risk and structural gravity.
+- Intent: Supports triage workflows where a human or agent wants to scan the riskiest parts of a codebase rather than search for something specific.
+
+## Entry Point Detection
+- Purpose: Surfaces where execution actually begins — routes, CLI handlers, mains — across frameworks.
+- Intent: Orients an agent unfamiliar with a codebase toward real starting points instead of making it guess from file names.
+
+## Guarded Query Language
+- Purpose: Gives MCP tools a fixed set of named query templates instead of a raw SQL surface.
+- Intent: An LLM-driven agent should never be able to construct arbitrary SQL against the vault — templates bound what's queryable and keep `pulseId` system-controlled.
+
+## Path Tracing
+- Purpose: Finds the shortest functional bridge between two symbols, weighting edges by structural risk rather than treating every hop as equal.
+- Intent: "How does A reach B" is a common but tedious question to answer by manually walking a call graph; risk-weighting favors the path that matters, not just the shortest one.
+
+## Impact / Blast Radius Analysis
+- Purpose: Reports who calls a symbol and what it calls, transitively, before a change is made.
+- Intent: Lets an agent judge the risk of touching a symbol without needing to already know the codebase's structure.
+
+## Execution & Data Flow Tracing
+- Purpose: Groups symbols into logical execution units and traces where a piece of data comes from and where it ends up.
+- Intent: Reconstructing a pipeline by reading call sites one at a time doesn't scale; this answers "where does this data come from" directly.
+
+## Composite Risk Explanation
+- Purpose: Decomposes why a symbol is considered risky into named, weighted signals (centrality, complexity, entropy, churn, fan-out, debt markers).
+- Intent: A single risk number is not actionable on its own — showing which signal dominates tells a reviewer what to actually fix.
+
+## Authorship Entropy
+- Purpose: Measures how concentrated a symbol's authorship is.
+- Intent: Single-author code is a bus-factor risk that structural metrics alone can't see; entropy makes that visible without reading git blame by hand.
+
+## Structural Cohesion
+- Purpose: Compares two graph neighborhoods for shared topology to suggest refactoring targets.
+- Intent: Identifies "these two areas do similar things structurally" as a starting point for consolidation, rather than relying on naming conventions.
+
+## Test Coverage Alignment
+- Purpose: Maps which production symbols are actually exercised by which tests, bidirectionally.
+- Intent: Line coverage tools tell you a line ran; this tells you what it verified structurally — useful when deciding if a change is safe.
+
+## Cross-Project Resonance
+- Purpose: Computes a structural similarity score between two codebases (or two snapshots) from their topological signatures.
+- Intent: Lets a team ask "is this new project shaped like ones we've built before" without a line-by-line diff.
+
+## Structural Integrity Audit
+- Purpose: Runs a fixed set of architectural sanity checks (circular dependencies, god objects, orphan exports) plus any project-defined rules.
+- Intent: Encodes house rules about architecture as enforceable checks instead of tribal knowledge that erodes as the team changes; supports a longitudinal mode to see if a codebase is trending better or worse.
+
+## Fallback Reporting
+- Purpose: Prioritizes fallback-tagged code for review or removal, scored by confidence and usage.
+- Intent: Not all fallback code is legacy cruft — this ranks candidates instead of flagging everything equally, so cleanup effort goes where it matters.
+
+## Structural Advisory
+- Purpose: Proactively recommends split candidates, exposes hidden coupling, and flags unpinned or heavy dependencies.
+- Intent: Turns passive metrics into concrete suggestions — a risk score alone doesn't tell you what action to take.
+
+## Policy Verification
+- Purpose: Checks the current graph against the project's declared structural laws.
+- Intent: Gives a yes/no compliance answer instead of requiring a human to manually re-check every convention after each change.
+
+## CI Regression Guard
+- Purpose: Compares structural entropy between the current pulse and a historical baseline, returning a block/pass verdict for CI.
+- Intent: Catches architectural regressions (not just failing tests) before they merge, using a threshold the team defines.
+
+## Guidance Oracle
+- Purpose: Indexes the project's own engineering-standard documents and exposes them to the CLI help system and MCP tools.
+- Intent: Keeps house standards discoverable and living — updating a skill file updates the guidance everywhere without a restart.
+
+## Config Detection
+- Purpose: Identifies the project's build tools, test runners, and linters from the graph and filesystem.
+- Intent: Downstream context generation needs to know the project's toolchain without a human specifying it manually.
+
+## Graph-Verified Rename
+- Purpose: Renames a symbol across every proven caller, atomically, with a dry run by default.
+- Intent: Text-based rename tools miss or over-match; verifying against the call graph before writing keeps a rename from silently breaking callers it can't see (e.g. type-only references).
+
+## Dead Code Detection
+- Purpose: Finds exported symbols with no incoming edges, excluding entry points and externally-accessible exports.
+- Intent: Removing dead code by hand requires knowing every caller exists — this makes "nothing calls this" a checkable fact instead of a guess.
+
+## Structural Diff
+- Purpose: Compares two pulses and reports symbols added, removed, or modified, plus deltas in complexity, gravity, and resonance.
+- Intent: Gives a structural, not textual, view of what changed between two points in history — useful for reviewing the shape of a change, not just its lines.
+
+## Longitudinal Drift Analysis
+- Purpose: Tracks structural velocity and decay trends across many historical pulses.
+- Intent: A single snapshot can't show direction — this answers "is the architecture getting healthier or worse over time."
+
+## Advanced Query Modes
+- Purpose: Adds a typed filter builder and named-template mode on top of basic symbol query.
+- Intent: Covers query patterns that fuzzy/regex search can't express, while still keeping the query surface bounded (no raw SQL) for agent use.
+
+## Co-Change / Architectural Lies Detection
+- Purpose: Finds files that change together in git history despite having no structural edge between them.
+- Intent: Surfaces coupling the code graph is structurally blind to — two files can be tightly coupled in practice while looking independent on paper.
+
+## Directory-Aware Clustering
+- Purpose: Groups files into functional communities by combining call density with directory proximity.
+- Intent: Neither call graph alone nor directory structure alone reliably identifies a module's real boundaries; combining both gives a better approximation, and feeds blueprint generation.
+
+## Live Mirror Dashboard
+- Purpose: Interactive, force-directed visualization of the full graph with zoom-aware labeling and click-to-focus paths.
+- Intent: Some structural questions ("what's connected to what, at what scale") are faster to answer visually than by querying — the dashboard is read-only so it can't be mistaken for a source of truth.
+
+## Static Structural Diagram
+- Purpose: Generates a static Mermaid diagram of the highest-gravity nodes and their immediate connections.
+- Intent: Gives agents and CI pipelines a lightweight, file-based alternative to the live Mirror when a running dashboard isn't available.
+
+## Architectural Blueprint Summary
+- Purpose: Produces a structural summary (clusters, entry points, audit results) sized for an LLM's context window.
+- Intent: Full graph dumps blow context budgets; the blueprint is the compressed version an agent actually needs to orient itself.
+
+## LLM Context Generation
+- Purpose: Writes a bounded-size architecture summary to the project root for consumption by coding agents.
+- Intent: Every agent session re-deriving architecture from scratch wastes tokens and time; this makes that context reusable and current.
+
+## Docs Bootstrap
+- Purpose: Initializes the project's documentation file set from templates, without overwriting files that already exist.
+- Intent: Removes the blank-page problem for teams adopting the docs standard, while never clobbering docs someone has already written.
+
+## First-Run Setup
+- Purpose: Configures the project for conducks on first use — config file, vault directory, environment validation.
+- Intent: Keeps onboarding to a single command instead of a manual checklist of prerequisites.
+
+## MCP Server
+- Purpose: Exposes conducks' query and analysis capabilities to MCP-compatible agent hosts.
+- Intent: Lets coding agents use conducks as a tool rather than a human-operated CLI, without giving them write access to the vault.
+
+## Vault Clean / Reset
+- Purpose: Drops the vault and clears zombie process locks so a fresh pulse can run.
+- Intent: Schema migrations and unresolvable lock contention need a clean-slate escape hatch rather than manual file surgery.
+
+## Pulse Snapshot Recording
+- Purpose: Records a named, labeled snapshot of the current pulse for later comparison.
+- Intent: Lets a team mark meaningful points in history (a release, a refactor) instead of relying on commit hashes to find them later.
+
+## Federated Repo Linking
+- Purpose: Merges a second repository's graph into the current one without overwriting either, resolving cross-repo edges.
+- Intent: Multi-repo systems have real structural connections that a single-repo pulse can't see; federation makes those connections queryable.
+
+## CLI Help System
+- Purpose: Groups all CLI commands into functional domains for discoverability.
+- Intent: A flat command list doesn't communicate intent; grouping by domain (analysis, governance, visual, etc.) helps a new user find the right command faster.
+
+## Context Display
+- Purpose: Shows the current workspace's vault path, pulse ID, node/edge counts, and staleness at a glance.
+- Intent: A fast sanity check before running anything else — answers "what am I actually querying right now."
+
+## MCP Host Configuration
+- Purpose: Installs and configures conducks into MCP hosts (Claude Desktop, Cursor, etc.).
+- Intent: Removes manual JSON-editing from the setup path for connecting conducks to an agent host.
+
+## Project Metadata Extraction
+- Purpose: Reads manifest files (package.json, requirements.txt) to detect the project's frameworks and dependencies.
+- Intent: Framework detection feeds config detection and context generation — without it, those features would need a human to specify the stack manually.
+
+## Structural Exclusions
+- Purpose: Lets a project exclude directories (build artifacts, dependencies, vendored code) from analysis by default, with a project-level override file.
+- Intent: Without exclusions, generated and vendored code would dominate risk/hotspot rankings and drown out the project's own code.
+
+## Regex Parsing Fallback
+- Purpose: Keeps structural extraction working even when a Tree-sitter grammar fails to load or crashes for a given environment.
+- Intent: A hard parser failure would otherwise silently degrade a whole language to file-only nodes; the fallback trades precision for still getting usable CALLS/IMPORTS edges.

@@ -1,107 +1,41 @@
-# Architecture — Structural Manifest
+# Architecture Context — conducks
+Generated: 2026-07-17T20:29:21.397Z | Pulse: pulse_1784315668415_8pr6i
 
-## Three-Layer Architecture
+## Entry Points (top 10 by gravity)
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/adjacency-list.ts::conducksadjacencylist` [STRUCTURE, gravity: 0.0155, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/persistence/persistence.ts::synapsepersistence` [STRUCTURE, gravity: 0.0137, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0124, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/git/chronicle-interface.ts::chronicleinterface` [STRUCTURE, gravity: 0.0112, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/grammar-registry.ts::grammarregistry` [STRUCTURE, gravity: 0.0069, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/index.ts::governanceservice` [STRUCTURE, gravity: 0.0069, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/graph-engine.ts::conducksgraph` [STRUCTURE, gravity: 0.0063, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/federation/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0063, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/fallback-detector.ts::fallbackdetector` [STRUCTURE, gravity: 0.0057, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/registry/dynamic-loader.ts::dynamictoolloader` [STRUCTURE, gravity: 0.0057, risk: 0.0200]
 
-Conducks is organized into three strict layers. Dependency flows one direction only.
+## Structural Hotspots (top 10 by risk)
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/coverage.ts::coveragecommand.execute` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/query.ts::querycommand.execute` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/taxonomy.ts::maptocanonical` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/index.ts::analysisservice.analyze` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/orchestrator.ts::analyzeorchestrator.analyze` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/reflector.ts::conducksreflector.reflect` [risk: 1.0000, gravity: 0.0013]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/advisor.ts::conducksadvisor.analyze` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/index.ts::governanceservice.auditwithrules` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/visual/mirror.engine.ts::mirrorengine.getvisualwave` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/resonance.js::configuregraph` [risk: 1.0000, gravity: 0.0007]
 
-```
-Conducks (Intelligence) → Synapse (Core) & Prism (Reflection)
-Prism (Reflection)      → Synapse (Core)
-Synapse (Core)          → [zero external project dependencies]
-```
+## Active Violations (10)
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/coverage.ts::coveragecommand.execute`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/query.ts::querycommand.execute`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/algorithms/ranker.ts::structuralranker.calculategravity`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/languages/typescript/bindings.ts::typescriptbindings.extract`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/languages/typescript/resolver.ts::typescriptresolver.resolvepackageimport`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/taxonomy.ts::maptocanonical`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/index.ts::analysisservice.analyze`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/orchestrator.ts::analyzeorchestrator.analyze`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/reflector.ts::conducksreflector.reflect`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/evolution/dead-code.ts::deadcodeanalyzer.analyze`
 
-**Synapse (Core Layer)** — Graph storage, algorithms, git integration.
-- `src/lib/core/registry-bootstrapper.ts` — Root discovery, vault anchoring, late-binding init.
-- `src/registry/` — Plugin architecture: `synapse-registry.ts`, `tool-registry.ts`, `dynamic-loader.ts`.
-
-**Prism (Reflection Layer)** — Language-specific parsers & processors.
-- Tree-sitter WASM grammars: `src/resources/grammars/` (14 languages).
-- Two-pass Neural Reflector: Pass 1 = scope mapping, Pass 2 = semantic dispatch.
-- Language lenses: TypeScript, Python, Go (production). Others deferred.
-
-**Conducks (Intelligence Layer)** — Analysis engines, MCP tools, CLI commands.
-- `src/interfaces/cli/` — 25 CLI commands, one file per command.
-- `src/interfaces/tools/` — MCP server (9 unified tools via HyperToon registry).
-- `src/interfaces/web/mirror-server.ts` — Visual dashboard server (port 3333).
-
----
-
-## File Tree
-
-```
-conducks/
-├── src/
-│   ├── interfaces/
-│   │   ├── cli/
-│   │   │   ├── index.ts                    ← Single CLI entry point
-│   │   │   ├── command.ts                  ← Base command definition
-│   │   │   └── commands/                   ← One file per CLI command
-│   │   │       ├── analyze.ts / blueprint.ts / cohesion.ts / context.ts
-│   │   │       ├── diff.ts / drift.ts / entropy.ts / entry.ts / explain.ts
-│   │   │       ├── flows.ts / guard.ts / impact.ts / mcp.ts / prune.ts
-│   │   │       ├── record.ts / rename.ts / resonance.ts / setup.ts
-│   │   │       └── status.ts / visualize.ts / watch.ts / fallback.ts / help.ts
-│   │   ├── tools/
-│   │   │   ├── server.ts                   ← MCP JSON-RPC server
-│   │   │   ├── entry.ts                    ← MCP entry point
-│   │   │   ├── hypertoon.ts               ← HyperToon dynamic tool registry
-│   │   │   ├── index.ts                    ← Tool initialization + registry anchor
-│   │   │   └── tools/
-│   │   │       ├── synapse.ts              ← status, query, governance, metrics, diff
-│   │   │       └── kinetic.ts              ← trace, evolution, system, link, explain
-│   │   └── web/
-│   │       └── mirror-server.ts            ← Visual dashboard HTTP server
-│   ├── lib/
-│   │   └── core/
-│   │       └── registry-bootstrapper.ts    ← Vault discovery + initialization
-│   ├── registry/
-│   │   ├── index.ts                        ← Registry facade + service propagation
-│   │   ├── synapse-registry.ts             ← Symbol + governance rule enforcement
-│   │   ├── tool-registry.ts                ← MCP tool registration + dispatch
-│   │   ├── dynamic-loader.ts               ← Live tool description loading from markdown
-│   │   ├── base.ts                         ← Registry base class
-│   │   └── types.ts                        ← Shared registry types
-│   ├── resources/
-│   │   ├── grammars/                       ← 14 Tree-sitter WASM grammar files
-│   │   ├── mirror/                         ← Visual dashboard (resonance.js, ui.js, styles.css)
-│   │   ├── skills-generator/               ← Agent skill prompt templates
-│   │   └── tools/                          ← conducks.config.json
-│   └── types/
-│       └── domain.ts                       ← Shared domain types
-├── docs/                                   ← This directory
-└── tests/                                  ← Unit, integration, benchmark suites
-```
-
----
-
-## Key Algorithms
-
-| Algorithm | File | Purpose |
-|:---|:---|:---|
-| Kahn's Algorithm | orchestrator | Topological file ordering before parsing |
-| Tarjan's SCC | adjacency-list | Cycle detection in O(V+E) |
-| PageRank | adjacency-list | Structural gravity (centrality) |
-| Weighted Dijkstra | impact engine | Blast radius pathfinding |
-| Shannon Entropy | entropy engine | Authorship concentration risk |
-| Two-Pass Reflector | reflector | Scope-aware symbol attribution |
-
----
-
-## Structural Laws
-
-- No circular imports in Synapse Core.
-- Prism lenses must implement `reflect()` + declare `extensions[]`.
-- `ChronicleInterface` uses only git-direct commands for discovery.
-- All persistence implements `SynapsePersistence` driver interface.
-- Impact analysis uses Weighted Dijkstra exclusively.
-- MCP server maintains exactly 9 unified tools (Rule 10/13).
-- DuckDB connections use Connect-Execute-Disconnect lifecycle (lazy persistence).
-- All node IDs are lowercase, absolute-normalized canonical FQNs: `file::class.method`.
-
----
-
-## Dependency Directions (Enforced)
-
-Forbidden: any `import` from Synapse into Prism or Conducks layers.
-Forbidden: any `import` from Prism into Conducks layer.
-The `src/registry/` module is the sole integration point between layers.
+## Framework
+- Detected: express
