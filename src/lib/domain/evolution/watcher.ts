@@ -4,7 +4,6 @@ import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { GlobalSymbolLinker } from "@/lib/core/graph/linker.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
-import { globalMirror } from "@/interfaces/web/mirror-server.js";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -32,6 +31,13 @@ interface WatcherOptions {
   ignored?: string[];
   persistence?: SynapsePersistence;
   watcher?: FSWatcher;
+  /**
+   * Optional pulse subscriber (dependency inversion). The watcher (domain) must NOT import the
+   * web mirror directly — that inverts the layer contract and creates a domain→web→composition
+   * →domain cycle. Instead the web layer, which legally imports domain, sets this callback to
+   * forward pulses to the mirror dashboard.
+   */
+  onPulse?: (pulse: { event: string; filePath: string }) => void;
 }
 
 import { ConducksComponent } from "@/contracts/types.js";
@@ -63,6 +69,15 @@ export class ConducksWatcher implements ConducksComponent {
    */
   public enableAutoPulse(enabled: boolean): void {
     this.autoPulse = enabled;
+  }
+
+  /**
+   * Subscribe to pulse events (dependency inversion). Called by the web layer to forward pulses
+   * to the mirror dashboard, so the watcher (domain) never imports web. Breaks the old
+   * domain→web→composition→domain cycle.
+   */
+  public setPulseSubscriber(onPulse: (pulse: { event: string; filePath: string }) => void): void {
+    this.options.onPulse = onPulse;
   }
 
   /**
@@ -213,10 +228,8 @@ export class ConducksWatcher implements ConducksComponent {
         await this.options.persistence.save(this.graph.getGraph());
       }
 
-      // 6. Notify Mirror Dashboard
-      if (globalMirror) {
-        globalMirror.broadcastPulse({ event, filePath });
-      }
+      // 6. Notify pulse subscriber (web mirror wires this in — dependency inversion, no domain→web import)
+      this.options.onPulse?.({ event, filePath });
     } catch (err: any) {
       console.error(`[Watcher] Pulse error for ${path.basename(filePath)}: ${err?.message || err}`);
     }
