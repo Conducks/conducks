@@ -15,7 +15,8 @@ export enum CanonicalKind {
   ECOSYSTEM = 'ECOSYSTEM',     // External Deps, Multi-Project Context
   REPOSITORY = 'REPOSITORY',   // Individual Project, Repo, or Microservice
   PACKAGE = 'PACKAGE',         // Deployable/versioned unit within a workspace (npm pkg, crate, service)
-  NAMESPACE = 'NAMESPACE',     // Folders, Packages, Namespaces
+  NAMESPACE = 'NAMESPACE',     // Language namespaces / modules
+  DIRECTORY = 'DIRECTORY',     // Filesystem folders (emitted by orchestrator L2; now first-class)
   UNIT = 'UNIT',               // Files, Modules
   INFRA = 'INFRA',             // Routers, Controllers, Decorators
   STRUCTURE = 'STRUCTURE',     // Classes, Interfaces, Structs, Types
@@ -31,14 +32,15 @@ export const CanonicalRank: Record<CanonicalKind, number> = {
   [CanonicalKind.REPOSITORY]: 1,
   [CanonicalKind.PACKAGE]: 2,
   [CanonicalKind.NAMESPACE]: 3,
-  [CanonicalKind.UNIT]: 4,
-  [CanonicalKind.INFRA]: 5,
-  [CanonicalKind.STRUCTURE]: 6,
-  [CanonicalKind.BEHAVIOR]: 7,
-  [CanonicalKind.STATEMENT]: 8,
-  [CanonicalKind.BRANCH]: 9,
-  [CanonicalKind.ATOM]: 10,
-  [CanonicalKind.DATA]: 11
+  [CanonicalKind.DIRECTORY]: 4,
+  [CanonicalKind.UNIT]: 5,
+  [CanonicalKind.INFRA]: 6,
+  [CanonicalKind.STRUCTURE]: 7,
+  [CanonicalKind.BEHAVIOR]: 8,
+  [CanonicalKind.STATEMENT]: 9,
+  [CanonicalKind.BRANCH]: 10,
+  [CanonicalKind.ATOM]: 11,
+  [CanonicalKind.DATA]: 12
 };
 
 /**
@@ -52,7 +54,7 @@ export function mapToCanonical(kind: string): { kind: CanonicalKind, rank: numbe
   if (k === 'external_dependency') ck = CanonicalKind.ECOSYSTEM;
   else if (k === 'repository' || k === 'project' || k === 'repo') ck = CanonicalKind.REPOSITORY;
   else if (k === 'package' || k === 'workspace_package') ck = CanonicalKind.PACKAGE;
-  else if (k === 'directory' || k === 'folder') ck = CanonicalKind.NAMESPACE;
+  else if (k === 'directory' || k === 'folder') ck = CanonicalKind.DIRECTORY;
   else if (k === 'module' || k === 'namespace') ck = CanonicalKind.NAMESPACE;
   else if (k === 'file' || k === 'unit') ck = CanonicalKind.UNIT;
   else if (k === 'class' || k === 'interface' || k === 'type' || k === 'struct' || k === 'enum' || k === 'generic' || k === 'heritage') ck = CanonicalKind.STRUCTURE;
