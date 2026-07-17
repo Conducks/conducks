@@ -1,5 +1,5 @@
 # todo06 — layer boundary cleanup (Clean Architecture)
-Status: doing
+Status: done
 - Acceptance: conducks self-analysis shows zero illegal cross-layer edges, enforced by `conducks guard`
 
 ## Phase 1 — extract contracts leaf
