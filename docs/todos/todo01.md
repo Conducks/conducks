@@ -21,11 +21,21 @@ No synthetic data. Proves: real code → parse → node spans → coverage bind 
 The risky unknown ("can this work?") is answered YES. Prototype: scratch/real-bind.mjs (gitignored).
 Next to productionize: a real `conducks coverage <istanbul.json>` CLI command wrapping this join.
 
-## C0 remaining (next slices)
-- [ ] UNIT (file) spans: lineStart=1, lineEnd=lastLine — needed for "% of file activated". 69 nodes at 0.
-- [ ] INFRA spans: 7 nodes at 0.
+## Parallel fleet shipped (2026-07-17) — commit 98ad47b
+- [x] UNIT (file) spans: reflector.ts now sets [1,lastLine]. website 0→32. (root cause: unitNode
+      had no `properties` field, persist reads m.range). C0 file-level coverage unblocked.
+- [x] `conducks coverage-view <cov.json>` — self-contained HTML overlay (C6 render). 86KB, 0 CDN.
+- [x] `conducks coverage --save-baseline / --vs-baseline` — drift detection (C7). Verified fires:
+      "addNode: was 86% → now 0% (BROKE)" on degraded input; 0 false positives on identical.
+
+## Still remaining
+- [ ] INFRA spans: 7 nodes at 0 — documented spec (React-hooks @isInfra needs isScoped handling).
+      reflector.ts:255 add IS_INFRA + resolve rangeNode for @pulse_assignment_name (array_pattern
+      → walk to variable_declarator). Not guessed; left as applyable spec.
 - [ ] STATEMENT/BRANCH emission: tiers exist in taxonomy but nothing emits these nodes yet.
 - [ ] DIRECTORY leaks as a raw kind (not in enum) — taxonomy mapping bypassed for folders.
+- [ ] C5 LIVE layer (watch app + stream coverage as you click) — deferred: a project, not a
+      parallel edit. Needs a running app instrumented with a live coverage stream.
 
 ## The proven fact
 BEHAVIOR nodes now carry real `[lineStart,lineEnd]` (e.g. Home 164–593, BlogPage 9–96).
