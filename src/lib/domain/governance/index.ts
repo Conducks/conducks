@@ -213,6 +213,13 @@ export class GovernanceService implements ConducksComponent {
         case 'has_cycles': {
           const cycles = this.graph.detectCycles().filter(c => {
             if (c.length <= 1) return false;
+            // Intra-file self-references (e.g. a singleton's class → getInstance → file-unit) are
+            // not circular MODULE dependencies — only cross-file cycles are architectural smells.
+            const files = new Set(c.map(id => {
+              const n = this.graph.getNode(id);
+              return String(n?.properties.filePath || n?.properties.file || id);
+            }));
+            if (files.size <= 1) return false;
             for (let i = 0; i < c.length; i++) {
               const sourceId = c[i];
               const targetId = c[(i + 1) % c.length];
