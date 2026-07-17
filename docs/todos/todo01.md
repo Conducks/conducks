@@ -28,14 +28,25 @@ Next to productionize: a real `conducks coverage <istanbul.json>` CLI command wr
 - [x] `conducks coverage --save-baseline / --vs-baseline` — drift detection (C7). Verified fires:
       "addNode: was 86% → now 0% (BROKE)" on degraded input; 0 false positives on identical.
 
-## Still remaining
-- [ ] INFRA spans: 7 nodes at 0 — documented spec (React-hooks @isInfra needs isScoped handling).
-      reflector.ts:255 add IS_INFRA + resolve rangeNode for @pulse_assignment_name (array_pattern
-      → walk to variable_declarator). Not guessed; left as applyable spec.
-- [ ] STATEMENT/BRANCH emission: tiers exist in taxonomy but nothing emits these nodes yet.
-- [ ] DIRECTORY leaks as a raw kind (not in enum) — taxonomy mapping bypassed for folders.
-- [ ] C5 LIVE layer (watch app + stream coverage as you click) — deferred: a project, not a
-      parallel edit. Needs a running app instrumented with a live coverage stream.
+## Second wave shipped (2026-07-17) — commits 24cb063, ae88fb7, b1941ba
+- [x] DIRECTORY: now a first-class CanonicalKind (rank 4). Was emitted by orchestrator L2 but
+      missing from the enum. Additive, no renames.
+- [x] INFRA: IS_INFRA added to reflector isScoped (helps multi-line infra). Hook-pattern @isInfra
+      (useState) still ~1 line — variable_declarator walk deferred (low value; documented inline).
+- [x] STATEMENT/BRANCH — resolved CORRECTLY as branch coverage at bind time (istanbul branchMap),
+      NOT node emission. Emitting per-statement/branch nodes would flood the graph = the original
+      over-granularity complaint. Function stays the node; `taken/total br` is fill detail. Shows
+      "100% lines but 1/2 branches" = error path never ran.
+- [x] C5 v1: `coverage-view --watch` re-renders overlay on coverage-file change. Test-driven
+      feedback loop (jest --watch rewrites coverage → overlay refreshes).
+
+## Genuinely remaining (real projects, not core edits)
+- [ ] C5 full: "click through the running APP and watch it light" — needs a live app instrumented
+      with a coverage stream. A separate project against a specific target app (mentorseed etc.),
+      not a conducks-core edit. The watch-v1 is the CLI-side of this.
+- [ ] INFRA hook spans (variable_declarator walk) — low value, applyable spec in reflector.ts.
+- [ ] Vault hygiene: incremental analyze accumulates duplicate nodes across runs (cosmetic; shows
+      as repeated rows in coverage output). A clean-analyze fixes it per-run.
 
 ## The proven fact
 BEHAVIOR nodes now carry real `[lineStart,lineEnd]` (e.g. Home 164–593, BlogPage 9–96).
