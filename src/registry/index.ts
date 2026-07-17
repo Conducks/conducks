@@ -8,6 +8,8 @@ import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, ContextGenerator, BlueprintGenerator, RegressionGuard } from "@/lib/domain/governance/index.js";
 import { IntelligenceService, ConducksSearch, GQLParser, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
+import { buildBoard } from "@/lib/domain/analysis/docs-grammar.js";
+import { parseIstanbul, bindCoverage, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
 import { ManifestService, ManifestEngine } from "@/lib/domain/manifest/index.js";
 import { MirrorEngine } from "@/lib/domain/visual/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
@@ -203,6 +205,19 @@ export const registry = {
     status: () => governance.status(),
     guard: (threshold?: number) => governance.shouldBlock(threshold),
     rules: (root?: string) => governance.auditWithRules(root)
+  },
+  docs: {
+    board: (root?: string) => buildBoard(root || chronicle.getProjectDir() || process.cwd())
+  },
+  coverage: {
+    // Query BEHAVIOR node spans, then range-join the istanbul report onto them (domain logic).
+    bind: async (covPath: string) => {
+      const nodes = await persistence.query<CovNode>(
+        `SELECT name, file, lineStart, lineEnd FROM nodes
+         WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart ORDER BY file, lineStart`
+      );
+      return bindCoverage(nodes, parseIstanbul(covPath));
+    }
   },
   infrastructure: {
     get graphEngine() { return graph; },
