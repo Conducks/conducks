@@ -240,9 +240,12 @@ export class GovernanceService implements ConducksComponent {
         }
 
         case 'rank_violation': {
-          // A rank violation is an edge where a lower-rank node imports from a higher-rank node
-          // (canonicalRank: lower number = more foundational; a BEHAVIOR depending on STRUCTURE is fine;
-          //  but a STRUCTURE depending on BEHAVIOR is a rank inversion)
+          // A rank inversion is a MORE-ABSTRACT (lower rank) module depending on a MORE-CONCRETE
+          // one. This is only meaningful at MODULE granularity — at symbol level a function
+          // (BEHAVIOR) using a class (STRUCTURE) is normal code, not an inversion. So skip any
+          // edge where both ends are symbol-level tiers (rank >= STRUCTURE). Module-level
+          // inversions are better caught by the layer_boundaries rule (ADR 0005).
+          const SYMBOL_LEVEL = 7; // CanonicalRank[STRUCTURE]; STRUCTURE/BEHAVIOR/ATOM/... are intra-file symbols
           const allEdges = this.graph.getAllEdges();
           for (const edge of allEdges) {
             if (edge.type === 'MEMBER_OF') continue;
@@ -252,6 +255,7 @@ export class GovernanceService implements ConducksComponent {
             const srcRank = src.properties.canonicalRank ?? -1;
             const tgtRank = tgt.properties.canonicalRank ?? -1;
             if (srcRank < 0 || tgtRank < 0) continue;
+            if (srcRank >= SYMBOL_LEVEL && tgtRank >= SYMBOL_LEVEL) continue; // normal symbol dependency
             // Violation: higher-ranked (more abstract) depending on lower-ranked (more concrete)
             // i.e. src rank > tgt rank means src is more abstract and should not depend on something more concrete
             if (srcRank > tgtRank && (rule.threshold === undefined || Math.abs(srcRank - tgtRank) >= rule.threshold)) {

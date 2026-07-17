@@ -20,5 +20,5 @@ Status: doing
 
 ## Phase 4 — discovered while wiring guard (pre-existing, NOT layer regressions)
 - [x] no_cycles: 0 — the 1 exposed cycle was a singleton intra-file false positive; fixed the DETECTOR (skip same-file cycles), not the code (singleton is correct)
-- [ ] rank_violations: 37 symbol-rank inversions (severity warning) — surfaced by guard, tracked
-- [ ] dead code flagged: registry/base.ts, registry/dynamic-loader.ts (0 importers)
+- [x] rank_violations: 0 — all 36 were false positives: 32 scratch/.wasm (excluded via .conducksignore), 4 function-uses-class (refined rule to skip symbol-level pairs; layer_boundaries is the real check)
+- [x] "dead files" RETRACTED — false positive: base.ts (ConducksRegistry) used by 21 files, dynamic-loader by 4, via re-export through tool-registry. NOT dead. Verify-before-delete caught it.

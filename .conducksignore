@@ -1,0 +1,6 @@
+# Non-source excluded from structural analysis
+scratch/
+build/
+*.wasm
+*.db
+.conducks/

@@ -143,5 +143,11 @@ export class MirrorServer {
 export let globalMirror: MirrorServer | null = null;
 export function initGlobalMirror(gateway: GatewayService) {
   globalMirror = new MirrorServer(gateway);
+  // Dependency inversion: the web layer (which legally imports domain + composition) subscribes
+  // the watcher's pulses to the mirror. The watcher (domain) no longer imports web, breaking the
+  // old domain→web→composition→domain cycle. Guarded by layer_boundaries (ADR 0005).
+  try {
+    registry.evolution.watcher?.setPulseSubscriber((pulse) => globalMirror?.broadcastPulse(pulse));
+  } catch { /* watcher not active in this context — mirror still serves static/gateway data */ }
   return globalMirror;
 }
