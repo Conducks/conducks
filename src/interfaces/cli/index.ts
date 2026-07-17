@@ -40,6 +40,8 @@ import { UninstallCommand } from "./commands/uninstall.js";
 import { DoctorCommand } from "./commands/doctor.js";
 import { CoverageCommand } from "./commands/coverage.js";
 import { CoverageViewCommand } from "./commands/coverage-view.js";
+import { DocsStatusCommand } from "./commands/docs-status.js";
+import { DocsLintCommand } from "./commands/docs-lint.js";
 import { ConducksCommand } from "./command.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 
@@ -104,7 +106,7 @@ export async function main() {
     new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
-    new CoverageViewCommand()
+    new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand()
   ];
 
   commands.push(new HelpCommand(commands));
@@ -112,7 +114,7 @@ export async function main() {
   const command = commands.find(c => c.id === commandId);
   
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp'].includes(commandId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint'].includes(commandId);
 
   if (command) {
     try {
