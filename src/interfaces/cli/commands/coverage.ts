@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import { readFileSync } from "node:fs";
 import chalk from "chalk";
+import { saveBaseline, loadBaseline, diffAgainstBaseline, defaultBaselinePath } from "@/lib/domain/analysis/coverage-baseline.js";
 
 /**
  * Conducks — Coverage Command 🏺 🟩
@@ -19,12 +20,14 @@ import chalk from "chalk";
 export class CoverageCommand implements ConducksCommand {
   public id = "coverage";
   public description = "Overlay istanbul/c8 coverage onto the graph — see which functions light up";
-  public usage = "conducks coverage <coverage-final.json> [--json] [--all] [path]";
+  public usage = "conducks coverage <coverage-final.json> [--json] [--all] [--save-baseline] [--vs-baseline] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const covPath = args.find(a => a.endsWith(".json") && !a.startsWith("--"));
     const useJson = args.includes("--json");
     const showAll = args.includes("--all"); // include DARK nodes (default: hide pure-dark noise)
+    const saveBaselineFlag = args.includes("--save-baseline");
+    const vsBaseline = args.includes("--vs-baseline");
 
     if (!covPath) {
       console.error(chalk.red("Missing coverage file. Usage: ") + this.usage);
@@ -89,6 +92,52 @@ export class CoverageCommand implements ConducksCommand {
       }
 
       const bound = results.filter(r => r.bound);
+
+      if (saveBaselineFlag) {
+        const baselinePath = defaultBaselinePath();
+        saveBaseline(bound, baselinePath);
+        console.log(chalk.green(`\n✓ Saved coverage baseline for ${bound.length} functions → ${baselinePath}\n`));
+        if (!vsBaseline) return;
+      }
+
+      if (vsBaseline) {
+        const baselinePath = defaultBaselinePath();
+        const baseline = loadBaseline(baselinePath);
+        if (!baseline) {
+          console.error(chalk.red(`No baseline found at ${baselinePath}. Run with --save-baseline first.`));
+          process.exitCode = 1;
+          return;
+        }
+        const drift = diffAgainstBaseline(bound, baseline);
+        const regressed = drift.filter(d => d.status === "REGRESSED");
+        const improved = drift.filter(d => d.status === "IMPROVED");
+        const created = drift.filter(d => d.status === "NEW");
+        const same = drift.filter(d => d.status === "SAME");
+
+        console.log(chalk.bold("\n--- 🟩 Conducks Coverage Drift vs Baseline ---\n"));
+        if (regressed.length === 0) {
+          console.log(chalk.green("  No regressions. ✓"));
+        } else {
+          for (const d of regressed) {
+            console.log(chalk.red(
+              `  ⚠ ${d.name}: was ${d.baselinePct}% → now ${d.currentPct}%` +
+              `${d.currentPct === 0 ? " (BROKE)" : ""}`
+            ) + chalk.dim(`  ${d.file}`));
+          }
+        }
+        if (created.length > 0) {
+          console.log(chalk.cyan(`\n  NEW (${created.length}): `) + created.map(d => d.name).join(", "));
+        }
+        if (improved.length > 0) {
+          console.log(chalk.green(`  IMPROVED (${improved.length}): `) + improved.map(d => `${d.name} (${d.baselinePct}%→${d.currentPct}%)`).join(", "));
+        }
+        console.log(
+          `\n  ${chalk.red(regressed.length + " regressed")} · ${chalk.green(improved.length + " improved")} · ` +
+          `${chalk.cyan(created.length + " new")} · ${chalk.gray(same.length + " same")}\n`
+        );
+        return;
+      }
+
       if (useJson) {
         console.log(JSON.stringify(bound, null, 2));
         return;

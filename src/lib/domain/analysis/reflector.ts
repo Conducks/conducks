@@ -82,14 +82,22 @@ export class ConducksReflector implements ConducksComponent {
     const namespaceId = namespacePath === '.' ? `repository::${rootName}` : `directory::${path.join(projectRoot, namespacePath).toLowerCase()}`;
 
     const fileId = `${canonicalPath}::unit`;
+    // A file's span runs from line 1 to its last line, so UNIT nodes carry a
+    // real range for "% of file activated by coverage" instead of lineEnd=0.
+    const fileLineCount = file.source.split('\n').length;
     const unitNode: SpectrumNode = {
       name: path.basename(file.path),
       kind: 'file' as any,
       canonicalKind: fileMeta.kind,
       canonicalRank: fileMeta.rank, // Rank 3
-      range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
+      range: { start: { line: 1, column: 0 }, end: { line: fileLineCount, column: 0 } },
       filePath: file.path,
       isExport: true,
+      properties: {
+        // persistence.ts derives lineStart/lineEnd from node.properties.range,
+        // not the top-level `range` field — mirror it here or UNIT rows persist lineEnd=0.
+        range: { start: { line: 1, column: 0 }, end: { line: fileLineCount, column: 0 } }
+      },
       metadata: {
         id: fileId,
         isGlobalNode: true,
@@ -103,7 +111,7 @@ export class ConducksReflector implements ConducksComponent {
         layer_path: relativePath,
         depth: 3
       }
-    };
+    } as any;
 
     const parser = grammars.getUnifiedParser(provider.langId);
 

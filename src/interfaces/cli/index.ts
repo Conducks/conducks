@@ -39,6 +39,7 @@ import { BootstrapDocsCommand } from "./commands/bootstrap-docs.js";
 import { UninstallCommand } from "./commands/uninstall.js";
 import { DoctorCommand } from "./commands/doctor.js";
 import { CoverageCommand } from "./commands/coverage.js";
+import { CoverageViewCommand } from "./commands/coverage-view.js";
 import { ConducksCommand } from "./command.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 
@@ -102,7 +103,8 @@ export async function main() {
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(), new MirrorCommand(),
-    new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand()
+    new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
+    new CoverageViewCommand()
   ];
 
   commands.push(new HelpCommand(commands));
