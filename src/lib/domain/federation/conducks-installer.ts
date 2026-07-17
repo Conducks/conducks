@@ -2,14 +2,10 @@ import fs from "fs-extra";
 import path from "node:path";
 import os from "node:os";
 
+import { fileURLToPath } from "node:url";
 import { ConducksComponent } from "@/contracts/types.js";
 
-/** Minimal oracle contract the installer needs — injected, not pulled from the composition root. */
-export interface OracleLike {
-  bootstrap(): Promise<void> | void;
-  listSkills(): Array<{ id: string; description: string }>;
-  getSkill(id: string): { content: string } | null | undefined;
-}
+const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../resources/skills");
 
 /**
  * The Conducks Installer
@@ -23,7 +19,6 @@ export class ConducksInstaller implements ConducksComponent {
 
   constructor(
     workspaceRoot: string,
-    private readonly oracle: OracleLike,
     private readonly fileSystem: any = fs
   ) {
     this.globalSkillsDir = path.join(os.homedir(), ".gemini", "antigravity", "skills");
@@ -34,9 +29,6 @@ export class ConducksInstaller implements ConducksComponent {
    * Performs the "Pentecost" synchronization of all Conducksic skills.
    */
   public async sync(): Promise<{ global: string[], workspace: string[] }> {
-    // Initialize the oracle to load skills dynamically
-    await this.oracle.bootstrap();
-
     const skills = this.getDynamicSkillTemplates();
     const installedGlobal: string[] = [];
     const installedWorkspace: string[] = [];
@@ -58,33 +50,23 @@ export class ConducksInstaller implements ConducksComponent {
     return { global: installedGlobal, workspace: installedWorkspace };
   }
 
+  /**
+   * Reads the conducks-usage skills straight from resources/skills/*.md (static content — no
+   * oracle, no MCP tool). Each file carries its description in a leading
+   * `<!-- description: ... -->` comment; the rest is the skill body.
+   */
   private getDynamicSkillTemplates(): Record<string, string> {
     const skills: Record<string, string> = {};
-    const skillList = this.oracle.listSkills();
+    let files: string[] = [];
+    try { files = this.fileSystem.readdirSync(SKILLS_DIR).filter((f: string) => f.endsWith('.md')); } catch { return skills; }
 
-    // Map skill IDs to the expected names used by the installer
-    const skillIdMapping: Record<string, string> = {
-      'conducks-debugging': 'conducks-debugging',
-      'conducks-refactoring': 'conducks-refactoring',
-      'conducks-guide': 'conducks-guide',
-      'conducks-exploring': 'conducks-exploring',
-      'conducks-governance': 'conducks-governance',
-      'conducks-impact-analysis': 'conducks-impact-analysis',
-      'conducks-cli': 'conducks-cli'
-    };
-
-    for (const skill of skillList) {
-      const detail = this.oracle.getSkill(skill.id);
-      if (detail && skillIdMapping[skill.id]) {
-        const targetName = skillIdMapping[skill.id];
-        skills[targetName] = `---
-name: ${targetName}
-description: ${skill.description}
----
-
-${detail.content}
-`;
-      }
+    for (const file of files) {
+      const name = file.replace(/\.md$/, '');
+      const raw = this.fileSystem.readFileSync(path.join(SKILLS_DIR, file), 'utf-8');
+      const descMatch = raw.match(/<!--\s*description:\s*(.+?)\s*-->/);
+      const description = descMatch ? descMatch[1] : `Conducks skill: ${name}`;
+      const body = raw.replace(/<!--\s*description:[\s\S]*?-->\s*/, '').trimStart();
+      skills[name] = `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`;
     }
 
     return skills;
