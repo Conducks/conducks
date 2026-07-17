@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { chronicle } from "../git/chronicle-interface.js";
 import { logger } from "../../core/utils/logger.js";
-import { SynapseRegistry } from "../../../registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import duckdb from "duckdb";
 import type { ConducksComponent } from "../../../contracts/types.js";
 

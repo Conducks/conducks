@@ -10,7 +10,7 @@ import { IntelligenceService, ConducksSearch, GQLParser, FederatedLinker } from 
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { ManifestService, ManifestEngine } from "@/lib/domain/manifest/index.js";
 import { MirrorEngine } from "@/lib/domain/visual/index.js";
-import { SynapseRegistry } from "@/registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { PYTHON_SUITE } from "@/lib/core/parsing/languages/python/index.js";
 import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/languages/typescript/index.js";

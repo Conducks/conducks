@@ -1,5 +1,5 @@
 # Architecture Context — conducks
-Generated: 2026-07-17T20:41:08.128Z | Pulse: pulse_1784320819141_hgad9
+Generated: 2026-07-17T20:54:27.291Z | Pulse: pulse_1784321621398_usg40
 
 ## Entry Points (top 10 by gravity)
 - `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/adjacency-list.ts::conducksadjacencylist` [STRUCTURE, gravity: 0.0152, risk: 0.0200]
