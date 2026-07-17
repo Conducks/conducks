@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Prune Command
@@ -10,8 +11,7 @@ export class PruneCommand implements ConducksCommand {
   public usage = "registry prune";
 
   public async execute(_args: string[], registry: Registry): Promise<void> {
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
     const findings = registry.explain.prune();
     console.log(`\n\x1b[1m--- ✂️ Dead Weight Discovery ---\x1b[0m`);
     

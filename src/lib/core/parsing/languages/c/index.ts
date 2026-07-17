@@ -1,14 +1,15 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { C_QUERIES } from "./queries.js";
 import { CResolver } from "./resolver.js";
 import { CExtractor } from "./extractor.js";
 
 /**
  * Conducks — High-Fidelity C Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps C structural DNA (Structs, Preprocessors, Includes) to the 8-layer taxonomy.
  */
-export class CProvider extends NativeProvider {
+export class CProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "c-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".c", ".h"];

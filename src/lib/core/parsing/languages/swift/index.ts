@@ -1,14 +1,15 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { SWIFT_QUERIES } from "./queries.js";
 import { SwiftResolver } from "./resolver.js";
 import { SwiftExtractor } from "./extractor.js";
 
 /**
  * Conducks — High-Fidelity Swift Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps Swift structural DNA (Classes, Protocols, Extensions, SwiftUI) to the 8-layer taxonomy.
  */
-export class SwiftProvider extends NativeProvider {
+export class SwiftProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "swift-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".swift"];

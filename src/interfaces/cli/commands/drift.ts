@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Drift Command 🕵️‍♂️
@@ -53,8 +54,9 @@ export class DriftCommand implements ConducksCommand {
 
     } catch (err: any) {
       console.error(`\x1b[31mError during drift analysis: ${err.message}\x1b[0m`);
+      process.exit(1);
     } finally {
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

@@ -1,9 +1,32 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import { ConducksComponent } from "@/registry/types.js";
 
 /**
+ * A file to be written during bootstrap.
+ */
+export interface ManifestFile {
+  filePath: string;
+  content: string;
+  name: string;
+}
+
+/**
+ * A record entry to be appended or written.
+ */
+export interface ManifestRecord {
+  filePath: string;
+  docsDir: string;
+  /** Content to append if the file already exists. */
+  appendContent: string;
+  /** Full content to write if the file does not yet exist. */
+  initialContent: string;
+}
+
+/**
  * Conducks — Manifest Engine
+ *
+ * Pure computation only — no filesystem I/O.
+ * Callers are responsible for writing the returned data to disk.
  */
 export class ManifestEngine implements ConducksComponent {
   public readonly id = 'manifest-engine';
@@ -20,51 +43,35 @@ export class ManifestEngine implements ConducksComponent {
   ];
 
   /**
-   * Bootstraps the 7-file documentation standard for a project.
+   * Computes the manifest files to create for a project.
+   * Returns one ManifestFile per required doc. Callers decide which to write
+   * (skip if already on disk) and perform the actual fs operations.
    */
-  public async bootstrap(projectRoot: string, projectName: string): Promise<string[]> {
+  public computeBootstrap(projectRoot: string, projectName: string): ManifestFile[] {
     const docsDir = path.join(projectRoot, 'docs', 'project', projectName);
-    await fs.mkdir(docsDir, { recursive: true });
-
-    const created: string[] = [];
-
-    for (const file of this.requiredFiles) {
-      const filePath = path.join(docsDir, file.name);
-      try {
-        await fs.access(filePath);
-        // File exists, skip
-      } catch {
-        const content = `# ${file.title} — ${projectName}\n\n> ${file.description}\n\n---\n\n## Initial Boot\n- Date: ${new Date().toISOString()}\n- Status: Initialized via Conducks Manifest Engine\n`;
-        await fs.writeFile(filePath, content, 'utf-8');
-        created.push(file.name);
-      }
-    }
-
-    return created;
+    return this.requiredFiles.map(file => ({
+      name: file.name,
+      filePath: path.join(docsDir, file.name),
+      content: `# ${file.title} — ${projectName}\n\n> ${file.description}\n\n---\n\n## Initial Boot\n- Date: ${new Date().toISOString()}\n- Status: Initialized via Conducks Manifest Engine\n`,
+    }));
   }
 
   /**
-   * Records a strategic learning or decision into the appropriate manifest file.
+   * Computes the entry to record into a manifest file.
+   * Returns the paths and content; the caller performs the actual fs operations.
    */
-  public async record(projectRoot: string, projectName: string, type: string, content: string): Promise<boolean> {
+  public computeRecord(projectRoot: string, projectName: string, type: string, content: string): ManifestRecord {
     const fileName = `${type.toLowerCase()}.md`;
     const docsDir = path.join(projectRoot, 'docs', 'project', projectName);
     const filePath = path.join(docsDir, fileName);
-
-    // Ensure directory exists
-    await fs.mkdir(docsDir, { recursive: true });
-
     const entry = `\n### Entry: ${new Date().toISOString()}\n${content}\n`;
-    
-    try {
-      await fs.appendFile(filePath, entry, 'utf-8');
-      return true;
-    } catch {
-      // If file doesn't exist, create it first
-      const fileMeta = this.requiredFiles.find(f => f.name === fileName) || { title: type, description: 'Recorded manifest.' };
-      const header = `# ${fileMeta.title} — ${projectName}\n\n> ${fileMeta.description}\n\n---\n`;
-      await fs.writeFile(filePath, header + entry, 'utf-8');
-      return true;
-    }
+    const fileMeta = this.requiredFiles.find(f => f.name === fileName) || { title: type, description: 'Recorded manifest.' };
+    const header = `# ${fileMeta.title} — ${projectName}\n\n> ${fileMeta.description}\n\n---\n`;
+    return {
+      filePath,
+      docsDir,
+      appendContent: entry,
+      initialContent: header + entry,
+    };
   }
 }

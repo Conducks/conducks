@@ -29,7 +29,7 @@ export class EntryCommand implements ConducksCommand {
       const success = registry.query.graph.getGraph().stats.nodeCount > 0;
       if (!success) {
         console.error(`\x1b[31m[Conducks CLI] Error: No structural index found at ${targetPath}. Run 'conducks analyze' first.\x1b[0m`);
-        return;
+        process.exit(1);
       }
 
       // Ensure entry point detection is fresh
@@ -62,8 +62,11 @@ export class EntryCommand implements ConducksCommand {
         console.log(`\x1b[35m${id.padEnd(50)}\x1b[0m ${kind.padEnd(15)} \x1b[33m${gravity.padEnd(10)}\x1b[0m`);
       });
     } finally {
-      // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks
-      await persistence.close();
+      // Only close persistence if we created our own instance (external path provided).
+      // Closing the shared singleton breaks subsequent commands in the same process.
+      if (pathArg) {
+        await persistence.close();
+      }
     }
   }
 }

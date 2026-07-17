@@ -31,6 +31,7 @@ export class GoExtractor {
     ]);
 
     const traverse = (n: any) => {
+      if (!n) return;
       if (branchNodes.has(n.type)) {
         complexity++;
       }
@@ -65,7 +66,7 @@ export class GoExtractor {
    * Extracts debt markers (TODO, FIXME, etc.) from a node's text.
    */
   public extractDebt(node: any): string[] {
-    const text = node.text;
+    const text = node?.text || '';
     const markers = ['TODO', 'FIXME', 'HACK', 'BUG', 'REFACTOR', 'DEPRECATED', 'XXX'];
     const found: string[] = [];
 
@@ -82,6 +83,24 @@ export class GoExtractor {
    * Extracts specific named bindings from a Go short assignment (:=)
    * or a keyed composite literal.
    */
+  public extractDocs(sourceCode: string, node: any): string {
+    if (!node || !node.parent) return '';
+    const siblings = node.parent.children;
+    const idx = siblings.indexOf(node);
+    for (let i = idx - 1; i >= 0; i--) {
+      const sib = siblings[i];
+      if (sib.type === 'comment') {
+        return sib.text
+          .replace(/^\/\*\*?|\*\/$/g, '')
+          .replace(/^\s*\*\s?/gm, '')
+          .replace(/^\/\/\/?/gm, '')
+          .trim();
+      }
+      if (sib.type !== 'newline' && !sib.type.includes('whitespace')) break;
+    }
+    return '';
+  }
+
   public extractShortBindings(node: any): Array<{ name: string; alias?: string }> {
     const bindings: Array<{ name: string; alias?: string }> = [];
     
@@ -90,6 +109,7 @@ export class GoExtractor {
       const left = node.childByFieldName('left');
       if (left) {
         const findIdentifiers = (n: any) => {
+          if (!n) return;
           if (n.type === 'identifier') {
             bindings.push({ name: n.text });
           }

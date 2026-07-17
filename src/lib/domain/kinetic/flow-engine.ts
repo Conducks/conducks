@@ -37,9 +37,16 @@ export class ConducksFlowEngine implements ConducksComponent {
   public groupProcesses(): Record<string, string[]> {
     const nodes = Array.from(this.graph.getAllNodes());
     const entryPoints = nodes.filter((n: ConducksNode) => {
-      // Logic: An entry point is a node with 0 incoming 'CALLS' edges
+      // Only structural/behavioral code nodes — skip files, directories, config, virtual nodes
+      if (!['STRUCTURE', 'BEHAVIOR', 'ATOM'].includes(n.label)) return false;
+      if (!n.properties?.filePath || !n.properties?.name) return false;
+      const name = (n.properties.name as string) || '';
+      // Skip file-level nodes (names with extensions like .yml, .ts, .py etc.)
+      if (/\.\w{2,5}$/.test(name)) return false;
+      // Entry point: 0 incoming CALLS edges, OR only HTTP cross-service CALLS (confidence < 1)
       const incoming = this.graph.getNeighbors(n.id, 'upstream').filter(e => e.type === 'CALLS');
-      return incoming.length === 0;
+      if (incoming.length === 0) return true;
+      return incoming.every(e => (e.confidence ?? 1) < 1);
     });
 
     const processes: Record<string, string[]> = {};

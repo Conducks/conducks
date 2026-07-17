@@ -122,17 +122,12 @@ export class Conducks implements ConducksComponent {
     }
 
     console.error(`[ConducksCore] Calling Orchestrator with ${files.length} units.`);
-    try {
-      await this.orchestrator.analyze(files);
-      const framework = (this.orchestrator as any).context.getFramework();
-      if (framework) {
-        this.graph.getGraph().setMetadata('framework', framework);
-      }
-      console.error(`[ConducksCore] Orchestrator call complete.`);
-    } catch (e) {
-      console.error(`[ConducksCore] Orchestrator FAILED: ${e}`);
-      throw e;
+    const result = await this.orchestrator.analyze(files);
+    const framework = (this.orchestrator as any).context?.getFramework?.();
+    if (framework) {
+      this.graph.getGraph().setMetadata('framework', framework);
     }
+    console.error(`[ConducksCore] Orchestrator call complete.`);
 
     // Conducks: Align Test Coverage
     this.aligner.align(this.graph.getGraph());
@@ -151,7 +146,6 @@ export class Conducks implements ConducksComponent {
       console.error(`[ConducksCore] Metadata set. Current metadata:`, Array.from(this.graph.getGraph().getAllMetadata().entries()));
     }
 
-    const result = await this.orchestrator.analyze(files);
     await this.persistence.save(this.graph.getGraph(), { nodeCount: result.nodeCount, edgeCount: result.edgeCount });
     return result.pulseId;
   }

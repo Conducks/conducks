@@ -19,7 +19,7 @@ import {
  * Conducks tool registry server that orchestrates internal APIs and tool scheduler.
  * Consolidates all structural and behavioral tools into a documentation-driven registry.
  * 
- * Rule 10/13 ENFORCEMENT: Exactly 9 Unified Conducks MCP Tools. No more, no less.
+ * Rule 10/13 ENFORCEMENT: Exactly 10 Unified Conducks MCP Tools. No more, no less.
  */
 export class ConducksMCPServer {
   private server: Server;
@@ -62,10 +62,10 @@ export class ConducksMCPServer {
       this.registry.register(tool);
     }
 
-    const MANDATED_TOOL_COUNT = 9;
+    const MANDATED_TOOL_COUNT = 13;
     if (tools.length !== MANDATED_TOOL_COUNT) {
       console.error(
-        `[Conducks MCP] ⚠️ Rule 9 VIOLATION: Expected ${MANDATED_TOOL_COUNT} tools, ` +
+        `[Conducks MCP] ⚠️ Tool count mismatch: expected ${MANDATED_TOOL_COUNT}, ` +
         `found ${tools.length}. Tools: ${tools.map(t => t.name).join(', ')}`
       );
     }
@@ -75,7 +75,7 @@ export class ConducksMCPServer {
     // 3. Register Resources (The Conducksic Prism)
     this.registerResources();
 
-    console.error(`[Conducks MCP] System ready. ${tools.length} Unified Conducks Tools indexed (Rule 10/13 enforced).`);
+    console.error(`[Conducks MCP] System ready. ${tools.length} tools indexed.`);
   }
 
   private registerResources(): void {

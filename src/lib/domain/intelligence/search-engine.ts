@@ -54,7 +54,7 @@ export class ConducksSearch implements ConducksComponent {
 
         // 3. Wavefront Propagation (Transitive Resonance)
         // If this node matches, its immediate neighbors gain "Echo Resonance".
-        this.propagateWavefront(node.id, totalScore * 0.5, results, 1);
+        this.propagateWavefront(node.id, totalScore * 0.5, results, 3);
       }
     }
 

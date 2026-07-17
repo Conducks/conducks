@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { logger } from "@/lib/core/utils/logger.js";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Guard Command 🛡️ 🏺 🟦
@@ -47,7 +48,7 @@ export class GuardCommand implements ConducksCommand {
       }
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

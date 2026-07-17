@@ -2,6 +2,17 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { execSync } from "child_process";
 
+function safeKill(pidStr: string): boolean {
+  const pid = parseInt(pidStr, 10);
+  if (!Number.isInteger(pid) || pid <= 1 || pid > 4194304) return false;
+  try {
+    process.kill(pid, 'SIGTERM');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Conducks — Nuclear Clean Command
  * 
@@ -36,15 +47,19 @@ export class CleanCommand implements ConducksCommand {
       for (const line of lines) {
         if (!line.trim()) continue;
         const parts = line.trim().split(/\s+/);
-        const pid = parseInt(parts[1]);
+        const pidStr = parts[1];
         const fullCmd = line.toLowerCase();
+
+        // Validate PID is a numeric string before parsing
+        if (!/^\d+$/.test(pidStr)) continue;
+        const pid = parseInt(pidStr, 10);
 
         // Safety Filter: Never kill myself or my Parent (The Sun/IDE)
         if (pid === myPid || pid === myParentPid) continue;
 
         // Surgical Check: Does this process run a recognized Conducks entry point?
         const isConducks = targetPatterns.some(pattern => fullCmd.includes(pattern.toLowerCase()));
-        
+
         if (isConducks) {
           victims.push(pid);
         }
@@ -52,10 +67,8 @@ export class CleanCommand implements ConducksCommand {
 
       if (victims.length > 0) {
         console.log(`📡 Evicting ${victims.length} surgical targets...`);
-        for (const pid of victims) {
-          try {
-            process.kill(pid, 9); // Force SIGKILL
-          } catch { /* Ignore */ }
+        for (const victim of victims) {
+          safeKill(String(victim));
         }
       }
     } catch { /* Error in ps or no node processes */ }

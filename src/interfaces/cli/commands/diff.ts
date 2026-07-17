@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { execSync } from 'node:child_process';
 import path from 'node:path';
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Diff Command (PR Risk Engine)
@@ -28,8 +29,7 @@ export class DiffCommand implements ConducksCommand {
     }
 
     // Default: Git-based PR Risk Engine
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
 
     console.log(`\n\x1b[1m--- 🛡️ Conducks PR Risk Engine ---\x1b[0m`);
 
@@ -39,7 +39,7 @@ export class DiffCommand implements ConducksCommand {
       diff = execSync('git diff -U0', { encoding: 'utf-8' });
     } catch (e) {
       console.error("Error: Git diff failed. Is this a git repository?");
-      return;
+      process.exit(1);
     }
     const changes = this.parseDiff(diff);
 
@@ -105,7 +105,7 @@ export class DiffCommand implements ConducksCommand {
     const db = registry.infrastructure.persistence;
     if (!(db instanceof SynapsePersistence)) {
       console.error("Chronoscopic diff requires DuckDB persistence.");
-      return;
+      process.exit(1);
     }
 
     console.log(`\n\x1b[1m--- 🏺 Chronoscopic Structural Diff ---\x1b[0m`);
@@ -195,7 +195,15 @@ export class DiffCommand implements ConducksCommand {
 
     for (const line of lines) {
       if (line.startsWith('+++ b/')) {
-        currentFile = path.resolve(process.cwd(), line.replace('+++ b/', '')).toLowerCase();
+        const userPath = line.replace('+++ b/', '');
+        const resolved = path.resolve(process.cwd(), userPath);
+        const cwd = path.resolve(process.cwd());
+        // S9: Reject paths that escape the repository root.
+        if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+          console.error(`Error: path '${userPath}' is outside repository root`);
+          process.exit(1);
+        }
+        currentFile = resolved.toLowerCase();
         changes.push({ file: currentFile, lines: [] });
       } else if (line.startsWith('@@')) {
         const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);

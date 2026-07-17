@@ -30,7 +30,7 @@ export class ConducksRegistry<T extends ConducksComponent> {
       status: 'active'
     });
 
-    console.info(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})`);
+    process.stderr.write(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})\n`);
   }
 
   /**

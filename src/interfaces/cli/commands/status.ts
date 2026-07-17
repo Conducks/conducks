@@ -3,25 +3,23 @@ import type { Registry } from "@/registry/index.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import path from "node:path";
 import chalk from "chalk";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Status Command 🏺 🟦
- * 
+ *
  * Provides structural health metrics and triggers micro-pulses.
  */
 export class StatusCommand implements ConducksCommand {
   public id = "status";
   public description = "Show health and symbol counts or pulse a file";
-  public usage = "conducks status [--mode pulse] [--file <path>] [path]";
+  public usage = "conducks status [--mode pulse] [--file <path>] [--json] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const isPulse = args.includes('--pulse') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'pulse');
     const fileArgIdx = args.indexOf('--file');
     const fileArg = fileArgIdx !== -1 ? args[fileArgIdx + 1] : null;
-    
-    // 1. Initial Structural Anchor & Resonance 🏺 (Read-Only: status never writes)
-    // Deprecated: Already handled by the CLI entry orchestrator.
-    
+    const useJson = args.includes('--json');
 
     try {
       // 5. Conducks Purge & Resurrection 🛡️(Lazy Incremental Induction)
@@ -46,23 +44,42 @@ export class StatusCommand implements ConducksCommand {
 
       // 2.6 Mode: Blueprint (Structural Integrity)
       if (args.includes('--blueprint') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'blueprint')) {
-          console.log(`🛡️  [Conducks Blueprint] Mapping structural integrity...`);
-          const audit = await registry.audit.audit();
-          console.log(chalk.bold("\n--- 🏺 Conducks Integrity Blueprint ---"));
-          console.log(`- Cycles:   ${chalk.red(audit.stats.cycles)}`);
-          console.log(`- Orphans:  ${chalk.red(audit.stats.orphans)}`);
-          console.log(`- Resonance: ${chalk.green(audit.success ? "100%" : "ST structural drift detected")}`);
-          if (audit.violations.length > 0) {
-            console.log(chalk.bold("\nViolations:"));
-            audit.violations.slice(0, 10).forEach(v => console.log(`  - ${v}`));
-          }
-          return;
+        console.log(`🛡️  [Conducks Blueprint] Mapping structural integrity...`);
+        const audit = await registry.audit.audit();
+        console.log(chalk.bold("\n--- 🏺 Conducks Integrity Blueprint ---"));
+        console.log(`- Cycles:   ${chalk.red(audit.stats.cycles)}`);
+        console.log(`- Orphans:  ${chalk.red(audit.stats.orphans)}`);
+        console.log(`- Resonance: ${chalk.green(audit.success ? "100%" : "ST structural drift detected")}`);
+        if (audit.violations.length > 0) {
+          console.log(chalk.bold("\nViolations:"));
+          audit.violations.slice(0, 10).forEach(v => console.log(`  - ${v}`));
+        }
+        return;
       }
 
       // 3. Mode: Health (Default)
       (registry.infrastructure.graphEngine as any).resonate();
       const status = registry.audit.status();
       const graph = registry.query.graph.getGraph();
+
+      const topGravity = Array.from(graph.getAllNodes())
+        .filter(n => !n.properties.isTest)
+        .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
+        .slice(0, 5);
+
+      if (useJson) {
+        process.stdout.write(JSON.stringify({
+          stats: status.stats,
+          status: status.status,
+          staleness: status.staleness,
+          topHotspots: topGravity.map(n => ({
+            id: n.id,
+            name: n.properties.name,
+            rank: n.properties.rank,
+          })),
+        }, null, 2) + '\n');
+        return;
+      }
 
       console.log(chalk.bold("\n--- 🏺 Structural Synapse Status ---"));
       console.log(`- Nodes:   ${chalk.yellow(status.stats.nodeCount)}`);
@@ -76,18 +93,13 @@ export class StatusCommand implements ConducksCommand {
         console.log(`- ${chalk.yellow('Staleness')}: ${chalk.green('SYNCHRONIZED')}`);
       }
 
-      const topGravity = Array.from(graph.getAllNodes())
-        .filter(n => !n.properties.isTest)
-        .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
-        .slice(0, 5);
-
       console.log(chalk.bold(`\n--- 🚀 Top Structural Hotspots ---`));
       topGravity.forEach((n, i) => {
         console.log(`${i + 1}. ${chalk.magenta(n.id)} [Gravity: ${chalk.cyan((n.properties.rank || 0).toFixed(4))}]`);
       });
       console.log();
     } finally {
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

@@ -16,6 +16,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 
 import { ConducksComponent } from "../../../registry/types.js";
+import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js";
 
 /**
  * Conducks — Structural Reflector
@@ -48,7 +49,27 @@ export class ConducksReflector implements ConducksComponent {
       metadata: { language: provider.langId }
     };
 
-    const isTestFile = file.path.includes("test_") || file.path.includes("/tests/") || file.path.includes(".test.");
+    const isTestFile = (() => {
+      const lowerPath = file.path.toLowerCase();
+      const fileName = lowerPath.split('/').pop() || '';
+      return (
+        fileName.startsWith('test_') ||
+        fileName.endsWith('_test.go') ||
+        fileName.endsWith('_test.rs') ||
+        fileName.endsWith('_test.py') ||
+        fileName.endsWith('_spec.rb') ||
+        fileName.endsWith('tests.swift') ||
+        fileName.endsWith('.test.ts') ||
+        fileName.endsWith('.test.js') ||
+        fileName.endsWith('.spec.ts') ||
+        fileName.endsWith('.spec.js') ||
+        /^test/.test(fileName) ||
+        lowerPath.includes('/tests/') ||
+        lowerPath.includes('/__tests__/') ||
+        lowerPath.includes('/spec/') ||
+        lowerPath.includes('/test/')
+      );
+    })();
 
     const fileMeta = mapToCanonical('file');
     const canonicalPath = file.path.toLowerCase();
@@ -84,8 +105,6 @@ export class ConducksReflector implements ConducksComponent {
       }
     };
 
-    spectrum.nodes.push(unitNode);
-
     const parser = grammars.getUnifiedParser(provider.langId);
 
     if (!parser) {
@@ -97,7 +116,13 @@ export class ConducksReflector implements ConducksComponent {
 
     let tree: any;
     try {
-      tree = parser.parse(file.source);
+      // tree-sitter's Node binding defaults to a 32KB parse buffer and throws
+      // "Invalid argument" on larger inputs. Size the buffer to the source so
+      // big files parse natively instead of falling back to the edge-less
+      // Gnosis extractor (which would make their symbols look orphaned).
+      const byteLen = Buffer.byteLength(file.source, 'utf8');
+      const bufferSize = byteLen > 31 * 1024 ? byteLen * 2 + 1024 : undefined;
+      tree = bufferSize ? parser.parse(file.source, undefined, { bufferSize }) : parser.parse(file.source);
     } catch (err) {
       if (process.env.CONDUCKS_DEBUG === '1') {
         console.error(`🛡️ [Conducks Reflector] Native Parse Crash: ${file.path}. Falling back to Gnosis.`, err);
@@ -145,16 +170,16 @@ export class ConducksReflector implements ConducksComponent {
 
     for (const match of matches) {
       const isScoped = match.captures.some((c: any) =>
-        c.name === 'isFunction' ||
-        c.name === 'isClass' ||
-        c.name === 'isStruct' ||
-        c.name === 'isMethod' ||
-        c.name === 'isInterface' ||
-        c.name === 'isInfra' ||
-        c.name === 'isEnum'
+        c.name === CaptureTags.IS_FUNCTION ||
+        c.name === CaptureTags.IS_CLASS ||
+        c.name === CaptureTags.IS_STRUCT ||
+        c.name === CaptureTags.IS_METHOD ||
+        c.name === CaptureTags.IS_INTERFACE ||
+        c.name === CaptureTags.IS_INFRA ||
+        c.name === CaptureTags.IS_ENUM
       );
       if (isScoped) {
-        const nameCap = match.captures.find((c: any) => c.name === 'name');
+        const nameCap = match.captures.find((c: any) => c.name === CaptureTags.NAME);
         if (nameCap && nameCap.node) {
           const name = nameCap.node.text;
           const rangeNode = nameCap.node.parent || nameCap.node;
@@ -196,7 +221,7 @@ export class ConducksReflector implements ConducksComponent {
       if (!firstCapture || !firstCapture.node) continue;
 
       const currentMatchRow = firstCapture.node.startPosition.row;
-      const matchNameCap = match.captures.find((c: any) => c.name === 'name' || c.name === 'pulse_assignment_name');
+      const matchNameCap = match.captures.find((c: any) => c.name === CaptureTags.NAME || c.name === 'pulse_assignment_name');
 
       let node: any;
       if (matchNameCap && matchNameCap.node) {
@@ -206,11 +231,7 @@ export class ConducksReflector implements ConducksComponent {
         const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
         
 
-        const isDefinition = match.captures.some((c: any) =>
-          c.name.startsWith('is') &&
-          c.name !== 'isImport' &&
-          c.name !== 'isExported'
-        );
+        const isDefinition = match.captures.some((c: any) => DEFINITION_CAPTURES.has(c.name));
 
         if (isDefinition) {
           if (context.isDiscoveryMode()) {
@@ -218,7 +239,7 @@ export class ConducksReflector implements ConducksComponent {
           }
 
           if (!nodeCache.has(scopedId)) {
-            const defCapture = match.captures.find((c: any) => c.name.startsWith('is') && c.name !== 'isImport' && c.name !== 'isExported');
+            const defCapture = match.captures.find((c: any) => DEFINITION_CAPTURES.has(c.name));
             let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
 
             const infraSuffixes = ['Service', 'Router', 'Controller', 'Registry', 'Store', 'Runner', 'Manager', 'Engine', 'Writer', 'Reporter', 'Provider', 'Client'];
@@ -226,7 +247,7 @@ export class ConducksReflector implements ConducksComponent {
               initialKind = 'infra';
             }
 
-            const isScoped = match.captures.some((c: any) => c.name === 'isFunction' || c.name === 'isClass' || c.name === 'isStruct' || c.name === 'isMethod');
+            const isScoped = match.captures.some((c: any) => c.name === CaptureTags.IS_FUNCTION || c.name === CaptureTags.IS_CLASS || c.name === CaptureTags.IS_STRUCT || c.name === CaptureTags.IS_METHOD);
             let rangeNode = matchNameCap.node;
             if (isScoped && matchNameCap.node.parent) {
               rangeNode = matchNameCap.node.parent;
@@ -240,10 +261,10 @@ export class ConducksReflector implements ConducksComponent {
               : fileId;
 
             const dna = {
-              isAsync: match.captures.some((c: any) => c.name === 'isAsync'),
-              isAbstract: match.captures.some((c: any) => c.name === 'isAbstract'),
-              isExported: match.captures.some((c: any) => c.name === 'isExported'),
-              isStatic: match.captures.some((c: any) => c.name === 'isStatic'),
+              isAsync: match.captures.some((c: any) => c.name === CaptureTags.IS_ASYNC),
+              isAbstract: match.captures.some((c: any) => c.name === CaptureTags.IS_ABSTRACT),
+              isExported: match.captures.some((c: any) => c.name === CaptureTags.IS_EXPORTED),
+              isStatic: match.captures.some((c: any) => c.name === CaptureTags.IS_STATIC),
               params: [],
               returns: 'void'
             };
@@ -311,7 +332,7 @@ export class ConducksReflector implements ConducksComponent {
 
       if (context.isDiscoveryMode()) continue;
 
-      if (node && match.captures.some((c: any) => c.name === 'isExported')) {
+      if (node && match.captures.some((c: any) => c.name === CaptureTags.IS_EXPORTED)) {
         node.isExport = true;
         node.metadata.isExport = true;
       }
@@ -320,8 +341,8 @@ export class ConducksReflector implements ConducksComponent {
       const args: string[] = [];
 
       match.captures.forEach((c: any) => {
-        captureMap[c.name] = c.node.text;
-        if (c.name === 'kinesis_arg') args.push(c.node.text);
+        if (c.node) captureMap[c.name] = c.node.text;
+        if (c.name === 'kinesis_arg' && c.node) args.push(c.node.text);
       });
 
       for (const capture of match.captures) {
@@ -332,9 +353,9 @@ export class ConducksReflector implements ConducksComponent {
           const kind = cName.slice(2).toLowerCase();
 
           if (kind === 'import') {
-            const sourceCap = match.captures.find((c: any) => c.name === 'source');
+            const sourceCap = match.captures.find((c: any) => c.name === CaptureTags.SOURCE);
             if (sourceCap && sourceCap.node) {
-              const specifier = sourceCap.node.text;
+              const specifier = sourceCap.node.text.replace(/^['"]|['"]$/g, '');
 
               // Seed the Spectrum with the RAW SPECIFIER for later resolution 🏺
               spectrum.relationships.push({
@@ -347,7 +368,7 @@ export class ConducksReflector implements ConducksComponent {
 
               for (let i = 0; i < match.captures.length; i++) {
                 const cap = match.captures[i];
-                if (cap.name === 'name' && cap.node) {
+                if (cap.name === CaptureTags.NAME && cap.node) {
                   const aliasCap = (i + 1 < match.captures.length && match.captures[i + 1].name === 'alias')
                     ? match.captures[i + 1] : undefined;
                   const bindingName = cap.node.text;
@@ -356,6 +377,15 @@ export class ConducksReflector implements ConducksComponent {
                   if (context) {
                     context.registerLocalBinding(aliasName, specifier);
                   }
+
+                  // Per-binding IMPORTS relationship for function-level dead code detection
+                  spectrum.relationships.push({
+                    sourceName: 'unit',
+                    targetName: specifier,
+                    type: 'IMPORTS' as any,
+                    confidence: 0.9,
+                    metadata: { specifier, bindingName: bindingName.toLowerCase(), isRawBinding: true }
+                  });
                 }
               }
             }
@@ -430,7 +460,7 @@ export class ConducksReflector implements ConducksComponent {
           const scope = getScopeAt(currentMatchRow);
           this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum, [], context);
         }
-        else if (cName === 'comment' && provider.extractDebt) {
+        else if (cName === CaptureTags.COMMENT && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
             const scopeName = getScopeAt(currentMatchRow);
@@ -448,7 +478,7 @@ export class ConducksReflector implements ConducksComponent {
     }
 
 
-    spectrum.nodes = [...spectrum.nodes, ...nodeCache.values()];
+    spectrum.nodes = Array.from(nodeCache.values());
 
     // Conducks: Hierarchical Unification (L2-L7 Parentage)
     // [Conducks Rule] MEMBER_OF edges are no longer persisted as structural scaffolding.
@@ -472,6 +502,7 @@ export class ConducksReflector implements ConducksComponent {
         let earliestTime = now;
 
         for (let line = startLine; line <= endLine; line++) {
+          if (!Array.isArray(blameData) || !(line in blameData)) continue;
           const meta = blameData[line];
           if (meta) {
             authors[meta.author] = (authors[meta.author] || 0) + 1;
@@ -514,14 +545,6 @@ export class ConducksReflector implements ConducksComponent {
       }
     }
     
-    // Final Flush: Project captured high-fidelity nodes into the spectrum 🏺
-    nodeCache.forEach(n => {
-      // Avoid duplicates if any were manually added (e.g. unitNode)
-      if (!spectrum.nodes.some(existing => existing.metadata.id === n.metadata.id)) {
-        spectrum.nodes.push(n);
-      }
-    });
-
     // Seed Import Map (Only in Discovery Mode)
     if (context.isDiscoveryMode()) {
       spectrum.relationships.filter(r => r.type === 'IMPORTS').forEach(r => {
@@ -564,7 +587,12 @@ export class ConducksReflector implements ConducksComponent {
       metadata: { language: provider.langId }
     };
 
-    if (provider.langId !== 'python' && provider.langId !== 'typescript' && provider.langId !== 'javascript') return spectrum;
+    if (provider.langId !== 'python' && provider.langId !== 'typescript' && provider.langId !== 'javascript') {
+      if (process.env.CONDUCKS_DEBUG === '1') {
+        console.error(`[Conducks Reflector] Gnosis fallback has no regex support for ${provider.langId}. Only file node captured for: ${file.path}`);
+      }
+      return spectrum;
+    }
 
     const lines = file.source.split('\n');
     const classMeta = mapToCanonical('class');

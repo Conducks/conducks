@@ -28,6 +28,7 @@ export interface ConducksNode<T = any> {
     fingerprint?: string;     // SHA256 of structural identity
     parentId?: string;        // Explicit hierarchical parent
     unitId?: string;          // Source file unit ID
+    rootId?: string;          // Root ancestor node ID
     namespaceId?: string;     // Logical namespace container
     structureId?: string;     // Primary structure container
     layer_path?: string;      // Materialized path (e.g. L0/L1/L2)
@@ -77,7 +78,7 @@ export class ConducksAdjacencyList {
   private nodes: Map<NodeId, ConducksNode> = new Map();
   private outEdges: Map<NodeId, Set<ConducksEdge>> = new Map(); // Forward: source -> edges
   private inEdges: Map<NodeId, Set<ConducksEdge>> = new Map();  // Backward: target -> edges
-  private nameIndex: Map<string, NodeId[]> = new Map();          // Fast search index
+  private nameIndex: Map<string, Set<NodeId>> = new Map();        // Fast search index (Set for O(1) dedup)
   private metadata: Map<string, string> = new Map();             // Global project metadata (Phase 5.3)
   private compressedMeat: Map<NodeId, Buffer> = new Map();       // VMC: Memory Zip for non-skeleton properties
 
@@ -120,7 +121,7 @@ export class ConducksAdjacencyList {
         fingerprint: node.properties.fingerprint,
         parentId: node.properties.parentId,
         unitId: node.properties.unitId,
-        rootId: node.properties.rootId,
+        rootId: node.properties.rootId ?? undefined,
         namespaceId: node.properties.namespaceId,
         structureId: node.properties.structureId,
         layer_path: node.properties.layer_path,
@@ -131,7 +132,7 @@ export class ConducksAdjacencyList {
         dna: node.properties.dna,
         kinetic: node.properties.kinetic,
         signature: node.properties.signature
-      } as any
+      }
     };
 
     // 2. Memory Zip (VMC): Compress the 'Meat' (metadata) if present
@@ -156,9 +157,8 @@ export class ConducksAdjacencyList {
     // 3. Update Fast Search Index
     const name = node.properties.name || '';
     if (name) {
-      if (!this.nameIndex.has(name)) this.nameIndex.set(name, []);
-      const indexArray = this.nameIndex.get(name)!;
-      if (!indexArray.includes(id)) indexArray.push(id);
+      if (!this.nameIndex.has(name)) this.nameIndex.set(name, new Set());
+      this.nameIndex.get(name)!.add(id);
     }
   }
 
@@ -248,7 +248,9 @@ export class ConducksAdjacencyList {
         for (const edge of incoming) {
           const outSet = this.outEdges.get(edge.sourceId);
           if (outSet) {
-            for (const e of outSet) if (e.id === edge.id) outSet.delete(e);
+            const toDelete: ConducksEdge[] = [];
+            for (const e of outSet) if (e.id === edge.id) toDelete.push(e);
+            for (const e of toDelete) outSet.delete(e);
           }
         }
       }
@@ -258,7 +260,9 @@ export class ConducksAdjacencyList {
         for (const edge of outgoing) {
           const inSet = this.inEdges.get(edge.targetId);
           if (inSet) {
-            for (const e of inSet) if (e.id === edge.id) inSet.delete(e);
+            const toDelete: ConducksEdge[] = [];
+            for (const e of inSet) if (e.id === edge.id) toDelete.push(e);
+            for (const e of toDelete) inSet.delete(e);
           }
         }
       }
@@ -270,8 +274,8 @@ export class ConducksAdjacencyList {
       // 3. Remove from Name Index
       const node = this.nodes.get(id);
       if (node && node.properties.name) {
-        const ids = this.nameIndex.get(node.properties.name) || [];
-        this.nameIndex.set(node.properties.name, ids.filter(nid => nid !== id));
+        const ids = this.nameIndex.get(node.properties.name);
+        if (ids) ids.delete(id);
       }
 
       // 4. Remove Node
@@ -368,7 +372,7 @@ export class ConducksAdjacencyList {
           }
         };
       } catch (err) {
-        console.error(`[Conducks VMC] Decompression failed for node ${id}:`, err);
+        throw new Error(`Decompression failed for node ${id}: ${err}`);
       }
     }
 
@@ -385,6 +389,14 @@ export class ConducksAdjacencyList {
 
   public getAllNodes(): IterableIterator<ConducksNode> {
     return this.nodes.values();
+  }
+
+  public getNodesMap(): Map<NodeId, ConducksNode> {
+    return this.nodes;
+  }
+
+  public getOutEdgesMap(): Map<NodeId, Set<ConducksEdge>> {
+    return this.outEdges;
   }
 
   public setMetadata(key: string, value: string): void {
@@ -420,9 +432,9 @@ export class ConducksAdjacencyList {
     const query = name.toLowerCase();
 
     // 1. Check Fast Index (Exact)
-    const exactIds = this.nameIndex.get(name) || [];
-    if (exactIds.length > 0) {
-      return exactIds.map(id => this.nodes.get(id)!).filter(Boolean);
+    const exactIds = this.nameIndex.get(name);
+    if (exactIds && exactIds.size > 0) {
+      return [...exactIds].map(id => this.nodes.get(id)!).filter(Boolean);
     }
 
     // 2. Fuzzy / Case-Insensitive Resonance (Fallback)

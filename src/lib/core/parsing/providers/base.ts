@@ -56,6 +56,16 @@ export interface ConducksProvider {
    * Built-in/Stdlib filtration.
    */
   isBuiltIn?(name: string): boolean;
+
+  /**
+   * Optional visibility heuristic for the language (public/private/protected).
+   */
+  getVisibility?(node: any, ...args: any[]): 'public' | 'private' | 'protected';
+
+  /**
+   * Optional documentation extraction (JSDoc, docstrings, etc.).
+   */
+  extractDocs?(node: any): string | undefined;
 }
 
 /**

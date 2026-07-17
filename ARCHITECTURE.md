@@ -1,31 +1,41 @@
 # Architecture Context — conducks
-Generated: 2026-04-29T13:06:21.098Z | Pulse: pulse_1777467979602_s11bl
+Generated: 2026-06-22T22:22:41.945Z | Pulse: pulse_1782166917606_m93e8
 
 ## Entry Points (top 10 by gravity)
-- `taxonomy::l4` [INFRA, gravity: 0.0008, risk: 0.0000]
-- `taxonomy::l5` [STRUCTURE, gravity: 0.0008, risk: 0.0000]
-- `taxonomy::l6` [BEHAVIOR, gravity: 0.0008, risk: 0.0000]
-- `repository::conducks` [REPOSITORY, gravity: 0.0000, risk: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/tests` [DIRECTORY, gravity: 0.0000, risk: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/tests/integration` [DIRECTORY, gravity: 0.0000, risk: 0.0000]
-- `taxonomy::l0` [ECOSYSTEM, gravity: 0.0000, risk: 0.0000]
-- `taxonomy::l1` [REPOSITORY, gravity: 0.0000, risk: 0.0000]
-- `taxonomy::l2` [DIRECTORY, gravity: 0.0000, risk: 0.0000]
-- `taxonomy::l3` [UNIT, gravity: 0.0000, risk: 0.0000]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/adjacency-list.ts::conducksadjacencylist` [STRUCTURE, gravity: 0.0157, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/persistence/persistence.ts::synapsepersistence` [STRUCTURE, gravity: 0.0138, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0126, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/git/chronicle-interface.ts::chronicleinterface` [STRUCTURE, gravity: 0.0113, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/grammar-registry.ts::grammarregistry` [STRUCTURE, gravity: 0.0070, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/index.ts::governanceservice` [STRUCTURE, gravity: 0.0070, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/graph-engine.ts::conducksgraph` [STRUCTURE, gravity: 0.0064, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/federation/context.ts::analyzecontext` [STRUCTURE, gravity: 0.0064, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/fallback-detector.ts::fallbackdetector` [STRUCTURE, gravity: 0.0057, risk: 0.0200]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/registry/dynamic-loader.ts::dynamictoolloader` [STRUCTURE, gravity: 0.0057, risk: 0.0200]
 
 ## Structural Hotspots (top 10 by risk)
-- `ecosystem::global` [risk: 0.0000, gravity: 0.0000]
-- `repository::conducks` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/tests` [risk: 0.0000, gravity: 0.0000]
-- `directory::/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/tests/integration` [risk: 0.0000, gravity: 0.0000]
-- `taxonomy::l0` [risk: 0.0000, gravity: 0.0000]
-- `taxonomy::l1` [risk: 0.0000, gravity: 0.0000]
-- `taxonomy::l2` [risk: 0.0000, gravity: 0.0000]
-- `taxonomy::l3` [risk: 0.0000, gravity: 0.0000]
-- `taxonomy::l4` [risk: 0.0000, gravity: 0.0008]
-- `taxonomy::l5` [risk: 0.0000, gravity: 0.0008]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/query.ts::querycommand.execute` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/taxonomy.ts::maptocanonical` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/index.ts::analysisservice.analyze` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/orchestrator.ts::analyzeorchestrator.analyze` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/reflector.ts::conducksreflector.reflect` [risk: 1.0000, gravity: 0.0014]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/advisor.ts::conducksadvisor.analyze` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/index.ts::governanceservice.auditwithrules` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/visual/mirror.engine.ts::mirrorengine.getvisualwave` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/resonance.js::configuregraph` [risk: 1.0000, gravity: 0.0007]
+- `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/resources/mirror/ui.js::initui` [risk: 1.0000, gravity: 0.0014]
 
-## Active Violations (0)
+## Active Violations (10)
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/interfaces/cli/commands/query.ts::querycommand.execute`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/graph/algorithms/ranker.ts::structuralranker.calculategravity`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/languages/typescript/bindings.ts::typescriptbindings.extract`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/languages/typescript/resolver.ts::typescriptresolver.resolvepackageimport`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/core/parsing/taxonomy.ts::maptocanonical`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/index.ts::analysisservice.analyze`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/orchestrator.ts::analyzeorchestrator.analyze`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/analysis/reflector.ts::conducksreflector.reflect`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/evolution/watcher.ts::conduckswatcher.handlepulseevent`
+- RISK_HOTSPOT: `/users/saidmustafasaid/documents/gospel_of_technology/conducks/conducks/src/lib/domain/governance/advisor.ts::conducksadvisor.analyze`
 
 ## Framework
 - Detected: express

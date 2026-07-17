@@ -130,7 +130,7 @@ export class RegistryBootstrapper {
     const { graph, persistence, ignoreManager, federation, updatePersistence, updateIgnoreManager } = context;
 
     if (!this.isGrammarInitialized) {
-      console.error(`🛡️ [Conducks Bootstrapper] Initializing Native Grammar Engine...`);
+      process.stderr.write(`🛡️ [Conducks Bootstrapper] Initializing Native Grammar Engine...\n`);
       await grammars.init();
       await grammars.loadLanguage('python');
       await grammars.loadLanguage('typescript');
@@ -145,7 +145,7 @@ export class RegistryBootstrapper {
       await grammars.loadLanguage('swift');
       await grammars.loadLanguage('c');
       this.isGrammarInitialized = true;
-      console.error(`🛡️ [Conducks Bootstrapper] Native Grammar Engine Ready.`);
+      process.stderr.write(`🛡️ [Conducks Bootstrapper] Native Grammar Engine Ready.\n`);
     }
 
     const baseRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
@@ -156,7 +156,7 @@ export class RegistryBootstrapper {
       logger.setLogFile(logPath);
     }
 
-    console.error(`🛡️ [Conducks Bootstrapper] Anchoring structural synapse at: ${effectiveRoot}`);
+    process.stderr.write(`🛡️ [Conducks Bootstrapper] Anchoring structural synapse at: ${effectiveRoot}\n`);
     const isCurrentlyConnected = persistence.isConnected();
     const rootChanged = chronicle.getProjectDir() !== effectiveRoot;
     const modeChanged = (persistence as any).readOnly !== readOnly;
@@ -180,7 +180,7 @@ export class RegistryBootstrapper {
       // FIX: Use the updated instance for the initial load
       try {
         await newPersistence.load(graph.getGraph());
-        console.error(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
+        process.stderr.write(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).\n`);
         await federation.hydrate(graph.getGraph());
       } catch (err: any) {
         console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);

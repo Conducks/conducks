@@ -31,7 +31,7 @@ export class MetricsService implements ConducksComponent {
   public async calculateEntropy(symbolId: string) {
     const g = this.graph.getGraph();
     const node = g.getNode(symbolId);
-    if (!node || !node.properties.filePath) return { entropy: 0, risk: 0 };
+    if (!node || !node.properties.filePath) return { entropy: 0, risk: 0, authorCount: 0 };
 
     const distribution = (await chronicle.getAuthorDistribution(node.properties.filePath)) || {};
     const authors = Object.keys(distribution);

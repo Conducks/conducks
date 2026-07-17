@@ -39,6 +39,7 @@ export function mapToCanonical(kind: string): { kind: CanonicalKind, rank: numbe
 
   if (k === 'external_dependency') ck = CanonicalKind.ECOSYSTEM;
   else if (k === 'repository' || k === 'project' || k === 'repo') ck = CanonicalKind.REPOSITORY;
+  else if (k === 'directory' || k === 'folder') ck = CanonicalKind.NAMESPACE;
   else if (k === 'module' || k === 'package' || k === 'namespace') ck = CanonicalKind.NAMESPACE;
   else if (k === 'file' || k === 'unit') ck = CanonicalKind.UNIT;
   else if (k === 'class' || k === 'interface' || k === 'type' || k === 'struct' || k === 'enum' || k === 'generic' || k === 'heritage') ck = CanonicalKind.STRUCTURE;

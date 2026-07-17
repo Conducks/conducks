@@ -4,6 +4,7 @@ import { ConducksWatcher } from "./watcher.js";
 import { DriftEngine, DriftResult } from "./drift-engine.js";
 import { AuditService, AuditResult } from "./audit-service.js";
 import { ConducksComponent } from "@/registry/types.js";
+import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 
 /**
  * Conducks — Structural Evolution Service 🧬
@@ -35,6 +36,15 @@ export class EvolutionService implements ConducksComponent {
     (this.auditService as any).persistence = persistence;
     if (this._watcher) {
       (this._watcher as any).options.persistence = persistence;
+    }
+  }
+
+  /**
+   * Propagates updated ignore patterns to the watcher (if active).
+   */
+  public setIgnoreManager(ignoreManager: IgnoreManager): void {
+    if (this._watcher) {
+      this._watcher.setIgnoreManager(ignoreManager);
     }
   }
 

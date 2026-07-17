@@ -14,6 +14,7 @@ import { SynapseRegistry } from "@/registry/synapse-registry.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { PYTHON_SUITE } from "@/lib/core/parsing/languages/python/index.js";
 import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/languages/typescript/index.js";
+import { TSXProvider } from "@/lib/core/parsing/languages/tsx/index.js";
 import { GoProvider } from "@/lib/core/parsing/languages/go/index.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { RustProvider } from "@/lib/core/parsing/languages/rust/index.js";
@@ -58,9 +59,9 @@ let ignoreManager = new IgnoreManager(process.cwd());
 const synapseRegistry = new SynapseRegistry();
 synapseRegistry.registerProvider('.py', PYTHON_SUITE.provider);
 synapseRegistry.registerProvider('.ts', TYPESCRIPT_SUITE.provider);
-synapseRegistry.registerProvider('.tsx', TYPESCRIPT_SUITE.provider);
+synapseRegistry.registerProvider('.tsx', new TSXProvider());
 synapseRegistry.registerProvider('.js', TYPESCRIPT_SUITE.provider);
-synapseRegistry.registerProvider('.jsx', TYPESCRIPT_SUITE.provider);
+synapseRegistry.registerProvider('.jsx', new TSXProvider());
 synapseRegistry.registerProvider('.go', new GoProvider());
 synapseRegistry.registerProvider('.rs', new RustProvider());
 synapseRegistry.registerProvider('.java', new JavaProvider());
@@ -125,9 +126,10 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
         governance.setPersistence(p);
         (conducksCore as any).persistence = p;
       },
-      updateIgnoreManager: (i) => { 
+      updateIgnoreManager: (i) => {
         ignoreManager = i;
         (orchestrator as any).ignoreManager = i;
+        evolution.setIgnoreManager(i);
       }
     }
   );

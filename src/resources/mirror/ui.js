@@ -14,7 +14,7 @@ function initUI() {
     item.addEventListener('click', () => {
       const targetSlate = item.id.replace('dock-', 'slate-');
       if (!document.getElementById(targetSlate)) return;
-      
+
       dockItems.forEach(i => i.classList.remove('active'));
       item.classList.add('active');
 
@@ -27,8 +27,186 @@ function initUI() {
         slateEl.style.display = 'block';
         slateEl.classList.add('slate-active');
       }
+
+      if (item.id === 'dock-governance') {
+        loadGovernance();
+      }
     });
   });
+
+  // 1b. 🛡️ GOVERNANCE PANEL
+  async function loadGovernance() {
+    const panel = document.getElementById('governance-panel');
+    if (!panel) return;
+    panel.innerHTML = '';
+
+    let data;
+    try {
+      const resp = await fetch('/api/governance');
+      data = await resp.json();
+    } catch (err) {
+      const errMsg = document.createElement('p');
+      errMsg.textContent = 'Failed to load governance data.';
+      errMsg.style.color = '#e53e3e';
+      panel.appendChild(errMsg);
+      return;
+    }
+
+    // Violations
+    const violationsSection = document.createElement('section');
+    violationsSection.className = 'deck-section';
+
+    const violHeader = document.createElement('div');
+    violHeader.className = 'section-header';
+    const violTitle = document.createElement('span');
+    violTitle.className = 'section-title';
+    violTitle.textContent = 'Violations';
+    const violBadge = document.createElement('div');
+    violBadge.className = 'section-badge';
+    violBadge.textContent = String(data.violations ? data.violations.length : 0);
+    violHeader.appendChild(violTitle);
+    violHeader.appendChild(violBadge);
+    violationsSection.appendChild(violHeader);
+
+    if (data.violations && data.violations.length > 0) {
+      data.violations.forEach(v => {
+        const item = document.createElement('div');
+        item.className = 'metric-pill';
+        item.style.marginBottom = '6px';
+        item.style.display = 'flex';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '8px';
+        item.style.padding = '10px 12px';
+
+        const badge = document.createElement('span');
+        const sev = v.severity ?? v.type ?? 'info';
+        badge.textContent = sev;
+        badge.style.background = sev === 'error' || sev === 'CIRCULAR' ? '#e53e3e' : sev === 'warning' || sev === 'REFACTOR' ? '#d69e2e' : '#4299e1';
+        badge.style.color = 'white';
+        badge.style.padding = '2px 6px';
+        badge.style.borderRadius = '4px';
+        badge.style.fontSize = '9px';
+        badge.style.fontWeight = '700';
+        badge.style.textTransform = 'uppercase';
+        badge.style.letterSpacing = '0.05em';
+        badge.style.flexShrink = '0';
+
+        const text = document.createElement('span');
+        text.textContent = v.message ?? v.id ?? JSON.stringify(v);
+        text.style.fontSize = '11px';
+        text.style.lineHeight = '1.4';
+        text.style.opacity = '0.8';
+        text.style.wordBreak = 'break-all';
+
+        item.appendChild(badge);
+        item.appendChild(text);
+        violationsSection.appendChild(item);
+      });
+    } else {
+      const ok = document.createElement('p');
+      ok.textContent = 'No violations detected.';
+      ok.style.fontSize = '11px';
+      ok.style.opacity = '0.5';
+      ok.style.marginTop = '8px';
+      violationsSection.appendChild(ok);
+    }
+    panel.appendChild(violationsSection);
+
+    // Recommendations
+    const recsSection = document.createElement('section');
+    recsSection.className = 'deck-section';
+
+    const recsHeader = document.createElement('div');
+    recsHeader.className = 'section-header';
+    const recsTitle = document.createElement('span');
+    recsTitle.className = 'section-title';
+    recsTitle.textContent = 'Recommendations';
+    const recsBadge = document.createElement('div');
+    recsBadge.className = 'section-badge';
+    recsBadge.textContent = String(data.recommendations ? data.recommendations.length : 0);
+    recsHeader.appendChild(recsTitle);
+    recsHeader.appendChild(recsBadge);
+    recsSection.appendChild(recsHeader);
+
+    if (data.recommendations && data.recommendations.length > 0) {
+      data.recommendations.slice(0, 20).forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'metric-pill';
+        item.style.marginBottom = '6px';
+        item.style.display = 'flex';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '8px';
+        item.style.padding = '10px 12px';
+
+        const badge = document.createElement('span');
+        badge.textContent = r.priority ?? r.severity ?? 'info';
+        badge.style.background = '#805ad5';
+        badge.style.color = 'white';
+        badge.style.padding = '2px 6px';
+        badge.style.borderRadius = '4px';
+        badge.style.fontSize = '9px';
+        badge.style.fontWeight = '700';
+        badge.style.textTransform = 'uppercase';
+        badge.style.letterSpacing = '0.05em';
+        badge.style.flexShrink = '0';
+
+        const text = document.createElement('span');
+        text.textContent = r.message ?? r.description ?? r.id ?? JSON.stringify(r);
+        text.style.fontSize = '11px';
+        text.style.lineHeight = '1.4';
+        text.style.opacity = '0.8';
+        text.style.wordBreak = 'break-all';
+
+        item.appendChild(badge);
+        item.appendChild(text);
+        recsSection.appendChild(item);
+      });
+    } else {
+      const ok = document.createElement('p');
+      ok.textContent = 'No recommendations available.';
+      ok.style.fontSize = '11px';
+      ok.style.opacity = '0.5';
+      ok.style.marginTop = '8px';
+      recsSection.appendChild(ok);
+    }
+    panel.appendChild(recsSection);
+
+    // Stats footer
+    if (data.stats) {
+      const statsSection = document.createElement('section');
+      statsSection.className = 'deck-section';
+
+      const statsTitle = document.createElement('p');
+      statsTitle.className = 'text-dim';
+      statsTitle.textContent = 'Audit Stats';
+      statsTitle.style.fontSize = '9px';
+      statsTitle.style.textTransform = 'uppercase';
+      statsTitle.style.letterSpacing = '0.2em';
+      statsTitle.style.fontWeight = '700';
+      statsTitle.style.marginBottom = '8px';
+      statsSection.appendChild(statsTitle);
+
+      const grid = document.createElement('div');
+      grid.className = 'grid grid-cols-2 gap-4';
+
+      Object.entries(data.stats).forEach(([key, val]) => {
+        const pill = document.createElement('div');
+        pill.className = 'metric-pill';
+        const label = document.createElement('p');
+        label.className = 'metric-label';
+        label.textContent = key.replace(/_/g, ' ');
+        const value = document.createElement('span');
+        value.className = 'metric-value';
+        value.textContent = String(val);
+        pill.appendChild(label);
+        pill.appendChild(value);
+        grid.appendChild(pill);
+      });
+
+      statsSection.appendChild(grid);
+      panel.appendChild(statsSection);
+    }
+  }
 
   // 2. 🧬 LAYER FILTERS & EVENT DELEGATION
   const layerCtn = document.getElementById('layer-filters');
@@ -38,15 +216,26 @@ function initUI() {
       const item = document.createElement('div');
       item.className = 'filter-shield';
       item.style.setProperty('--shield-color', l.color);
-      item.innerHTML = `
-        <div class="filter-shield-meta">
-          <span class="filter-shield-title">${l.name}</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" data-layer="${l.id}" ${window.MirrorState.selectedLayers.includes(l.id) ? 'checked' : ''}>
-          <span class="slider"></span>
-        </label>
-      `;
+      const meta = document.createElement('div');
+      meta.className = 'filter-shield-meta';
+      const title = document.createElement('span');
+      title.className = 'filter-shield-title';
+      title.textContent = l.name;
+      meta.appendChild(title);
+
+      const switchLabel = document.createElement('label');
+      switchLabel.className = 'switch';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.layer = l.id;
+      if (window.MirrorState.selectedLayers.includes(l.id)) checkbox.checked = true;
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+      switchLabel.appendChild(checkbox);
+      switchLabel.appendChild(slider);
+
+      item.appendChild(meta);
+      item.appendChild(switchLabel);
       layerCtn.appendChild(item);
     });
     document.getElementById('layer-count').innerText = window.MirrorState.layers.length;
@@ -222,16 +411,30 @@ function updateClusterUI(wave) {
     item.style.setProperty('--shield-color', c.color);
     if (currentQ && !c.name.toLowerCase().includes(currentQ)) item.style.display = 'none';
     
-    item.innerHTML = `
-      <div class="filter-shield-meta">
-        <span class="filter-shield-title">${c.name}</span>
-        <span class="filter-shield-count">${c.count || 0}</span>
-      </div>
-      <label class="switch">
-        <input type="checkbox" data-cluster="${c.id}" ${window.MirrorState.selectedClusters.includes(c.id) ? 'checked' : ''}>
-        <span class="slider"></span>
-      </label>
-    `;
+    const clMeta = document.createElement('div');
+    clMeta.className = 'filter-shield-meta';
+    const clTitle = document.createElement('span');
+    clTitle.className = 'filter-shield-title';
+    clTitle.textContent = c.name;
+    const clCount = document.createElement('span');
+    clCount.className = 'filter-shield-count';
+    clCount.textContent = String(c.count || 0);
+    clMeta.appendChild(clTitle);
+    clMeta.appendChild(clCount);
+
+    const clSwitch = document.createElement('label');
+    clSwitch.className = 'switch';
+    const clCheckbox = document.createElement('input');
+    clCheckbox.type = 'checkbox';
+    clCheckbox.dataset.cluster = c.id;
+    if (window.MirrorState.selectedClusters.includes(c.id)) clCheckbox.checked = true;
+    const clSlider = document.createElement('span');
+    clSlider.className = 'slider';
+    clSwitch.appendChild(clCheckbox);
+    clSwitch.appendChild(clSlider);
+
+    item.appendChild(clMeta);
+    item.appendChild(clSwitch);
     clusterCtn.appendChild(item);
   });
 }

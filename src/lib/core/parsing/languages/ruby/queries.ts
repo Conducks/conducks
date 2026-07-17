@@ -2,6 +2,11 @@
  * Conducks — High-Fidelity Ruby SCM Query 🏺 🟦 (Omni-Detail)
  */
 export const RUBY_QUERIES = `
+  ;; --- Imports (L3-L4: Kinesis) ---
+  (call
+    method: (identifier) @_req (#match? @_req "^require(_relative)?$")
+    arguments: (argument_list (string) @source)) @isImport
+
   ;; --- Atoms (L6: Persistence & State) ---
   (assignment left: (identifier) @name) @isVariable
   (instance_variable) @isProperty
@@ -29,8 +34,24 @@ export const RUBY_QUERIES = `
   
   ;; --- Kinesis (Execution Flow) ---
   (call method: (identifier) @kinesis_target)
-  (call method: (identifier) @kinesis_target)
   
+  ;; --- Metaprogramming: attr_accessor / attr_reader / attr_writer ---
+  (call
+    method: (identifier) @source
+    (#match? @source "^attr_(accessor|reader|writer)$")
+    arguments: (argument_list)) @isProperty
+
+  ;; --- Rails DSL: belongs_to, has_many, validates, before_action etc. ---
+  (call
+    method: (identifier) @source
+    (#match? @source "^(belongs_to|has_many|has_one|has_and_belongs_to_many|validates|validates_presence_of|scope|before_action|after_action|before_filter|callback)$")) @isInfra
+
+  ;; --- Dynamic Method Definition (define_method) ---
+  (call
+    method: (identifier) @source
+    (#eq? @source "define_method")
+    arguments: (argument_list (_) @isMethod)) @isMethod
+
   ;; --- Debt Markers ---
   (comment) @comment
 `;

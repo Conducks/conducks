@@ -34,18 +34,33 @@ export interface RegistryEntry<T extends ConducksComponent> {
 }
 
 /**
+ * MCP tool annotations per the Model Context Protocol spec.
+ */
+export interface ToolAnnotations {
+  /** Hint that the tool does not modify state */
+  readOnlyHint?: boolean;
+  /** Hint that the tool may perform destructive/irreversible operations */
+  destructiveHint?: boolean;
+  /** Hint that repeated calls with same args produce the same result */
+  idempotentHint?: boolean;
+}
+
+/**
  * Interface for a functional tool that can be executed via MCP or CLI.
  */
 export interface Tool extends ConducksComponent {
   /** The unique name of the tool for command-line/RPC invocation */
   readonly name: string;
-  
+
   /** JSON Schema for the tool's input arguments */
   readonly inputSchema: any;
-  
+
+  /** MCP tool annotations describing tool behavior hints */
+  readonly annotations?: ToolAnnotations;
+
   /** The execution logic for the tool */
   handler: (args: any) => Promise<any>;
-  
+
   /** Mandatory formatter to convert the raw result into a human-readable string */
   formatter: (res: any) => string;
 }

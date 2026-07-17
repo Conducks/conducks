@@ -36,10 +36,16 @@ import { GuardCommand } from "./commands/guard.js";
 import { RecordCommand } from "./commands/record.js";
 import { VisualizeCommand } from "./commands/visualize.js";
 import { BootstrapDocsCommand } from "./commands/bootstrap-docs.js";
+import { UninstallCommand } from "./commands/uninstall.js";
+import { DoctorCommand } from "./commands/doctor.js";
 import { ConducksCommand } from "./command.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 
 import { fileURLToPath } from 'url';
+
+process.stdout.on('error', (e: NodeJS.ErrnoException) => {
+  if (e.code === 'EPIPE') process.exit(0);
+});
 
 /**
  * Conducks — Modular Conducks CLI v2.0.0
@@ -62,7 +68,7 @@ export async function main() {
     positionalArgs.push(arg);
   }
 
-  const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows'].includes(commandId);
+  const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows', 'context'].includes(commandId);
   const pathCandidate = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
   let targetPath = process.cwd();
@@ -95,7 +101,7 @@ export async function main() {
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(), new MirrorCommand(),
-    new BootstrapDocsCommand()
+    new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand()
   ];
 
   commands.push(new HelpCommand(commands));
@@ -103,7 +109,7 @@ export async function main() {
   const command = commands.find(c => c.id === commandId);
   
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp'].includes(commandId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp'].includes(commandId);
 
   if (command) {
     try {

@@ -14,7 +14,7 @@ export class LinkCommand implements ConducksCommand {
     const projectPath = args[0];
     if (!projectPath) {
       console.error("Error: Please provide a path to the proprietary project to link.");
-      return;
+      process.exit(1);
     }
     const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
     const linker = new FederatedLinker(targetPath);
@@ -23,6 +23,7 @@ export class LinkCommand implements ConducksCommand {
       console.log(`✅ Successfully linked foundation synapse: ${projectPath}`);
     } catch (err) {
       console.error(`❌ Synapse Linking failed: ${(err as Error).message}`);
+      process.exit(1);
     }
   }
 }

@@ -5,8 +5,12 @@
  */
 export const TYPESCRIPT_QUERIES = `
   ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
-  (import_statement (string) @source) @isImport
-  (export_statement (string) @source) @isImport
+  (import_statement source: (string) @source) @isImport
+  (export_statement source: (string) @source) @isImport
+  ;; Per-binding capture: each named import specifier gets its own match with @name
+  (import_statement
+    (import_clause (named_imports (import_specifier name: (identifier) @name)))
+    source: (string) @source) @isImport
 
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
@@ -17,7 +21,7 @@ export const TYPESCRIPT_QUERIES = `
   (class_declaration name: (type_identifier) @name) @isStruct
   (interface_declaration name: (type_identifier) @name) @isInterface
   (type_alias_declaration name: (type_identifier) @name) @isInterface
-  (enum_declaration name: (identifier) @name) @isStruct
+  (enum_declaration name: (identifier) @name) @isEnum
   
   (function_declaration name: (identifier) @name) @isFunction
   (method_definition name: (_) @name) @isMethod
@@ -46,11 +50,18 @@ export const TYPESCRIPT_QUERIES = `
   ;; --- Kinesis (Execution Flow) ---
   (call_expression 
     function: [(identifier) (member_expression) (super)] @kinesis_target
-    arguments: (arguments (_) @kinesis_arg))
+    arguments: (arguments (_)* @kinesis_arg))
   (new_expression 
     constructor: (identifier) @kinesis_target
-    arguments: (arguments (_) @kinesis_arg))
+    arguments: (arguments (_)* @kinesis_arg))
   
+  ;; --- Modifiers (DNA flags) ---
+  (export_statement (function_declaration name: (identifier) @name) @isExported) @isFunction
+  (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
+  (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
+  (function_declaration "async" name: (identifier) @name) @isAsync @isFunction
+  (abstract_method_signature name: (_) @name) @isAbstract @isMethod
+
   ;; --- Metadata & Debt ---
-  (comment) @docs
+  (comment) @comment
 `;

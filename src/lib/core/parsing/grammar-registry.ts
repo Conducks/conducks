@@ -50,6 +50,7 @@ export class GrammarRegistry {
       let packageName: string | undefined;
       switch (langId) {
         case 'typescript': packageName = 'tree-sitter-typescript'; mod = await import(packageName); break;
+        case 'tsx': packageName = 'tree-sitter-typescript'; mod = await import(packageName); break;
         case 'javascript': packageName = 'tree-sitter-javascript'; mod = await import(packageName); break;
         case 'python': packageName = 'tree-sitter-python'; mod = await import(packageName); break;
         case 'go': packageName = 'tree-sitter-go'; mod = await import(packageName); break;
@@ -71,6 +72,7 @@ export class GrammarRegistry {
       
       let lang = langModule;
       if (langId === 'typescript' && langModule.typescript) lang = langModule.typescript;
+      else if (langId === 'tsx' && langModule.tsx) lang = langModule.tsx;
       else if (langId === 'php' && langModule.php) lang = langModule.php;
       else if (langId === 'python' && langModule.python) lang = langModule.python;
 
@@ -101,11 +103,6 @@ export class GrammarRegistry {
     const lang = this.languages.get(langId);
     if (!lang) return undefined;
 
-    // 🛡️ [Resilience Policy] v3.2
-    // If we're on Python, we force the Gnosis Fallback to avoid native binding crashes
-    // while the local environment is being stabilized.
-    if (langId === 'python') return undefined;
-
     let parser = this.isolatedParsers.get(langId);
     if (!parser) {
       parser = new Parser();
@@ -115,8 +112,12 @@ export class GrammarRegistry {
     try {
       // 🛡️ Resilience: Native bindings for Python 0.25+ are often wrapped
       const nativeLang = (lang as any).language || lang;
-      parser.setLanguage(nativeLang);
-      
+      // tree-sitter 0.25's JS wrapper unmarshals nodes via `tree.language.nodeSubclasses`,
+      // which is derived from nodeTypeInfo. Pass the FULL {language, nodeTypeInfo} object —
+      // passing the raw `.language` pointer triggers "Cannot read properties of undefined
+      // (reading '166')" on first node access. (The native bypass below still needs the raw pointer.)
+      parser.setLanguage(lang);
+
       // 🛡️ [Conducks Sanity Check] 🧬
       // We perform a micro-parse to verify the native bridge is healthy.
       // This prevents 'reading 166' type crashes from bubbling up.

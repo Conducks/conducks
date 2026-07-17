@@ -1,14 +1,15 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { CSHARP_QUERIES } from "./queries.js";
 import { CSharpResolver } from "./resolver.js";
 import { CSharpExtractor } from "./extractor.js";
 
 /**
  * Conducks — High-Fidelity C# Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps C# structural DNA (Classes, Namespaces, ASP.NET Attributes) to the 8-layer taxonomy.
  */
-export class CSharpProvider extends NativeProvider {
+export class CSharpProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "csharp-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".cs"];

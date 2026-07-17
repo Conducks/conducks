@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Resonance (Compare) Command
@@ -13,11 +14,10 @@ export class ResonanceCommand implements ConducksCommand {
     const otherPath = args[0];
     if (!otherPath) {
       console.error("Error: Please provide a path to a linked foundation project to compare.");
-      return;
+      process.exit(1);
     }
     
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
     const diff = await registry.explain.compare(otherPath);
 
     const fmt = (v: any) => {
@@ -28,6 +28,6 @@ export class ResonanceCommand implements ConducksCommand {
     console.log(`\n\x1b[1m--- 📡 Project Resonance: Comparison ---\x1b[0m`);
     console.log(`- Resonance Score: ${diff.similarity || 0}%`);
     console.log(`- Summary: ${diff.summary}`);
-    console.log(`\x1b[33m- Metrics: Density (${fmt(diff.metrics?.density)}%), Typology (${fmt(diff.metrics?.typology)}%)\x1b[0m`);
+    console.log(`\x1b[33m- Metrics: Density (${fmt(diff.metrics?.density)}%), Kinetic (${fmt(diff.metrics?.kinetic)}%), Typology (${fmt(diff.metrics?.typology)}%)\x1b[0m`);
   }
 }

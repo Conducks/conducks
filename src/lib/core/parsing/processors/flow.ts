@@ -36,6 +36,8 @@ export class FlowProcessor {
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: 'network',
       isExport: true,
+      canonicalKind: 'BEHAVIOR',
+      canonicalRank: 6,
       metadata: { isRoute: true, path, method: method.toUpperCase(), framework }
     });
 
@@ -98,6 +100,8 @@ export class FlowProcessor {
       range: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
       filePath: 'network',
       isExport: false,
+      canonicalKind: 'BEHAVIOR',
+      canonicalRank: 6,
       metadata: { isRequest: true, url, method: method.toUpperCase(), receiver }
     });
 

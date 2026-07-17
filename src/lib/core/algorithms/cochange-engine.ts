@@ -75,8 +75,8 @@ export class CoChangeEngine {
           const hiddenCoupling = [];
           for (const row of rows) {
             // Check if there is a structural edge in the graph
-            const hasEdge = (graph as any).getNeighborsByFilePath(row.fA, 'downstream').some((n: any) => n.targetPath === row.fB) ||
-                            (graph as any).getNeighborsByFilePath(row.fB, 'downstream').some((n: any) => n.targetPath === row.fA);
+            const hasEdge = graph.getNeighborsByFilePath(row.fA, 'downstream').some((n) => n.targetPath === row.fB) ||
+                            graph.getNeighborsByFilePath(row.fB, 'downstream').some((n) => n.targetPath === row.fA);
 
             if (!hasEdge) {
               hiddenCoupling.push({

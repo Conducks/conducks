@@ -5,9 +5,9 @@
  */
 export const PYTHON_QUERIES = `
   ;; --- Imports (L3-L4: Kinesis) ---
-  (import_statement (dotted_name) @name) @isImport
-  (import_from_statement 
-    module_name: [(dotted_name) (relative_import)] @name
+  (import_statement (dotted_name) @source) @isImport
+  (import_from_statement
+    module_name: [(dotted_name) (relative_import)] @source
     name: [
       (dotted_name) @named_import
       (aliased_import (dotted_name) @named_import (identifier) @metadata)
@@ -66,6 +66,6 @@ export const PYTHON_QUERIES = `
   (await) @isAsync
 
   ;; --- Metadata & Debt ---
-  (expression_statement (string) @docs) ; Docstrings
-  (comment) @docs
+  (expression_statement (string) @comment) ; Docstrings
+  (comment) @comment
 `;

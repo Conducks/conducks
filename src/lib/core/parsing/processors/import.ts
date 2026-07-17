@@ -25,6 +25,9 @@ export class ImportProcessor {
     context?: AnalyzeContext
   ): string | { name: string, kind: 'external_dependency' } | undefined {
     
+    // Strip surrounding quotes (tree-sitter (string) nodes include them)
+    specifier = specifier.replace(/^['"]|['"]$/g, '');
+
     // 1. Specialized Provider Resolution (Higher Priority)
     if (provider?.resolveImport) {
       const specialized = provider.resolveImport(specifier, importerPath, allPaths);
@@ -43,8 +46,13 @@ export class ImportProcessor {
 
     // 3. Conducks Resolution Engine (Relative -> Absolute)
     if (specifier.startsWith('.')) {
-      const absoluteBase = path.resolve(dir, specifier);
-      
+      // For TypeScript ESM: imports use .js extension but files are .ts
+      // Try both the specifier as-is and with .js stripped (enabling .ts resolution)
+      const bases = [path.resolve(dir, specifier)];
+      if (specifier.endsWith('.js')) {
+        bases.push(path.resolve(dir, specifier.slice(0, -3)));
+      }
+
       // Try exact, then extensions, then index files
       const candidates = [
         '', // Exact
@@ -54,14 +62,14 @@ export class ImportProcessor {
       ];
 
       const canonicalPaths = new Set(allPaths.map(p => canonicalize(p)));
-      
-      for (const ext of candidates) {
-        const fullPath = absoluteBase + ext;
-        const candidateCanonical = canonicalize(fullPath);
-        if (canonicalPaths.has(candidateCanonical)) {
-           // We found the actual file! return its ORIGINAL path from the registry if possible.
-           // For now, we return the absolute candidate and let the orchestrator map it.
-           return fullPath;
+
+      for (const absoluteBase of bases) {
+        for (const ext of candidates) {
+          const fullPath = absoluteBase + ext;
+          const candidateCanonical = canonicalize(fullPath);
+          if (canonicalPaths.has(candidateCanonical)) {
+            return fullPath;
+          }
         }
       }
     }

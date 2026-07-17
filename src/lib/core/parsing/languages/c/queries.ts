@@ -10,10 +10,11 @@ export const C_QUERIES = `
   (function_definition (function_declarator (identifier) @name)) @isFunction
   (struct_specifier (type_identifier) @name) @isStruct
   (union_specifier (type_identifier) @name) @isStruct
-  (enum_specifier (type_identifier) @name) @isStruct
-  
+  (enum_specifier (type_identifier) @name) @isEnum
+
   ;; --- Infrastructure (L3: Entry Points) ---
-  (preproc_include (_) @name) @isPackage
+  (preproc_include
+    path: [(string_literal) (system_lib_string)] @source) @isImport
   (preproc_def (identifier) @name) @isMacro
   
   ;; --- Pulse Flow (Assignments) ---

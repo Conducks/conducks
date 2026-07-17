@@ -2,48 +2,8 @@ import Parser from "tree-sitter";
 import { ConducksNode, ConducksEdge } from "@/lib/core/graph/adjacency-list.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 
-/**
- * Conducks — Structural Prism Request
- */
-export interface PrismRequest {
-  path: string;
-  source: string;
-}
-
-/**
- * Conducks — Structural Spectrum Node
- */
-export interface SpectrumNode {
-  name: string;
-  kind: 'function' | 'class' | 'interface' | 'type' | 'enum' | 'method' | 'variable' | 'import' | 'module' | 'parameter' | 'field' | 'struct' | 'trait' | 'alias';
-  range: {
-    start: { line: number; column: number };
-    end: { line: number; column: number };
-  };
-  filePath: string;
-  isExport: boolean;
-  canonicalKind: string;
-  canonicalRank: number;
-  metadata: Record<string, any>;
-}
-
-/**
- * Conducks — Structural Prism Spectrum
- */
-export interface PrismSpectrum {
-  nodes: SpectrumNode[];
-  relationships: Array<{
-    sourceName: string;
-    targetName: string;
-    type: 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'CONSTRUCTS' | 'ALIASES';
-    confidence: number;
-    metadata?: Record<string, any>;
-  }>;
-  metadata: {
-    language: string;
-    [key: string]: any;
-  };
-}
+export type { PrismRequest, SpectrumNode, PrismSpectrum } from "@/types/prism-types.js";
+import type { PrismRequest, PrismSpectrum } from "@/types/prism-types.js";
 
 /**
  * Conducks — Prism Core Interface (Base)

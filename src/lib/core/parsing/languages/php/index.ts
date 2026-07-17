@@ -1,14 +1,15 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { PHP_QUERIES } from "./queries.js";
 import { PHPResolver } from "./resolver.js";
 import { PHPExtractor } from "./extractor.js";
 
 /**
  * Conducks — High-Fidelity PHP Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps PHP structural DNA (Classes, Traits, Attributes, Namespaces) to the 8-layer taxonomy.
  */
-export class PHPProvider extends NativeProvider {
+export class PHPProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "php-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".php"];

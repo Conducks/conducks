@@ -91,7 +91,8 @@ export class GVREngine implements ConducksComponent {
 
       // Step B: Perform in-memory replacements (word-boundary safe regex)
       for (const [filePath, content] of backups) {
-        const newContent = content.replace(new RegExp(`\\b${oldName}\\b`, 'g'), newName);
+        const escapedName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const newContent = content.replace(new RegExp(`\\b${escapedName}\\b`, 'g'), newName);
         // Step C: Write to disk
         await this.fileSystem.writeFile(filePath, newContent, 'utf-8');
       }
@@ -106,16 +107,14 @@ export class GVREngine implements ConducksComponent {
       this.log(`[GVR] Refactor failed. Rolling back...`, err);
       // Step D: Rollback all changes
       for (const [filePath, originalContent] of backups) {
-        await this.fileSystem.writeFile(filePath, originalContent, 'utf-8').catch((e: Error) => {
-          this.log(`[GVR] CRITICAL: Rollback failed for ${filePath}`, e);
-        });
+        try {
+          await this.fileSystem.writeFile(filePath, originalContent, 'utf-8');
+        } catch (rollbackErr) {
+          console.error(`[GVREngine] ROLLBACK FAILED for ${filePath}:`, rollbackErr);
+        }
       }
 
-      return {
-        success: false,
-        affectedFiles: Array.from(affectedFiles),
-        message: `Refactor failed: ${(err as Error).message}. All changes rolled back.`
-      };
+      throw err;
     }
   }
 

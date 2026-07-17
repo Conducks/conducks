@@ -16,7 +16,7 @@ export class ExplainCommand implements ConducksCommand {
     const symbolId = args[0];
     if (!symbolId) {
       console.error("Usage: conducks explain <symbol_id>");
-      return;
+      process.exit(1);
     }
 
     // Structural Sync via Registry Bridge
@@ -34,7 +34,7 @@ export class ExplainCommand implements ConducksCommand {
 
     if (!node) {
       console.error(`Error: Symbol "${symbolId}" not found in the Synapse.`);
-      return;
+      process.exit(1);
     }
 
     const entropyRes = await registry.explain.calculateEntropy(node.id);
@@ -43,7 +43,7 @@ export class ExplainCommand implements ConducksCommand {
 
     if (!riskData) {
       console.error(`Error: Could not calculate risk for "${symbolId}".`);
-      return;
+      process.exit(1);
     }
 
     const { score, factors, breakdown } = riskData;

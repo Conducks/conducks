@@ -9,6 +9,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { ConducksComponent } from "@/registry/types.js";
 import path from "node:path";
+import { loadSentinelRules, type SentinelRule } from "./sentinel-rules.js";
 
 /**
  * Conducks — Governance Domain Service
@@ -193,6 +194,135 @@ export class GovernanceService implements ConducksComponent {
   }
 
   /**
+   * Evaluates user-configured sentinel rules (YAML DSL) against the current graph.
+   * Loads rules from `.conducks/sentinel.yml` in the project root, falling back to defaults.
+   *
+   * Supports conditions: has_cycles, rank_violation, dead_code, high_churn, deep_nesting.
+   */
+  public auditWithRules(rootDir?: string): {
+    success: boolean;
+    violations: Array<{ id: string; ruleId: string; severity: 'error' | 'warning' | 'info'; message: string }>;
+  } {
+    const projectRoot = rootDir || chronicle.getProjectDir() || process.cwd();
+    const rules = loadSentinelRules(projectRoot);
+
+    const violations: Array<{ id: string; ruleId: string; severity: 'error' | 'warning' | 'info'; message: string }> = [];
+
+    for (const rule of rules) {
+      switch (rule.condition) {
+        case 'has_cycles': {
+          const cycles = this.graph.detectCycles().filter(c => {
+            if (c.length <= 1) return false;
+            for (let i = 0; i < c.length; i++) {
+              const sourceId = c[i];
+              const targetId = c[(i + 1) % c.length];
+              const edges = this.graph.getNeighbors(sourceId, 'downstream');
+              if (edges.some(e => e.targetId === targetId && e.type === 'MEMBER_OF')) return false;
+            }
+            return true;
+          });
+          for (const cycle of cycles) {
+            violations.push({
+              id: cycle[0],
+              ruleId: rule.id,
+              severity: rule.severity,
+              message: `[${rule.name}] Circular dependency: ${cycle.join(' -> ')}`,
+            });
+          }
+          break;
+        }
+
+        case 'rank_violation': {
+          // A rank violation is an edge where a lower-rank node imports from a higher-rank node
+          // (canonicalRank: lower number = more foundational; a BEHAVIOR depending on STRUCTURE is fine;
+          //  but a STRUCTURE depending on BEHAVIOR is a rank inversion)
+          const allEdges = this.graph.getAllEdges();
+          for (const edge of allEdges) {
+            if (edge.type === 'MEMBER_OF') continue;
+            const src = this.graph.getNode(edge.sourceId);
+            const tgt = this.graph.getNode(edge.targetId);
+            if (!src || !tgt) continue;
+            const srcRank = src.properties.canonicalRank ?? -1;
+            const tgtRank = tgt.properties.canonicalRank ?? -1;
+            if (srcRank < 0 || tgtRank < 0) continue;
+            // Violation: higher-ranked (more abstract) depending on lower-ranked (more concrete)
+            // i.e. src rank > tgt rank means src is more abstract and should not depend on something more concrete
+            if (srcRank > tgtRank && (rule.threshold === undefined || Math.abs(srcRank - tgtRank) >= rule.threshold)) {
+              violations.push({
+                id: edge.sourceId,
+                ruleId: rule.id,
+                severity: rule.severity,
+                message: `[${rule.name}] Rank inversion: [${src.properties.name}](rank ${srcRank}) -> [${tgt.properties.name}](rank ${tgtRank})`,
+              });
+            }
+          }
+          break;
+        }
+
+        case 'dead_code': {
+          // Dead code: nodes with no incoming edges, not marked as entry points, and not exported
+          const allNodes = Array.from(this.graph.getAllNodes());
+          for (const node of allNodes) {
+            if (node.properties.isEntryPoint) continue;
+            if (node.properties.isExport) continue;
+            const incoming = this.graph.getNeighbors(node.id, 'upstream').filter(e => e.type !== 'MEMBER_OF');
+            if (incoming.length === 0) {
+              violations.push({
+                id: node.id,
+                ruleId: rule.id,
+                severity: rule.severity,
+                message: `[${rule.name}] Unreachable module: [${node.properties.name || node.id}]`,
+              });
+            }
+          }
+          break;
+        }
+
+        case 'high_churn': {
+          // High churn: nodes whose kineticEnergy exceeds the threshold
+          const threshold = rule.threshold ?? 30;
+          const allNodes = Array.from(this.graph.getAllNodes());
+          for (const node of allNodes) {
+            const energy = node.properties.kineticEnergy ?? 0;
+            if (energy >= threshold) {
+              violations.push({
+                id: node.id,
+                ruleId: rule.id,
+                severity: rule.severity,
+                message: `[${rule.name}] High churn: [${node.properties.name || node.id}] has kinetic energy ${energy} (threshold: ${threshold})`,
+              });
+            }
+          }
+          break;
+        }
+
+        case 'deep_nesting': {
+          // Deep nesting: nodes whose depth exceeds the threshold
+          const threshold = rule.threshold ?? 5;
+          const allNodes = Array.from(this.graph.getAllNodes());
+          for (const node of allNodes) {
+            const depth = node.properties.depth ?? 0;
+            if (depth > threshold) {
+              violations.push({
+                id: node.id,
+                ruleId: rule.id,
+                severity: rule.severity,
+                message: `[${rule.name}] Deep nesting: [${node.properties.name || node.id}] at depth ${depth} (threshold: ${threshold})`,
+              });
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    return {
+      success: violations.filter(v => v.severity === 'error').length === 0,
+      violations,
+    };
+  }
+
+  /**
    * Calculates the current structural health status.
    */
   public status() {
@@ -226,3 +356,5 @@ export { ContextGenerator } from "./context-generator.js";
 export { BlueprintGenerator } from "./blueprint-generator.js";
 export { GuidanceOracle } from "./oracle.js";
 export { RegressionGuard } from "./guard.js";
+export { loadSentinelRules, getDefaultRules } from "./sentinel-rules.js";
+export type { SentinelRule, SentinelCondition, SentinelRuleFile } from "./sentinel-rules.js";

@@ -48,7 +48,12 @@ export class EssenceLens {
         const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
         if (deps['next']) return 'nextjs';
         if (deps['express']) return 'express';
-      } catch { return null; }
+      } catch (err) {
+        if (process.env.CONDUCKS_DEBUG === '1') {
+          console.error('[EssenceLens] JSON parse failed:', err);
+        }
+        return null;
+      }
     } else if (fileName.endsWith('.py')) {
       if (source.includes('from fastapi import') || source.includes('import fastapi')) return 'fastapi';
       if (source.includes('from flask import') || source.includes('import flask')) return 'flask';

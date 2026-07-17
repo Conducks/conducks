@@ -19,7 +19,7 @@ export class RenameCommand implements ConducksCommand {
 
     if (!symbolId || !newName) {
       console.error("Error: Usage: conducks rename <symbolId> <newName> [--confirm]");
-      return;
+      process.exit(1);
     }
 
     const dryRun = !confirmed;
@@ -44,6 +44,7 @@ export class RenameCommand implements ConducksCommand {
       }
     } else {
       console.error(`\x1b[31m❌ ${result.message}\x1b[0m`);
+      process.exit(1);
     }
   }
 }

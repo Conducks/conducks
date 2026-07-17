@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import type { Advice } from "@/types/domain.js";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Advise Command
@@ -28,7 +29,7 @@ export class AdviseCommand implements ConducksCommand {
       });
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

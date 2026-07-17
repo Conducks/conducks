@@ -15,8 +15,8 @@ export const GO_QUERIES = `
   (package_clause (package_identifier) @name) @isPackage
 
   ;; Modern Genetics (Go 1.18+)
-  (type_parameter_list (parameter_declaration name: (identifier) @name)) @isGeneric
-  (type_parameter_list (parameter_declaration) @generic_param)
+  (type_parameter_list (type_parameter_declaration name: (identifier) @name)) @isGeneric
+  (type_parameter_list (type_parameter_declaration) @generic_param)
 
   ;; Methods with Receivers
   (method_declaration 
@@ -32,6 +32,21 @@ export const GO_QUERIES = `
   (type_spec name: (type_identifier) @name type: (interface_type)) @isInterface
 
   ;; --- Infrastructure (L3: Entry Points & Routers) ---
+  ;; Goroutine invocations
+  (go_statement) @isInfra
+
+  ;; Channel type declarations
+  (channel_type) @isInfra
+
+  ;; Select statements (concurrency control flow)
+  (select_statement) @isInfra
+
+  ;; Make with channel
+  (call_expression
+    function: (identifier) @source
+    (#eq? @source "make")
+    arguments: (argument_list (channel_type))) @isInfra
+
   ;; HTTP Handlers: http.HandleFunc("/path", handler)
   (call_expression
     function: (selector_expression
@@ -87,7 +102,7 @@ export const GO_QUERIES = `
 
   ;; --- Heritage (Embellished DNA) ---
   ;; Interface Methods (L5)
-  (method_spec name: (field_identifier) @name) @isMethod
+  (method_elem name: (field_identifier) @name) @isMethod
 
   ;; Embedded Structs (L4 Inheritance)
   (field_declaration type: [(type_identifier) (pointer_type) (slice_type) (map_type) (call_expression)] @heritage)
@@ -106,7 +121,6 @@ export const GO_QUERIES = `
   ;; --- Global Resonance (Type Capture) ---
   (type_identifier) @pulse_type_target
   (type_assertion_expression type: (type_identifier) @pulse_type_target)
-  (type_parameter_list (parameter_declaration (type_identifier) @pulse_type_target))
 
   ;; --- Imports & Aliases ---
   (import_spec name: (package_identifier) @alias path: [(interpreted_string_literal) (raw_string_literal)] @source) @isBinding

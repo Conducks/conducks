@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Record Command
@@ -19,7 +20,7 @@ export class RecordCommand implements ConducksCommand {
 
     if (!content || content.startsWith('--')) {
       console.error("Usage: conducks record --type [vision|architecture|implementation|handover|conventions|todo|memory] \"content\"");
-      return;
+      process.exit(1);
     }
 
     const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
@@ -43,8 +44,9 @@ export class RecordCommand implements ConducksCommand {
       console.log(`✅ Recorded successfully in docs/project/${projectName}/${targetType}.md`);
     } catch (err) {
       console.error(`Record Error: ${(err as Error).message}`);
+      process.exit(1);
     } finally {
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

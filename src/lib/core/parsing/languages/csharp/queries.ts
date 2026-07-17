@@ -2,6 +2,10 @@
  * Conducks — High-Fidelity C# SCM Query 🏺 🟦 (Omni-Detail)
  */
 export const CSHARP_QUERIES = `
+  ;; --- Imports (L3-L4: Kinesis) ---
+  (using_directive
+    [(identifier) (qualified_name) (alias_qualified_name)] @source) @isImport
+
   ;; --- Atoms (L6: Persistence & State) ---
   (field_declaration (variable_declaration (variable_declarator (identifier) @name))) @isProperty
   (variable_declaration (variable_declarator (identifier) @name)) @isVariable
@@ -10,11 +14,16 @@ export const CSHARP_QUERIES = `
   (class_declaration (identifier) @name) @isStruct
   (record_declaration (identifier) @name) @isStruct
   (interface_declaration (identifier) @name) @isInterface
-  (enum_declaration (identifier) @name) @isStruct
+  (enum_declaration (identifier) @name) @isEnum
   
   (method_declaration (identifier) @name) @isFunction
   (constructor_declaration (identifier) @name) @isFunction
   (destructor_declaration (identifier) @name) @isFunction
+
+  ;; Properties and Events (C# API surface)
+  (property_declaration name: (identifier) @name) @isProperty
+  (event_declaration name: (identifier) @name) @isProperty
+  (indexer_declaration) @isProperty
   
   (namespace_declaration [(identifier) (qualified_name)] @name) @isPackage
   
@@ -35,6 +44,19 @@ export const CSHARP_QUERIES = `
   (invocation_expression [(identifier) (member_access_expression)] @kinesis_target)
   (object_creation_expression (_) @kinesis_target)
   
+  ;; --- Delegate Declarations ---
+  (delegate_declaration
+    name: (identifier) @isFunction) @isInfra
+
+  ;; --- LINQ Query Expressions ---
+  (query_expression) @isInfra
+
+  ;; --- Anonymous Method / Lambda in Event Handler ---
+  (event_field_declaration
+    (variable_declaration
+      (variable_declarator
+        name: (identifier) @isProperty))) @isProperty
+
   ;; --- Debt Markers ---
   (comment) @comment
 `;

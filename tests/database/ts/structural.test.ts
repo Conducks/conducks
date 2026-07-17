@@ -135,7 +135,7 @@ describe('Synapse Structural Layer Audit', () => {
 
     if (hitList.length > 0) {
       console.warn(`\n⚠️  [Structural Sin] Top Functional Orphans:`);
-      hitList.forEach(i => console.warn(`   - [${i.canonicalKind}] ${i.id}`));
+      hitList.forEach(i => i && console.warn(`   - [${i?.canonicalKind}] ${i?.id}`));
     }
   });
 });

@@ -6,7 +6,9 @@ import { GlobalSymbolLinker } from "@/lib/core/graph/linker.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { globalMirror } from "@/interfaces/web/mirror-server.js";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+const execFileAsync = promisify(execFile);
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 
@@ -64,6 +66,15 @@ export class ConducksWatcher implements ConducksComponent {
   }
 
   /**
+   * Replaces the ignore manager used to filter watched file events.
+   * Must be called before start() for the new patterns to take effect,
+   * since chokidar captures the ignored predicate at watch-time.
+   */
+  public setIgnoreManager(ignoreManager: IgnoreManager): void {
+    this.ignoreManager = ignoreManager;
+  }
+
+  /**
    * Starts the Synapse Monitor.
    */
   public start(): void {
@@ -82,7 +93,8 @@ export class ConducksWatcher implements ConducksComponent {
     this.watcher
       .on("add", (filePath: string) => { console.error(`[Watcher Debug] add: ${filePath}`); this.handlePulseEvent("add", filePath); })
       .on("change", (filePath: string) => { console.error(`[Watcher Debug] change: ${filePath}`); this.handlePulseEvent("change", filePath); })
-      .on("unlink", (filePath: string) => { console.error(`[Watcher Debug] unlink: ${filePath}`); this.handlePulseEvent("unlink", filePath); });
+      .on("unlink", (filePath: string) => { console.error(`[Watcher Debug] unlink: ${filePath}`); this.handlePulseEvent("unlink", filePath); })
+      .on("error", (err: unknown) => { console.error('[Watcher]', err); });
   }
 
   /**
@@ -122,7 +134,7 @@ export class ConducksWatcher implements ConducksComponent {
       // 1. Kinetic Diff Extraction (Phase 5.7)
       let changedLines: number[] = [];
       try {
-        const diff = execSync(`git diff HEAD "${filePath}"`, { cwd: this.rootDir, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+        const { stdout: diff } = await execFileAsync('git', ['diff', 'HEAD', '--', filePath], { cwd: this.rootDir, encoding: 'utf8' });
         const hunks = diff.split('\n').filter(line => line.startsWith('@@'));
         for (const hunk of hunks) {
           const match = hunk.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);

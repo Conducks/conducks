@@ -91,8 +91,9 @@ export class StructuralRanker {
       const outgoing = graph.getNeighbors(node.id, 'downstream').length;
 
       if (incoming === 0 && outgoing > 0) {
-        if (node.label === 'module' || node.label === 'file' || node.label === 'function' || node.label === 'class') {
-           isEntry = true;
+        const ck = props.canonicalKind || node.label || '';
+        if (ck === 'BEHAVIOR' || ck === 'STRUCTURE') {
+          isEntry = true;
         }
       }
 

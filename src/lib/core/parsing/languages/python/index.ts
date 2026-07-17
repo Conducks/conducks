@@ -1,4 +1,5 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { PYTHON_QUERIES } from "./queries.js";
 import { PythonResolver } from "./resolver.js";
 import { PythonBindings } from "./bindings.js";
@@ -7,10 +8,10 @@ import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 
 /**
  * Conducks — High-Fidelity Python Language Provider (Suite v3) 🏺 🟦 🐍
- * 
+ *
  * Maps Python structural DNA (Decorators, Docstrings, Type Hints, MRO) to the 8-layer taxonomy.
  */
-export class PythonProvider extends NativeProvider {
+export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "python-provider";
   public readonly version = "3.2.0"; // Upgraded for Super-Detail Induction
   public readonly extensions = [".py"];

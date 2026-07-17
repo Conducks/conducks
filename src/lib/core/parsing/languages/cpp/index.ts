@@ -1,14 +1,15 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { CPP_QUERIES } from "./queries.js";
 import { CPPResolver } from "./resolver.js";
 import { CPPExtractor } from "./extractor.js";
 
 /**
  * Conducks — High-Fidelity C++ Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps C++ structural DNA (Classes, Templates, Namespaces) to the 8-layer taxonomy.
  */
-export class CPPProvider extends NativeProvider {
+export class CPPProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "cpp-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".h"];

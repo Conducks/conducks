@@ -59,7 +59,13 @@ export class GoResolver {
   private tryExtensions(target: string, allFiles: string[]): string | undefined {
     // Usually any .go file in the directory belongs to the package.
     // We return the directory path itself if files exist, or a sample .go file.
-    const goFiles = allFiles.filter(f => f.startsWith(target.toLowerCase()) && f.endsWith('.go'));
+    const goFiles = allFiles.filter(f => {
+      if (!f.startsWith(target.toLowerCase())) return false;
+      if (!f.endsWith('.go')) return false;
+      if (f.endsWith('_test.go')) return false;
+      if (f.includes('/vendor/') || f.includes('\\vendor\\')) return false;
+      return true;
+    });
     if (goFiles.length > 0) {
       // Return the most generic file or the dir if possible.
       return goFiles[0];

@@ -2,6 +2,12 @@
  * Conducks — High-Fidelity Java SCM Query 🏺 🟦 (Omni-Detail)
  */
 export const JAVA_QUERIES = `
+  ;; --- Imports (L3-L4: Kinesis) ---
+  (import_declaration
+    (scoped_identifier) @source) @isImport
+  (import_declaration
+    (identifier) @source) @isImport
+
   ;; --- Atoms (L6: Persistence & State) ---
   (field_declaration (variable_declarator name: (identifier) @name)) @isField
   (local_variable_declaration (variable_declarator name: (identifier) @name)) @isVariable
@@ -10,12 +16,25 @@ export const JAVA_QUERIES = `
   (class_declaration name: (identifier) @name) @isStruct
   (record_declaration name: (identifier) @name) @isStruct
   (interface_declaration name: (identifier) @name) @isInterface
-  (enum_declaration name: (identifier) @name) @isStruct
+  (enum_declaration name: (identifier) @name) @isEnum
   
   (method_declaration name: (identifier) @name) @isFunction
   (constructor_declaration name: (identifier) @name) @isFunction
   
   (package_declaration (scoped_identifier) @name) @isPackage
+
+  ;; Heritage: extends / implements
+  (class_declaration
+    superclass: (type_identifier) @heritage)
+  (class_declaration
+    interfaces: (super_interfaces
+      (type_list (type_identifier) @heritage)))
+  (interface_declaration
+    (extends_interfaces
+      (type_list (type_identifier) @heritage)))
+  (enum_declaration
+    (super_interfaces
+      (type_list (type_identifier) @heritage)))
   
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Spring Boot / JAX-RS Route Annotations: @GetMapping("/")

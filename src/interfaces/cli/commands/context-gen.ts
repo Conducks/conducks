@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { syncGraph, closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Neural Context Generator Command 🧠
@@ -14,8 +15,7 @@ export class ContextGenCommand implements ConducksCommand {
   public async execute(_args: string[], registry: Registry): Promise<void> {
     try {
       console.log("[Conducks] Generating Neural Architecture Context...");
-      // Structural Sync via Registry Bridge
-      await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+      await syncGraph(registry);
       
       const contextMd = await (registry.audit as any).contextFile();
       const outputPath = path.join(process.cwd(), 'ARCHITECTURE.md');
@@ -25,7 +25,7 @@ export class ContextGenCommand implements ConducksCommand {
       console.log(`✅ Neural Context generated at: ${outputPath}`);
       console.log(`🚀 This file is optimized for LLM context windows (max 4000 tokens).`);
     } finally {
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

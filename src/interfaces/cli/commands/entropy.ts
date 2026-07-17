@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Entropy Command
@@ -16,8 +17,7 @@ export class EntropyCommand implements ConducksCommand {
       return;
     }
     
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
     const { entropy, risk, authorCount } = await registry.explain.calculateEntropy(symbolId) as any;
 
     const fmt = (v: any) => isNaN(Number(v)) ? "0.00" : (Number(v) * 100).toFixed(2);

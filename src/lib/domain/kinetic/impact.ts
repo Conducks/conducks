@@ -40,7 +40,7 @@ export class BlastRadiusAnalyzer extends BaseAnalyzer implements ConducksCompone
     });
 
     // Score is the sum of inverse weighted distances
-    const score = affectedNodes.reduce((acc, node) => acc + (1 / node.distance), 0);
+    const score = affectedNodes.reduce((acc, node) => acc + (node.distance === 0 ? 1.0 : 1 / node.distance), 0);
 
     return {
       targetId: startId,

@@ -20,13 +20,21 @@ export class CallProcessor {
 
     // Conducks.6: Deterministic Symbol Resolution (The Great Binding)
     if (context && context.isResolutionMode()) {
-      const lowTarget = target.toLowerCase();
-      
+      // Strip this. prefix — class self-calls resolve via same-file IntraLinker lookup
+      const startsWithThis = target.toLowerCase().startsWith('this.');
+      const afterThis = startsWithThis ? target.toLowerCase().slice(5) : target.toLowerCase();
+      // If still dotted after stripping this. (e.g. this.field.method), extract the final
+      // property so IntraLinker can resolve it across imported files. Non-this member
+      // expressions (Math.random, service.foo) keep their full dotted form — safer.
+      const lowTarget = (startsWithThis && afterThis.includes('.'))
+        ? afterThis.split('.').pop()!
+        : afterThis;
+
       // 1. Resolve Local Bindings (Imports/Aliases)
       const resolvedPath = context.resolveLocalBinding(lowTarget);
       if (resolvedPath) {
         targetId = `${resolvedPath}::${lowTarget}`;
-      } 
+      }
       // 2. Resolve Global Atmosphere (Built-ins like 'process', 'os')
       else if (isBuiltIn(target, langId)) {
         targetId = getGlobalId(target);

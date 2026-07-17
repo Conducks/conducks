@@ -32,6 +32,7 @@ export class CSharpExtractor {
     ]);
 
     const traverse = (n: any) => {
+      if (!n) return;
       if (branchNodes.has(n.type)) {
         complexity++;
       }
@@ -56,8 +57,29 @@ export class CSharpExtractor {
    * Conducks — Technical Debt Signals
    * Extracts markers (TODO, FIXME, etc.) from comments.
    */
+  public extractDocs(sourceCode: string, node: any): string {
+    if (!node || !node.parent) return '';
+    const siblings = node.parent.children;
+    const idx = siblings.indexOf(node);
+    for (let i = idx - 1; i >= 0; i--) {
+      const sib = siblings[i];
+      if (sib.type === 'comment' ||
+          sib.type === 'singleline_documentation_comment' ||
+          sib.type === 'multiline_documentation_comment') {
+        return sib.text
+          .replace(/^\/\*\*?|\*\/$/g, '')
+          .replace(/^\s*\*\s?/gm, '')
+          .replace(/^\/\/\/?/gm, '')
+          .replace(/<\/?[^>]+>/g, '')
+          .trim();
+      }
+      if (sib.type !== 'newline' && !sib.type.includes('whitespace')) break;
+    }
+    return '';
+  }
+
   public extractDebt(node: any): string[] {
-    const text = node.text;
+    const text = node?.text || '';
     const markers = ['TODO', 'FIXME', 'HACK', 'BUG', 'REFACTOR', 'DEPRECATED', 'XXX', 'UNSAFE'];
     const found: string[] = [];
 

@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Analyze Command
@@ -37,7 +38,7 @@ export class AnalyzeCommand implements ConducksCommand {
       throw err;
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

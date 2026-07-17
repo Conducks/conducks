@@ -20,6 +20,11 @@ export class TypeScriptResolver {
     // 0. Strip Quotes (Tree-sitter 'string' node includes them)
     const cleanPath = rawImportPath.replace(/^['"]|['"]$/g, '');
 
+    // Build case-insensitive lookup: lowercase → original path
+    // allFiles may have original OS case; tryFile compares lowercase targets
+    const lowerToOriginal = new Map<string, string>();
+    for (const f of allFiles) lowerToOriginal.set(f.toLowerCase(), f);
+
     // 1. Alias & Path Resolution via nearest tsconfig
     const fileDir = path.dirname(currentFile);
     const tsconfigPath = this.findNearestTsconfig(fileDir);
@@ -34,9 +39,13 @@ export class TypeScriptResolver {
           cfg = cached.config;
         } else {
           const raw = fs.readFileSync(tsconfigPath, 'utf8');
-          // Strip comments from tsconfig.json
-          const cleanJson = raw.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
-          cfg = JSON.parse(cleanJson) || {};
+          // Try raw parse first; only strip comments if it fails (regex can corrupt JSON strings like "@/*")
+          try {
+            cfg = JSON.parse(raw) || {};
+          } catch {
+            const cleanJson = raw.replace(/\/\/[^\n]*/g, '').replace(/,(\s*[}\]])/g, '$1');
+            cfg = JSON.parse(cleanJson) || {};
+          }
           TypeScriptResolver.tsconfigCache[tsconfigPath] = { mtime: stat.mtimeMs, config: cfg };
         }
 
@@ -55,14 +64,18 @@ export class TypeScriptResolver {
             const remainder = wildcard ? cleanPath.slice(prefix.length + 1) : '';
             for (const entry of entries) {
               const mapped = entry.replace(/\*$/, remainder);
-              const candidates = [
-                path.resolve(baseUrl, mapped).toLowerCase(),
-                ...rootDirs.map(rd => path.resolve(rd, mapped).toLowerCase())
-              ];
-              
-              for (const cand of candidates) {
-                const res = this.tryFile(cand, allFiles) || this.tryDirectory(cand, allFiles);
-                if (res) return res;
+              // ESM imports use .js extensions for .ts source files — strip before trying extensions
+              const mappedNoExt = mapped.replace(/\.(js|jsx)$/, '');
+              const bases = Array.from(new Set([mapped, mappedNoExt]));
+              for (const base of bases) {
+                const candidates = [
+                  path.resolve(baseUrl, base).toLowerCase(),
+                  ...rootDirs.map(rd => path.resolve(rd, base).toLowerCase())
+                ];
+                for (const cand of candidates) {
+                  const res = this.tryFile(cand, lowerToOriginal) || this.tryDirectory(cand, lowerToOriginal);
+                  if (res) return res;
+                }
               }
             }
           }
@@ -85,7 +98,7 @@ export class TypeScriptResolver {
     const baseWithoutExt = cleanPath.replace(/\.(js|jsx|ts|tsx)$/, '');
     const targetBase = path.resolve(dir, baseWithoutExt).toLowerCase();
 
-    return this.tryFile(targetBase, allFiles) || this.tryDirectory(targetBase, allFiles);
+    return this.tryFile(targetBase, lowerToOriginal) || this.tryDirectory(targetBase, lowerToOriginal);
   }
 
   /**
@@ -107,26 +120,26 @@ export class TypeScriptResolver {
 
   /**
    * Tries to find a file by matching with supported extensions.
+   * Accepts either a string[] (legacy) or Map<lowercase, original> for case-insensitive lookup.
    */
-  private tryFile(target: string, allFiles: string[]): string | undefined {
+  private tryFile(target: string, allFiles: string[] | Map<string, string>): string | undefined {
     const extensions = ['.d.ts', '.ts', '.tsx', '.js', '.jsx'];
-    
-    // Exact match
-    if (allFiles.includes(target)) return target;
+    const look = allFiles instanceof Map
+      ? (k: string) => allFiles.get(k.toLowerCase())
+      : (k: string) => allFiles.includes(k) ? k : undefined;
 
-    // With extensions
+    if (look(target)) return look(target);
     for (const ext of extensions) {
-      const candidate = target + ext;
-      if (allFiles.includes(candidate)) return candidate;
+      const r = look(target + ext);
+      if (r) return r;
     }
-
     return undefined;
   }
 
   /**
    * Tries to find an 'index' file within a directory.
    */
-  private tryDirectory(target: string, allFiles: string[]): string | undefined {
+  private tryDirectory(target: string, allFiles: string[] | Map<string, string>): string | undefined {
     const indexBase = path.join(target, 'index');
     return this.tryFile(indexBase, allFiles);
   }

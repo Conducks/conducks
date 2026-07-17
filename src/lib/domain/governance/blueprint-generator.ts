@@ -6,6 +6,15 @@ import { ConfigDetector } from './config-detector.js';
 import { ConducksSentinel } from './sentinel.js';
 import { ConducksComponent } from "@/registry/types.js";
 
+export interface BlueprintDiff {
+  nodesAdded: string[];
+  nodesRemoved: string[];
+  rankViolationsAdded: string[];
+  rankViolationsRemoved: string[];
+  newCycles: string[][];
+  resolvedCycles: string[][];
+}
+
 /**
  * Conducks — Blueprint (AI-Readiness Generator)
  */
@@ -29,7 +38,13 @@ export class BlueprintGenerator implements ConducksComponent {
     const infra = await this.detector.discover(outputDir);
     
     // 2. Governance Audit
-    const sentinelRules = JSON.parse(await fs.readFile("config/sentinel.json", 'utf-8').catch(() => '[]'));
+    const sentinelConfigPath = new URL('../../../../config/sentinel.json', import.meta.url);
+    let sentinelRules: any[];
+    try {
+      sentinelRules = JSON.parse(await fs.readFile(sentinelConfigPath, 'utf-8').catch(() => '[]'));
+    } catch {
+      sentinelRules = [];
+    }
     const audit = await this.sentinel.validate(graph, sentinelRules);
 
     // 3. Group by Clusters
@@ -76,10 +91,80 @@ ${audit.violations.slice(0, 3).map(v => `- Violation: [${v.ruleId}] in ${v.nodeI
 
     const outputPath = path.join(outputDir, 'BLUEPRINT.md');
     const llmsPath = path.join(outputDir, 'llms.txt');
-    
+
     await fs.writeFile(outputPath, blueprint, 'utf-8');
     await fs.writeFile(llmsPath, blueprint, 'utf-8'); // For now, llms.txt is a copy of the blueprint
-    
+
     return outputPath;
+  }
+
+  /**
+   * Saves a blueprint snapshot as JSON to .conducks/blueprints/<pulseId>.json
+   */
+  public async saveSnapshot(pulseId: string, blueprint: object): Promise<void> {
+    const snapshotsDir = path.join(process.cwd(), '.conducks', 'blueprints');
+    await fs.mkdir(snapshotsDir, { recursive: true });
+    const snapshotPath = path.join(snapshotsDir, `${pulseId}.json`);
+    await fs.writeFile(snapshotPath, JSON.stringify(blueprint, null, 2), 'utf-8');
+  }
+
+  /**
+   * Loads a blueprint snapshot.
+   * ref can be a pulseId or a numeric offset like HEAD~3 (3rd most recent snapshot).
+   */
+  public async loadSnapshot(snapshotRef: string): Promise<object | null> {
+    const snapshotsDir = path.join(process.cwd(), '.conducks', 'blueprints');
+
+    const headMatch = snapshotRef.match(/^HEAD~(\d+)$/);
+    if (headMatch) {
+      const offset = parseInt(headMatch[1], 10);
+      let files: string[];
+      try {
+        files = await fs.readdir(snapshotsDir);
+      } catch {
+        return null;
+      }
+      // Sort descending by filename (pulseIds are timestamps or sortable strings)
+      const jsonFiles = files.filter(f => f.endsWith('.json')).sort().reverse();
+      const target = jsonFiles[offset];
+      if (!target) return null;
+      snapshotRef = target.replace(/\.json$/, '');
+    }
+
+    const snapshotPath = path.join(snapshotsDir, `${snapshotRef}.json`);
+    try {
+      const raw = await fs.readFile(snapshotPath, 'utf-8');
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Compares two blueprint snapshots and returns a structured diff.
+   */
+  public diffSnapshots(snapshotA: object, snapshotB: object): BlueprintDiff {
+    const a = snapshotA as any;
+    const b = snapshotB as any;
+
+    const nodesA = new Set<string>(Array.isArray(a.nodes) ? a.nodes : []);
+    const nodesB = new Set<string>(Array.isArray(b.nodes) ? b.nodes : []);
+    const violationsA = new Set<string>(Array.isArray(a.rankViolations) ? a.rankViolations : []);
+    const violationsB = new Set<string>(Array.isArray(b.rankViolations) ? b.rankViolations : []);
+    const cyclesA: string[][] = Array.isArray(a.cycles) ? a.cycles : [];
+    const cyclesB: string[][] = Array.isArray(b.cycles) ? b.cycles : [];
+
+    const cycleKey = (c: string[]) => [...c].sort().join('|');
+    const cycleSetA = new Set(cyclesA.map(cycleKey));
+    const cycleSetB = new Set(cyclesB.map(cycleKey));
+
+    return {
+      nodesAdded: [...nodesB].filter(n => !nodesA.has(n)),
+      nodesRemoved: [...nodesA].filter(n => !nodesB.has(n)),
+      rankViolationsAdded: [...violationsB].filter(v => !violationsA.has(v)),
+      rankViolationsRemoved: [...violationsA].filter(v => !violationsB.has(v)),
+      newCycles: cyclesB.filter(c => !cycleSetA.has(cycleKey(c))),
+      resolvedCycles: cyclesA.filter(c => !cycleSetB.has(cycleKey(c))),
+    };
   }
 }

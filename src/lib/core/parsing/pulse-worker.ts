@@ -4,6 +4,8 @@ import { AnalyzeContext } from "./context.js";
 import { grammars } from "./grammar-registry.js";
 import { PythonProvider } from "./languages/python/index.js";
 import { TypeScriptProvider } from "./languages/typescript/index.js";
+import { TSXProvider } from "./languages/tsx/index.js";
+import { JavaScriptProvider } from "./languages/javascript/index.js";
 import { GoProvider } from "./languages/go/index.js";
 import { RustProvider } from "./languages/rust/index.js";
 import { JavaProvider } from "./languages/java/index.js";
@@ -36,32 +38,43 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
     }
   }
 
+  const cppProvider = new CPPProvider();
+  const cProvider = new CProvider();
+
+  function isCppHeader(filePath: string): boolean {
+    try {
+      const content = fs.readFileSync(filePath, 'utf8').slice(0, 2000);
+      return /\bclass\b|\btemplate\s*<|\bnamespace\b|::/.test(content);
+    } catch {
+      return false;
+    }
+  }
+
   // Structural Mapping: File Extension -> Provider
   const providers = new Map<string, any>([
     [".py", new PythonProvider()],
     [".ts", new TypeScriptProvider()],
-    [".tsx", new TypeScriptProvider()],
-    [".js", new TypeScriptProvider()],
-    [".jsx", new TypeScriptProvider()],
+    [".tsx", new TSXProvider()],
+    [".js", new JavaScriptProvider()],
+    [".jsx", new JavaScriptProvider()],
     [".go", new GoProvider()],
     [".rs", new RustProvider()],
     [".java", new JavaProvider()],
     [".cs", new CSharpProvider()],
-    [".cpp", new CPPProvider()],
-    [".h", new CPPProvider()],
-    [".hpp", new CPPProvider()],
-    [".cc", new CPPProvider()],
+    [".cpp", cppProvider],
+    [".hpp", cppProvider],
+    [".cc", cppProvider],
     [".php", new PHPProvider()],
     [".rb", new RubyProvider()],
     [".rake", new RubyProvider()],
     [".swift", new SwiftProvider()],
-    [".c", new CProvider()]
+    [".c", cProvider]
   ]);
 
   // Structural Mapping: File Extension -> Grammar Metadata
   const extensionToGrammar = new Map<string, { id: string, file: string }>([
     [".ts", { id: 'typescript', file: 'tree-sitter-typescript.wasm' }],
-    [".tsx", { id: 'typescript', file: 'tree-sitter-typescript.wasm' }],
+    [".tsx", { id: 'tsx', file: 'tree-sitter-tsx.wasm' }],
     [".js", { id: 'javascript', file: 'tree-sitter-javascript.wasm' }],
     [".jsx", { id: 'javascript', file: 'tree-sitter-javascript.wasm' }],
     [".py", { id: 'python', file: 'tree-sitter-python.wasm' }],
@@ -86,7 +99,7 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
   for (const unit of units) {
     try {
       const ext = path.extname(unit.path);
-      const provider = providers.get(ext);
+      const provider = ext === '.h' ? (isCppHeader(unit.path) ? cppProvider : cProvider) : providers.get(ext);
       if (!provider) continue;
 
       // Phase 1: Omni-Repo Native Grammar Induction 🛡️ 🔨

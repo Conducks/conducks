@@ -18,7 +18,9 @@ export class TestAligner implements ConducksComponent {
 
     // 1. Identify all nodes that belong to a test environment
     const testRelevantNodes = nodes.filter((n: any) => {
-      const isTest = n.properties.isTest || (n.properties.isGlobalNode && n.id.includes('/tests/'));
+      const segments = n.id.split('/');
+      const isTestPath = segments.some((s: string) => s === 'tests' || s === '__tests__') || segments.some((s: string) => s.endsWith('.spec.ts') || s.endsWith('.test.ts'));
+      const isTest = n.properties.isTest || (n.properties.isGlobalNode && isTestPath);
       return isTest;
     }) as ConducksNode[];
 

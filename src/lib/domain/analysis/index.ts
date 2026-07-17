@@ -10,6 +10,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
+import { HttpServiceLinker } from "@/lib/core/graph/http-service-linker.js";
 import { ConducksComponent } from "@/registry/types.js";
 
 import { QueryService } from "./query-service.js";
@@ -165,9 +166,11 @@ export class AnalysisService implements ConducksComponent {
     // 4.1 Commit computed gravity values back to the vault (targeted UPDATE, safe on shallow nodes).
     const gravityValues = Array.from(this.graph.getGraph().getAllNodes()).map(n => ({
       id: n.id,
-      gravity: (n.properties.gravity as number) || 0
+      gravity: (n.properties.gravity as number) || 0,
+      isEntryPoint: (n.properties.isEntryPoint as boolean) || false
     }));
     await this.persistence.updateRanks(gravityValues);
+    await this.persistence.updateRisks();
 
     // 4.2 Intra-Project Symbol Resolution
     // Resolves bare cross-file targetIds (e.g. "synapsepersistence") to fully-qualified
@@ -176,6 +179,15 @@ export class AnalysisService implements ConducksComponent {
     const intraLinker = new IntraLinker();
     const resolvedEdges = intraLinker.resolve(this.graph.getGraph());
     await this.persistence.updateEdgeTargets(resolvedEdges);
+
+    // 4.3 Cross-Service HTTP Call Detection
+    // Scans source files for HTTP URL literals and emits CALLS edges to matched service nodes.
+    const serviceLinker = new HttpServiceLinker(this.graph.getGraph());
+    const serviceEdges = serviceLinker.link(dirtyFiles);
+    if (serviceEdges.length > 0) {
+      logger.info(`[ServiceLinker] Created ${serviceEdges.length} cross-service HTTP edges`);
+      await this.persistence.saveEdges(serviceEdges, pulseId);
+    }
 
     const linker = new FederatedLinker();
     await linker.hydrate(this.graph.getGraph());
@@ -215,7 +227,7 @@ export class AnalysisService implements ConducksComponent {
    * by library/namespace. This transforms "Orphans" into "Ecosystem Members".
    */
   private async induceVirtualLibraries(graph: ConducksGraph | any): Promise<void> {
-    const allEdges = (graph as any).getAllEdges();
+    const allEdges = graph.getAllEdges();
     const externalPrefixes = ['global', 'npm', 'std', 'pip', 'gem', 'mvn', 'go', 'crates'];
     
     let inducedCount = 0;

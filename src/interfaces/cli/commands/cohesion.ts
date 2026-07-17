@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Cohesion Command
@@ -15,11 +16,10 @@ export class CohesionCommand implements ConducksCommand {
 
     if (!s1 || !s2) {
       console.error("Error: Please provide two symbol IDs.");
-      return;
+      process.exit(1);
     }
 
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
 
     try {
       const vector = registry.explain.getCohesionVector(s1, s2);
@@ -27,6 +27,7 @@ export class CohesionCommand implements ConducksCommand {
       console.log(`\x1b[35mVector Similarity:\x1b[0m ${(vector * 100).toFixed(2)}%`);
     } catch (err) {
       console.error(`Cohesion Error: ${(err as Error).message}`);
+      process.exit(1);
     }
   }
 }

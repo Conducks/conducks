@@ -1,14 +1,15 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { RUST_QUERIES } from "./queries.js";
 import { RustResolver } from "./resolver.js";
 import { RustExtractor } from "./extractor.js";
 
 /**
  * Conducks — High-Fidelity Rust Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps Rust structural DNA (Traits, Mods, Impls, Attributes) to the 8-layer taxonomy.
  */
-export class RustProvider extends NativeProvider {
+export class RustProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "rust-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".rs"];

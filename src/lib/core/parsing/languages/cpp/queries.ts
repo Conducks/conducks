@@ -10,6 +10,7 @@ export const CPP_QUERIES = `
   ;; Classes and Structs
   (class_specifier (type_identifier) @name) @isStruct
   (struct_specifier (type_identifier) @name) @isStruct
+  (enum_specifier (type_identifier) @name) @isEnum
   
   ;; Namespaces (Resonance Shield)
   (namespace_definition (_) @name) @isPackage
@@ -25,7 +26,8 @@ export const CPP_QUERIES = `
   (destructor_name) @name
   
   ;; --- Infrastructure (L3: Entry Points) ---
-  (preproc_include (_) @name) @isPackage
+  (preproc_include
+    path: [(string_literal) (system_lib_string)] @source) @isImport
   (preproc_def (_) @name) @isMacro
   
   ;; --- Pulse Flow (Assignments) ---

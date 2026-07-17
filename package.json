@@ -37,7 +37,8 @@
 		"test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
 		"test:int": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
 		"benchmark": "node --loader ts-node/esm tests/benchmark/run.ts",
-		"test:persistence": "jest --config jest.persistence.config.cjs"
+		"test:persistence": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects persistence",
+		"bootstrap": "node scripts/bootstrap.mjs"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.22.0",

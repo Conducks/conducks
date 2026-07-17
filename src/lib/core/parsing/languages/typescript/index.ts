@@ -1,4 +1,5 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { TYPESCRIPT_QUERIES } from "./queries.js";
 import { TypeScriptResolver } from "./resolver.js";
 import { TypeScriptExtractor } from "./extractor.js";
@@ -6,13 +7,13 @@ import { TypeScriptBindings } from "./bindings.js";
 
 /**
  * Conducks — High-Fidelity TypeScript & JavaScript Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps TS/JS structural DNA (Decorators, JSDoc, Hooks, Interfaces) to the 8-layer taxonomy.
  */
-export class TypeScriptProvider extends NativeProvider {
+export class TypeScriptProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "typescript-provider";
   public readonly version = "3.0.0";
-  public readonly extensions = [".ts", ".tsx", ".js", ".jsx"];
+  public readonly extensions = [".ts", ".js", ".jsx"];
   public readonly langId = "typescript";
   public readonly importSemantics: ImportSemantics = 'named';
 

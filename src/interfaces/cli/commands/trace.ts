@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Trace (Lineage) Command
@@ -17,11 +18,10 @@ export class TraceCommand implements ConducksCommand {
 
     if (!symbolInput) {
       console.error("Usage: conducks trace <symbol_id> [--flow]");
-      return;
+      process.exit(1);
     }
 
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
 
     let symbolId = symbolInput;
     if (!registry.query.graph.getGraph().getNode(symbolInput)) {
@@ -58,6 +58,7 @@ export class TraceCommand implements ConducksCommand {
       }
     } catch (err) {
       console.error(`Trace Error: ${(err as Error).message}`);
+      process.exit(1);
     }
   }
 }

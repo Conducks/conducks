@@ -20,15 +20,15 @@ export class MirrorEngine implements ConducksComponent {
    * v1.5.0: Professional Command Center & Adaptive Scaling.
    */
   public getVisualWave(visibleLayers: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8], visibleClusters: string[] = [], spread: number = 1200) {
-    const g = this.graph as any;
     const layerSet = new Set(visibleLayers);
     const clusterSet = new Set(visibleClusters);
-    
+
     // 1. Identify Hub Nodes (Node Degrees)
     const degreeMap = new Map<string, number>();
     const allNodes = Array.from(this.graph.getAllNodes());
-    
-    for (const [sourceId, edges] of g.outEdges) {
+    const outEdgesMap = this.graph.getOutEdgesMap();
+
+    for (const [sourceId, edges] of outEdgesMap) {
       degreeMap.set(sourceId, (degreeMap.get(sourceId) || 0) + edges.size);
       for (const edge of edges) {
         degreeMap.set(edge.targetId, (degreeMap.get(edge.targetId) || 0) + 1);
@@ -176,7 +176,7 @@ export class MirrorEngine implements ConducksComponent {
     const linkCheck = new Set<string>();
     const visualNodeIds = new Set(visualNodes.map(n => n.id));
 
-    for (const [sourceId, edges] of g.outEdges) {
+    for (const [sourceId, edges] of outEdgesMap) {
       const vSrcData = nvpMap.get(sourceId);
       if (!vSrcData || !visualNodeIds.has(vSrcData.id)) continue;
 
@@ -190,7 +190,7 @@ export class MirrorEngine implements ConducksComponent {
         // 5.1 CLIP: Hide links that are stretched for "no reason" (Threshold: 5)
         if (totalTransitivity > 5) continue;
 
-        const category = edge.type === 'MEMBER_OF' || edge.type === 'CONTAINS' || edge.category === 'STRUCTURAL' ? 'LINEAGE' : 'KINESIS';
+        const category = edge.type === 'MEMBER_OF' || edge.type === 'CONTAINS' || (edge as any).category === 'STRUCTURAL' ? 'LINEAGE' : 'KINESIS';
         const key = `${vSrcData.id}->${vTgtData.id}->${category}`;
         
         if (!linkCheck.has(key)) {

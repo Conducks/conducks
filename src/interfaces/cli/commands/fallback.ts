@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Fallback Analysis Command
@@ -19,8 +20,7 @@ export class FallbackCommand implements ConducksCommand {
     console.log(`\x1b[35m[Conducks Fallback Analysis] Scanning for suspicious fallback patterns...\x1b[0m`);
     console.log(`Filters: confidence ≥ ${minConfidence}, tenure ≥ ${minTenure} days, limit ${limit}\n`);
 
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
 
     try {
       const results = await registry.analyze.query.execute('suspicious_fallbacks',
@@ -56,6 +56,7 @@ export class FallbackCommand implements ConducksCommand {
 
     } catch (err) {
       console.error(`Error analyzing fallbacks: ${(err as Error).message}`);
+      process.exit(1);
     }
   }
 

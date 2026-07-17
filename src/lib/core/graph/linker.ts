@@ -1,4 +1,5 @@
 import { ConducksAdjacencyList, NodeId, ConducksEdge } from "./adjacency-list.js";
+import { ImportResolver, sameFamily } from "./import-resolver.js";
 import path from "node:path";
 
 /**
@@ -13,7 +14,7 @@ export class GlobalSymbolLinker {
    * Iterates through all nodes and attempts to resolve dangling references.
    */
   public link(graph: ConducksAdjacencyList): void {
-    const nodes = Array.from((graph as any).nodes.values()) as any[]; 
+    const nodes = Array.from(graph.getNodesMap().values()) as any[];
     
     this.log(`[Conducks Linker] Starting global resolution for ${nodes.length} nodes...`);
 
@@ -25,48 +26,66 @@ export class GlobalSymbolLinker {
   }
 
   /**
-   * Resolves a single import node.
-   * Logic: Matches the import name and source path to a specific definition.
+   * Resolves a single import node using the 3-tier ImportResolver.
+   *
+   * Tier 1 (0.95): same-file symbol
+   * Tier 2 (0.9 / 0.85): path-scoped resolution with named/namespace/default semantics
+   * Tier 3 (0.5): global fuzzy fallback
    */
   private resolveImport(node: any, graph: ConducksAdjacencyList): void {
     const filePath = node.properties.filePath;
     const sourcePath = node.properties.source; // e.g., './utils.js'
     const symbolName = node.properties.name;
+    const importText = node.properties.importText; // optional raw import statement
 
     if (!sourcePath || !filePath) return;
 
-    // 1. Resolve absolute path of the source
+    // Build candidate absolute paths (extensions + index files)
     const absoluteSource = path.resolve(path.dirname(filePath), sourcePath);
-    
-    // 2. Search for the actual definition in the target file
-    const targetNodeId = `${absoluteSource.toLowerCase()}::${symbolName.toLowerCase()}`;
-    const targetNode = graph.getNode(targetNodeId);
+    const resolvedCandidates = [
+      absoluteSource,
+      absoluteSource + '.ts',
+      absoluteSource + '.js',
+      absoluteSource + '.py',
+      absoluteSource + '/index.ts',
+      absoluteSource + '/index.js',
+    ];
 
-    if (targetNode) {
-      // 3. Create the IMPORTS edge
+    const resolver = new ImportResolver(graph);
+    const resolution = resolver.resolve(
+      node.id,
+      sourcePath,
+      symbolName,
+      importText,
+      resolvedCandidates
+    );
+
+    if (resolution) {
       const edge: ConducksEdge = {
-        id: `${node.id}::${targetNodeId}::IMPORTS`,
+        id: `${node.id}::${resolution.targetId}::IMPORTS`,
         sourceId: node.id,
-        targetId: targetNodeId,
+        targetId: resolution.targetId,
         type: 'IMPORTS',
-        confidence: 1.0,
-        properties: {}
+        confidence: resolution.confidence,
+        properties: { tier: resolution.tier }
       };
       graph.addEdge(edge);
-      this.log(`[Conducks Linker] Linked: ${node.id} -> ${targetNodeId}`);
-    } else {
-      // Fuzzy match or cross-package link placeholder
-      this.fuzzyLink(node, symbolName, graph);
+      return;
     }
+
+    // Tier 3 fallback: name-only fuzzy match (legacy path)
+    if (symbolName) this.fuzzyLink(node, symbolName, graph);
   }
 
   /**
    * Attempts to link symbols by name if path resolution fails.
    */
   private fuzzyLink(node: any, name: string, graph: ConducksAdjacencyList): void {
-    // Simplified: Find any node with the same name that is a 'function' or 'class'
-    const candidates = Array.from((graph as any).nodes.values()).filter((n: any) => 
-      n.properties.name === name && (n.label === 'function' || n.label === 'class')
+    // Simplified: Find any node with the same name that is a BEHAVIOR or STRUCTURE.
+    // Never match across language families (a TS symbol cannot import a Rust/Go/Python one).
+    const candidates = Array.from(graph.getNodesMap().values()).filter((n: any) =>
+      n.properties?.name === name && (n.label === 'BEHAVIOR' || n.label === 'STRUCTURE') &&
+      sameFamily(node.id, n.id)
     );
 
     if (candidates.length === 1) {
@@ -76,8 +95,8 @@ export class GlobalSymbolLinker {
         sourceId: node.id,
         targetId: target.id,
         type: 'IMPORTS',
-        confidence: 0.7,
-        properties: { fuzzy: true }
+        confidence: 0.5,
+        properties: { fuzzy: true, tier: 3 }
       };
       graph.addEdge(edge);
     }

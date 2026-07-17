@@ -43,3 +43,7 @@ venv/
 dist/
 .conducks/
 .conducks
+scratch/
+
+# agent worktree scratch (47M, never commit)
+.claude/

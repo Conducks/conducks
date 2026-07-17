@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import path from "node:path";
 import fs from "fs-extra";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Visualize Command (The Structural Mirror)
@@ -94,7 +95,7 @@ export class VisualizeCommand implements ConducksCommand {
       console.log(`- Nodes Visualized: ${nodes.length}`);
       console.log(`- Federated Pulse: Active`);
     } finally {
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

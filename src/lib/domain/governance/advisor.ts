@@ -18,7 +18,8 @@ export class ConducksAdvisor implements ConducksComponent {
     const nodes = Array.from(graph.getAllNodes());
 
     // 1. Detect Circular Dependencies (Fatal Logic - Non-Exit)
-    const cycles = (graph as any).detectCycles({ ignoreTypes: ['MEMBER_OF', 'CONTAINS'] });
+    // Only traverse IMPORTS graph — CALLS cycles are runtime recursion, not architectural violations
+    const cycles = graph.detectCycles({ ignoreTypes: ['MEMBER_OF', 'CONTAINS', 'CALLS', 'CONSTRUCTS', 'TYPE_REFERENCE', 'ACCESSES'] });
     const architecturalCycles = (cycles as NodeId[][]).filter(cycle => {
       // Filter out purely internal file cycles (Implementation Detail vs Architectural Sin)
       const filePaths = new Set(cycle.map(id => graph.getNode(id)?.properties.filePath).filter(Boolean));
@@ -39,14 +40,21 @@ export class ConducksAdvisor implements ConducksComponent {
     });
 
     // 2. Detect Monolithic Hubs (Over-Coupling)
+    // Metric: distinct files that import or call this node (cross-file only).
+    // Same-file references don't indicate coupling between modules.
     const hubThreshold = Math.max(stats.medianDegree * 5, 10);
     for (const node of nodes as ConducksNode[]) {
-      const degree = graph.getNeighbors(node.id, 'upstream').length + graph.getNeighbors(node.id, 'downstream').length;
-      if (degree > hubThreshold) {
+      const nodeFile = node.properties.filePath;
+      const crossFileCallerFiles = new Set(
+        graph.getNeighbors(node.id, 'upstream')
+          .map(e => graph.getNode(e.sourceId)?.properties.filePath)
+          .filter((f): f is string => !!f && f !== nodeFile)
+      );
+      if (crossFileCallerFiles.size > hubThreshold) {
         advice.push({
           level: 'WARNING',
           type: 'HUB',
-          message: `Monolithic Hub: This symbol is excessively coupled (${degree} refs). Consider splitting.`,
+          message: `Monolithic Hub: ${crossFileCallerFiles.size} distinct files depend on this symbol. Consider splitting.`,
           nodes: [node.id]
         });
       }

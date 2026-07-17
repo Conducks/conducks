@@ -8,63 +8,69 @@
 
 ## Required files
 
-### Single Application Structure
-For single applications, use `docs/` at the project root:
+### Core (always exist — bootstrap these on session 1 if missing)
+
+These five files are the minimum for any project. A cold agent reads them in this order at the start of every session.
 
 | File | Purpose | Written when |
 |---|---|---|
-| `business_plan.md` | Business strategy, market positioning, and revenue models | On confirmed business direction — append only, never rewrite |
-| `product_plan.md` | Product vision, user stories, and feature roadmap | On confirmed product direction — append only, never rewrite |
-| `features.md` | Product features and specifications (source of truth) | Immediately upon any capability change |
+| `todo.md` | Active tasks with phases and acceptance criteria | Plan phase — before touching any file |
 | `architecture.md` | Module map, file tree, dependency directions, forbidden imports | Whenever structure or contracts change |
-| `implementation.md` | What was built — a running log | Only when user explicitly asks |
-| `handover.md` | Full session state for the next agent | Only when user explicitly asks |
-| `conventions.md` | Non-negotiable rules for this service | Agent detects and appends; user defines |
-| `styling.md` | High-fidelity source of truth for visual and interactive standards | At project start or when design tokens are defined |
-| `creative_brief.md` | Strategy for branding, marketing, and creative direction | On project start or when engaging designers |
-| `todo.md` | Phases and tasks with acceptance criteria | During plan phase, updated throughout |
-| `completed/` | Historical completed todos (todo1.md, todo2.md, etc.) | When todos are completed |
-| `legacy/` | Existing documentation that does not fit into the standard required files but must be preserved | When moving to the Conducks documentation standard |
-| `memory.md` | Critical agent-only notes that must survive sessions | Agent appends during execute and memory phases |
+| `conventions.md` | Non-negotiable rules for this service — ID, statement, reason | Agent detects and appends; user defines |
+| `features.md` | What the system currently does — source of truth for capabilities | Immediately upon any capability change |
+| `memory.md` | Critical gotchas and constraints that cannot be inferred from code | Written throughout the session, read first |
 
-> **Note:** Not every project needs every file. Create only the files relevant to the project's actual scope. A marketing website does not need `business_plan.md` if strategy lives elsewhere. A CLI tool with no UI does not need `styling.md`. Never create a file just to satisfy the table above — only create it when there is real content to record.
+### On-Demand (create only when user explicitly asks)
+
+| File | Purpose |
+|---|---|
+| `handover.md` | Full session state for the next agent — only needed for mid-task interruptions or multi-session tasks. Redundant in a 1-task-per-session model. |
+| `implementation.md` | Running log of what was built — historical record, useful for PR descriptions |
+
+### Conditional (create only when the project scope warrants it)
+
+| File | When to create |
+|---|---|
+| `styling.md` | Any project with UI — defines design tokens and interaction rules |
+| `business_plan.md` | If the project has a business model to record — append-only |
+| `product_plan.md` | If there is a product roadmap that needs tracking — append-only |
+| `creative_brief.md` | If the project involves branding or external design work |
+
+### Archive directories
+
+| Directory | Purpose |
+|---|---|
+| `completed/` | Completed todo files — move `todo.md` here as `todo{N}.md` when a phase closes |
+| `legacy/` | Pre-migration docs that don't fit the standard but must not be lost |
+
+---
 
 ### Multi-Service Structure
-For multi-service projects, each service has its own `docs/` directory:
+
+For multi-service projects, each service has its own `docs/` directory with its own core files. Shared concepts belong in the root `docs/`.
 
 ```
 service1/
 ├── docs/
-│   ├── business_plan.md
-│   ├── product_plan.md
+│   ├── todo.md
+│   ├── architecture.md
+│   ├── conventions.md
 │   ├── features.md
-│   └── ... (all required files)
-└── src/
-    └── ...
-
+│   └── memory.md
 service2/
 ├── docs/
-│   ├── business_plan.md
-│   ├── product_plan.md
-│   ├── features.md
-│   └── ... (all required files)
-└── src/
-    └── ...
+│   └── ...
 ```
-
-Core shared concepts belong in the root `docs/` directory unless service-specific.
-
-If any of these files are missing when a session starts, create them from templates before doing anything else.
 
 ---
 
 ## Rules
 
 **DOCS-1 — Bootstrap on Session Start** `[severity: high]`
-At the start of every session, verify that all required documentation files exist for the current scope (project root for single apps, service directory for multi-service). If any are missing, create them from templates immediately. Do not start work without its docs in place.
+At the start of every session, verify that the five core files exist. If any are missing, create them from templates before doing anything else. Do not create on-demand or conditional files unless explicitly requested.
 
 **DOCS-2 — Business and Product Plans are Append-Only** `[severity: high]`
-Never edit or delete existing entries in `business_plan.md` or `product_plan.md`. The history of business and product intent is permanent. New entries are always appended at the bottom with a date and a confirmation that the user approved the update.
+Never edit or delete existing entries in `business_plan.md` or `product_plan.md`. The history of business and product intent is permanent. New entries are always appended at the bottom with a date and explicit user confirmation.
 
 **DOCS-3 — Architecture Stays Current** `[severity: high]`
 `architecture.md` must reflect the real state of the codebase at all times. Every file in the project must appear in the file tree. Every module's dependencies must be listed. Update it during execute phase — not after.
@@ -73,7 +79,7 @@ Never edit or delete existing entries in `business_plan.md` or `product_plan.md`
 Do not append to `implementation.md` unless the user asks. When they do, cover only what happened since the previous entry. Never edit previous entries.
 
 **DOCS-5 — Handover is On-Demand** `[severity: high]`
-Do not write `handover.md` unless the user asks. When they do, overwrite the entire file. Be specific, honest, and complete. The next agent's ability to start without confusion depends entirely on this document.
+Do not write `handover.md` unless the user asks. When they do, overwrite the entire file. Be specific, honest, and complete. In a 1-task-per-session model, `todo.md` and `memory.md` together replace handover — only write it for genuine multi-session or interrupted work.
 
 **DOCS-6 — Conventions Grow Over Time** `[severity: medium]`
 `conventions.md` is never finished. The agent appends to it when detecting patterns; the user defines rules at any time. Both are valid. Every rule must have an ID, a clear statement, and a reason it exists.
@@ -85,25 +91,19 @@ All doc files use `#` and `##` headings, plain prose, and tables where structure
 `memory.md` entries must be short. If an entry needs more than three or four lines, it belongs in `handover.md` or `architecture.md` instead. Memory is a quick-reference — not a log.
 
 **DOCS-9 — Completed Todos Archive** `[severity: high]`
-When a `todo.md` is completed, move it to `completed/todo{N}.md` where N is the next incremental number (1, 2, 3, etc.). Never delete completed todos — they serve as historical record of what was built and why.
+When a `todo.md` phase is completed, move it to `completed/todo{N}.md` where N is the next incremental number. Never delete completed todos — they are a historical record of what was built and why.
 
-**DOCS-10 — Features File Structure** `[severity: high]`
-Every project must have a `features.md` file (at `docs/features.md` for single apps, or per-service in multi-service projects) that follows the strict structure: Title headers for modules, detailed plain-text bullet points for capabilities, no formatting within bullets, immediate sync requirement, and source-of-truth status. Read `features.md` before making any changes to understand what capabilities exist.
+**DOCS-10 — Features File is the Capability Truth** `[severity: high]`
+`features.md` documents what the system currently does — shipped, working capabilities only. It is not a roadmap. Future capabilities belong in `product_plan.md`. Read `features.md` before making any changes to understand what already exists. Update it the moment a capability ships or changes.
 
 **DOCS-11 — Styling Guide Standards** `[severity: high]`
-`styling.md` must define design tokens, typography scales, and interactive affordances. It serves as the visual source of truth. Any UI change that breaks these tokens must either update the tokens or be reverted.
-
-- Use `ResizeObserver` on the container element for any component whose rendering depends on available width (charts, conditional layouts, responsive tables). Do not use `window` resize events — flex and grid containers resize independently of the viewport.
+`styling.md` must define design tokens, typography scales, and interaction rules. It is the visual source of truth. Any UI change that breaks these tokens must either update the tokens or be reverted. Only create it if the project has UI.
 
 **DOCS-12 — Creative Brief Integrity** `[severity: medium]`
-`creative_brief.md` is required for projects involving branding or external design. It must follow the standard 8-section structure to ensure alignment between business goals and creative execution.
+`creative_brief.md` is required only for projects involving branding or external design. When created, it must follow the standard 8-section structure to ensure alignment between business goals and creative execution.
 
 **DOCS-13 — Legacy Preservation** `[severity: low]`
-The `legacy/` folder is used for existing documentation that does not fit into the new primary required files but contains valuable context. Use this to house pre-migration docs, old implementation notes, or unique project documentation that must not be lost during the transition to the Conducks standard.
-
-
-
-
+The `legacy/` folder is for existing documentation that does not fit the standard required files but contains valuable context. Use it for pre-migration docs and old implementation notes that must not be lost.
 
 ---
 
@@ -112,18 +112,21 @@ The `legacy/` folder is used for existing documentation that does not fit into t
 **Tone:** Write for the next agent, not for a human presentation. Be direct, specific, and terse. Name files and functions. Avoid vague summaries.
 
 **What belongs where:**
-- Business strategy or market decisions → `business_plan.md`
-- Product vision or feature roadmap → `product_plan.md`
-- A decision and why → `architecture.md`
-- A constraint from outside the codebase → `memory.md`
-- A rule the team follows → `conventions.md`
-- The story of what changed → `implementation.md`
-- Visual tokens and UI rules → `styling.md`
-- Creative and branding strategy → `creative_brief.md`
-- The current broken state → `handover.md`
-- What to do next → `todo.md`
-- What was completed → `completed/todo{N}.md`
-- Deprecated but important history → `legacy/`
+
+| Content | File |
+|---|---|
+| What to do next | `todo.md` |
+| What exists and how it connects | `architecture.md` |
+| A rule the team follows | `conventions.md` |
+| What the system currently does | `features.md` |
+| A constraint that cannot be inferred from code | `memory.md` |
+| The full current broken state | `handover.md` |
+| What was completed and why | `implementation.md` |
+| Visual tokens and UI rules | `styling.md` |
+| Business strategy or market decisions | `business_plan.md` |
+| Product vision or feature roadmap | `product_plan.md` |
+| Creative and branding strategy | `creative_brief.md` |
+| Deprecated but important history | `legacy/` |
 
 **What never belongs in docs:**
 - Marketing language or aspirational copy

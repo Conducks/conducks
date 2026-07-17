@@ -76,7 +76,7 @@ export class IntraLinker {
       } else {
         unitImports.set(sourceUnitId, [targetUnit]);
       }
-      logger.info(`🛡️ [IntraLinker] Edge ${sourceUnitId} imports ${targetUnit}`);
+      logger.debug(`🛡️ [IntraLinker] Edge ${sourceUnitId} imports ${targetUnit}`);
     }
 
     // ── 3. Resolve unresolved edges ─────────────────────────────────────────

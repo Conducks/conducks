@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Watch Command
@@ -17,7 +18,7 @@ export class WatchCommand implements ConducksCommand {
 
     // Read-Only: watcher observes structural shifts, only analyze writes
     await (registry as any).initialize(true, rootPath, true);
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
 
     console.log('[Watch] Step 2: getting watcher instance...');
     const watcher = (registry.evolution as any).watcher;
@@ -25,7 +26,7 @@ export class WatchCommand implements ConducksCommand {
     console.log('[Watch] Step 3: watcher =', watcher ? 'OK' : 'NULL');
     if (!watcher) {
       console.error("[Conducks Watch] Could not initialize watcher — invalid project root: " + rootPath);
-      return; 
+      process.exit(1);
     }
 
     if (isPulse && watcher) {

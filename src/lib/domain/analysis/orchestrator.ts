@@ -3,6 +3,7 @@ import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { SynapseRegistry } from "@/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { sameFamily } from "@/lib/core/graph/import-resolver.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
@@ -10,10 +11,12 @@ import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/registry/types.js";
+import type { PrismSpectrum } from "@/types/prism-types.js";
 import { logger } from "@/lib/core/utils/logger.js";
 import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
 import { Worker } from "node:worker_threads";
-import { fork } from "node:child_process";
+import { fork, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
@@ -37,7 +40,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
   public context = new AnalyzeContext();
 
   constructor(
-    private registry: SynapseRegistry<any>,
+    private registry: SynapseRegistry<ConducksComponent>,
     private graph: ConducksGraph,
     private aligner?: TestAligner,
     private persistence?: SynapsePersistence,
@@ -90,7 +93,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         filePath: workspaceRoot,
         canonicalKind: 'ECOSYSTEM',
         canonicalRank: 0
-      } as any
+      }
     });
 
     // 2. Create repository Nodes (Rank 1)
@@ -107,7 +110,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
           canonicalKind: 'REPOSITORY',
           canonicalRank: 1,
           parentId: ecosystemId // Oracle DNA: Hierarchical Link
-        } as any
+        }
       });
 
       // Materialize Ecosystem -> Repository Link
@@ -157,7 +160,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
             canonicalKind: 'DIRECTORY',
             canonicalRank: 2,
             parentId
-          } as any
+          }
         });
 
         // Materialize Directory -> Parent Link
@@ -176,6 +179,25 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     }
 
     // Phase 0.2: Legendary Anchor (Taxonomy Guide) 🏺
+    this.graph.getGraph().addNode({
+      id: 'ecosystem::legend',
+      label: 'Legend',
+      properties: {
+        name: 'Structural Legend',
+        canonicalKind: 'ECOSYSTEM',
+        canonicalRank: -1,
+        parentId: 'ecosystem::global'
+      }
+    });
+    this.graph.getGraph().addEdge({
+      id: 'member::legend->global',
+      sourceId: 'ecosystem::legend',
+      targetId: 'ecosystem::global',
+      type: 'MEMBER_OF',
+      confidence: 1.0,
+      properties: {}
+    });
+
     const layers = [
       { id: 'L0', name: 'ECOSYSTEM', rank: 0 },
       { id: 'L1', name: 'REPOSITORY', rank: 1 },
@@ -197,7 +219,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
           canonicalKind: layer.name,
           canonicalRank: layer.rank,
           parentId: 'ecosystem::legend'
-        } as any
+        }
       });
       this.graph.getGraph().addEdge({
         id: `member::taxonomy::${layer.id.toLowerCase()}->legend`,
@@ -208,25 +230,6 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         properties: {}
       });
     }
-
-    this.graph.getGraph().addNode({
-      id: 'ecosystem::legend',
-      label: 'Legend',
-      properties: {
-        name: 'Structural Legend',
-        canonicalKind: 'ECOSYSTEM',
-        canonicalRank: -1,
-        parentId: 'ecosystem::global'
-      } as any
-    });
-    this.graph.getGraph().addEdge({
-      id: 'member::legend->global',
-      sourceId: 'ecosystem::legend',
-      targetId: 'ecosystem::global',
-      type: 'MEMBER_OF',
-      confidence: 1.0,
-      properties: {}
-    });
 
     // Adaptive Memory Pressure Calculation
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -262,7 +265,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
            canonicalRank: 3,
            parentId,
            rootId: `repository::${rootName}`
-         } as any
+         }
        });
 
         // Materialize Unit -> Directory/Repository Link
@@ -278,13 +281,20 @@ export class AnalyzeOrchestrator implements ConducksComponent {
 
     let totalNodes = 0;
     let totalEdges = 0;
+    let pulseIncomplete = false;
 
     // Flush Discovery Pass to clear RAM for Induction
     if (this.persistence) {
       logger.info(`🛡️ [Conducks] [Pass 1.5] Flushing structural hierarchy to vault...`);
-      const { nodeCount, edgeCount } = await (this.graph as any).flushAndClear(this.persistence, pulseId);
-      totalNodes += nodeCount;
-      totalEdges += edgeCount;
+      try {
+        const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
+        totalNodes += nodeCount;
+        totalEdges += edgeCount;
+      } catch (flushErr) {
+        console.error(`[Conducks Orchestrator] Chunk flush failed for discovery pass:`, flushErr);
+        // B3 fix: mark pulse incomplete so caller knows node/edge counts are stale
+        pulseIncomplete = true;
+      }
     }
 
     // === Pass 2 & 3: Conducks Streaming Induction & Binding 🛡️ ===
@@ -292,6 +302,9 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     
     const CHUNK_SIZE = 500;
     const totalBatches = Math.ceil(normalizedFiles.length / CHUNK_SIZE);
+    // B8 fix: track consecutive flush failures for circuit breaker
+    let consecutiveFlushFailures = 0;
+    const MAX_CONSECUTIVE_FLUSH_FAILURES = 3;
 
     for (let i = 0; i < normalizedFiles.length; i += CHUNK_SIZE) {
       const chunk = normalizedFiles.slice(i, i + CHUNK_SIZE);
@@ -318,11 +331,14 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         this.graph.ingestSpectrum(res.path, res.spectrum, useShallowMode, unitId, rootId);
 
         // 3.2 Global Neural Binding (Imports -> Units)
+        const provider = this.registry.getProvider(res.path);
         for (const rel of res.spectrum.relationships) {
-          if (rel.type === 'IMPORTS' && (rel.metadata as any)?.isRaw) {
-            const specifier = (rel.metadata as any).specifier;
-            const linkage = this.reflector.imports.link(specifier, res.path, allPaths, undefined, context);
-            if (linkage) {
+          if (rel.type === 'IMPORTS' && rel.metadata?.isRaw) {
+            const specifier = rel.metadata.specifier;
+            const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
+            // B2 fix: guard both linkage and targetId before accessing fields
+            // Never bind across language families (e.g. a .py import resolving to a .tsx/.go file by basename).
+            if (linkage && linkage.targetId && sameFamily(res.path, linkage.targetId)) {
               this.graph.getGraph().addEdge({
                 id: `NEURAL::${unitId}->${linkage.targetId}`,
                 sourceId: unitId,
@@ -333,16 +349,69 @@ export class AnalyzeOrchestrator implements ConducksComponent {
               });
             }
           }
+
+          // Per-binding IMPORTS: file::unit → target_file::unit::bindingName
+          if (rel.type === 'IMPORTS' && rel.metadata?.isRawBinding) {
+            const specifier = rel.metadata.specifier;
+            const bindingName = rel.metadata.bindingName as string;
+            const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
+            if (linkage && linkage.type === 'IMPORTS' && linkage.targetId && sameFamily(res.path, linkage.targetId)) {
+              const fileBase = linkage.targetId.includes('::') ? linkage.targetId.split('::')[0] : linkage.targetId;
+              const targetNodeId = `${fileBase}::${bindingName}`;
+              this.graph.getGraph().addEdge({
+                id: `BIND::${unitId}->${targetNodeId}`,
+                sourceId: unitId,
+                targetId: targetNodeId,
+                type: 'IMPORTS',
+                confidence: 0.9,
+                properties: { specifier, bindingName }
+              });
+            }
+          }
         }
       }
 
       // Flush Chunk to Vault & Clear RAM
       if (this.persistence) {
         logger.info(`🛡️ [Conducks] [Wave ${batchNum}] Flushing structural delta to vault...`);
-        const { nodeCount, edgeCount } = await (this.graph as any).flushAndClear(this.persistence, pulseId);
-        totalNodes += nodeCount;
-        totalEdges += edgeCount;
-        
+        try {
+          const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
+          totalNodes += nodeCount;
+          totalEdges += edgeCount;
+          // B8 fix: reset failure streak on success
+          consecutiveFlushFailures = 0;
+        } catch (flushErr) {
+          consecutiveFlushFailures++;
+          console.error(`[Conducks Orchestrator] Chunk flush failed for wave ${batchNum} (consecutive: ${consecutiveFlushFailures}):`, flushErr);
+          // B3 fix: mark pulse incomplete on any flush failure
+          pulseIncomplete = true;
+          // B8 fix: circuit breaker — abort after 3 consecutive failures
+          if (consecutiveFlushFailures >= MAX_CONSECUTIVE_FLUSH_FAILURES) {
+            logger.warn(`🛡️ [Conducks] Aborting analysis wave: ${consecutiveFlushFailures} consecutive flush failures.`);
+            break;
+          }
+        }
+
+        // DF1: Write per-symbol kinetic columns from spectrum kinetic blobs
+        for (const res of inductionResults) {
+          if (!res.success || !res.spectrum) continue;
+          for (const n of (res.spectrum.nodes || [])) {
+            const kinetic = n.metadata?.kinetic;
+            const nodeId = n.metadata?.id;
+            if (!nodeId || !kinetic) continue;
+            try {
+              await this.persistence!.updateKineticColumns(nodeId, {
+                blame_age_days: kinetic.tenureDays ?? undefined,
+                churn_count_90d: kinetic.resonance ?? undefined,
+                entropy_score: kinetic.entropy ?? undefined,
+                last_author: kinetic.primaryAuthor || undefined,
+              });
+            } catch {
+              // Non-fatal — kinetic column update failure does not block the pulse
+            }
+          }
+        }
+
         // Recover Heap
         if (global.gc) {
           global.gc();
@@ -355,9 +424,10 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
       
       // Conducks Pulse Hardening: Ensure pulse record knows total count.
+      // B3 fix: surface pulseIncomplete so callers can detect stale counts.
       await this.persistence.run(
         "INSERT OR REPLACE INTO pulses (id, timestamp, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?)",
-        [pulseId, Date.now(), totalNodes, totalEdges, JSON.stringify({ totalUnits: normalizedFiles.length })]
+        [pulseId, Date.now(), totalNodes, totalEdges, JSON.stringify({ totalUnits: normalizedFiles.length, incomplete: pulseIncomplete })]
       );
     }
 
@@ -395,21 +465,19 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       }
     }
 
-    const skipWorker = true; // Hardened for absolute stability during monorepo induction
+    const workerCount = parseInt(process.env.CONDUCKS_WORKERS ?? String(Math.max(1, os.cpus().length - 1)), 10);
+    const skipWorker = workerCount <= 0 || (!isTs && tsxLoader === null);
     if (!skipWorker) {
-      const coreCount = Math.max(1, os.cpus().length - 1);
+      // NOTE: tsxLoader is null when running compiled JS; tsxLoader! below will throw if workerCount>0 in that mode.
+      const coreCount = workerCount;
       const chunkSize = Math.ceil(unitCount / coreCount);
-      const results: any[] = [];
+      const results: Array<{ success: boolean; path: string; spectrum?: PrismSpectrum; state?: unknown }> = [];
 
       for (let i = 0; i < unitCount; i += chunkSize) {
         const chunk = files.slice(i, i + chunkSize);
 
         const spawnWorker = async (chunk: string[]) => {
           return new Promise<any[]>((resolve) => {
-            const { spawnSync } = require('node:child_process');
-            const fs = require('node:fs');
-            const os = require('node:os');
-            const path = require('node:path');
             
             const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
             const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
@@ -478,7 +546,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         if (discoveryMode) context.setDiscoveryMode(true);
         if (globalSymbols) {
           for (const [id, sym] of Object.entries(globalSymbols)) {
-            context.registerGlobalSymbol(id, sym as any);
+            context.registerGlobalSymbol(id, sym);
           }
         }
 

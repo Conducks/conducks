@@ -1,5 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Flows Command (Behavioral Processes)
@@ -10,8 +11,7 @@ export class FlowsCommand implements ConducksCommand {
   public usage = "registry flows";
 
   public async execute(_args: string[], registry: Registry): Promise<void> {
-    // Structural Sync via Registry Bridge
-    await registry.infrastructure.persistence.load(registry.query.graph.getGraph());
+    await syncGraph(registry);
     
     const processes = registry.kinetic.getProcesses();
     console.log("\x1b[1m--- 🌊 Behavioral Processes ---\x1b[0m");

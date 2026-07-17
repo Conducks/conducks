@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { GatewayService } from '@/lib/domain/analysis/gateway-service.js';
 import { chronicle } from '@/lib/core/git/chronicle-interface.js';
 import { Logger } from '@/lib/core/utils/logger.js';
+import { registry } from '@/registry/index.js';
 import http from 'node:http';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,7 +35,11 @@ export class MirrorServer {
   }
 
   private setupRoutes() {
-    this.app.use(cors());
+    // S8: Restrict CORS to localhost only — rejects cross-origin requests from external domains.
+    this.app.use(cors({
+      origin: ['http://localhost', /^http:\/\/localhost:\d+$/],
+      credentials: false
+    }));
 
     const staticPath = path.resolve(__dirname, '../../resources/mirror');
     this.app.use(express.static(staticPath));
@@ -68,6 +73,22 @@ export class MirrorServer {
         res.json(hydratedNode);
       } catch (err) {
         res.status(500).json({ error: 'Structural Hydration Failure.' });
+      }
+    });
+
+    // Governance dashboard data
+    this.app.get('/api/governance', async (req, res) => {
+      try {
+        const auditResult = registry.audit.audit();
+        const recommendations = await registry.audit.advise();
+        res.json({
+          violations: auditResult.violations,
+          recommendations,
+          stats: auditResult.stats,
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        res.status(500).json({ error: String(err) });
       }
     });
 

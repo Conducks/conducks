@@ -131,7 +131,7 @@ export class DAACClustering {
   }
 
   private getUniqueFilesFromGraph(graph: ConducksAdjacencyList): string[] {
-    const nodes = (graph as any).nodes as Map<NodeId, ConducksNode>;
+    const nodes = graph.getNodesMap();
     const files = new Set<string>();
     for (const node of nodes.values()) {
       if (node.properties.filePath) {

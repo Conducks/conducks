@@ -63,6 +63,7 @@ export class PythonExtractor {
     ]);
 
     const traverse = (n: any) => {
+      if (!n) return;
       if (branchNodes.has(n.type)) {
         complexity++;
       }

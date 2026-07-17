@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
+import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Bootstrap Documentation Command
@@ -31,8 +32,9 @@ export class BootstrapDocsCommand implements ConducksCommand {
       }
     } catch (err) {
       console.error(`Bootstrap Error: ${(err as Error).message}`);
+      process.exit(1);
     } finally {
-      await registry.infrastructure.persistence.close();
+      await closePersistence(registry);
     }
   }
 }

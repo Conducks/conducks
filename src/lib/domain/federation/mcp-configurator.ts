@@ -1,4 +1,5 @@
 import fs from "fs-extra";
+import { writeFileSync, renameSync, copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
@@ -48,7 +49,13 @@ export class MCPConfigurator implements ConducksComponent {
         }
       };
 
-      await this.fsMock.writeJson(this.claudeConfigPath, config, { spaces: 2 });
+      const tmpPath = this.claudeConfigPath + '.tmp';
+      const bakPath = this.claudeConfigPath + '.bak';
+      writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8');
+      if (existsSync(this.claudeConfigPath)) {
+        copyFileSync(this.claudeConfigPath, bakPath);
+      }
+      renameSync(tmpPath, this.claudeConfigPath);
       return { success: true, message: `✅ Successfully registered Conducks in Claude Desktop.` };
     } catch (err) {
       return { success: false, message: `❌ Claude Setup Failed: ${(err as Error).message}` };

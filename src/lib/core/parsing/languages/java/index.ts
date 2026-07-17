@@ -1,14 +1,15 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
+import { ILanguagePlugin } from "@/types/language-plugin.js";
 import { JAVA_QUERIES } from "./queries.js";
 import { JavaResolver } from "./resolver.js";
 import { JavaExtractor } from "./extractor.js";
 
 /**
  * Conducks — High-Fidelity Java Language Provider (Suite v3) 🏺 🟦
- * 
+ *
  * Maps Java structural DNA (Classes, Records, Spring Annotations) to the 8-layer taxonomy.
  */
-export class JavaProvider extends NativeProvider {
+export class JavaProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "java-provider";
   public readonly version = "3.0.0";
   public readonly extensions = [".java"];
