@@ -1,7 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
-import { readFileSync } from "node:fs";
 import chalk from "chalk";
 import { saveBaseline, loadBaseline, diffAgainstBaseline, defaultBaselinePath } from "@/lib/domain/analysis/coverage-baseline.js";
 
@@ -36,86 +35,17 @@ export class CoverageCommand implements ConducksCommand {
     }
 
     try {
-      // 1. Runtime signal: istanbul coverage → ran-lines per file (lowercased path key).
-      let cov: Record<string, any>;
+      // Range-join coverage onto BEHAVIOR node spans — shared domain logic (coverage-bind.ts),
+      // reached through the composition root so the same code backs `conducks_coverage` (MCP).
+      let results: Awaited<ReturnType<typeof registry.coverage.bind>>;
       try {
-        cov = JSON.parse(readFileSync(covPath, "utf8"));
+        results = await registry.coverage.bind(covPath);
       } catch (e) {
-        console.error(chalk.red(`Cannot read coverage file ${covPath}: ${(e as Error).message}`));
+        console.error(chalk.red(`Cannot read/bind coverage file ${covPath}: ${(e as Error).message}`));
         process.exitCode = 1;
         return;
       }
-      const ranByFile = new Map<string, Set<number>>();
-      for (const [file, d] of Object.entries<any>(cov)) {
-        const lines = new Set<number>();
-        const sm = d.statementMap || {}, s = d.s || {};
-        for (const id of Object.keys(sm)) {
-          if ((s[id] || 0) > 0) {
-            const st = sm[id];
-            const end = (st.end && st.end.line) || st.start.line;
-            for (let ln = st.start.line; ln <= end; ln++) lines.add(ln);
-          }
-        }
-        ranByFile.set(file.toLowerCase(), lines);
-      }
-
-      // 1b. Branch data (istanbul branchMap + b): per file, each branch location's line and
-      // how many of its arms were taken. This is the "error path never ran" signal — computed
-      // as fill detail inside a function, NOT emitted as graph nodes (that would flood the graph).
-      const branchesByFile = new Map<string, Array<{ line: number; arms: number[] }>>();
-      for (const [file, d] of Object.entries<any>(cov)) {
-        const bm = d.branchMap || {}, b = d.b || {};
-        const list: Array<{ line: number; arms: number[] }> = [];
-        for (const id of Object.keys(bm)) {
-          const loc = bm[id];
-          const line = (loc.loc && loc.loc.start && loc.loc.start.line) || (loc.line) || 0;
-          if (line && Array.isArray(b[id])) list.push({ line, arms: b[id] });
-        }
-        branchesByFile.set(file.toLowerCase(), list);
-      }
-
-      // 2. Structural side: BEHAVIOR nodes that carry a real line span.
-      const nodes = await registry.infrastructure.persistence.query<{
-        name: string; file: string; lineStart: number; lineEnd: number;
-      }>(
-        `SELECT name, file, lineStart, lineEnd FROM nodes
-         WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart
-         ORDER BY file, lineStart`
-      );
-
-      const covKeys = [...ranByFile.keys()];
-      const matchFile = (f: string): string | undefined => {
-        const lf = f.toLowerCase();
-        return covKeys.find(k => k === lf || k.endsWith(lf) || lf.endsWith(k)
-          || k.endsWith("/" + lf.split("/").pop()));
-      };
-
-      // 3. The bind: range-join each covered line into the node whose span contains it.
-      //    Line fill% = lines run / span. Branch coverage = arms taken / arms, for branches
-      //    whose location falls inside the function span (never-taken arms = dead error paths).
-      const results: Array<{
-        name: string; file: string; start: number; end: number;
-        pct: number; branchTaken: number; branchTotal: number; bound: boolean;
-      }> = [];
-      for (const n of nodes) {
-        const key = matchFile(n.file);
-        const span = n.lineEnd - n.lineStart + 1;
-        let hit = 0, branchTaken = 0, branchTotal = 0;
-        if (key) {
-          const ran = ranByFile.get(key)!;
-          for (let ln = n.lineStart; ln <= n.lineEnd; ln++) if (ran.has(ln)) hit++;
-          for (const br of branchesByFile.get(key) || []) {
-            if (br.line >= n.lineStart && br.line <= n.lineEnd) {
-              branchTotal += br.arms.length;
-              branchTaken += br.arms.filter(c => c > 0).length;
-            }
-          }
-        }
-        results.push({
-          name: n.name, file: n.file, start: n.lineStart, end: n.lineEnd,
-          pct: Math.round((hit / span) * 100), branchTaken, branchTotal, bound: !!key,
-        });
-      }
+      const nodes = results; // total functions with spans (for the summary line)
 
       const bound = results.filter(r => r.bound);
 

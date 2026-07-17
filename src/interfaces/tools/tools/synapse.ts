@@ -713,5 +713,69 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
         await (registry.infrastructure.persistence as any).close();
       }
     }
+  },
+
+  // Parity: docs progress board (todo %, ADR states) parsed from the authored markdown grammar.
+  conducks_docs: {
+    id: "conducks-docs",
+    name: "conducks_docs",
+    type: "tool",
+    version: "1.0.0",
+    description: `Progress board parsed straight from the project's authored docs (conducks-docs grammar):
+todo phases/%, ADR states, feature/memory/convention counts, and any grammar violations.
+
+WHEN TO USE: Check what work is in flight and its status without reading every doc.`,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    inputSchema: {
+      type: "object",
+      properties: { path: { type: "string", description: "Optional: the project root." } }
+    },
+    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    handler: async ({ path: customPath }: any) => {
+      try {
+        await ensureAnchor(customPath, true);
+        const board = registry.docs.board(customPath);
+        return mcpOk(board, { nodeCount: board.todos.length + board.decisions.length });
+      } catch (err: any) {
+        return mcpErr('DOCS_FAILED', err.message, 'Check the docs/ folder follows the conducks-docs grammar.', true);
+      }
+    }
+  },
+
+  // Parity: coverage overlay — range-join a coverage report onto function spans (drift detection).
+  conducks_coverage: {
+    id: "conducks-coverage",
+    name: "conducks_coverage",
+    type: "tool",
+    version: "1.0.0",
+    description: `Overlay an istanbul coverage-final.json onto the graph: per-function fill % and
+branch coverage. A dark function (0%) with no callers is dead/forgotten code; one that was
+covered and is now dark has broken.
+
+WHEN TO USE: See which functions a test run exercised, and spot lost/untested capabilities.`,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    inputSchema: {
+      type: "object",
+      properties: {
+        coverage: { type: "string", description: "Path to an istanbul coverage-final.json." },
+        path: { type: "string", description: "Optional: the project root." }
+      },
+      required: ["coverage"]
+    },
+    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    handler: async ({ coverage, path: customPath }: any) => {
+      try {
+        await ensureAnchor(customPath, true);
+        const results = await registry.coverage.bind(coverage);
+        const bound = results.filter((r: any) => r.bound);
+        const full = bound.filter((r: any) => r.pct >= 99).length;
+        const dark = bound.filter((r: any) => r.pct === 0).length;
+        return mcpOk({ functions: bound, summary: { total: bound.length, full, dark } }, { nodeCount: bound.length });
+      } catch (err: any) {
+        return mcpErr('COVERAGE_FAILED', err.message, 'Run conducks analyze first, and pass a valid coverage-final.json.', true);
+      } finally {
+        await (registry.infrastructure.persistence as any).close();
+      }
+    }
   }
 };
