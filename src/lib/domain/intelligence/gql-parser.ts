@@ -1,5 +1,5 @@
 import { ConducksAdjacencyList, ConducksNode, EdgeType } from "@/lib/core/graph/adjacency-list.js";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — GQL (Graph Query Language) Parser

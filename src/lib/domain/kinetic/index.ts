@@ -2,7 +2,7 @@ import { TraceAnalyzer } from "./trace.js";
 import { BlastRadiusAnalyzer } from "./impact.js";
 import { ConducksFlowEngine } from "./flow-engine.js";
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Kinetic Domain Service

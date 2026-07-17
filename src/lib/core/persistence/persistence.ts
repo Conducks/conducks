@@ -4,7 +4,7 @@ import { chronicle } from "../git/chronicle-interface.js";
 import { logger } from "../../core/utils/logger.js";
 import { SynapseRegistry } from "../../../registry/synapse-registry.js";
 import duckdb from "duckdb";
-import type { ConducksComponent } from "../../../registry/types.js";
+import type { ConducksComponent } from "../../../contracts/types.js";
 
 /**
  * Conducks — Synapse Persistence Engine (DuckDB v2) 🏺 🟦

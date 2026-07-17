@@ -34,7 +34,7 @@ interface WatcherOptions {
   watcher?: FSWatcher;
 }
 
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Synapse Structural Monitor (Watcher)

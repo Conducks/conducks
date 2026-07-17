@@ -1,4 +1,4 @@
-import { ConducksComponent } from '@/registry/types.js';
+import { ConducksComponent } from '@/contracts/types.js';
 
 /**
  * Metadata for a file to be parsed.

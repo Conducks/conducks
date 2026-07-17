@@ -5,7 +5,7 @@ import { ResonanceAnalyzer } from "./resonance.js";
 import { TestAligner } from "./test-aligner.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Metrics Domain Service

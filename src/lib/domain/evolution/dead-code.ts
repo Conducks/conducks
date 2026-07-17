@@ -1,5 +1,5 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 export interface Finding {
   type: 'ORPHAN' | 'UNUSED_EXPORT' | 'UNREACHABLE_LOGIC' | 'STALE_IMPORT';

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * A file to be written during bootstrap.

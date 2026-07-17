@@ -11,7 +11,7 @@ import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
 import { HttpServiceLinker } from "@/lib/core/graph/http-service-linker.js";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 import { QueryService } from "./query-service.js";
 

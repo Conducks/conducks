@@ -2,7 +2,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import os from "node:os";
 
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 
 /**

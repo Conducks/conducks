@@ -1,6 +1,6 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
 import type { Advice } from '@/types/domain.js';
-import { ConducksComponent } from '@/registry/types.js';
+import { ConducksComponent } from '@/contracts/types.js';
 
 /**
  * Conducks — Conducks Architecture Advisor

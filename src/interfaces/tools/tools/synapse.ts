@@ -1,4 +1,4 @@
-import { Tool } from "@/registry/types.js";
+import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { ensureAnchor } from "../shared/anchor.js";

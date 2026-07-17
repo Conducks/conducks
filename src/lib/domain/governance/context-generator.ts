@@ -1,7 +1,7 @@
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Neural Context Generator

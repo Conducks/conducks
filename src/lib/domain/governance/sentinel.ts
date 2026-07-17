@@ -26,7 +26,7 @@ export interface SentinelReport {
   coverage?: Record<string, number>; // Summary of framework usage
 }
 
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 export class ConducksSentinel implements ConducksComponent {
   public readonly id = 'structural-sentinel';
