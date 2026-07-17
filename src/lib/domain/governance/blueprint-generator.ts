@@ -4,7 +4,7 @@ import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { DAACClustering } from '@/lib/core/algorithms/clustering/daac.js';
 import { ConfigDetector } from './config-detector.js';
 import { ConducksSentinel } from './sentinel.js';
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 export interface BlueprintDiff {
   nodesAdded: string[];

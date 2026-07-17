@@ -10,7 +10,7 @@ import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import path from "node:path";
 
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 import type { PrismSpectrum } from "@/types/prism-types.js";
 import { logger } from "@/lib/core/utils/logger.js";
 import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";

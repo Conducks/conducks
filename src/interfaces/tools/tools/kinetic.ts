@@ -1,4 +1,4 @@
-import { Tool } from "@/registry/types.js";
+import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { execSync } from "node:child_process";
 import { ensureAnchor } from "../shared/anchor.js";

@@ -1,7 +1,7 @@
 import { ConducksSearch } from "./search-engine.js";
 import { GQLParser } from "./gql-parser.js";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Intelligence Service

@@ -7,7 +7,7 @@ import { RegressionGuard } from "./guard.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 import path from "node:path";
 import { loadSentinelRules, type SentinelRule } from "./sentinel-rules.js";
 

@@ -15,7 +15,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs";
 
-import { ConducksComponent } from "../../../registry/types.js";
+import { ConducksComponent } from "../../../contracts/types.js";
 import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js";
 
 /**

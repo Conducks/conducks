@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import { ConducksAdjacencyList, NodeId } from '@/lib/core/graph/adjacency-list.js';
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 export interface RefactorResult {
   success: boolean;

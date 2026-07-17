@@ -1,4 +1,4 @@
-import { ConducksComponent } from "./types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Synapse Registry

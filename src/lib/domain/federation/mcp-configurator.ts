@@ -3,7 +3,7 @@ import { writeFileSync, renameSync, copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — MCP Configurator

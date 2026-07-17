@@ -1,5 +1,5 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
-import { ConducksComponent } from '@/registry/types.js';
+import { ConducksComponent } from '@/contracts/types.js';
 
 /**
  * Conducks — Graph Search Engine

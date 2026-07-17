@@ -1,6 +1,6 @@
 import { AnalyzeContext } from "./context.js";
 
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Pulse Pipeline

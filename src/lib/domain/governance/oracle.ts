@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ConducksComponent } from "@/registry/types.js";
+import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Guidance Oracle 🔱
