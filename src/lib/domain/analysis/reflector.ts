@@ -255,7 +255,10 @@ export class ConducksReflector implements ConducksComponent {
               initialKind = 'infra';
             }
 
-            const isScoped = match.captures.some((c: any) => c.name === CaptureTags.IS_FUNCTION || c.name === CaptureTags.IS_CLASS || c.name === CaptureTags.IS_STRUCT || c.name === CaptureTags.IS_METHOD || c.name === CaptureTags.IS_INTERFACE || c.name === CaptureTags.IS_ENUM);
+            // IS_INFRA included so multi-line infra (decorators, providers) get a real span.
+            // Note: single-line @isInfra hook patterns (useState/useEffect array_pattern) still
+            // collapse to ~1 line — resolving those needs a variable_declarator walk (deferred, low value).
+            const isScoped = match.captures.some((c: any) => c.name === CaptureTags.IS_FUNCTION || c.name === CaptureTags.IS_CLASS || c.name === CaptureTags.IS_STRUCT || c.name === CaptureTags.IS_METHOD || c.name === CaptureTags.IS_INTERFACE || c.name === CaptureTags.IS_ENUM || c.name === CaptureTags.IS_INFRA);
             let rangeNode = matchNameCap.node;
             if (isScoped && matchNameCap.node.parent) {
               rangeNode = matchNameCap.node.parent;

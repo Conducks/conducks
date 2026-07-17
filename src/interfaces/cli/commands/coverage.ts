@@ -59,6 +59,21 @@ export class CoverageCommand implements ConducksCommand {
         ranByFile.set(file.toLowerCase(), lines);
       }
 
+      // 1b. Branch data (istanbul branchMap + b): per file, each branch location's line and
+      // how many of its arms were taken. This is the "error path never ran" signal — computed
+      // as fill detail inside a function, NOT emitted as graph nodes (that would flood the graph).
+      const branchesByFile = new Map<string, Array<{ line: number; arms: number[] }>>();
+      for (const [file, d] of Object.entries<any>(cov)) {
+        const bm = d.branchMap || {}, b = d.b || {};
+        const list: Array<{ line: number; arms: number[] }> = [];
+        for (const id of Object.keys(bm)) {
+          const loc = bm[id];
+          const line = (loc.loc && loc.loc.start && loc.loc.start.line) || (loc.line) || 0;
+          if (line && Array.isArray(b[id])) list.push({ line, arms: b[id] });
+        }
+        branchesByFile.set(file.toLowerCase(), list);
+      }
+
       // 2. Structural side: BEHAVIOR nodes that carry a real line span.
       const nodes = await registry.infrastructure.persistence.query<{
         name: string; file: string; lineStart: number; lineEnd: number;
@@ -76,18 +91,29 @@ export class CoverageCommand implements ConducksCommand {
       };
 
       // 3. The bind: range-join each covered line into the node whose span contains it.
-      const results: Array<{ name: string; file: string; start: number; end: number; pct: number; bound: boolean }> = [];
+      //    Line fill% = lines run / span. Branch coverage = arms taken / arms, for branches
+      //    whose location falls inside the function span (never-taken arms = dead error paths).
+      const results: Array<{
+        name: string; file: string; start: number; end: number;
+        pct: number; branchTaken: number; branchTotal: number; bound: boolean;
+      }> = [];
       for (const n of nodes) {
         const key = matchFile(n.file);
         const span = n.lineEnd - n.lineStart + 1;
-        let hit = 0;
+        let hit = 0, branchTaken = 0, branchTotal = 0;
         if (key) {
           const ran = ranByFile.get(key)!;
           for (let ln = n.lineStart; ln <= n.lineEnd; ln++) if (ran.has(ln)) hit++;
+          for (const br of branchesByFile.get(key) || []) {
+            if (br.line >= n.lineStart && br.line <= n.lineEnd) {
+              branchTotal += br.arms.length;
+              branchTaken += br.arms.filter(c => c > 0).length;
+            }
+          }
         }
         results.push({
           name: n.name, file: n.file, start: n.lineStart, end: n.lineEnd,
-          pct: Math.round((hit / span) * 100), bound: !!key,
+          pct: Math.round((hit / span) * 100), branchTaken, branchTotal, bound: !!key,
         });
       }
 
@@ -158,7 +184,10 @@ export class CoverageCommand implements ConducksCommand {
         const bar = chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(10 - filled));
         const label = r.pct >= 99 ? chalk.green("FULL") : r.pct === 0 ? chalk.gray("DARK") : chalk.yellow("PART");
         const short = r.file.split("/").slice(-1)[0];
-        console.log(`  [${bar}] ${String(r.pct).padStart(3)}%  ${label}  ${r.name.padEnd(22)} ${chalk.dim(short + ":" + r.start + "-" + r.end)}`);
+        const br = r.branchTotal > 0
+          ? "  " + (r.branchTaken < r.branchTotal ? chalk.magenta : chalk.dim)(`${r.branchTaken}/${r.branchTotal} br`)
+          : "";
+        console.log(`  [${bar}] ${String(r.pct).padStart(3)}%  ${label}  ${r.name.padEnd(22)} ${chalk.dim(short + ":" + r.start + "-" + r.end)}${br}`);
       }
       console.log(
         `\n  ${chalk.green(full + " full")} · ${chalk.yellow(part + " partial")} · ${chalk.gray(dark + " dark")}` +

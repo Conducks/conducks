@@ -1,7 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, watch } from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 
@@ -16,12 +16,13 @@ import chalk from "chalk";
 export class CoverageViewCommand implements ConducksCommand {
   public id = "coverage-view";
   public description = "Render istanbul/c8 coverage overlay as a self-contained static HTML file";
-  public usage = "conducks coverage-view <coverage-final.json> [--out coverage.html] [path]";
+  public usage = "conducks coverage-view <coverage-final.json> [--out coverage.html] [--watch] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const covPath = args.find(a => a.endsWith(".json") && !a.startsWith("--"));
     const outIdx = args.indexOf("--out");
     const outPath = outIdx !== -1 && args[outIdx + 1] ? args[outIdx + 1] : "coverage.html";
+    const isWatch = args.includes("--watch");
 
     if (!covPath) {
       console.error(chalk.red("Missing coverage file. Usage: ") + this.usage);
@@ -29,15 +30,26 @@ export class CoverageViewCommand implements ConducksCommand {
       return;
     }
 
-    try {
-      // 1. Runtime signal: istanbul coverage → ran-lines per file (lowercased path key).
+    const resolvedOut = outPath.startsWith("/") ? outPath : path.resolve(process.cwd(), outPath);
+
+    // Structural side queried ONCE — the graph doesn't change during a test-watch session.
+    const nodes = await registry.infrastructure.persistence.query<{
+      name: string; file: string; lineStart: number; lineEnd: number;
+    }>(
+      `SELECT name, file, lineStart, lineEnd FROM nodes
+       WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart
+       ORDER BY file, lineStart`
+    );
+
+    // Re-bind the (changing) coverage file against the (fixed) graph and rewrite the HTML.
+    // Returns false if the coverage file couldn't be read (e.g. mid-write); caller may retry.
+    const regenerate = (): boolean => {
       let cov: Record<string, any>;
       try {
         cov = JSON.parse(readFileSync(covPath, "utf8"));
       } catch (e) {
-        console.error(chalk.red(`Cannot read coverage file ${covPath}: ${(e as Error).message}`));
-        process.exitCode = 1;
-        return;
+        if (!isWatch) console.error(chalk.red(`Cannot read coverage file ${covPath}: ${(e as Error).message}`));
+        return false;
       }
       const ranByFile = new Map<string, Set<number>>();
       for (const [file, d] of Object.entries<any>(cov)) {
@@ -52,24 +64,12 @@ export class CoverageViewCommand implements ConducksCommand {
         }
         ranByFile.set(file.toLowerCase(), lines);
       }
-
-      // 2. Structural side: BEHAVIOR nodes that carry a real line span.
-      const nodes = await registry.infrastructure.persistence.query<{
-        name: string; file: string; lineStart: number; lineEnd: number;
-      }>(
-        `SELECT name, file, lineStart, lineEnd FROM nodes
-         WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart
-         ORDER BY file, lineStart`
-      );
-
       const covKeys = [...ranByFile.keys()];
       const matchFile = (f: string): string | undefined => {
         const lf = f.toLowerCase();
         return covKeys.find(k => k === lf || k.endsWith(lf) || lf.endsWith(k)
           || k.endsWith("/" + lf.split("/").pop()));
       };
-
-      // 3. The bind: range-join each covered line into the node whose span contains it.
       const results: Array<{ name: string; file: string; start: number; end: number; pct: number; bound: boolean }> = [];
       for (const n of nodes) {
         const key = matchFile(n.file);
@@ -79,33 +79,44 @@ export class CoverageViewCommand implements ConducksCommand {
           const ran = ranByFile.get(key)!;
           for (let ln = n.lineStart; ln <= n.lineEnd; ln++) if (ran.has(ln)) hit++;
         }
-        results.push({
-          name: n.name, file: n.file, start: n.lineStart, end: n.lineEnd,
-          pct: Math.round((hit / span) * 100), bound: !!key,
-        });
+        results.push({ name: n.name, file: n.file, start: n.lineStart, end: n.lineEnd, pct: Math.round((hit / span) * 100), bound: !!key });
       }
-
       const bound = results.filter(r => r.bound);
-
-      // 4. Group by file for the HTML report.
       const byFile = new Map<string, typeof bound>();
       for (const r of bound) {
         if (!byFile.has(r.file)) byFile.set(r.file, []);
         byFile.get(r.file)!.push(r);
       }
-
-      const html = this.renderHtml(byFile, nodes.length);
-      const resolvedOut = outPath.startsWith("/") ? outPath : path.resolve(process.cwd(), outPath);
-      writeFileSync(resolvedOut, html, "utf8");
-
+      writeFileSync(resolvedOut, this.renderHtml(byFile, nodes.length), "utf8");
       const full = bound.filter(r => r.pct >= 99).length;
       const part = bound.filter(r => r.pct > 0 && r.pct < 99).length;
       const dark = bound.filter(r => r.pct === 0).length;
-      console.log(chalk.bold("\n--- 🟩🖼️  Conducks Coverage View ---\n"));
+      const stamp = isWatch ? chalk.dim(" (re-rendered)") : "";
+      console.log(chalk.bold("\n--- 🟩🖼️  Conducks Coverage View ---") + stamp + "\n");
       console.log(`  ${chalk.green(full + " full")} · ${chalk.yellow(part + " partial")} · ${chalk.gray(dark + " dark")}` +
         `   (${bound.length} functions bound of ${nodes.length} with spans)`);
       console.log(chalk.dim(`  Wrote ${resolvedOut}`));
-      console.log();
+      return true;
+    };
+
+    try {
+      regenerate();
+      if (!isWatch) return;
+
+      // C5 (live, v1): re-render whenever the coverage file changes. Run `jest --watch`
+      // (or c8 --watch) in another terminal — each test re-run rewrites coverage-final.json,
+      // and the overlay refreshes. Not the full "click through the app" stream (that needs a
+      // running app instrumented), but the same feedback loop for a test-driven session.
+      console.log(chalk.cyan(`\n  👁  Watching ${covPath} — re-renders on change. Ctrl-C to stop.`));
+      let timer: NodeJS.Timeout | null = null;
+      watch(covPath, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { regenerate(); }, 150); // debounce mid-write bursts
+      });
+      // Keep the process alive until interrupted.
+      await new Promise<void>((resolve) => {
+        process.on("SIGINT", () => { console.log(chalk.dim("\n  Stopped watching.")); resolve(); });
+      });
     } finally {
       await closePersistence(registry);
     }
