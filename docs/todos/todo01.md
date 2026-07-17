@@ -1,6 +1,49 @@
 # todo01 — Live Architecture Visualizer (structure ⊕ coverage overlay)
 
-**Status:** 🔄 design settled, build not started
+**Status:** 🔄 C0 in progress — taxonomy + BEHAVIOR/STRUCTURE spans done; UNIT/INFRA spans + statement/branch emission pending
+
+## Progress log (record — append only)
+- `0473309` checkpoint: clean baseline (prior parsing work + doc cleanup). Discovered prior
+  C1 work already exists: `import-resolver.ts` (3-tier ref edges), `http-service-linker.ts`
+  (cross-service edges), `languages/javascript` + `languages/tsx` plugins.
+- `e58be42` taxonomy: added PACKAGE, STATEMENT, BRANCH kinds (additive, no renames — 24
+  downstream string-compares untouched). Decision: reconcile-by-ADDITION not rename, after
+  measuring that renames = 24 silent-break sites for zero functional value.
+- `84eb06c` fix(spans): lineEnd was 0 for EVERY node (blocked the entire coverage overlay).
+  Two strip points fixed (adjacency-list whitelist dropped range; reflector isScoped omitted
+  interface/enum). Now BEHAVIOR 12/13, STRUCTURE 8/9 carry real spans. Verified on ../website.
+
+## SPINE PROVEN (2026-07-17) — C2 + C3 end-to-end, fully real
+Ran conducks' own jest suite with istanbul coverage → range-joined that real coverage to
+conducks' own graph (self-analysis). Result: 24 functions in adjacency-list.ts bound to real
+test coverage — `addNode` 86%, `addEdge` 57%, `traverseAStar`/`findSymbolAtLine` DARK (untested).
+No synthetic data. Proves: real code → parse → node spans → coverage bind → functions light.
+The risky unknown ("can this work?") is answered YES. Prototype: scratch/real-bind.mjs (gitignored).
+Next to productionize: a real `conducks coverage <istanbul.json>` CLI command wrapping this join.
+
+## Parallel fleet shipped (2026-07-17) — commit 98ad47b
+- [x] UNIT (file) spans: reflector.ts now sets [1,lastLine]. website 0→32. (root cause: unitNode
+      had no `properties` field, persist reads m.range). C0 file-level coverage unblocked.
+- [x] `conducks coverage-view <cov.json>` — self-contained HTML overlay (C6 render). 86KB, 0 CDN.
+- [x] `conducks coverage --save-baseline / --vs-baseline` — drift detection (C7). Verified fires:
+      "addNode: was 86% → now 0% (BROKE)" on degraded input; 0 false positives on identical.
+
+## Still remaining
+- [ ] INFRA spans: 7 nodes at 0 — documented spec (React-hooks @isInfra needs isScoped handling).
+      reflector.ts:255 add IS_INFRA + resolve rangeNode for @pulse_assignment_name (array_pattern
+      → walk to variable_declarator). Not guessed; left as applyable spec.
+- [ ] STATEMENT/BRANCH emission: tiers exist in taxonomy but nothing emits these nodes yet.
+- [ ] DIRECTORY leaks as a raw kind (not in enum) — taxonomy mapping bypassed for folders.
+- [ ] C5 LIVE layer (watch app + stream coverage as you click) — deferred: a project, not a
+      parallel edit. Needs a running app instrumented with a live coverage stream.
+
+## The proven fact
+BEHAVIOR nodes now carry real `[lineStart,lineEnd]` (e.g. Home 164–593, BlogPage 9–96).
+This unblocks C3: coverage line N → node whose span contains N → that function lights.
+Next meaningful step = prove that bind on ONE function end-to-end.
+
+---
+
 **Owner unit:** conducks (primary) — extends the existing structural graph engine
 **Scope of this todo:** TS / TSX / JS npm projects ONLY. No other languages until the spine works on one repo.
 

@@ -125,6 +125,7 @@ export class ConducksAdjacencyList {
         namespaceId: node.properties.namespaceId,
         structureId: node.properties.structureId,
         layer_path: node.properties.layer_path,
+        range: node.properties.range,
         depth: node.properties.depth,
         risk: node.properties.risk,
         gravity: node.properties.gravity,
