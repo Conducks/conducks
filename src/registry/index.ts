@@ -202,7 +202,8 @@ export const registry = {
     contextFile: () => governance.generateManifest(persistence),
     blueprint: () => governance.generateBlueprint(),
     status: () => governance.status(),
-    guard: (threshold?: number) => governance.shouldBlock(threshold)
+    guard: (threshold?: number) => governance.shouldBlock(threshold),
+    rules: (root?: string) => governance.auditWithRules(root)
   },
   oracle: {
     bootstrap: () => oracle.bootstrap(),

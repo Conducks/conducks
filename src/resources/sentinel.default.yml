@@ -27,3 +27,8 @@ rules:
     severity: info
     threshold: 5
     enabled: false
+  - id: layer_boundaries
+    name: Clean Architecture layer contract
+    condition: layer_boundaries
+    severity: error
+    enabled: true

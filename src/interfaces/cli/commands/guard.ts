@@ -26,7 +26,31 @@ export class GuardCommand implements ConducksCommand {
         logger.info('🛡️ [Guard] Pulse recorded.');
       }
 
-      // 2. Structural Regression Scan
+      // 2. Layer-contract check (ADR 0005) — Clean-Architecture boundaries via sentinel rules
+      logger.info('🛡️ [Guard] Checking layer boundaries...');
+      const ruleReport = (registry.audit as any).rules() as { violations: Array<{ ruleId: string; severity: string; message: string }> };
+      const layerViolations = ruleReport.violations.filter(v => v.ruleId === 'layer_boundaries');
+
+      // The layer contract is the hard gate — it's the one this guard was built to enforce.
+      if (layerViolations.length > 0) {
+        console.error('\n❌ Layer contract violated (ADR 0005):');
+        for (const v of layerViolations) console.error(`  - ${v.message}`);
+        console.error(`\n${layerViolations.length} illegal cross-layer dependency(ies). Blocked.`);
+        process.exit(1);
+      }
+      console.log('✅ Layer contract clean.');
+
+      // Other enabled sentinel rules (cycles, rank inversions) are surfaced as findings, not
+      // hard-blocked here — they are tracked separately and predate the layer split.
+      const otherErrors = ruleReport.violations.filter(v => v.ruleId !== 'layer_boundaries');
+      if (otherErrors.length > 0) {
+        const byRule: Record<string, number> = {};
+        for (const v of otherErrors) byRule[v.ruleId] = (byRule[v.ruleId] || 0) + 1;
+        console.log('⚠️  Other structural findings (pre-existing, tracked): ' +
+          Object.entries(byRule).map(([k, n]) => `${k}=${n}`).join(', '));
+      }
+
+      // 3. Structural Regression Scan
       logger.info(`🛡️ [Guard] Scanning structural delta (Threshold: ${threshold})...`);
       const status = await registry.audit.guard(threshold);
 
