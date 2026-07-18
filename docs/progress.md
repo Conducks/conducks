@@ -1,5 +1,10 @@
 # Progress — conducks
 
+## 2026-07-19 · atomic analyze pulse (prevention)
+- purge+flush+rank+save wrapped in ONE transaction (persistence beginPulse/abortPulse; save commits).
+  A killed analyze rolls back — previous good graph survives. Proven: killed mid-flush → graph
+  unchanged at 11029 edges (not a 511-edge partial). Health check remains as the backstop.
+
 ## 2026-07-19 · incomplete-pulse health check
 - `status` flags a graph with density < 0.5 on 50+ nodes as `⚠ INCOMPLETE PULSE` (an interrupted
   analyze persists nodes but loses most edges — loads fine, silently ~95% disconnected). health

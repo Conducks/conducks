@@ -19,6 +19,25 @@ export class SynapsePersistence {
   private registry = new SynapseRegistry<ConducksComponent>();
   private lazy: boolean = true;
   private readOnly: boolean = false;
+  // When true, individual write methods run INSIDE one big analyze transaction instead of
+  // self-committing. An interrupted analyze then never commits → duckdb rolls the whole pulse
+  // back on next open, so the previous good graph survives (no silent partial-graph corruption).
+  private inPulse: boolean = false;
+
+  /** Open an atomic analyze pulse: every write until save()/abortPulse() is one transaction. */
+  public async beginPulse(): Promise<void> {
+    if (this.readOnly || this.inPulse) return;
+    await this.ensureVaultOpen();
+    await this.run("BEGIN TRANSACTION");
+    this.inPulse = true;
+  }
+
+  /** Roll the pulse back (on error). A process kill mid-pulse auto-rolls-back on the next open. */
+  public async abortPulse(): Promise<void> {
+    if (!this.inPulse) return;
+    this.inPulse = false;
+    try { await this.run("ROLLBACK"); } catch { /* connection may already be gone */ }
+  }
 
   constructor(private vaultPath: string, readOnly = false) {
     this.readOnly = readOnly;
@@ -202,8 +221,9 @@ export class SynapsePersistence {
   public async saveNodes(nodes: any[], pulseId: string): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
+    const owned = !this.inPulse;
     try {
-      await this.run("BEGIN TRANSACTION");
+      if (owned) await this.run("BEGIN TRANSACTION");
       const stmt = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, fingerprint, canonicalKind, canonicalRank, semantic_kind, name, file, lineStart, lineEnd, parentId, rootId, namespaceId, unitId, structureId, layer_path, depth, risk, gravity, complexity, isEntryPoint, visibility, dna, signature, kinetic, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const n of nodes) {
         const m = n.properties || {};
@@ -225,9 +245,9 @@ export class SynapsePersistence {
         ));
       }
       stmt.finalize();
-      await this.run("COMMIT");
+      if (owned) await this.run("COMMIT");
     } catch (err) {
-      try { await this.run('ROLLBACK'); } catch {}
+      if (owned) { try { await this.run('ROLLBACK'); } catch {} }
       throw err;
     }
   }
@@ -236,8 +256,9 @@ export class SynapsePersistence {
   public async saveEdges(edges: any[], pulseId: string): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
+    const owned = !this.inPulse;
     try {
-      await this.run("BEGIN TRANSACTION");
+      if (owned) await this.run("BEGIN TRANSACTION");
       const stmt = db.prepare(`INSERT OR REPLACE INTO edges (id, pulseId, sourceId, targetId, category, type, weight, confidence, lineNumber, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const e of edges) {
         await new Promise<void>((r, j) => stmt.run(
@@ -246,9 +267,9 @@ export class SynapsePersistence {
         ));
       }
       stmt.finalize();
-      await this.run("COMMIT");
+      if (owned) await this.run("COMMIT");
     } catch (err) {
-      try { await this.run('ROLLBACK'); } catch {}
+      if (owned) { try { await this.run('ROLLBACK'); } catch {} }
       throw err;
     }
   }
@@ -260,14 +281,15 @@ export class SynapsePersistence {
 
     const lowered = unitIds.map(id => id.toLowerCase());
     const placeholders = lowered.map(() => '?').join(',');
+    const owned = !this.inPulse;
 
     try {
-      await this.run(`BEGIN TRANSACTION`);
+      if (owned) await this.run(`BEGIN TRANSACTION`);
       await this.run(`DELETE FROM edges WHERE sourceId IN (SELECT id FROM nodes WHERE unitId IN (${placeholders}))`, lowered);
       await this.run(`DELETE FROM nodes WHERE unitId IN (${placeholders})`, lowered);
-      await this.run(`COMMIT`);
+      if (owned) await this.run(`COMMIT`);
     } catch (err) {
-      try { await this.run('ROLLBACK'); } catch {}
+      if (owned) { try { await this.run('ROLLBACK'); } catch {} }
       throw err;
     }
   }
@@ -279,15 +301,26 @@ export class SynapsePersistence {
     const pulseId = graph.getMetadata('targetPulseId') || `pulse_${Date.now()}`;
     const headHash = chronicle.getHeadHash() || 'unknown';
 
-    await this.run(`BEGIN TRANSACTION`);
-    const metadata = graph.getAllMetadata();
-    for (const [key, value] of metadata.entries()) {
-      await this.run(`INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`, [key, String(value)]);
+    // save() is the FINAL step of an analyze pulse: writing the pulse record + metadata and then
+    // COMMITting is what atomically publishes the whole pulse. If we're inside a pulse (inPulse),
+    // this COMMIT closes that big transaction; otherwise save() runs standalone in its own.
+    const owned = !this.inPulse;
+    try {
+      if (owned) await this.run(`BEGIN TRANSACTION`);
+      const metadata = graph.getAllMetadata();
+      for (const [key, value] of metadata.entries()) {
+        await this.run(`INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`, [key, String(value)]);
+      }
+      await this.run(`INSERT OR REPLACE INTO pulses (id, timestamp, commitHash, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?, ?)`, [
+        pulseId, Date.now(), headHash, options.nodeCount || graph.nodeCount(), options.edgeCount || graph.edgeCount(), JSON.stringify(Object.fromEntries(metadata))
+      ]);
+      await this.run(`COMMIT`);   // publishes the pulse (owned tx, or the big inPulse tx)
+      this.inPulse = false;
+    } catch (err) {
+      // On failure leave inPulse as-is so the caller's abortPulse() rolls the whole pulse back.
+      if (owned) { try { await this.run('ROLLBACK'); } catch {} }
+      throw err;
     }
-    await this.run(`INSERT OR REPLACE INTO pulses (id, timestamp, commitHash, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?, ?)`, [
-      pulseId, Date.now(), headHash, options.nodeCount || graph.nodeCount(), options.edgeCount || graph.edgeCount(), JSON.stringify(Object.fromEntries(metadata))
-    ]);
-    await this.run(`COMMIT`);
   }
 
   public async run(sql: string, params: unknown[] = []): Promise<void> {
@@ -314,15 +347,16 @@ export class SynapsePersistence {
     const db = await this.ensureVaultOpen();
     try {
       const exec = (sql: string) => new Promise<void>((r, j) => db.exec(sql, (e: duckdb.DuckDbError | null) => e ? j(e) : r()));
-      await exec("BEGIN TRANSACTION");
+      const owned = !this.inPulse;
+      if (owned) await exec("BEGIN TRANSACTION");
       const stmt = db.prepare(`UPDATE nodes SET gravity = ?, isEntryPoint = ? WHERE id = ?`);
       for (const entry of nodeRanks) {
         await new Promise<void>((r, j) => stmt.run(entry.gravity, entry.isEntryPoint ?? false, entry.id.toLowerCase(), (e: Error | null) => e ? j(e) : r()));
       }
       stmt.finalize();
-      await exec("COMMIT");
+      if (owned) await exec("COMMIT");
     } catch (fail) {
-      try { await this.run('ROLLBACK'); } catch {}
+      if (!this.inPulse) { try { await this.run('ROLLBACK'); } catch {} }
       throw fail;
     }
   }
@@ -337,15 +371,16 @@ export class SynapsePersistence {
     const db = await this.ensureVaultOpen();
     try {
       const exec = (sql: string) => new Promise<void>((r, j) => db.exec(sql, (e: duckdb.DuckDbError | null) => e ? j(e) : r()));
-      await exec("BEGIN TRANSACTION");
+      const owned = !this.inPulse;
+      if (owned) await exec("BEGIN TRANSACTION");
       const stmt = db.prepare(`UPDATE edges SET targetId = ? WHERE id = ?`);
       for (const entry of rebinds) {
         await new Promise<void>((r, j) => stmt.run(entry.newTargetId.toLowerCase(), entry.id, (e: Error | null) => e ? j(e) : r()));
       }
       stmt.finalize();
-      await exec("COMMIT");
+      if (owned) await exec("COMMIT");
     } catch (fail) {
-      try { await this.run('ROLLBACK'); } catch {}
+      if (!this.inPulse) { try { await this.run('ROLLBACK'); } catch {} }
       throw fail;
     }
   }

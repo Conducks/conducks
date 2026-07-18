@@ -129,6 +129,12 @@ export class AnalysisService implements ConducksComponent {
       allUnits.push(...batch);
     }
 
+    // [Conducks Atomic Pulse] purge + flush + rank + save are ONE transaction. An interrupted
+    // analyze never reaches the final COMMIT, so duckdb rolls the whole pulse back on next open —
+    // the previous good graph survives instead of being left half-written (nodes but no edges).
+    await this.persistence.beginPulse();
+    try {
+
     // 2.2 Conducks Purge: Remove old structural DNA for these units
     logger.info(`🛡️ [Persistence] Purging structural DNA for ${dirtyFiles.length} units...`);
     const unitIds = dirtyFiles.map(f => `${f.toLowerCase()}::unit`);
@@ -199,11 +205,18 @@ export class AnalysisService implements ConducksComponent {
     // 4.5 [Conducks Virtual Induction] 🏺
     await this.induceVirtualLibraries(this.graph.getGraph());
 
+    // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
     await this.persistence.save(this.graph.getGraph(), {
       metadataOnly: true,
       nodeCount,
       edgeCount
     });
+
+    } catch (pulseErr) {
+      // Any failure before the commit rolls the entire pulse back — no partial graph is left behind.
+      await this.persistence.abortPulse();
+      throw pulseErr;
+    }
 
     // No derived-doc regeneration. Structure lives in the graph and is queried on demand
     // (audit/impact/trace/coverage) — never written to a static file that goes stale.
