@@ -1,99 +1,82 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { STRUCTURAL_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
 import path from "node:path";
 import fs from "fs-extra";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
  * Conducks — Visualize Command (The Structural Mirror)
+ *
+ * Emits a READABLE Mermaid graph, not the whole synapse. Two modes:
+ *   visualize [N]              → the top-N nodes by gravity + the dependency edges AMONG them
+ *   visualize --focus <name>   → one symbol and its 1-hop dependency neighbours (a connected subgraph)
+ * Only dependency edges are drawn — structural containment (a file owning its symbols) and
+ * self-loops are excluded, or the diagram degenerates into a hairball of ownership arrows.
  */
 export class VisualizeCommand implements ConducksCommand {
   public id = "visualize";
-  public description = "Generate a static Mermaid structural mirror";
-  public usage = "registry visualize [limit]";
+  public description = "Generate a static Mermaid structural mirror (top-N by gravity, or --focus <symbol>)";
+  public usage = "conducks visualize [N] [--focus <symbol>]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const limitArg = args.find(a => !a.startsWith('--'));
     const limit = limitArg ? parseInt(limitArg, 10) : 30;
+    const focusIdx = args.indexOf('--focus');
+    const focus = focusIdx !== -1 ? args[focusIdx + 1] : undefined;
     const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
 
     chronicle.setProjectDir(targetPath);
 
     try {
-      // Resonate to ensure PageRank gravity is calculated on the merged graph
       (registry.infrastructure.graphEngine as any).resonate();
-
       const graph = registry.query.graph.getGraph();
-      const nodes = Array.from(graph.getAllNodes() as Iterable<any>)
-        .sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0))
-        .slice(0, limit);
 
+      const isDependency = (e: any) => !STRUCTURAL_EDGE_TYPES.includes(e.type) && e.sourceId !== e.targetId;
+      const key = (id: string) => id.replace(/[^a-zA-Z0-9]/g, '_');
+      const allNodes = Array.from(graph.getAllNodes() as Iterable<any>);
+
+      // Build the node set: a focused subgraph, or the top-N by gravity.
+      let selected: any[];
+      if (focus) {
+        const hit = allNodes.find((n: any) => (n.properties?.name || '').toLowerCase() === focus.toLowerCase())
+          || allNodes.find((n: any) => (n.properties?.name || '').toLowerCase().includes(focus.toLowerCase()));
+        if (!hit) { console.log(`\x1b[31mNo node matches --focus "${focus}".\x1b[0m`); return; }
+        const neighbourIds = new Set<string>([hit.id]);
+        for (const dir of ['downstream', 'upstream'] as const)
+          for (const e of graph.getNeighbors(hit.id, dir) as any[])
+            if (isDependency(e)) neighbourIds.add(dir === 'downstream' ? e.targetId : e.sourceId);
+        selected = [...neighbourIds].map(id => graph.getNode(id)).filter(Boolean);
+      } else {
+        selected = allNodes
+          .sort((a: any, b: any) => (b.properties.rank || 0) - (a.properties.rank || 0))
+          .slice(0, limit);
+      }
+
+      const inScope = new Set(selected.map((n: any) => n.id));
       const mermaidLines: string[] = ["graph TD"];
-      const edges = new Set<string>();
-      const renderedNodes = new Set<string>();
+      for (const n of selected) mermaidLines.push(`  ${key(n.id)}["${n.properties?.name || n.id}"]`);
 
-      // Register a node definition Helper
-      const registerNode = (n: any) => {
-        if (!renderedNodes.has(n.id)) {
-          const sourceId = n.id.replace(/[^a-zA-Z0-9]/g, '_');
-          const sourceLabel = n.properties?.name || n.id;
-          mermaidLines.push(`  ${sourceId}["${sourceLabel}"]`);
-          renderedNodes.add(n.id);
-        }
-      };
-
-      // 1. Seed the core requested nodes
-      for (const node of nodes) {
-        registerNode(node);
-      }
-
-      // 2. Expand exactly 1 connection layer deep for the hubs
-      for (const node of nodes) {
-        const outEdges = graph.getNeighbors(node.id, 'downstream') as any[];
-        const inEdges = graph.getNeighbors(node.id, 'upstream') as any[];
-        
-        // Handle Downstream (Node -> Target)
-        for (const edge of outEdges) {
-            const targetNode = graph.getNode(edge.targetId);
-            if (targetNode) {
-              registerNode(targetNode);
-              const sourceKey = node.id.replace(/[^a-zA-Z0-9]/g, '_');
-              const targetKey = targetNode.id.replace(/[^a-zA-Z0-9]/g, '_');
-              const edgeKey = `${sourceKey}->${targetKey}`;
-              
-              if (!edges.has(edgeKey)) {
-                mermaidLines.push(`  ${sourceKey} --> ${targetKey}`);
-                edges.add(edgeKey);
-              }
-            }
-        }
-        
-        // Handle Upstream (Source -> Node)
-        for (const edge of inEdges) {
-            const sourceNode = graph.getNode(edge.sourceId);
-            if (sourceNode) {
-              registerNode(sourceNode);
-              const sourceKey = sourceNode.id.replace(/[^a-zA-Z0-9]/g, '_');
-              const targetKey = node.id.replace(/[^a-zA-Z0-9]/g, '_');
-              const edgeKey = `${sourceKey}->${targetKey}`;
-              
-              if (!edges.has(edgeKey)) {
-                mermaidLines.push(`  ${sourceKey} --> ${targetKey}`);
-                edges.add(edgeKey);
-              }
-            }
+      // Edges: dependency-only, and BOTH endpoints in scope — keeps the diagram bounded + readable.
+      const seen = new Set<string>();
+      let edgeCount = 0;
+      for (const n of selected) {
+        for (const e of graph.getNeighbors(n.id, 'downstream') as any[]) {
+          if (!isDependency(e) || !inScope.has(e.targetId)) continue;
+          const ek = `${key(n.id)}->${key(e.targetId)}`;
+          if (seen.has(ek)) continue;
+          seen.add(ek); edgeCount++;
+          mermaidLines.push(`  ${key(n.id)} --> ${key(e.targetId)}`);
         }
       }
 
-      const content = mermaidLines.join('\n');
+      const title = focus ? `Focus: ${focus}` : `Top ${selected.length} by gravity`;
       const artifactPath = path.join(targetPath, '.conducks', 'structural_mirror.md');
-      
-      await fs.outputFile(artifactPath, `# Structural Mirror — Federated Pulse\n\n\`\`\`mermaid\n${content}\n\`\`\`\n`, 'utf-8');
-      
-      console.log(`\x1b[32m✅ Structural Mirror generated successfully at: ${artifactPath}\x1b[0m`);
-      console.log(`- Nodes Visualized: ${nodes.length}`);
-      console.log(`- Federated Pulse: Active`);
+      await fs.outputFile(artifactPath, `# Structural Mirror — ${title}\n\n\`\`\`mermaid\n${mermaidLines.join('\n')}\n\`\`\`\n`, 'utf-8');
+
+      console.log(`\x1b[32m✅ Structural Mirror generated at: ${artifactPath}\x1b[0m`);
+      console.log(`- Nodes: ${selected.length}  ·  Edges: ${edgeCount}  ·  ${title}`);
     } finally {
       await closePersistence(registry);
     }
