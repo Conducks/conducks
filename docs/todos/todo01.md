@@ -15,7 +15,7 @@ Status: doing
 - [x] C2 runtime collector: real coverage bind proven end-to-end via conducks' own jest suite with istanbul coverage (self-analysis)
 - [x] C3 binder: range-joined real coverage to the graph — 24 functions in adjacency-list.ts bound to real test coverage (addNode 86%, addEdge 57%, traverseAStar/findSymbolAtLine DARK)
 - [x] `conducks coverage <istanbul.json>` CLI command productionized (no synthetic data)
-- [ ] Vault hygiene: incremental analyze accumulates duplicate nodes across runs (cosmetic, shows as repeated rows) — a clean-analyze fixes it per-run
+- [x] Vault hygiene — RETRACTED as false (verified: no vault duplicates, 5074→5074 across incremental analyzes). The visible repeated rows were coverage matchFile basename over-binding — the REAL bug, tracked in todo08
 
 ## Phase 3 — Render & drift (C5–C7)
 - [x] STATEMENT/BRANCH resolved as branch coverage at bind time (istanbul branchMap), not as emitted nodes — deliberate, avoids graph flood; function stays the node, "taken/total br" is fill detail
@@ -26,7 +26,7 @@ Status: doing
 
 ## Phase 4 — Intent docs & acceptance (C4)
 - [ ] C4 node-anchored intent docs standard (structure derived, intent authored, keyed to stable node id, dangling anchor → flag)
-- [ ] Docs-rules skill updated for node-anchored intent (parallel prep in flight this session)
+- [x] Docs-rules skill updated for node-anchored intent (§12 added; conducks-docs skill carries it forward)
 - [x] Acceptance: parse one real TS/JS npm repo → correct node graph (proven via self-analysis + website)
 - [x] Acceptance: run tests / manual click-through → coverage captured
 - [x] Acceptance: BIND — every graph node shows a fill % of lines executed this session
