@@ -30,3 +30,15 @@ On TargetedCV: audit 49 → 3 circular dependencies, and all 3 are genuine cross
 under the <1% target. Locked with two regression tests (interface-member structural loop → 0;
 single-file CALLS loop → 0; genuine cross-file cycle → 1 still fires). Any consumer of `detectCycles`
 that wants dependency-only cycles should pass `ignoreTypes: STRUCTURAL_EDGE_TYPES`.
+
+## Addendum — ARCH-4 self-import + a validated coverage gap
+Cross-checked the 3 against `madge` (independent JS/TS detector): 60/66 of madge's cycle-files sit
+inside conducks' 3 SCC clusters — same tangles, conducks just groups them. The 6 madge flagged that
+conducks didn't were `export * from './self'` self-re-export stubs, a *different* class. Added an
+**ARCH-4 self-import** violation: a self-referential import surfaces as a same-file IMPORTS edge; the
+orchestrator emits a durable `unit → unit` self-edge when a specifier resolves back to its own file.
+Two regression tests cover it. KNOWN GAP: those 6 specific files are 1-line, declaration-less
+re-export stubs — conducks does not materialize a unit node for a file with no declarations, so they
+never enter the graph and ARCH-4 can't see them. Closing that needs the parser to index re-export-only
+barrel files (broad blast radius) — deferred, tracked separately. ARCH-4 catches self-imports in any
+file that IS indexed.

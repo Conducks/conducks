@@ -11,6 +11,19 @@ import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/contracts/types.js";
+
+/**
+ * A self-import: an import/re-export whose specifier resolves back to its own file — e.g.
+ * `export * from './self'` or an `@/alias` pointing at the current file. The resolver often can't
+ * bind these (they'd be a self-edge), so they vanish; detect them here so the audit can flag ARCH-4.
+ */
+function isSelfImportSpecifier(specifier: string, filePath: string): boolean {
+  const noExt = (p: string) => p.replace(/\.(tsx?|jsx?|py)$/i, "").replace(/\\/g, "/");
+  const self = noExt(filePath);
+  if (specifier.startsWith(".")) return noExt(path.resolve(path.dirname(filePath), specifier)) === self;
+  if (specifier.startsWith("@/")) return self.endsWith("/" + specifier.slice(2));
+  return false;
+}
 import type { PrismSpectrum } from "@/types/prism-types.js";
 import { logger } from "@/lib/core/utils/logger.js";
 import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
@@ -335,6 +348,15 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         for (const rel of res.spectrum.relationships) {
           if (rel.type === 'IMPORTS' && rel.metadata?.isRaw) {
             const specifier = rel.metadata.specifier;
+            // Self-import (e.g. `export * from './self'`): emit a durable unit → unit self-edge so
+            // the audit flags it as ARCH-4, and skip normal linkage (it would never bind to self).
+            if (isSelfImportSpecifier(specifier, filePath)) {
+              this.graph.getGraph().addEdge({
+                id: `SELF::${unitId}`, sourceId: unitId, targetId: unitId,
+                type: 'IMPORTS', confidence: 1.0, properties: { specifier, selfImport: true }
+              });
+              continue;
+            }
             const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
             // B2 fix: guard both linkage and targetId before accessing fields
             // Never bind across language families (e.g. a .py import resolving to a .tsx/.go file by basename).

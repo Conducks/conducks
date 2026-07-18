@@ -99,4 +99,27 @@ describe('GovernanceService Audit', () => {
     const circular = service.audit().violations.filter(v => v.type === 'CIRCULAR');
     expect(circular.length).toBe(0);
   });
+
+  it('should flag a self-import as ARCH-4 (not ARCH-3), from the linker self-edge', () => {
+    // `export * from './self'` — the linker emits a durable unit → unit self-edge.
+    const graph = new ConducksAdjacencyList();
+    graph.addNode({ id: 'a.ts::unit', label: 'UNIT', properties: { name: 'a.ts', filePath: 'a.ts', canonicalKind: 'STRUCTURE', canonicalRank: 1 } });
+    graph.addEdge({ id: 'a-self', sourceId: 'a.ts::unit', targetId: 'a.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: {} });
+
+    const report = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any).audit();
+    const self = report.violations.filter(v => v.type === 'SELF_IMPORT');
+    const circular = report.violations.filter(v => v.type === 'CIRCULAR');
+    expect(self.length).toBe(1);
+    expect(circular.length).toBe(0); // it is NOT a module cycle
+  });
+
+  it('should flag a same-file IMPORTS edge as ARCH-4', () => {
+    const graph = new ConducksAdjacencyList();
+    graph.addNode({ id: 'b.ts::x', label: 'STRUCTURE', properties: { name: 'x', filePath: 'b.ts', canonicalKind: 'STRUCTURE', canonicalRank: 2 } });
+    graph.addNode({ id: 'b.ts::y', label: 'STRUCTURE', properties: { name: 'y', filePath: 'b.ts', canonicalKind: 'STRUCTURE', canonicalRank: 2 } });
+    graph.addEdge({ id: 'b-self', sourceId: 'b.ts::x', targetId: 'b.ts::y', type: 'IMPORTS', confidence: 1.0, properties: {} });
+
+    const self = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any).audit().violations.filter(v => v.type === 'SELF_IMPORT');
+    expect(self.length).toBe(1);
+  });
 });

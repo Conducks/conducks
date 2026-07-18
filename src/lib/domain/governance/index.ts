@@ -4,7 +4,7 @@ import { ConducksSentinel } from "./sentinel.js";
 import { ContextGenerator } from "./context-generator.js";
 import { BlueprintGenerator } from "./blueprint-generator.js";
 import { RegressionGuard } from "./guard.js";
-import { ConducksAdjacencyList, STRUCTURAL_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksAdjacencyList, STRUCTURAL_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { ConducksComponent } from "@/contracts/types.js";
@@ -75,6 +75,31 @@ export class GovernanceService implements ConducksComponent {
         id: cycle[0],
         type: 'CIRCULAR',
         message: `ARCH-3: Circular: ${cycle.join(" -> ")}`
+      });
+    }
+
+    // 1b. Self-import detection (distinct from ARCH-3 module cycles).
+    // A file that imports/re-exports from its own module path — e.g. `export * from './self'` —
+    // is a degenerate self-reference (dead stub / accidental barrel loop), not a cross-file
+    // dependency cycle. The cross-file rule above deliberately skips these, so flag them here.
+    const fileOf = (id: NodeId): string | undefined => {
+      const n = this.graph.getNode(id);
+      return (n?.properties.filePath || n?.properties.file) as string | undefined;
+    };
+    // A self-referential import surfaces as an IMPORTS edge whose source and target resolve to the
+    // same file — either the linker's explicit self-edge (unit → unit) or any same-file IMPORTS.
+    const selfImportFiles = new Set<string>();
+    for (const e of this.graph.getAllEdges()) {
+      if (e.type !== 'IMPORTS' && e.type !== 'DEPENDS_ON') continue;
+      if (e.sourceId === e.targetId) { const f = fileOf(e.sourceId); if (f) selfImportFiles.add(f); continue; }
+      const sf = fileOf(e.sourceId), tf = fileOf(e.targetId);
+      if (sf && tf && sf === tf) selfImportFiles.add(sf);
+    }
+    for (const f of selfImportFiles) {
+      violations.push({
+        id: f,
+        type: 'SELF_IMPORT',
+        message: `ARCH-4: Self-import: ${f} imports/re-exports from its own module`,
       });
     }
 

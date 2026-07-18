@@ -1,10 +1,13 @@
 # Progress — conducks
 
-## 2026-07-18 · cycle-detection false-positive fix (ADR 0010)
+## 2026-07-18 · cycle-detection false-positive fix + ARCH-4 self-import (ADR 0010)
 - audit/guard/advisor now ignore STRUCTURAL_EDGE_TYPES (MEMBER_OF/CONTAINS/HAS_METHOD/HAS_PROPERTY)
   + require cross-file; deleted the broken SCC-as-ordered-path filter
 - On TargetedCV (Next.js/TS, 22k nodes): audit 49 → 3 cycles, all 3 genuine cross-file import
-  cycles. False-flag rate ~94% → 0%. Locked with 2 regression tests. Suite 41/41.
+  cycles. False-flag rate ~94% → 0%. Cross-validated against madge (60/66 files overlap).
+- Added ARCH-4 self-import detection (same-file IMPORTS edge; orchestrator emits unit→unit self-edge).
+  Known gap: declaration-less `export * from './self'` stubs aren't indexed as units, so ARCH-4
+  can't see them — deferred (needs re-export-only-barrel indexing). Suite 43/43.
 
 ## 2026-07-18 · hard/soft docs + uninstall symmetry (ADR 0009)
 - docs-grammar: dropped the prose whitelist + `unknown` type — soft is the default; governed core is
