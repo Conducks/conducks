@@ -11,9 +11,9 @@ import path from "node:path";
 
 export type DocType =
   | "todo" | "decision" | "features" | "memory" | "conventions" | "progress"
-  | "derived" | "unknown";
+  | "handover" | "derived" | "prose" | "unknown";
 
-export const GOVERNED: DocType[] = ["todo", "decision", "features", "memory", "conventions", "progress"];
+export const GOVERNED: DocType[] = ["todo", "decision", "features", "memory", "conventions", "progress", "handover"];
 
 const RE = {
   title: /^#\s+(.+?)\s*$/,
@@ -33,7 +33,10 @@ export function inferType(fp: string): DocType {
   if (/memory\.md$/.test(fp)) return "memory";
   if (/conventions\.md$/.test(fp)) return "conventions";
   if (/progress\.md$/.test(fp)) return "progress";
+  if (/handover\.md$/.test(fp)) return "handover";
   if (/architecture\.md$|map\.md$|drift\.md$/.test(fp)) return "derived";
+  // Free-form authored categories + the front door — part of the standard, kept but not parsed.
+  if (/\/(product|business|brand|design|process)\//.test(fp) || /readme\.md$/i.test(fp)) return "prose";
   return "unknown";
 }
 
@@ -75,6 +78,7 @@ export function shape(type: DocType, body: Body, file: string): any {
   if (type === "features" || type === "memory" || type === "conventions")
     return { ...base, entries: body.sections.map(s => ({ name: s.head, ...s.fields })) };
   if (type === "progress") return { ...base, entries: body.sections.map(s => ({ when: s.head })) };
+  if (type === "handover") return { ...base, status: body.status, sections: body.sections.map(s => s.head) };
   return base;
 }
 
@@ -90,6 +94,7 @@ export function lint(type: DocType, body: Body): string[] {
     for (const req of ["Context", "Decision", "Consequences"])
       if (!body.sections.some(s => s.head === req)) errs.push(`missing ## ${req} section`);
   }
+  if (type === "handover" && !body.status) errs.push("missing `Status:` (current | stale)");
   return errs;
 }
 

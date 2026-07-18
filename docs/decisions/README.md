@@ -14,7 +14,11 @@ Group every ADR under this file by its status, newest-numbered last within each 
 - Accepted: [0001 — Derive structure, author intent](0001-derive-structure-author-intent.md),
   [0002 — Three-layer dependency stack, downward-only imports](0002-three-layer-dependency-stack.md),
   [0003 — Additive taxonomy reconcile (PACKAGE/STATEMENT/BRANCH/DIRECTORY)](0003-additive-taxonomy-reconcile.md),
-  [0004 — Coverage as a range-join onto node line-spans, shown as fill detail](0004-coverage-as-range-join-fill-detail.md)
+  [0004 — Coverage as a range-join onto node line-spans, shown as fill detail](0004-coverage-as-range-join-fill-detail.md),
+  [0005 — Layer contract](0005-layer-contract.md),
+  [0006 — conducks_guide → native skills](0006-guide-to-skills.md),
+  [0007 — MCP tool surface](0007-mcp-tool-surface.md),
+  [0008 — Unify docs standard on conducks-docs; retire docs-rules](0008-unify-docs-standard-on-conducks-docs.md)
 - Superseded: none yet
 - Amended: none yet
 

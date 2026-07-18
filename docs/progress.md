@@ -1,5 +1,13 @@
 # Progress — conducks
 
+## 2026-07-18 · unify docs standard (ADR 0008)
+- conducks-docs rewritten as the complete evolution of docs-rules (folder set, handover, ADR
+  supersede/amend, todo epic/slice, linking, node-anchored intent, edge cases, format-first)
+- docs-grammar.ts: +handover governed type, +prose type (category folders + README) — nothing in
+  the standard reads "unknown"; locked with docs-grammar.test.ts. docs-lint clean (19 governed)
+- docs-rules skill deleted; arch-audit + multi-agent-protocol repointed; stale .base dup removed
+- Vault refs (VAULT.md, Workshop.md → phantom docs_rules.md) flagged for Said, not touched
+
 ## 2026-07-18 · coverage matcher fix (todo08)
 - Fixed coverage-bind matchFile: dropped bare-basename fallback → boundary + ≥dir/basename suffix
 - Result: 64 phantom-FULL index.ts rows → 2 real rows; summary honest (0 full · 14 partial · 77 dark)
