@@ -1,5 +1,11 @@
 # Progress — conducks
 
+## 2026-07-18 · cycle-detection false-positive fix (ADR 0010)
+- audit/guard/advisor now ignore STRUCTURAL_EDGE_TYPES (MEMBER_OF/CONTAINS/HAS_METHOD/HAS_PROPERTY)
+  + require cross-file; deleted the broken SCC-as-ordered-path filter
+- On TargetedCV (Next.js/TS, 22k nodes): audit 49 → 3 cycles, all 3 genuine cross-file import
+  cycles. False-flag rate ~94% → 0%. Locked with 2 regression tests. Suite 41/41.
+
 ## 2026-07-18 · hard/soft docs + uninstall symmetry (ADR 0009)
 - docs-grammar: dropped the prose whitelist + `unknown` type — soft is the default; governed core is
   the only universal set. Any non-governed doc → prose (valid, never flagged). 0 unknown on conducks

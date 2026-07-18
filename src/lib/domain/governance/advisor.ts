@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId, ConducksNode, STRUCTURAL_EDGE_TYPES } from '@/lib/core/graph/adjacency-list.js';
 import type { Advice } from '@/types/domain.js';
 import { ConducksComponent } from '@/contracts/types.js';
 
@@ -18,8 +18,10 @@ export class ConducksAdvisor implements ConducksComponent {
     const nodes = Array.from(graph.getAllNodes());
 
     // 1. Detect Circular Dependencies (Fatal Logic - Non-Exit)
-    // Only traverse IMPORTS graph — CALLS cycles are runtime recursion, not architectural violations
-    const cycles = graph.detectCycles({ ignoreTypes: ['MEMBER_OF', 'CONTAINS', 'CALLS', 'CONSTRUCTS', 'TYPE_REFERENCE', 'ACCESSES'] });
+    // Traverse the import-level graph only: ignore structural containment (interface/class/file
+    // ownership — never a dependency) AND runtime edges (CALLS/ACCESSES are recursion, not an
+    // architectural violation). What remains — IMPORTS/EXTENDS/IMPLEMENTS/DEPENDS_ON — is module coupling.
+    const cycles = graph.detectCycles({ ignoreTypes: [...STRUCTURAL_EDGE_TYPES, 'CALLS', 'CONSTRUCTS', 'TYPE_REFERENCE', 'ACCESSES'] });
     const architecturalCycles = (cycles as NodeId[][]).filter(cycle => {
       // Filter out purely internal file cycles (Implementation Detail vs Architectural Sin)
       const filePaths = new Set(cycle.map(id => graph.getNode(id)?.properties.filePath).filter(Boolean));

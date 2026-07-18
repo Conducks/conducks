@@ -4,7 +4,7 @@ import { ConducksSentinel } from "./sentinel.js";
 import { ContextGenerator } from "./context-generator.js";
 import { BlueprintGenerator } from "./blueprint-generator.js";
 import { RegressionGuard } from "./guard.js";
-import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksAdjacencyList, STRUCTURAL_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { ConducksComponent } from "@/contracts/types.js";
@@ -57,21 +57,17 @@ export class GovernanceService implements ConducksComponent {
     const projectRoot = chronicle.getProjectDir() || process.cwd();
     
     // 1. Circular Dependency Detection (Conducks Filtering) 🛡️
-    // Only flag multi-node cycles that are NOT purely hierarchical (no MEMBER_OF edges).
-    const cycles = this.graph.detectCycles().filter(c => {
+    // Traverse only real dependency edges — structural containment (interface→property, class→
+    // method, symbol→file) is excluded via STRUCTURAL_EDGE_TYPES so it never forms a false cycle.
+    // A genuine architectural cycle spans ≥2 files; a single-file loop (recursion, a type owning
+    // its own members) is an implementation detail, not a module-dependency smell.
+    const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES }).filter(c => {
       if (c.length <= 1) return false;
-      
-      // Check if any edge in the cycle is a MEMBER_OF edge.
-      // If so, it's a hierarchical "Unit Noise" cycle, not an architectural violation.
-      for (let i = 0; i < c.length; i++) {
-        const sourceId = c[i];
-        const targetId = c[(i + 1) % c.length];
-        const edges = this.graph.getNeighbors(sourceId, 'downstream');
-        if (edges.some(e => e.targetId === targetId && e.type === 'MEMBER_OF')) {
-          return false;
-        }
-      }
-      return true;
+      const files = new Set(c.map(id => {
+        const n = this.graph.getNode(id);
+        return String(n?.properties.filePath || n?.properties.file || id);
+      }));
+      return files.size > 1;
     });
 
     for (const cycle of cycles) {
@@ -211,7 +207,7 @@ export class GovernanceService implements ConducksComponent {
     for (const rule of rules) {
       switch (rule.condition) {
         case 'has_cycles': {
-          const cycles = this.graph.detectCycles().filter(c => {
+          const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES }).filter(c => {
             if (c.length <= 1) return false;
             // Intra-file self-references (e.g. a singleton's class → getInstance → file-unit) are
             // not circular MODULE dependencies — only cross-file cycles are architectural smells.
@@ -219,14 +215,7 @@ export class GovernanceService implements ConducksComponent {
               const n = this.graph.getNode(id);
               return String(n?.properties.filePath || n?.properties.file || id);
             }));
-            if (files.size <= 1) return false;
-            for (let i = 0; i < c.length; i++) {
-              const sourceId = c[i];
-              const targetId = c[(i + 1) % c.length];
-              const edges = this.graph.getNeighbors(sourceId, 'downstream');
-              if (edges.some(e => e.targetId === targetId && e.type === 'MEMBER_OF')) return false;
-            }
-            return true;
+            return files.size > 1;
           });
           for (const cycle of cycles) {
             violations.push({

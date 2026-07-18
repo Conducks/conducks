@@ -8,6 +8,15 @@
 export type NodeId = string;
 export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY';
 
+/**
+ * Structural containment edges — they express "X is defined inside Y", NOT "X depends on Y".
+ * A TS interface owning its fields (HAS_PROPERTY), a class owning its methods (HAS_METHOD), a
+ * member belonging to its file (MEMBER_OF), a file containing a symbol (CONTAINS) form trivial
+ * loops (type → property → file → type) that are NOT circular dependencies. Cycle detection for
+ * architectural auditing must ignore these, or every interface/singleton reads as a false cycle.
+ */
+export const STRUCTURAL_EDGE_TYPES: EdgeType[] = ['MEMBER_OF', 'CONTAINS', 'HAS_METHOD', 'HAS_PROPERTY'];
+
 export interface ConducksNode<T = any> {
   id: NodeId;
   label: string;
