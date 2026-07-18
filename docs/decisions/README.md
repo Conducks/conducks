@@ -18,7 +18,8 @@ Group every ADR under this file by its status, newest-numbered last within each 
   [0005 — Layer contract](0005-layer-contract.md),
   [0006 — conducks_guide → native skills](0006-guide-to-skills.md),
   [0007 — MCP tool surface](0007-mcp-tool-surface.md),
-  [0008 — Unify docs standard on conducks-docs; retire docs-rules](0008-unify-docs-standard-on-conducks-docs.md)
+  [0008 — Unify docs standard on conducks-docs; retire docs-rules](0008-unify-docs-standard-on-conducks-docs.md),
+  [0009 — Hard/soft docs, architecture file-or-folder, uninstall symmetry](0009-hard-soft-docs-and-uninstall-symmetry.md)
 - Superseded: none yet
 - Amended: none yet
 

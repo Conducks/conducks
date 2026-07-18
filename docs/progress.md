@@ -1,5 +1,12 @@
 # Progress — conducks
 
+## 2026-07-18 · hard/soft docs + uninstall symmetry (ADR 0009)
+- docs-grammar: dropped the prose whitelist + `unknown` type — soft is the default; governed core is
+  the only universal set. Any non-governed doc → prose (valid, never flagged). 0 unknown on conducks
+- architecture is now file-OR-folder: `architecture/` per-subsystem files classified as derived
+- uninstall symmetric with setup: ConducksInstaller.remove() clears the workspace skills setup wrote
+- conducks-docs skill updated (soft demotion, architecture file/folder); locked by docs-grammar.test
+
 ## 2026-07-18 · unify docs standard (ADR 0008)
 - conducks-docs rewritten as the complete evolution of docs-rules (folder set, handover, ADR
   supersede/amend, todo epic/slice, linking, node-anchored intent, edge cases, format-first)

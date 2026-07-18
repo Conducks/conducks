@@ -11,7 +11,7 @@ import path from "node:path";
 
 export type DocType =
   | "todo" | "decision" | "features" | "memory" | "conventions" | "progress"
-  | "handover" | "derived" | "prose" | "unknown";
+  | "handover" | "derived" | "prose";
 
 export const GOVERNED: DocType[] = ["todo", "decision", "features", "memory", "conventions", "progress", "handover"];
 
@@ -34,10 +34,13 @@ export function inferType(fp: string): DocType {
   if (/conventions\.md$/.test(fp)) return "conventions";
   if (/progress\.md$/.test(fp)) return "progress";
   if (/handover\.md$/.test(fp)) return "handover";
-  if (/architecture\.md$|map\.md$|drift\.md$/.test(fp)) return "derived";
-  // Free-form authored categories + the front door — part of the standard, kept but not parsed.
-  if (/\/(product|business|brand|design|process)\//.test(fp) || /readme\.md$/i.test(fp)) return "prose";
-  return "unknown";
+  // Architecture is file-OR-folder: `architecture.md` is the derived overview; the `architecture/`
+  // folder holds per-subsystem detail + charts for large projects. Both are the derived tier.
+  if (/architecture\.md$|map\.md$|drift\.md$/.test(fp) || /\/architecture\//.test(fp)) return "derived";
+  // Everything else a human keeps under docs/ is SOFT — free-form, project-specific, valid, never
+  // flagged (business/ design/ product/ process/ are just common examples, not a required set).
+  // The only lint failures are GOVERNED files that break their own skeleton.
+  return "prose";
 }
 
 export function inferUnit(fp: string): string {

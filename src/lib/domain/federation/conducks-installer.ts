@@ -45,6 +45,24 @@ export class ConducksInstaller implements ConducksComponent {
   }
 
   /**
+   * Removes the conducks-usage skills this installer owns from the workspace .claude/skills/.
+   * Scoped to the names in resources/skills/ — never touches skills conducks did not install.
+   * Symmetric with sync(): setup installs them, uninstall removes them (no orphans left behind).
+   */
+  public async remove(): Promise<{ removed: string[] }> {
+    const owned = Object.keys(this.getDynamicSkillTemplates());
+    const removed: string[] = [];
+    for (const name of owned) {
+      const dir = path.join(this.workspaceSkillsDir, name);
+      if (this.fileSystem.existsSync(dir)) {
+        await this.fileSystem.remove(dir);
+        removed.push(name);
+      }
+    }
+    return { removed };
+  }
+
+  /**
    * Reads the conducks-usage skills straight from resources/skills/*.md (static content — no
    * oracle, no MCP tool). Each file carries its description in a leading
    * `<!-- description: ... -->` comment; the rest is the skill body.
