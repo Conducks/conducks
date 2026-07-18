@@ -50,10 +50,16 @@ export function parseIstanbul(covPath: string): ParsedCoverage {
 /** Range-join coverage onto BEHAVIOR node spans → per-function fill % + branch coverage. */
 export function bindCoverage(nodes: CovNode[], parsed: ParsedCoverage): CovResult[] {
   const covKeys = [...parsed.ranByFile.keys()];
+  // Suffix match only on a path-segment boundary AND only when the suffix carries a directory
+  // (≥ dir/basename). `long` ends with `short`, the char before the join is a "/", and `short`
+  // itself spans a "/". Prevents a bare basename or a wrong-dir sibling (src/bar/index.ts)
+  // binding to src/foo/index.ts — the old fallback lit every same-named file FULL from one file.
+  const suffixMatch = (long: string, short: string): boolean =>
+    long === short ||
+    (short.includes("/") && long.endsWith(short) && long[long.length - short.length - 1] === "/");
   const matchFile = (f: string): string | undefined => {
     const lf = f.toLowerCase();
-    return covKeys.find(k => k === lf || k.endsWith(lf) || lf.endsWith(k)
-      || k.endsWith("/" + lf.split("/").pop()));
+    return covKeys.find(k => suffixMatch(k, lf) || suffixMatch(lf, k));
   };
   const results: CovResult[] = [];
   for (const n of nodes) {
