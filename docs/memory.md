@@ -1,5 +1,14 @@
 # Memory — conducks
 
+## An interrupted analyze persists a PARTIAL graph
+- Gotcha: killing `analyze` mid-run (e.g. a timeout) leaves a graph with all nodes but only a
+  fraction of edges — it loads fine and reports `stale: false`, but is ~95% disconnected. Symptoms:
+  everything looks like an orphan, ATOM/leaf nodes appear unconnected, cycles/impact come back empty.
+- Why: `saveNodes`/`saveEdges` run during analyze in separate transactions; the pulse record is
+  written last. An interrupt lands between them — nodes committed, edges partial, no pulse row.
+- Applies: any confusing "the graph looks broken/disconnected" report. Check `conducks status` —
+  density < 0.5 on 50+ nodes now flags `⚠ INCOMPLETE PULSE`. Fix: `conducks clean` + fresh `analyze`.
+
 ## Incremental analyze skips unchanged files
 - Gotcha: after editing a linker/orchestrator pass, re-running `analyze` may show NO change — edges from analysis passes (e.g. the `self::` self-import edge) don't regenerate for files unchanged since the last pulse.
 - Why: `analyze` is incremental — unchanged files are skipped entirely. Persisted edges from the prior pulse remain; new pass logic never runs on them.

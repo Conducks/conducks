@@ -1,5 +1,10 @@
 # Progress — conducks
 
+## 2026-07-19 · incomplete-pulse health check
+- `status` flags a graph with density < 0.5 on 50+ nodes as `⚠ INCOMPLETE PULSE` (an interrupted
+  analyze persists nodes but loses most edges — loads fine, silently ~95% disconnected). health
+  field added to `status --json`. Root cause + fix noted in memory.md.
+
 ## 2026-07-19 · kill derived-doc generation (ADR 0011)
 - Removed commands context-gen / blueprint / visualize + their generators; stopped auto-writing
   ARCHITECTURE.md after analyze; dropped status --manifest + MCP manifest mode; bootstrap-docs no

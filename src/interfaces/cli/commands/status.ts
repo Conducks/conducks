@@ -59,11 +59,19 @@ export class StatusCommand implements ConducksCommand {
         .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
         .slice(0, 5);
 
+      // Health: a real codebase graph is never near-disconnected. A density below ~0.5 on a
+      // non-trivial node set means an analyze was interrupted and persisted a PARTIAL graph
+      // (nodes written, edges lost) — it loads and looks fine but is silently broken. Flag it.
+      const s = status.stats;
+      const incomplete = s.nodeCount > 50 && s.density < 0.5;
+      const health = { incomplete, reason: incomplete ? `density ${s.density.toFixed(2)} with ${s.nodeCount} nodes — likely an interrupted analyze; re-run \`conducks analyze\`` : null };
+
       if (useJson) {
         process.stdout.write(JSON.stringify({
           stats: status.stats,
           status: status.status,
           staleness: status.staleness,
+          health,
           topHotspots: topGravity.map(n => ({
             id: n.id,
             name: n.properties.name,
@@ -78,6 +86,10 @@ export class StatusCommand implements ConducksCommand {
       console.log(`- Edges:   ${chalk.yellow(status.stats.edgeCount)}`);
       console.log(`- Density: ${status.stats.density.toFixed(4)} relationships/symbol`);
       console.log(`- Status:  ${status.status.toUpperCase()}`);
+
+      if (incomplete) {
+        console.log(`- ${chalk.yellow('Health')}:  ${chalk.red('⚠ INCOMPLETE PULSE')} — ${health.reason}`);
+      }
 
       if (status.staleness.stale) {
         console.log(`- ${chalk.yellow('Staleness')}: ${chalk.red('STALE')} (${status.staleness.commitsBehind} commits behind)`);
