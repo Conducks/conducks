@@ -89,3 +89,8 @@
 - Gotcha: Cross-file edges from a prior pulse can linger after `analyze --force`, even though nodes were re-ingested.
 - Why: `--force` re-ingests nodes but does not purge orphaned cross-file edges from prior pulses. After a linker change, run `conducks clean` (which purges the vault via `persistence.clear()`) before re-analyzing.
 - Applies: `conducks analyze --force`, linker changes.
+
+## Incremental analyze accumulates duplicate nodes
+- Gotcha: running `conducks analyze` repeatedly (incremental, without `clean`) can leave stale/duplicate node rows in the vault — e.g. coverage output shows the same function several times.
+- Why: incremental pulses re-insert nodes without fully purging prior rows for unchanged units; the graph looks right per-pulse but the vault carries leftovers.
+- Applies: always `conducks clean <path>` before a fresh full `analyze` when node counts matter (coverage, docs-status, guard). Real fix (dedupe on pulse) is tracked in todo08.
