@@ -104,7 +104,7 @@ describe('GovernanceService Audit', () => {
     // `export * from './self'` — the linker emits a durable unit → unit self-edge.
     const graph = new ConducksAdjacencyList();
     graph.addNode({ id: 'a.ts::unit', label: 'UNIT', properties: { name: 'a.ts', filePath: 'a.ts', canonicalKind: 'STRUCTURE', canonicalRank: 1 } });
-    graph.addEdge({ id: 'a-self', sourceId: 'a.ts::unit', targetId: 'a.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: {} });
+    graph.addEdge({ id: 'SELF::a.ts::unit', sourceId: 'a.ts::unit', targetId: 'a.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: { selfImport: true } });
 
     const report = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any).audit();
     const self = report.violations.filter(v => v.type === 'SELF_IMPORT');
@@ -113,13 +113,14 @@ describe('GovernanceService Audit', () => {
     expect(circular.length).toBe(0); // it is NOT a module cycle
   });
 
-  it('should flag a same-file IMPORTS edge as ARCH-4', () => {
+  it('should NOT flag a same-file IMPORTS between different symbols (legit intra-file ref)', () => {
+    // Only a true self-edge (unit → unit) is ARCH-4; two distinct symbols in one file are not.
     const graph = new ConducksAdjacencyList();
     graph.addNode({ id: 'b.ts::x', label: 'STRUCTURE', properties: { name: 'x', filePath: 'b.ts', canonicalKind: 'STRUCTURE', canonicalRank: 2 } });
     graph.addNode({ id: 'b.ts::y', label: 'STRUCTURE', properties: { name: 'y', filePath: 'b.ts', canonicalKind: 'STRUCTURE', canonicalRank: 2 } });
-    graph.addEdge({ id: 'b-self', sourceId: 'b.ts::x', targetId: 'b.ts::y', type: 'IMPORTS', confidence: 1.0, properties: {} });
+    graph.addEdge({ id: 'b-ref', sourceId: 'b.ts::x', targetId: 'b.ts::y', type: 'IMPORTS', confidence: 1.0, properties: {} });
 
     const self = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any).audit().violations.filter(v => v.type === 'SELF_IMPORT');
-    expect(self.length).toBe(1);
+    expect(self.length).toBe(0);
   });
 });

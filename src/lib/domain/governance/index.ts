@@ -86,14 +86,16 @@ export class GovernanceService implements ConducksComponent {
       const n = this.graph.getNode(id);
       return (n?.properties.filePath || n?.properties.file) as string | undefined;
     };
-    // A self-referential import surfaces as an IMPORTS edge whose source and target resolve to the
-    // same file — either the linker's explicit self-edge (unit → unit) or any same-file IMPORTS.
+    // A self-referential import is flagged ONLY via the orchestrator's explicit marker: a `self::`
+    // edge, emitted precisely when an import specifier resolves back to its own file (`export * from
+    // './self'`, `@/`-alias to self). We do NOT infer it from generic unit → unit self-loops — those
+    // arise from other resolution paths (fuzzy name matches, Go/Python intra-package links) and are
+    // not self-re-export stubs. Matching the marker keeps ARCH-4 free of false positives.
     const selfImportFiles = new Set<string>();
     for (const e of this.graph.getAllEdges()) {
-      if (e.type !== 'IMPORTS' && e.type !== 'DEPENDS_ON') continue;
-      if (e.sourceId === e.targetId) { const f = fileOf(e.sourceId); if (f) selfImportFiles.add(f); continue; }
-      const sf = fileOf(e.sourceId), tf = fileOf(e.targetId);
-      if (sf && tf && sf === tf) selfImportFiles.add(sf);
+      if (!(e.id || '').startsWith('self::')) continue;
+      const f = fileOf(e.sourceId);
+      if (f) selfImportFiles.add(f);
     }
     for (const f of selfImportFiles) {
       violations.push({

@@ -70,6 +70,13 @@ export class AuditCommand implements ConducksCommand {
         .forEach((v: any) => console.log(`  - ${v.message}`));
     }
 
+    // 2b. Self-imports (ARCH-4) — a file importing/re-exporting from itself (degenerate, not a cycle)
+    const selfImports = auditData.violations.filter((v: any) => v.type === 'SELF_IMPORT');
+    if (selfImports.length > 0) {
+      console.log(`\n\x1b[33m♻️  [Self-Import] ${selfImports.length} file(s) import/re-export from themselves:\x1b[0m`);
+      selfImports.forEach((v: any) => console.log(`  - ${v.message}`));
+    }
+
     // 3. Sentinel Static Governance (Rule-based)
     const sentinel = new ConducksSentinel();
     const rulesPath = path.join(chronicle.getProjectDir(), 'config/sentinel.json');

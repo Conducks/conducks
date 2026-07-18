@@ -16,12 +16,21 @@ import { ConducksComponent } from "@/contracts/types.js";
  * A self-import: an import/re-export whose specifier resolves back to its own file — e.g.
  * `export * from './self'` or an `@/alias` pointing at the current file. The resolver often can't
  * bind these (they'd be a self-edge), so they vanish; detect them here so the audit can flag ARCH-4.
+ *
+ * GENERAL (any language): a RELATIVE specifier is resolved against the file's dir and compared
+ * exactly — no heuristic. LANGUAGE-CENTERED (TS/JS convention): the `@/` path alias maps to the
+ * project `src/` root; resolve it against the file's own `src/`-relative path and compare exactly.
+ * Other languages' alias schemes would add their own branch here (or, better, be pre-resolved by
+ * their language plugin's import resolver).
  */
 function isSelfImportSpecifier(specifier: string, filePath: string): boolean {
   const noExt = (p: string) => p.replace(/\.(tsx?|jsx?|py)$/i, "").replace(/\\/g, "/");
   const self = noExt(filePath);
   if (specifier.startsWith(".")) return noExt(path.resolve(path.dirname(filePath), specifier)) === self;
-  if (specifier.startsWith("@/")) return self.endsWith("/" + specifier.slice(2));
+  if (specifier.startsWith("@/")) {
+    const rel = self.match(/\/src\/(.+)$/);           // TS/JS: @/x === <src>/x
+    return rel ? rel[1] === specifier.slice(2) : false;
+  }
   return false;
 }
 import type { PrismSpectrum } from "@/types/prism-types.js";
@@ -348,15 +357,16 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         for (const rel of res.spectrum.relationships) {
           if (rel.type === 'IMPORTS' && rel.metadata?.isRaw) {
             const specifier = rel.metadata.specifier;
+            const emitSelfEdge = () => this.graph.getGraph().addEdge({
+              id: `SELF::${unitId}`, sourceId: unitId, targetId: unitId,
+              type: 'IMPORTS', confidence: 1.0, properties: { specifier, selfImport: true }
+            });
             // Self-import (e.g. `export * from './self'`): emit a durable unit → unit self-edge so
             // the audit flags it as ARCH-4, and skip normal linkage (it would never bind to self).
-            if (isSelfImportSpecifier(specifier, filePath)) {
-              this.graph.getGraph().addEdge({
-                id: `SELF::${unitId}`, sourceId: unitId, targetId: unitId,
-                type: 'IMPORTS', confidence: 1.0, properties: { specifier, selfImport: true }
-              });
-              continue;
-            }
+            // Keyed strictly off the SPECIFIER (a relative or `@/` path pointing at this file) — NOT
+            // off resolution, because the fuzzy resolver matches a bare package name (`context`,
+            // `routing`) to a same-named local file and would report a false self-import.
+            if (isSelfImportSpecifier(specifier, filePath)) { emitSelfEdge(); continue; }
             const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
             // B2 fix: guard both linkage and targetId before accessing fields
             // Never bind across language families (e.g. a .py import resolving to a .tsx/.go file by basename).

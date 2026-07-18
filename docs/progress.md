@@ -5,9 +5,10 @@
   + require cross-file; deleted the broken SCC-as-ordered-path filter
 - On TargetedCV (Next.js/TS, 22k nodes): audit 49 → 3 cycles, all 3 genuine cross-file import
   cycles. False-flag rate ~94% → 0%. Cross-validated against madge (60/66 files overlap).
-- Added ARCH-4 self-import detection (same-file IMPORTS edge; orchestrator emits unit→unit self-edge).
-  Known gap: declaration-less `export * from './self'` stubs aren't indexed as units, so ARCH-4
-  can't see them — deferred (needs re-export-only-barrel indexing). Suite 43/43.
+- Added ARCH-4 self-import detection (orchestrator emits a `self::` unit→unit edge, keyed off the
+  specifier). Clean audit on TargetedCV: ARCH-3=3, ARCH-4=6 (the real `export * from './self'` stubs),
+  0 false positives. Gotcha found + documented: incremental cache skips unchanged files, so
+  analysis-pass edges only regenerate on `clean` + fresh `analyze`. Suite 43/43.
 
 ## 2026-07-18 · hard/soft docs + uninstall symmetry (ADR 0009)
 - docs-grammar: dropped the prose whitelist + `unknown` type — soft is the default; governed core is

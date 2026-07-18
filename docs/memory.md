@@ -1,5 +1,15 @@
 # Memory — conducks
 
+## Incremental analyze skips unchanged files
+- Gotcha: after editing a linker/orchestrator pass, re-running `analyze` may show NO change — edges from analysis passes (e.g. the `self::` self-import edge) don't regenerate for files unchanged since the last pulse.
+- Why: `analyze` is incremental — unchanged files are skipped entirely. Persisted edges from the prior pulse remain; new pass logic never runs on them.
+- Applies: verifying any cycle/edge/graph change. Wipe `.conducks/` (or `conducks clean`) + fresh `analyze` before auditing, or you debug against stale results.
+
+## Node properties don't persist; edges do
+- Gotcha: setting an ad-hoc `node.properties.X` in a pass is lost after persist+reload; the graph survives a round-trip but arbitrary node props don't.
+- Why: `ConducksAdjacencyList.addNode` copies only an allowlist of properties into the stored skeleton, and the DB schema has fixed columns. Edges (id/source/target/type) persist fully.
+- Applies: passing signals between analysis and audit — use a distinctly-id'd edge (e.g. `self::…`), not a node property.
+
 ## ESM Mocking Constraint
 - Gotcha: `jest.mock()` and `spyOn()` fail on `node:child_process` and `node:fs/promises` imports.
 - Why: ESM exports from Node built-ins are immutable — they can't be monkey-patched like CJS exports. Testable wrappers need Dependency Injection instead.

@@ -37,8 +37,11 @@ inside conducks' 3 SCC clusters — same tangles, conducks just groups them. The
 conducks didn't were `export * from './self'` self-re-export stubs, a *different* class. Added an
 **ARCH-4 self-import** violation: a self-referential import surfaces as a same-file IMPORTS edge; the
 orchestrator emits a durable `unit → unit` self-edge when a specifier resolves back to its own file.
-Two regression tests cover it. KNOWN GAP: those 6 specific files are 1-line, declaration-less
-re-export stubs — conducks does not materialize a unit node for a file with no declarations, so they
-never enter the graph and ARCH-4 can't see them. Closing that needs the parser to index re-export-only
-barrel files (broad blast radius) — deferred, tracked separately. ARCH-4 catches self-imports in any
-file that IS indexed.
+Two regression tests cover it. GAP CLOSED: on a clean analyze conducks flags exactly the 6 real
+stubs and zero false positives. Detection is keyed strictly off the import SPECIFIER (a relative or
+`@/` path resolving back to this file), NOT off resolution — the fuzzy resolver matches a bare
+package name (`context`, `routing`) to a same-named local file, which would report a false self-import.
+The audit matches only the orchestrator's explicit `self::` edge marker, never a generic unit → unit
+self-loop (those come from other resolution paths). NB — the earlier "0 detected" was an
+incremental-cache artifact: unchanged files are skipped on re-analyze, so analysis-pass edges only
+regenerate on a clean pulse; verify cycle/self-import changes with `clean` + fresh `analyze`.
