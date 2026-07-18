@@ -19,8 +19,7 @@ export class SetupCommand implements ConducksCommand {
     // 1. Sync Conducks skills (read straight from resources/skills/ — static content)
     const installer = new ConducksInstaller(process.cwd());
     const skillResult = await installer.sync();
-    console.log(`✅ Synced ${skillResult.global.length} Skills to Global.`);
-    console.log(`✅ Synced ${skillResult.workspace.length} Skills to Workspace.`);
+    console.log(`✅ Synced ${skillResult.workspace.length} skills → .claude/skills/ (workspace).`);
 
     const configurator = new MCPConfigurator();
     const buildPath = path.join(process.cwd(), "build", "index.js");

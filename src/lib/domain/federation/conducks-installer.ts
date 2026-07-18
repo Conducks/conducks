@@ -1,6 +1,5 @@
 import fs from "fs-extra";
 import path from "node:path";
-import os from "node:os";
 
 import { fileURLToPath } from "node:url";
 import { ConducksComponent } from "@/contracts/types.js";
@@ -13,41 +12,36 @@ const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 export class ConducksInstaller implements ConducksComponent {
   public readonly id = 'conducks-installer';
   public readonly type = 'analyzer';
-  public readonly description = 'Handles the automated synchronization of Conducks instructions (SKILL.md) to the IDE.';
-  private readonly globalSkillsDir: string;
+  public readonly description = 'Syncs the conducks-usage skills (SKILL.md) into the workspace .claude/skills/.';
   private readonly workspaceSkillsDir: string;
 
   constructor(
     workspaceRoot: string,
     private readonly fileSystem: any = fs
   ) {
-    this.globalSkillsDir = path.join(os.homedir(), ".gemini", "antigravity", "skills");
-    this.workspaceSkillsDir = path.join(workspaceRoot, ".claude", "skills", "conducks");
+    // ONE source (resources/skills/), ONE target: <workspace>/.claude/skills/<name>/SKILL.md.
+    // Flat — Claude Code discovers only direct children of skills/; the old extra conducks/
+    // nesting broke discovery. Claude-only by decision (ADR 0006); the old Antigravity global
+    // target (~/.gemini/antigravity/skills) is dropped — multi-IDE targets return only when a
+    // second consumer actually exists.
+    this.workspaceSkillsDir = path.join(workspaceRoot, ".claude", "skills");
   }
 
   /**
-   * Performs the "Pentecost" synchronization of all Conducksic skills.
+   * Syncs all conducks-usage skills into the workspace.
    */
-  public async sync(): Promise<{ global: string[], workspace: string[] }> {
+  public async sync(): Promise<{ workspace: string[] }> {
     const skills = this.getDynamicSkillTemplates();
-    const installedGlobal: string[] = [];
     const installedWorkspace: string[] = [];
 
     for (const [name, content] of Object.entries(skills)) {
-      // 1. Sync Global (Antigravity)
-      const gPath = path.join(this.globalSkillsDir, name, "SKILL.md");
-      await this.fileSystem.ensureDir(path.dirname(gPath));
-      await this.fileSystem.writeFile(gPath, content, "utf-8");
-      installedGlobal.push(name);
-
-      // 2. Sync Workspace (Claude)
       const wPath = path.join(this.workspaceSkillsDir, name, "SKILL.md");
       await this.fileSystem.ensureDir(path.dirname(wPath));
       await this.fileSystem.writeFile(wPath, content, "utf-8");
       installedWorkspace.push(name);
     }
 
-    return { global: installedGlobal, workspace: installedWorkspace };
+    return { workspace: installedWorkspace };
   }
 
   /**
