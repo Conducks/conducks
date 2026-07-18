@@ -9,8 +9,6 @@ import { QueryCommand } from "./commands/query.js";
 import { ContextCommand } from "./commands/context.js";
 import { AuditCommand } from "./commands/audit.js";
 import { CleanCommand } from "./commands/clean.js";
-import { ContextGenCommand } from "./commands/context-gen.js";
-import { BlueprintCommand } from "./commands/blueprint.js";
 import { SetupCommand } from "./commands/setup.js";
 import { ListCommand } from "./commands/list.js";
 import { EntropyCommand } from "./commands/entropy.js";
@@ -34,7 +32,6 @@ import { McpCommand } from "./commands/mcp.js";
 import { DriftCommand } from "./commands/drift.js";
 import { GuardCommand } from "./commands/guard.js";
 import { RecordCommand } from "./commands/record.js";
-import { VisualizeCommand } from "./commands/visualize.js";
 import { BootstrapDocsCommand } from "./commands/bootstrap-docs.js";
 import { UninstallCommand } from "./commands/uninstall.js";
 import { DoctorCommand } from "./commands/doctor.js";
@@ -101,10 +98,10 @@ export async function main() {
     new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
     new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
-    new AdviseCommand(), new PruneCommand(), new BlueprintCommand(), new ContextGenCommand(),
+    new AdviseCommand(), new PruneCommand(),
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
-    new DriftCommand(), new GuardCommand(), new RecordCommand(), new VisualizeCommand(), new MirrorCommand(),
+    new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
     new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand()
   ];
@@ -114,7 +111,7 @@ export async function main() {
   const command = commands.find(c => c.id === commandId);
   
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs'].includes(commandId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs'].includes(commandId);
 
   if (command) {
     try {

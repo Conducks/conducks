@@ -23,7 +23,7 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "LANDSCAPE (Status)": {
-        ids: ["status", "link", "resonance", "blueprint"],
+        ids: ["status", "link", "resonance"],
         examples: [
           "conducks status",
           "conducks status --json",
@@ -63,13 +63,13 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "VISUAL (Mirror)": {
-        ids: ["mirror", "visualize"],
+        ids: ["mirror"],
         examples: [
-          "conducks visualize --format svg",
+          "conducks mirror",
         ],
       },
       "SYSTEM (Meta)": {
-        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "context-gen", "bootstrap-docs", "help"],
+        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "bootstrap-docs", "help"],
         examples: [
           "conducks setup",
           "conducks uninstall",

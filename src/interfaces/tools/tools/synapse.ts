@@ -185,11 +185,6 @@ Modes:
           );
         }
 
-        if (mode === "manifest") {
-          const manifest = await registry.audit.contextFile();
-          return mcpOk({ manifest, stats: status.stats });
-        }
-
         if (mode === "pulse") {
           if (!file) return mcpErr('MISSING_PARAM', "Mode 'pulse' requires a 'file' parameter.", 'Provide the file param with the relative path to the file to pulse.', false);
           const result = await (registry.analyze as any).resonate(file);

@@ -46,7 +46,7 @@ describe('GovernanceService Audit', () => {
     expect(rawCycles[0]).toContain('file.ts::fn');
 
     // 4. Verify Governance Audit filters it
-    const service = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any);
+    const service = new GovernanceService(graph, {} as any, {} as any, {} as any);
     const report = service.audit();
     
     const circularViolations = report.violations.filter(v => v.type === 'CIRCULAR');
@@ -62,7 +62,7 @@ describe('GovernanceService Audit', () => {
     graph.addEdge({ id: 'A->B', sourceId: 'A', targetId: 'B', type: 'CALLS' as any, confidence: 1.0, properties: {} });
     graph.addEdge({ id: 'B->A', sourceId: 'B', targetId: 'A', type: 'CALLS' as any, confidence: 1.0, properties: {} });
 
-    const service = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any);
+    const service = new GovernanceService(graph, {} as any, {} as any, {} as any);
     const report = service.audit();
     
     const circularViolations = report.violations.filter(v => v.type === 'CIRCULAR');
@@ -82,7 +82,7 @@ describe('GovernanceService Audit', () => {
     graph.addEdge({ id: 'e2', sourceId: 'm.tsx::props.onClose', targetId: 'm.tsx::unit', type: 'MEMBER_OF', confidence: 1.0, properties: {} });
     graph.addEdge({ id: 'e3', sourceId: 'm.tsx::unit', targetId: 'm.tsx::props', type: 'CONTAINS', confidence: 1.0, properties: {} });
 
-    const service = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any);
+    const service = new GovernanceService(graph, {} as any, {} as any, {} as any);
     const circular = service.audit().violations.filter(v => v.type === 'CIRCULAR');
     expect(circular.length).toBe(0);
   });
@@ -95,7 +95,7 @@ describe('GovernanceService Audit', () => {
     graph.addEdge({ id: 'a->b', sourceId: 's.ts::a', targetId: 's.ts::b', type: 'CALLS' as any, confidence: 1.0, properties: {} });
     graph.addEdge({ id: 'b->a', sourceId: 's.ts::b', targetId: 's.ts::a', type: 'CALLS' as any, confidence: 1.0, properties: {} });
 
-    const service = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any);
+    const service = new GovernanceService(graph, {} as any, {} as any, {} as any);
     const circular = service.audit().violations.filter(v => v.type === 'CIRCULAR');
     expect(circular.length).toBe(0);
   });
@@ -106,7 +106,7 @@ describe('GovernanceService Audit', () => {
     graph.addNode({ id: 'a.ts::unit', label: 'UNIT', properties: { name: 'a.ts', filePath: 'a.ts', canonicalKind: 'STRUCTURE', canonicalRank: 1 } });
     graph.addEdge({ id: 'SELF::a.ts::unit', sourceId: 'a.ts::unit', targetId: 'a.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: { selfImport: true } });
 
-    const report = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any).audit();
+    const report = new GovernanceService(graph, {} as any, {} as any, {} as any).audit();
     const self = report.violations.filter(v => v.type === 'SELF_IMPORT');
     const circular = report.violations.filter(v => v.type === 'CIRCULAR');
     expect(self.length).toBe(1);
@@ -120,7 +120,7 @@ describe('GovernanceService Audit', () => {
     graph.addNode({ id: 'b.ts::y', label: 'STRUCTURE', properties: { name: 'y', filePath: 'b.ts', canonicalKind: 'STRUCTURE', canonicalRank: 2 } });
     graph.addEdge({ id: 'b-ref', sourceId: 'b.ts::x', targetId: 'b.ts::y', type: 'IMPORTS', confidence: 1.0, properties: {} });
 
-    const self = new GovernanceService(graph, {} as any, {} as any, {} as any, {} as any).audit().violations.filter(v => v.type === 'SELF_IMPORT');
+    const self = new GovernanceService(graph, {} as any, {} as any, {} as any).audit().violations.filter(v => v.type === 'SELF_IMPORT');
     expect(self.length).toBe(0);
   });
 });

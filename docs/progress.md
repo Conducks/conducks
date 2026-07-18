@@ -1,5 +1,12 @@
 # Progress — conducks
 
+## 2026-07-19 · kill derived-doc generation (ADR 0011)
+- Removed commands context-gen / blueprint / visualize + their generators; stopped auto-writing
+  ARCHITECTURE.md after analyze; dropped status --manifest + MCP manifest mode; bootstrap-docs no
+  longer scaffolds a derived architecture.md.
+- conducks-docs re-scoped to AUTHORED-only — structure is queried live (audit/impact/trace), never
+  written to a stale file. Build green, 43/43. Follow-up: purge generated docs from TargetedCV+sofie.
+
 ## 2026-07-18 · cycle-detection false-positive fix + ARCH-4 self-import (ADR 0010)
 - audit/guard/advisor now ignore STRUCTURAL_EDGE_TYPES (MEMBER_OF/CONTAINS/HAS_METHOD/HAS_PROPERTY)
   + require cross-file; deleted the broken SCC-as-ordered-path filter

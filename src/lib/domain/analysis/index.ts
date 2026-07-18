@@ -3,7 +3,6 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
-import { ContextGenerator } from "@/lib/domain/governance/context-generator.js";
 import { Logger } from "@/lib/core/utils/logger.js";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -31,8 +30,7 @@ export class AnalysisService implements ConducksComponent {
   constructor(
     private orchestrator: AnalyzeOrchestrator,
     private graph: ConducksGraph,
-    private persistence: SynapsePersistence,
-    private contextGenerator: ContextGenerator
+    private persistence: SynapsePersistence
   ) {
     this.query = new QueryService(this.persistence);
   }
@@ -207,15 +205,8 @@ export class AnalysisService implements ConducksComponent {
       edgeCount
     });
 
-    // 5. Neural Context Regeneration
-    try {
-      const contextMd = await this.contextGenerator.generateFileSummary(this.persistence);
-      const archPath = path.join(projectRoot, 'ARCHITECTURE.md');
-      await fs.writeFile(archPath, contextMd, 'utf-8');
-    } catch (err) {
-      logger.error("Failed to regenerate ARCHITECTURE.md", err);
-    }
-
+    // No derived-doc regeneration. Structure lives in the graph and is queried on demand
+    // (audit/impact/trace/coverage) — never written to a static file that goes stale.
     return { success: true, files: files.length };
   }
 

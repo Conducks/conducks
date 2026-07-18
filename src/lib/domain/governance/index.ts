@@ -1,8 +1,6 @@
 import { ConducksAdvisor } from "./advisor.js";
 import type { Advice } from "@/types/domain.js";
 import { ConducksSentinel } from "./sentinel.js";
-import { ContextGenerator } from "./context-generator.js";
-import { BlueprintGenerator } from "./blueprint-generator.js";
 import { RegressionGuard } from "./guard.js";
 import { ConducksAdjacencyList, STRUCTURAL_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
@@ -27,8 +25,6 @@ export class GovernanceService implements ConducksComponent {
     private graph: ConducksAdjacencyList,
     private advisor: ConducksAdvisor,
     private sentinel: ConducksSentinel,
-    private contextGenerator: ContextGenerator,
-    private blueprint: BlueprintGenerator,
     persistence?: SynapsePersistence
   ) {
     this.persistence = persistence || null;
@@ -44,7 +40,6 @@ export class GovernanceService implements ConducksComponent {
   public setPersistence(persistence: SynapsePersistence) {
     this.persistence = persistence;
     this.guard = new RegressionGuard(persistence as any);
-    this.contextGenerator.setPersistence(persistence);
   }
 
   /**
@@ -193,27 +188,6 @@ export class GovernanceService implements ConducksComponent {
   public async shouldBlock(threshold?: number) {
     if (!this.guard) throw new Error("Regression guard requires persistence layer.");
     return this.guard.shouldBlock(threshold);
-  }
-
-  /**
-   * Generates localized structural context for AI agents.
-   */
-  public async generateContext(persistence: SynapsePersistence) {
-    return this.contextGenerator.generateTop10Context(persistence);
-  }
-
-  /**
-   * Generates a high-level ARCHITECTURE.md manifest.
-   */
-  public async generateManifest(persistence: SynapsePersistence) {
-    return this.contextGenerator.generateFileSummary(persistence);
-  }
-
-  /**
-   * Generates an interactive structural blueprint.
-   */
-  public generateBlueprint() {
-    return this.blueprint.generate(this.graph);
   }
 
   /**
@@ -412,8 +386,6 @@ export class GovernanceService implements ConducksComponent {
 export type { Advice };
 export { ConducksAdvisor } from "./advisor.js";
 export { ConducksSentinel } from "./sentinel.js";
-export { ContextGenerator } from "./context-generator.js";
-export { BlueprintGenerator } from "./blueprint-generator.js";
 export { RegressionGuard } from "./guard.js";
 export { loadSentinelRules, getDefaultRules } from "./sentinel-rules.js";
 export type { SentinelRule, SentinelCondition, SentinelRuleFile } from "./sentinel-rules.js";

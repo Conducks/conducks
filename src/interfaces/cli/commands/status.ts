@@ -34,14 +34,6 @@ export class StatusCommand implements ConducksCommand {
         return;
       }
 
-      // 2.5 Mode: Manifest (Conducks Context) 🛡️
-      if (args.includes('--manifest') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'manifest')) {
-        console.log(`🛡️  [Conducks Manifest] Generating architectural context...`);
-        const manifest = await registry.audit.contextFile();
-        console.log("\n" + manifest);
-        return;
-      }
-
       // 2.6 Mode: Blueprint (Structural Integrity)
       if (args.includes('--blueprint') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'blueprint')) {
         console.log(`🛡️  [Conducks Blueprint] Mapping structural integrity...`);
