@@ -23,11 +23,9 @@ export class ManifestService implements ConducksComponent {
     const files = this.engine.computeBootstrap(projectRoot, projectName);
     const created: string[] = [];
 
-    if (files.length > 0) {
-      await fs.mkdir(path.dirname(files[0].filePath), { recursive: true });
-    }
-
     for (const file of files) {
+      // Each file may live in a subdir (e.g. todos/todo01.md) — ensure its own parent.
+      await fs.mkdir(path.dirname(file.filePath), { recursive: true });
       try {
         await fs.access(file.filePath);
         // File exists — skip

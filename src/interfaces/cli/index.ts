@@ -114,7 +114,7 @@ export async function main() {
   const command = commands.find(c => c.id === commandId);
   
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint'].includes(commandId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'visualize', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs'].includes(commandId);
 
   if (command) {
     try {

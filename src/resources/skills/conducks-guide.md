@@ -63,14 +63,14 @@ These tools provide active structural and behavioral intelligence by querying th
 
 ```
 synapse_query    → High-fidelity symbol/structural search
-synapse_context  → 360-degree symbol heritage and immediate blast radius
+conducks_context  → 360-degree symbol heritage and immediate blast radius
 synapse_impact   → Deep structural blast radius analysis (d1-d3)
 synapse_groups   → DAAC functional community mapping
 synapse_refactor → Atomic, graph-verified renames (GVR)
 sentinel_audit   → Active scanner for structural law (ARCH-X) violations
 blueprint_gen    → Generate the AI-native structural manifest
-kinetic_circuit  → Trace the 'Cerebral Circuit' (Execution Flow)
-kinetic_wave     → Search for logical patterns via Resonance
+conducks_trace  → Trace the 'Cerebral Circuit' (Execution Flow)
+conducks_query     → Search for logical patterns via Resonance
 ```
 
 ---

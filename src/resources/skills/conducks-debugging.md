@@ -11,17 +11,17 @@
 When a bug is reported or an error is thrown, follow this three-step protocol:
 
 ### 1. Resonance Discovery
-Use **`kinetic_wave`** to search for the error signature or behavioral pattern. This finds similar logic across the entire Synapse, identifying if the bug is a systemic pattern or an isolated defect.
+Use **`conducks_query`** to search for the error signature or behavioral pattern. This finds similar logic across the entire Synapse, identifying if the bug is a systemic pattern or an isolated defect.
 
 ### 2. Path Tracing
-Identify the entry point (the "trigger neuron") and run **`kinetic_circuit`**.
+Identify the entry point (the "trigger neuron") and run **`conducks_trace`**.
 - Follow the data mutation at every step.
 - Verify if the `lib/core` primitives are being used correctly by the `lib/product` service.
 - Flag any step that violates the downward dependency rule.
 
 ### 3. Root Cause Isolation
 Once the broken neuron is found:
-- Check its **`synapse_context`**.
+- Check its **`conducks_context`**.
 - Identify its callers (upstream) to see if the input was already corrupted.
 - Identify its callees (downstream) to see the extent of the corruption blast radius.
 
@@ -36,4 +36,4 @@ Never use empty `catch` blocks. All errors must be logged to `stderr` with a tra
 A bug fix is not complete until a unit test reproduces the failure state. The test must follow the same "circuit path" identified during the trace.
 
 **DEBUG-3 — Use the Tools** `[severity: medium]`
-Do not start grepping the codebase until you have used `synapse_query` and `kinetic_wave`. The graph knows more than the text search.
+Do not start grepping the codebase until you have used `synapse_query` and `conducks_query`. The graph knows more than the text search.

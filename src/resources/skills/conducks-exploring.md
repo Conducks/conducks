@@ -12,5 +12,5 @@ You are the **Explorer of the Syntactic Lattice**. You use Synapse search to map
 ## Probes
 1. **`conducks_synapse_query({query: "concept"})`**: High-fidelity symbol/structural search.
 2. **`conducks_synapse_groups()`**: Identify functional "Communities" (Auth, API, UI).
-3. **`conducks_synapse_context({symbolId: "filePath::name"})`**: 360-degree symbol heritage.</content>
+3. **`conducks_conducks_context({symbolId: "filePath::name"})`**: 360-degree symbol heritage.</content>
 <parameter name="filePath">conducks/src/resources/skills-generator/conducks-exploring.md
