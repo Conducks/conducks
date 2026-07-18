@@ -90,7 +90,7 @@
 - Why: `--force` re-ingests nodes but does not purge orphaned cross-file edges from prior pulses. After a linker change, run `conducks clean` (which purges the vault via `persistence.clear()`) before re-analyzing.
 - Applies: `conducks analyze --force`, linker changes.
 
-## Incremental analyze accumulates duplicate nodes
-- Gotcha: running `conducks analyze` repeatedly (incremental, without `clean`) can leave stale/duplicate node rows in the vault — e.g. coverage output shows the same function several times.
-- Why: incremental pulses re-insert nodes without fully purging prior rows for unchanged units; the graph looks right per-pulse but the vault carries leftovers.
-- Applies: always `conducks clean <path>` before a fresh full `analyze` when node counts matter (coverage, docs-status, guard). Real fix (dedupe on pulse) is tracked in todo08.
+## Coverage matchFile binds by basename (over-matching)
+- Gotcha: the coverage overlay can show many same-named files (e.g. 12 index.ts) all FULL when only one was covered.
+- Why: coverage-bind matchFile falls back to matching the bare basename, so one covered index.ts binds its lines to every index.ts in the graph. Not vault duplication — verified the vault has zero duplicate rows.
+- Applies: trust per-file coverage only after todo08 (matcher fix) lands; distinct-path functions are real, their fill % may be borrowed.
