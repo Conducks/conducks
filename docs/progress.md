@@ -1,5 +1,16 @@
 # Progress — conducks
 
+## 2026-07-19 · System 2 surfacing + workspace ledger (todo09 Phase 3 mostly closed)
+- `conducks supply-chain`: stdlib vs dependency surface, deps by blast radius, versions from
+  package.json, phantom-dependency warnings (4 undeclared on conducks). `--deps-only`.
+- `conducks ledger`: workspace survey + letter grade (nodes/edges/density, kinds, deps, orphans with
+  deductions). conducks = Grade B (88/100).
+- Closed as won't-fix (reasoned): 4 registry getters + initUI false orphans — need flood-prone
+  member-read capture or fiddly getter-accessor grammar; not worth the risk for 5 proven-benign
+  symbols (recipe recorded in todo09). Blocked/deferred: vuln surface (needs advisory DB/network),
+  live cross-service overlay (needs a target app, not conducks). Suite 47/47.
+
+
 ## 2026-07-19 · System 2 core — boundary-origin classification (ADR 0014)
 - Built the supply-chain surface that did not exist: external imports produced NO edge (link returned
   undefined during streaming), so conducks tracked 0 dependency edges. Now `boundary-classifier.ts`

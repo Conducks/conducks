@@ -40,6 +40,7 @@ import { CoverageViewCommand } from "./commands/coverage-view.js";
 import { DocsStatusCommand } from "./commands/docs-status.js";
 import { DocsLintCommand } from "./commands/docs-lint.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
+import { LedgerCommand } from "./commands/ledger.js";
 import { ConducksCommand } from "./command.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 
@@ -105,7 +106,7 @@ export async function main() {
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
     new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(),
-    new SupplyChainCommand()
+    new SupplyChainCommand(), new LedgerCommand()
   ];
 
   commands.push(new HelpCommand(commands));

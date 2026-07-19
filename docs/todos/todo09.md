@@ -88,15 +88,17 @@ emission, pruned at the end). No reflector change.
         referenced, but only within its own file via `{ initialize: … }`, so statically still an
         unused export; benign — it is the DI entry called dynamically as `registry.initialize()`).
         +14 ACCESSES, +1 dangler — no flood, the imported/same-file gate held. Suite 43/43.
-      - REMAINING getters (`diff`/`watcher`/`graphEngine`/`chronicle`) — these are `get X()` accessors
-        on the registry object, accessed via property read `registry.evolution.watcher`. `semantic_kind`
-        is 'method' (grammar doesn't capture the `get` keyword), so they're indistinguishable from
-        methods, and property-READS emit no edge. To connect: either capture the `get`/`set` accessor
-        keyword and EXEMPT accessors from orphan (they're invoked implicitly), or capture member-reads
-        (flood-prone). Left as documented-benign — 4 infra getters, poor risk/value vs a grammar change.
-      - Top-level call capture: `document.addEventListener('…', initUI)` at module scope in ui.js —
-        the JS grammar resolves the call target to `global::document` and the `initUI` arg is not
-        collected there. A ui.js/browser-asset quirk; documented-benign, low priority (not product code).
+      - DROPPED (deliberate, with reason): getters `diff`/`watcher`/`graphEngine`/`chronicle` +
+        `initUI`. These are `get X()` accessors read via `registry.evolution.watcher` (property reads
+        emit no edge) and a browser top-level `addEventListener` callback. Connecting them needs either
+        member-READ edge capture (flood-prone) or a `get`/`set`-accessor grammar capture that then has
+        to fight the node properties-vs-metadata persistence split to carry an `isAccessor` flag to
+        dead-code. High regression risk for 5 symbols already PROVEN benign — and a prune tool should
+        err toward reporting a maybe-orphan, not hiding it. NOT WORTH the risk; closed as won't-fix.
+        Exact recipe if ever revisited: (1) query `(method_definition "get" name:(_) @name) @isMethod
+        @isAccessor`; (2) `mapToCanonical('accessor') → BEHAVIOR`; (3) mirror `isAccessor` to
+        node.properties (not just metadata) so it survives persist/load; (4) dead-code exempts
+        `node.properties.isAccessor`. For initUI: exempt `resources/**` browser assets like test files.
       - `isSupported` (language-plugin.ts:51): DECISION = KEEP — language-plugin API contract; removing
         public API for a zero-caller flag is destructive. Accept as known-benign orphan.
       - External boundary tagging (path.*/fs.*/logger.* — the 280+ correctly-dangling calls) is the
@@ -120,6 +122,11 @@ Not dead code — each verified alive or intentional (see memory.md "prune is ad
       (base-class contract method); removing public API for a zero-caller flag is destructive for
       no gain. Accept the flag as a known-benign orphan.
 
-- [ ] WORKSPACE_LEDGER: workspace-level survey/grade doc (mentioned in the design, never built).
-- [ ] (see todo01) live cross-service overlay / coverage click-through — deferred to a target-app project.
+- [x] WORKSPACE_LEDGER: DONE — `conducks ledger` (`commands/ledger.ts`). Workspace survey + letter
+      grade from the graph: nodes/edges/density, kind distribution, third-party surface, orphan
+      dead-weight, with the score deductions shown. On conducks: Grade B (88/100), density 4.45,
+      −12 for 6 (documented-benign) orphans. Reuses persistence queries + prune; suite 47/47.
+- [ ] (see todo01) live cross-service overlay / coverage click-through — CANNOT do on conducks: needs
+      a running multi-service TARGET app to emit live coverage/trace. Deferred to a target-app project
+      by design (ADR 0012 static⊕live overlay) — not buildable against conducks-analyzing-itself.
 - [ ] EXPRESSION kind: stays dropped per ADR 0013 — this item is a marker, not work, unless a real query need appears.
