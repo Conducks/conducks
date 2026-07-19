@@ -4,11 +4,17 @@ Status: todo
   DATA is gone as a node kind, node count falls ~5,000 → ~1,400, and coverage/audit/impact/query all
   still pass. Decision recorded in ADR 0013 (resolves ADR 0012).
 
+Code anchors (where kinds are decided + emitted): the raw→canonical mapping is `mapToCanonical`
+(`src/lib/core/parsing/taxonomy.ts:49` — `parameter/argument/literal → DATA`, `variable/property/
+const/field/export → ATOM`); nodes get their `canonicalKind` in the reflector
+(`src/lib/domain/analysis/reflector.ts:267` and `:409`). Externals map via `essence-lens.ts:71,115`.
+Coverage does NOT read ATOM/DATA — it binds to BEHAVIOR spans (`coverage-bind.ts:50`), so it's safe.
+
 ## Phase 1 — cut DATA, edge-gate ATOM (the C0 fix that blocks everything)
-- [ ] Stop emitting DATA nodes — parameters/arguments/literals become attributes/metadata on their parent, not graph nodes.
-- [ ] Edge-gate ATOM: emit an ATOM node ONLY if it carries a real reference edge (exported const imported elsewhere, field accessed cross-scope); demote local-only vars/params to attributes on the parent BEHAVIOR/STRUCTURE.
+- [ ] Stop emitting DATA nodes — at the reflector emission points (`reflector.ts:267,409`), parameters/arguments/literals become attributes/metadata on their parent, not graph nodes. (Leave `mapToCanonical` intact or drop the DATA branch — decide during impl.)
+- [ ] Edge-gate ATOM: emit an ATOM node ONLY if it carries a real reference edge (exported const imported elsewhere, field accessed cross-scope); demote local-only vars/params to attributes on the parent BEHAVIOR/STRUCTURE. The gate needs the reference edges — run it after linking, not at first emission.
 - [ ] Re-route dropped atoms' edges to their parent node so no dependency is lost.
-- [ ] Verify: fresh analyze on conducks + one external TS repo → ATOM count small, DATA=0, density healthy.
+- [ ] Verify: fresh analyze on conducks + one external TS repo → ATOM count small, DATA=0, density healthy (recall: `analyze` is incremental — `clean` first, per memory.md).
 
 ## Phase 2 — keep the features that read ATOM working on the surviving set
 - [ ] dead-code/prune (`dead-code.ts:107`) — still finds unused *exported/referenced* atoms; the local-var false-positive flood (todo05) is gone by construction.
