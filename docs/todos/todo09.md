@@ -60,7 +60,7 @@ emission, pruned at the end). No reflector change.
       - [x] Version surface — done via the command's live package.json join (dep + dev + peer).
       - [ ] Vuln surface — BLOCKED offline: needs an advisory DB / `npm audit` (network). Deferred
         until conducks has a sanctioned data source; the boundary node + version are ready to carry it.
-      - [ ] WORKSPACE_LEDGER — see below.
+      - [x] WORKSPACE_LEDGER — DONE (conducks ledger; see item below).
 - [~] **Edge resolution for dynamic/interface/entry-point dispatch** — PARTIAL (2026-07-19).
       DONE: method-call resolution + dead-code accuracy.
       - `linker-intra.ts` step 3c: dangling `receiver.method` targets now resolve the METHOD segment
@@ -116,11 +116,13 @@ Not dead code — each verified alive or intentional (see memory.md "prune is ad
 - [x] `inferUnit`, `walkDocs` — analysis/docs-grammar.ts
 - [~] `getDefaultRules` — governance/sentinel-rules.ts: KEPT. It IS re-exported via a barrel
       (`export { … } from`), so the UNUSED_EXPORT flag is a false positive — leaving `export`.
-7 ORPHAN — live via a path static analysis can't draw (fixed by the deeper layers above, NOT deletion):
-- [ ] `chronicle`, `diff`, `graphEngine`, `watcher` — registry/index.ts, via `registry.evolution.X`
-      dynamic-property chains → DI modeling.
-- [ ] `initializeRegistry` — registry/index.ts, via `{ initialize: initializeRegistry }` → object-value capture.
-- [ ] `initUI` — resources/mirror/ui.js, top-level `addEventListener` → top-level-call capture (browser asset, low priority).
+7 ORPHAN — live via a path static analysis can't draw (resolved individually below):
+- [~] `chronicle`, `diff`, `graphEngine`, `watcher` — registry getters. WON'T-FIX (reasoned): see the
+      "DROPPED (deliberate, with reason)" block above — flood-prone member-read / fiddly accessor
+      grammar for 4 proven-benign symbols. Recipe recorded if ever revisited.
+- [x] `initializeRegistry` — CONNECTED via object-value capture (`(pair value: (identifier))`); now
+      referenced (flipped to a benign same-file UNUSED_EXPORT — it is the dynamically-called DI entry).
+- [~] `initUI` — WON'T-FIX (reasoned): ui.js browser-asset top-level callback; grouped with the getters above.
 - [x] `isSupported` — language-plugin.ts:51: DECISION = KEEP. It is language-plugin API surface
       (base-class contract method); removing public API for a zero-caller flag is destructive for
       no gain. Accept the flag as a known-benign orphan.
