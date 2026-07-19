@@ -1,5 +1,6 @@
 # 0012 — Taxonomy: two-system design vs the flat 13-kind code (open reconcile)
 Status: Accepted
+- Resolved by: 0013 (the open reconcile is now decided — cut DATA, edge-gate ATOM)
 - Date: 2026-07-19
 
 ## Context

@@ -1,5 +1,11 @@
 # Progress — conducks
 
+## 2026-07-19 · taxonomy reconcile decided + tracked (ADR 0013, todo09)
+- Decided C0: cut DATA as a node kind, edge-gate ATOM (keep only reference-carrying atoms, demote the
+  rest to attributes) — kills the 72%% flood, aligns to the 9-kind design. todo09 holds the build +
+  the recovered design debt (supply-chain edge tagging, workspace-ledger). Nothing left in chat.
+
+
 ## 2026-07-19 · recovered taxonomy design from chat (ADR 0012)
 - Documented the two-system taxonomy design (9-kind structure tree + separate reference-edge system,
   ATOM as attribute, static⊕live overlay) that lived only in chat history; amended ADR 0003; memory
