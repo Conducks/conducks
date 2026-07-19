@@ -104,6 +104,20 @@ export class IntraLinker {
         resolvedId = this.resolveSymbol(bareName, sourceUnitId, unitImports, unitSymbols);
       }
 
+      // 3c. Method-call resolution: targets arrive as `receiver.method` (e.g. `reflector.reflect`,
+      // `graph.getNeighbors`). Resolve the METHOD segment against the source file's imported units
+      // only. This binds real internal method calls while leaving external receivers (path.join,
+      // results.filter — no in-graph method of that name in an imported unit) correctly dangling.
+      // Import-scoping is the safety rail: a bare method name is never bound to an arbitrary global.
+      if (!resolvedId && bareName.includes('.')) {
+        const method = bareName.split('.').pop()!;
+        if (method && method !== bareName) {
+          resolvedId =
+            unitSymbols.get(sourceUnitId)?.get(method) ??
+            this.resolveSymbol(method, sourceUnitId, unitImports, unitSymbols);
+        }
+      }
+
       if (resolvedId) {
         graph.rebindEdgeTarget(edge, resolvedId);
         resolved.push({ id: edge.id, newTargetId: resolvedId });

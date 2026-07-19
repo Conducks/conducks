@@ -69,7 +69,13 @@ export class DeadCodeAnalyzer implements ConducksComponent {
       if (!DeadCodeAnalyzer.REFERENCE_EDGES.has(edge.type)) continue;
       if (graph.getNode(edge.targetId)) continue; // resolved to a real node
       const bare = edge.targetId.includes('::') ? edge.targetId.split('::').pop()! : edge.targetId;
-      if (bare) danglingRefNames.add(bare.toLowerCase());
+      if (!bare) continue;
+      danglingRefNames.add(bare.toLowerCase());
+      // Method calls dangle as `receiver.method` (e.g. `reflector.reflect`, `registry.evolution.audit`)
+      // — whatever the intra-linker could not bind to a concrete node. The USED symbol is the method
+      // segment, so protect that name too, or every interface/abstract/dynamically-dispatched method
+      // reads as a false orphan. (Errs toward under-reporting — the safe direction for a prune tool.)
+      if (bare.includes('.')) danglingRefNames.add(bare.split('.').pop()!.toLowerCase());
     }
 
     for (const node of nodes as ConducksNode[]) {
@@ -77,6 +83,9 @@ export class DeadCodeAnalyzer implements ConducksComponent {
       if (!node.properties.filePath || !node.properties.name) continue;
       // Skip container nodes (files/dirs/modules) even if mis-kinded as STRUCTURE.
       if (DeadCodeAnalyzer.CONTAINER_KINDS.has((node.properties.kind || '').toLowerCase())) continue;
+      // Skip test/fixture code: its symbols are inputs and test scaffolding, not product code —
+      // their "deadness" is meaningless (a fixture function is never called by the app by design).
+      if (DeadCodeAnalyzer.isTestPath(node.properties.filePath)) continue;
 
       // Count only reference (usage) edges, not structural containment.
       const incomingRefs = graph.getNeighbors(node.id, 'upstream')
@@ -151,6 +160,13 @@ export class DeadCodeAnalyzer implements ConducksComponent {
     const parent = graph.getNode(parentId);
     if (!parent) return true;
     return ['UNIT', 'NAMESPACE', 'REPOSITORY', 'ECOSYSTEM'].includes((parent as any).label);
+  }
+
+  // Test fixtures, specs, and mocks are not product code — their symbols are never "dead".
+  private static isTestPath(filePath: string): boolean {
+    const fp = filePath.toLowerCase();
+    return /(^|\/)(tests?|__tests__|__mocks__|spec|fixtures?|polyglot-verify)(\/|$)/.test(fp)
+      || /\.(test|spec)\.[cm]?[jt]sx?$/.test(fp);
   }
 
   private isEntryPoint(node: any): boolean {

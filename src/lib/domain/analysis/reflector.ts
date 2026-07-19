@@ -222,6 +222,10 @@ export class ConducksReflector implements ConducksComponent {
     };
 
     // === Pass 2: Semantic Pulse ===
+    // Reference-as-value candidates: bare identifiers passed as call arguments (callbacks, DI-table
+    // values). Collected here, resolved AFTER the match loop — tree-sitter match order is NOT source
+    // order, so gating on nodeCache mid-loop would miss a use that precedes its definition.
+    const refValueCandidates: Array<{ scope: string; name: string }> = [];
     for (const match of matches) {
       if (!match || !match.captures || match.captures.length === 0) continue;
 
@@ -442,6 +446,16 @@ export class ConducksReflector implements ConducksComponent {
 
           const type = this.calls.isConstructor(finalTarget, provider) ? 'CONSTRUCTS' : 'CALLS';
           this.calls.process(finalTarget, scope, type, spectrum, args, context);
+
+          // Reference-as-value: a bare identifier passed as a call ARGUMENT (a callback like
+          // `addEventListener('load', initUI)`, or a function handed to a DI/command table) is a
+          // USE of that symbol, not a call — the call processor only records the callee. Collect the
+          // identifier args now; emit ACCESSES edges after the loop when nodeCache is complete.
+          for (const rawArg of args) {
+            const a = rawArg.trim();
+            if (!/^[A-Za-z_$][\w$]*$/.test(a)) continue; // identifiers only (rejects strings/nums/exprs)
+            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase() });
+          }
         }
         else if (cName === 'pulse_assignment_name') {
           const val = captureMap['pulse_assignment_value'] ?? 'unknown';
@@ -488,6 +502,20 @@ export class ConducksReflector implements ConducksComponent {
       }
     }
 
+
+    // Emit reference-as-value edges now that nodeCache holds every definition in this file. Gate on
+    // "imported here OR defined in this file" — so a local-variable arg never floods the graph or adds
+    // a dangler. IntraLinker binds the bare name against imported/same-file symbols afterward.
+    for (const { scope, name } of refValueCandidates) {
+      if (!context.resolveLocalBinding(name) && !nodeCache.has(`${file.path.toLowerCase()}::${name}`)) continue;
+      spectrum.relationships.push({
+        sourceName: scope,
+        targetName: name,
+        type: 'ACCESSES' as any,
+        confidence: 0.8,
+        metadata: { referenceAsValue: true }
+      });
+    }
 
     spectrum.nodes = Array.from(nodeCache.values());
 
