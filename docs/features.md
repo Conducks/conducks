@@ -9,8 +9,8 @@
 - Intent: Keeps the graph at architectural altitude. Emitting every local variable floods the graph (~72% ATOM on a real repo) and buries the signal; edge-gating keeps only the atoms that are actually load-bearing. (ADR 0012/0013 — cut DATA, edge-gate ATOM.)
 
 ## Boundary / Supply-Chain Classification (System 2 — data flow)
-- Purpose: Every reference that leaves the repo lands on a boundary node classified by origin — internal (resolves in-repo), stdlib (trusted, unversioned), or dependency (versioned, supply-chain-relevant, with package name). External imports become durable origin-tagged DEPENDS_ON edges.
-- Intent: "Edge classification, not node count, tells architecture health." A dependency is only meaningful once you know it's third-party and versioned; this makes the supply-chain surface a queryable part of the graph instead of invisible. (ADR 0014.)
+- Purpose: Classify every reference that leaves the repo by origin — internal, stdlib (trusted, unversioned), or third-party dependency (versioned, supply-chain-relevant) — so the dependency surface is a first-class, queryable part of the graph.
+- Intent: "Edge classification, not node count, tells architecture health." A dependency only matters once you know it's third-party and versioned; without origin, the supply-chain surface is invisible. (ADR 0014.)
 
 ## Structural Health Status
 - Purpose: One command that answers "what's wrong with this codebase right now" — hotspots, entry points, god objects, staleness — instead of making an agent assemble that picture from raw graph queries.
@@ -113,8 +113,8 @@
 - Intent: Text-based rename tools miss or over-match; verifying against the call graph before writing keeps a rename from silently breaking callers it can't see (e.g. type-only references).
 
 ## Dead Code Detection
-- Purpose: Finds exported symbols with no incoming edges, excluding entry points and externally-accessible exports. Guards against false positives: method-dispatch (a dangling `receiver.method` protects the method name), test fixtures (tests/, spec, mocks, polyglot-verify), and identifier-as-value references (callbacks, DI tables) all count as usage.
-- Intent: Removing dead code by hand requires knowing every caller exists — this makes "nothing calls this" a checkable fact instead of a guess. A prune tool is only trustworthy if it errs toward under-reporting; the guards keep dynamically-dispatched and entry-wired symbols from reading as dead.
+- Purpose: Finds exported symbols with no incoming edges, excluding entry points, test fixtures, and symbols reached only through dynamic dispatch or identifier-as-value wiring (callbacks, DI tables).
+- Intent: Removing dead code by hand requires knowing every caller exists — this makes "nothing calls this" a checkable fact instead of a guess. A prune tool is only trustworthy if it errs toward under-reporting, so dynamically-reached symbols must never read as dead.
 
 ## Supply-Chain Surface
 - Purpose: `conducks supply-chain` reports the boundary classification — stdlib vs third-party edge surface, dependencies ranked by blast radius (importing files), versions joined live from package.json, and PHANTOM dependencies (imported but undeclared in the manifest).
