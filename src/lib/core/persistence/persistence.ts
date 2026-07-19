@@ -261,8 +261,12 @@ export class SynapsePersistence {
       if (owned) await this.run("BEGIN TRANSACTION");
       const stmt = db.prepare(`INSERT OR REPLACE INTO edges (id, pulseId, sourceId, targetId, category, type, weight, confidence, lineNumber, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const e of edges) {
+        // Graph edges (ConducksEdge) carry their data on `.properties`, not `.metadata`; weight lives
+        // on `.confidence`. Reading `.metadata`/`.weight` (old code) silently dropped EVERY edge's
+        // properties + lineNumber and forced weight=1.0. Read the real fields.
+        const props = e.properties || e.metadata || {};
         await new Promise<void>((r, j) => stmt.run(
-          e.id, pulseId, e.sourceId?.toLowerCase(), e.targetId?.toLowerCase(), e.type === 'IMPORTS' ? 'dependency' : 'structural', e.type, e.weight || 1.0, e.confidence || 1.0, e.metadata?.line || 0, JSON.stringify(e.metadata || {}),
+          e.id, pulseId, e.sourceId?.toLowerCase(), e.targetId?.toLowerCase(), e.type === 'IMPORTS' ? 'dependency' : 'structural', e.type, e.weight || e.confidence || 1.0, e.confidence || 1.0, props?.line || 0, JSON.stringify(props),
           (err: Error | null) => err ? j(err) : r()
         ));
       }

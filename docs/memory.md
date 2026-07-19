@@ -13,21 +13,14 @@
   (decision). The old 72% ATOM flood is gone (3561 → ~227 on conducks).
 
 
-## BUG — edge properties/metadata NEVER persist (saveEdges reads wrong fields)
-- Verified (2026-07-19): every row in the `edges` table has `properties = {}`, `weight = 1.0`,
-  `lineNumber = 0` — INCLUDING `CALLS` edges that `call.ts` explicitly tags with `{arguments,
-  original}`. Edge-level metadata is universally dropped at persist time.
-- Root cause: `persistence.saveEdges` (`persistence.ts:265`) reads `e.metadata`, `e.weight`,
-  `e.metadata?.line`. But `graph-engine.flushAndClear` passes `graph.getAllEdges()` → `ConducksEdge`
-  objects whose fields are `.properties` and `.confidence` (there is NO `.metadata` or `.weight`).
-  Field-name mismatch → the `|| {}` / `|| 1.0` fallbacks always fire. `ingestSpectrum` is fine
-  (`graph-engine.ts:240` maps `rel.metadata → edge.properties` correctly); the loss is only at save.
-- Fix spec (out-of-lane, deliberate — changes persisted data for ALL edges, test before shipping):
-  in `saveEdges` use `e.properties` not `e.metadata`, and `e.properties?.line` not `e.metadata?.line`;
-  `weight` — ConducksEdge has no weight, drop it or map from `e.confidence`.
-- Consequence / dependency: **System 2 boundary-node tagging (todo09 Phase 3) stores origin ON edges
-  — it is BLOCKED until this is fixed.** Also why the `referenceAsValue` metadata tag on the new
-  ACCESSES edges is currently inert (the edges persist fine; only their tag is lost).
+## FIXED — edge properties/metadata used to be dropped at persist (saveEdges)
+- Was: every `edges` row had `properties={}`, `weight=1.0`, `lineNumber=0` — `saveEdges`
+  (`persistence.ts`) read `e.metadata`/`e.weight`/`e.metadata?.line`, but `flushAndClear` passes
+  `ConducksEdge` objects whose fields are `.properties`/`.confidence` (no `.metadata`/`.weight`).
+- Fixed 2026-07-19: `saveEdges` now reads `e.properties` (fallback `e.metadata`), `props.line`, and
+  weight from `e.weight || e.confidence`. Verified: CALLS persist `{arguments,original}`, IMPORTS the
+  specifier, ACCESSES the `referenceAsValue` tag. Suite 43/43.
+- Unblocks System 2 boundary-node tagging (todo09 Phase 3) — it can now store origin on edges.
 
 ## Known: 5 shadow symbols on conducks (uninvestigated)
 - The structural test suite reports "Found 5 Shadow Symbols (Binding Failures)" on conducks itself

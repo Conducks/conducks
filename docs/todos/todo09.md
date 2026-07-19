@@ -38,14 +38,13 @@ emission, pruned at the end). No reflector change.
 - [x] Regression: full suite 43/43 green; typecheck 0 errors. No feature silently lost data.
 
 ## Phase 3 — tracked design debt (recovered from chat, do not lose again)
-- [ ] **PREREQUISITE BUG — edge properties never persist.** `persistence.saveEdges` (`persistence.ts:265`)
+- [x] **PREREQUISITE BUG — edge properties never persist.** FIXED 2026-07-19. `persistence.saveEdges` (`persistence.ts:265`)
       reads `e.metadata`/`e.weight`/`e.metadata?.line`, but flushAndClear passes `ConducksEdge` objects
       with `.properties`/`.confidence` (no `.metadata`/`.weight`). Result: EVERY edge row has
       `properties={}`, `weight=1.0`, `lineNumber=0` (verified 2026-07-19, incl. CALLS with `arguments`).
       Fix: `e.metadata`→`e.properties`, `e.metadata?.line`→`e.properties?.line`, drop/derive `weight`.
-      Deliberate — changes persisted data for ALL edges, test first. See memory.md. **Blocks System 2
-      below** (boundary tagging stores origin on edges).
-- [ ] System 2 — boundary-node origin/version tagging: tag external targets stdlib(trust/no-version) vs dependency(versioned/supply-chain). "Edge classification, not node count, tells architecture health." (ADR 0012) — needs the edge-properties bug fixed first.
+      Fixed in saveEdges (reads e.properties). Verified CALLS persist arguments; suite 43/43. **Unblocks System 2 below.**
+- [ ] System 2 — boundary-node origin/version tagging: tag external targets stdlib(trust/no-version) vs dependency(versioned/supply-chain). "Edge classification, not node count, tells architecture health." (ADR 0012) — edge-properties bug now fixed, so edges can carry origin tags.
 - [~] **Edge resolution for dynamic/interface/entry-point dispatch** — PARTIAL (2026-07-19).
       DONE: method-call resolution + dead-code accuracy.
       - `linker-intra.ts` step 3c: dangling `receiver.method` targets now resolve the METHOD segment
