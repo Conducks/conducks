@@ -1,5 +1,15 @@
 # Progress — conducks
 
+## 2026-07-19 · docs cleanup + skill single-sourced
+- Deleted docs/legacy/ (26 superseded files) + stale implementation.md (~374KB). docs/ is now the
+  governed core (features/conventions/memory/progress/handover/decisions/todos) + soft folders only.
+- Refreshed the stale handover (was 07-18, pre-taxonomy/System 2). README updated (dropped dead refs,
+  added architecture/).
+- conducks-docs standard single-sourced: src/resources/skills/conducks-docs.md (installer `<!--
+  description -->` format) is canonical; the ~/.claude skill is now byte-identical to what the
+  installer generates from it. docs-lint clean (28 governed), suite 48/48.
+
+
 ## 2026-07-19 · docs standard fix — architecture is authored, not derived (ADR 0015)
 - `docs-grammar.ts`: architecture.md / architecture/ / MODULE.md now classify as AUTHORED
   ("architecture" type, free-form, never lint-flagged); only map.md/drift.md stay "derived". Wiring

@@ -1,7 +1,4 @@
----
-name: conducks-docs
-description: The single documentation standard for every project. Docs hold AUTHORED intent only — features, conventions, memory, decisions, todos, handover, and authored architecture (a human explaining a module's purpose/boundaries/why). How code is WIRED (calls, imports, cycles, dead code, coverage) is never written to a file; query it live from the conducks graph (audit, impact, trace, coverage). Covers single-repo + monorepo layouts, the per-file grammar, living-vs-record, ADR + todo rules. Use when creating, moving, or reviewing any doc, bootstrapping docs/, writing an ADR/todo, or deciding where a fact goes.
----
+<!-- description: The single documentation standard for every project. Docs hold AUTHORED intent only — features, conventions, memory, decisions, todos, handover, and authored architecture (a human explaining a module's purpose/boundaries/why). How code is WIRED (calls, imports, cycles, dead code, coverage) is never written to a file; query it live from the conducks graph (audit, impact, trace, coverage). Covers single-repo + monorepo layouts, the per-file grammar, living-vs-record, ADR + todo rules. Use when creating, moving, or reviewing any doc, bootstrapping docs/, writing an ADR/todo, or deciding where a fact goes. -->
 
 # conducks-docs
 
@@ -195,3 +192,4 @@ Status: current | stale
   wiring (calls/imports/cycles) out of it — that's what `audit`/`impact`/`trace` are for.
 - **Never**: write wiring in a doc · put wiring in features.md · auto-generate architecture · mutate a
   record · write a fact twice.
+

@@ -13,8 +13,9 @@ Follows the **conducks-docs** standard.
 - **handover.md** — dated snapshot for the next session.
 - **decisions/** — ADRs (one immutable file per decision, indexed in `decisions/README.md`).
 - **todos/** — numbered todos; `completed/` = done.
+- **architecture/** — authored per-module intent (`MODULE.md`), if/when a module's shape needs
+  explaining. Free-form, never auto-generated (ADR 0015). None yet — add on demand.
 
-Soft docs (`business/`, `brand/`, `product/`, `design/`, `implementation.md`) hold project-specific
-material. `legacy/` is archived/superseded content — write-once, nothing live links in.
+Soft docs (`business/`, `brand/`, `product/`, `design/`) hold project-specific material.
 
 Want structure? `conducks audit` · `conducks impact <sym>` · `conducks trace <sym>` · `conducks coverage`.

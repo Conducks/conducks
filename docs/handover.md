@@ -1,32 +1,26 @@
-# Handover — 2026-07-18
+# Handover — 2026-07-19
 Status: current
-- Scope: state after the conducks completion arc (coverage, docs-as-data, clean architecture, MCP surface) + full claim re-verification against the codebase
 
-## Where the system stands (all verified against code this date)
-- conducks tool COMPLETE for its core loop: analyze → derived docs → coverage overlay → drift
-  baseline → guard (layer contract + cycles + ranks, all clean, self-enforced)
-- MCP: 14 tools incl. conducks_docs + conducks_coverage (ADR 0007); guidance ships as native
-  skills (ADR 0006); CLI 39 commands; one shared domain implementation behind both surfaces
-- Docs: 8 todos + 7 ADRs + features(48)/memory/conventions in the strict grammar; docs-lint clean
+## Where it stands
+- **Taxonomy reconcile (C0) done** — `pruneTaxonomy()` cuts DATA, edge-gates ATOM at pulse end. On
+  conducks: ~5000→~1660 nodes, ATOM 3561→~230, DATA 0, density ~4.5. ADR 0013. (todo09 Phase 1+2)
+- **Edge-resolution (Phase 3) mostly done** — method-call resolution, dead-code accuracy (dot-guard,
+  fixture exclusion), reference-as-value + object-literal-value edges. `prune` 25→8 findings, all
+  documented-benign. Registry getters + initUI left as reasoned won't-fix (recipe in todo09).
+- **Edge-properties persist bug fixed** — `saveEdges` read `.metadata`/`.weight`; now `.properties`/
+  `.confidence`. Every edge kept `{}` before. Unblocked System 2. (memory.md)
+- **System 2 built (ADR 0014)** — `boundary-classifier.ts` classifies imports internal/stdlib/
+  dependency; durable origin-tagged DEPENDS_ON edges. New commands: `conducks supply-chain` (surface +
+  versions + phantom-dep detection) and `conducks ledger` (workspace survey + grade). conducks = B(88).
+- **Docs standard fixed (ADR 0015)** — architecture is AUTHORED, not derived; `docs-grammar.ts` +
+  the conducks-docs skill updated. Canonical standard now lives at
+  `src/resources/skills/conducks-docs.md`; the `~/.claude` skill is generated from it by the installer.
+- **Docs cleaned** — deleted `docs/legacy/` (26 superseded files) + stale `implementation.md`.
+- Suite 48/48, typecheck clean, docs-lint clean. Pushed to `origin/main`.
 
-## The prioritized plan (next sessions, in order)
-1. todo08 — fix coverage matchFile basename over-binding (small, correctness): one covered
-   index.ts currently lights ALL 12 same-named files FULL. Drop the bare-basename fallback in
-   coverage-bind.ts. Do FIRST — dark-counts are the drift signal the rollout reads.
-2. todo07 Phase 1 — workspace rollout, worst rot first (claims re-verified exact this date):
-   mycvpath (212-file dormant framework → integrate-or-delete+ADR), orchestrator (483M legacy
-   + 230M datahub → decide+record), dual_chatbot (root orphans → delete+ADR), unnamed-C-level
-   (regenerate architecture from code). Per repo: analyze → context-gen → coverage/drift →
-   author intent → guard. ~1 focused session each.
-3. todo07 Phase 3 — active/freeze/kill triage across the workspace; drift ledger becomes live.
-4. todo01 C4 — node-anchored intent (author Nodes: anchors in features.md, build the
-   dangling-anchor flag). C5-full (live click-through overlay) after rollout picks the target app.
-5. Tails, opportunistically: todo05 Go ABI pin · todo04 LC7 runs · todo03 S7 auth / A1 god-object
-   / Q1 (9 scratch files still git-tracked) / Q3+Q4 test restoration.
-6. todo02 — re-scope before executing: drive the 90% coverage push from `conducks coverage`
-   dark-lists, not the old plan ("19 templates" count unverified).
-
-## Corrections made during re-verification (honesty trail)
-- todo08 premise retracted (vault duplicates = false); real bug is the coverage matcher.
-- todo01 stale items fixed (vault claim retracted; docs-rules-skill item was already done).
-- memory.md gotcha corrected to the true cause.
+## Next, in order
+1. todo09 Phase 3 externally-blocked items: vuln surface (needs advisory DB / network), live
+   cross-service overlay (needs a target app). EXPRESSION stays a no-op marker.
+2. Optional: author `docs/architecture/*.MODULE.md` for the heavy modules (reflector, orchestrator,
+   persistence, graph) now that authored architecture is a valid doc type.
+3. Optional: re-verify the taxonomy + System 2 on one external TS repo (not just conducks itself).
