@@ -82,19 +82,22 @@ emission, pruned at the end). No reflector change.
         System 2 supply-chain item above, NOT a linker bug.
 ## Phase 3 — the exact 16 `prune` findings still open (enumerated so they're directly actionable)
 Not dead code — each verified alive or intentional (see memory.md "prune is advisory-only").
-9 UNUSED_EXPORT — used in-file, over-exported. Fix = DROP the `export` keyword (NOT delete the symbol):
-- [ ] `globalMirror` — mirror-server.ts
-- [ ] `detectImportKind` — import-resolver.ts
-- [ ] `buildMRO`, `resolveMethodInMRO` — languages/python/resolver.ts
-- [ ] `snapshotKey`, `buildSnapshot` — analysis/coverage-baseline.ts
-- [ ] `inferUnit`, `walkDocs` — analysis/docs-grammar.ts
-- [ ] `getDefaultRules` — governance/sentinel-rules.ts
+9 UNUSED_EXPORT — used in-file, over-exported. Dropped the `export` keyword (grep-verified 0 importers):
+- [x] `globalMirror` — mirror-server.ts (was `export let`)
+- [x] `detectImportKind` — import-resolver.ts
+- [x] `buildMRO`, `resolveMethodInMRO` — languages/python/resolver.ts
+- [x] `snapshotKey`, `buildSnapshot` — analysis/coverage-baseline.ts
+- [x] `inferUnit`, `walkDocs` — analysis/docs-grammar.ts
+- [~] `getDefaultRules` — governance/sentinel-rules.ts: KEPT. It IS re-exported via a barrel
+      (`export { … } from`), so the UNUSED_EXPORT flag is a false positive — leaving `export`.
 7 ORPHAN — live via a path static analysis can't draw (fixed by the deeper layers above, NOT deletion):
 - [ ] `chronicle`, `diff`, `graphEngine`, `watcher` — registry/index.ts, via `registry.evolution.X`
       dynamic-property chains → DI modeling.
 - [ ] `initializeRegistry` — registry/index.ts, via `{ initialize: initializeRegistry }` → object-value capture.
 - [ ] `initUI` — resources/mirror/ui.js, top-level `addEventListener` → top-level-call capture (browser asset, low priority).
-- [ ] `isSupported` — language-plugin.ts:51, ZERO callers → decide keep-as-contract vs remove.
+- [x] `isSupported` — language-plugin.ts:51: DECISION = KEEP. It is language-plugin API surface
+      (base-class contract method); removing public API for a zero-caller flag is destructive for
+      no gain. Accept the flag as a known-benign orphan.
 
 - [ ] WORKSPACE_LEDGER: workspace-level survey/grade doc (mentioned in the design, never built).
 - [ ] (see todo01) live cross-service overlay / coverage click-through — deferred to a target-app project.

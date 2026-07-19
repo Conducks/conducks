@@ -99,7 +99,7 @@ export class PythonResolver {
  * @param classMap   - Map from class name → its direct base classes.
  * @returns Ordered MRO list starting with `className` and ending with `'object'`.
  */
-export function buildMRO(
+function buildMRO(
   className: string,
   baseClasses: string[],
   classMap: Map<string, string[]>
@@ -131,7 +131,7 @@ export function buildMRO(
  * @param methodIndex - Map from class name → set of method names it defines.
  * @returns The first class in MRO order that defines the method, or `undefined`.
  */
-export function resolveMethodInMRO(
+function resolveMethodInMRO(
   methodName: string,
   mro: string[],
   methodIndex: Map<string, Set<string>>

@@ -140,7 +140,7 @@ export class MirrorServer {
   }
 }
 
-export let globalMirror: MirrorServer | null = null;
+let globalMirror: MirrorServer | null = null;
 export function initGlobalMirror(gateway: GatewayService) {
   globalMirror = new MirrorServer(gateway);
   // Dependency inversion: the web layer (which legally imports domain + composition) subscribes

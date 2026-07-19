@@ -58,7 +58,7 @@ export function sameFamily(sourceFileId: string, targetFileId: string): boolean 
  *   `import X from './baz'`          → default
  *   `import './side-effect'`         → default (no binding)
  */
-export function detectImportKind(importText?: string): ImportKind {
+function detectImportKind(importText?: string): ImportKind {
   if (!importText) return 'default';
   if (/\*\s+as\s+\w+/.test(importText)) return 'namespace';
   if (/\{[^}]+\}/.test(importText)) return 'named';

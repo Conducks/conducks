@@ -43,7 +43,7 @@ export function inferType(fp: string): DocType {
   return "prose";
 }
 
-export function inferUnit(fp: string): string {
+function inferUnit(fp: string): string {
   const m = fp.match(/([^/]+)\/docs\//);
   return m ? m[1] : path.basename(path.dirname(fp));
 }
@@ -102,7 +102,7 @@ export function lint(type: DocType, body: Body): string[] {
 }
 
 /** Walk a docs tree, skipping archive dirs (records/superseded material is not linted). */
-export function walkDocs(dir: string): string[] {
+function walkDocs(dir: string): string[] {
   const out: string[] = [];
   let entries: string[];
   try { entries = readdirSync(dir); } catch { return out; }

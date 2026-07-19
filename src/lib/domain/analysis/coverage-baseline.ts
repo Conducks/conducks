@@ -31,7 +31,7 @@ const REGRESSED_HARD_BREAK_MIN_BASELINE = 50; // was meaningfully covered...
 const REGRESSED_HARD_BREAK_MAX_CURRENT = 0;   // ...and now runs zero lines at all.
 const REGRESSED_MAJOR_DROP = 40;              // or dropped by >= 40 points even if not to zero.
 
-export function snapshotKey(file: string, name: string): string {
+function snapshotKey(file: string, name: string): string {
   return `${file}::${name}`;
 }
 
@@ -40,7 +40,7 @@ export function defaultBaselinePath(projectRoot: string = process.cwd()): string
 }
 
 /** Builds a snapshot object ("file::name" -> pct) from a set of coverage results. */
-export function buildSnapshot(results: CoverageResult[]): CoverageSnapshot {
+function buildSnapshot(results: CoverageResult[]): CoverageSnapshot {
   const snapshot: CoverageSnapshot = {};
   for (const r of results) {
     snapshot[snapshotKey(r.file, r.name)] = r.pct;
