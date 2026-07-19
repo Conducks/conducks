@@ -22,11 +22,17 @@
   specifier, ACCESSES the `referenceAsValue` tag. Suite 43/43.
 - Unblocks System 2 boundary-node tagging (todo09 Phase 3) — it can now store origin on edges.
 
-## Known: 5 shadow symbols on conducks (uninvestigated)
-- The structural test suite reports "Found 5 Shadow Symbols (Binding Failures)" on conducks itself
-  (a console.warn diagnostic, within tolerance — suite stays 43/43). Count was 5 before AND after the
-  Phase 3 linker changes, so not introduced by them. Not yet investigated — a shadow = a symbol
-  reference that never bound to a node. Likely more of the same dynamic/DI dispatch gap (Phase 3).
+## Resolved: the 5 shadow symbols are BENIGN (polymorphic method names, not binding failures)
+- The structural test's "Shadow Symbols" heuristic counts STRUCTURE/BEHAVIOR nodes sharing a bare
+  NAME >5× (a console.warn diagnostic, no assertion). Investigated 2026-07-19 — the 5 on conducks are:
+  `extractDocs` ×15, `resolve` ×14, `getVisibility` ×8, `audit` ×7, `setPersistence` ×6.
+- Verdict: all legitimate — one implementation each across the parallel LANGUAGE plugins
+  (rust/ruby/go/python/java extractors + resolvers) or analysis classes. The nodes are CORRECTLY
+  distinct (different files, distinct ids like `rust/extractor.ts::conducksextractor.extractdocs`).
+  Not duplicate bindings, not a bug. The heuristic groups by name only, ignoring the owning class, so
+  it false-flags any polyglot analyzer with N plugins implementing the same interface method.
+- If ever worth silencing: group the shadow query by (name, structureId/parent), not bare name — then
+  genuine same-class duplicates surface and cross-plugin polymorphism does not. Low priority (diagnostic).
 
 ## `prune` (dead-code) is advisory-only — do NOT auto-delete from it
 - State (2026-07-19, after Phase 3 method + reference-as-value resolution): `prune` on conducks reports
