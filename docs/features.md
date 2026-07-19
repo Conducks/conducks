@@ -4,6 +4,14 @@
 - Purpose: Build the symbol graph for a codebase in one pass so every other command has something to query.
 - Intent: Repos this large make single-threaded, incremental-only parsing impractical — the pulse trades a one-time scan cost for near-instant queries afterward.
 
+## Structural Taxonomy (System 1 — containment)
+- Purpose: Model code as a containment tree where the deepest routinely-emitted node is the function (BEHAVIOR). Parameters/arguments/literals carry no architectural signal and are NOT nodes; variables/fields (ATOM) become nodes ONLY when they carry a real cross-scope reference edge — the rest are attributes on their parent.
+- Intent: Keeps the graph at architectural altitude. Emitting every local variable floods the graph (~72% ATOM on a real repo) and buries the signal; edge-gating keeps only the atoms that are actually load-bearing. (ADR 0012/0013 — cut DATA, edge-gate ATOM.)
+
+## Boundary / Supply-Chain Classification (System 2 — data flow)
+- Purpose: Every reference that leaves the repo lands on a boundary node classified by origin — internal (resolves in-repo), stdlib (trusted, unversioned), or dependency (versioned, supply-chain-relevant, with package name). External imports become durable origin-tagged DEPENDS_ON edges.
+- Intent: "Edge classification, not node count, tells architecture health." A dependency is only meaningful once you know it's third-party and versioned; this makes the supply-chain surface a queryable part of the graph instead of invisible. (ADR 0014.)
+
 ## Structural Health Status
 - Purpose: One command that answers "what's wrong with this codebase right now" — hotspots, entry points, god objects, staleness — instead of making an agent assemble that picture from raw graph queries.
 - Intent: Cuts the number of round-trips an agent needs before it can start reasoning about a codebase.
@@ -105,8 +113,16 @@
 - Intent: Text-based rename tools miss or over-match; verifying against the call graph before writing keeps a rename from silently breaking callers it can't see (e.g. type-only references).
 
 ## Dead Code Detection
-- Purpose: Finds exported symbols with no incoming edges, excluding entry points and externally-accessible exports.
-- Intent: Removing dead code by hand requires knowing every caller exists — this makes "nothing calls this" a checkable fact instead of a guess.
+- Purpose: Finds exported symbols with no incoming edges, excluding entry points and externally-accessible exports. Guards against false positives: method-dispatch (a dangling `receiver.method` protects the method name), test fixtures (tests/, spec, mocks, polyglot-verify), and identifier-as-value references (callbacks, DI tables) all count as usage.
+- Intent: Removing dead code by hand requires knowing every caller exists — this makes "nothing calls this" a checkable fact instead of a guess. A prune tool is only trustworthy if it errs toward under-reporting; the guards keep dynamically-dispatched and entry-wired symbols from reading as dead.
+
+## Supply-Chain Surface
+- Purpose: `conducks supply-chain` reports the boundary classification — stdlib vs third-party edge surface, dependencies ranked by blast radius (importing files), versions joined live from package.json, and PHANTOM dependencies (imported but undeclared in the manifest).
+- Intent: Turns the dependency graph into an actionable supply-chain view — which packages are load-bearing, which are undeclared — without a separate SCA tool. Built on the System 2 boundary edges.
+
+## Workspace Ledger
+- Purpose: `conducks ledger` gives a workspace-level survey and a single letter grade — node/edge counts, density, kind distribution, third-party surface, and orphan dead-weight — with the score deductions shown.
+- Intent: A "state of the codebase" glance assembled from the graph the pulse already produced, so health is one command instead of a manual assembly of separate queries.
 
 ## Structural Diff
 - Purpose: Compares two pulses and reports symbols added, removed, or modified, plus deltas in complexity, gravity, and resonance.
