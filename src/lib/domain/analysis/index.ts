@@ -205,6 +205,10 @@ export class AnalysisService implements ConducksComponent {
     // 4.5 [Conducks Virtual Induction] 🏺
     await this.induceVirtualLibraries(this.graph.getGraph());
 
+    // 4.6 Taxonomy reconcile (ADR 0013): cut DATA, edge-gate ATOM. Runs last so every reference
+    // edge (intra/service/federated/virtual) is present when deciding which atoms are load-bearing.
+    await this.persistence.pruneTaxonomy();
+
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
     await this.persistence.save(this.graph.getGraph(), {
       metadataOnly: true,

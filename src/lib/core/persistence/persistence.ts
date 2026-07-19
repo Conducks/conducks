@@ -385,6 +385,52 @@ export class SynapsePersistence {
     }
   }
 
+  /**
+   * Taxonomy reconcile — cut DATA, edge-gate ATOM (ADR 0013 / todo09 C0).
+   *
+   * Runs AFTER linking, so the reference edges exist. An ATOM node survives only if it carries a
+   * real reference edge (IMPORTS/CALLS/CONSTRUCTS/TYPE_REFERENCE/ACCESSES/…) — anything not in
+   * STRUCTURAL_EDGE_TYPES. Local vars/params/fields with only containment edges are demoted (their
+   * param info already lives in the parent BEHAVIOR's dna). DATA (parameters/arguments/literals) is
+   * always cut — nothing depends on it. This kills the ~72% ATOM flood (~5,000 → ~1,400 nodes).
+   *
+   * Reference edges that touched a dropped node are rerouted onto its parent so no dependency is
+   * lost. Executes via run() inside the active pulse transaction (inPulse), so it commits atomically
+   * with save() and rolls back with abortPulse() on any failure — never leaves a half-pruned graph.
+   */
+  public async pruneTaxonomy(): Promise<void> {
+    if (this.readOnly) return;
+    await this.ensureVaultOpen();
+    const STRUCTURAL = `('MEMBER_OF','CONTAINS','HAS_METHOD','HAS_PROPERTY')`;
+
+    // 1. Freeze the drop set BEFORE mutating edges — the ATOM edge test reads the current edge set.
+    await this.run(`CREATE OR REPLACE TEMP TABLE _pruned AS
+      SELECT id, parentId FROM nodes n
+      WHERE n.canonicalKind = 'DATA'
+         OR (n.canonicalKind = 'ATOM' AND NOT EXISTS (
+               SELECT 1 FROM edges e
+               WHERE (e.sourceId = n.id OR e.targetId = n.id)
+                 AND e.type NOT IN ${STRUCTURAL}))`);
+
+    // 2. Reroute reference edges off the dropped nodes onto their parent (dependency preserved).
+    await this.run(`UPDATE edges SET sourceId = (SELECT parentId FROM _pruned WHERE id = edges.sourceId)
+      WHERE type NOT IN ${STRUCTURAL}
+        AND sourceId IN (SELECT id FROM _pruned)
+        AND (SELECT parentId FROM _pruned WHERE id = edges.sourceId) IS NOT NULL`);
+    await this.run(`UPDATE edges SET targetId = (SELECT parentId FROM _pruned WHERE id = edges.targetId)
+      WHERE type NOT IN ${STRUCTURAL}
+        AND targetId IN (SELECT id FROM _pruned)
+        AND (SELECT parentId FROM _pruned WHERE id = edges.targetId) IS NOT NULL`);
+
+    // 3. Delete edges still touching a dropped node (structural, or reroute had no parent) + self-loops.
+    await this.run(`DELETE FROM edges WHERE sourceId IN (SELECT id FROM _pruned) OR targetId IN (SELECT id FROM _pruned)`);
+    await this.run(`DELETE FROM edges WHERE sourceId = targetId`);
+
+    // 4. Drop the nodes.
+    await this.run(`DELETE FROM nodes WHERE id IN (SELECT id FROM _pruned)`);
+    await this.run(`DROP TABLE _pruned`);
+  }
+
   public async clear(): Promise<void> {
     if (this.readOnly) return;
     await this.run('DELETE FROM nodes');
