@@ -1,5 +1,15 @@
 # Progress — conducks
 
+## 2026-07-19 · System 2 core — boundary-origin classification (ADR 0014)
+- Built the supply-chain surface that did not exist: external imports produced NO edge (link returned
+  undefined during streaming), so conducks tracked 0 dependency edges. Now `boundary-classifier.ts`
+  (pure, unit-tested) classifies internal/stdlib/dependency; reflector tags origin/package on IMPORTS;
+  orchestrator emits durable ecosystem boundary nodes + origin-tagged DEPENDS_ON edges for externals.
+- On conducks: 262 DEPENDS_ON (179 stdlib/14 modules, 83 dependency/17 packages — tree-sitter x23,
+  duckdb x17, chalk, express, MCP SDK), 0 dangling. Suite 47/47 (43+4). Remaining: supply-chain
+  command, version/vuln enrichment, workspace ledger (todo09).
+
+
 ## 2026-07-19 · Phase 3 (partial) — method-call edge resolution + dead-code accuracy (todo09)
 - `linker-intra.ts` step 3c: dangling `receiver.method` targets resolve the method segment within the
   source file's IMPORTED units only (import-scoped, never a global). IntraLinker 600 → 959 (+359 real

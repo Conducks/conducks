@@ -3,6 +3,7 @@ import { PrismSpectrum, SpectrumNode } from "../../core/persistence/prism-core.j
 import { ConducksProvider } from "../../core/parsing/providers/base.js";
 import { grammars } from "../../core/parsing/grammar-registry.js";
 import { ImportProcessor } from "../../core/parsing/processors/import.js";
+import { classifyOrigin } from "../../core/graph/boundary-classifier.js";
 import { BindingProcessor } from "../../core/parsing/processors/binding.js";
 import { CallProcessor } from "../../core/parsing/processors/call.js";
 import { HeritageProcessor } from "../../core/parsing/processors/heritage.js";
@@ -372,13 +373,17 @@ export class ConducksReflector implements ConducksComponent {
             if (sourceCap && sourceCap.node) {
               const specifier = sourceCap.node.text.replace(/^['"]|['"]$/g, '');
 
+              // System 2 (ADR 0012): classify the boundary origin at capture. Edge properties now
+              // persist, so this rides through to the vault — internal/stdlib/dependency + package.
+              const boundary = classifyOrigin(specifier);
+
               // Seed the Spectrum with the RAW SPECIFIER for later resolution 🏺
               spectrum.relationships.push({
                 sourceName: 'unit',
                 targetName: specifier,
                 type: 'IMPORTS' as any,
                 confidence: 1.0,
-                metadata: { specifier, isRaw: true }
+                metadata: { specifier, isRaw: true, origin: boundary.origin, package: boundary.package }
               });
 
               for (let i = 0; i < match.captures.length; i++) {
@@ -399,7 +404,7 @@ export class ConducksReflector implements ConducksComponent {
                     targetName: specifier,
                     type: 'IMPORTS' as any,
                     confidence: 0.9,
-                    metadata: { specifier, bindingName: bindingName.toLowerCase(), isRawBinding: true }
+                    metadata: { specifier, bindingName: bindingName.toLowerCase(), isRawBinding: true, origin: boundary.origin, package: boundary.package }
                   });
                 }
               }

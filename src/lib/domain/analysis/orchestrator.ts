@@ -367,6 +367,32 @@ export class AnalyzeOrchestrator implements ConducksComponent {
             // off resolution, because the fuzzy resolver matches a bare package name (`context`,
             // `routing`) to a same-named local file and would report a false self-import.
             if (isSelfImportSpecifier(specifier, filePath)) { emitSelfEdge(); continue; }
+
+            // System 2 (ADR 0012): an external import (stdlib/dependency) is a BOUNDARY. It never
+            // resolves to an in-repo node, and during streaming no ECOSYSTEM node exists yet, so the
+            // old code dropped it entirely — the dependency surface was invisible. Emit a durable
+            // boundary node + a DEPENDS_ON edge tagged with origin/package: the supply-chain surface.
+            const origin = rel.metadata.origin;
+            if (origin && origin !== 'internal') {
+              const pkg = (rel.metadata.package as string | null) || specifier.replace(/^node:/, '');
+              const boundaryId = `ecosystem::${pkg.toLowerCase()}`;
+              if (!this.graph.getGraph().getNode(boundaryId)) {
+                this.graph.getGraph().addNode({
+                  id: boundaryId, label: 'ECOSYSTEM', isShallow: true,
+                  properties: {
+                    name: pkg, filePath: '', canonicalKind: 'ECOSYSTEM', canonicalRank: 0,
+                    origin, package: origin === 'dependency' ? pkg : null, isBoundary: true,
+                  } as any,
+                });
+              }
+              this.graph.getGraph().addEdge({
+                id: `DEP::${unitId}->${boundaryId}`, sourceId: unitId, targetId: boundaryId,
+                type: 'DEPENDS_ON', confidence: 1.0,
+                properties: { specifier, origin, package: rel.metadata.package },
+              });
+              continue;
+            }
+
             const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
             // B2 fix: guard both linkage and targetId before accessing fields
             // Never bind across language families (e.g. a .py import resolving to a .tsx/.go file by basename).
@@ -377,7 +403,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
                 targetId: linkage.targetId.includes('::') ? linkage.targetId : `${linkage.targetId}::unit`,
                 type: linkage.type,
                 confidence: 1.0,
-                properties: { specifier }
+                properties: { specifier, origin: rel.metadata.origin, package: rel.metadata.package }
               });
             }
           }
@@ -396,7 +422,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
                 targetId: targetNodeId,
                 type: 'IMPORTS',
                 confidence: 0.9,
-                properties: { specifier, bindingName }
+                properties: { specifier, bindingName, origin: rel.metadata.origin, package: rel.metadata.package }
               });
             }
           }

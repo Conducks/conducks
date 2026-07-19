@@ -44,7 +44,14 @@ emission, pruned at the end). No reflector change.
       `properties={}`, `weight=1.0`, `lineNumber=0` (verified 2026-07-19, incl. CALLS with `arguments`).
       Fix: `e.metadata`→`e.properties`, `e.metadata?.line`→`e.properties?.line`, drop/derive `weight`.
       Fixed in saveEdges (reads e.properties). Verified CALLS persist arguments; suite 43/43. **Unblocks System 2 below.**
-- [ ] System 2 — boundary-node origin/version tagging: tag external targets stdlib(trust/no-version) vs dependency(versioned/supply-chain). "Edge classification, not node count, tells architecture health." (ADR 0012) — edge-properties bug now fixed, so edges can carry origin tags.
+- [~] System 2 — boundary-node origin/version tagging (ADR 0014). CORE DONE 2026-07-19:
+      `boundary-classifier.ts` (pure, unit-tested) classifies each import internal/stdlib/dependency;
+      reflector tags origin/package on IMPORTS; orchestrator emits durable `ecosystem::<pkg>` boundary
+      nodes + origin-tagged DEPENDS_ON edges for externals (previously the dep surface was INVISIBLE —
+      external imports produced no edge at all). On conducks: 262 DEPENDS_ON (179 stdlib/14 mods, 83
+      dependency/17 pkgs), 0 dangling, suite 47/47. REMAINING: (a) user-facing `supply-chain`/`deps`
+      command (needs command-registry wiring); (b) version + vuln surface (read package.json/lockfile
+      onto the boundary node); (c) the WORKSPACE_LEDGER below.
 - [~] **Edge resolution for dynamic/interface/entry-point dispatch** — PARTIAL (2026-07-19).
       DONE: method-call resolution + dead-code accuracy.
       - `linker-intra.ts` step 3c: dangling `receiver.method` targets now resolve the METHOD segment
