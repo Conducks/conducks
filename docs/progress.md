@@ -1,5 +1,31 @@
 # Progress — conducks
 
+## 2026-07-19 · Phase 3 (partial) — method-call edge resolution + dead-code accuracy (todo09)
+- `linker-intra.ts` step 3c: dangling `receiver.method` targets resolve the method segment within the
+  source file's IMPORTED units only (import-scoped, never a global). IntraLinker 600 → 959 (+359 real
+  edges); danglers 3919 → 3567. Verified `reflector.reflect` → concrete impl, 280 external calls
+  (path/fs/logger) correctly stay dangling, 0 wrongly bound.
+- `dead-code.ts`: dot-segment safety net (method name of any dangling ref added to the not-orphan set)
+  + test-fixture exclusion. `prune` 25 → 17 false-positive-free findings.
+- `reflector.ts`: reference-as-value edges — a bare identifier passed as a call ARG (callback / DI
+  value) emits an ACCESSES edge (collected in-loop, emitted after so nodeCache is complete; gated to
+  imported/same-file so no flood). +103 ACCESSES, ~+32 resolved, fixed `registry.graph`; `prune` 17→16.
+  Suite 43/43, no new shadows.
+- Remaining Phase 3 (documented, each a distinct layer): DI property-chains (registry.evolution.*),
+  object-literal value capture (initializeRegistry), top-level-call capture (initUI, ui.js quirk),
+  external boundary tagging (System 2). Not fabricated — needs grammar/DI work.
+
+## 2026-07-19 · taxonomy reconcile BUILT — cut DATA, edge-gate ATOM (todo09 Phase 1+2)
+- Implemented as one post-link SQL step `persistence.pruneTaxonomy()`, called in `analysis/index.ts`
+  after `induceVirtualLibraries`, inside the pulse transaction (atomic). Cuts every DATA node;
+  keeps an ATOM only if it carries a non-structural reference edge; reroutes dropped nodes' reference
+  edges to their parent, deletes structural/self-loop remnants.
+- Proven on conducks itself: nodes 5221 → 1626, ATOM 3561 → 227, DATA 0, density 4.54 (healthy),
+  self-loops 0, no prune-created dangling edges (remaining danglers are pre-existing unresolved
+  external/type imports — System 2 boundary debt, todo09 Phase 3). audit/prune/query/impact pass;
+  typecheck clean; suite 43/43. Kills the 72% flood. ADR 0013 realized. Phase 3 (supply-chain edge
+  tagging, workspace-ledger, live overlay) still open.
+
 ## 2026-07-19 · taxonomy reconcile decided + tracked (ADR 0013, todo09)
 - Decided C0: cut DATA as a node kind, edge-gate ATOM (keep only reference-carrying atoms, demote the
   rest to attributes) — kills the 72%% flood, aligns to the 9-kind design. todo09 holds the build +

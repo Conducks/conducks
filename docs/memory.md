@@ -1,12 +1,53 @@
 # Memory — conducks
 
-## Taxonomy: code has 13 kinds, the design intended 9 (ATOM = attribute)
-- Gotcha: `taxonomy.ts` defines 13 first-class kinds incl. ATOM/DATA (ATOM ≈ 72% of nodes). The original
-  design (recovered from chat, ADR 0012) intended 9 structural kinds with ATOM as a cross-cutting
-  ATTRIBUTE and a separate reference-edge system — not a flat node enum. Divergence is OPEN.
-- Why: ADR 0003 added kinds without recording the design tension; the intent lived only in chat.
-- Applies: any taxonomy/node-kind work — read ADR 0012 first; do not treat the 13-kind enum as settled.
+## Taxonomy: DATA cut, ATOM edge-gated at pulse end (ADR 0013 / todo09) — enum still lists 13
+- State: `taxonomy.ts` STILL declares 13 kinds and `mapToCanonical` still tags params→DATA and
+  vars→ATOM at emission. But nodes are FILTERED at the end of every analyze by
+  `persistence.pruneTaxonomy()` (called in `analysis/index.ts` after `induceVirtualLibraries`): every
+  DATA node is deleted, and an ATOM survives ONLY if it carries a non-structural reference edge.
+- Gotcha: the enum/emission and the persisted graph now DISAGREE by design — do NOT "fix" the enum to
+  match the 227-atom reality; the tagging is intentional and the prune is the reconciler. To change
+  what survives, edit `pruneTaxonomy`, not the enum. DATA=0 and ATOM≈edge-carrying-only in any vault.
+- Why: the edge-gate needs post-link edges, the vault is authoritative (streaming flushes before the
+  prune), and param data already lives in the parent's `dna.params`. See ADR 0012 (design) + 0013
+  (decision). The old 72% ATOM flood is gone (3561 → ~227 on conducks).
 
+
+## BUG — edge properties/metadata NEVER persist (saveEdges reads wrong fields)
+- Verified (2026-07-19): every row in the `edges` table has `properties = {}`, `weight = 1.0`,
+  `lineNumber = 0` — INCLUDING `CALLS` edges that `call.ts` explicitly tags with `{arguments,
+  original}`. Edge-level metadata is universally dropped at persist time.
+- Root cause: `persistence.saveEdges` (`persistence.ts:265`) reads `e.metadata`, `e.weight`,
+  `e.metadata?.line`. But `graph-engine.flushAndClear` passes `graph.getAllEdges()` → `ConducksEdge`
+  objects whose fields are `.properties` and `.confidence` (there is NO `.metadata` or `.weight`).
+  Field-name mismatch → the `|| {}` / `|| 1.0` fallbacks always fire. `ingestSpectrum` is fine
+  (`graph-engine.ts:240` maps `rel.metadata → edge.properties` correctly); the loss is only at save.
+- Fix spec (out-of-lane, deliberate — changes persisted data for ALL edges, test before shipping):
+  in `saveEdges` use `e.properties` not `e.metadata`, and `e.properties?.line` not `e.metadata?.line`;
+  `weight` — ConducksEdge has no weight, drop it or map from `e.confidence`.
+- Consequence / dependency: **System 2 boundary-node tagging (todo09 Phase 3) stores origin ON edges
+  — it is BLOCKED until this is fixed.** Also why the `referenceAsValue` metadata tag on the new
+  ACCESSES edges is currently inert (the edges persist fine; only their tag is lost).
+
+## Known: 5 shadow symbols on conducks (uninvestigated)
+- The structural test suite reports "Found 5 Shadow Symbols (Binding Failures)" on conducks itself
+  (a console.warn diagnostic, within tolerance — suite stays 43/43). Count was 5 before AND after the
+  Phase 3 linker changes, so not introduced by them. Not yet investigated — a shadow = a symbol
+  reference that never bound to a node. Likely more of the same dynamic/DI dispatch gap (Phase 3).
+
+## `prune` (dead-code) is advisory-only — do NOT auto-delete from it
+- State (2026-07-19, after Phase 3 method + reference-as-value resolution): `prune` on conducks reports
+  16 findings, down from 25. All HONEST — 9 real unused-*exports* (symbol used in-file, just
+  over-`export`ed; fix = drop `export`, not the code) + 7 orphans (see blind spots). Method-dispatch,
+  test-fixture, and call-arg-callback false positives are gone.
+- Still-blind spots (the 7 orphans): DI dynamic-property CHAINS (`registry.evolution.watcher/audit()` —
+  chronicle/diff/graphEngine/watcher), object-literal values (`{ initialize: initializeRegistry }` — no
+  grammar capture for `key: identifier`), a ui.js top-level-call quirk (initUI), and `isSupported`
+  (zero callers — likely genuine unused interface API). All tracked in todo09 Phase 3.
+- Why still advisory: the remaining blind spots mean an "orphan" can still be a live DI/entry symbol.
+- Applies: never bulk-delete from `prune`. Verify each with a real grep for call sites first. Note the
+  9 unused-EXPORTS are legit — but "unused export" means "drop the export keyword", NOT "delete the
+  symbol" (it is used inside its own file).
 
 ## Analyze is atomic — an interrupted pulse rolls back
 - Gotcha (historical): a killed `analyze` used to leave a partial graph (all nodes, few edges) that
