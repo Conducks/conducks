@@ -49,9 +49,15 @@ emission, pruned at the end). No reflector change.
       reflector tags origin/package on IMPORTS; orchestrator emits durable `ecosystem::<pkg>` boundary
       nodes + origin-tagged DEPENDS_ON edges for externals (previously the dep surface was INVISIBLE —
       external imports produced no edge at all). On conducks: 262 DEPENDS_ON (179 stdlib/14 mods, 83
-      dependency/17 pkgs), 0 dangling, suite 47/47. REMAINING: (a) user-facing `supply-chain`/`deps`
-      command (needs command-registry wiring); (b) version + vuln surface (read package.json/lockfile
-      onto the boundary node); (c) the WORKSPACE_LEDGER below.
+      dependency/17 pkgs), 0 dangling, suite 47/47.
+      - [x] `supply-chain` command (`commands/supply-chain.ts`) — reports stdlib vs dependency surface,
+        deps by blast radius (importing files), versions joined live from package.json, and flags
+        PHANTOM dependencies (imported but undeclared — found 4 on conducks: chalk, @jest/globals,
+        web-tree-sitter, minimatch). `--deps-only` filters to third-party.
+      - [x] Version surface — done via the command's live package.json join (dep + dev + peer).
+      - [ ] Vuln surface — BLOCKED offline: needs an advisory DB / `npm audit` (network). Deferred
+        until conducks has a sanctioned data source; the boundary node + version are ready to carry it.
+      - [ ] WORKSPACE_LEDGER — see below.
 - [~] **Edge resolution for dynamic/interface/entry-point dispatch** — PARTIAL (2026-07-19).
       DONE: method-call resolution + dead-code accuracy.
       - `linker-intra.ts` step 3c: dangling `receiver.method` targets now resolve the METHOD segment

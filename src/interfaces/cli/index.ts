@@ -39,6 +39,7 @@ import { CoverageCommand } from "./commands/coverage.js";
 import { CoverageViewCommand } from "./commands/coverage-view.js";
 import { DocsStatusCommand } from "./commands/docs-status.js";
 import { DocsLintCommand } from "./commands/docs-lint.js";
+import { SupplyChainCommand } from "./commands/supply-chain.js";
 import { ConducksCommand } from "./command.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 
@@ -103,7 +104,8 @@ export async function main() {
     new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
-    new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand()
+    new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(),
+    new SupplyChainCommand()
   ];
 
   commands.push(new HelpCommand(commands));
