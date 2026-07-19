@@ -18,9 +18,14 @@ describe('docs-grammar — full-format classification', () => {
     }
   });
 
-  it('treats architecture as file OR folder — both are the derived tier', () => {
-    expect(inferType('docs/architecture.md')).toBe('derived');       // overview file
-    expect(inferType('docs/architecture/auth.md')).toBe('derived');  // per-subsystem detail
+  it('classifies architecture as AUTHORED (file OR folder OR MODULE.md), not derived — ADR 0015', () => {
+    expect(inferType('docs/architecture.md')).toBe('architecture');            // overview file
+    expect(inferType('docs/architecture/auth.md')).toBe('architecture');       // per-subsystem detail
+    expect(inferType('docs/architecture/electron/MODULE.md')).toBe('architecture');
+    expect(inferType('app/docs/architecture/kernel.MODULE.md')).toBe('architecture');
+  });
+
+  it('keeps map/drift as derived — pure wiring, query it, never author it', () => {
     expect(inferType('docs/map.md')).toBe('derived');
     expect(inferType('docs/drift.md')).toBe('derived');
   });

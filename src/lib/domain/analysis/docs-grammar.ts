@@ -11,7 +11,7 @@ import path from "node:path";
 
 export type DocType =
   | "todo" | "decision" | "features" | "memory" | "conventions" | "progress"
-  | "handover" | "derived" | "prose";
+  | "handover" | "architecture" | "derived" | "prose";
 
 export const GOVERNED: DocType[] = ["todo", "decision", "features", "memory", "conventions", "progress", "handover"];
 
@@ -34,9 +34,14 @@ export function inferType(fp: string): DocType {
   if (/conventions\.md$/.test(fp)) return "conventions";
   if (/progress\.md$/.test(fp)) return "progress";
   if (/handover\.md$/.test(fp)) return "handover";
-  // Architecture is file-OR-folder: `architecture.md` is the derived overview; the `architecture/`
-  // folder holds per-subsystem detail + charts for large projects. Both are the derived tier.
-  if (/architecture\.md$|map\.md$|drift\.md$/.test(fp) || /\/architecture\//.test(fp)) return "derived";
+  // Architecture is AUTHORED, not derived: a human explaining a module/subsystem's purpose, layer,
+  // boundaries, and deferred design — the WHY the code can't tell you (see sofie's per-module
+  // MODULE.md). It is free-form (no skeleton), never lint-flagged, and must NEVER be auto-generated.
+  // file-OR-folder: `architecture.md`, an `architecture/` folder, or per-module `MODULE.md`.
+  if (/architecture\.md$/.test(fp) || /\/architecture\//.test(fp) || /MODULE\.md$/.test(fp)) return "architecture";
+  // `map.md` / `drift.md` are pure wiring — that IS derived structure; don't author it, query the
+  // graph (audit / impact / trace / coverage) instead.
+  if (/map\.md$|drift\.md$/.test(fp)) return "derived";
   // Everything else a human keeps under docs/ is SOFT — free-form, project-specific, valid, never
   // flagged (business/ design/ product/ process/ are just common examples, not a required set).
   // The only lint failures are GOVERNED files that break their own skeleton.

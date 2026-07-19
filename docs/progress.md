@@ -1,5 +1,13 @@
 # Progress — conducks
 
+## 2026-07-19 · docs standard fix — architecture is authored, not derived (ADR 0015)
+- `docs-grammar.ts`: architecture.md / architecture/ / MODULE.md now classify as AUTHORED
+  ("architecture" type, free-form, never lint-flagged); only map.md/drift.md stay "derived". Wiring
+  still queried (audit/impact/trace untouched); only AUTO-GENERATED architecture is banned (ADR 0011).
+- Canonical conducks-docs standard now lives in the repo (src/resources/skills/conducks-docs.md) as
+  the source of truth; ~/.claude skill synced from it. Amends ADR 0009. docs-lint clean, typecheck clean.
+
+
 ## 2026-07-19 · System 2 surfacing + workspace ledger (todo09 Phase 3 mostly closed)
 - `conducks supply-chain`: stdlib vs dependency surface, deps by blast radius, versions from
   package.json, phantom-dependency warnings (4 undeclared on conducks). `--deps-only`.

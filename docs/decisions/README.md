@@ -24,9 +24,11 @@ Group every ADR under this file by its status, newest-numbered last within each 
   [0011 — Kill derived-doc generation; structure is queried, never written](0011-kill-derived-doc-generation.md),
   [0012 — Taxonomy: two-system design vs flat 13-kind (open reconcile)](0012-taxonomy-two-systems-vs-flat-13-kind.md),
   [0013 — Taxonomy reconcile: cut DATA, edge-gate ATOM](0013-taxonomy-reconcile-cut-data-edge-gate-atom.md),
-  [0014 — System 2: boundary-origin classification](0014-system2-boundary-origin-classification.md)
+  [0014 — System 2: boundary-origin classification](0014-system2-boundary-origin-classification.md),
+  [0015 — Architecture docs are authored, not derived](0015-architecture-is-authored-not-derived.md)
 - Superseded: none yet
-- Amended: [0003 — Additive taxonomy reconcile](0003-additive-taxonomy-reconcile.md) (amended by 0012)
+- Amended: [0003 — Additive taxonomy reconcile](0003-additive-taxonomy-reconcile.md) (amended by 0012),
+  [0009 — Hard/soft docs, architecture file-or-folder](0009-hard-soft-docs-and-uninstall-symmetry.md) (amended by 0015)
 
 ## Consequences
 New ADRs are appended to the list above under the correct status group when they are accepted,
