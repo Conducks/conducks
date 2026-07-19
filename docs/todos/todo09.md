@@ -1,5 +1,8 @@
 # todo09 — Taxonomy reconcile (C0) + tracked design debt
-Status: Phase 1+2 done · Phase 3 open
+Status: Phase 1+2 done · Phase 3 largely done — only externally-blocked items remain
+- Open items are ONLY: vuln surface (needs an advisory DB / network), live cross-service overlay
+  (needs a running target app), and the EXPRESSION marker (no-work). Everything else is done or a
+  documented reasoned won't-fix (registry getters + initUI). See per-item status below.
 - Acceptance: on a real TS repo, ATOM drops from ~72% of nodes to a few hundred (edge-carrying only),
   DATA is gone as a node kind, node count falls ~5,000 → ~1,400, and coverage/audit/impact/query all
   still pass. Decision recorded in ADR 0013 (resolves ADR 0012).
