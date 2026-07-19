@@ -46,6 +46,10 @@ export const TYPESCRIPT_QUERIES = `
 
   ;; --- Pulse Flow (Assignments) ---
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
+
+  ;; --- Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps) ---
+  ;; The value identifier is a USE of that symbol, not a call. Feeds the reference-as-value path.
+  (pair value: (identifier) @ref_value)
   
   ;; --- Kinesis (Execution Flow) ---
   (call_expression 

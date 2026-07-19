@@ -69,15 +69,23 @@ emission, pruned at the end). No reflector change.
       - DI dynamic-property CHAINS: `registry.evolution.watcher` / `registry.evolution.audit()` —
         multi-hop property access on the composition-root object (chronicle/diff/graphEngine/watcher
         still orphan). Needs the registry object modeled, or an entry-manifest root list.
-      - Object-literal value capture: `{ initialize: initializeRegistry }` passes a symbol as a VALUE
-        in an object literal — no grammar capture exists for `key: identifier` values, so
-        `initializeRegistry` stays orphan. Add a capture that feeds these into the same
-        reference-as-value emission (the foundation is already built). Verify it doesn't flood.
+      - [x] Object-literal value capture — DONE. Added `(pair value: (identifier) @ref_value)` to the
+        TS/TSX/JS queries + a reflector handler that feeds it into the reference-as-value emission.
+        `initializeRegistry` now has an incoming ACCESSES edge (flipped ORPHAN → UNUSED_EXPORT — it is
+        referenced, but only within its own file via `{ initialize: … }`, so statically still an
+        unused export; benign — it is the DI entry called dynamically as `registry.initialize()`).
+        +14 ACCESSES, +1 dangler — no flood, the imported/same-file gate held. Suite 43/43.
+      - REMAINING getters (`diff`/`watcher`/`graphEngine`/`chronicle`) — these are `get X()` accessors
+        on the registry object, accessed via property read `registry.evolution.watcher`. `semantic_kind`
+        is 'method' (grammar doesn't capture the `get` keyword), so they're indistinguishable from
+        methods, and property-READS emit no edge. To connect: either capture the `get`/`set` accessor
+        keyword and EXEMPT accessors from orphan (they're invoked implicitly), or capture member-reads
+        (flood-prone). Left as documented-benign — 4 infra getters, poor risk/value vs a grammar change.
       - Top-level call capture: `document.addEventListener('…', initUI)` at module scope in ui.js —
         the JS grammar resolves the call target to `global::document` and the `initUI` arg is not
-        collected there. A ui.js/browser-asset quirk; low priority (not product code).
-      - `isSupported` (language-plugin.ts:51) has ZERO callers anywhere — likely genuine unused
-        interface-API surface, not a dispatch miss. Decide: keep as contract or remove.
+        collected there. A ui.js/browser-asset quirk; documented-benign, low priority (not product code).
+      - `isSupported` (language-plugin.ts:51): DECISION = KEEP — language-plugin API contract; removing
+        public API for a zero-caller flag is destructive. Accept as known-benign orphan.
       - External boundary tagging (path.*/fs.*/logger.* — the 280+ correctly-dangling calls) is the
         System 2 supply-chain item above, NOT a linker bug.
 ## Phase 3 — the exact 16 `prune` findings still open (enumerated so they're directly actionable)

@@ -57,6 +57,9 @@ export const TSX_QUERIES = `
   ;; --- Pulse Flow (Assignments) ---
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
 
+  ;; Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps)
+  (pair value: (identifier) @ref_value)
+
   ;; --- Kinesis (Execution Flow) ---
   (call_expression
     function: [(identifier) (member_expression) (super)] @kinesis_target

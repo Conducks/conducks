@@ -457,6 +457,15 @@ export class ConducksReflector implements ConducksComponent {
             refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase() });
           }
         }
+        else if (cName === 'ref_value') {
+          // Object-literal value `{ key: someSymbol }` — a reference-as-value (DI table / command
+          // map). Same handling as an identifier call-arg: collect now, emit + gate after the loop.
+          const a = cText.trim();
+          if (/^[A-Za-z_$][\w$]*$/.test(a)) {
+            const scope = getScopeAt(currentMatchRow);
+            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase() });
+          }
+        }
         else if (cName === 'pulse_assignment_name') {
           const val = captureMap['pulse_assignment_value'] ?? 'unknown';
           const scopeName = getScopeAt(currentMatchRow);
