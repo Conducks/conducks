@@ -1,5 +1,11 @@
 # Progress — conducks
 
+## 2026-07-19 · recovered taxonomy design from chat (ADR 0012)
+- Documented the two-system taxonomy design (9-kind structure tree + separate reference-edge system,
+  ATOM as attribute, static⊕live overlay) that lived only in chat history; amended ADR 0003; memory
+  pointer added. Divergence code(13 flat)↔design(9) is now a tracked OPEN reconcile, not lost.
+
+
 ## 2026-07-19 · atomic analyze pulse (prevention)
 - purge+flush+rank+save wrapped in ONE transaction (persistence beginPulse/abortPulse; save commits).
   A killed analyze rolls back — previous good graph survives. Proven: killed mid-flush → graph

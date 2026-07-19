@@ -1,5 +1,13 @@
 # Memory — conducks
 
+## Taxonomy: code has 13 kinds, the design intended 9 (ATOM = attribute)
+- Gotcha: `taxonomy.ts` defines 13 first-class kinds incl. ATOM/DATA (ATOM ≈ 72% of nodes). The original
+  design (recovered from chat, ADR 0012) intended 9 structural kinds with ATOM as a cross-cutting
+  ATTRIBUTE and a separate reference-edge system — not a flat node enum. Divergence is OPEN.
+- Why: ADR 0003 added kinds without recording the design tension; the intent lived only in chat.
+- Applies: any taxonomy/node-kind work — read ADR 0012 first; do not treat the 13-kind enum as settled.
+
+
 ## Analyze is atomic — an interrupted pulse rolls back
 - Gotcha (historical): a killed `analyze` used to leave a partial graph (all nodes, few edges) that
   loaded fine but was ~95% disconnected — everything looked like an orphan.

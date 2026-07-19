@@ -21,9 +21,10 @@ Group every ADR under this file by its status, newest-numbered last within each 
   [0008 — Unify docs standard on conducks-docs; retire docs-rules](0008-unify-docs-standard-on-conducks-docs.md),
   [0009 — Hard/soft docs, architecture file-or-folder, uninstall symmetry](0009-hard-soft-docs-and-uninstall-symmetry.md),
   [0010 — Cycle detection ignores structural edges (Node/TS false-positive fix)](0010-cycle-detection-ignores-structural-edges.md),
-  [0011 — Kill derived-doc generation; structure is queried, never written](0011-kill-derived-doc-generation.md)
+  [0011 — Kill derived-doc generation; structure is queried, never written](0011-kill-derived-doc-generation.md),
+  [0012 — Taxonomy: two-system design vs flat 13-kind (open reconcile)](0012-taxonomy-two-systems-vs-flat-13-kind.md)
 - Superseded: none yet
-- Amended: none yet
+- Amended: [0003 — Additive taxonomy reconcile](0003-additive-taxonomy-reconcile.md) (amended by 0012)
 
 ## Consequences
 New ADRs are appended to the list above under the correct status group when they are accepted,
