@@ -69,7 +69,8 @@ docs/
 ├── features.md       what each capability is FOR + why        (living)
 ├── conventions.md    binding rules, IDed, with reasons        (living)
 ├── memory.md         gotchas the code can't show              (living)
-├── architecture/     authored per-module intent — MODULE.md   (living, free-form, OPTIONAL)
+├── architecture/     authored intent, one MODULE.md per module/part (living, free-form, OPTIONAL)
+│   └── modules/<path mirroring src>/MODULE.md
 ├── decisions/        one ADR per file + README index          (record)
 ├── todos/            todoNN.md · completed/ · legacy/          (record)
 ├── progress.md       dated log of what shipped                (record)
@@ -87,7 +88,8 @@ db/docs/         ┘
 ```
 
 `architecture/` is AUTHORED and OPTIONAL — add it when a module's intent needs explaining; skip it
-when it doesn't. Never `map.md` / `drift.md` — those are pure wiring; query the graph, don't write them.
+when it doesn't. Scope each file to ONE module, part, or feature (see the MODULE.md rules below).
+Never `map.md` / `drift.md` — those are pure wiring; query the graph, don't write them.
 
 ---
 
@@ -124,8 +126,18 @@ enforces the governed set; `architecture/` and soft folders are free-form and ne
 - Applies: <file / node / area>
 ```
 
-**`architecture/<module>.MODULE.md`** — AUTHORED, free-form (no enforced skeleton). One per module or
-subsystem, explaining what the code can't tell you about its shape:
+**`architecture/**/MODULE.md`** — AUTHORED, free-form (no enforced skeleton). Explains what the code
+can't tell you about a module's shape.
+
+**Granularity is the whole game: one doc per module, PART, or feature — never one per layer.** A doc
+that has to describe several unrelated things stops being specific enough to act on. When a module
+has parts with genuinely different intent (a query language vs a grammar loader), each part gets its
+own doc and the parent becomes a short overview that links to them and **repeats nothing**. Mirror
+the source tree — `architecture/modules/<path>/MODULE.md` — so a reader can find a part's doc from
+its path.
+
+The inverse matters as much: **don't add a doc to complete a set.** Small, self-describing modules
+get none. A doc is written when intent stops being obvious from the source, not to fill a directory.
 ```markdown
 # <module> — <one-line role>
 

@@ -16,6 +16,12 @@
   the standard's Layer/Responsibility/Boundaries/Deferred shape instead, wiring-free.
 - Small modules (kinetic, metrics, intelligence, federation, manifest, visual, web) intentionally have
   no MODULE.md — add one when intent stops being obvious, not to complete a set.
+- Propagated the granularity rule into the STANDARD itself, not just this repo: canonical skill
+  `src/resources/skills/conducks-docs.md` now states "one doc per module, PART, or feature — never
+  one per layer", the parent-is-an-overview-that-repeats-nothing rule, the mirror-the-source-tree
+  layout, and the inverse (don't add a doc to complete a set). The `~/.claude` skill was regenerated
+  with the installer's exact transform (`conducks-installer.getDynamicSkillTemplates`) and verified
+  byte-identical — one source of truth, so any workspace `conducks setup` produces the same file.
 
 ## 2026-07-20 · dead-code gap traced to missing inheritance edges (todo11)
 - `STALE_IMPORT` is documented in the MCP tool surface but could never fire: `dead-code.ts` gated it
