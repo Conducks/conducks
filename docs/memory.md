@@ -1,5 +1,32 @@
 # Memory — conducks
 
+## Inheritance is never recorded — the graph has ZERO EXTENDS/IMPLEMENTS edges
+- Gotcha: `EXTENDS`/`IMPLEMENTS` are in the `EdgeType` union, `dead-code.ts:29` counts them as usage,
+  and ADR 0010 lists them among "genuine coupling" — but no such edge has ever existed. Verified on a
+  full conducks pulse: edge types are MEMBER_OF, CALLS, DEPENDS_ON, CONSTRUCTS, ACCESSES, IMPORTS,
+  TYPE_REFERENCE only. Cause: `reflector.ts:438` gates heritage on `cName === 'heritage' && node`,
+  but the query patterns `(class_heritage (implements_clause (_) @heritage))` are STANDALONE — they
+  carry no `@isX` definition capture, so no node is built for that match, `node` is null, and
+  `heritage.process()` is never called. The captures themselves are fine (probed against the real
+  grammar: they hit).
+- Why: heritage was written as its own pattern rather than as part of the class pattern, so it never
+  associates with the enclosing class node the handler requires.
+- Applies: `reflector.ts:438`, `processors/heritage.ts`, all `languages/*/queries.ts` heritage
+  patterns. Anything reasoning about inheritance is currently reasoning about nothing. Fix by
+  capturing heritage together with the class declaration so one match carries both.
+
+## STALE_IMPORT is advertised but unreachable, and blocked on heritage
+- Gotcha: `dead-code.ts` gated STALE_IMPORT on `node.label === 'import_clause' | 'import_specifier'`
+  — raw tree-sitter node types. Labels are canonical kinds (UNIT/STRUCTURE/BEHAVIOR/ATOM/…), so the
+  branch could never fire, while the MCP tool surface documents the finding (`synapse.ts:661`).
+- Why the obvious fix is not enough: computing "unused import" from the reflector's per-file usage
+  evidence produced 232 findings against `tsc --noUnusedLocals`'s 96 — a flood, because
+  `implements ConducksCommand` registers no usage (see the heritage entry above), so every CLI
+  command's interface import looked unused. Reverted rather than shipped; prune must err toward
+  under-reporting.
+- Applies: fix heritage FIRST, then re-derive stale imports and re-validate against
+  `tsc --noUnusedLocals` before shipping.
+
 ## Lowercased node IDs collide a local variable with a same-named type
 - Gotcha: IDs are lowercase-normalized (mandatory for APFS — see the case-sensitivity entry below),
   so the parameter `nodeId` in `traversal.ts:44` and the imported TYPE `NodeId` both key to

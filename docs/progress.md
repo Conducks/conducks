@@ -1,5 +1,21 @@
 # Progress — conducks
 
+## 2026-07-20 · dead-code gap traced to missing inheritance edges (todo11)
+- `STALE_IMPORT` is documented in the MCP tool surface but could never fire: `dead-code.ts` gated it
+  on `node.label === 'import_clause' | 'import_specifier'`, raw tree-sitter node types, while labels
+  are canonical kinds. Unreachable branch.
+- Rebuilding it from the reflector's per-file usage evidence produced 232 findings against
+  `tsc --noUnusedLocals`'s 96. Root cause: the graph has **ZERO EXTENDS/IMPLEMENTS edges** — verified
+  on a full pulse — so `implements ConducksCommand` registers no usage and every CLI command's
+  interface import read as unused. `reflector.ts:438` requires a node for the heritage capture, but
+  the heritage query patterns are standalone and build none, so `heritage.process()` never runs.
+- Reverted rather than shipped (prune must err toward under-reporting). Both findings recorded in
+  memory.md; todo11 sequences the real fix: heritage edges first, then STALE_IMPORT, validated
+  against tsc.
+- Bonus already banked: the TS type captures flipped dead-code's `graphTracksTypes` guard on, so real
+  dead types now surface — 5 in `types/domain.ts` (SynapseNode, SynapseEdge, Pulse, KineticResult,
+  ResonanceScore) plus McpPagination, each verified unused by hand. Orphans ~8 → 25.
+
 ## 2026-07-20 · self-audit is CLEAN — case collision fixed, validated against madge (todo10 P1–P3)
 - `conducks audit` on conducks: **0 circular dependencies, 0 hub overloads**. Both long-standing
   findings were false positives; neither the cycle nor the hub was ever real.
