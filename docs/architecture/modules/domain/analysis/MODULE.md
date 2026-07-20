@@ -1,47 +1,39 @@
-# domain/analysis — the reflector, the orchestrator, and the query surface
+# domain/analysis — establishing what is true about the code
 
 **Layer:** domain. Imports core + contracts.
 
-**Responsibility:** driving a pulse. The reflector walks a file's query matches and builds its
-spectrum; the orchestrator sequences the multi-pass analysis (discovery → induction → cross-file
-resolution) and owns everything that can only be decided once *all* files are known; the query
-service answers structural questions over the finished graph.
+**Responsibility:** everything that turns source into knowledge — reflecting files, sequencing a
+pulse, answering structural queries, and the feature-shaped analyses that sit on top (coverage, the
+docs grammar).
 
-**Boundaries:** it decides what is *true* about the code, never what is *acceptable* — no thresholds,
-no violations. Governance owns judgement.
+**Boundaries:** this module decides what is **true**, never what is **acceptable**. No thresholds, no
+violations, no severity — [governance](../governance/MODULE.md) owns judgement. The split matters:
+the same cycle data serves an audit, an advisor and a guard with three different opinions applied on
+top.
 
-**Deferred / not built:** the reflector is a single ~750-line match loop with no internal seams, and
-every language flows through it. Splitting it into per-capture handlers is wanted and not done;
-until then, treat every edit as systemic and verify with a clean pulse rather than a unit test alone.
+**Deferred / not built:** a query planner. `query-service` answers a fixed set of questions with
+hand-written SQL and graph walks; there is no general query language beyond the small GQL parser.
+Adequate while the question set is known.
 
-## Why analyze is multi-pass
+## Parts
+
+- **[reflector/](reflector/MODULE.md)** — file → spectrum. The single most load-bearing unit here.
+- **[orchestrator/](orchestrator/MODULE.md)** — the multi-pass pulse, incremental analysis, workers.
+- **[coverage/](coverage/MODULE.md)** — binding an external coverage report onto the graph.
+- **[docs-grammar/](docs-grammar/MODULE.md)** — the conducks-docs standard, enforced.
+
+`conducks-core` is the façade the registry wires; `query-service` answers structural questions;
+`fallback-detector` reports where analysis degraded.
+
+## Why analysis is multi-pass
 
 A single pass cannot resolve a cross-file reference, because the target may not be parsed yet.
-Discovery registers symbols; induction reflects each file; a final pass resolves imports and binds
-bare names. This is also why the orchestrator, not the reflector, builds IMPORTS edges — the
-reflector only seeds a raw specifier for later resolution.
+Discovery registers symbols, induction reflects each file, and a final pass resolves imports and
+binds bare names. That is why the reflector only seeds a raw specifier and the orchestrator builds
+the actual IMPORTS edges.
 
-The consequence that bites: **`analyze` is incremental — unchanged files are skipped entirely.**
-Edges produced by an analysis pass do not regenerate for a file that has not changed, so after
-editing a linker, orchestrator or query, a re-run may show no change at all. Verify any graph-shape
-work with `conducks clean` + a fresh `analyze`, or you will debug against stale results. A partially
-fixed state produces numbers that look real and are not.
-
-## Type-only classification lives here
-
-`markTypeOnlyImports` decides whether an import survives compilation (ADR 0016). It marks a binding
-type-only only on **positive** type evidence plus no value use, and defaults to "value" whenever
-evidence is missing — over-counting coupling is visible, hiding a real cycle is not. It matches
-case-sensitively via the original spellings that parsing preserves, because lowercased IDs collapse
-`nodeId` onto `NodeId`.
-
-Note the asymmetry with unused-import detection: "no evidence" must mean *value* for type-only
-classification but would mean *unused* for a stale-import finding — the aggressive direction. That
-is why STALE_IMPORT is not simply the same computation inverted, and why it is still unshipped
-(todo11).
-
-## Docs grammar
-
-`docs-grammar.ts` is here because the docs standard is a structural question about the repo. It
-classifies each governed doc and lints it; architecture docs (this folder) are AUTHORED and
-free-form, never linted (ADR 0015).
+The consequence that bites everyone: **`analyze` is incremental — unchanged files are skipped
+entirely**, so edges from an analysis pass do not regenerate for a file that has not changed. After
+editing anything in this module, verify with `conducks clean` + a fresh `analyze`. A stale graph
+produces numbers that look completely real; a half-fixed one produces numbers that are plausible and
+wrong.

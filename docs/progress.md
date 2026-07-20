@@ -1,12 +1,16 @@
 # Progress — conducks
 
-## 2026-07-21 · authored architecture/ docs (matching sofie's practice)
-- Added `docs/architecture/` — README (layer contract + index) and 9 MODULE.md covering core/{graph,
-  parsing,persistence}, domain/{analysis,governance,evolution}, registry, interfaces/{cli,tools}.
-  Optional under the standard, but these modules now carry intent this session generated and nothing
-  else records: the persistence seam that broke twice, the tree-sitter all-or-nothing query trap, why
-  the graph algorithms look circular and aren't, why the registry is not a hub, and why prune must
-  under-report.
+## 2026-07-21 · authored architecture/ docs, one per module/part/feature
+- Added `docs/architecture/` — README (layer contract + index) and **20 MODULE.md**. Granularity is
+  the rule: one doc per module, PART, or feature, never one per layer. A first pass at directory
+  granularity was too coarse (one doc covering parsing's 66 files), so parts were split out —
+  parsing/{languages,processors,grammar-registry,taxonomy}, graph/{algorithms,linkers},
+  analysis/{reflector,orchestrator,coverage,docs-grammar}, governance/sentinel — and each parent
+  trimmed to an overview that links and repeats nothing (the standard forbids writing a fact twice).
+- These carry intent this session generated and nothing else records: the persistence seam that broke
+  in both directions, the tree-sitter all-or-nothing query trap, why the graph algorithms look
+  circular and aren't, why the registry is not a hub, why prune must under-report, and the
+  taxonomy's deliberate 13-vs-9 disagreement.
 - Deliberately NOT sofie's format. Sofie's MODULE.md carries a `## Symbol map` and a `## Features`
   section — symbol maps are wiring (they rot; query them) and features duplicate features.md. Used
   the standard's Layer/Responsibility/Boundaries/Deferred shape instead, wiring-free.

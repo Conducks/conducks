@@ -1,49 +1,39 @@
-# core/parsing — grammars, language plugins, and the capture processors
+# core/parsing — source text → spectrum
 
 **Layer:** core. Imports contracts only. The largest module in the codebase (~66 files), almost all
 of it per-language surface area.
 
-**Responsibility:** turning source text into a language-agnostic spectrum. It owns the tree-sitter
-grammar lifecycle, one query (`.scm`) per language, the small processors that turn a capture into a
-relationship (import, call, heritage, binding, flow), and the canonical taxonomy that maps a
-language's own node kinds onto conducks' 9.
+**Responsibility:** turning source text into a language-agnostic *spectrum* — the intermediate form
+everything above consumes. Nothing upstream of this module knows what language a file was written in.
 
-**Boundaries:** it produces a spectrum, never a graph. It does not resolve cross-file references —
-that is the orchestrator's later pass — and it does not decide what a finding means.
+**Boundaries:** it produces a spectrum, never a graph, and it works one file at a time. Cross-file
+resolution belongs to the [orchestrator](../../domain/analysis/orchestrator/MODULE.md); judgement
+belongs to [governance](../../domain/governance/MODULE.md).
 
-**Deferred / not built:** type-position captures exist only for TypeScript, TSX and Go. Python,
-Rust, Java and C# are type-blind, so any analysis keyed on type usage silently yields nothing for
-them. That is a known limit, not a bug, and it is why `isTypeOnly` never fires outside TS/TSX.
+**Deferred / not built:** language parity. Support is deliberately uneven — TypeScript and TSX are
+first-class, Go and Python close behind, the rest have definitions and calls but shallower semantics.
+Breadth was chosen over uniform depth; see the per-part docs for what that costs.
 
-## The query is the most dangerous file in the module
+## Parts
 
-A tree-sitter query compiles all-or-nothing. **One unrecognized node type fails the entire query**
-and drops the language to the Gnosis (regex, file-only) fallback — silently. Counts fall; nothing
-errors. This has happened at least four times: Go `method_spec` → `method_elem`, Rust
-`constrained_type_parameter` removed in 0.24, TSX `jsx_attribute`, and grammar renames at 0.25.
+- **[languages/](languages/MODULE.md)** — one tree-sitter query per language. Where language support
+  actually lives, and the most dangerous files to edit.
+- **[processors/](processors/MODULE.md)** — capture → relationship. Import resolution, calls,
+  heritage, bindings, flow.
+- **[grammar-registry/](grammar-registry/MODULE.md)** — native grammar loading, parsers, ABI.
+- **[taxonomy/](taxonomy/MODULE.md)** — the canonical 9 kinds and ranks.
 
-So: never hand-verify a pattern against grammar docs. Compile each candidate against the real
-installed grammar first, from a script **inside the repo** (one in `/tmp` cannot resolve
-`tree-sitter` from node_modules). After the edit, run a clean `analyze` and check the node count
-held steady — a collapse means the fallback engaged.
+Unlisted files are small and self-describing: `context` (per-pulse symbol registry and local
+bindings), `ignore-manager` (`.conducksignore`), `pipeline` and `pulse-worker` (batching and worker
+entry), `built-ins` (per-language globals), `essence-lens` (package manifests).
 
-## Captures only fire where a node exists
+## The one theme across every part
 
-A standalone query pattern that carries no `@isX` definition capture builds no node, and any handler
-gated on that node never runs. This is why the graph has **zero EXTENDS/IMPLEMENTS edges** despite
-inheritance being captured correctly and both types being in the `EdgeType` union — the heritage
-patterns are standalone, so `heritage.process()` has never been called (todo11). When adding a
-capture, check whether its handler needs an enclosing node, and pattern it accordingly.
+**Failures here are silent, not loud.** A bad query pattern, a mismatched grammar ABI, an
+undersized parse buffer, a capture with no enclosing node — none of them throw. They degrade: fewer
+nodes, missing edges, or a whole language dropping to the regex fallback while the command still
+exits 0. Four distinct features have shipped keyed off data this module never produced.
 
-## Case is load-bearing at this boundary
-
-Downstream IDs are lowercased for APFS, which collapses TypeScript's type and value namespaces
-(`nodeId` vs `NodeId`). Processors therefore preserve the original spelling in `metadata.original`.
-A new processor that emits a name-bearing relationship must do the same or it will silently break
-type/value classification.
-
-## Grammars and workers
-
-Grammar loading is native, not WASM, so ABI must match the tree-sitter runtime — a mismatch produces
-a NULL root and a silent degrade, not an error. Worker threads do not inherit the parent's loaded
-grammar; each worker loads its own, cached per worker.
+So the verification habit is fixed: after any change here, run a clean `analyze` and compare node
+and edge counts against the previous run. Counts holding steady is the signal that nothing silently
+fell back.
