@@ -1,5 +1,22 @@
 # Progress — conducks
 
+## 2026-07-20 · edge load-side round-trip bug + ADR 0016 (type-only imports)
+- `persistence.load` wrote parsed edge rows onto `.metadata` — a field `ConducksEdge` does not have —
+  so EVERY vault-loaded edge had `properties === undefined`. Exact mirror of the save-side bug fixed
+  07-19; `as any` at the seam let both compile. Runtime probe before the fix: 4971/4971 IMPORTS+CALLS
+  edges with empty `.properties`. Fixed to load into `.properties`; new `edge-roundtrip.test.ts`
+  covers the full save→load cycle (a save-only test is what missed it). Verified the test fails on
+  the old code before keeping it. Suite 48→49.
+- Measured conducks' own 2 audit findings against compiled output: both are FALSE POSITIVES. TS
+  erases imports used only in type position, so the ARCH-3 cycle
+  (traversal→ranker→cycle-detector→adjacency-list) has no runtime import at all, and 41 of 50
+  `registry/index.ts` importers (82%) are erased — real fan-in ~9 vs the limit of 50. ADR 0016
+  records the rule (a dependency is what survives compilation), amends 0010, and settles the
+  three-way TYPE_REFERENCE disagreement between advisor/sentinel/dead-code. Implementation pending.
+- Gotcha confirmed the hard way: the first audit ran on a stale incremental graph (1782 nodes); a
+  clean + fresh analyze gives 5244/11531. Findings matched, but only the fresh numbers are quotable.
+
+
 ## 2026-07-19 · docs cleanup + skill single-sourced
 - Deleted docs/legacy/ (26 superseded files) + stale implementation.md (~374KB). docs/ is now the
   governed core (features/conventions/memory/progress/handover/decisions/todos) + soft folders only.

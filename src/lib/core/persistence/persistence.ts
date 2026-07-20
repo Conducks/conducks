@@ -205,6 +205,9 @@ export class SynapsePersistence {
     }
 
     for (const row of edges) {
+      // A ConducksEdge carries its data on `.properties` — there is no `.metadata` field. Loading
+      // into `.metadata` (old code) left EVERY vault-loaded edge with `properties === undefined`,
+      // the mirror of the save-side bug fixed in saveEdges. Load into the real field.
       graph.addEdge({
         id: row.id,
         sourceId: row.sourceId,
@@ -212,7 +215,7 @@ export class SynapsePersistence {
         type: row.type,
         weight: row.weight,
         confidence: row.confidence,
-        metadata: JSON.parse(row.properties || '{}')
+        properties: JSON.parse(row.properties || '{}')
       });
     }
   }

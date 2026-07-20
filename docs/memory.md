@@ -11,11 +11,17 @@
   (3561→~227 on conducks). Design in ADR 0012, decision in ADR 0013.
 - Applies: any taxonomy / node-kind / `pruneTaxonomy` work; anyone surprised the graph has fewer kinds than the enum.
 
-## Edge data lives on `.properties`/`.confidence`, never `.metadata`/`.weight`
+## Edge data lives on `.properties`/`.confidence`, never `.metadata`/`.weight` — BOTH directions
 - Gotcha: a `ConducksEdge` carries its data on `.properties` and `.confidence` — there is NO
   `.metadata` or `.weight` field. `persistence.saveEdges` must read `e.properties` / `e.properties?.line`
   / `e.confidence`. It once read `e.metadata`/`e.weight` and silently wrote `properties={}`,
   `weight=1.0`, `lineNumber=0` on EVERY edge (fixed 2026-07-19). Do not reintroduce the wrong fields.
+- The SAME bug existed on the load side and outlived the save fix by a day: `persistence.load` built
+  `metadata: JSON.parse(row.properties)`, so every vault-loaded edge had `properties === undefined`
+  (measured: 4971/4971 IMPORTS+CALLS edges empty). `analyze` was unaffected — it builds edges in
+  process — but every command that LOADS the vault (audit/impact/query/trace/prune) saw stripped
+  edges. Fixed 2026-07-20. Lesson: a save-side test cannot catch this; assert the full save→load
+  round-trip (`tests/unit/core/edge-roundtrip.test.ts`).
 - Why: `ingestSpectrum` maps `rel.metadata → edge.properties`, so downstream everything is `.properties`;
   reading `.metadata` at save hits the `|| {}` fallback and drops all edge data (CALLS arguments,
   import specifiers, System 2 origin tags).
