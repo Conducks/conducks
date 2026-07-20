@@ -22,6 +22,14 @@
   layout, and the inverse (don't add a doc to complete a set). The `~/.claude` skill was regenerated
   with the installer's exact transform (`conducks-installer.getDynamicSkillTemplates`) and verified
   byte-identical — one source of truth, so any workspace `conducks setup` produces the same file.
+- Added a dedicated **Structuring `architecture/`** section to the standard, codifying what conducks
+  (20 files) and sofie (90) both do in practice but neither wrote down: a `README.md` index carrying
+  the project's own layer rules, `modules/<path mirroring src>/MODULE.md`, split-when-parts-differ
+  with the parent as a link-only overview, nest as deep as the source, and `<part>/MODULE.md` as the
+  default naming with `<name>.MODULE.md` allowed for a single file. States explicitly that a
+  project's internal rules (what counts as a part, how deep) are its own and belong in its
+  architecture README — what does not vary is authored-not-generated, no wiring, one file per
+  module/part/feature, and a README index.
 
 ## 2026-07-20 · dead-code gap traced to missing inheritance edges (todo11)
 - `STALE_IMPORT` is documented in the MCP tool surface but could never fire: `dead-code.ts` gated it
