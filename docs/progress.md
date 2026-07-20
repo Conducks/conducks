@@ -1,5 +1,18 @@
 # Progress — conducks
 
+## 2026-07-21 · authored architecture/ docs (matching sofie's practice)
+- Added `docs/architecture/` — README (layer contract + index) and 9 MODULE.md covering core/{graph,
+  parsing,persistence}, domain/{analysis,governance,evolution}, registry, interfaces/{cli,tools}.
+  Optional under the standard, but these modules now carry intent this session generated and nothing
+  else records: the persistence seam that broke twice, the tree-sitter all-or-nothing query trap, why
+  the graph algorithms look circular and aren't, why the registry is not a hub, and why prune must
+  under-report.
+- Deliberately NOT sofie's format. Sofie's MODULE.md carries a `## Symbol map` and a `## Features`
+  section — symbol maps are wiring (they rot; query them) and features duplicate features.md. Used
+  the standard's Layer/Responsibility/Boundaries/Deferred shape instead, wiring-free.
+- Small modules (kinetic, metrics, intelligence, federation, manifest, visual, web) intentionally have
+  no MODULE.md — add one when intent stops being obvious, not to complete a set.
+
 ## 2026-07-20 · dead-code gap traced to missing inheritance edges (todo11)
 - `STALE_IMPORT` is documented in the MCP tool surface but could never fire: `dead-code.ts` gated it
   on `node.label === 'import_clause' | 'import_specifier'`, raw tree-sitter node types, while labels
