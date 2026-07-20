@@ -132,13 +132,26 @@
 - Applies: the shadow-symbol check; to silence, group by (name, structureId/parent), not bare name.
 
 ## `prune` (dead-code) is advisory-only — never auto-delete from it
-- Gotcha: on conducks `prune` reports ~8 findings, all benign — real unused-*exports* (used in-file,
-  fix = drop the `export` keyword, NOT delete the symbol) plus orphans that are live via paths static
-  analysis can't draw: DI property chains (`registry.evolution.watcher`), a browser entry (`initUI`),
-  and `isSupported` (zero callers, kept as API contract).
+- Gotcha: after the TS type captures landed (ADR 0016), `graphTracksTypes` flips true and type
+  declarations are no longer suppressed, so conducks reports 25 ORPHAN + 5 UNUSED_EXPORT (was ~8).
+  Audited every one on 2026-07-20: **20 of 25 orphans are genuinely unreferenced** — 14 have zero
+  textual occurrences anywhere in src/tests/scripts, and 6 more appear only in archived tests,
+  comments, or a barrel re-export nothing consumes. All 5 UNUSED_EXPORT are correct (fix = drop the
+  `export` keyword, not the symbol).
+- The 5 REMAINING false positives are all dynamic dispatch, unchanged: the four registry getters
+  (`diff`, `watcher`, `graphEngine`, `chronicle` — reached via DI property chains) and `initUI` (a
+  browser entry). `isSupported` has zero callers and is genuinely unreferenced, kept as an API
+  contract by choice.
+- Correction to todo06's "dead files RETRACTED" note: `DynamicToolLoader` was said to be live via a
+  re-export through tool-registry. That re-export no longer exists — zero references in `src/`
+  today, only archived tests. It IS dead now. Re-verify such claims rather than trusting them.
+- Worth knowing: `ConducksPipeline` is both a dead class AND a stale import in `orchestrator.ts:1`
+  (imported, never used) — a concrete example of why STALE_IMPORT is worth finishing (todo11).
 - Why: dynamic-dispatch / entry-wired symbols have no incoming edge in the graph, so they read as
   orphans though they are used. A prune tool must err toward under-reporting.
-- Applies: never bulk-delete from `prune`; grep for real call sites first. Remaining blind spots tracked in todo09 Phase 3.
+- Applies: never bulk-delete from `prune`; grep for real call sites first. The cheap audit is a
+  textual `grep -rn "\bSym\b" src tests scripts` excluding the defining file — zero occurrences
+  means nothing could reference it, so it cannot be a broken-edge false positive.
 
 ## Analyze is atomic — an interrupted pulse rolls back
 - Gotcha (historical): a killed `analyze` used to leave a partial graph (all nodes, few edges) that
