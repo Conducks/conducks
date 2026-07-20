@@ -226,7 +226,7 @@ export class ConducksReflector implements ConducksComponent {
     // Reference-as-value candidates: bare identifiers passed as call arguments (callbacks, DI-table
     // values). Collected here, resolved AFTER the match loop — tree-sitter match order is NOT source
     // order, so gating on nodeCache mid-loop would miss a use that precedes its definition.
-    const refValueCandidates: Array<{ scope: string; name: string }> = [];
+    const refValueCandidates: Array<{ scope: string; name: string; raw: string }> = [];
     for (const match of matches) {
       if (!match || !match.captures || match.captures.length === 0) continue;
 
@@ -404,7 +404,7 @@ export class ConducksReflector implements ConducksComponent {
                     targetName: specifier,
                     type: 'IMPORTS' as any,
                     confidence: 0.9,
-                    metadata: { specifier, bindingName: bindingName.toLowerCase(), isRawBinding: true, origin: boundary.origin, package: boundary.package }
+                    metadata: { specifier, bindingName: bindingName.toLowerCase(), bindingNameRaw: bindingName, isRawBinding: true, origin: boundary.origin, package: boundary.package }
                   });
                 }
               }
@@ -459,7 +459,7 @@ export class ConducksReflector implements ConducksComponent {
           for (const rawArg of args) {
             const a = rawArg.trim();
             if (!/^[A-Za-z_$][\w$]*$/.test(a)) continue; // identifiers only (rejects strings/nums/exprs)
-            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase() });
+            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a });
           }
         }
         else if (cName === 'ref_value') {
@@ -468,7 +468,7 @@ export class ConducksReflector implements ConducksComponent {
           const a = cText.trim();
           if (/^[A-Za-z_$][\w$]*$/.test(a)) {
             const scope = getScopeAt(currentMatchRow);
-            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase() });
+            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a });
           }
         }
         else if (cName === 'pulse_assignment_name') {
@@ -520,14 +520,14 @@ export class ConducksReflector implements ConducksComponent {
     // Emit reference-as-value edges now that nodeCache holds every definition in this file. Gate on
     // "imported here OR defined in this file" — so a local-variable arg never floods the graph or adds
     // a dangler. IntraLinker binds the bare name against imported/same-file symbols afterward.
-    for (const { scope, name } of refValueCandidates) {
+    for (const { scope, name, raw } of refValueCandidates) {
       if (!context.resolveLocalBinding(name) && !nodeCache.has(`${file.path.toLowerCase()}::${name}`)) continue;
       spectrum.relationships.push({
         sourceName: scope,
         targetName: name,
         type: 'ACCESSES' as any,
         confidence: 0.8,
-        metadata: { referenceAsValue: true }
+        metadata: { referenceAsValue: true, original: raw }
       });
     }
 
@@ -624,24 +624,45 @@ export class ConducksReflector implements ConducksComponent {
   private markTypeOnlyImports(spectrum: PrismSpectrum): void {
     // In resolution mode a target is rewritten to a resolved id (`path::symbol`, or a dotted member
     // expression), so compare against the trailing segment rather than the raw string.
-    const leaf = (name: string): string =>
-      name.toLowerCase().split('::').pop()!.split('.').pop()!;
+    const leaf = (name: string): string => name.split('::').pop()!.split('.').pop()!;
+
+    // Node IDs are lowercased (required for APFS), which collapses a local variable onto a
+    // same-named type — `nodeId` and `NodeId` both key to `nodeid`, so the variable's value uses
+    // would mark the TYPE as value-used. Producers keep the pre-lowercase name in
+    // `metadata.original`; prefer it so type and value namespaces stay distinct. Heritage targets
+    // are never lowercased, so their targetName is already case-accurate.
+    const caseSafeName = (rel: any): string | null => {
+      const original = rel.metadata?.original;
+      if (typeof original === 'string' && original) return leaf(original);
+      if (rel.type === 'EXTENDS' || rel.type === 'IMPLEMENTS') return leaf(String(rel.targetName));
+      return null;
+    };
 
     const valueUses = new Set<string>();
     const typeUses = new Set<string>();
+    // Names seen in a value position with no case-accurate spelling available. Matched
+    // case-insensitively as a fallback so an unattributable use still blocks a type-only call.
+    const valueUsesFolded = new Set<string>();
 
     for (const rel of spectrum.relationships) {
       // EXTENDS is a value use — a base class is a runtime binding. IMPLEMENTS is type-only.
-      if (rel.type === 'CALLS' || rel.type === 'CONSTRUCTS' || rel.type === 'ACCESSES' || rel.type === 'EXTENDS') {
-        valueUses.add(leaf(rel.targetName));
-      } else if (rel.type === 'TYPE_REFERENCE' || rel.type === 'IMPLEMENTS') {
-        typeUses.add(leaf(rel.targetName));
+      const isValue = rel.type === 'CALLS' || rel.type === 'CONSTRUCTS' || rel.type === 'ACCESSES' || rel.type === 'EXTENDS';
+      const isType = rel.type === 'TYPE_REFERENCE' || rel.type === 'IMPLEMENTS';
+      if (!isValue && !isType) continue;
+
+      const name = caseSafeName(rel);
+      if (isType) {
+        if (name) typeUses.add(name);
+      } else if (name) {
+        valueUses.add(name);
+      } else {
+        valueUsesFolded.add(leaf(String(rel.targetName)).toLowerCase());
       }
     }
 
     const isTypeOnly = (binding: string): boolean => {
       const name = leaf(binding);
-      return typeUses.has(name) && !valueUses.has(name);
+      return typeUses.has(name) && !valueUses.has(name) && !valueUsesFolded.has(name.toLowerCase());
     };
 
     // Per-binding edges first; the file-level edge is type-only only if every binding it carries is.
@@ -650,7 +671,7 @@ export class ConducksReflector implements ConducksComponent {
     for (const rel of spectrum.relationships) {
       if (rel.type !== 'IMPORTS' || !rel.metadata?.isRawBinding) continue;
       const specifier = String(rel.metadata.specifier);
-      const typeOnly = isTypeOnly(String(rel.metadata.bindingName));
+      const typeOnly = isTypeOnly(String(rel.metadata.bindingNameRaw ?? rel.metadata.bindingName));
       if (typeOnly) rel.metadata.isTypeOnly = true;
 
       const tally = bindingsBySpecifier.get(specifier) || { total: 0, typeOnly: 0 };

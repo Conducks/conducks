@@ -1,5 +1,25 @@
 # Progress — conducks
 
+## 2026-07-20 · self-audit is CLEAN — case collision fixed, validated against madge (todo10 P1–P3)
+- `conducks audit` on conducks: **0 circular dependencies, 0 hub overloads**. Both long-standing
+  findings were false positives; neither the cycle nor the hub was ever real.
+- Root cause of the last one: node IDs are lowercased for APFS, so the parameter `nodeId` in
+  `traversal.ts:44` and the imported type `NodeId` both keyed to `nodeid` — the variable's value
+  uses marked the TYPE as value-used. Producers now carry the pre-lowercase name
+  (`metadata.original` on flow assignments + reference-as-value ACCESSES, `bindingNameRaw` on import
+  bindings) and the classifier matches case-sensitively, falling back to case-insensitive only where
+  no case-accurate spelling exists. Type-only edges 213 → 267 of 1237.
+- Removed a genuinely unused `ConducksNode` import in `ranker.ts:1` — found by hand, which is itself
+  a gap: dead-code should have flagged it (tracked in todo10).
+- Validated per ADR 0010's bar: on compiled JS, conducks and `madge` both report 0 cycles. `madge`
+  on TS *source* still reports 3 — the type-erasure blind spot ADR 0016 describes. Conducks is the
+  more accurate of the two, which is the claim worth defending.
+- Registry hub corrected with real numbers: `::unit` 74 raw → 14 runtime, `::registry` 77 → 37, both
+  under the limit of 50. The earlier "split the registry" recommendation is withdrawn — it counted
+  type imports. Suite 8 suites / 35 tests, including 4 new type-only classification tests verified
+  to fail on the pre-fix code.
+
+
 ## 2026-07-20 · type-aware governance: TS type captures + isTypeOnly (ADR 0016, 0017)
 - TypeScript had NO type-position capture — only Go emitted `@pulse_type_target`, so the graph held
   zero TYPE_REFERENCE edges for TS and could not tell a type-only import from a real one. Added

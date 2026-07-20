@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksNode } from "../adjacency-list.js";
+import { ConducksAdjacencyList, NodeId } from "../adjacency-list.js";
 
 /**
  * Conducks — Structural Ranking & Anchoring

@@ -1,5 +1,9 @@
 # todo10 — finish the type-aware governance pass (ADR 0016 + 0017)
 Status: doing
+- Result: `conducks audit` on conducks is CLEAN — 0 circular dependencies, 0 hub overloads.
+  Cross-checked against `madge`: on compiled JS both report 0. `madge` on TS *source* still reports
+  3, which is the type-erasure blind spot ADR 0016 describes — conducks is the more accurate of the
+  two here, and that is the claim to defend.
 - Acceptance: `conducks audit` on conducks reports 0 circular dependencies and 0 hub overloads, or
   each remaining finding is confirmed genuine with evidence; cross-checked against `madge`.
 
@@ -12,28 +16,30 @@ Status: doing
 - [x] Suite counts were inflated by abandoned agent worktrees under `.claude/worktrees/` running
       duplicate stale copies — the `npm test` script's CLI `--testPathIgnorePatterns` silently
       overrode the config list. Real suite is 7 suites / 31 tests, not "49"
-- [ ] Cross-validate against `madge` per ADR 0010's bar — conducks and madge must agree on conducks
-- [ ] ARCH-3 still fires on conducks; the cause is Phase 2, not the cycle definition
+- [x] Cross-validate against `madge` per ADR 0010's bar — on compiled JS both report 0 cycles
+- [x] ARCH-3 no longer fires on conducks (cleared by Phase 2, as diagnosed)
 
 ## Phase 2 — the real ARCH-3 blocker: binding misclassification
 Two separate causes stop `algorithms/* → adjacency-list` imports from qualifying as type-only, which
 is what actually keeps the cycle alive (`adjacency-list → cycle-detector` is a genuine runtime
 import, so only the return direction can clear it):
-- [ ] **Case collision.** Node IDs are lowercased (required for APFS, see memory.md), so the local
-      parameter `nodeId` in `traversal.ts:44` and the imported type `NodeId` both key to `nodeid`.
-      The variable's value uses mark the TYPE as value-used. Name-based classification cannot work
-      on lowercased bare names — the type/value sets need original case or scope awareness
-- [ ] **No type evidence.** `ranker.ts:1` imports `ConducksNode` and never uses it, so there is no
-      positive type evidence and the conservative rule leaves it a value import. This is a genuine
-      unused import — worth flagging as dead code in its own right
-- [ ] Re-measure after both: more of the 1238 IMPORTS edges should qualify (213 today)
+- [x] **Case collision.** Fixed by preserving the pre-lowercase name: producers now carry
+      `metadata.original` (flow assignments, reference-as-value ACCESSES) and the import binding
+      carries `bindingNameRaw`. The classifier matches case-sensitively and falls back to
+      case-insensitive only for uses with no case-accurate spelling (stays conservative)
+- [x] **No type evidence.** `ranker.ts:1` imported `ConducksNode` and never used it — a genuine
+      unused import, removed. The conservative rule correctly refused to guess (covered by a test)
+- [x] Re-measured: 267 of 1237 IMPORTS edges now type-only (was 213)
+- [ ] Dead-code should flag an unused import like `ranker.ts`'s directly — it took a manual read to
+      find, which is exactly what the tool is for
 
-## Phase 3 — the registry hub, now a real finding
-- [ ] `registry/index.ts::registry` sits at 60 upstream connections against a limit of 50, after
-      type-only edges were removed. Establish what the 60 are before acting — if they are genuine
-      runtime fan-in, this is the composition-root coupling the earlier audit flagged
-- [ ] Decide: split the registry by domain (core/analysis/governance), or raise the limit with a
-      recorded reason. Do not silence it without one
+## Phase 3 — the registry hub: was never a real finding
+- [x] Measured after the Phase 2 fix: `::unit` 74 raw → **14** runtime fan-in, `::registry` 77 raw →
+      **37**, both well under the limit of 50. The intermediate reading of 60 was a partially-fixed
+      state, not a real number. The registry is a DI type contract that almost every CLI command
+      imports for typing only — it was never runtime-overloaded
+- [x] No split needed and no limit raised. Recorded here so the earlier "hub-overloaded, split the
+      registry" recommendation is not acted on later — it was an artifact of counting type imports
 
 ## Phase 4 — deferred, not dropped (ADR 0017)
 - [ ] Surface symbol-level mutual-call tangles as their own finding, separate from ARCH-3, with its

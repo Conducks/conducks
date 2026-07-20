@@ -18,7 +18,9 @@ export class FlowProcessor {
       targetName: name.toLowerCase(),
       type: 'ACCESSES' as any,
       confidence: 1.0,
-      metadata: { reason: 'assignment', value }
+      // `original` preserves the pre-lowercase name: IDs are case-folded for APFS, which collapses
+      // a variable and a same-named type (`nodeId` / `NodeId`). Case-sensitive consumers need this.
+      metadata: { reason: 'assignment', value, original: name }
     });
   }
 
