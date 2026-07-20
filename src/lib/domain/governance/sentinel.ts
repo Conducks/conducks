@@ -137,7 +137,9 @@ export class ConducksSentinel implements ConducksComponent {
 
       case 'max_fans':
         if (!node) return "Illegal state: Node required for fan check.";
-        const totalFans = graph.getNeighbors(node.id, 'upstream').length;
+        // ADR 0016: type-only imports are erased at compile time — they are not runtime fan-in.
+        const totalFans = graph.getNeighbors(node.id, 'upstream')
+          .filter(e => e.properties?.isTypeOnly !== true).length;
         const limit = rule.max || 30;
         if (totalFans > limit) {
           return `ARCH-1: Hub Overload detected. Symbol has [${totalFans}] upstream connections (Limit: ${limit}).`;

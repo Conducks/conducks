@@ -403,7 +403,8 @@ export class AnalyzeOrchestrator implements ConducksComponent {
                 targetId: linkage.targetId.includes('::') ? linkage.targetId : `${linkage.targetId}::unit`,
                 type: linkage.type,
                 confidence: 1.0,
-                properties: { specifier, origin: rel.metadata.origin, package: rel.metadata.package }
+                // isTypeOnly (ADR 0016): erased by the compiler, so excluded from cycle/hub findings.
+                properties: { specifier, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true }
               });
             }
           }
@@ -422,7 +423,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
                 targetId: targetNodeId,
                 type: 'IMPORTS',
                 confidence: 0.9,
-                properties: { specifier, bindingName, origin: rel.metadata.origin, package: rel.metadata.package }
+                properties: { specifier, bindingName, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true }
               });
             }
           }

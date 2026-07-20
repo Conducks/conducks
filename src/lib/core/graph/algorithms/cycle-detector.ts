@@ -7,8 +7,9 @@ import { ConducksAdjacencyList, NodeId } from "../adjacency-list.js";
  * Linear time complexity: O(V + E).
  */
 export class CycleDetector {
-  public static detect(graph: ConducksAdjacencyList, options: { ignoreTypes?: string[] } = {}): NodeId[][] {
+  public static detect(graph: ConducksAdjacencyList, options: { ignoreTypes?: string[], ignoreTypeOnly?: boolean } = {}): NodeId[][] {
     const ignoreTypes = options.ignoreTypes || [];
+    const ignoreTypeOnly = options.ignoreTypeOnly === true;
     const cycles: NodeId[][] = [];
     let index = 0;
     const stack: NodeId[] = [];
@@ -26,6 +27,8 @@ export class CycleDetector {
       const neighbors = graph.getNeighbors(nodeId, 'downstream');
       for (const edge of neighbors) {
         if (ignoreTypes.includes(edge.type)) continue;
+        // ADR 0016: a type-only import is erased at compile time — not a runtime cycle.
+        if (ignoreTypeOnly && edge.properties?.isTypeOnly === true) continue;
 
         if (!indices.has(edge.targetId)) {
           strongconnect(edge.targetId);

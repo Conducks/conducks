@@ -598,6 +598,8 @@ export class ConducksReflector implements ConducksComponent {
       }
     }
     
+    this.markTypeOnlyImports(spectrum);
+
     // Seed Import Map (Only in Discovery Mode)
     if (context.isDiscoveryMode()) {
       spectrum.relationships.filter(r => r.type === 'IMPORTS').forEach(r => {
@@ -608,8 +610,68 @@ export class ConducksReflector implements ConducksComponent {
     return spectrum;
   }
   /**
+   * Conducks — Type-only import marking (ADR 0016). 🧬
+   *
+   * A dependency is what survives compilation: TypeScript erases an import whose bindings are only
+   * ever used in type position, even when written as a plain `import { X } from`. Such an edge is
+   * still recorded, but must not count as runtime coupling for cycle / hub findings.
+   *
+   * Marking requires POSITIVE evidence of a type use and NO evidence of a value use. A binding with
+   * no usage relationships at all stays a value import — capture coverage is incomplete (bare value
+   * uses like `foo(Bar)` or `export { Bar }` may emit nothing), so absence of evidence must not read
+   * as type-only. Over-counting coupling is visible; hiding a real cycle is not (ADR 0016).
+   */
+  private markTypeOnlyImports(spectrum: PrismSpectrum): void {
+    // In resolution mode a target is rewritten to a resolved id (`path::symbol`, or a dotted member
+    // expression), so compare against the trailing segment rather than the raw string.
+    const leaf = (name: string): string =>
+      name.toLowerCase().split('::').pop()!.split('.').pop()!;
+
+    const valueUses = new Set<string>();
+    const typeUses = new Set<string>();
+
+    for (const rel of spectrum.relationships) {
+      // EXTENDS is a value use — a base class is a runtime binding. IMPLEMENTS is type-only.
+      if (rel.type === 'CALLS' || rel.type === 'CONSTRUCTS' || rel.type === 'ACCESSES' || rel.type === 'EXTENDS') {
+        valueUses.add(leaf(rel.targetName));
+      } else if (rel.type === 'TYPE_REFERENCE' || rel.type === 'IMPLEMENTS') {
+        typeUses.add(leaf(rel.targetName));
+      }
+    }
+
+    const isTypeOnly = (binding: string): boolean => {
+      const name = leaf(binding);
+      return typeUses.has(name) && !valueUses.has(name);
+    };
+
+    // Per-binding edges first; the file-level edge is type-only only if every binding it carries is.
+    const bindingsBySpecifier = new Map<string, { total: number; typeOnly: number }>();
+
+    for (const rel of spectrum.relationships) {
+      if (rel.type !== 'IMPORTS' || !rel.metadata?.isRawBinding) continue;
+      const specifier = String(rel.metadata.specifier);
+      const typeOnly = isTypeOnly(String(rel.metadata.bindingName));
+      if (typeOnly) rel.metadata.isTypeOnly = true;
+
+      const tally = bindingsBySpecifier.get(specifier) || { total: 0, typeOnly: 0 };
+      tally.total++;
+      if (typeOnly) tally.typeOnly++;
+      bindingsBySpecifier.set(specifier, tally);
+    }
+
+    for (const rel of spectrum.relationships) {
+      if (rel.type !== 'IMPORTS' || !rel.metadata?.isRaw) continue;
+      const tally = bindingsBySpecifier.get(String(rel.metadata.specifier));
+      // A side-effect import (`import './x.js'`) carries no bindings — it is a real runtime edge.
+      if (tally && tally.total > 0 && tally.total === tally.typeOnly) {
+        rel.metadata.isTypeOnly = true;
+      }
+    }
+  }
+
+  /**
    * Conducks — Gnosis Dynamic Fallback extractor (Regex-based). 🧬
-   * 
+   *
    * Activated when native bindings fail or are unavailable for a specific language.
    */
   private reflectGnosis(file: { path: string, source: string }, provider: ConducksProvider, context: AnalyzeContext): PrismSpectrum {

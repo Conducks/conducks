@@ -532,7 +532,7 @@ export class ConducksAdjacencyList {
    * Detects all Strongly Connected Components (SCCs) using Tarjan's algorithm.
    * Linear time complexity: O(V + E).
    */
-  public detectCycles(options: { ignoreTypes?: string[] } = {}): NodeId[][] {
+  public detectCycles(options: { ignoreTypes?: string[], ignoreTypeOnly?: boolean } = {}): NodeId[][] {
     return CycleDetector.detect(this, options);
   }
 }

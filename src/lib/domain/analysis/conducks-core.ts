@@ -15,7 +15,7 @@ import { GVREngine } from "@/lib/domain/evolution/gvr-engine.js";
 import { GQLParser } from "@/lib/domain/intelligence/gql-parser.js";
 import { ResonanceAnalyzer } from "@/lib/domain/metrics/resonance.js";
 import { FallbackDetector } from "./fallback-detector.js";
-import { ConducksNode } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksNode, STRUCTURAL_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
 import { DeadCodeAnalyzer } from "@/lib/domain/evolution/dead-code.js";
 import { ConducksAdvisor } from "@/lib/domain/governance/advisor.js";
 import { CoChangeEngine } from "@/lib/core/algorithms/cochange-engine.js";
@@ -346,7 +346,9 @@ export class Conducks implements ConducksComponent {
   public audit(): any {
     const graph = this.graph.getGraph();
     const violations: string[] = [];
-    const cycles = graph.detectCycles();
+    // Reporting path: containment is not dependency (ADR 0010) and a type-only import is erased at
+    // compile time (ADR 0016). This call site predates both and was still counting each as a cycle.
+    const cycles = graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES, ignoreTypeOnly: true });
     for (const cycle of cycles) violations.push(`ARCH-3: Circular: ${cycle.join(" -> ")}`);
     return { success: violations.length === 0, violations };
   }

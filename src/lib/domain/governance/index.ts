@@ -56,7 +56,7 @@ export class GovernanceService implements ConducksComponent {
     // method, symbol→file) is excluded via STRUCTURAL_EDGE_TYPES so it never forms a false cycle.
     // A genuine architectural cycle spans ≥2 files; a single-file loop (recursion, a type owning
     // its own members) is an implementation detail, not a module-dependency smell.
-    const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES }).filter(c => {
+    const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
       if (c.length <= 1) return false;
       const files = new Set(c.map(id => {
         const n = this.graph.getNode(id);
@@ -208,7 +208,7 @@ export class GovernanceService implements ConducksComponent {
     for (const rule of rules) {
       switch (rule.condition) {
         case 'has_cycles': {
-          const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES }).filter(c => {
+          const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
             if (c.length <= 1) return false;
             // Intra-file self-references (e.g. a singleton's class → getInstance → file-unit) are
             // not circular MODULE dependencies — only cross-file cycles are architectural smells.
