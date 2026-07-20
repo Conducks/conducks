@@ -2,7 +2,7 @@ import { ConducksAdvisor } from "./advisor.js";
 import type { Advice } from "@/types/domain.js";
 import { ConducksSentinel } from "./sentinel.js";
 import { RegressionGuard } from "./guard.js";
-import { ConducksAdjacencyList, STRUCTURAL_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { ConducksComponent } from "@/contracts/types.js";
@@ -52,11 +52,14 @@ export class GovernanceService implements ConducksComponent {
     const projectRoot = chronicle.getProjectDir() || process.cwd();
     
     // 1. Circular Dependency Detection (Conducks Filtering) 🛡️
-    // Traverse only real dependency edges — structural containment (interface→property, class→
-    // method, symbol→file) is excluded via STRUCTURAL_EDGE_TYPES so it never forms a false cycle.
+    // ARCH-3 is a MODULE IMPORT cycle (ADR 0017), so traverse only edges that are a module-level
+    // runtime dependency. IMPORT_CYCLE_IGNORED_EDGE_TYPES drops structural containment
+    // (interface→property, class→method, symbol→file — ADR 0010), type references, which the
+    // compiler erases (ADR 0016), and call-level coupling, where a CALLS edge onto a parameter's
+    // method is resolved onto the owning class only because that parameter is type-annotated.
     // A genuine architectural cycle spans ≥2 files; a single-file loop (recursion, a type owning
     // its own members) is an implementation detail, not a module-dependency smell.
-    const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
+    const cycles = this.graph.detectCycles({ ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
       if (c.length <= 1) return false;
       const files = new Set(c.map(id => {
         const n = this.graph.getNode(id);
@@ -208,7 +211,7 @@ export class GovernanceService implements ConducksComponent {
     for (const rule of rules) {
       switch (rule.condition) {
         case 'has_cycles': {
-          const cycles = this.graph.detectCycles({ ignoreTypes: STRUCTURAL_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
+          const cycles = this.graph.detectCycles({ ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
             if (c.length <= 1) return false;
             // Intra-file self-references (e.g. a singleton's class → getInstance → file-unit) are
             // not circular MODULE dependencies — only cross-file cycles are architectural smells.

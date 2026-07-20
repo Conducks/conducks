@@ -1,5 +1,27 @@
 # Progress — conducks
 
+## 2026-07-20 · type-aware governance: TS type captures + isTypeOnly (ADR 0016, 0017)
+- TypeScript had NO type-position capture — only Go emitted `@pulse_type_target`, so the graph held
+  zero TYPE_REFERENCE edges for TS and could not tell a type-only import from a real one. Added
+  three patterns to the TS + TSX queries, each compiled against the real grammar first (the
+  documented Gnosis-fallback trap). TYPE_REFERENCE 0 → 609; node count held (5258 → 5259), so no
+  silent fallback.
+- `reflector.markTypeOnlyImports` marks a binding type-only only on positive type evidence plus no
+  value use; the file-level edge follows only if every binding does. 213 of 1238 IMPORTS edges now
+  marked. Flag carried through orchestrator Pass 3 and consumed by `detectCycles`
+  (`ignoreTypeOnly`) and the sentinel fan count. New `NON_RUNTIME_EDGE_TYPES` single-sources
+  containment + TYPE_REFERENCE.
+- Result: hub `registry/index.ts::unit` cleared (74 → under 50), `::registry` 77 → 60. The ARCH-3
+  cycle did NOT clear — it never rode IMPORTS edges. It is closed by a `CALLS` edge onto a
+  parameter's method, resolved onto the class only because the parameter is type-annotated;
+  compiled `cycle-detector.js` imports nothing from `adjacency-list.js`. ADR 0017 records the fix:
+  ARCH-3 means a module import cycle, aligning the audit with `advisor.ts` and `madge`. Remaining
+  work in todo10.
+- Third instance of one pattern, now in memory.md: a governance finding counted a relationship that
+  is not the relationship it claims to measure (0010 containment, 0016 type-only imports, 0017
+  type-directed calls).
+
+
 ## 2026-07-20 · edge load-side round-trip bug + ADR 0016 (type-only imports)
 - `persistence.load` wrote parsed edge rows onto `.metadata` — a field `ConducksEdge` does not have —
   so EVERY vault-loaded edge had `properties === undefined`. Exact mirror of the save-side bug fixed

@@ -17,6 +17,23 @@ export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSE
  */
 export const STRUCTURAL_EDGE_TYPES: EdgeType[] = ['MEMBER_OF', 'CONTAINS', 'HAS_METHOD', 'HAS_PROPERTY'];
 
+/**
+ * Edges that are not runtime coupling: containment (ADR 0010) plus type references, which the
+ * compiler erases (ADR 0016). Cycle and hub findings ignore these; dead-code still counts a type
+ * reference as usage, which is a different question.
+ */
+export const NON_RUNTIME_EDGE_TYPES: EdgeType[] = [...STRUCTURAL_EDGE_TYPES, 'TYPE_REFERENCE'];
+
+/**
+ * Edges ARCH-3 does not traverse. ARCH-3 means a MODULE IMPORT cycle (ADR 0017), so on top of the
+ * non-runtime edges it also drops call-level coupling: a CALLS edge onto a parameter's method is
+ * resolved onto the owning class purely because the parameter is type-annotated, which closes loops
+ * that do not exist between modules. Pair with `ignoreTypeOnly` to drop erased imports too.
+ */
+export const IMPORT_CYCLE_IGNORED_EDGE_TYPES: EdgeType[] = [
+  ...NON_RUNTIME_EDGE_TYPES, 'CALLS', 'CONSTRUCTS', 'ACCESSES'
+];
+
 export interface ConducksNode<T = any> {
   id: NodeId;
   label: string;

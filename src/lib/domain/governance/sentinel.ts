@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { ConducksAdjacencyList, ConducksNode } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksAdjacencyList, ConducksNode, NON_RUNTIME_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
 
 /**
  * Conducks — Sentinel Policy Engine
@@ -137,9 +137,10 @@ export class ConducksSentinel implements ConducksComponent {
 
       case 'max_fans':
         if (!node) return "Illegal state: Node required for fan check.";
-        // ADR 0016: type-only imports are erased at compile time — they are not runtime fan-in.
+        // ADR 0016: a type reference and a type-only import are both erased at compile time, so
+        // neither is runtime fan-in.
         const totalFans = graph.getNeighbors(node.id, 'upstream')
-          .filter(e => e.properties?.isTypeOnly !== true).length;
+          .filter(e => !NON_RUNTIME_EDGE_TYPES.includes(e.type) && e.properties?.isTypeOnly !== true).length;
         const limit = rule.max || 30;
         if (totalFans > limit) {
           return `ARCH-1: Hub Overload detected. Symbol has [${totalFans}] upstream connections (Limit: ${limit}).`;

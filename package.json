@@ -33,7 +33,7 @@
 		"watch": "tsc --watch",
 		"inspector": "npx @modelcontextprotocol/inspector build/index.js",
 		"type-check": "tsc --noEmit",
-		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns='tests/legacy/archived-tests'",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
 		"test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
 		"test:int": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
 		"benchmark": "node --loader ts-node/esm tests/benchmark/run.ts",

@@ -1,5 +1,73 @@
 # Memory — conducks
 
+## Lowercased node IDs collide a local variable with a same-named type
+- Gotcha: IDs are lowercase-normalized (mandatory for APFS — see the case-sensitivity entry below),
+  so the parameter `nodeId` in `traversal.ts:44` and the imported TYPE `NodeId` both key to
+  `nodeid`. Any analysis that classifies a symbol by its bare lowercased name will attribute the
+  variable's value uses to the type — which is why `NodeId` reads as a value import and keeps the
+  ARCH-3 cycle alive despite ADR 0016/0017. `nodeId`/`NodeId` is a ubiquitous TS convention, so this
+  is not an edge case.
+- Why: normalization is applied at ID generation for cross-platform correctness; nothing preserves
+  the original casing alongside it, and TS's type/value namespaces are distinguished only by case.
+- Applies: `reflector.markTypeOnlyImports` and anything else keying on lowercased symbol names.
+  Fix needs original-case names or scope awareness, not a tweak to the classifier.
+
+## The npm test script's CLI flag silently overrode jest's ignore list
+- Gotcha: `"test": "jest --testPathIgnorePatterns=…"` REPLACES the config array rather than adding to
+  it, so entries in `jest.config.js` were ignored. Abandoned agent worktrees under
+  `.claude/worktrees/` each hold a stale copy of the suite, and `moduleNameMapper` resolves `@/` to
+  the real `<rootDir>/src` — so they ran outdated expectations against current source. This also
+  double-counted the suite: reported "48/49 tests" was really 7 suites / 31 tests.
+- Why: jest CLI options override config rather than merge; the flag duplicated a config entry, so
+  nothing looked wrong until a test expectation legitimately changed.
+- Applies: `package.json` test scripts, `jest.config.js`. Keep ignore patterns in the config only.
+
+## A cycle/hub finding is only as good as the edge types it counts
+- Gotcha: three separate false-positive hunts (ADR 0010, 0016, 0017) all had the same root cause —
+  the graph counted a relationship that is not the relationship the finding claims to measure.
+  0010: containment edges counted as dependency. 0016: type-only imports counted as runtime coupling.
+  0017: a `CALLS` edge onto a *parameter's* method (resolved onto the class only because the param
+  is type-annotated) counted as a module dependency. Before trusting ANY new ARCH finding, list the
+  edge types it traverses and ask whether each one survives compilation.
+- Why: `detectCycles`/`max_fans` walk whatever edges exist; the graph is deliberately rich (it also
+  serves impact/trace/dead-code, which legitimately want type + call edges). Governance must filter
+  down, and the filter has been added late every time.
+- Applies: any new sentinel rule or ARCH-N finding. Filter with `NON_RUNTIME_EDGE_TYPES`
+  (`adjacency-list.ts`), and state the intended edge set in the ADR before shipping.
+
+## Consumers of detectCycles disagreed on what a cycle is — check before adding a fourth
+- Gotcha: `advisor.ts` has always restricted cycles to import-level (ignores CALLS/CONSTRUCTS/
+  ACCESSES/TYPE_REFERENCE), `governance/index.ts` used containment-only filtering, and
+  `conducks-core.audit` had NO filter at all — three call sites, three definitions of "cycle",
+  which is why the same false positive kept reappearing in a different command. Aligned under
+  ADR 0017; keep them aligned.
+- Why: each was fixed in isolation when its own false positive surfaced; nothing forced the four
+  call sites to share a definition.
+- Applies: `graph.detectCycles` call sites — `governance/index.ts:59,211`, `advisor.ts:24`,
+  `conducks-core.ts:351`.
+
+## TypeScript had NO type-position capture until ADR 0016 — types were invisible
+- Gotcha: `typescript/queries.ts` captured type *declarations* (class/interface/type-alias names) but
+  never type *usages*; only Go emitted `@pulse_type_target`. So the graph held zero TYPE_REFERENCE
+  edges for TS and could not distinguish a type-only import from a real one — any analysis keyed on
+  type usage silently evaluated to nothing rather than failing. Added
+  `(type_annotation (type_identifier))`, `(type_annotation (generic_type name: …))` and
+  `(type_arguments (type_identifier))` to the TS + TSX queries (609 TYPE_REFERENCE edges on conducks).
+- Why: the query grew around definitions and call sites; nothing needed type usage until ADR 0016.
+- Applies: `typescript/queries.ts`, `tsx/queries.ts`. Other languages are still type-blind — Python/
+  Rust/Java/C# have no `pulse_type_target` capture, so `isTypeOnly` never fires for them.
+
+## Probe a tree-sitter query pattern before adding it to a .scm
+- Gotcha: one unrecognized node type fails the WHOLE query and silently drops the language to the
+  Gnosis (file-only) fallback — documented three times over (Go `method_spec`, Rust
+  `constrained_type_parameter`, TSX `jsx_attribute`). Don't hand-verify against grammar docs; compile
+  each candidate pattern against the real grammar first, from INSIDE the repo (a script in /tmp
+  cannot resolve `tree-sitter` from node_modules).
+- Why: tree-sitter query compilation is all-or-nothing, and the fallback is silent — counts drop but
+  nothing errors.
+- Applies: any `languages/*/queries.ts` edit. Verify after with a clean `analyze`: node count must
+  hold steady (a collapse means the fallback engaged).
+
 ## Taxonomy enum lists 13 kinds but the persisted graph has 9 — the prune reconciles them
 - Gotcha: `taxonomy.ts` declares 13 kinds and `mapToCanonical` tags params→DATA, vars→ATOM at
   emission, but every analyze ends by filtering the vault in `persistence.pruneTaxonomy()` — DATA is

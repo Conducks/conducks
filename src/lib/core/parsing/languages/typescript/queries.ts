@@ -30,6 +30,14 @@ export const TYPESCRIPT_QUERIES = `
   (class_heritage (extends_clause (_) @heritage))
   (class_heritage (implements_clause (_) @heritage))
   (extends_type_clause (_) @heritage)
+
+  ;; --- Type positions (ADR 0016) ---
+  ;; A symbol used only here is erased by the compiler, so its import is not runtime coupling.
+  ;; Without these captures the graph has no type-usage evidence at all and cannot tell a
+  ;; type-only import from a real one.
+  (type_annotation (type_identifier) @pulse_type_target)
+  (type_annotation (generic_type name: (type_identifier) @pulse_type_target))
+  (type_arguments (type_identifier) @pulse_type_target)
   
   ;; --- Infrastructure (L3-L4: Entry Points) ---
   ;; Decorators: @Controller('/path'), @Get('/path')

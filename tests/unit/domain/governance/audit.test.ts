@@ -54,19 +54,54 @@ describe('GovernanceService Audit', () => {
   });
 
   it('should NOT filter out genuine architectural cycles', () => {
+    // ARCH-3 is a MODULE IMPORT cycle (ADR 0017) — two files importing each other is the real thing.
     const graph = new ConducksAdjacencyList();
-    
+
     graph.addNode({ id: 'A', label: 'BEHAVIOR', properties: { name: 'A', filePath: 'A.ts', canonicalKind: 'BEHAVIOR', canonicalRank: 2 } });
     graph.addNode({ id: 'B', label: 'BEHAVIOR', properties: { name: 'B', filePath: 'B.ts', canonicalKind: 'BEHAVIOR', canonicalRank: 2 } });
-    
-    graph.addEdge({ id: 'A->B', sourceId: 'A', targetId: 'B', type: 'CALLS' as any, confidence: 1.0, properties: {} });
-    graph.addEdge({ id: 'B->A', sourceId: 'B', targetId: 'A', type: 'CALLS' as any, confidence: 1.0, properties: {} });
+
+    graph.addEdge({ id: 'A->B', sourceId: 'A', targetId: 'B', type: 'IMPORTS', confidence: 1.0, properties: {} });
+    graph.addEdge({ id: 'B->A', sourceId: 'B', targetId: 'A', type: 'IMPORTS', confidence: 1.0, properties: {} });
 
     const service = new GovernanceService(graph, {} as any, {} as any, {} as any);
     const report = service.audit();
-    
+
     const circularViolations = report.violations.filter(v => v.type === 'CIRCULAR');
     expect(circularViolations.length).toBe(1);
+  });
+
+  it('should NOT flag a mutual-call tangle that crosses no import boundary (ADR 0017)', () => {
+    // The conducks self-audit false positive. cycle-detector calls graph.getNeighbors() on a
+    // PARAMETER; conducks resolves that call onto ConducksAdjacencyList only because the parameter
+    // is type-annotated. Compiled cycle-detector.js imports nothing from adjacency-list.js, so
+    // there is no module cycle — only adjacency-list -> cycle-detector is a real import.
+    const graph = new ConducksAdjacencyList();
+    graph.addNode({ id: 'adj.ts::list', label: 'STRUCTURE', properties: { name: 'List', filePath: 'adj.ts', canonicalKind: 'STRUCTURE', canonicalRank: 2 } });
+    graph.addNode({ id: 'cyc.ts::detector', label: 'STRUCTURE', properties: { name: 'Detector', filePath: 'cyc.ts', canonicalKind: 'STRUCTURE', canonicalRank: 2 } });
+
+    // Real, one-directional import + construction.
+    graph.addEdge({ id: 'imp', sourceId: 'adj.ts::list', targetId: 'cyc.ts::detector', type: 'IMPORTS', confidence: 1.0, properties: {} });
+    graph.addEdge({ id: 'con', sourceId: 'adj.ts::list', targetId: 'cyc.ts::detector', type: 'CONSTRUCTS' as any, confidence: 1.0, properties: {} });
+    // The type-directed call back onto the parameter's class — NOT an import.
+    graph.addEdge({ id: 'call', sourceId: 'cyc.ts::detector', targetId: 'adj.ts::list', type: 'CALLS' as any, confidence: 1.0, properties: {} });
+
+    const service = new GovernanceService(graph, {} as any, {} as any, {} as any);
+    const circular = service.audit().violations.filter(v => v.type === 'CIRCULAR');
+    expect(circular.length).toBe(0);
+  });
+
+  it('should NOT flag a cycle formed only by type-only imports (ADR 0016)', () => {
+    // Plain `import { X } from` whose bindings are used only in type position is erased by tsc.
+    const graph = new ConducksAdjacencyList();
+    graph.addNode({ id: 'x.ts::unit', label: 'UNIT', properties: { name: 'x.ts', filePath: 'x.ts', canonicalKind: 'STRUCTURE', canonicalRank: 1 } });
+    graph.addNode({ id: 'y.ts::unit', label: 'UNIT', properties: { name: 'y.ts', filePath: 'y.ts', canonicalKind: 'STRUCTURE', canonicalRank: 1 } });
+
+    graph.addEdge({ id: 'x->y', sourceId: 'x.ts::unit', targetId: 'y.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: { isTypeOnly: true } });
+    graph.addEdge({ id: 'y->x', sourceId: 'y.ts::unit', targetId: 'x.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: { isTypeOnly: true } });
+
+    const service = new GovernanceService(graph, {} as any, {} as any, {} as any);
+    const circular = service.audit().violations.filter(v => v.type === 'CIRCULAR');
+    expect(circular.length).toBe(0);
   });
 
   it('should NOT flag a TS interface owning its own fields as a cycle (structural noise)', () => {

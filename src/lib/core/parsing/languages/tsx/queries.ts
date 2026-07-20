@@ -31,6 +31,11 @@ export const TSX_QUERIES = `
   (class_heritage (implements_clause (_) @heritage))
   (extends_type_clause (_) @heritage)
 
+  ;; --- Type positions (ADR 0016) ---
+  (type_annotation (type_identifier) @pulse_type_target)
+  (type_annotation (generic_type name: (type_identifier) @pulse_type_target))
+  (type_arguments (type_identifier) @pulse_type_target)
+
   ;; --- Infrastructure (L3-L4: Entry Points) ---
   ;; Decorators: @Controller('/path'), @Get('/path')
   (decorator

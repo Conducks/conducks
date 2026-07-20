@@ -26,11 +26,13 @@ Group every ADR under this file by its status, newest-numbered last within each 
   [0013 — Taxonomy reconcile: cut DATA, edge-gate ATOM](0013-taxonomy-reconcile-cut-data-edge-gate-atom.md),
   [0014 — System 2: boundary-origin classification](0014-system2-boundary-origin-classification.md),
   [0015 — Architecture docs are authored, not derived](0015-architecture-is-authored-not-derived.md),
-  [0016 — Type-only imports are not runtime dependencies](0016-type-only-imports-are-not-runtime-dependencies.md)
+  [0016 — Type-only imports are not runtime dependencies](0016-type-only-imports-are-not-runtime-dependencies.md),
+  [0017 — ARCH-3 means a module import cycle](0017-arch3-is-a-module-import-cycle.md)
 - Superseded: none yet
 - Amended: [0003 — Additive taxonomy reconcile](0003-additive-taxonomy-reconcile.md) (amended by 0012),
   [0009 — Hard/soft docs, architecture file-or-folder](0009-hard-soft-docs-and-uninstall-symmetry.md) (amended by 0015),
-  [0010 — Cycle detection ignores structural edges](0010-cycle-detection-ignores-structural-edges.md) (amended by 0016)
+  [0010 — Cycle detection ignores structural edges](0010-cycle-detection-ignores-structural-edges.md) (amended by 0016),
+  [0016 — Type-only imports are not runtime dependencies](0016-type-only-imports-are-not-runtime-dependencies.md) (amended by 0017)
 
 ## Consequences
 New ADRs are appended to the list above under the correct status group when they are accepted,
