@@ -1,5 +1,11 @@
 # Progress — conducks
 
+## 2026-07-25 · the 18 stale imports fixed
+- All 18 STALE_IMPORT findings removed from source — each name verified import-only by independent
+  grep before touching (0 refusals, matching the detector's 0-FP validation). tsc's unused-import
+  count in src/ dropped 84 → 66; `conducks prune` now reports 0 STALE_IMPORT on a clean pulse.
+  The first real cleanup driven end-to-end by the graph's own finding.
+
 ## 2026-07-25 · todo14 closed: STALE_IMPORT recall 1 → 18/0FP + call-edge truth (single-thread)
 - Four type-position captures (array/as/predicate/union) + four FP-closure captures (constraint,
   nested generic, type re-export, for-of reads), every one probed first; canary suite added.

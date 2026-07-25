@@ -1,4 +1,4 @@
-import { ConducksNode, ConducksEdge, ConducksAdjacencyList } from "./adjacency-list.js";
+import { ConducksAdjacencyList } from "./adjacency-list.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { Logger } from "../utils/logger.js";

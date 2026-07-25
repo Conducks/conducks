@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { ConducksComponent } from "@/contracts/types.js";
 
 interface StructuralSignature {

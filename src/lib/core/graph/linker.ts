@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksEdge } from "./adjacency-list.js";
+import { ConducksAdjacencyList, ConducksEdge } from "./adjacency-list.js";
 import { ImportResolver, sameFamily } from "./import-resolver.js";
 import path from "node:path";
 
