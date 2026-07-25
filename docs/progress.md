@@ -1,5 +1,19 @@
 # Progress — conducks
 
+## 2026-07-25 · MCP dogfood test caught a dangling-edge class; linker now resolves specifier ids
+- Deployed conducks (npm link global CLI; MCP registered in Claude Code user scope + Claude Desktop)
+  and tested all core tools on conducks itself. status/audit/docs/query/prune/impact/context all
+  truthful — and `conducks_trace` path-mode returned EMPTY for a call whose edge we "verified" this
+  morning. The graph told the truth: the edge's target was `./algorithms/traversal.js::…`, a
+  relative-specifier pseudo-id the IntraLinker skipped as "already resolved" (it contains `::`).
+  252 edges dangled in this class — 129 CONSTRUCTS (every imported `new Foo()`) predating today.
+- Fix in `linker-intra.ts`: relative-specifier ids are now resolved against the source file and
+  rewritten ONLY when the target node exists. 252 → 46 dangling (the 46 have no real target — the
+  linker refuses to guess). IntraLinker 1001 → 1125 resolved refs; trace now walks
+  wrapper → GraphTraversal.traverseUpstream for real.
+- Lesson recorded: `conducks clean` while an MCP host holds the vault kills that server for the
+  session (CONDUCKS-12's contention, dogfood-confirmed) — restart the host after a clean.
+
 ## 2026-07-25 · the 18 stale imports fixed
 - All 18 STALE_IMPORT findings removed from source — each name verified import-only by independent
   grep before touching (0 refusals, matching the detector's 0-FP validation). tsc's unused-import

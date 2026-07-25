@@ -83,6 +83,25 @@ export class IntraLinker {
     const resolved: Array<{ id: string; newTargetId: string }> = [];
 
     for (const edge of graph.getAllEdges()) {
+      // Specifier-prefixed pseudo-ids: the call processor's binding resolution emits
+      // `./algorithms/traversal.js::graphtraversal.traverseupstream` — a RELATIVE specifier, not a
+      // canonical node id. The '::' made this loop treat them as already resolved, so every such
+      // edge (imported `new Foo()`, class-qualified static calls) dangled forever. Resolve the
+      // specifier against the source file and rewrite ONLY when the target node really exists.
+      if (/^\.\.?\//.test(edge.targetId) && edge.targetId.includes('::')) {
+        if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type)) continue;
+        const [spec, sym] = edge.targetId.split('::');
+        const srcNode = graph.getNode(edge.sourceId);
+        const srcFile = srcNode?.properties?.filePath || edge.sourceId.split('::')[0];
+        const abs = this.resolver.resolve(spec, srcFile, allFilePaths);
+        if (abs) {
+          const candidate = `${abs.toLowerCase()}::${sym.toLowerCase()}`;
+          if (graph.getNode(candidate)) {
+            resolved.push({ id: edge.id, newTargetId: candidate });
+          }
+        }
+        continue;
+      }
       // Skip already-resolved edges (fully qualified IDs always contain '::')
       if (edge.targetId.includes('::')) continue;
       if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type)) continue;
