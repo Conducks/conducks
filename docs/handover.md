@@ -1,26 +1,40 @@
-# Handover — 2026-07-19
+# Handover — 2026-07-24
 Status: current
 
 ## Where it stands
-- **Taxonomy reconcile (C0) done** — `pruneTaxonomy()` cuts DATA, edge-gates ATOM at pulse end. On
-  conducks: ~5000→~1660 nodes, ATOM 3561→~230, DATA 0, density ~4.5. ADR 0013. (todo09 Phase 1+2)
-- **Edge-resolution (Phase 3) mostly done** — method-call resolution, dead-code accuracy (dot-guard,
-  fixture exclusion), reference-as-value + object-literal-value edges. `prune` 25→8 findings, all
-  documented-benign. Registry getters + initUI left as reasoned won't-fix (recipe in todo09).
-- **Edge-properties persist bug fixed** — `saveEdges` read `.metadata`/`.weight`; now `.properties`/
-  `.confidence`. Every edge kept `{}` before. Unblocked System 2. (memory.md)
-- **System 2 built (ADR 0014)** — `boundary-classifier.ts` classifies imports internal/stdlib/
-  dependency; durable origin-tagged DEPENDS_ON edges. New commands: `conducks supply-chain` (surface +
-  versions + phantom-dep detection) and `conducks ledger` (workspace survey + grade). conducks = B(88).
-- **Docs standard fixed (ADR 0015)** — architecture is AUTHORED, not derived; `docs-grammar.ts` +
-  the conducks-docs skill updated. Canonical standard now lives at
-  `src/resources/skills/conducks-docs.md`; the `~/.claude` skill is generated from it by the installer.
-- **Docs cleaned** — deleted `docs/legacy/` (26 superseded files) + stale `implementation.md`.
-- Suite 48/48, typecheck clean, docs-lint clean. Pushed to `origin/main`.
+- **conducks-docs standard hardened** (`src/resources/skills/conducks-docs.md`, 265 lines). Seven new
+  rules, the load-bearing one being **promote-on-close**: a record freezes the *why*, but what is true
+  NOW must move to a living file the same turn — nothing in `completed/`/`legacy/` counts as context.
+  Also: handover rewritten every session; `docs/README.md` and `decisions/README.md` now governed;
+  memory-vs-conventions tiebreak; `## Tunables` in features.md; one-docs-root; generated-output-untracked.
+  `handover` moved Record→Living (it is overwritten, never superseded).
+- **Skill lives in 3 places, all in parity**: `src/resources/skills/` (source) → `build/src/resources/skills/`
+  → `~/.claude/skills/`. The middle one matters: the installer resolves `SKILLS_DIR` relative to its
+  own *compiled* file, so `conducks setup` ships the build copy — a stale one silently reinstalls the
+  old skill over the new. Refresh with `npm run build` (or a direct `cp`) after editing the source.
+- **Deleted `ARCHITECTURE.md`, `BLUEPRINT.md`, `llms.txt`** from the repo root — 16,551 lines, staged
+  not committed. Orphaned pre-ADR-0011 artifacts: nothing in `src/` writes them, `status --blueprint`
+  prints to stdout only, and `generateBlueprint()` (`conducks-core.ts:356`) is a 4-line stub with zero
+  callers. `BLUEPRINT.md` and `llms.txt` were byte-identical.
+- **features.md was advertising capabilities that do not exist** — "Static Structural Diagram" (no
+  mermaid/graphviz anywhere in `src`) and "LLM Context Generation" (wrote a summary to the project
+  root — the exact thing ADR 0011 banned). Both removed, replaced by one honest entry for
+  `conducks status --blueprint`.
+- **Docs truth pass** — ADR index no longer double-lists 0003/0009/0010/0016 (amendments are inline on
+  a single entry now); `memory.md` lost 4 entries that duplicated CONDUCKS-4/11/12 or were already
+  resolved, their surviving detail promoted into those conventions; `docs/README.md` rewritten as a map
+  (state + read-order + table); todo02 `doing`→`todo` (0 of 18 done), todo09 `doing`→`blocked` (only
+  externally-blocked items remain). Superseded parent-level `features.md` moved to `archive/`.
 
 ## Next, in order
-1. todo09 Phase 3 externally-blocked items: vuln surface (needs advisory DB / network), live
-   cross-service overlay (needs a target app). EXPRESSION stays a no-op marker.
-2. Optional: author `docs/architecture/*.MODULE.md` for the heavy modules (reflector, orchestrator,
-   persistence, graph) now that authored architecture is a valid doc type.
-3. Optional: re-verify the taxonomy + System 2 on one external TS repo (not just conducks itself).
+1. **todo11 — inheritance edges.** The graph has ZERO EXTENDS/IMPLEMENTS edges (see `memory.md`), so
+   `implements X` registers no usage and STALE_IMPORT floods. Fix heritage capture first, then prune.
+2. **todo07 — workspace rollout.** Run conducks on the drifting repos. Nothing started.
+3. **`todos/completed/` is 1,976 lines (37% of all docs)** and still holds live facts. Needs a
+   promote-then-compress pass under the new rule: promote survivors into features/conventions/memory,
+   then cut each file to a ≤10-line stub. Until then, do not read those files as context.
+4. `features.md` names its command for only ~5 of 51 capabilities. The rest need a *verified*
+   feature→command mapping — a guessed command name is worse than none. `progress.md` (241 lines,
+   unbounded) still needs a cap rule.
+5. Left alone by decision: the `conducks-governance` skill still instructs `conducks_blueprint_gen()`
+   → BLUEPRINT.md — a tool that does not exist, writing a file that no longer exists.

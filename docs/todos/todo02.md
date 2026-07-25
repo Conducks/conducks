@@ -1,5 +1,5 @@
 # todo02 — Test Coverage & Query Intelligence
-Status: doing
+Status: todo
 - Acceptance: npm run test:int passes all 8 domain suites AND npm run test shows 90%+ statement coverage AND all 19 query templates execute correctly on Conducks' own repo.
 
 ## Phase 1 — Domain Integration Test Suites

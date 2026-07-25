@@ -162,7 +162,7 @@ conducks advise                   # Refactor suggestions based on the graph
 conducks diff                     # Structural diff of uncommitted changes
 conducks rename <id> <new-name>   # Graph-verified safe rename
 conducks guard                    # Block commits if risk threshold exceeded
-conducks blueprint                # Generate BLUEPRINT.md from the graph
+conducks status --blueprint       # Integrity readout: cycles, orphans, violations (stdout only)
 conducks bootstrap-docs <name>    # Scaffold project documentation
 conducks mirror                   # Open the visual graph dashboard
 conducks mcp                      # Start the MCP server

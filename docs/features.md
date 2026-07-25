@@ -148,17 +148,9 @@
 - Purpose: Interactive, force-directed visualization of the full graph with zoom-aware labeling and click-to-focus paths.
 - Intent: Some structural questions ("what's connected to what, at what scale") are faster to answer visually than by querying — the dashboard is read-only so it can't be mistaken for a source of truth.
 
-## Static Structural Diagram
-- Purpose: Generates a static Mermaid diagram of the highest-gravity nodes and their immediate connections.
-- Intent: Gives agents and CI pipelines a lightweight, file-based alternative to the live Mirror when a running dashboard isn't available.
-
-## Architectural Blueprint Summary
-- Purpose: Produces a structural summary (clusters, entry points, audit results) sized for an LLM's context window.
-- Intent: Full graph dumps blow context budgets; the blueprint is the compressed version an agent actually needs to orient itself.
-
-## LLM Context Generation
-- Purpose: Writes a bounded-size architecture summary to the project root for consumption by coding agents.
-- Intent: Every agent session re-deriving architecture from scratch wastes tokens and time; this makes that context reusable and current.
+## Integrity Blueprint — `conducks status --blueprint`
+- Purpose: One-screen structural integrity readout — cycle count, orphan count, resonance, and the first violations — printed to stdout.
+- Intent: A pass/fail glance before committing, without opening the dashboard. Deliberately stdout-only: a blueprint written to a file is stale on the next commit (ADR 0011), so it is printed, never persisted.
 
 ## Docs Bootstrap
 - Purpose: Initializes the project's documentation file set from templates, without overwriting files that already exist.

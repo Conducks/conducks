@@ -42,8 +42,8 @@
 
 ## CONDUCKS-11 — Explicit per-worker grammar loading
 - Rule: Worker threads must explicitly load their required WASM grammars (`typescript.wasm`, `python.wasm`, `go.wasm`) before commencing pulses. Grammar loading is not inherited from the parent thread.
-- Reason: The Grammar Bridge (v0.9.0) fix. Without explicit per-worker grammar loading, workers produce "Missing Grammar" nodes and the structural graph collapses.
+- Reason: The Grammar Bridge (v0.9.0) fix. Without explicit per-worker grammar loading, workers produce "Missing Grammar" nodes and the structural graph collapses. Grammar is cached per worker, not per file.
 
 ## CONDUCKS-12 — Connect-Execute-Disconnect for DuckDB
 - Rule: All DuckDB connections use the Connect-Execute-Disconnect pattern. Connections must be released immediately after query execution.
-- Reason: Lazy persistence prevents database locking during parallel CLI + MCP server usage. Persistent connections block concurrent writes.
+- Reason: Lazy persistence prevents database locking during parallel CLI + MCP server usage. Persistent connections block concurrent writes. Never open two read-write connections at once: `conducks analyze` holds read-write, the MCP server read-only. `conducks clean` clears zombie handles when lock files accumulate.

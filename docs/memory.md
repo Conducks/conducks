@@ -180,20 +180,10 @@
 - Why: Build target is `build/src/cli.js`, the vault directory is `.conducks/` at project root, grammars live at `src/resources/grammars/tree-sitter-{lang}.wasm`.
 - Applies: build tooling, vault access, grammar loading.
 
-## Worker Thread WASM Loading
-- Gotcha: A worker thread does not have the parent thread's WASM grammar loaded, even though the parent already loaded it.
-- Why: Workers in a pure ESM project don't inherit WASM instances from the parent thread — each worker must explicitly call `loadGrammar()` before parsing. Grammar is cached per worker, not per file.
-- Applies: multi-core parsing / worker pool.
-
 ## DuckDB Streaming Requirement
 - Gotcha: Loading all file essences into memory at once causes OOM on large repos.
 - Why: For repos with 1,000+ files, batch ingestion via `AsyncGenerator` is mandatory to keep heap under 200MB.
 - Applies: ingestion pipeline.
-
-## APFS Case-Sensitivity
-- Gotcha: Mixed-case node IDs fragment the graph — `/Users/Said/` and `/users/said/` become distinct nodes.
-- Why: macOS APFS is case-insensitive, so node IDs must be lowercase-normalized before generation or cross-module links silently break. Fixed in v0.8.0 via Canonical Path Normalization.
-- Applies: node ID generation.
 
 ## Jest Coverage Only Tracks Imported Files
 - Gotcha: Files never imported during a test run don't show up in coverage reports at all — coverage numbers look better than reality without `collectCoverageFrom`.
@@ -204,11 +194,6 @@
 - Gotcha: Importing `src/interfaces/tools/entry.ts` in a test starts the MCP server process as a side effect.
 - Why: The module starts the server on import, not on explicit invocation. Use mocks or defer imports to avoid unwanted server startup during tests.
 - Applies: `src/interfaces/tools/entry.ts` and any test touching it.
-
-## DuckDB Singleton Pattern
-- Gotcha: Two read-write connections open at once looks fine until it deadlocks.
-- Why: `conducks analyze` (CLI) uses a read-write connection; the MCP server uses read-only. Never open two read-write connections simultaneously. `conducks clean` resolves zombie handles when lock files accumulate.
-- Applies: persistence layer, CLI + MCP server concurrent usage.
 
 ## Tarjan SCC vs DFS
 - Gotcha: DFS-based cycle detection misses A→B→C→A style cycles.
@@ -224,11 +209,6 @@
 - Gotcha: `CoChangeEngine` and `FederatedLinker` logging can pollute agent context even when not in debug mode.
 - Why: `logger.info` always writes to stderr regardless of level — per-edge `IntraLinker` logging was demoted to `logger.debug` for this reason. Always check `LOG_LEVEL` before logging.
 - Applies: `CoChangeEngine`, `FederatedLinker`, `IntraLinker`.
-
-## Native Grammar ABI Mismatch (Go) — Resolved
-- Gotcha: Go structural extraction silently degraded to file-only nodes (Gnosis fallback) with no obvious error.
-- Why: Parsing uses native `tree-sitter` bindings, not bundled WASM — a grammar only loads if its ABI matches the runtime. Runtime was pinned to `tree-sitter@0.21.x` while `tree-sitter-go@0.25` emitted a newer ABI, producing a NULL root. Fixed by bumping the runtime to `tree-sitter@0.25` (backward-compatible with TS/Python/Rust grammars too).
-- Applies: `grammar-registry.ts`, Go language support.
 
 ## Node 23+ Build Requires C++20
 - Gotcha: `npm install` fails with `"C++20 or later required"` on Node 23/24/25.

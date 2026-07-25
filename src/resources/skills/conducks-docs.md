@@ -18,12 +18,9 @@ conducks coverage   test fill per function
 
 Writing **wiring** into a `.md` guarantees it's wrong on the next commit. So don't — query it.
 
-**Architecture is the exception people get wrong.** The *shape* of the wiring is queryable, but the
-*intent* behind it is not: why a module exists, what layer it sits in, where its boundaries are, what
-was deliberately deferred. That is authored architecture, and it belongs in a doc a human writes.
-The rule is not "no architecture docs" — it is **"architecture is authored, never auto-generated."**
-A script emitting `ARCHITECTURE.md` from the code is the thing that's banned; a person writing a
-`MODULE.md` that explains the module is exactly right (see sofie's `docs/architecture/**/MODULE.md`).
+**Architecture is the exception people get wrong.** The wiring's *shape* is queryable; the *intent*
+behind it — why a module exists, its layer, its boundaries, what was deferred — is not. So the rule
+is never "no architecture docs"; it is **authored, never auto-generated**.
 
 ---
 
@@ -55,7 +52,14 @@ Ask two questions:
 
 | | Living (overwrite) | Record (never edit; stamp + supersede) |
 |---|---|---|
-| files | `features` `conventions` `memory` `architecture` | `decisions/` `todos/` `progress` `handover` |
+| files | `features` `conventions` `memory` `architecture` `handover` | `decisions/` `todos/` `progress` |
+
+`handover` is the one living file that carries a date: it is overwritten every session (never
+appended), and the stamp says how fresh it is, not which version to keep.
+
+**`memory` vs `conventions` tiebreak** — a rule you must FOLLOW → `conventions.md`. A surprise you
+must KNOW → `memory.md`. Once a gotcha has a rule that prevents it, delete the memory entry; don't
+keep both. A resolved gotcha is a deleted gotcha, not one labelled "resolved".
 
 ---
 
@@ -65,7 +69,7 @@ Ask two questions:
 
 ```
 docs/
-├── README.md         start here
+├── README.md         the map: state + read-order + what each doc holds
 ├── features.md       what each capability is FOR + why        (living)
 ├── conventions.md    binding rules, IDed, with reasons        (living)
 ├── memory.md         gotchas the code can't show              (living)
@@ -74,18 +78,53 @@ docs/
 ├── decisions/        one ADR per file + README index          (record)
 ├── todos/            todoNN.md · completed/ · legacy/          (record)
 ├── progress.md       dated log of what shipped                (record)
-├── handover.md       dated snapshot for next session          (record)
+├── handover.md       snapshot for next session; overwritten     (living, dated)
 └── <soft>/           product/ business/ design/ … free-form, never linted
 ```
 
 **Monorepo** — same set inside every unit, plus a root `docs/` for cross-cutting intent:
 
 ```
-docs/            ← platform-wide: features · conventions · memory · decisions/ · todos/
+docs/            ← platform-wide: features · conventions · memory · decisions/ · todos/ (epics)
 app/docs/        ┐
 api/docs/        ├─ each unit: the full set above
 db/docs/         ┘
 ```
+
+**Use the split only if you have 2+ independently deployable units.** One unit → one flat `docs/`,
+no root-vs-unit question, no epics, no index files. If you catch yourself asking "root or unit?"
+in a single-unit repo, you are doing paperwork, not documentation. The split exists to stop four
+teams writing the same fact four times; with one team it buys nothing and costs a folder tree.
+
+### Root vs unit: ownership, not altitude
+
+> **A fact lives next to the code that must change when the fact becomes wrong.**
+
+Apply it one fact at a time, never a whole file. **The root test:** *can you name one unit that
+would change if this line became false?* Yes → it belongs to that unit. No → it is a **seam** — a
+fact about how units talk to each other, owned by nobody — and seams are what root is for.
+
+Root is NOT "the general version" of a unit doc. Root `features.md` is an **index** that links to
+each unit's features; a unit's `features.md` holds the content. An index that skips things is not
+an index, so a feature living in exactly one unit still gets its root link.
+
+| situation | where it goes |
+|---|---|
+| fact touches two units | the one that must change if it's wrong — not everyone who reads it |
+| fact has no owner at all | seam → root |
+| a rule only one unit follows | not a convention — that unit's architecture doc |
+| a unit needs a shared package changed | the package is a dependency, not a slice: note the version it needs, open work in the package's own todo |
+| adding / removing a unit | create or delete its `docs/` **and** its root index entries in the same change |
+
+**Links run one way, or are stamped on both ends (records only).** Root living docs link *down* to
+units. Todo slices link *up* to their epic — never sideways to each other. Nothing points sideways;
+that is what stops links rotting when a file moves.
+
+**Epic + slices** — a job touching 2+ units gets `docs/todos/todoNN.md` as the epic holding the
+context, the acceptance criteria, and the **only** status table. Each slice opens with one line
+pointing up (`> Epic: [todoNN](…) · Siblings: db, app`) and nothing else linking outward. The number
+is the join key — find every slice with `grep -rln "todoNN" */docs/`. Numbering is global; never
+restart per unit.
 
 `architecture/` is AUTHORED and OPTIONAL — add it when a module's intent needs explaining; skip it
 when it doesn't. Never `map.md` / `drift.md` — those are pure wiring; query the graph, don't write them.
@@ -107,22 +146,14 @@ docs/architecture/
             analysis/reflector/MODULE.md
 ```
 
-Rules that hold everywhere:
+- **`README.md` is the index** — lists every MODULE.md and states the project's own layer contract.
+- **Split when parts have different intent**; the parent then becomes a link-only overview that
+  repeats none of their content. Nest as deep as the source does — follow the code, not a fixed depth.
+- **Naming:** `<part>/MODULE.md` by default; a sibling `<name>.MODULE.md` for a single file.
 
-- **`README.md` is the index** — it lists every MODULE.md and states the project's own layer
-  contract / dependency direction. It is the entry point; everything else hangs off it.
-- **Path mirrors source path.** A reader who knows `src/lib/core/graph/algorithms/` finds
-  `architecture/modules/core/graph/algorithms/MODULE.md` without searching.
-- **Split when parts have different intent.** One doc covering a directory of unrelated concerns is
-  too coarse to act on. When you split, the parent becomes a short overview that links to the parts
-  and repeats none of their content.
-- **Nest as deep as the source does.** Two levels or five — follow the code, not a fixed depth.
-- **Naming:** `<part>/MODULE.md` (directory form) is the default. A sibling `<name>.MODULE.md` is
-  acceptable for a single file that deserves its own doc without a folder.
-
-**Each project's internal rules are its own** — what counts as a "part", how deep to nest, and any
-extra sections belong to that project and are declared in its `architecture/README.md`. What does
-NOT vary: authored not generated, no wiring, one file per module/part/feature, and a README index.
+What counts as a "part" and how deep to nest is each project's own call, declared in its
+`architecture/README.md`. What does NOT vary: authored not generated, no wiring, one file per
+module/part/feature, a README index.
 
 ---
 
@@ -135,10 +166,16 @@ enforces the governed set; `architecture/` and soft folders are free-form and ne
 ```markdown
 # Features — <unit>
 
-## <Capability>
+## <Capability> — `<the command that runs it>`
 - Purpose: what it's FOR (one line the code can't tell you)
 - Intent: why it exists / the tradeoff
+
+## Tunables
+| knob | default | file:line | effect |
 ```
+Name the command in the heading — a capability nobody can invoke is not findable. `## Tunables` is
+required once the unit has any: defaults, thresholds, gates. Without it they end up buried in
+whichever ADR or todo created them and get re-derived from source later.
 
 **`conventions.md`** — one `##` per rule, IDed.
 ```markdown
@@ -175,6 +212,15 @@ obvious from the source — never to complete a set.
 The wiring itself stays in the graph: `conducks trace <module>` / `conducks impact <module>`.>
 ```
 
+**`features.md` vs `MODULE.md` — different obligations, not different zoom levels.** features.md is
+the PROMISE: what the system offers and why that is worth having, one flat catalogue you scan.
+MODULE.md is the CONTRACT: what one part owns, refuses, assumes, breaks on, and deliberately did not
+build — the negative space features.md structurally cannot carry. A MODULE.md may state what it does
+ONCE, to orient the reader; that overlap is expected, not a duplicate. It may NEVER carry a
+capability catalogue (`## Features`) or a symbol map. features.md may never state a boundary, a trap,
+or a deferred decision. They do not map 1:1 — a capability spans several modules, and plenty of
+modules back no user-facing capability at all — so neither can be derived from the other.
+
 **`todos/todoNN.md`** — `%` done = checked ÷ total, per phase and overall.
 ```markdown
 # todoNN — <title>
@@ -197,7 +243,9 @@ Status: Accepted | Superseded by NNNN | Amended by NNNN
 ## Consequences
 ```
 
-**`handover.md`** — dated snapshot; expires, then archive.
+**`handover.md`** — the first file a new session reads. Rewritten (overwritten, never appended) at
+the END of every working session, re-stamped. Two sections, ≤15 lines. If you did not touch it this
+session, flip `Status: stale` — a stale handover that says so beats one that lies.
 ```markdown
 # Handover — <ISO-date>
 Status: current | stale
@@ -214,12 +262,39 @@ Status: current | stale
 - <what shipped>
 ```
 
-**`README.md`** and soft folders (`product/`, `business/`, …) — free prose, no skeleton.
+**`docs/README.md`** — the MAP of the docs, not a description of the project. Update it the turn you
+add or retire a doc set.
+```markdown
+# <unit> — docs
+
+**State:** <one line: what works today>
+**Read in order:** handover.md → todos/ (active) → memory.md
+
+| doc | holds |
+|---|---|
+```
+
+**`decisions/README.md`** — one line per ADR, in exactly ONE status group. An amendment is inline on
+that single entry, never a second listing: `0010 — Cycle detection … (amended by 0016, 0017)`.
+Groups: Accepted · Superseded. A double-listed ADR means whoever reads only the first line acts on a
+belief a later ADR already changed.
+
+Soft folders (`product/`, `business/`, …) — free prose, no skeleton, never linted.
 
 ---
 
 ## Rules
 
+- **Promote on close.** A record freezes the *why*; what is TRUE NOW must move to a living file the
+  same turn. ADR Accepted → the rule to `conventions.md`, the trap to `memory.md`, the capability to
+  `features.md`. Todo done → promote its surviving facts BEFORE moving it to `completed/`. The living
+  line states the current state and cites the record (`— ADR 0013`); it never restates the reasoning.
+  **A pointer is not a duplicate.** Nothing in `completed/` or `legacy/` counts as context — if a new
+  session must read a closed record to learn how the system behaves today, the promotion never happened.
+- **One docs root per unit** (`<unit>/docs/`). A governed filename outside it is dead by definition.
+- **Generated output is never tracked.** Blueprints, context dumps, pulse summaries go to the vault
+  (`.conducks/`) and are gitignored. A generated `.md` at the repo root outranks the authored docs by
+  accident and is stale within a commit.
 - **ADRs**: one decision per numbered file, never edited. Replace → stamp both ends
   (0009 "Supersedes 0004", 0004 "Superseded by 0009"). Part changed → amend, not supersede.
   The `decisions/README.md` index carries the state.
@@ -229,6 +304,14 @@ Status: current | stale
   wiring (calls/imports/cycles) out of it — that's what `audit`/`impact`/`trace` are for. Scope each
   file to ONE module/part/feature, mirror the source path, and index them from
   `architecture/README.md`.
+- **A doc never outranks the code.** If a doc and the code disagree, the doc is wrong — fix it in the
+  same change that revealed it. This includes code comments: a comment claiming "fail-open" above a
+  branch that fails closed is a doc bug, and it will fool the next reader.
+- **Never trust a `[DONE]` without a test that can fail.** A test with no assertions reads as coverage
+  and is worse than no test.
+- **Mutating a record — the one allowed exception is a stamp.** You may add a status line or a
+  supersede/extracted-to link to a closed record. That is metadata pointing elsewhere. Changing its
+  reasoning, outcome, or content is forbidden: add a signpost, never redraw the map.
 - **Never**: write wiring in a doc · put wiring in features.md · auto-generate architecture · mutate a
-  record · write a fact twice.
+  record · write a fact twice — a living line citing a record is NOT a duplicate (see *Promote on close*).
 

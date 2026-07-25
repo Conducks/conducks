@@ -1,5 +1,5 @@
 # todo09 — Taxonomy reconcile (C0) + tracked design debt
-Status: doing
+Status: blocked
 - Progress: Phase 1+2 done · Phase 3 largely done — only externally-blocked items remain (vuln
   surface needs a network advisory DB; live overlay needs a target app; EXPRESSION is a no-op marker).
 - Open items are ONLY: vuln surface (needs an advisory DB / network), live cross-service overlay
