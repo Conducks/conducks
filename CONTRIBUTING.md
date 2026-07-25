@@ -25,7 +25,7 @@ Conducks aims to be the standard structural intelligence layer for AI-native eng
 6. **Submit the PR**: Ensure your description clearly explains the structural change.
 
 ## 🛡️ Sentinel Policies
-All contributions must pass the existing `sentinel.json` audits. If you are adding a new core service, ensure it follows the 8-layer canonical taxonomy described in the [BLUEPRINT](docs/BLUEPRINT.md).
+All contributions must pass the existing `sentinel.json` audits. If you are adding a new core service, ensure it follows the canonical taxonomy — 9 kinds are persisted (13 are declared; see `docs/memory.md`) — described in [docs/architecture/README.md](docs/architecture/README.md).
 
 ## 📜 Code of Conduct
 By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).

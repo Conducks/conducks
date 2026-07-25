@@ -18,8 +18,9 @@ The audit flagged `registry/index.ts` at 74 and 77 upstream connections against 
 the obvious reading — "composition-root god object, split it by domain" — was wrong. Measured after
 type-only imports were excluded: **74 raw → 14 runtime, 77 → 37**, both well under the limit.
 
-41 of 50 importers are CLI commands that import the registry purely to *type* their handler; the
-compiler erases every one. The registry is a DI type contract, not a runtime hub. Do not split it on
+38 of its 50 importers are CLI commands, and every one of the 38 imports the registry purely to *type*
+its handler, so the compiler erases all of them. The registry is a DI type contract, not a runtime
+hub. Do not split it on
 fan-in evidence, and be suspicious of any future coupling metric here that has not excluded type
 imports (ADR 0016).
 

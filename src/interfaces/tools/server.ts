@@ -18,8 +18,9 @@ import {
  * 
  * Conducks tool registry server that orchestrates internal APIs and tool scheduler.
  * Consolidates all structural and behavioral tools into a documentation-driven registry.
- * 
- * Rule 10/13 ENFORCEMENT: Exactly 10 Unified Conducks MCP Tools. No more, no less.
+ *
+ * The tool surface is whatever `synapseTools` + `kineticTools` export (ADR 0018 §3). The count is
+ * derived from that list at bootstrap — never restated here, in a constant, or in a doc.
  */
 export class ConducksMCPServer {
   private server: Server;
@@ -62,11 +63,13 @@ export class ConducksMCPServer {
       this.registry.register(tool);
     }
 
-    const MANDATED_TOOL_COUNT = 13;
-    if (tools.length !== MANDATED_TOOL_COUNT) {
+    // ADR 0018 §3: the expected count is DERIVED from the tools we handed to the registry, not from a
+    // hand-maintained literal. This catches the registry dropping or duplicating a tool, which is the
+    // only failure a count check can actually detect.
+    if (tools.length !== staticTools.length) {
       console.error(
-        `[Conducks MCP] ⚠️ Tool count mismatch: expected ${MANDATED_TOOL_COUNT}, ` +
-        `found ${tools.length}. Tools: ${tools.map(t => t.name).join(', ')}`
+        `[Conducks MCP] ⚠️ Registry altered the tool surface: handed in ${staticTools.length}, ` +
+        `got back ${tools.length}. Tools: ${tools.map(t => t.name).join(', ')}`
       );
     }
 

@@ -1,7 +1,8 @@
 # domain/analysis/reflector — file → spectrum
 
-**Part of:** [domain/analysis](../MODULE.md). One file, ~750 lines, and the single most load-bearing
-unit in the codebase: every language, every file, every pulse goes through its match loop.
+**Part of:** [domain/analysis](../MODULE.md). One file, `analysis/reflector.ts`, ~830 lines, and the
+single most load-bearing unit in the codebase: every language, every file, every pulse goes through
+its match loop.
 
 **Responsibility:** walking a file's query matches and building its spectrum — nodes with canonical
 kinds and ranges, relationships, scope resolution, per-binding import records, and the type-only

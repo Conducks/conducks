@@ -3,6 +3,7 @@ Status: Accepted
 - Date: 2026-07-19
 - Implements: the "System 2 — data-flow / boundary nodes tagged by origin" half of ADR 0012.
 - Depends on: the edge-properties persist fix (memory.md) — origin tags ride on edge properties.
+- Promoted: docs/features.md ("Boundary / Supply-Chain Classification (System 2 — data flow)"); docs/architecture/modules/core/parsing/taxonomy/MODULE.md
 
 ## Context
 ADR 0012 recovered the design: System 1 is the containment tree; System 2 is reference edges whose

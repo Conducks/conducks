@@ -1,6 +1,7 @@
 # 0004 — Coverage as a range-join onto node line-spans, shown as fill detail
 Status: Accepted
 - Date: 2026-07-17
+- Promoted: docs/architecture/modules/domain/analysis/coverage/MODULE.md ("Coverage is a range-join, not a lookup")
 
 ## Context
 todo01 needed to bind live test coverage (istanbul/c8 output) to the structural graph so

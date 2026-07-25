@@ -13,7 +13,7 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class DiffCommand implements ConducksCommand {
   public id = "diff";
   public description = "Analyze structural risk of current changes (staged/unstaged)";
-  public usage = "registry diff [--base <id>] [--head <id>]";
+  public usage = "conducks diff [--base <id>] [--head <id>]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const baseIdx = args.indexOf('--base');

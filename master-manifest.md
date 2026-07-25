@@ -27,7 +27,7 @@ The Conducks CLI is a powerful engine designed for deep architectural discovery 
 - `conducks query`: Fuzzy and Regex symbol lookup against the Synapse ID registry.
 - `conducks status`: Generates a structural health manifest identifying **Hotspots** and **Pillars**.
 - `conducks context`: Generates an LLM-optimized technical manifest of the project.
-- `conducks blueprint`: Auto-generates `BLUEPRINT.md` from the current graph.
+- `conducks status --blueprint`: Prints an integrity readout (cycles, orphans, violations) to stdout. Nothing is written to a file — ADR 0011.
 
 ### ⚡ Behavioral Tracing
 - `conducks trace`: Dijkstra-weighted pathfinding between two functional symbols.

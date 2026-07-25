@@ -8,7 +8,7 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class FlowsCommand implements ConducksCommand {
   public id = "flows";
   public description = "List behavioral processes across the Synapse";
-  public usage = "registry flows";
+  public usage = "conducks flows";
 
   public async execute(_args: string[], registry: Registry): Promise<void> {
     await syncGraph(registry);

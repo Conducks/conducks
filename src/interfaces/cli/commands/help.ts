@@ -9,7 +9,7 @@ import type { Registry } from "@/registry/index.js";
 export class HelpCommand implements ConducksCommand {
   public id = "help";
   public description = "Show this help message";
-  public usage = "conducks --help";
+  public usage = "conducks help";
 
   constructor(private commands: ConducksCommand[]) {}
 

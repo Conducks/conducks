@@ -23,17 +23,18 @@ Adequate while the question set is known.
 - **[docs-grammar/](docs-grammar/MODULE.md)** — the conducks-docs standard, enforced.
 
 `conducks-core` is the façade the registry wires; `query-service` answers structural questions;
-`fallback-detector` reports where analysis degraded.
+`fallback-detector` reports where analysis degraded; `gateway-service` is the live vault-watch feed
+behind the Mirror dashboard, constructed by the `mirror` CLI command and consumed by the web server.
 
-## Why analysis is multi-pass
+## Why the split between the parts is where it is
 
-A single pass cannot resolve a cross-file reference, because the target may not be parsed yet.
-Discovery registers symbols, induction reflects each file, and a final pass resolves imports and
-binds bare names. That is why the reflector only seeds a raw specifier and the orchestrator builds
-the actual IMPORTS edges.
+One pass cannot resolve a cross-file reference, because the target may not be parsed yet. That single
+constraint is what divides this module: the [reflector](reflector/MODULE.md) sees exactly one file and
+seeds unresolved specifiers, the [orchestrator](orchestrator/MODULE.md) is the only thing allowed to
+see all files and is therefore where real edges get built, and the feature analyses
+([coverage](coverage/MODULE.md), [docs-grammar](docs-grammar/MODULE.md)) read the finished graph and
+never touch parsing. Anything that needs repo-wide knowledge moves up, never sideways.
 
-The consequence that bites everyone: **`analyze` is incremental — unchanged files are skipped
-entirely**, so edges from an analysis pass do not regenerate for a file that has not changed. After
-editing anything in this module, verify with `conducks clean` + a fresh `analyze`. A stale graph
-produces numbers that look completely real; a half-fixed one produces numbers that are plausible and
-wrong.
+The consequence every part inherits — `analyze` is incremental, so a re-run can show no change while
+your new logic never executed — is spelled out once, in the orchestrator's doc. Read it before
+believing any number produced from this module.

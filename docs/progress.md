@@ -1,5 +1,30 @@
 # Progress — conducks
 
+## 2026-07-25 · skills + docs truth pass (todo12, 13 agents)
+- All 8 skills verified against the code and the live MCP surface; six dead tool names removed
+  (`synapse_query/_impact/_groups/_refactor`, `sentinel_audit`, `blueprint_gen`) and enforced going
+  forward by `tests/unit/interfaces/tools/skills-tool-surface.test.ts` (ADR 0018). `conducks-guide`
+  119 → 86 lines, losing the generic frontend/backend/security content ADR 0006 had ordered deleted.
+  `conducks-exploring` had leaked tool-call markup committed as content.
+- Tool count derived in one place. It had been asserted four ways — CONDUCKS-9 said 9, ADR 0006 said
+  12, `server.ts` said 13, reality was 14 — so the mismatch warning fired on every boot.
+- Six real bugs fixed: `conducks record` (called a non-existent `registry.manifest`, hidden by
+  `as any`), `conducks setup` (registered Claude Desktop against a path that never exists, no `mcp`
+  arg), `audit` (cwd-relative rules path → zero policy rules, reported as confirmed), `coverage-view`
+  (todo08's basename bug, fixed only in `coverage-bind`), `conducks explain` (never printed
+  `complexity`, its largest weight), and MCP `conducks_impact`'s swapped mode descriptions.
+- Found that ADR 0005's layer contract has never been enforced: `guard` matches a `ruleId` that is
+  never loaded. ~71 illegal edges measured across 5 layer pairs. Not enabled — todo06 reopened,
+  because it had been marked done on precisely that criterion.
+- Java/PHP/Swift extraction proven dead on a 12-language test repo — their query files fail to compile,
+  so those files silently become one file-only node. README support levels corrected.
+- Docs: `memory.md` 30 → 24, `features.md` 50 → 46 with commands in every heading and a 26-row
+  Tunables table, CONDUCKS-13…17 added to promote ADR consequences out of immutable records, 14 false
+  claims corrected across 20 MODULE.md, ADR index de-duplicated, todo08 retired.
+- Our own new test made the gate flaky — importing the tool modules booted registry singletons and
+  raced the parsing suites. Caught pre-commit via a HEAD worktree comparison and rewritten to read
+  text. 4/4 parallel runs green after.
+
 ## 2026-07-21 · authored architecture/ docs, one per module/part/feature
 - Added `docs/architecture/` — README (layer contract + index) and **20 MODULE.md**. Granularity is
   the rule: one doc per module, PART, or feature, never one per layer. A first pass at directory

@@ -65,10 +65,15 @@ export class CoverageViewCommand implements ConducksCommand {
         ranByFile.set(file.toLowerCase(), lines);
       }
       const covKeys = [...ranByFile.keys()];
+      // Same matcher as coverage-bind (todo08). Suffix match only on a path-segment boundary AND
+      // only when the suffix carries a directory. The old bare-basename fallback lit EVERY
+      // same-named file FULL from one covered file — 12 index.ts all reading 100%.
+      const suffixMatch = (long: string, short: string): boolean =>
+        long === short ||
+        (short.includes("/") && long.endsWith(short) && long[long.length - short.length - 1] === "/");
       const matchFile = (f: string): string | undefined => {
         const lf = f.toLowerCase();
-        return covKeys.find(k => k === lf || k.endsWith(lf) || lf.endsWith(k)
-          || k.endsWith("/" + lf.split("/").pop()));
+        return covKeys.find(k => suffixMatch(k, lf) || suffixMatch(lf, k));
       };
       const results: Array<{ name: string; file: string; start: number; end: number; pct: number; bound: boolean }> = [];
       for (const n of nodes) {

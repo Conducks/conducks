@@ -6,9 +6,10 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 /**
  * Conducks — Bootstrap Documentation Command
  *
- * Scaffolds the conducks-docs grammar file set (features/conventions/memory/progress +
- * todos/, plus a DERIVED architecture stub) flat under docs/. Every scaffolded file passes
- * `conducks docs-lint` by construction.
+ * Scaffolds the conducks-docs grammar file set (features.md, conventions.md, memory.md,
+ * progress.md, todos/todo01.md) flat under docs/. No architecture file is written — ADR 0011
+ * removed generated architecture output. Every scaffolded file passes `conducks docs-lint`
+ * by construction.
  */
 export class BootstrapDocsCommand implements ConducksCommand {
   public id = "bootstrap-docs";

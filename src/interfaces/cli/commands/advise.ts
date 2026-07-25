@@ -9,7 +9,7 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 export class AdviseCommand implements ConducksCommand {
   public id = "advise";
   public description = "Get architectural recommendations";
-  public usage = "registry advise";
+  public usage = "conducks advise";
 
   public async execute(_args: string[], registry: Registry): Promise<void> {
     try {

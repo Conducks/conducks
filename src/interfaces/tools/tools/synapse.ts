@@ -7,10 +7,8 @@ import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
  *
- * These 4 tools form the analytical core of the Conducks MCP suite.
+ * The tools exported below form the analytical core of the Conducks MCP suite.
  * They provide discovery, structural health, governance, and precision metrics.
- *
- * CRITICAL RULE 10/13: Exactly 10 Unified Conducks MCP Tools mandated.
  */
 
 // S2: Whitelist of allowed Oracle query template names.

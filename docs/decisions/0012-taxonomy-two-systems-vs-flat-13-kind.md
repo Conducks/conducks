@@ -2,6 +2,7 @@
 Status: Accepted
 - Resolved by: 0013 (the open reconcile is now decided — cut DATA, edge-gate ATOM)
 - Date: 2026-07-19
+- Promoted: docs/architecture/modules/core/parsing/taxonomy/MODULE.md (the two orthogonal systems); docs/memory.md ("Taxonomy enum lists 13 kinds but the persisted graph has 9")
 
 ## Context
 The taxonomy was DESIGNED in an early session (chat 2026-07-18, project history session ca61981d)

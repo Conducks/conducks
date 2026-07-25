@@ -1,28 +1,42 @@
-# core/parsing/taxonomy — the canonical 9 kinds
+# core/parsing/taxonomy — the canonical kind vocabulary
 
-**Part of:** [core/parsing](../MODULE.md).
+**Part of:** [core/parsing](../MODULE.md). One file, `parsing/taxonomy.ts`.
 
 **Responsibility:** mapping each language's own node kinds onto one shared vocabulary, so that a
 Python class and a Go struct answer the same question. Every node carries a `canonicalKind` and a
-`canonicalRank`, and rank is what gives the graph its hierarchy (ecosystem → repository → directory →
-unit → structure → behavior → atom).
+`canonicalRank`, and rank is what gives the graph its hierarchy — the full ladder is 13 rungs, 0…12:
+ecosystem → repository → package → namespace → directory → unit → infra → structure → behavior →
+statement → branch → atom → data.
 
 **Boundaries:** naming only. It does not decide which nodes survive — see below.
 
-**Deferred / not built:** the second classification system. ADR 0012 describes two orthogonal systems
-— *what a symbol is* (this) and *where its boundary lies* (origin: internal / stdlib / dependency,
-ADR 0014). They are deliberately separate axes; do not fold origin into the kind enum.
+**Deferred / not built:** two things. (1) The second classification system: ADR 0012 describes two
+orthogonal systems — *what a symbol is* (this) and *where its boundary lies* (origin: internal /
+stdlib / dependency, ADR 0014). They are deliberately separate axes; do not fold origin into the kind
+enum. (2) `STATEMENT` and `BRANCH` are declared for statement- and branch-level coverage and **nothing
+emits them** — the two names appear nowhere else in `src/`. Coverage therefore range-joins onto
+BEHAVIOR spans instead ([coverage](../../../domain/analysis/coverage/MODULE.md)). Reserved, not
+implemented.
 
 ## The enum and the persisted graph disagree, by design
 
 `taxonomy.ts` declares **13** kinds and tags params as DATA and vars as ATOM at emission. A persisted
-graph has **9**: every analyze ends with `persistence.pruneTaxonomy()`, which deletes DATA outright
-and keeps an ATOM only if it carries a non-structural reference edge.
+graph carries fewer, for two different reasons that are easy to conflate:
+
+- **Pruned:** every analyze ends with `persistence.pruneTaxonomy()`, which deletes DATA outright and
+  keeps an ATOM only if it carries a non-structural reference edge. DATA is always 0 in a vault.
+- **Never emitted:** STATEMENT and BRANCH have no producer, and NAMESPACE has none for TypeScript.
+  Their absence is not the prune's doing.
+
+Conducks' own vault shows the 9 that remain — BEHAVIOR, ATOM, UNIT, STRUCTURE, DIRECTORY, ECOSYSTEM,
+REPOSITORY, PACKAGE, INFRA. Do not read "9 kinds" as the design; the design is 13 with a documented
+gap.
 
 This is intentional and load-bearing. Do **not** "fix" the enum to match the graph — the edge gate
 needs post-link edges to exist, and the vault is authoritative because streaming flushes before the
 prune runs. Parameter data already lives on the parent's `dna.params`, so nothing is lost. It killed
-a 72% ATOM flood (3561 → ~227 on conducks).
+a 72% ATOM flood (3561 → ~227 on conducks, measured at ADR 0013; the live figure moves with the
+code — recount, don't quote).
 
 **To change what survives, edit `pruneTaxonomy` in persistence — not this enum.** Any vault will show
 DATA = 0 and ATOM ≈ edge-carrying only. Design in ADR 0012, decision in ADR 0013.

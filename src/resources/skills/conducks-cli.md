@@ -16,16 +16,17 @@
 - `conducks docs-status [--json]` — progress board parsed from the markdown (todo %, ADR states)
 - `conducks docs-lint` — validate docs against the grammar; exits 1 on violation (CI gate)
 - `conducks bootstrap-docs [name]` — scaffold the grammar file set into docs/
-- `conducks context-gen --out docs/architecture.md` — regenerate the DERIVED architecture doc
 
 ## Architecture governance
-- `conducks guard [--threshold N]` — layer contract (ADR 0005) + cycles + rank rules; blocks violations
-- `conducks audit` / `advise` / `blueprint` — structural audit, advice, integrity map
+- `conducks guard [--threshold=N] [--force]` — layer contract (ADR 0005) + cycles + rank rules; blocks violations
+- `conducks audit [--fallback] [--history=<window>]` / `advise` — structural audit + advice
+- `conducks status --blueprint` — integrity readout (cycles/orphans/violations) printed to stdout; writes nothing
 - `conducks drift [prevPulseId]` / `diff` — structural change between pulses
 
 ## Symbol intelligence
-- `conducks query <pattern> [--mode fuzzy|template]` · `explain <id>` · `context <id>`
-- `conducks impact <id> [upstream|downstream]` · `trace <id> [--flow]` · `flows`
+- `conducks query <pattern> [--mode fuzzy|template] [--template <id>] [--limit <n>] [--json]`
+- `conducks explain <id>` · `context <id> [--json]`
+- `conducks impact <id> [upstream|downstream] [--json] [--tree]` · `trace <id> [--flow]` · `flows`
 - `conducks rename <id> <new> [--confirm]` — graph-verified rename · `prune` — dead-path cleanup
 
 ## Lifecycle

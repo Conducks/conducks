@@ -1,6 +1,7 @@
 # 0017 — ARCH-3 means a module import cycle (amends 0016)
 Status: Accepted
 - Date: 2026-07-20
+- Promoted: docs/architecture/modules/domain/governance/MODULE.md (Deferred — the call-cycle finding); docs/architecture/modules/core/graph/algorithms/MODULE.md ("Filtering is the caller's job"); docs/memory.md
 
 ## Context
 ADR 0016 predicted that excluding type-only imports would take conducks' self-audit to 0 circular

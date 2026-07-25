@@ -7,7 +7,7 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
  */
 export class QueryCommand implements ConducksCommand {
   public id = "query";
-  public description = "Search code (use --gql for patterns)";
+  public description = "Search code (use --mode template --template <id> for Oracle patterns)";
   public usage = "conducks query <pattern> [--mode fuzzy|template] [--template <id>] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {

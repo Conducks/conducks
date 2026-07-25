@@ -40,8 +40,8 @@ export class RecordCommand implements ConducksCommand {
 
     try {
       console.log(`[Manifest] Recording ${targetType} for ${projectName}...`);
-      await (registry as any).manifest.record(projectRoot, projectName, targetType, content);
-      console.log(`✅ Recorded successfully in docs/project/${projectName}/${targetType}.md`);
+      await registry.status.record(projectRoot, projectName, targetType, content);
+      console.log(`✅ Recorded in docs/${targetType}.md`);
     } catch (err) {
       console.error(`Record Error: ${(err as Error).message}`);
       process.exit(1);

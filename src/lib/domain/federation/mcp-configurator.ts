@@ -43,10 +43,10 @@ export class MCPConfigurator implements ConducksComponent {
 
       config.mcpServers["conducks"] = {
         command: "node",
-        args: [serverPath],
-        env: {
-          PORT: "3001"
-        }
+        // The "mcp" arg is required — serverPath is the CLI entry, and without a command it
+        // prints help and exits instead of starting the server.
+        args: [serverPath, "mcp"],
+        disabled: false
       };
 
       const tmpPath = this.claudeConfigPath + '.tmp';

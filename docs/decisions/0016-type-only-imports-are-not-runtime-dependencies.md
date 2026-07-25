@@ -1,6 +1,8 @@
 # 0016 — Type-only imports are not runtime dependencies (amends 0010)
 Status: Accepted
 - Date: 2026-07-20
+- Amended by: 0017
+- Promoted: docs/architecture/modules/core/graph/algorithms/MODULE.md ("They look like a circular dependency and are not"); docs/architecture/modules/domain/governance/sentinel/MODULE.md ("`max_fans` counts runtime fan-in only")
 
 ## Context
 `conducks audit` on conducks itself reports two violations, both reproducible on a clean vault

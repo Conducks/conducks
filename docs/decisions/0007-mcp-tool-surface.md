@@ -1,6 +1,7 @@
 # 0007 — MCP tool surface: parity with CLI analysis, no speculative tools
 Status: Accepted
 - Date: 2026-07-18
+- Promoted: docs/architecture/modules/interfaces/tools/MODULE.md (Boundaries — parity with the CLI, no speculative tools)
 
 ## Context
 MCP exposed 13 (then 12 after ADR 0006) multi-modal tools; the CLI had 39 flat commands. An

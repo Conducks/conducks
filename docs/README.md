@@ -1,8 +1,10 @@
 # conducks — docs
 
 **State:** Structural pulse, taxonomy (System 1) and boundary classification (System 2) all ship;
-`conducks audit` on conducks itself is clean. Known hole: the graph records no inheritance edges,
-which blocks STALE_IMPORT (todo11). Workspace rollout not started (todo07).
+`conducks audit` on conducks itself is clean. Known holes: the graph records no inheritance edges,
+which blocks STALE_IMPORT (todo11); Java, PHP and Swift extraction is dead — their query files fail
+to compile against the installed grammars, so those files silently degrade to the file-only Gnosis
+fallback. Workspace rollout not started (todo07).
 
 **Read in order:** `handover.md` → `todos/` (active) → `memory.md`
 
@@ -17,7 +19,7 @@ Follows the **conducks-docs** standard.
 | `conventions.md` | binding rules (`CONDUCKS-N`), each with its reason |
 | `memory.md` | gotchas the code can't show — traps, not rules |
 | `architecture/` | authored per-module intent: `README.md` (layer contract + index) + 20 `MODULE.md` |
-| `decisions/` | 17 ADRs, immutable; status index in `decisions/README.md` |
+| `decisions/` | 18 ADRs, immutable; status index in `decisions/README.md` |
 | `todos/` | `todoNN.md` active · `completed/` closed (not context — facts get promoted out) |
 | `progress.md` | dated log of what shipped, newest first |
 

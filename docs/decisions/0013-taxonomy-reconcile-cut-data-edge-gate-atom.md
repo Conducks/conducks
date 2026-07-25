@@ -1,6 +1,7 @@
 # 0013 — Taxonomy reconcile: cut DATA, edge-gate ATOM, align to the 9-kind design
 Status: Accepted
 - Date: 2026-07-19
+- Promoted: docs/features.md ("Structural Taxonomy (System 1 — containment)"); docs/memory.md ("Taxonomy enum lists 13 kinds but the persisted graph has 9"); docs/architecture/modules/core/parsing/taxonomy/MODULE.md
 
 ## Context
 ADR 0012 recorded the divergence between the 9-kind structural design (ATOM = cross-cutting

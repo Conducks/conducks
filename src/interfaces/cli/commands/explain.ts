@@ -59,6 +59,7 @@ export class ExplainCommand implements ConducksCommand {
     console.log();
     console.log(`\x1b[1mSignal Decomposition:\x1b[0m`);
     console.log(`  ├── \x1b[36mgravity:\x1b[0m     ${(breakdown.gravity.value * 10).toFixed(2)}  (centrality rank: ${node.properties.rank?.toFixed(4) || 0})`);
+    console.log(`  ├── \x1b[36mcomplexity:\x1b[0m  ${(breakdown.complexity.value * 10).toFixed(2)}  (largest weight in the composite score)`);
     console.log(`  ├── \x1b[36mfan-out:\x1b[0m     ${(breakdown.fanOut.value * 10).toFixed(2)}  (outgoing structural dependencies)`);
     console.log(`  ├── \x1b[36mchurn:\x1b[0m       ${(breakdown.churn.value * 10).toFixed(2)}  (resonance / temporal frequency)`);
     console.log(`  ├── \x1b[36mentropy:\x1b[0m     ${(breakdown.entropy.value * 10).toFixed(2)}  (authorship fragmentation: ${(entropyRes.entropy).toFixed(2)})`);

@@ -3,6 +3,7 @@ Status: Accepted
 - Amends: 0009 (which classified architecture as the "derived" tier)
 - Related: 0011 (killed auto-generated derived docs — still correct)
 - Date: 2026-07-19
+- Promoted: docs/architecture/README.md (header); docs/architecture/modules/domain/analysis/docs-grammar/MODULE.md ("Governed vs free-form is a deliberate two-tier design")
 
 ## Context
 ADR 0009 classified `architecture.md` and the `architecture/` folder as the "derived" tier, and

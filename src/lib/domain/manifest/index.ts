@@ -16,7 +16,7 @@ export class ManifestService implements ConducksComponent {
   constructor(private readonly engine: ManifestEngine = new ManifestEngine()) {}
 
   /**
-   * Bootstraps the 7-file documentation standard for a project.
+   * Bootstraps the conducks-docs grammar file set for a project.
    * Writes only files that don't already exist on disk.
    */
   public async bootstrap(projectRoot: string, projectName: string): Promise<string[]> {

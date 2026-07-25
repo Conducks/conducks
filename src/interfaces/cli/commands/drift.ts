@@ -10,7 +10,7 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 export class DriftCommand implements ConducksCommand {
   public id = "drift";
   public description = "Analyze architectural drift between structural pulses";
-  public usage = "registry drift [prevPulseId]";
+  public usage = "conducks drift [prevPulseId]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const prevPulseId = args.find(a => !a.startsWith('--'));

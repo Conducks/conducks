@@ -11,7 +11,7 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 export class GuardCommand implements ConducksCommand {
   public id = "guard";
   public description = "Enforce structural stability via regression thresholds";
-  public usage = "conducks guard [--threshold N]";
+  public usage = "conducks guard [--threshold=N] [--force]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const thresholdArg = args.find(a => a.startsWith("--threshold="));

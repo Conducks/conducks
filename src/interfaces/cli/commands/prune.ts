@@ -8,7 +8,7 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class PruneCommand implements ConducksCommand {
   public id = "prune";
   public description = "Identify unused exports and dead code";
-  public usage = "registry prune";
+  public usage = "conducks prune";
 
   public async execute(_args: string[], registry: Registry): Promise<void> {
     await syncGraph(registry);

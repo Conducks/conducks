@@ -1,40 +1,43 @@
-# Handover — 2026-07-24
+# Handover — 2026-07-25
 Status: current
 
 ## Where it stands
-- **conducks-docs standard hardened** (`src/resources/skills/conducks-docs.md`, 265 lines). Seven new
-  rules, the load-bearing one being **promote-on-close**: a record freezes the *why*, but what is true
-  NOW must move to a living file the same turn — nothing in `completed/`/`legacy/` counts as context.
-  Also: handover rewritten every session; `docs/README.md` and `decisions/README.md` now governed;
-  memory-vs-conventions tiebreak; `## Tunables` in features.md; one-docs-root; generated-output-untracked.
-  `handover` moved Record→Living (it is overwritten, never superseded).
-- **Skill lives in 3 places, all in parity**: `src/resources/skills/` (source) → `build/src/resources/skills/`
-  → `~/.claude/skills/`. The middle one matters: the installer resolves `SKILLS_DIR` relative to its
-  own *compiled* file, so `conducks setup` ships the build copy — a stale one silently reinstalls the
-  old skill over the new. Refresh with `npm run build` (or a direct `cp`) after editing the source.
-- **Deleted `ARCHITECTURE.md`, `BLUEPRINT.md`, `llms.txt`** from the repo root — 16,551 lines, staged
-  not committed. Orphaned pre-ADR-0011 artifacts: nothing in `src/` writes them, `status --blueprint`
-  prints to stdout only, and `generateBlueprint()` (`conducks-core.ts:356`) is a 4-line stub with zero
-  callers. `BLUEPRINT.md` and `llms.txt` were byte-identical.
-- **features.md was advertising capabilities that do not exist** — "Static Structural Diagram" (no
-  mermaid/graphviz anywhere in `src`) and "LLM Context Generation" (wrote a summary to the project
-  root — the exact thing ADR 0011 banned). Both removed, replaced by one honest entry for
-  `conducks status --blueprint`.
-- **Docs truth pass** — ADR index no longer double-lists 0003/0009/0010/0016 (amendments are inline on
-  a single entry now); `memory.md` lost 4 entries that duplicated CONDUCKS-4/11/12 or were already
-  resolved, their surviving detail promoted into those conventions; `docs/README.md` rewritten as a map
-  (state + read-order + table); todo02 `doing`→`todo` (0 of 18 done), todo09 `doing`→`blocked` (only
-  externally-blocked items remain). Superseded parent-level `features.md` moved to `archive/`.
+- **todo12 closed** — a 13-agent truth pass over the skills and both repos' docs. All 8 skills now name
+  only live MCP tools, enforced by a test (ADR 0018). `conducks-guide` lost the ~80 lines of
+  frontend/backend/security guidance ADR 0006 had already ordered deleted. Tool count is derived in one
+  place (was asserted four ways: 9, 12, 13, actual 14).
+- **Six real bugs fixed, none of them in scope when the pass started.** `conducks record` never worked
+  (`registry.manifest` does not exist; an `as any` hid it). `conducks setup` registered Claude Desktop
+  against `<project>/build/index.js`, a path that never exists, with no `mcp` arg — so every
+  auto-registered server silently failed to start. `audit` read a cwd-relative `config/sentinel.json`,
+  evaluating zero policy rules outside the project root while printing "Governance confirmed".
+  `coverage-view` still had todo08's basename bug. `conducks explain` never printed `complexity`, its
+  largest-weighted signal. MCP `conducks_impact`'s two mode descriptions were swapped end-for-end.
+- **ADR 0005's layer contract is NOT enforced** — `guard` prints "Layer contract clean" because
+  `layer_boundaries` is absent from `getDefaultRules()` and no `.conducks/sentinel.yml` exists. Measured
+  with the rule force-enabled: ~71 illegal edges across 5 layer pairs. Deliberately NOT enabled — it
+  would hard-block. **todo06 is reopened**: it had been closed on this exact criterion.
+- **Java, PHP and Swift extraction is dead.** Proven empirically on a 12-language repo: their query
+  files fail to compile against the installed grammars (`TSQueryErrorStructure` @921,
+  `TSQueryErrorNodeType` @146 and @199), so every file in those languages degrades to a single
+  file-only node. The README's support table said "experimental"; it now says broken. No todo covers it.
+- **Docs are smaller and true**: `memory.md` 30 → 24 entries, `features.md` 50 → 46 with every heading
+  naming its command (was 5 of 50) plus a 26-row `## Tunables` table, 5 new conventions
+  (CONDUCKS-13…17) promoting ADR consequences that had lived only inside immutable records, 14 false
+  claims corrected across the 20 MODULE.md, and the ADR index no longer double-lists any decision.
+- Gates: typecheck 0 · 44/44 tests, 9/9 suites · docs-lint clean (33 governed) · `conducks audit`
+  confirmed. `website/` committed separately.
 
 ## Next, in order
-1. **todo11 — inheritance edges.** The graph has ZERO EXTENDS/IMPLEMENTS edges (see `memory.md`), so
-   `implements X` registers no usage and STALE_IMPORT floods. Fix heritage capture first, then prune.
-2. **todo07 — workspace rollout.** Run conducks on the drifting repos. Nothing started.
-3. **`todos/completed/` is 1,976 lines (37% of all docs)** and still holds live facts. Needs a
-   promote-then-compress pass under the new rule: promote survivors into features/conventions/memory,
-   then cut each file to a ≤10-line stub. Until then, do not read those files as context.
-4. `features.md` names its command for only ~5 of 51 capabilities. The rest need a *verified*
-   feature→command mapping — a guessed command name is worse than none. `progress.md` (241 lines,
-   unbounded) still needs a cap rule.
-5. Left alone by decision: the `conducks-governance` skill still instructs `conducks_blueprint_gen()`
-   → BLUEPRINT.md — a tool that does not exist, writing a file that no longer exists.
+1. **todo06 — make the layer contract true, then turn the gate on.** Ordered fix is in the todo: route
+   `cli → core`/`cli → domain` through composition (61 of the 71 edges), decide the `cli → mcp`
+   launcher exception, fix `pulse-worker.ts:2` (core → domain), then add the rule. Do NOT add the rule
+   first.
+2. **New todo needed: the three broken languages.** Probe each candidate pattern against the real
+   grammar before it goes in a query file — the recipe is in `memory.md`.
+3. **Decide the `upstream`/`downstream` default.** MCP defaults `downstream`; the CLI, registry and
+   analyzer all default `upstream`, and `upstream` is what "what breaks if I change this" means. The
+   descriptions are now honest, so this is a deliberate behaviour change, not a typo.
+4. **todo11 — inheritance edges.** Still zero EXTENDS/IMPLEMENTS in the vault, re-confirmed by census.
+5. Your live Claude Desktop config still points at the dead `build/index.js` from an older `setup` run
+   — the code is fixed, but the existing entry needs the corrected path plus the `mcp` arg.

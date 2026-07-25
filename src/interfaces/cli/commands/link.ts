@@ -8,7 +8,7 @@ import type { Registry } from "@/registry/index.js";
 export class LinkCommand implements ConducksCommand {
   public id = "link";
   public description = "Link a proprietary foundation synapse";
-  public usage = "registry link <path>";
+  public usage = "conducks link <path>";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const projectPath = args[0];

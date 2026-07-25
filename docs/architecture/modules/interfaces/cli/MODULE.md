@@ -1,15 +1,26 @@
 # interfaces/cli — the command surface
 
-**Layer:** interfaces. Imports composition only. Never imports another interface, with one allowed
-exception: the `mirror` command launches the web server — a launcher edge, not logic coupling
-(ADR 0005).
+**Layer:** interfaces. It is *meant* to import composition only, and it does import another interface
+exactly once, legally: `mirror.ts:3` pulls `initGlobalMirror` from `interfaces/web` — a launcher edge,
+not logic coupling (ADR 0005, encoded as `cli → web`).
+
+**What it actually does, today:** 19 imports across 14 command files reach past the registry straight
+into `@/lib/domain/*` and `@/lib/core/*` (`chronicle-interface`, `persistence`, `docs-grammar`,
+`sentinel`, `gateway-service`, `linker-federated`, …). The encoded contract allows cli → composition,
+contracts and web only, so each of those is an illegal downward reach. They are not caught because the
+layer rule is not loaded ([sentinel](../../domain/governance/sentinel/MODULE.md)). Treat "imports
+composition only" as the target state; when you touch a command that does otherwise, route it through
+the registry instead of adding another one.
 
 **Responsibility:** argument parsing, output formatting, exit codes, and the one-line lifecycle of
-opening and closing the vault. Roughly 40 commands, one file each.
+opening and closing the vault. 38 commands, one file each.
 
-**Boundaries:** a command holds no analysis logic. If a command computes something rather than
-asking a service for it, that computation belongs in domain. Commands are meant to be thin enough
-that reading one tells you which service does the work.
+**Boundaries:** a command holds no analysis logic, and it never loads policy or config itself. If a
+command computes something rather than asking a service for it, that computation belongs in domain.
+Commands are meant to be thin enough that reading one tells you which service does the work. The
+standing exception is `audit.ts`, which loads the sentinel policy file itself; that is how it managed
+to evaluate an empty rule set while printing a pass
+([sentinel](../../domain/governance/sentinel/MODULE.md)).
 
 **Deferred / not built:** commands take symbol IDs, not file paths. `conducks impact <symbolId>`
 resolves a bare name via `resolveSymbol` but rejects a path, since a path has no `::`. Accepting a

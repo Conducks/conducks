@@ -24,7 +24,7 @@ the first listing would act on a belief a later ADR already changed.
   [0009 — Hard/soft docs, architecture file-or-folder, uninstall symmetry](0009-hard-soft-docs-and-uninstall-symmetry.md) *(amended by 0015)*,
   [0010 — Cycle detection ignores structural edges (Node/TS false-positive fix)](0010-cycle-detection-ignores-structural-edges.md) *(amended by 0016, 0017)*,
   [0011 — Kill derived-doc generation; structure is queried, never written](0011-kill-derived-doc-generation.md),
-  [0012 — Taxonomy: two-system design vs flat 13-kind (open reconcile)](0012-taxonomy-two-systems-vs-flat-13-kind.md),
+  [0012 — Taxonomy: two-system design vs flat 13-kind (open reconcile)](0012-taxonomy-two-systems-vs-flat-13-kind.md) *(resolved by 0013)*,
   [0013 — Taxonomy reconcile: cut DATA, edge-gate ATOM](0013-taxonomy-reconcile-cut-data-edge-gate-atom.md),
   [0014 — System 2: boundary-origin classification](0014-system2-boundary-origin-classification.md),
   [0015 — Architecture docs are authored, not derived](0015-architecture-is-authored-not-derived.md),

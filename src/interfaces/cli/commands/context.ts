@@ -10,7 +10,7 @@ import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 export class ContextCommand implements ConducksCommand {
   public id = "context";
   public description = "View symbol relationships and technical flows";
-  public usage = "registry context <symbolId> [--json]";
+  public usage = "conducks context <symbolId> [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const useJson = args.includes('--json');

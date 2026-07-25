@@ -3,6 +3,7 @@ import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js
 import { MCPConfigurator } from "@/lib/domain/federation/mcp-configurator.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import fs from "fs-extra";
 
 /**
@@ -11,7 +12,7 @@ import fs from "fs-extra";
 export class SetupCommand implements ConducksCommand {
   public id = "setup";
   public description = "Configure MCP and install skills";
-  public usage = "registry setup";
+  public usage = "conducks setup";
 
   public async execute(_args: string[], _registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks Setup] Initializing Environment...\x1b[0m");
@@ -22,8 +23,13 @@ export class SetupCommand implements ConducksCommand {
     console.log(`✅ Synced ${skillResult.workspace.length} skills → .claude/skills/ (workspace).`);
 
     const configurator = new MCPConfigurator();
-    const buildPath = path.join(process.cwd(), "build", "index.js");
-    const mcpResult = await configurator.registerClaude(buildPath);
+    // Resolve the CONDUCKS install root from this compiled file, NOT from process.cwd(): setup runs
+    // inside the project being analyzed, so cwd is the wrong repo entirely. This file compiles to
+    // build/src/interfaces/cli/commands/setup.js, so the CLI entry is three levels up.
+    // The old value was `<analyzed-project>/build/index.js` — a path that never exists, which is
+    // why every auto-registered Claude Desktop server silently failed to start.
+    const cliEntry = fileURLToPath(new URL("../index.js", import.meta.url));
+    const mcpResult = await configurator.registerClaude(cliEntry);
     console.log(mcpResult.message);
 
     // 3. Harden Environment (.conducksignore)

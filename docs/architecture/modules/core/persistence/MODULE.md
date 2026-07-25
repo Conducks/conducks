@@ -1,6 +1,7 @@
 # core/persistence — the vault (DuckDB) and the pulse transaction
 
-**Layer:** core. Imports contracts only.
+**Layer:** core. Imports contracts plus core siblings (`git`, `utils`, `core/registry`) — nothing from
+domain or above.
 
 **Responsibility:** owns the vault at `.conducks/`, the node/edge schema, and the atomicity of a
 pulse. It is the boundary where an in-memory graph becomes rows and back again.

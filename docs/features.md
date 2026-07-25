@@ -1,201 +1,224 @@
 # Features — conducks
 
-## Full Structural Pulse
-- Purpose: Build the symbol graph for a codebase in one pass so every other command has something to query.
+## Full Structural Pulse — `conducks analyze [path]`
+- Purpose: Build the whole symbol graph for a codebase in one pass, so every other command answers from a stored graph instead of re-reading the source.
 - Intent: Repos this large make single-threaded, incremental-only parsing impractical — the pulse trades a one-time scan cost for near-instant queries afterward.
 
-## Structural Taxonomy (System 1 — containment)
-- Purpose: Model code as a containment tree where the deepest routinely-emitted node is the function (BEHAVIOR). Parameters/arguments/literals carry no architectural signal and are NOT nodes; variables/fields (ATOM) become nodes ONLY when they carry a real cross-scope reference edge — the rest are attributes on their parent.
-- Intent: Keeps the graph at architectural altitude. Emitting every local variable floods the graph (~72% ATOM on a real repo) and buries the signal; edge-gating keeps only the atoms that are actually load-bearing. (ADR 0012/0013 — cut DATA, edge-gate ATOM.)
+## Structural Taxonomy (System 1 — containment) — built by `conducks analyze`
+- Purpose: Model code as a containment tree whose deepest routinely-emitted node is the function (BEHAVIOR), so a query lands on a unit an engineer actually reasons about.
+- Intent: Keeps the graph at architectural altitude. Emitting every local variable floods the graph (~72% ATOM on a real repo) and buries the signal; edge-gating keeps only the atoms that are load-bearing. (ADR 0012/0013 — cut DATA, edge-gate ATOM.)
 
-## Boundary / Supply-Chain Classification (System 2 — data flow)
-- Purpose: Classify every reference that leaves the repo by origin — internal, stdlib (trusted, unversioned), or third-party dependency (versioned, supply-chain-relevant) — so the dependency surface is a first-class, queryable part of the graph.
-- Intent: "Edge classification, not node count, tells architecture health." A dependency only matters once you know it's third-party and versioned; without origin, the supply-chain surface is invisible. (ADR 0014.)
+## Boundary / Supply-Chain Classification (System 2 — data flow) — built by `conducks analyze`, read via `conducks supply-chain`
+- Purpose: Give every reference that leaves the repo an origin — internal, stdlib, or third-party dependency — so "what does this project actually depend on" is a graph query, not a manifest read.
+- Intent: "Edge classification, not node count, tells architecture health." A dependency only matters once you know it is third-party and versioned; without origin, the supply-chain surface is invisible. (ADR 0014.)
 
-## Structural Health Status
-- Purpose: One command that answers "what's wrong with this codebase right now" — hotspots, entry points, god objects, staleness — instead of making an agent assemble that picture from raw graph queries.
-- Intent: Cuts the number of round-trips an agent needs before it can start reasoning about a codebase.
+## Structural Health Status — `conducks status`
+- Purpose: Answer "is the graph I am about to query sound, and where is the weight in this codebase" in one screen — node/edge counts, density, staleness, top hotspots by structural gravity.
+- Intent: Cuts the number of round-trips an agent needs before it can start reasoning about a codebase. `conducks_status` with `mode: "map"` adds the detected entry points for first-contact orientation.
 
-## Staleness Detection
-- Purpose: Tells the user or agent when the persisted graph no longer reflects the current git state, before they act on stale context.
-- Intent: Silent staleness is worse than an explicit warning — agents that reason over a drifted graph give confidently wrong answers.
+## Staleness Detection — reported by `conducks status`, and on every MCP result
+- Purpose: Tell the reader the persisted graph no longer matches the current git state, before they act on it.
+- Intent: Silent staleness is worse than an explicit warning — an agent reasoning over a drifted graph gives confidently wrong answers, so every tool result carries the flag rather than expecting the caller to ask.
 
-## Live Watch Mode
-- Purpose: Keeps the graph in sync automatically while a developer is actively editing, without re-running a full pulse per keystroke.
-- Intent: Full pulses are too slow to run on every save; only the changed file needs to be re-inducted.
+## Live Watch Mode — `conducks watch`
+- Purpose: Keep the graph in sync while a developer is actively editing, re-inducting only the file that changed.
+- Intent: Full pulses are too slow to run on every save, and a graph that is only correct right after a manual `analyze` is a graph nobody trusts.
 
-## Mirror Live Sync
-- Purpose: Pushes graph changes to connected dashboard clients as they happen.
-- Intent: A dashboard that requires manual refresh loses the value of live watch mode — the two are meant to be used together.
+## Mirror Live Sync — `conducks mirror` (with `conducks watch` running)
+- Purpose: Push graph changes to connected dashboard clients as they land, so the picture on screen matches the code on disk.
+- Intent: A dashboard that needs a manual refresh loses the value of watch mode — the two are meant to be used together.
 
-## Fallback Pattern Detection
-- Purpose: Flags code that only exists to catch a primary path's failure, so it can be told apart from canonical logic during analysis.
-- Intent: Fallback code inflates apparent complexity and risk scores if treated as equally important as the primary path it backs up.
+## Fallback Pattern Detection — built by `conducks analyze`, read via `conducks fallback`
+- Purpose: Recognise code whose only job is to catch a primary path's failure, so it can be weighed differently from canonical logic.
+- Intent: Fallback code inflates apparent complexity and risk if treated as equally important as the path it backs up — so risk scoring re-weights once a symbol is recognised as fallback.
 
-## Symbol Query
-- Purpose: Locate a symbol by fuzzy match, regex, or structured filter, and get back a canonical, addressable ID.
-- Intent: Agents need a precise handle on "this exact symbol," not a text match — grep-style search can't disambiguate overloaded or shadowed names.
+## Symbol Query — `conducks query <pattern>`
+- Purpose: Turn a half-remembered name into a canonical, addressable symbol ID that every other command accepts.
+- Intent: Agents need a precise handle on "this exact symbol," not a text match — grep cannot disambiguate an overloaded or shadowed name, and every downstream command needs the ID, not the string.
 
-## Symbol Listing
-- Purpose: Full inventory of indexed symbols ranked by risk and structural gravity.
-- Intent: Supports triage workflows where a human or agent wants to scan the riskiest parts of a codebase rather than search for something specific.
+## Symbol Listing — `conducks query "*"`
+- Purpose: Full inventory of indexed symbols ordered by structural gravity, for reading a codebase top-down instead of searching for something you already know the name of.
+- Intent: Supports triage — a human or agent who wants "show me the heaviest things here" rather than "find X".
 
-## Entry Point Detection
-- Purpose: Surfaces where execution actually begins — routes, CLI handlers, mains — across frameworks.
-- Intent: Orients an agent unfamiliar with a codebase toward real starting points instead of making it guess from file names.
+## Entry Point Detection — `conducks entry`
+- Purpose: Show where execution actually begins — routes, CLI handlers, mains — ranked by gravity, across frameworks.
+- Intent: Orients a reader who has never seen the repo toward real starting points instead of making them guess from file names.
 
-## Guarded Query Language
-- Purpose: Gives MCP tools a fixed set of named query templates instead of a raw SQL surface.
-- Intent: An LLM-driven agent should never be able to construct arbitrary SQL against the vault — templates bound what's queryable and keep `pulseId` system-controlled.
+## Guarded Query Language — `conducks query --mode template --template <id>`, MCP `conducks_query` / `conducks_graph_query`
+- Purpose: Offer named, parameterised query templates for the questions people actually ask, so the common analyses are one call instead of hand-written SQL.
+- Intent: Templates keep `pulseId` system-controlled and turn expensive graph traversals into indexed SQL scans. The escape hatch (`conducks_graph_query`) accepts a raw statement but refuses anything that is not a `SELECT`, so exploration never becomes a write path.
 
-## Path Tracing
-- Purpose: Finds the shortest functional bridge between two symbols, weighting edges by structural risk rather than treating every hop as equal.
-- Intent: "How does A reach B" is a common but tedious question to answer by manually walking a call graph; risk-weighting favors the path that matters, not just the shortest one.
+## Path Tracing — MCP `conducks_trace` with `mode: "path"` and a `target`
+- Purpose: Find the shortest functional bridge between two named symbols, weighting each hop by how strong the structural relationship is.
+- Intent: "How does A reach B" is a common but tedious question to answer by walking a call graph by hand; risk-weighting favours the path that matters over the merely shortest one.
 
-## Impact / Blast Radius Analysis
-- Purpose: Reports who calls a symbol and what it calls, transitively, before a change is made.
-- Intent: Lets an agent judge the risk of touching a symbol without needing to already know the codebase's structure.
+## Impact / Blast Radius Analysis — `conducks impact <symbol> [upstream|downstream]`
+- Purpose: Answer "what breaks if I touch this" before the edit, with a risk band and the affected symbols ordered by structural distance.
+- Intent: Lets a reader judge the cost of a change without already knowing the codebase. Depth is a cumulative edge-weight budget, not a hop count, so a chain of cheap inheritance edges reaches further than a chain of imports.
 
-## Execution & Data Flow Tracing
-- Purpose: Groups symbols into logical execution units and traces where a piece of data comes from and where it ends up.
-- Intent: Reconstructing a pipeline by reading call sites one at a time doesn't scale; this answers "where does this data come from" directly.
+## Execution & Data Flow Tracing — `conducks context <symbol>`, `conducks trace <symbol> --flow`, `conducks flows`
+- Purpose: Group symbols into named execution units and follow where a value comes from and where it ends up.
+- Intent: Reconstructing a pipeline by reading call sites one at a time does not scale; this answers "where does this data come from" as a single question.
 
-## Composite Risk Explanation
-- Purpose: Decomposes why a symbol is considered risky into named, weighted signals (centrality, complexity, entropy, churn, fan-out, debt markers).
-- Intent: A single risk number is not actionable on its own — showing which signal dominates tells a reviewer what to actually fix.
+## Composite Risk Explanation — `conducks explain <symbol>`
+- Purpose: Break a symbol's risk into named, weighted signals — gravity, complexity, authorship entropy, churn, fan-out, fallback — so the number can be argued with.
+- Intent: A single risk score is not actionable. Showing which signal dominates tells a reviewer what to fix; the weights are published (see Tunables) so nobody has to reverse-engineer them from a score.
 
-## Authorship Entropy
-- Purpose: Measures how concentrated a symbol's authorship is.
-- Intent: Single-author code is a bus-factor risk that structural metrics alone can't see; entropy makes that visible without reading git blame by hand.
+## Authorship Entropy — `conducks entropy <symbol>`
+- Purpose: Measure how concentrated a file's authorship is, as a Shannon entropy over git author distribution.
+- Intent: Single-author code is a bus-factor risk that no structural metric can see; entropy makes it comparable across a repo without reading blame by hand.
 
-## Structural Cohesion
-- Purpose: Compares two graph neighborhoods for shared topology to suggest refactoring targets.
-- Intent: Identifies "these two areas do similar things structurally" as a starting point for consolidation, rather than relying on naming conventions.
+## Structural Cohesion — `conducks cohesion <symbolA> <symbolB>`
+- Purpose: Score how alike two symbols' structural neighbourhoods are, as a starting point for consolidation.
+- Intent: Answers "do these two things do the same shape of work" from topology rather than from naming conventions, which lie.
 
-## Test Coverage Alignment
-- Purpose: Maps which production symbols are actually exercised by which tests, bidirectionally.
-- Intent: Line coverage tools tell you a line ran; this tells you what it verified structurally — useful when deciding if a change is safe.
+## Structural Integrity Audit — `conducks audit [--history=<window>]`
+- Purpose: Run a fixed set of architectural sanity checks — import cycles, hub overload, orphan exports — plus the project's own declared rules, and report violations.
+- Intent: Encodes house rules as enforceable checks instead of tribal knowledge that erodes as a team changes. `--history` reads several past pulses so the answer can be "trending better or worse", not only "bad today".
 
-## Cross-Project Resonance
-- Purpose: Computes a structural similarity score between two codebases (or two snapshots) from their topological signatures.
-- Intent: Lets a team ask "is this new project shaped like ones we've built before" without a line-by-line diff.
+## Fallback Reporting — `conducks fallback`, `conducks audit --fallback`
+- Purpose: Rank fallback-tagged code for review or removal by confidence and usage, rather than listing every match.
+- Intent: Not all fallback code is cruft — ranking sends cleanup effort to the candidates that are actually stale.
 
-## Structural Integrity Audit
-- Purpose: Runs a fixed set of architectural sanity checks (circular dependencies, god objects, orphan exports) plus any project-defined rules.
-- Intent: Encodes house rules about architecture as enforceable checks instead of tribal knowledge that erodes as the team changes; supports a longitudinal mode to see if a codebase is trending better or worse.
+## Structural Advisory — `conducks advise`
+- Purpose: Turn metrics into concrete suggestions — split candidates, hidden coupling, unpinned or heavy dependencies, stability risks.
+- Intent: A risk score alone does not tell you what to do next; the advisor names an action per finding.
 
-## Fallback Reporting
-- Purpose: Prioritizes fallback-tagged code for review or removal, scored by confidence and usage.
-- Intent: Not all fallback code is legacy cruft — this ranks candidates instead of flagging everything equally, so cleanup effort goes where it matters.
+## Co-Change / Architectural Lies Detection — `conducks advise`
+- Purpose: Find files that keep changing together in git history despite having no structural edge between them.
+- Intent: Surfaces coupling the code graph is blind to — two files can be tightly coupled in practice while looking independent on paper.
 
-## Structural Advisory
-- Purpose: Proactively recommends split candidates, exposes hidden coupling, and flags unpinned or heavy dependencies.
-- Intent: Turns passive metrics into concrete suggestions — a risk score alone doesn't tell you what action to take.
+## Policy Verification — `conducks audit`
+- Purpose: Check the graph against the project's declared structural laws (`config/sentinel.json`) and give a yes/no answer.
+- Intent: A convention nobody can check is a convention that decays; declaring rules as data means a reviewer never re-verifies them by hand.
 
-## Policy Verification
-- Purpose: Checks the current graph against the project's declared structural laws.
-- Intent: Gives a yes/no compliance answer instead of requiring a human to manually re-check every convention after each change.
+## CI Regression Guard — `conducks guard [--threshold=N]`
+- Purpose: Compare structural entropy against a historical baseline and exit non-zero when the codebase has decayed past a threshold the team picks.
+- Intent: Catches architectural regressions, not just failing tests, before they merge — the threshold is the team's tolerance made explicit.
 
-## CI Regression Guard
-- Purpose: Compares structural entropy between the current pulse and a historical baseline, returning a block/pass verdict for CI.
-- Intent: Catches architectural regressions (not just failing tests) before they merge, using a threshold the team defines.
+## Graph-Verified Rename — `conducks rename <symbol> <newName>`
+- Purpose: Rename a symbol across every proven caller in one operation, showing the plan before it writes.
+- Intent: Text-based renames miss references and over-match unrelated ones; verifying against the call graph first means the edit set is the one the graph can defend.
 
-## Guidance Oracle
-- Purpose: Indexes the project's own engineering-standard documents and exposes them to the CLI help system and MCP tools.
-- Intent: Keeps house standards discoverable and living — updating a skill file updates the guidance everywhere without a restart.
+## Dead Code Detection — `conducks prune`
+- Purpose: Flag exported symbols that no proven edge reaches, as review candidates — excluding entry points and test fixtures.
+- Intent: "Nothing calls this" is normally a guess; this makes it a checkable claim you can start from. It reports candidates for a human to confirm, never a delete list.
 
-## Config Detection
-- Purpose: Identifies the project's build tools, test runners, and linters from the graph and filesystem.
-- Intent: Downstream context generation needs to know the project's toolchain without a human specifying it manually.
+## Supply-Chain Surface — `conducks supply-chain`
+- Purpose: Report the dependency surface — stdlib vs third-party edges, packages ranked by how many files import them, versions joined live from the manifest, and packages imported but never declared.
+- Intent: Turns the dependency graph into an actionable view of which packages are load-bearing and which are undeclared, without a separate SCA tool.
 
-## Graph-Verified Rename
-- Purpose: Renames a symbol across every proven caller, atomically, with a dry run by default.
-- Intent: Text-based rename tools miss or over-match; verifying against the call graph before writing keeps a rename from silently breaking callers it can't see (e.g. type-only references).
+## Workspace Ledger — `conducks ledger`
+- Purpose: A workspace survey with one letter grade — size, density, kind distribution, third-party surface, orphan dead weight — with each score deduction shown.
+- Intent: A "state of the codebase" glance in one command, assembled from the pulse that already ran, with the arithmetic visible so the grade is arguable.
 
-## Dead Code Detection
-- Purpose: Finds exported symbols with no incoming edges, excluding entry points, test fixtures, and symbols reached only through dynamic dispatch or identifier-as-value wiring (callbacks, DI tables).
-- Intent: Removing dead code by hand requires knowing every caller exists — this makes "nothing calls this" a checkable fact instead of a guess. A prune tool is only trustworthy if it errs toward under-reporting, so dynamically-reached symbols must never read as dead.
+## Structural Diff — `conducks diff [--base <pulseId>] [--head <pulseId>]`
+- Purpose: Compare two points in history structurally — symbols added, removed, modified, plus deltas in complexity and gravity. With no arguments it scores the risk of the current working changes.
+- Intent: Reviewing a change by its lines misses shape changes; this reports what the change did to the structure.
 
-## Supply-Chain Surface
-- Purpose: `conducks supply-chain` reports the boundary classification — stdlib vs third-party edge surface, dependencies ranked by blast radius (importing files), versions joined live from package.json, and PHANTOM dependencies (imported but undeclared in the manifest).
-- Intent: Turns the dependency graph into an actionable supply-chain view — which packages are load-bearing, which are undeclared — without a separate SCA tool. Built on the System 2 boundary edges.
+## Longitudinal Drift Analysis — `conducks drift [prevPulseId]`
+- Purpose: Track structural velocity and decay across many recorded pulses.
+- Intent: A single snapshot cannot show direction — this answers "is the architecture getting healthier or worse over time".
 
-## Workspace Ledger
-- Purpose: `conducks ledger` gives a workspace-level survey and a single letter grade — node/edge counts, density, kind distribution, third-party surface, and orphan dead-weight — with the score deductions shown.
-- Intent: A "state of the codebase" glance assembled from the graph the pulse already produced, so health is one command instead of a manual assembly of separate queries.
+## Directory-Aware Grouping — `conducks flows`
+- Purpose: Group symbols into named behavioural processes so a reader sees "what this system does" as a handful of flows instead of thousands of functions.
+- Intent: Neither the call graph nor the folder tree alone names a module's real boundary; a flow named after its entry point is the smallest unit a human recognises.
 
-## Structural Diff
-- Purpose: Compares two pulses and reports symbols added, removed, or modified, plus deltas in complexity, gravity, and resonance.
-- Intent: Gives a structural, not textual, view of what changed between two points in history — useful for reviewing the shape of a change, not just its lines.
-
-## Longitudinal Drift Analysis
-- Purpose: Tracks structural velocity and decay trends across many historical pulses.
-- Intent: A single snapshot can't show direction — this answers "is the architecture getting healthier or worse over time."
-
-## Advanced Query Modes
-- Purpose: Adds a typed filter builder and named-template mode on top of basic symbol query.
-- Intent: Covers query patterns that fuzzy/regex search can't express, while still keeping the query surface bounded (no raw SQL) for agent use.
-
-## Co-Change / Architectural Lies Detection
-- Purpose: Finds files that change together in git history despite having no structural edge between them.
-- Intent: Surfaces coupling the code graph is structurally blind to — two files can be tightly coupled in practice while looking independent on paper.
-
-## Directory-Aware Clustering
-- Purpose: Groups files into functional communities by combining call density with directory proximity.
-- Intent: Neither call graph alone nor directory structure alone reliably identifies a module's real boundaries; combining both gives a better approximation, and feeds blueprint generation.
-
-## Live Mirror Dashboard
-- Purpose: Interactive, force-directed visualization of the full graph with zoom-aware labeling and click-to-focus paths.
-- Intent: Some structural questions ("what's connected to what, at what scale") are faster to answer visually than by querying — the dashboard is read-only so it can't be mistaken for a source of truth.
+## Live Mirror Dashboard — `conducks mirror`
+- Purpose: Interactive, force-directed view of the whole graph with zoom-aware labelling and click-to-focus paths.
+- Intent: Some structural questions ("what is connected to what, at what scale") are faster to see than to query.
 
 ## Integrity Blueprint — `conducks status --blueprint`
-- Purpose: One-screen structural integrity readout — cycle count, orphan count, resonance, and the first violations — printed to stdout.
-- Intent: A pass/fail glance before committing, without opening the dashboard. Deliberately stdout-only: a blueprint written to a file is stale on the next commit (ADR 0011), so it is printed, never persisted.
+- Purpose: One-screen integrity readout before committing — cycle count, orphan count, resonance, and the first violations.
+- Intent: A pass/fail glance without opening the dashboard (ADR 0011).
 
-## Docs Bootstrap
-- Purpose: Initializes the project's documentation file set from templates, without overwriting files that already exist.
-- Intent: Removes the blank-page problem for teams adopting the docs standard, while never clobbering docs someone has already written.
+## Test Coverage Overlay — `conducks coverage <coverage-final.json>`, `conducks coverage-view`
+- Purpose: Bind an existing istanbul/c8 coverage report onto function spans in the graph, so coverage is reported per function and can be compared against a saved baseline. Conducks consumes a coverage report; it does not run tests or measure coverage itself.
+- Intent: A percentage over a file says nothing about which capability is tested. Per-function fill, joined to the graph, turns coverage into "which behaviour is unverified" — and the baseline diff turns it into "which behaviour just lost its test". (ADR 0004.)
 
-## First-Run Setup
-- Purpose: Configures the project for conducks on first use — config file, vault directory, environment validation.
-- Intent: Keeps onboarding to a single command instead of a manual checklist of prerequisites.
+## Cross-Project Resonance — `conducks resonance <path>`
+- Purpose: Score how structurally similar two codebases are from their topological signatures.
+- Intent: Lets a team ask "is this new project shaped like the ones we already run" without a line-by-line comparison.
 
-## MCP Server
-- Purpose: Exposes conducks' query and analysis capabilities to MCP-compatible agent hosts.
-- Intent: Lets coding agents use conducks as a tool rather than a human-operated CLI, without giving them write access to the vault.
+## Federated Repo Linking — `conducks link <path>`
+- Purpose: Merge another repository's graph into the current one and resolve the edges that cross between them.
+- Intent: Multi-repo systems have real structural connections a single-repo pulse cannot see; linking makes those connections queryable from one side.
 
-## Vault Clean / Reset
-- Purpose: Drops the vault and clears zombie process locks so a fresh pulse can run.
-- Intent: Schema migrations and unresolvable lock contention need a clean-slate escape hatch rather than manual file surgery.
+## Authored Record Capture — `conducks record --type <type> "content"`
+- Purpose: Append an authored note — a decision, a gotcha, an intent — into the matching `docs/<type>.md` in the conducks-docs grammar, from the terminal, at the moment it is decided.
+- Intent: A fact that lives only in a conversation does not exist. Capturing it in one command removes the excuse for writing it "later", and the entry is written in the same grammar `docs-lint` checks.
 
-## Pulse Snapshot Recording
-- Purpose: Records a named, labeled snapshot of the current pulse for later comparison.
-- Intent: Lets a team mark meaningful points in history (a release, a refactor) instead of relying on commit hashes to find them later.
+## Docs Bootstrap — `conducks bootstrap-docs`
+- Purpose: Scaffold the conducks-docs file set into `docs/`, leaving any file that already exists untouched.
+- Intent: Removes the blank-page problem for a project adopting the standard, while never clobbering docs someone already wrote.
 
-## Federated Repo Linking
-- Purpose: Merges a second repository's graph into the current one without overwriting either, resolving cross-repo edges.
-- Intent: Multi-repo systems have real structural connections that a single-repo pulse can't see; federation makes those connections queryable.
+## Docs Progress Board — `conducks docs-status`, `conducks docs-lint`
+- Purpose: Read the authored docs as data — todo phases and percentages, ADR states, feature/convention/memory counts — and fail a CI gate when a governed file breaks the grammar.
+- Intent: Docs only stay trustworthy if something checks them; making the board queryable means "what work is in flight" needs no doc-by-doc read.
 
-## CLI Help System
-- Purpose: Groups all CLI commands into functional domains for discoverability.
-- Intent: A flat command list doesn't communicate intent; grouping by domain (analysis, governance, visual, etc.) helps a new user find the right command faster.
+## First-Run Setup — `conducks setup`
+- Purpose: Get a repo ready for conducks in one command — install the usage skills, register the MCP server, and write a starting exclusion file.
+- Intent: Onboarding as a single command rather than a checklist of prerequisites nobody finishes.
 
-## Context Display
-- Purpose: Shows the current workspace's vault path, pulse ID, node/edge counts, and staleness at a glance.
-- Intent: A fast sanity check before running anything else — answers "what am I actually querying right now."
+## MCP Host Configuration — `conducks setup`, `conducks uninstall`
+- Purpose: Write and remove the conducks entry in an MCP host's config, and the skills it installed, without hand-editing JSON.
+- Intent: Setup and teardown are symmetric on purpose — an uninstall that leaves orphaned skills or a dead server entry behind is how a tool wears out its welcome. (ADR 0009.)
 
-## MCP Host Configuration
-- Purpose: Installs and configures conducks into MCP hosts (Claude Desktop, Cursor, etc.).
-- Intent: Removes manual JSON-editing from the setup path for connecting conducks to an agent host.
+## MCP Server — `conducks mcp`
+- Purpose: Expose the query and analysis surface to MCP-compatible agent hosts as typed tools.
+- Intent: Lets a coding agent use conducks as a tool rather than as a human-operated CLI, with every tool annotated read-only so a host can reason about safety before calling. (ADR 0007.)
 
-## Project Metadata Extraction
-- Purpose: Reads manifest files (package.json, requirements.txt) to detect the project's frameworks and dependencies.
-- Intent: Framework detection feeds config detection and context generation — without it, those features would need a human to specify the stack manually.
+## Environment & Vault Check — `conducks doctor`
+- Purpose: Verify the machine can actually run conducks — Node version, the DuckDB binding, the tree-sitter grammars — and report whether a vault exists and how old its last pulse is.
+- Intent: Most "conducks is broken" reports are environment, not logic. One command that names the failing prerequisite is cheaper than reading a stack trace.
 
-## Structural Exclusions
-- Purpose: Lets a project exclude directories (build artifacts, dependencies, vendored code) from analysis by default, with a project-level override file.
-- Intent: Without exclusions, generated and vendored code would dominate risk/hotspot rankings and drown out the project's own code.
+## Vault Clean / Reset — `conducks clean`
+- Purpose: Drop the vault and clear stuck process locks so a fresh pulse can run.
+- Intent: Schema changes and lock contention need a clean-slate escape hatch rather than manual file surgery in `.conducks/`.
 
-## Regex Parsing Fallback
-- Purpose: Keeps structural extraction working even when a Tree-sitter grammar fails to load or crashes for a given environment.
-- Intent: A hard parser failure would otherwise silently degrade a whole language to file-only nodes; the fallback trades precision for still getting usable CALLS/IMPORTS edges.
+## CLI Help System — `conducks help`
+- Purpose: Present the commands grouped by what you are trying to do — discovery, landscape, behavioural, metrics, governance, historical, mutational, visual, system — with a worked example per group.
+- Intent: A flat command list communicates nothing about intent; grouping by question type is how a new user finds the right command on the first try.
+
+## Project Metadata Extraction — built by `conducks analyze`
+- Purpose: Read manifest files (`package.json`, `requirements.txt`) as graph input, so declared dependencies and their versions are nodes like anything else.
+- Intent: Without the manifest in the graph, the supply-chain view could not tell a declared dependency from an undeclared one, or attach a version to either.
+
+## Structural Exclusions — `.conducksignore`, generated by `conducks setup`
+- Purpose: Keep build output, vendored code, and dependency trees out of analysis by default, with a per-project override file.
+- Intent: Without exclusions, generated and vendored code dominates every hotspot and risk ranking and drowns out the project's own code.
+
+## Regex Parsing Fallback — used by `conducks analyze`
+- Purpose: Keep structural extraction producing CALLS and IMPORTS edges when a Tree-sitter grammar cannot load in a given environment.
+- Intent: Precision is worth trading for a graph that still has edges — an environment-specific grammar failure should cost accuracy, not the whole language.
+
+## Tunables
+
+| knob | default | file:line | effect |
+|---|---|---|---|
+| symbol search limit | 10 | src/lib/domain/intelligence/index.ts:23 | how many symbols a fuzzy search returns |
+| `conducks query --limit` | 10 | src/interfaces/cli/commands/query.ts:22 | CLI override of the search limit |
+| `conducks_query` limit | 10 (1–500) | src/interfaces/tools/tools/synapse.ts:82 | MCP-side cap on returned symbols |
+| `conducks_graph_query` statement guard | `SELECT` only | src/interfaces/tools/tools/synapse.ts:566 | any non-SELECT statement is rejected as `FORBIDDEN_QUERY` |
+| `conducks_context` radius | 2 (1–10) | src/interfaces/tools/tools/synapse.ts:404 | BFS hops walked around the anchor symbol |
+| `conducks_context` max_tokens | 8000 (accepts 100–100000) | src/interfaces/tools/tools/synapse.ts:434 (bounds :405) | token budget at which the context payload is truncated |
+| `conducks_flows` min_members | 2 | src/interfaces/tools/tools/synapse.ts:608 | flows with fewer members are dropped as noise |
+| `conducks_flows` limit | 20 (1–100) | src/interfaces/tools/tools/synapse.ts:609 | max flows returned |
+| `conducks flows` noise floor | 2 members | src/interfaces/cli/commands/flows.ts:21 | CLI hides smaller flows; prints the first 5 members of each (:23) |
+| `conducks_prune` limit | 50 (1–200) | src/interfaces/tools/tools/synapse.ts:678 | max dead-code findings returned |
+| guard threshold | 0.1 | src/interfaces/cli/commands/guard.ts:18 | max tolerated entropy decay before `conducks guard` exits non-zero |
+| `conducks_audit` guard threshold | 0.1 | src/interfaces/tools/tools/synapse.ts:238 | same gate, MCP side |
+| `conducks_audit` archeology window | 5 (1–10) | src/interfaces/tools/tools/synapse.ts:240 | how many historical pulses the longitudinal mode reads |
+| impact depth | 5 (1–10) | src/interfaces/tools/tools/kinetic.ts:68 | cumulative Dijkstra edge weight walked — not a hop count |
+| impact weight budget (domain) | 5 | src/lib/domain/kinetic/impact.ts:17 | same budget where the traversal runs |
+| impact Dijkstra edge weights | EXTENDS 0.5 · IMPLEMENTS 0.7 · CALLS 1.0 · CONSTRUCTS 1.2 · MEMBER_OF 1.5 · IMPORTS 2.0 · DEPENDS_ON 2.5 | src/lib/domain/kinetic/impact.ts:18-26 | lower weight = closer, so inheritance reaches further into the blast radius than an import at the same depth |
+| impact risk bands | LOW <2 · MEDIUM <5 · HIGH <15 | src/lib/domain/kinetic/impact.ts:59-61 | how the summed inverse-distance score becomes a word |
+| trace depth | 10 | src/lib/domain/kinetic/trace.ts:141 (traversal cap :79) | how far an execution trace walks |
+| `conducks_impact` / `conducks_trace` page size | 10 | src/interfaces/tools/tools/kinetic.ts:83 / :150 | results are cut to 10 and flagged `truncated` (:93 / :153) |
+| `conducks_diff` page size | 10 | src/interfaces/tools/tools/kinetic.ts:194 | deltas cut to 10 and flagged `truncated` (:208) |
+| `conducks impact` print cap | 10 flat / 20 tree | src/interfaces/cli/commands/impact.ts:93 / :90 | how many affected symbols the CLI prints |
+| composite risk weights | gravity .25 · complexity .35 · entropy .10 · churn .10 · fan-out .15 · fallback .05 | src/lib/domain/analysis/conducks-core.ts:228 | how `conducks explain` weighs each signal |
+| composite risk weights (fallback symbol) | gravity .15 · complexity .30 · entropy .10 · churn .10 · fan-out .10 · fallback .25 | src/lib/domain/analysis/conducks-core.ts:227 | re-weighting applied once a symbol is recognised as fallback |
+| hub-overload `max_fans` | 50 | config/sentinel.json:19 | a `src/registry` symbol with more fans than this is a Sentinel violation |
+| incomplete-pulse warning | density < 0.5 with > 50 nodes | src/interfaces/cli/commands/status.ts:66 | when `conducks status` calls the persisted graph a partial pulse |
+| mirror port | 3333 | src/interfaces/cli/commands/mirror.ts:28 | where the dashboard is served |

@@ -8,7 +8,7 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class EntropyCommand implements ConducksCommand {
   public id = "entropy";
   public description = "Measure the structural risk of a symbol";
-  public usage = "registry entropy <symbolId>";
+  public usage = "conducks entropy <symbolId>";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];

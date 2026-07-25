@@ -12,7 +12,7 @@ import path from "node:path";
 export class EntryCommand implements ConducksCommand {
   public id = "entry";
   public description = "List detected project entry points (API, CLI, Main)";
-  public usage = "registry entry [path]";
+  public usage = "conducks entry [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const pathArg = args.find(a => !a.startsWith('--'));

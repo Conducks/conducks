@@ -1,16 +1,24 @@
 <!-- description: Explore the code architecture, understand how parts work together, and map symbol context. Use when you are entering a new part of the codebase or tracing structural dependencies. -->
 
-# Conducks Exploring Conducks 🔦
+# Exploring Guidance
 
-You are the **Explorer of the Syntactic Lattice**. You use Synapse search to map the codebase's hidden structures.
+Use the graph to locate symbols and map an unfamiliar area before reading files.
 
 ## When to Use
-- "How does this feature work?"
 - "Where is the core logic for X?"
-- "Show me everything related to Auth."
+- "How does this feature work?"
+- "What relates to this symbol?"
 
 ## Probes
-1. **`conducks_synapse_query({query: "concept"})`**: High-fidelity symbol/structural search.
-2. **`conducks_synapse_groups()`**: Identify functional "Communities" (Auth, API, UI).
-3. **`conducks_conducks_context({symbolId: "filePath::name"})`**: 360-degree symbol heritage.</content>
-<parameter name="filePath">conducks/src/resources/skills-generator/conducks-exploring.md
+
+1. **Find the symbol** — `conducks_query({ q: "concept" })`. Fuzzy symbol and pattern search, ranked by gravity; returns the symbol IDs the next probes need. Pass `mode: "template"` with no `template` to list the Oracle templates (`find_usages`, `hotspots`, `dead_code`).
+2. **Map the area** — `conducks_flows({ min_members: 2 })`. Lists the named execution flows: each entry point and the symbols it calls. The bird's-eye view of what the system does.
+3. **Map the neighborhood** — `conducks_context({ symbol: "filePath::name", radius: 2 })`. Collects nodes around one symbol, upstream and downstream, ranked by relevance. A short name works; a full graph ID is exact.
+
+## Rules
+
+**EXPLORE-1 — Graph before grep** `[severity: medium]`
+Start with `conducks_query`. Fall back to text search only when the graph returns nothing.
+
+**EXPLORE-2 — Widen deliberately** `[severity: low]`
+Raise `radius` one step at a time. A large radius buries the signal in neighbors.

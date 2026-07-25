@@ -1,6 +1,7 @@
 # 0011 — kill derived-doc generation; structure is queried, never written
 Status: Accepted
 - Date: 2026-07-19
+- Promoted: docs/features.md ("Integrity Blueprint — `conducks status --blueprint`" — stdout-only, never persisted); docs/architecture/modules/domain/analysis/docs-grammar/MODULE.md
 
 ## Context
 conducks generated a family of static structural docs — `ARCHITECTURE.md` (context-gen, auto-written

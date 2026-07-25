@@ -80,7 +80,13 @@ export class AuditCommand implements ConducksCommand {
     // 3. Sentinel Static Governance (Rule-based)
     const sentinel = new ConducksSentinel();
     const rulesPath = path.join(chronicle.getProjectDir(), 'config/sentinel.json');
-    const rules = JSON.parse(await fs.readFile("config/sentinel.json", "utf-8").catch(() => "[]"));
+    // Read via rulesPath, not a cwd-relative literal: running the CLI from outside the project
+    // root used to swallow ENOENT and evaluate an EMPTY rule set, so `audit` reported
+    // "Governance confirmed" while checking nothing. Warn rather than pass silently.
+    const rules = JSON.parse(await fs.readFile(rulesPath, "utf-8").catch(() => {
+      console.warn(`[Conducks] ⚠️  No policy rules at ${rulesPath} — project rule checks skipped.`);
+      return "[]";
+    }));
     const report = await sentinel.validate(registry.query.graph.getGraph() as any, rules);
 
     if (report.success && auditData.success) {

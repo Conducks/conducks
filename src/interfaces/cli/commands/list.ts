@@ -7,7 +7,7 @@ import type { Registry } from "@/registry/index.js";
 export class ListCommand implements ConducksCommand {
   public id = "list";
   public description = "List all federated projects";
-  public usage = "registry list";
+  public usage = "conducks list";
 
   public async execute(_args: string[], _registry: Registry): Promise<void> {
     // Simplified list for now

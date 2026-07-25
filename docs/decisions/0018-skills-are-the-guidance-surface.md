@@ -1,6 +1,7 @@
 # 0018 — Skills are the guidance surface; they may name only live MCP tools
 Status: Accepted
 - Date: 2026-07-25
+- Promoted: docs/conventions.md CONDUCKS-9 (§3 derived tool count, §4 skills↔tools test). §1, §2, §5 NOT yet promoted.
 
 ## Context
 ADR 0006 moved conducks-usage guidance off MCP (`conducks_guide`) and into native skills, deleted the

@@ -11,21 +11,26 @@
 All structural changes to the Synapse must follow the **Graph-Verified Refactoring (GVR)** protocol:
 
 ### 1. Blast Radius Analysis
-Before any rename or move, run **`synapse_impact`**.
-- Identify **d1 dependencies** (Will break).
-- Identify **d2 dependencies** (Likely affected).
-- If the risk is **HIGH** (impact score > 15), do not proceed without an ADR or explicit user review of the plan.
+Before any rename or move, run **`conducks_impact`** (CLI: `conducks impact <symbol>`).
+- Identify **d1 dependencies** — affected nodes at distance 1 (will break).
+- Identify **d2 dependencies** — distance 2 (likely affected).
+- If the reported **Overall Risk is > 7 / 10**, do not proceed without an ADR or explicit user review of the plan.
 
 ### 2. Atomic Extraction
-When extracting logic into a new module:
-- Move the file to `lib/product/[domain]/utils.ts` or similar.
-- Update ALL d1 callers in the same turn.
-- Run `sentinel_audit` to ensure no circular dependencies were introduced.
+When extracting logic into a new module, place it by LAYER, not by convenience:
+- primitives (parsing, graph, persistence, git) → `src/lib/core/<area>/`
+- logic over primitives → `src/lib/domain/<area>/`
+- shared interfaces/types → `src/contracts/`
+- wiring → `src/registry/index.ts` only · entry points → `src/interfaces/{cli,tools,web}/`
+
+Then update ALL d1 callers in the same turn, and run `conducks guard` (the `layer_boundaries` rule) plus **`conducks_audit`** to prove no illegal edge, cycle, or self-import was introduced.
 
 ### 3. Verification
 After the refactor:
-- Run `npm run build` to catch type errors.
-- Run `blueprint_gen` to verify the new structural hierarchy matches the intent.
+- Run `npm run type-check` (`tsc --noEmit`) — whole program, 0 errors. `npm run build` also compiles but does far more.
+- Run `conducks audit` — orphans, circular dependencies, self-imports, sentinel governance rules. It exits non-zero on any violation.
+- Re-run the tests covering the moved code (`npm test`, or `npm run test:unit` / `test:int`).
+- Never generate a structural doc to "verify" the new shape — structure is queried, never written (ADR 0011).
 
 ---
 
@@ -35,7 +40,7 @@ After the refactor:
 Never rename a symbol in only one file. If use of the symbol is spread across the Synapse, all instances must be updated in a single, atomic commit.
 
 **REF-2 — Downward Only** `[severity: high]`
-A refactor that moves a utility from `lib/core` to `src` is a violation. Primitives move DOWN (more shared), not UP (more specific).
+Dependencies run downward only: `contracts <- core <- domain <- composition (src/registry/index.ts) <- interfaces {cli, tools, web}` (ADR 0005). Moving a primitive UP a layer — `src/lib/core/` into `src/lib/domain/`, or anything into `src/interfaces/` — is a violation. Primitives move DOWN (more shared), not UP (more specific). The contract is encoded as `ALLOWED_DEPENDENCIES` in `governance/sentinel-rules.ts`, but it is NOT currently enforced — the `layer_boundaries` rule is absent from `getDefaultRules()` and no `.conducks/sentinel.yml` exists, so `conducks guard` prints "Layer contract clean" without checking (see `memory.md`). Verify the direction by reading the imports yourself; do not rely on the gate.
 
 **REF-3 — Document the Growth** `[severity: medium]`
-If a domain grows too large, split it into sub-domains. Update the `architecture.md` file tree accordingly.
+If a module grows too large, split it into parts. Each part gets its own AUTHORED `docs/architecture/modules/<path mirroring src>/MODULE.md` stating **Layer / Responsibility / Boundaries / Deferred**; the parent MODULE.md becomes an overview that links to the parts and repeats nothing. Link it from `docs/architecture/README.md`. A MODULE.md is hand-written (never generated) and carries no wiring, no symbol map, and no capability catalogue — capabilities live in `features.md`, wiring stays queryable (ADR 0015).

@@ -14,7 +14,7 @@ import os from "node:os";
 export class UninstallCommand implements ConducksCommand {
   public id = "uninstall";
   public description = "Remove Conducks MCP config + the skills setup installed";
-  public usage = "conducks uninstall [--global]";
+  public usage = "conducks uninstall";
 
   public async execute(args: string[], _registry: Registry): Promise<void> {
     const claudeConfigPath = path.join(

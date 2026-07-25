@@ -352,13 +352,6 @@ export class Conducks implements ConducksComponent {
     for (const cycle of cycles) violations.push(`ARCH-3: Circular: ${cycle.join(" -> ")}`);
     return { success: violations.length === 0, violations };
   }
-
-  public generateBlueprint(): string {
-    const graph = this.graph.getGraph();
-    let bp = `# CONDUCKS: BLUEPRINT 💎\n\n`;
-    bp += `> Neurons: ${graph.stats.nodeCount}\n\n`;
-    return bp;
-  }
 }
 
 export const conducks = new Conducks();

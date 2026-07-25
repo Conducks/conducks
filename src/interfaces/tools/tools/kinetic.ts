@@ -9,8 +9,6 @@ import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
  *
  * These 4 tools form the behavioral and mutational core of the Conducks MCP suite.
  * They provide tracing, impact analysis, historical diffing, and graph-verified renaming.
- *
- * CRITICAL RULE 9: Exactly 9 Unified Conducks MCP Tools mandated.
  */
 
 // MCP6: validate symbol/nodeId param
@@ -49,8 +47,12 @@ WHEN TO USE: Assessing the risk of modifying a shared utility or framework-level
 AFTER THIS: Use conducks_trace to see granular execution steps.
 
 Modes:
-- downstream (default): Shows what breaks IF this symbol is modified.
-- upstream: Shows where this symbol originates or is imported from.`,
+- upstream: callers — who points AT this symbol. This is the blast radius: what breaks IF you modify it.
+- downstream (default): dependencies — what this symbol itself relies on.
+
+CAUTION: the default is "downstream", which answers "what does this depend on", NOT "what breaks if
+I change this". For a blast radius you must pass direction="upstream" explicitly. The CLI
+(\`conducks impact\`) and the registry both default to "upstream" instead — the two surfaces disagree.`,
     // MCP2: tool annotations
     annotations: {
       readOnlyHint: true,

@@ -1,7 +1,7 @@
 # core/graph — the structural graph
 
-**Layer:** core. Imports contracts only. Everything above depends on it; it depends on nothing in the
-codebase.
+**Layer:** core. Imports contracts, plus core siblings (the prism/spectrum types, `utils`) — nothing
+from domain or above. Everything above depends on it.
 
 **Responsibility:** owning the in-memory graph — the shape of a node and an edge, adjacency, the ID
 normalization rules everything else must obey, and ingestion of a spectrum into that structure.

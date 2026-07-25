@@ -17,8 +17,8 @@ not dropped.
 
 ## Parts
 
-- **[sentinel/](sentinel/MODULE.md)** — the declarative rule engine, the layer contract,
-  `conducks guard`.
+- **[sentinel/](sentinel/MODULE.md)** — the declarative rule engine, the layer contract (encoded but
+  **not currently loaded at runtime** — read this before trusting a green `guard`), `conducks guard`.
 
 `advisor` produces prioritized recommendations; `index` hosts the audit that assembles findings for
 `conducks audit`.
@@ -42,6 +42,12 @@ command. They now share `IMPORT_CYCLE_IGNORED_EDGE_TYPES`. Keep them aligned.
 compilation, in the ADR.** That single step would have prevented all three.
 
 ## What a clean audit means
+
+**"Orphan" means two different things and they are both right.** Here, an orphan is a *dangling edge*
+— an edge whose target node was never induced (`governance/index.ts:106-158`, reported as ECOSYSTEM-1
+or DISCOVERY-1). In [evolution](../evolution/MODULE.md), an ORPHAN is a *node with no incoming edge*.
+So `conducks audit` reporting zero orphans while `conducks prune` lists 25 is not a contradiction and
+neither number is stale. Never quote one as the other.
 
 `conducks audit` on conducks reports zero findings, and that is validated rather than assumed: on
 compiled JS, conducks and `madge` both report zero cycles. `madge` on TS *source* still reports three

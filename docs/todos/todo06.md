@@ -1,6 +1,22 @@
 # todo06 — layer boundary cleanup (Clean Architecture)
-Status: done
+Status: doing
 - Acceptance: conducks self-analysis shows zero illegal cross-layer edges, enforced by `conducks guard`
+
+**REOPENED 2026-07-25.** This was marked done on an acceptance criterion that was never met. `conducks
+guard` printed "Layer contract clean" because the `layer_boundaries` rule is absent from
+`getDefaultRules()` and no `.conducks/sentinel.yml` exists — the gate checked nothing and reported
+success. Measured with the rule force-enabled against the real graph: **6 engine violations / ~71
+illegal edges** — cli→core (32), cli→domain (29), mcp→core (5), mcp→domain (3), cli→mcp (2). The
+phase-1 work below did land; the enforcement did not. See `docs/memory.md` and ADR 0005.
+
+## Phase 4 — make the contract true, then turn the gate on (in this order)
+- [ ] Route `cli → core` through composition: re-export logger, chronicle, persistence, adjacency-list, FederatedLinker from `src/registry/index.ts` and switch the ~9 CLI import sites
+- [ ] Route `cli → domain` the same way: TraceAnalyzer, ConducksInstaller, MCPConfigurator, buildBoard, coverage-baseline, ConducksSentinel, FallbackDetector, GatewayService
+- [ ] `cli → mcp` (`commands/mcp.ts:2`): either add `mcp` to `ALLOWED_DEPENDENCIES.cli` as a documented launcher exception (same shape as the existing `web` one) or move the launcher behind composition — a policy call, not a bug
+- [ ] `mcp → core` / `mcp → domain`: route Logger and FallbackDetector through the registry
+- [ ] `src/lib/core/parsing/pulse-worker.ts:2` imports `domain/analysis/reflector` — a real core→domain runtime edge; inject the reflector instead
+- [ ] Only then add `{ id: 'layer_boundaries', condition: 'layer_boundaries', severity: 'error', enabled: true }` to `getDefaultRules()` — the id must be exactly `layer_boundaries` because `guard.ts:32` matches on `ruleId`
+- [ ] Either wire `src/resources/sentinel.default.yml` into `setup` (it already declares the rule) or delete it — nothing reads it today
 
 ## Phase 1 — extract contracts leaf
 - [x] move registry/types.ts → contracts/ (ConducksComponent, Tool, RegistryEntry, RegistryConfig)

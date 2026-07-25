@@ -1,7 +1,9 @@
 # core/parsing/languages — one tree-sitter query per language
 
-**Part of:** [core/parsing](../MODULE.md). ~50 files, one folder per language, each owning an `.scm`
-query and a small provider.
+**Part of:** [core/parsing](../MODULE.md). 50 files across 13 language folders. Each folder owns a
+`queries.ts` (the tree-sitter query, an S-expression string — there are **no `.scm` files**; the
+query language is scm, the container is TypeScript), an `index.ts` provider, and usually a
+`resolver.ts` / `extractor.ts` / `bindings.ts`.
 
 **Responsibility:** declaring what a language's syntax means in conducks' vocabulary — which node is
 a definition, a call, an import, a type position. This is where language support actually lives; the
@@ -15,7 +17,7 @@ belongs in [processors](../processors/MODULE.md).
 them and any type-driven analysis silently yields nothing. Adding them is per-language work tracked
 in todo10.
 
-## The all-or-nothing trap — read before editing any .scm
+## The all-or-nothing trap — read before editing any `queries.ts`
 
 A tree-sitter query compiles as a unit. **One unrecognized node type fails the whole query**, and the
 language silently drops to the Gnosis regex fallback: file-level nodes only, no edges, no error. The
@@ -37,7 +39,12 @@ Never verify a pattern against grammar documentation or memory. Compile it.
 ## A capture only fires where its handler can reach a node
 
 A standalone pattern — one with no `@isX` definition capture — builds no node, so a handler gated on
-the enclosing node never runs. This is why the graph has **zero EXTENDS/IMPLEMENTS edges**: the
-heritage patterns are syntactically correct and hit when probed, but they are standalone, so
-`heritage.process()` has never been called (todo11). Pattern a capture together with the definition
-it belongs to when its handler needs one.
+the enclosing node never runs. This is why the graph has **zero EXTENDS/IMPLEMENTS edges** — still
+true today; a vault edge census shows no heritage edge of either type. The heritage patterns are
+syntactically correct and hit when probed, but every one of them is standalone
+(`typescript/queries.ts:30-32`, `python/queries.ts:22-23`, and the same shape in go, rust, java,
+javascript), while the handler is gated on an enclosing node: `else if (cName === 'heritage' && node)`
+(`analysis/reflector.ts:438`). Ruby is the only language whose heritage pattern carries a definition
+capture (`@isHeritage`), and so the only one that could reach the handler at all. Fix tracked in
+todo11. **Pattern a capture together with
+the definition it belongs to when its handler needs one.**
