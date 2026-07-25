@@ -30,10 +30,12 @@ contracts  ←  core  ←  domain  ←  composition  ←  interfaces {cli, mcp, 
   and `web → domain`/`core` directly. The second is wider than ADR 0005's prose, which says
   interfaces import composition. The table is the contract that runs; the ADR is the intent.
 
-**The rule is not currently running, and the contract is currently broken.** `layer_boundaries` is not
-one of `getDefaultRules()` and this repo has no `.conducks/sentinel.yml`, so `conducks guard` filters
-for a rule that was never evaluated and prints "Layer contract clean" regardless — while
-`core/parsing/pulse-worker.ts` imports `domain/analysis/reflector.ts`. Details and the fix path:
+**The rule runs, and the contract is true** (since 2026-07-25). `layer_boundaries` is a default rule;
+`conducks guard` evaluates it on every run and hard-blocks any upward edge — imports and calls, and
+type-only imports count too. 74 illegal edges were routed through composition to get here (facades on
+`registry`, one lazy import in `pulse-worker`, and the `cli → mcp` launcher exception added alongside
+`cli → web`). A green "Layer contract clean" now means zero cross-layer edges in the fresh graph, and
+re-injecting a violation was verified to block. History and mechanics:
 [sentinel](modules/domain/governance/sentinel/MODULE.md).
 
 ## Granularity

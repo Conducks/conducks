@@ -47,12 +47,11 @@ WHEN TO USE: Assessing the risk of modifying a shared utility or framework-level
 AFTER THIS: Use conducks_trace to see granular execution steps.
 
 Modes:
-- upstream: callers — who points AT this symbol. This is the blast radius: what breaks IF you modify it.
-- downstream (default): dependencies — what this symbol itself relies on.
+- upstream (default): callers — who points AT this symbol. This is the blast radius: what breaks IF you modify it.
+- downstream: dependencies — what this symbol itself relies on.
 
-CAUTION: the default is "downstream", which answers "what does this depend on", NOT "what breaks if
-I change this". For a blast radius you must pass direction="upstream" explicitly. The CLI
-(\`conducks impact\`) and the registry both default to "upstream" instead — the two surfaces disagree.`,
+The default matches the CLI (\`conducks impact\`), the registry, and the analyzer: asking about a
+symbol means "what breaks if I change it" unless you say otherwise.`,
     // MCP2: tool annotations
     annotations: {
       readOnlyHint: true,
@@ -63,7 +62,7 @@ I change this". For a blast radius you must pass direction="upstream" explicitly
       type: "object",
       properties: {
         symbol: { type: "string", description: "The symbol graph ID to analyze." },
-        direction: { type: "string", enum: ["upstream", "downstream"], default: "downstream" },
+        direction: { type: "string", enum: ["upstream", "downstream"], default: "upstream" },
         // MCP1: numeric bounds
         depth: { type: "number", default: 5, minimum: 1, maximum: 10, description: "Max structural depth." },
         path: { type: "string", description: "Optional: The absolute project root." }
@@ -71,7 +70,7 @@ I change this". For a blast radius you must pass direction="upstream" explicitly
       required: ["symbol"]
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ symbol, direction, depth, path: customPath }: any) => {
+    handler: async ({ symbol, direction = "upstream", depth, path: customPath }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;

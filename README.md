@@ -249,12 +249,16 @@ Every language below is parsed with a native Tree-sitter grammar and a per-langu
 | C / C++                 | Partial       | structs/classes, functions, methods — no per-binding imports, no type-usage edges   |
 | C#                      | Partial       | namespaces, classes, methods — properties are not extracted                         |
 | Ruby                    | Partial       | classes and methods                                                                 |
-| Java / PHP / Swift      | Broken        | the query file fails to compile against the installed grammar, so these files fall back to a single file-level node and yield **no symbols** |
+| Java                    | Partial       | classes, records, interfaces, enums, methods, fields, imports, **EXTENDS/IMPLEMENTS heritage**; no constructors (name-collision with the class), no annotations, no type-usage edges |
+| PHP                     | Partial       | namespaces, classes, traits, interfaces, enums, methods, functions, typed properties, use-imports incl. aliases; no heritage edges, no constants or enum cases |
+| Swift                   | Partial       | classes, actors, structs, enums, extensions, protocols, funcs/init/deinit, properties, enum cases, typealiases, **conformance + superclass heritage**; no subscripts, no property wrappers, no async/visibility DNA |
 
 Two limits apply to every language:
 
-- **No inheritance edges.** `extends` / `implements` / trait impls are captured by the queries but no
-  `EXTENDS` or `IMPLEMENTS` edge is persisted — the vault holds zero of both.
+- **Inheritance edges exist only for Java and Swift** (since 2026-07-25 — their heritage patterns
+  co-capture the subject, which `reflector.ts:438` requires). TypeScript, TSX and Go still persist
+  zero `EXTENDS`/`IMPLEMENTS`: their heritage patterns capture `@heritage` alone, so the reflector
+  drops the match. The Java fix is the recipe (todo11).
 - **Type-usage edges only for TypeScript, TSX and Go.** Other languages have no type-position
   capture, so type-only-import detection never fires for them.
 

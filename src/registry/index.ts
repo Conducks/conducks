@@ -10,6 +10,18 @@ import { IntelligenceService, ConducksSearch, GQLParser, FederatedLinker } from 
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard } from "@/lib/domain/analysis/docs-grammar.js";
 import { parseIstanbul, bindCoverage, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
+import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
+import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
+import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
+import { MCPConfigurator } from "@/lib/domain/federation/mcp-configurator.js";
+import {
+  defaultBaselinePath,
+  saveBaseline,
+  loadBaseline,
+  diffAgainstBaseline,
+  type CoverageResult,
+  type CoverageSnapshot,
+} from "@/lib/domain/analysis/coverage-baseline.js";
 import { ManifestService, ManifestEngine } from "@/lib/domain/manifest/index.js";
 import { MirrorEngine } from "@/lib/domain/visual/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
@@ -27,7 +39,7 @@ import { PHPProvider } from "@/lib/core/parsing/languages/php/index.js";
 import { RubyProvider } from "@/lib/core/parsing/languages/ruby/index.js";
 import { SwiftProvider } from "@/lib/core/parsing/languages/swift/index.js";
 import { CProvider } from "@/lib/core/parsing/languages/c/index.js";
-import { Logger } from "@/lib/core/utils/logger.js";
+import { Logger, logger } from "@/lib/core/utils/logger.js";
 import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
 import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
@@ -199,7 +211,10 @@ export const registry = {
     advise: () => governance.advise(),
     status: () => governance.status(),
     guard: (threshold?: number) => governance.shouldBlock(threshold),
-    rules: (root?: string) => governance.auditWithRules(root)
+    rules: (root?: string) => governance.auditWithRules(root),
+    // Composition-owned factories (ADR 0005): interfaces must not import domain directly.
+    createSentinel: () => new ConducksSentinel(),
+    createFallbackDetector: () => new FallbackDetector()
   },
   docs: {
     board: (root?: string) => buildBoard(root || chronicle.getProjectDir() || process.cwd())
@@ -212,16 +227,30 @@ export const registry = {
          WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart ORDER BY file, lineStart`
       );
       return bindCoverage(nodes, parseIstanbul(covPath));
-    }
+    },
+    defaultBaselinePath: (projectRoot?: string) => defaultBaselinePath(projectRoot),
+    saveBaseline: (results: CoverageResult[], baselinePath?: string) => saveBaseline(results, baselinePath),
+    loadBaseline: (baselinePath?: string) => loadBaseline(baselinePath),
+    diffAgainstBaseline: (results: CoverageResult[], baseline: CoverageSnapshot) => diffAgainstBaseline(results, baseline)
+  },
+  federation: {
+    createInstaller: (root: string) => new ConducksInstaller(root),
+    createMCPConfigurator: () => new MCPConfigurator(),
+    createLinker: (root: string) => new FederatedLinker(root)
   },
   infrastructure: {
     get graphEngine() { return graph; },
     get persistence() { return persistence; },
     get chronicle() { return chronicle; },
-    get registry() { return synapseRegistry; }
+    get registry() { return synapseRegistry; },
+    get logger() { return logger; },
+    createLogger: (scope?: string) => new Logger(scope),
+    createPersistence: (dbPath: string, readOnly?: boolean) => new SynapsePersistence(dbPath, readOnly)
   },
   mirror: {
-    getVisualWave: (layers?: number[], clusters?: string[], spread?: number) => (mirrorEngine as any).getVisualWave(layers, clusters, spread)
+    getVisualWave: (layers?: number[], clusters?: string[], spread?: number) => (mirrorEngine as any).getVisualWave(layers, clusters, spread),
+    // Gateway is wired against the composition-owned graph + persistence singletons.
+    createGateway: (projectRoot: string) => new GatewayService(graph, persistence, projectRoot)
   },
   evolution: {
     rename: (symbolId: string, newName: string, dryRun?: boolean) => evolution.rename(symbolId, newName, dryRun),

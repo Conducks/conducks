@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs";
@@ -42,7 +41,6 @@ import { DocsLintCommand } from "./commands/docs-lint.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
 import { LedgerCommand } from "./commands/ledger.js";
 import { ConducksCommand } from "./command.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 
 import { fileURLToPath } from 'url';
 
@@ -91,9 +89,9 @@ export async function main() {
   // Only 'analyze' writes to the vault. 'clean' is a destructive wipe (also needs write access).
   // Every other command is strictly read-only.
   const isReadCommand = !['analyze', 'clean'].includes(commandId);
-  const persistence = new SynapsePersistence(targetPath, isReadCommand);
+  const persistence = registry.infrastructure.createPersistence(targetPath, isReadCommand);
   
-  chronicle.setProjectDir(targetPath);
+  registry.infrastructure.chronicle.setProjectDir(targetPath);
 
   // Registry of modular commands
   const commands: ConducksCommand[] = [

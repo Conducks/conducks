@@ -1,8 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { ConducksSentinel } from "@/lib/domain/governance/sentinel.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
-import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -78,8 +75,8 @@ export class AuditCommand implements ConducksCommand {
     }
 
     // 3. Sentinel Static Governance (Rule-based)
-    const sentinel = new ConducksSentinel();
-    const rulesPath = path.join(chronicle.getProjectDir(), 'config/sentinel.json');
+    const sentinel = registry.audit.createSentinel();
+    const rulesPath = path.join(registry.infrastructure.chronicle.getProjectDir(), 'config/sentinel.json');
     // Read via rulesPath, not a cwd-relative literal: running the CLI from outside the project
     // root used to swallow ENOENT and evaluate an EMPTY rule set, so `audit` reported
     // "Governance confirmed" while checking nothing. Warn rather than pass silently.
@@ -104,7 +101,7 @@ export class AuditCommand implements ConducksCommand {
   private async runFallbackAnalysis(registry: Registry): Promise<void> {
     console.log(`\x1b[35m[Conducks Audit] Analyzing fallback patterns...\x1b[0m`);
 
-    const detector = new FallbackDetector();
+    const detector = registry.audit.createFallbackDetector();
     const graph = registry.infrastructure.graphEngine.getGraph();
     const allNodes = Array.from(graph.getAllNodes());
 

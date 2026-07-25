@@ -1,10 +1,11 @@
 # conducks — docs
 
 **State:** Structural pulse, taxonomy (System 1) and boundary classification (System 2) all ship;
-`conducks audit` on conducks itself is clean. Known holes: the graph records no inheritance edges,
-which blocks STALE_IMPORT (todo11); Java, PHP and Swift extraction is dead — their query files fail
-to compile against the installed grammars, so those files silently degrade to the file-only Gnosis
-fallback. Workspace rollout not started (todo07).
+`conducks audit` is clean and the ADR 0005 layer contract is ENFORCED — `conducks guard` hard-blocks
+upward edges (since 2026-07-25, after routing 74 illegal edges through composition). Java, PHP and
+Swift extraction revived the same day; Java and Swift emit the graph's first EXTENDS/IMPLEMENTS
+edges. Known holes: TS/TSX/Go still record no inheritance edges, which blocks STALE_IMPORT (todo11 —
+the Java co-capture recipe is the fix). Workspace rollout not started (todo07).
 
 **Read in order:** `handover.md` → `todos/` (active) → `memory.md`
 

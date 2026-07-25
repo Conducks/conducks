@@ -40,7 +40,7 @@ Graph rules load from `.conducks/sentinel.yml`; when that file is absent, `getDe
 | `no_cycles` | `has_cycles` | error |
 | `rank_violations` | `rank_violation` | warning |
 
-Other conditions exist but must be enabled in the YAML: `layer_boundaries`, `dead_code`, `high_churn`, `deep_nesting`. **`layer_boundaries` is not a default** — without a `sentinel.yml` declaring it, guard's layer check has nothing to fail on.
+Default rules: `no_cycles`, `rank_violations`, and `layer_boundaries` (a default since 2026-07-25 — guard's layer check is live and hard-blocks upward edges). Other conditions exist but need a `.conducks/sentinel.yml`: `dead_code`, `high_churn`, `deep_nesting`. On foreign repos `layerOf()` returns null for files matching no conducks fragment, so the layer rule is silent there rather than noisy.
 
 ## Accuracy rules
 - **A cycle/hub finding is only as good as the edge types it counts** (`docs/memory.md`; ADRs 0010, 0016, 0017). Cycle detection filters `IMPORT_CYCLE_IGNORED_EDGE_TYPES` and type-only edges; hub-overload filters `NON_RUNTIME_EDGE_TYPES`. Before trusting a new finding, list the edge types it traverses and ask whether each survives compilation. Never report a cycle as "a design flaw" without naming the edges behind it.

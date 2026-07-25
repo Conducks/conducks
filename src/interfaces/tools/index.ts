@@ -1,7 +1,6 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { registry } from "@/registry/index.js";
-import { Logger } from "@/lib/core/utils/logger.js";
 
 /**
  * Conducks — Synapse Tools Entry (MCP Server)
@@ -16,7 +15,7 @@ export async function main() {
   console.warn = silence;
   console.debug = silence;
 
-  const logger = new Logger("Synapse Tools");
+  const logger = registry.infrastructure.createLogger("Synapse Tools");
   logger.info(`Starting MCP Server (CWD: ${process.cwd()})`);
 
   // Conducks: Late-Binding Registry Initialization

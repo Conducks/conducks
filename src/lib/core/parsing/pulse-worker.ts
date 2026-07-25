@@ -1,5 +1,4 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { ConducksReflector } from "../../domain/analysis/reflector.js";
 import { AnalyzeContext } from "./context.js";
 import { grammars } from "./grammar-registry.js";
 import { PythonProvider } from "./languages/python/index.js";
@@ -27,6 +26,13 @@ import fs from 'node:fs';
 async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = false) {
   const { units, allPaths, discoveryMode, globalSymbols, resourceDir } = data;
 
+  // The reflector lives in the DOMAIN layer; this worker is in CORE. A static import would be a
+  // core → domain edge (ADR 0005). This file is a process entry point, not a core primitive — it is
+  // spawned standalone (worker / fork / spawn) so the reflector cannot be constructor-injected
+  // across the process boundary. Loading it lazily keeps the dependency dynamic: nothing in core
+  // pulls domain at module-resolution time, and the worker still gets the real reflector on its
+  // first (and only) call. Behaviourally identical — runWorker is invoked immediately at bootstrap.
+  const { ConducksReflector } = await import("../../domain/analysis/reflector.js");
   const reflector = new ConducksReflector();
   const context = new AnalyzeContext();
   

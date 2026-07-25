@@ -1,5 +1,25 @@
 # Progress — conducks
 
+## 2026-07-25 · layer contract enforced + three languages revived (todo06, todo13)
+- ADR 0005 enforced for real: 74 illegal cross-layer edges routed through composition (registry
+  facades; structural type in `cli/shared/error.ts` — the rule counts type-only imports AND calls;
+  lazy `import()` in `pulse-worker.ts`; `cli → mcp` launcher exception). `layer_boundaries` added to
+  `getDefaultRules()`; non-vacuousness proven by a zero raw-edge dump and a re-injected violation
+  blocking. todo06 closed — it had been marked done on a gate that never ran. `sentinel.default.yml`
+  deleted (zero readers, divergent).
+- Java/PHP/Swift extraction revived, one probe-first agent each: java `superclass` wrapper (@921),
+  php 0.24.2 grammar renames — 4 patterns (@199), swift `declaration_kind` redesign — 11 corrections
+  (@146). 55 canary tests total, each compiling the full query. Java + Swift now emit the graph's
+  FIRST EXTENDS/IMPLEMENTS edges; the co-capture recipe for TS/Go is recorded in todo11.
+- MCP `conducks_impact` default aligned to `upstream` across all surfaces (was: schema said
+  downstream, handler fell through to upstream — two clients, two answers).
+- jest made deterministic: `workerIdleMemoryLimit: '1KB'` (one tree-sitter wrapper per process was
+  randomly failing whichever grammar suite ran second). 99/99 × 3.
+- Fixed the `setup` MCP registration (resolved install root from `import.meta.url`, added the `mcp`
+  arg) and repaired the live Claude Desktop entry it had broken. Removed two stale agent worktrees.
+- Reflector corruption found and specced, not yet fixed: a modifier capture (`@isExported`) can
+  overwrite a class's `kind` and demote it to ATOM (`reflector.ts:368`).
+
 ## 2026-07-25 · skills + docs truth pass (todo12, 13 agents)
 - All 8 skills verified against the code and the live MCP surface; six dead tool names removed
   (`synapse_query/_impact/_groups/_refactor`, `sentinel_audit`, `blueprint_gen`) and enforced going

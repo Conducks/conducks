@@ -6,13 +6,11 @@ export const PHP_QUERIES = `
   (namespace_use_declaration
     (namespace_use_clause
       (qualified_name) @source)) @isImport
-  (namespace_use_declaration
-    (namespace_use_clause
-      (namespace_aliasing_clause
-        (qualified_name) @source))) @isImport
 
   ;; --- Atoms (L6: Persistence & State) ---
-  (property_declaration (variable_name) @name) @isProperty
+  ;; tree-sitter-php 0.24: the variable sits under (property_element name: (variable_name)),
+  ;; never directly under (property_declaration).
+  (property_declaration (property_element name: (variable_name) @name)) @isProperty
   (assignment_expression (variable_name) @pulse_assignment_name (_) @pulse_assignment_value) @isPulse
   
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
@@ -44,14 +42,15 @@ export const PHP_QUERIES = `
   (member_call_expression (name) @kinesis_target)
   
   ;; --- Namespace Alias (use A\B as C) ---
+  ;; tree-sitter-php 0.24 flattened the old (namespace_aliasing_clause) into an "alias:" field.
   (namespace_use_clause
-    name: (_) @source
-    alias: (namespace_aliasing_clause
-      name: (name) @isBinding)) @isImport
+    [(qualified_name) (name)] @source
+    alias: (name) @isBinding) @isImport
 
   ;; --- Trait Conflict Resolution (insteadof) ---
+  ;; "T1::hi insteadof T2" — the left side is a (class_constant_access_expression), not a bare (name).
   (use_instead_of_clause
-    (name) @isHeritage
+    (class_constant_access_expression . (name) @isHeritage)
     (name) @source) @isInfra
 
   ;; --- Debt Markers ---

@@ -13,6 +13,13 @@ export default {
 	// DuckDB is single-writer; tests share fixture vaults, so parallel
 	// workers collide on the DB lock. Force serial execution.
 	maxWorkers: 1,
+	// The tree-sitter native addon serves ONE JS-wrapper instance per process. Four suites now load
+	// grammars (java/php/swift extraction + type-only-imports); the second one in the same process
+	// gets a wrapper whose tree.rootNode is undefined and fails at random. Recycling the worker
+	// after every test file gives each suite a fresh process while maxWorkers:1 keeps DuckDB serial.
+	// CAUTION: --runInBand bypasses workers entirely (everything in one process) and reintroduces
+	// the collision — do not use it; plain `npm test` is already serial via maxWorkers.
+	workerIdleMemoryLimit: '1KB',
 	projects: [
 		{
 			displayName: 'unit',

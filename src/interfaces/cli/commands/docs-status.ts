@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { buildBoard } from "@/lib/domain/analysis/docs-grammar.js";
 import path from "node:path";
 import chalk from "chalk";
 
@@ -17,12 +16,12 @@ export class DocsStatusCommand implements ConducksCommand {
   public description = "Progress board parsed from the authored docs (todo %, ADR states)";
   public usage = "conducks docs-status [--json] [path]";
 
-  public async execute(args: string[], _registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const useJson = args.includes("--json");
     const posArg = args.find(a => !a.startsWith("--"));
     const root = posArg ? (posArg.startsWith("/") ? posArg : path.resolve(process.cwd(), posArg)) : process.cwd();
 
-    const board = buildBoard(root);
+    const board = registry.docs.board(root);
 
     if (useJson) { console.log(JSON.stringify(board, null, 2)); return; }
 

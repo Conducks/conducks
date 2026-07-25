@@ -1,6 +1,5 @@
 import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
-import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { ensureAnchor } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 
@@ -260,7 +259,7 @@ Modes:
         }
 
         if (mode === "fallback") {
-          const detector = new FallbackDetector();
+          const detector = registry.audit.createFallbackDetector();
           const graph = registry.infrastructure.graphEngine.getGraph();
           const allNodes = Array.from(graph.getAllNodes());
 

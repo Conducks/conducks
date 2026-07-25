@@ -34,7 +34,7 @@ conducks_flows        every named execution flow (entry point + the symbols it c
 
 **"What breaks if I change it?"**
 ```
-conducks_impact       blast radius of a symbol; downstream = what breaks, upstream = origins
+conducks_impact       blast radius of a symbol; upstream (default) = what breaks, downstream = its dependencies
 conducks_diff         structural change: uncommitted (git diff mapped to symbols), historical,
                       drift (vs the previous pulse)
 ```

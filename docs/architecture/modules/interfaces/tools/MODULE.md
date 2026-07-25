@@ -31,16 +31,12 @@ node types the graph does not carry. An agent filtering for it silently gets not
 the codebase is clean. When a finding type is declared here, something must assert it can actually
 be produced.
 
-**`conducks_impact` disagrees with the CLI about which way is which.** The graph defines direction
-once: `getNeighbors(id, 'downstream')` walks **out**-edges (what this symbol depends on) and
-`'upstream'` walks **in**-edges (who depends on it), and the Dijkstra walk follows that
-(`kinetic/trace.ts:120`). So "what breaks if I change X" is **upstream**, which is what the analyzer
-documents and what the CLI defaults to (`cli/commands/impact.ts:17`). The MCP tool defaults to
-`downstream` and describes it as "shows what breaks IF this symbol is modified"
-(`tools/kinetic.ts:50-51`, `:62`) — the label is inverted and the default is the opposite of the
-CLI's. An agent calling the tool with no `direction` therefore gets X's dependencies while being told
-they are X's dependents. Until the tool is corrected, pass `direction` explicitly and read it as the
-graph defines it, not as the description says. (`kinetic` has no MODULE.md of its own; if one is ever
+**Direction is defined once, at the graph.** `getNeighbors(id, 'downstream')` walks **out**-edges
+(what this symbol depends on); `'upstream'` walks **in**-edges (who depends on it). "What breaks if I
+change X" is therefore **upstream**, and every surface — MCP tool, CLI, registry, analyzer — defaults
+to it (aligned 2026-07-25; the MCP tool had shipped with the two descriptions swapped and the
+opposite default). No test asserts direction semantics yet, so a regression here would be silent —
+worth one if this area is touched again. (`kinetic` has no MODULE.md of its own; if one is ever
 written, this belongs there and should leave a pointer here.)
 
 **Stale results.** `analyze` is incremental, so a tool call can return numbers from a previous pulse

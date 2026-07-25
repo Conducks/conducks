@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -33,7 +32,7 @@ export class SupplyChainCommand implements ConducksCommand {
       return;
     }
 
-    const versions = this.readPackageVersions();
+    const versions = this.readPackageVersions(registry.infrastructure.chronicle.getProjectDir());
 
     console.log(`\n\x1b[1m--- 🏺 Supply-Chain Surface (System 2) ---\x1b[0m`);
     for (const row of summary) {
@@ -66,10 +65,10 @@ export class SupplyChainCommand implements ConducksCommand {
   }
 
   /** Live-read declared versions from the nearest package.json (dependencies + devDependencies). */
-  private readPackageVersions(): Map<string, string> {
+  private readPackageVersions(projectDir: string): Map<string, string> {
     const out = new Map<string, string>();
     try {
-      const root = chronicle.getProjectDir() || process.cwd();
+      const root = projectDir || process.cwd();
       const pkgPath = path.join(root, "package.json");
       if (!fs.existsSync(pkgPath)) return out;
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));

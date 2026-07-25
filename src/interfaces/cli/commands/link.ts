@@ -1,5 +1,4 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import type { Registry } from "@/registry/index.js";
 
 /**
@@ -17,7 +16,7 @@ export class LinkCommand implements ConducksCommand {
       process.exit(1);
     }
     const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-    const linker = new FederatedLinker(targetPath);
+    const linker = registry.federation.createLinker(targetPath);
     try {
       await linker.link(projectPath);
       console.log(`✅ Successfully linked foundation synapse: ${projectPath}`);

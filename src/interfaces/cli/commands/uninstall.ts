@@ -1,5 +1,4 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
 import type { Registry } from "@/registry/index.js";
 import fs from "fs-extra";
 import path from "node:path";
@@ -16,7 +15,7 @@ export class UninstallCommand implements ConducksCommand {
   public description = "Remove Conducks MCP config + the skills setup installed";
   public usage = "conducks uninstall";
 
-  public async execute(args: string[], _registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const claudeConfigPath = path.join(
       os.homedir(),
       "Library",
@@ -53,7 +52,7 @@ export class UninstallCommand implements ConducksCommand {
 
     // Remove the conducks-usage skills setup installed into this workspace (scoped to what
     // conducks owns — never touches other skills). Symmetric with `setup`.
-    const skillResult = await new ConducksInstaller(process.cwd()).remove();
+    const skillResult = await registry.federation.createInstaller(process.cwd()).remove();
     if (skillResult.removed.length > 0) {
       console.log(`Removed ${skillResult.removed.length} conducks skill(s) from .claude/skills/ (workspace).`);
     } else {

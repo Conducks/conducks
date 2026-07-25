@@ -1,6 +1,4 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
-import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
-import { MCPConfigurator } from "@/lib/domain/federation/mcp-configurator.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,15 +12,15 @@ export class SetupCommand implements ConducksCommand {
   public description = "Configure MCP and install skills";
   public usage = "conducks setup";
 
-  public async execute(_args: string[], _registry: Registry): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks Setup] Initializing Environment...\x1b[0m");
 
     // 1. Sync Conducks skills (read straight from resources/skills/ — static content)
-    const installer = new ConducksInstaller(process.cwd());
+    const installer = registry.federation.createInstaller(process.cwd());
     const skillResult = await installer.sync();
     console.log(`✅ Synced ${skillResult.workspace.length} skills → .claude/skills/ (workspace).`);
 
-    const configurator = new MCPConfigurator();
+    const configurator = registry.federation.createMCPConfigurator();
     // Resolve the CONDUCKS install root from this compiled file, NOT from process.cwd(): setup runs
     // inside the project being analyzed, so cwd is the wrong repo entirely. This file compiles to
     // build/src/interfaces/cli/commands/setup.js, so the CLI entry is three levels up.

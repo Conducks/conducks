@@ -10,9 +10,9 @@ Calculate the structural cost of an edit before making it.
 - "Is it safe to change this function?"
 
 ## Probes
-1. **`conducks_impact({symbol: "UserService", direction: "downstream", depth: 5})`**: structural blast radius.
+1. **`conducks_impact({symbol: "UserService", depth: 5})`**: structural blast radius.
    - `symbol` (required): graph ID (`file::name`) or a bare name — a bare name resolves to the highest-gravity match.
-   - `direction`: `"upstream"` | `"downstream"`. MCP default `downstream` (what breaks if this symbol is modified); `upstream` shows where it originates.
+   - `direction`: `"upstream"` (default — callers: what breaks if this symbol is modified) | `"downstream"` (dependencies: what it relies on). Same default as the CLI and the analyzer.
    - `depth`: 1–10, default 5. Not a hop count — it is the max cumulative **edge weight** walked by Dijkstra.
    - `path`: optional absolute project root.
    - Returns the top 10 affected nodes only; check `truncated` in the meta for more.

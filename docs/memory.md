@@ -1,21 +1,21 @@
 # Memory — conducks
 
-## Inheritance is never recorded — the graph has ZERO EXTENDS/IMPLEMENTS edges
+## Inheritance is recorded ONLY for Java and Swift — TS/TSX/Go still emit ZERO heritage edges
 - Gotcha: `EXTENDS`/`IMPLEMENTS` are in the `EdgeType` union (`adjacency-list.ts:9`),
   `evolution/dead-code.ts:29` counts them as usage, and ADR 0010 lists them among "genuine coupling"
-  — but no such edge has ever existed. Re-verified 2026-07-25 against the vault: the only edge types
-  present are CALLS, MEMBER_OF, IMPORTS, CONSTRUCTS, TYPE_REFERENCE, DEPENDS_ON, ACCESSES.
-  Cause: `reflector.ts:438` gates heritage on `cName === 'heritage' && node`, but the query patterns
+  — yet for TS/TSX/Go no such edge has ever existed. `reflector.ts:438` gates heritage on
+  `cName === 'heritage' && node`, and their heritage patterns
   (`(class_heritage (implements_clause (_) @heritage))`, `typescript/queries.ts:30-32`) are
-  STANDALONE — they carry no `@isX` definition capture, so no node is built for that match, `node` is
-  null, and `heritage.process()` (`processors/heritage.ts:17`, the only producer of these edge types)
-  never runs. The captures themselves are fine (probed against the real grammar: they hit).
-- Why: heritage was written as its own pattern rather than as part of the class pattern, so it never
-  associates with the enclosing class node the handler requires.
-- Applies: `reflector.ts:438`, `lib/core/parsing/processors/heritage.ts`, all
-  `lib/core/parsing/languages/*/queries.ts` heritage patterns. Anything reasoning about inheritance is
-  currently reasoning about nothing (this gates todo11). Fix by capturing heritage together with the
-  class declaration so one match carries both.
+  STANDALONE — no co-captured `@name`, so no node exists for the match and `heritage.process()`
+  (`processors/heritage.ts:17`, the only producer of these edge types) never runs. The captures
+  themselves hit; the reflector drops them.
+- Why: heritage was written as its own pattern rather than as part of the class pattern. The FIX IS
+  PROVEN: Java and Swift's queries (2026-07-25) co-capture the subject in the same pattern
+  (`superclass: (superclass (type_identifier) @heritage)` alongside `@name @isStruct`) and their
+  suites now assert real EXTENDS/IMPLEMENTS edges.
+- Applies: `typescript/queries.ts:30-32`, tsx, javascript, go heritage patterns. Port the Java/Swift
+  co-capture shape (this is todo11's whole job). Until then, anything reasoning about TS/Go
+  inheritance is reasoning about nothing — and STALE_IMPORT stays blocked on it.
 
 ## STALE_IMPORT is advertised but unreachable, and blocked on heritage
 - Gotcha: `evolution/dead-code.ts:135` gates STALE_IMPORT on
@@ -29,26 +29,6 @@
   under-reporting.
 - Applies: fix heritage FIRST, then re-derive stale imports and re-validate against
   `tsc --noUnusedLocals` before shipping.
-
-## `upstream`/`downstream` mean opposite things depending on the surface
-- Gotcha: the same word points the traversal in opposite directions across the impact stack, and the
-  defaults disagree too. Ground truth is `adjacency-list.getNeighbors` (`adjacency-list.ts:337-339`):
-  `downstream` walks OUT-edges (what I depend on), `upstream` walks IN-edges (who depends on me — what
-  breaks if I change). The docs split on this:
-  - `lib/domain/kinetic/impact.ts:15` — "`upstream` (who is affected by ME) or `downstream` (what
-    impacts ME)". Matches the traversal.
-  - `interfaces/tools/tools/kinetic.ts:50-52` — "`downstream` (default): Shows what breaks IF this
-    symbol is modified. `upstream`: Shows where this symbol originates or is imported from." Exactly
-    inverted, and it is the text an agent reads before choosing.
-  - defaults: the MCP tool defaults to `downstream` (`kinetic.ts:62`), while
-    `lib/domain/kinetic/index.ts:36`, `registry/index.ts:173` and
-    `interfaces/cli/commands/impact.ts:17` all default to `upstream`. `conducks impact X` and
-    `conducks_impact {symbol:X}` therefore answer two different questions.
-- Why: the domain layer and the MCP description were written independently; nothing forces one
-  definition of the word, and no test asserts direction semantics.
-- Applies: any caller of `getImpact`. A caller who assumes one meaning silently gets the other — an
-  "impact" answer that lists dependencies instead of dependents. Fixing it is a DECISION (pick one
-  meaning, then align the four sites + the MCP default), not a doc edit.
 
 ## The computed impact risk band never reaches a user
 - Gotcha: `BlastRadiusAnalyzer.analyzeImpact` returns `risk: 'LOW'|'MEDIUM'|'HIGH'|'CRITICAL'`
@@ -241,23 +221,20 @@
   grammars live at `src/resources/grammars/tree-sitter-{lang}.wasm`.
 - Applies: build tooling, vault access, grammar loading.
 
-## `conducks guard` reports "Layer contract clean" without checking anything
-- Gotcha: `guard.ts:32` filters violations for `ruleId === 'layer_boundaries'`, finds none, and prints `✅ Layer contract clean.` — but that rule is never loaded. `loadSentinelRules` (`sentinel-rules.ts:144`) reads `.conducks/sentinel.yml`, which does not exist in this repo, and falls back to `getDefaultRules()` (`:156`) = `no_cycles` + `rank_violations` only. The gate fails OPEN and reports success. Measured against the real graph with the rule force-enabled: 6 engine violations / ~71 illegal edges across cli→core, cli→domain, cli→mcp, mcp→core, mcp→domain.
-- Why: the rule was written as data and wired into `guard`, but the shipping step was never built. `src/resources/sentinel.default.yml` DOES declare `layer_boundaries: enabled: true`, yet nothing in `src/` reads or copies that file — it is an orphaned resource, so `setup` never installs it. ADR 0005's Consequences claim guard "blocks any new illegal cross-layer edge".
-- Applies: `interfaces/cli/commands/guard.ts:32`, `governance/sentinel-rules.ts:144-178`, `src/resources/sentinel.default.yml`. Treat ADR 0005's contract as a convention, not a gate, until the rule is enabled — and enabling it will block immediately, so the violations come first. — ADR 0005
-
-## Importing an MCP tool module in a test boots singletons and races the parsing suites
-- Gotcha: a test that does `import { synapseTools } from '@/interfaces/tools/tools/synapse.js'` — even
-  just to read tool names — transitively boots the registry singletons (grammar registry, persistence).
-  That raced the parsing suites: `tests/unit/core/type-only-imports.test.ts` failed intermittently with
-  `metadata.isTypeOnly` `undefined` instead of `true`, in BOTH parallel and `--runInBand` mode, roughly
-  one run in three. The classifier was never at fault.
-- Why: the tree-sitter parser is a shared singleton (`getUnifiedParser`) and grammar state is cached per
-  worker, not per file; `setLanguage` carries `{language, nodeTypeInfo}` that another module's boot can
-  move underneath an in-flight parse. Diagnosis needed a HEAD worktree: HEAD was green 3/3 with 35
-  tests, the working tree flaky with 44 — the delta was the new suite, not the new code.
-- Applies: any test under `tests/` that needs the MCP tool surface. Derive it by reading the `name:`
-  fields out of `src/interfaces/tools/tools/*.ts` as text (see
-  `tests/unit/interfaces/tools/skills-tool-surface.test.ts`), never by importing the modules. More
-  generally: before believing a red suite, re-run it — and before believing a green one, run it 3-4
-  times. A gate that fails at random is worse than no gate.
+## Two process-level singletons make test isolation the suite's real constraint
+- Gotcha: two independent native singletons break tests that share a process. (1) Importing anything
+  from `src/interfaces/tools/**` boots the registry (grammar registry, persistence) and races the
+  parsing suites — derive the MCP tool surface by reading `name:` fields as text instead (see
+  `tests/unit/interfaces/tools/skills-tool-surface.test.ts`). (2) The tree-sitter native addon serves
+  ONE JS-wrapper per process: the second test file to load a grammar in the same process gets
+  `tree.rootNode === undefined` and `Query.matches` throws — reproduced with the registry bypassed
+  entirely, so no in-process test shape dodges it.
+- Why: jest's module registry is per-file but native addon state is per-process. `maxWorkers: 1`
+  (required by the DuckDB single-writer lock) puts every suite in one worker, guaranteeing the
+  collision once more than one suite loads a grammar.
+- Applies: `jest.config.js` sets `workerIdleMemoryLimit: '1KB'` — the worker recycles after each test
+  file, so DuckDB stays serial AND every grammar suite gets a fresh process. NEVER verify with
+  `--runInBand`: it bypasses workers entirely and reintroduces the collision, so grammar-suite
+  failures under `--runInBand` are expected noise, not regressions. Plain `npm test` is already
+  serial. (The java suite additionally runs its reflector in a `tsx` child process — belt and
+  braces, and a portable pattern if isolation ever breaks again.)

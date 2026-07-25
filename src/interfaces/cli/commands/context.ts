@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { TraceAnalyzer } from "@/lib/domain/kinetic/trace.js";
 import { syncGraph, closePersistence } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 
@@ -24,8 +23,7 @@ export class ContextCommand implements ConducksCommand {
       await syncGraph(registry);
       const g = registry.query.graph.getGraph();
       const resolvedId = resolveSymbol(symbolId, g);
-      const analyzer = new TraceAnalyzer(g);
-      const steps = analyzer.trace(resolvedId);
+      const steps = registry.kinetic.trace(resolvedId);
 
       if (steps.length === 0) {
         if (useJson) {

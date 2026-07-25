@@ -54,7 +54,11 @@ export const ALLOWED_DEPENDENCIES: Record<string, string[]> = {
   core: ['contracts'],
   domain: ['core', 'contracts'],
   composition: ['domain', 'core', 'contracts'],
-  cli: ['composition', 'contracts', 'web'],       // web = the `mirror` launcher edge (allowed)
+  // Two allowed sibling edges, both LAUNCHERS (start a process) rather than logic coupling:
+  //   web = the `mirror` command starting the visual server
+  //   mcp = the `mcp` command starting the MCP stdio server (commands/mcp.ts -> tools/index.ts main)
+  // Routing a process entry point through composition buys nothing and hides the entry point.
+  cli: ['composition', 'contracts', 'web', 'mcp'],
   mcp: ['composition', 'contracts'],
   web: ['composition', 'domain', 'core', 'contracts'],
 };
@@ -167,6 +171,17 @@ export function getDefaultRules(): SentinelRule[] {
       name: 'No rank violations',
       condition: 'rank_violation',
       severity: 'warning',
+      enabled: true,
+    },
+    // The layer contract is a DEFAULT, not opt-in (ADR 0005). It shipped as data only, so
+    // `conducks guard` filtered for a rule that was never loaded and printed "Layer contract
+    // clean" without checking anything (todo06). The id must stay exactly `layer_boundaries`
+    // — `interfaces/cli/commands/guard.ts:32` matches violations on that ruleId.
+    {
+      id: 'layer_boundaries',
+      name: 'Layer contract',
+      condition: 'layer_boundaries',
+      severity: 'error',
       enabled: true,
     },
   ];

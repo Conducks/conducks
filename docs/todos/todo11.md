@@ -3,6 +3,13 @@ Status: todo
 - Acceptance: the graph carries EXTENDS/IMPLEMENTS edges for TS classes, and `conducks prune`
   STALE_IMPORT findings match `tsc --noUnusedLocals` with ~0 false positives.
 
+**2026-07-25 — the fix is now proven in-repo.** Java and Swift heritage works: co-capture the
+subject (`@name` + `@isX`) with `@heritage` in ONE pattern so `reflector.ts:438` has its node
+(`java/queries.ts` `superclass:` pattern is the template; asserted by
+`tests/unit/core/languages/{java,swift}-extraction.test.ts`). Phase 1 is porting that shape to
+typescript/tsx/javascript/go. Beware the reflector traps recorded by the swift agent: modifier
+captures (`is*`) can overwrite `kind`, and `query.matches()` is NOT ordered by pattern index.
+
 ## Phase 1 — heritage edges (the blocker)
 - [ ] `reflector.ts:438` gates heritage on `cName === 'heritage' && node`, but the heritage query
       patterns are standalone and build no node, so `heritage.process()` never runs. The graph has

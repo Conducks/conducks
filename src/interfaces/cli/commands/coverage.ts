@@ -2,7 +2,6 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import chalk from "chalk";
-import { saveBaseline, loadBaseline, diffAgainstBaseline, defaultBaselinePath } from "@/lib/domain/analysis/coverage-baseline.js";
 
 /**
  * Conducks — Coverage Command 🏺 🟩
@@ -50,21 +49,21 @@ export class CoverageCommand implements ConducksCommand {
       const bound = results.filter(r => r.bound);
 
       if (saveBaselineFlag) {
-        const baselinePath = defaultBaselinePath();
-        saveBaseline(bound, baselinePath);
+        const baselinePath = registry.coverage.defaultBaselinePath();
+        registry.coverage.saveBaseline(bound, baselinePath);
         console.log(chalk.green(`\n✓ Saved coverage baseline for ${bound.length} functions → ${baselinePath}\n`));
         if (!vsBaseline) return;
       }
 
       if (vsBaseline) {
-        const baselinePath = defaultBaselinePath();
-        const baseline = loadBaseline(baselinePath);
+        const baselinePath = registry.coverage.defaultBaselinePath();
+        const baseline = registry.coverage.loadBaseline(baselinePath);
         if (!baseline) {
           console.error(chalk.red(`No baseline found at ${baselinePath}. Run with --save-baseline first.`));
           process.exitCode = 1;
           return;
         }
-        const drift = diffAgainstBaseline(bound, baseline);
+        const drift = registry.coverage.diffAgainstBaseline(bound, baseline);
         const regressed = drift.filter(d => d.status === "REGRESSED");
         const improved = drift.filter(d => d.status === "IMPROVED");
         const created = drift.filter(d => d.status === "NEW");

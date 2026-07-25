@@ -1,8 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { initGlobalMirror } from "@/interfaces/web/mirror-server.js";
-import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 
 /**
  * Conducks — Mirror Command
@@ -16,12 +14,8 @@ export class MirrorCommand implements ConducksCommand {
     console.log("\x1b[35m[Conducks] Initializing Visual Dashboard...\x1b[0m");
     
     // 1. Initialize Gateway Service
-    const projectRoot = chronicle.getProjectDir();
-    const gateway = new GatewayService(
-      registry.infrastructure.graphEngine,
-      registry.infrastructure.persistence,
-      projectRoot
-    );
+    const projectRoot = registry.infrastructure.chronicle.getProjectDir();
+    const gateway = registry.mirror.createGateway(projectRoot);
 
     // 2. Start Mirror Server
     const server = initGlobalMirror(gateway);

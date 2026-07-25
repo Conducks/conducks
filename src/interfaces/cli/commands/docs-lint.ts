@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { buildBoard } from "@/lib/domain/analysis/docs-grammar.js";
 import path from "node:path";
 import chalk from "chalk";
 
@@ -17,11 +16,11 @@ export class DocsLintCommand implements ConducksCommand {
   public description = "Validate authored docs against the conducks-docs grammar (CI gate)";
   public usage = "conducks docs-lint [path]";
 
-  public async execute(args: string[], _registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const posArg = args.find(a => !a.startsWith("--"));
     const root = posArg ? (posArg.startsWith("/") ? posArg : path.resolve(process.cwd(), posArg)) : process.cwd();
 
-    const board = buildBoard(root);
+    const board = registry.docs.board(root);
 
     if (board.lint.length === 0) {
       const n = board.todos.length + board.decisions.length + board.other.filter(o => o.entries).length;

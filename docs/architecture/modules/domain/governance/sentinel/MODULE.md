@@ -21,36 +21,31 @@ why a finding that cannot be trusted must be removed rather than downgraded — 
 `ALLOWED_DEPENDENCIES` are hardcoded because the minimal YAML parser has no nested maps, so the
 contract guards conducks itself and nobody else.
 
-## The layer contract lives here — and today nothing evaluates it
+## The layer contract lives and is enforced here
 
-`ALLOWED_DEPENDENCIES` (`sentinel-rules.ts:52`) encodes ADR 0005's downward-only stack, and the
+`ALLOWED_DEPENDENCIES` (`sentinel-rules.ts`) encodes ADR 0005's downward-only stack, and the
 `layer_boundaries` condition (`governance/index.ts:266`) reports one violation per illegal
 layer-pair. Layers are matched by path fragment and **order matters** — `/lib/core` precedes
 `/registry` so `lib/core/registry/` classifies as core, not composition.
 
-**But the rule is not loaded.** `loadSentinelRules` reads `.conducks/sentinel.yml`
-(`sentinel-rules.ts:144`); this repo has no such file, so it falls back to `getDefaultRules()`, which
-returns exactly two rules — `no_cycles` and `rank_violations`. `layer_boundaries` is absent.
-`conducks guard` then filters `violations` for `ruleId === 'layer_boundaries'`
-(`cli/commands/guard.ts:32`), finds an empty list, and prints **"✅ Layer contract clean."** That
-line is currently vacuous: it means the rule never ran, not that the code is clean. Historic evidence
-that it works when enabled (domain → registry service-locator leaks, 82 → 0) predates this gap.
+**Enforced as a default since 2026-07-25.** For its first year the rule existed but never loaded:
+`loadSentinelRules` read `.conducks/sentinel.yml` (absent), fell back to defaults that lacked
+`layer_boundaries`, and `guard` filtered for a rule that never ran — printing "Layer contract clean"
+vacuously while the repo carried 74 illegal cross-layer edges. Those edges were routed through
+composition (registry facades; a lazy `import()` in `pulse-worker` for the core → domain edge, which
+cannot be constructor-injected because the worker is a standalone process) and the rule was added to
+`getDefaultRules()`. Non-vacuousness was proven both directions: a raw cross-layer edge dump returns
+zero, and a deliberately re-injected `cli → core` import blocks the gate.
 
-This is not hypothetical. Against the table as written, the repo currently carries: one **core →
-domain** edge (`core/parsing/pulse-worker.ts` imports, constructs and calls
-`domain/analysis/reflector.ts`), 19 **cli → domain/core** imports across 14 command files, and 2
-**mcp → domain/core** imports. `guard` reports the contract clean anyway. Whoever turns the rule on
-should expect a non-empty first run and decide, per pair, whether to fix the import or widen the table
-deliberately — a green light today proves nothing either way.
+Traps that survive: the rule iterates all non-`MEMBER_OF` edges, so **calls count, not just
+imports**, and it does **not** skip `isTypeOnly` — a type-only import is still a layer violation
+here even though cycle detection ignores it (ADR 0016). On foreign repos `layerOf()` returns null
+for paths matching no conducks fragment, so the rule is silent rather than noisy; per-project layer
+config is deliberately not built.
 
-`src/resources/sentinel.default.yml` already declares `layer_boundaries` with `enabled: true`, but
-nothing copies it into `.conducks/`. Fixing this is either shipping that file at setup or adding the
-rule to `getDefaultRules()`. Until one happens, treat the layer contract as **documented intent, not
-a gate** — and do not read a green `guard` as proof of layering.
-
-Two encoded edges are wider than ADR 0005's prose: `cli → web` (the sanctioned `mirror` launcher)
-and `web → domain`/`core` directly. The ADR says interfaces import composition; the table permits
-more. The table is what would run.
+Three encoded edges are wider than ADR 0005's prose: `cli → web` (the `mirror` launcher),
+`cli → mcp` (the `conducks mcp` launcher — added 2026-07-25, same shape), and `web → domain`/`core`.
+The ADR says interfaces import composition; the table is what runs.
 
 ## The policy rules are loaded by the CLI, and that seam failed silently once
 

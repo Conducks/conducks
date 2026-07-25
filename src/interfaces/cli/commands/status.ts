@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import path from "node:path";
 import chalk from "chalk";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";

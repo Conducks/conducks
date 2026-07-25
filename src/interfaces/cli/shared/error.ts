@@ -1,5 +1,13 @@
 import chalk from 'chalk';
-import type { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+
+/**
+ * The only capability this helper needs from the graph: name → candidate nodes.
+ * Declared structurally so the CLI never names a core type (ADR 0005) — the concrete
+ * `ConducksAdjacencyList` handed in by the registry satisfies it by shape.
+ */
+export interface NameIndex {
+  findNodesByName(name: string): Array<{ id: string; properties?: unknown }>;
+}
 
 export function cliError(code: string, message: string, suggestion?: string): never {
   process.stderr.write(chalk.red(`[ERROR] ${code}: ${message}\n`));
@@ -17,7 +25,7 @@ export function cliWarn(message: string): void {
  * Otherwise use name index to find best match (highest gravity).
  * Exits with helpful error if no match found.
  */
-export function resolveSymbol(input: string, graph: ConducksAdjacencyList): string {
+export function resolveSymbol(input: string, graph: NameIndex): string {
   if (input.includes('::')) return input;
 
   const matches = graph.findNodesByName(input);

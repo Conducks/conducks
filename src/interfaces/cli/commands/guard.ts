@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { logger } from "@/lib/core/utils/logger.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
@@ -17,6 +16,8 @@ export class GuardCommand implements ConducksCommand {
     const thresholdArg = args.find(a => a.startsWith("--threshold="));
     const threshold = thresholdArg ? parseFloat(thresholdArg.split("=")[1]) : 0.1;
     const force = args.includes("--force");
+
+    const logger = registry.infrastructure.logger;
 
     try {
       // 1. Optional Analysis Pulse (Directly via registry)

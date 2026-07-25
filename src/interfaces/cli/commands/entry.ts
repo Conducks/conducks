@@ -1,6 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
 
 /**
@@ -20,8 +19,8 @@ export class EntryCommand implements ConducksCommand {
 
     // When a specific external path is provided, scope persistence to that project.
     // Otherwise use the injected persistence.
-    const persistence: SynapsePersistence = pathArg
-      ? new SynapsePersistence(targetPath, true)
+    const persistence = pathArg
+      ? registry.infrastructure.createPersistence(targetPath, true)
       : registry.infrastructure.persistence;
 
     try {
