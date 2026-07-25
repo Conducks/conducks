@@ -9,7 +9,7 @@ export const TYPESCRIPT_QUERIES = `
   (export_statement source: (string) @source) @isImport
   ;; Per-binding capture: each named import specifier gets its own match with @name
   (import_statement
-    (import_clause (named_imports (import_specifier name: (identifier) @name)))
+    (import_clause (named_imports (import_specifier name: (identifier) @name alias: (identifier)? @alias)))
     source: (string) @source) @isImport
 
   ;; --- Atoms (L6: Persistence & State) ---
@@ -19,6 +19,10 @@ export const TYPESCRIPT_QUERIES = `
   
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (type_identifier) @name) @isStruct
+  ;; 'abstract class' is (abstract_class_declaration), a DIFFERENT node type — without these two an
+  ;; abstract class was extracted only when it had heritage (the heritage patterns below), so a
+  ;; heritage-less abstract base (e.g. ConducksPrism, prism-core.ts:11) produced no node at all.
+  (abstract_class_declaration name: (type_identifier) @name) @isStruct
   (interface_declaration name: (type_identifier) @name) @isInterface
   (type_alias_declaration name: (type_identifier) @name) @isInterface
   (enum_declaration name: (identifier) @name) @isEnum
@@ -26,10 +30,40 @@ export const TYPESCRIPT_QUERIES = `
   (function_declaration name: (identifier) @name) @isFunction
   (method_definition name: (_) @name) @isMethod
   
-  ;; Heritage: extends/implements
-  (class_heritage (extends_clause (_) @heritage))
-  (class_heritage (implements_clause (_) @heritage))
-  (extends_type_clause (_) @heritage)
+  ;; Heritage: extends / implements (EXTENDS + IMPLEMENTS edges)
+  ;; The subject @name is co-captured in the SAME pattern on purpose — the reflector only processes a
+  ;; @heritage capture when the match also resolves a definition node (reflector.ts:438). The old
+  ;; STANDALONE patterns ((class_heritage (extends_clause (_) @heritage)) etc.) compiled fine and
+  ;; captured the supertype, but carried no @name, so no node existed and every capture was dropped
+  ;; silently — the graph had ZERO heritage edges for TS. See docs/memory.md.
+  ;; tree-sitter-typescript 0.23.2 shapes (verified against node-types.json + a compile probe):
+  ;;   - a class's supertypes live in a (class_heritage) CHILD holding (extends_clause value: …)
+  ;;     and/or (implements_clause …); extends_clause also has a type_arguments: field, so the
+  ;;     value: field is required or 'extends Array<string>' would also capture 'string'.
+  ;;   - an INTERFACE has no class_heritage; its supertypes sit in a sibling
+  ;;     (extends_type_clause type: …). Different node entirely — do not merge the two.
+  ;;   - 'abstract class' is (abstract_class_declaration), NOT (class_declaration) — a separate node
+  ;;     type, so it needs its own patterns or every abstract base loses its heritage.
+  ;; The capture NAME carries the relation type: @heritage_extends -> EXTENDS,
+  ;; @heritage_implements -> IMPLEMENTS. TypeScript's grammar separates the two clauses, so the
+  ;; relation is KNOWN here and must not be re-guessed downstream — plain @heritage falls back to
+  ;; HeritageProcessor's target-NAME heuristic, which typed 'implements Speaker' as EXTENDS.
+  (class_declaration
+    name: (type_identifier) @name
+    (class_heritage (extends_clause value: (_) @heritage_extends))) @isStruct
+  (class_declaration
+    name: (type_identifier) @name
+    (class_heritage (implements_clause (_) @heritage_implements))) @isStruct
+  (abstract_class_declaration
+    name: (type_identifier) @name
+    (class_heritage (extends_clause value: (_) @heritage_extends))) @isStruct
+  (abstract_class_declaration
+    name: (type_identifier) @name
+    (class_heritage (implements_clause (_) @heritage_implements))) @isStruct
+  ;; An interface's supertypes are always EXTENDS (interface extends interface).
+  (interface_declaration
+    name: (type_identifier) @name
+    (extends_type_clause type: (_) @heritage_extends)) @isInterface
 
   ;; --- Type positions (ADR 0016) ---
   ;; A symbol used only here is erased by the compiler, so its import is not runtime coupling.
@@ -70,6 +104,7 @@ export const TYPESCRIPT_QUERIES = `
   ;; --- Modifiers (DNA flags) ---
   (export_statement (function_declaration name: (identifier) @name) @isExported) @isFunction
   (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
+  (export_statement (abstract_class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
   (function_declaration "async" name: (identifier) @name) @isAsync @isFunction
   (abstract_method_signature name: (_) @name) @isAbstract @isMethod

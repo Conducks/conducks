@@ -56,26 +56,38 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
     }
   }
 
-  // Structural Mapping: File Extension -> Provider
-  const providers = new Map<string, any>([
-    [".py", new PythonProvider()],
-    [".ts", new TypeScriptProvider()],
-    [".tsx", new TSXProvider()],
-    [".js", new JavaScriptProvider()],
-    [".jsx", new JavaScriptProvider()],
-    [".go", new GoProvider()],
-    [".rs", new RustProvider()],
-    [".java", new JavaProvider()],
-    [".cs", new CSharpProvider()],
-    [".cpp", cppProvider],
-    [".hpp", cppProvider],
-    [".cc", cppProvider],
-    [".php", new PHPProvider()],
-    [".rb", new RubyProvider()],
-    [".rake", new RubyProvider()],
-    [".swift", new SwiftProvider()],
-    [".c", cProvider]
-  ]);
+  // Structural Mapping: File Extension -> Provider.
+  // DERIVED from each provider's own `extensions` array (CONDUCKS-2 guarantees the field) — the
+  // hand-written map this replaces had to be kept in sync with the providers by hand and drifted
+  // (CPPProvider declares .cxx/.hxx; neither was ever registered here or in src/registry, so those
+  // files were found by discovery and then dispatched to nothing).
+  // List order = precedence, LAST claim wins: JavaScriptProvider comes after TypeScriptProvider so
+  // .js/.jsx keep the JavaScript provider (TypeScriptProvider also declares both), and cProvider
+  // comes after cppProvider so .h resolves to C — irrelevant in practice because .h is decided by
+  // the isCppHeader() content sniff before this map is consulted.
+  const providerPrecedence = [
+    new PythonProvider(),
+    new TypeScriptProvider(),
+    new TSXProvider(),
+    new JavaScriptProvider(),
+    new GoProvider(),
+    new RustProvider(),
+    new JavaProvider(),
+    new CSharpProvider(),
+    cppProvider,
+    new PHPProvider(),
+    new RubyProvider(),
+    new SwiftProvider(),
+    cProvider
+  ];
+  const providers = new Map<string, any>();
+  for (const provider of providerPrecedence) {
+    // Lookup here is by path.extname, so only dot patterns are dispatchable (Ruby's bare
+    // 'Rakefile'/'Gemfile' claims are filename patterns and belong to the registry's filename map).
+    for (const pattern of ((provider as any).extensions ?? []) as string[]) {
+      if (pattern.startsWith('.')) providers.set(pattern, provider);
+    }
+  }
 
   // Structural Mapping: File Extension -> Grammar Metadata
   const extensionToGrammar = new Map<string, { id: string, file: string }>([

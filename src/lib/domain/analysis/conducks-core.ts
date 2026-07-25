@@ -12,7 +12,6 @@ import { ConducksFlowEngine } from "@/lib/domain/kinetic/flow-engine.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { GVREngine } from "@/lib/domain/evolution/gvr-engine.js";
-import { GQLParser } from "@/lib/domain/intelligence/gql-parser.js";
 import { ResonanceAnalyzer } from "@/lib/domain/metrics/resonance.js";
 import { FallbackDetector } from "./fallback-detector.js";
 import { ConducksNode, IMPORT_CYCLE_IGNORED_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
@@ -43,7 +42,6 @@ export class Conducks implements ConducksComponent {
   public flows = new ConducksFlowEngine(this.graph.getGraph());
   private diffEngine = new ConducksDiffEngine();
   private gvr = new GVREngine();
-  private gql = new GQLParser();
   private resonance = new ResonanceAnalyzer();
   private fallbackDetector = new FallbackDetector();
   private death = new DeadCodeAnalyzer();
@@ -150,8 +148,7 @@ export class Conducks implements ConducksComponent {
     return result.pulseId;
   }
 
-  public query(query: string, options: { gql?: boolean } = {}) {
-    if (options.gql) return this.gql.query(this.graph.getGraph(), query);
+  public query(query: string) {
     return this.search.search(query);
   }
 

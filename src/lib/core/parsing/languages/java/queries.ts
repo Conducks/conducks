@@ -31,23 +31,24 @@ export const JAVA_QUERIES = `
 
   ;; Heritage: extends / implements
   ;; The subject @name is captured in the SAME pattern on purpose — the reflector only processes a
-  ;; @heritage capture when the match also resolves a definition node (reflector.ts:438).
+  ;; heritage captures co-resolve a definition node (reflector.ts:438); the _extends/_implements
+  ;; suffix carries the clause so the processor does not fall back to the name heuristic.
   ;; grammar 0.23: the superclass field holds a (superclass) wrapper, not a bare type_identifier
   (class_declaration
     name: (identifier) @name
-    superclass: (superclass (type_identifier) @heritage)) @isStruct
+    superclass: (superclass (type_identifier) @heritage_extends)) @isStruct
   (class_declaration
     name: (identifier) @name
     interfaces: (super_interfaces
-      (type_list (type_identifier) @heritage))) @isStruct
+      (type_list (type_identifier) @heritage_implements))) @isStruct
   (interface_declaration
     name: (identifier) @name
     (extends_interfaces
-      (type_list (type_identifier) @heritage))) @isInterface
+      (type_list (type_identifier) @heritage_extends))) @isInterface
   (enum_declaration
     name: (identifier) @name
     interfaces: (super_interfaces
-      (type_list (type_identifier) @heritage))) @isEnum
+      (type_list (type_identifier) @heritage_implements))) @isEnum
   
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Spring Boot / JAX-RS Route Annotations: @GetMapping("/")

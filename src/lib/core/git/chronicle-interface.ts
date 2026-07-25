@@ -2,8 +2,87 @@ import { execSync } from 'node:child_process';
 import path from 'node:path';
 
 /**
+ * Non-code files the FS fallback still ingests. No language provider declares these — they carry
+ * config/documentation context, not structural DNA, so they cannot be derived from the providers.
+ */
+const NON_CODE_EXTENSIONS = ['.json', '.txt', '.md'];
+
+/**
+ * Exact filenames the FS fallback ingests, matched by name instead of extension.
+ *
+ * `.env` lives here, not in NON_CODE_EXTENSIONS: `path.extname('.env')` returns `''` for a leading-dot
+ * file, so the old list's `.env` entry could never match and `.env` was silently skipped.
+ */
+const NON_CODE_FILENAMES = ['Dockerfile', '.env'];
+
+interface DiscoverySurface {
+  extensions: Set<string>;
+  filenames: Set<string>;
+}
+
+let discoverySurface: DiscoverySurface | undefined;
+
+/**
+ * Derives what the FS fallback accepts from what the language providers actually declare
+ * (CONDUCKS-2: `extensions: string[]` per provider). The old hardcoded list silently dropped most
+ * supported languages (.rs .tsx .jsx .cs .c .cpp .h .hpp .php .swift) while listing .kt, for which
+ * no provider or grammar exists.
+ *
+ * The providers are pulled in via dynamic `import()`, NOT static imports: typescript/resolver.ts
+ * imports the `chronicle` singleton from this very file, so a static provider import here closes an
+ * ESM cycle and crashes with a TDZ error on whichever module is evaluated second. Deferring the load
+ * to first call breaks the cycle — and this is the cold path (git discovery already failed), so the
+ * providers are never loaded in the normal case. Same idiom, same reason, as pulse-worker.ts.
+ *
+ * Providers are cheap value objects; grammars load lazily via the GrammarRegistry. Some declare bare
+ * filenames (Ruby's `Rakefile`, `Gemfile`) alongside real extensions, so the two are split apart to
+ * keep `path.extname()` matching correct.
+ */
+async function getDiscoverySurface(): Promise<DiscoverySurface> {
+  if (discoverySurface) return discoverySurface;
+
+  const modules = await Promise.all([
+    import("@/lib/core/parsing/languages/python/index.js"),
+    import("@/lib/core/parsing/languages/typescript/index.js"),
+    import("@/lib/core/parsing/languages/tsx/index.js"),
+    import("@/lib/core/parsing/languages/javascript/index.js"),
+    import("@/lib/core/parsing/languages/go/index.js"),
+    import("@/lib/core/parsing/languages/rust/index.js"),
+    import("@/lib/core/parsing/languages/java/index.js"),
+    import("@/lib/core/parsing/languages/csharp/index.js"),
+    import("@/lib/core/parsing/languages/cpp/index.js"),
+    import("@/lib/core/parsing/languages/php/index.js"),
+    import("@/lib/core/parsing/languages/ruby/index.js"),
+    import("@/lib/core/parsing/languages/swift/index.js"),
+    import("@/lib/core/parsing/languages/c/index.js")
+  ]);
+
+  const declared = [
+    new modules[0].PythonProvider(),
+    new modules[1].TypeScriptProvider(),
+    new modules[2].TSXProvider(),
+    new modules[3].JavaScriptProvider(),
+    new modules[4].GoProvider(),
+    new modules[5].RustProvider(),
+    new modules[6].JavaProvider(),
+    new modules[7].CSharpProvider(),
+    new modules[8].CPPProvider(),
+    new modules[9].PHPProvider(),
+    new modules[10].RubyProvider(),
+    new modules[11].SwiftProvider(),
+    new modules[12].CProvider()
+  ].flatMap(p => p.extensions);
+
+  discoverySurface = {
+    extensions: new Set([...declared.filter(e => e.startsWith('.')), ...NON_CODE_EXTENSIONS]),
+    filenames: new Set([...declared.filter(e => !e.startsWith('.')), ...NON_CODE_FILENAMES])
+  };
+  return discoverySurface;
+}
+
+/**
  * Conducks — Chronicle Interface (Git-Direct)
- * 
+ *
  * Direct interaction with the Git Object Model for Chronoscopic Mirroring.
  * Replaces the generic filesystem crawler with a high-fidelity Git-native engine.
  */
@@ -56,6 +135,7 @@ export class ChronicleInterface {
     // 2. Fallback: Recursive FS Scan (Conducks Universal Discovery)
     console.error(`[Chronicle Interface] Git discovery failed. Falling back to universal FS scan for: ${this.projectDir}`);
     const fs = await import('node:fs/promises');
+    const { extensions, filenames } = await getDiscoverySurface();
 
     const scan = async (dir: string) => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -68,7 +148,7 @@ export class ChronicleInterface {
         } else {
           // Only ingest relevant code/config extensions to prevent bloat
           const ext = path.extname(entry.name);
-          if (['.py', '.js', '.ts', '.java', '.kt', '.go', '.rb', '.json', '.txt', '.md', '.env', 'Dockerfile'].includes(ext) || entry.name === 'Dockerfile') {
+          if (extensions.has(ext) || filenames.has(entry.name)) {
             allFiles.add(fullPath);
           }
         }

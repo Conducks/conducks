@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
 import { ConducksComponent } from "@/contracts/types.js";
 
 export interface Finding {
@@ -131,17 +131,153 @@ export class DeadCodeAnalyzer implements ConducksComponent {
         }
       }
 
-      // 3. Stale Imports
-      if (node.label === 'import_clause' || node.label === 'import_specifier') {
-        const usage = graph.getNeighbors(node.id, 'downstream').filter(e => e.type === 'CALLS' || e.type === 'ACCESSES');
-        if (usage.length === 0) {
-          findings.push({
-            type: 'STALE_IMPORT',
-            symbol: node.properties.name,
-            file: node.properties.filePath,
-            message: `Imported symbol is never used in this file.`
-          });
-        }
+    }
+
+    findings.push(...this.findStaleImports(graph, allEdges));
+
+    return findings;
+  }
+
+  /**
+   * Edge types that count as EVIDENCE OF USE for an imported binding.
+   * All of them must be affirmatively absent before a binding is called stale.
+   */
+  private static readonly USAGE_EVIDENCE_EDGES = new Set<string>([
+    'CALLS', 'CONSTRUCTS', 'ACCESSES',   // value positions
+    'TYPE_REFERENCE',                    // type annotations / type arguments
+    'EXTENDS', 'IMPLEMENTS',             // heritage clauses (`implements ConducksCommand`)
+    'DEPENDS_ON', 'VIRTUAL_LINK',        // boundary + inferred references
+  ]);
+
+  /**
+   * Declaration kinds a stale-import claim is allowed to be made about.
+   *
+   * Deliberately VALUE-only (a class is kinded `struct` here). Type declarations are excluded
+   * because the type-position captures are incomplete: `(type_annotation (type_identifier))`,
+   * `(type_annotation (generic_type name:))` and `(type_arguments (type_identifier))` are captured,
+   * but `Foo[]` (array_type), `x as Foo[]` (as_expression) and `n is Foo` (type_predicate) are NOT —
+   * so an interface used only in those positions leaves no TYPE_REFERENCE edge and would read as
+   * unused. Measured on conducks itself: allowing type targets turned 22 true positives into 22
+   * true + 11 false. Widen this set ONLY after those captures exist and a re-validation against
+   * `tsc --noUnusedLocals` still shows zero findings tsc does not also report.
+   */
+  private static readonly PRUNABLE_BINDING_KINDS = new Set<string>([
+    'function', 'class', 'struct', 'method',
+  ]);
+
+  /**
+   * Conducks — Stale import detection. ✂️
+   *
+   * A binding is stale ONLY when every class of evidence is affirmatively absent: no value use
+   * (CALLS / CONSTRUCTS / ACCESSES), no type use (TYPE_REFERENCE, or the reflector's `isTypeOnly`
+   * verdict), no heritage clause naming it (EXTENDS / IMPLEMENTS), and no use as a bare value
+   * inside a recorded call's argument list. Anything ambiguous is NOT stale — prune must err
+   * toward under-reporting, so a missed dead import is acceptable and a wrong one is not.
+   *
+   * NEVER reported, by construction rather than by a filter:
+   *   - `import * as x from "..."`  — a namespace import binds no specifier, so the reflector emits
+   *     no per-binding IMPORTS edge for it. Its members are reached as `x.member`, which the graph
+   *     records against the member, not the namespace: absence of evidence is guaranteed and would
+   *     be a false positive every time.
+   *   - `import "./x"`             — a side-effect import has no binding at all; being "unused" is
+   *     the entire point of writing it.
+   *   - default imports, and any import whose specifier did not resolve to a project file
+   *     (dependencies, stdlib) — the orchestrator only emits a per-binding edge for a resolved
+   *     in-project named import (orchestrator.ts:412), so these never become candidates.
+   */
+  private findStaleImports(graph: ConducksAdjacencyList, allEdges: ConducksEdge[]): Finding[] {
+    const fileOfNode = (nodeId: NodeId): string => {
+      const node = graph.getNode(nodeId) as ConducksNode | undefined;
+      const fromNode = node?.properties?.filePath;
+      if (fromNode) return fromNode.toLowerCase();
+      // Unit ids are `<file>::unit`; fall back to the id prefix when the node is not loaded.
+      return nodeId.includes('::') ? nodeId.split('::')[0] : '';
+    };
+
+    // Identifier tokens, lowercased — node ids and binding names are already folded to lower case.
+    const tokensOf = (value: unknown): string[] =>
+      String(value ?? '').toLowerCase().match(/[a-z_$][a-z0-9_$]*/g) || [];
+
+    // A resolved target is `<file>::<symbol>`; a dangling one is the raw expression text.
+    const targetTail = (targetId: string): string => targetId.includes('::') ? targetId.split('::').pop()! : targetId;
+
+    // Every name the file was seen USING, from all evidence classes at once.
+    const usedNamesByFile = new Map<string, Set<string>>();
+    const recordUse = (file: string, name: string): void => {
+      if (!file || !name) return;
+      let names = usedNamesByFile.get(file);
+      if (!names) usedNamesByFile.set(file, names = new Set<string>());
+      names.add(name);
+    };
+
+    for (const edge of allEdges) {
+      if (!DeadCodeAnalyzer.USAGE_EVIDENCE_EDGES.has(edge.type)) continue;
+      const file = fileOfNode(edge.sourceId);
+      const props: any = edge.properties || {};
+      // `original` carries the pre-lowercase spelling; the target tail carries the resolved symbol
+      // or the raw member expression (`graphtraversal.traverseupstream`), so both receiver and
+      // member count as evidence.
+      for (const token of tokensOf(props.original)) recordUse(file, token);
+      for (const token of tokensOf(targetTail(edge.targetId))) recordUse(file, token);
+      // Identifier-as-value wiring: `register(HANDLERS)` passes the binding without calling it.
+      if (Array.isArray(props.arguments)) {
+        for (const argument of props.arguments) for (const token of tokensOf(argument)) recordUse(file, token);
+      }
+    }
+
+    // Candidates, grouped per import statement (file + specifier).
+    interface Candidate { binding: string; targetId: string; isTypeOnly: boolean }
+    const statements = new Map<string, { file: string; specifier: string; candidates: Candidate[] }>();
+
+    for (const edge of allEdges) {
+      if (edge.type !== 'IMPORTS') continue;
+      const props: any = edge.properties || {};
+      // Only the per-binding edge carries `bindingName`; the file-level edge never does.
+      if (!props.bindingName) continue;
+      const file = fileOfNode(edge.sourceId);
+      if (!file || DeadCodeAnalyzer.isTestPath(file)) continue;
+      const key = `${file}::${props.specifier}`;
+      let statement = statements.get(key);
+      if (!statement) statements.set(key, statement = { file, specifier: String(props.specifier), candidates: [] });
+      statement.candidates.push({
+        binding: String(props.bindingName).toLowerCase(),
+        targetId: edge.targetId,
+        isTypeOnly: props.isTypeOnly === true,
+      });
+    }
+
+    const findings: Finding[] = [];
+    const reported = new Set<string>();
+
+    for (const statement of statements.values()) {
+      const usedNames = usedNamesByFile.get(statement.file) || new Set<string>();
+      const isUsed = (c: Candidate) => c.isTypeOnly || usedNames.has(c.binding);
+
+      // Import-site calibration: if NOTHING this statement brings in was ever seen being used, the
+      // extractor may simply not cover how this file uses it (an aliased specifier is recorded
+      // under the ORIGINAL name, a bare `= CONFIG` initializer and a `for (const x of TABLE)`
+      // produce no relationship at all). Absence of evidence is then not evidence of absence, so
+      // the whole statement is left alone. This costs recall on single-binding imports and is the
+      // price of never being wrong.
+      if (!statement.candidates.some(isUsed)) continue;
+
+      for (const candidate of statement.candidates) {
+        if (isUsed(candidate)) continue;
+        // Only claim staleness about a declaration the graph can fully see used (see
+        // PRUNABLE_BINDING_KINDS). An unresolved target proves nothing either way.
+        const target = graph.getNode(candidate.targetId) as ConducksNode | undefined;
+        const kind = (target?.properties?.kind || '').toLowerCase();
+        if (!kind || !DeadCodeAnalyzer.PRUNABLE_BINDING_KINDS.has(kind)) continue;
+
+        const key = `${statement.file}::${candidate.binding}`;
+        if (reported.has(key)) continue;
+        reported.add(key);
+        findings.push({
+          type: 'STALE_IMPORT',
+          symbol: target!.properties.name,
+          file: statement.file,
+          message: `Imported from '${statement.specifier}' but never used in this file (no call, construction, access, type reference, or heritage clause).`,
+        });
       }
     }
 

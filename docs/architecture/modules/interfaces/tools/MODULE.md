@@ -25,11 +25,12 @@ graph, not the working tree.
 A human reading CLI output can discount a suspicious finding; an agent will act on it. That raises
 the cost of two things in particular:
 
-**A documented finding that cannot fire.** The tool schema advertises `STALE_IMPORT` — "imported but
-never used in the file" — and it has never been emitted, because its condition tested tree-sitter
-node types the graph does not carry. An agent filtering for it silently gets nothing and concludes
-the codebase is clean. When a finding type is declared here, something must assert it can actually
-be produced.
+**A documented finding that could not fire — fixed, and the lesson stands.** The tool schema
+advertised `STALE_IMPORT` for a year while its condition tested tree-sitter node types the graph
+never carries, so an agent filtering for it silently got nothing and concluded the codebase was
+clean. It fires since 2026-07-25 (`tests/unit/domain/stale-import.test.ts` asserts it can be
+produced). The rule that survives: when a finding type is declared on this surface, a test must
+assert it can actually be emitted.
 
 **Direction is defined once, at the graph.** `getNeighbors(id, 'downstream')` walks **out**-edges
 (what this symbol depends on); `'upstream'` walks **in**-edges (who depends on it). "What breaks if I

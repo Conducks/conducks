@@ -10,7 +10,7 @@ export const JAVASCRIPT_QUERIES = `
   (export_statement source: (string) @source) @isImport
   ;; Per-binding capture
   (import_statement
-    (import_clause (named_imports (import_specifier name: (identifier) @name)))
+    (import_clause (named_imports (import_specifier name: (identifier) @name alias: (identifier)? @alias)))
     source: (string) @source) @isImport
 
   ;; --- CommonJS require() ---
@@ -21,8 +21,11 @@ export const JAVASCRIPT_QUERIES = `
       arguments: (arguments (string) @source))) @isImport
 
   ;; --- Atoms (L6: Persistence & State) ---
-  (property_signature name: (property_identifier) @name) @isProperty
-  (public_field_definition name: (property_identifier) @name) @isProperty
+  ;; tree-sitter-javascript 0.25 has NO property_signature / public_field_definition (both are
+  ;; TS-only). They were copied from the TS query and made THIS WHOLE QUERY fail to compile
+  ;; (TSQueryErrorNodeType at offset 607), which silently dropped every .js file to the Gnosis
+  ;; file-only fallback. The JS class field node is (field_definition property: …).
+  (field_definition property: (property_identifier) @name) @isProperty
   (variable_declarator name: (identifier) @name) @isVariable
 
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
@@ -31,8 +34,16 @@ export const JAVASCRIPT_QUERIES = `
   (function_declaration name: (identifier) @name) @isFunction
   (method_definition name: (_) @name) @isMethod
 
-  ;; Heritage: extends
-  (class_heritage (extends_clause (_) @heritage))
+  ;; Heritage: extends (EXTENDS edge). JS has no 'implements'.
+  ;; Two bugs fixed here at once:
+  ;;   1. tree-sitter-javascript 0.25 has NO (extends_clause) node — the JS (class_heritage) holds
+  ;;      the superclass EXPRESSION directly. The old pattern therefore failed to compile and took
+  ;;      the whole JS query down with it (see the Atoms note above).
+  ;;   2. it was STANDALONE, so even had it compiled, reflector.ts:438 would have dropped the
+  ;;      capture for want of a co-captured @name. See docs/memory.md.
+  (class_declaration
+    name: (identifier) @name
+    (class_heritage (_) @heritage_extends)) @isStruct
 
   ;; --- React Hooks: const [x, setX] = useState() ---
   (variable_declarator

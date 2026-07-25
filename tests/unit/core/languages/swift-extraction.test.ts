@@ -61,6 +61,10 @@ actor Counter {
     func bump() {}
 }
 
+open class Widget {}
+
+package struct Crate {}
+
 typealias Handler = (Int) -> Void
 
 func topLevel(a: Int) -> Int {
@@ -97,6 +101,8 @@ func topLevel(a: Int) -> Int {
       canonicalKind: n.canonicalKind,
       id: n.metadata && n.metadata.id,
       parentId: n.metadata && n.metadata.parentId,
+      dna: (n.metadata && n.metadata.dna) || {},
+      isExport: !!n.isExport,
     })),
     rels: s.relationships.map((r) => ({
       type: r.type,
@@ -111,7 +117,10 @@ func topLevel(a: Int) -> Int {
   let result: {
     grammarLoaded: boolean;
     compileError: string | null;
-    nodes: Array<{ name: string; kind: string; canonicalKind: string; id: string; parentId: string }>;
+    nodes: Array<{
+      name: string; kind: string; canonicalKind: string; id: string; parentId: string;
+      dna: Record<string, boolean>; isExport: boolean;
+    }>;
     rels: Array<{ type: string; source: string; target: string; specifier?: string }>;
   };
 
@@ -147,6 +156,8 @@ func topLevel(a: Int) -> Int {
     ['Point', 'struct'],
     ['Direction', 'enum'],
     ['Counter', 'class'],
+    ['Widget', 'class'],
+    ['Crate', 'struct'],
     ['Greeter', 'interface'],
     ['Handler', 'interface'],
     ['refresh', 'function'],
@@ -167,9 +178,55 @@ func topLevel(a: Int) -> Int {
   it('keeps types STRUCTUREs and functions BEHAVIORs', () => {
     expect(find('UserService')?.canonicalKind).toBe('STRUCTURE');
     expect(find('Point')?.canonicalKind).toBe('STRUCTURE');
-    // The query deliberately omits @isAsync: the reflector's last-'is*'-capture-wins rule would
-    // demote `refresh` to kind 'async' (canonical ATOM). A regression here means it came back.
     expect(find('refresh')?.canonicalKind).toBe('BEHAVIOR');
+  });
+
+  it('flags an async func WITHOUT demoting it out of BEHAVIOR', () => {
+    // `public func refresh() async` — @isAsync rides the same pattern as @isFunction. Before the
+    // reflector gated its kind branch on DEFINITION_CAPTURES, the modifier capture rewrote kind to
+    // 'async', which mapToCanonical falls through to ATOM — the function demoted and prune could
+    // delete it. Both halves are asserted: kind survives AND the flag is actually recorded.
+    const refresh = find('refresh');
+    expect(refresh?.kind).toBe('function');
+    expect(refresh?.canonicalKind).toBe('BEHAVIOR');
+    expect(refresh?.dna.isAsync).toBe(true);
+
+    // A plain func in the same file must NOT pick the flag up — the `?` quantifier binds nothing.
+    expect(find('bump')?.dna.isAsync).toBeFalsy();
+  });
+
+  it('flags public / open / package visibility WITHOUT demoting the type', () => {
+    for (const name of ['UserService', 'Widget']) {
+      expect(find(name)?.kind).toBe('class');
+      expect(find(name)?.canonicalKind).toBe('STRUCTURE');
+      expect(find(name)?.dna.isExported).toBe(true);
+      expect(find(name)?.isExport).toBe(true);
+    }
+    expect(find('Crate')?.kind).toBe('struct');
+    expect(find('Crate')?.dna.isExported).toBe(true);
+
+    // Swift's default visibility is `internal` — no modifier means not exported. Also proves the
+    // optional group did not swallow the declarations that carry no `modifiers` node at all.
+    expect(find('Point')?.dna.isExported).toBeFalsy();
+    expect(find('Counter')?.dna.isExported).toBeFalsy();
+  });
+
+  it('never lets a MODIFIER capture become a node kind', () => {
+    // Regression guard for the reflector bug, language-agnostic in spirit: modifier captures
+    // (@isAsync/@isExported/@isStatic/@isAbstract) have dedicated handling and must never reach the
+    // kind branch. query.matches() is NOT ordered by pattern index, so pattern order cannot fix it.
+    const MODIFIER_KINDS = ['async', 'exported', 'static', 'abstract'];
+    const offenders = result.nodes.filter((n) => MODIFIER_KINDS.includes(n.kind));
+    expect(offenders).toEqual([]);
+
+    // And every symbol that actually carries a modifier flag still holds a real canonical rank —
+    // nothing silently fell through mapToCanonical into ATOM.
+    const flagged = result.nodes.filter((n) => n.dna.isAsync || n.dna.isExported);
+    expect(flagged.length).toBeGreaterThan(0);
+    for (const n of flagged) {
+      expect(['STRUCTURE', 'BEHAVIOR', 'ATOM', 'INFRA', 'UNIT']).toContain(n.canonicalKind);
+      expect(n.kind).not.toBe('unknown');
+    }
   });
 
   it('records the import module specifiers', () => {

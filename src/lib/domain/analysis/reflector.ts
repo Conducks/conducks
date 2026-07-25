@@ -1,5 +1,5 @@
 import Parser from "tree-sitter";
-import { PrismSpectrum, SpectrumNode } from "../../core/persistence/prism-core.js";
+import { PrismSpectrum, SpectrumNode } from "../../core/parsing/prism-core.js";
 import { ConducksProvider } from "../../core/parsing/providers/base.js";
 import { grammars } from "../../core/parsing/grammar-registry.js";
 import { ImportProcessor } from "../../core/parsing/processors/import.js";
@@ -412,8 +412,18 @@ export class ConducksReflector implements ConducksComponent {
           }
 
           if (node) {
-            node.kind = kind as any;
             node.metadata[cName] = true;
+          }
+
+          // ONLY definition captures may set `kind`. Modifier captures (@isAsync, @isExported,
+          // @isStatic, @isAbstract) have dedicated handling (dna at creation, isExport below) and
+          // flow markers (@isPulse, @isKinetic, @isGuard, @isFlow, @isContract, @isConcurrent,
+          // @isDeferred, @isVariadic) carry no kind at all. Ungated, any of them overwrote the
+          // node's real kind — a public class became kind 'exported', which mapToCanonical falls
+          // through to ATOM, demoting the class so prune could delete it. Pattern ordering cannot
+          // fix this: query.matches() is NOT ordered by pattern index. See todo13.
+          if (node && DEFINITION_CAPTURES.has(cName as any)) {
+            node.kind = kind as any;
 
             const canonical = mapToCanonical(kind);
             node.canonicalKind = canonical.kind;
@@ -435,8 +445,15 @@ export class ConducksReflector implements ConducksComponent {
             }
           }
         }
-        else if (cName === 'heritage' && node) {
-          this.heritage.process(cText, node.name, spectrum);
+        else if ((cName === 'heritage' || cName === 'heritage_extends' || cName === 'heritage_implements') && node) {
+          // The clause keyword IS the relation type. Queries whose grammar separates the two
+          // clauses (typescript, tsx) capture @heritage_extends / @heritage_implements, so the
+          // decision is made HERE, not guessed from the target's name. Plain @heritage keeps the
+          // processor's name heuristic as a fallback for the languages not yet split.
+          const explicit = cName === 'heritage_extends' ? 'EXTENDS'
+            : cName === 'heritage_implements' ? 'IMPLEMENTS'
+            : undefined;
+          this.heritage.process(cText, node.name, spectrum, explicit);
         }
         else if (cName === 'alias' && node) {
           this.bindings.processAlias(node.name, cText, spectrum);

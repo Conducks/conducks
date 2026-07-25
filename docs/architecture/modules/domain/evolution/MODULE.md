@@ -8,10 +8,13 @@ exports; drift compares the graph against a baseline; the watcher drives increme
 **Boundaries:** advisory only. Nothing here deletes anything, and nothing here should ever be wired
 to an automatic fix.
 
-**Deferred / not built:** `STALE_IMPORT` is declared in the `Finding` union and documented in the MCP
-tool surface, but has never been able to fire — it was gated on `node.label === 'import_clause' |
-'import_specifier'`, raw tree-sitter node types, while labels are canonical kinds. Rebuilding it
-correctly is blocked on inheritance edges (see below) and tracked in todo11.
+**Deferred / not built:** raising `STALE_IMPORT` recall past its deliberate floor. The finding fires
+since 2026-07-25 (`findStaleImports` — for a year it was gated on raw tree-sitter node types that
+labels never carry, then blocked on missing inheritance edges; todo11 closed both). It reports only
+on affirmative absence across every evidence class and currently yields 1 finding vs tsc's 75 —
+a strict subset with zero false positives. The recall gap is a query-coverage problem, not detector
+logic, and un-excluding type targets before the type-position captures exist would re-create the
+measured 36-false-positive flood (todo14).
 
 ## Prune must under-report, and here is the proof
 

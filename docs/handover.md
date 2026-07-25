@@ -2,42 +2,35 @@
 Status: current
 
 ## Where it stands
-- **The layer contract is real now.** `conducks guard` enforces ADR 0005 as a default rule — proven
-  non-vacuous both directions (raw cross-layer edge dump = 0 on a fresh 1801-node pulse; a
-  re-injected `cli → core` import blocks). Getting there routed 74 illegal edges through composition:
-  registry facades, one structural `NameIndex` type (NOT `import type` — this rule counts type-only
-  imports, unlike cycle detection, and it counts CALLS too), a lazy `import()` in `pulse-worker.ts`
-  (standalone process, cannot be injected), and a documented `cli → mcp` launcher exception beside
-  `cli → web`. todo06 closed for real this time. `sentinel.default.yml` deleted (zero readers,
-  divergent second source).
-- **Java, PHP and Swift extract again** (todo13 closed). Root causes: java `superclass:` holds a
-  wrapper node; php grammar 0.24.2 deleted `namespace_aliasing_clause` (4 broken patterns); swift has
-  no `struct_declaration` — everything is `class_declaration declaration_kind:` (11 corrections).
-  Canary tests (15+15+25) compile the FULL query so the next grammar bump fails loudly. **Java and
-  Swift emit the graph's first EXTENDS/IMPLEMENTS edges** — the co-capture recipe TS/Go need is now
-  proven in-repo and recorded in todo11.
-- **MCP impact direction settled**: `upstream` (= what breaks) is the default on every surface, and
-  the handler echoes the applied default. Before, a schema-honoring client and a param-omitting
-  client got opposite answers.
-- **Suite is deterministic again**: `workerIdleMemoryLimit: '1KB'` recycles the jest worker per file
-  — DuckDB stays serial, each grammar suite gets a fresh process (the tree-sitter native addon
-  serves ONE wrapper per process). 99/99 × 3 plain runs. NEVER verify with `--runInBand` — it
-  bypasses workers and reintroduces the collision (memory.md).
-- **Claude Desktop config fixed** — was pointing at a nonexistent `build/index.js` with no `mcp` arg
-  since an old `setup` run; the setup command that wrote it is also fixed (resolves the install root
-  from `import.meta.url`, not cwd). Two stale agent worktrees removed after verifying their diffs
-  were already in main.
+- **todo11 closed, both phases.** Heritage edges live for every extractable language — fresh vault:
+  IMPLEMENTS 84, EXTENDS 18 (was 0/0 forever). Clause-driven types (@heritage_extends/_implements;
+  the /^I[A-Z]/ name heuristic is fallback-only for go/swift/python/ruby/rust). En route: the ENTIRE
+  JavaScript query had never compiled — every .js file was a file-only node until now.
+- **STALE_IMPORT fires, under-reporting by design**: 1 finding / 0 false positives on conducks,
+  strict subset of tsc's 75. The measured ungated variant was 80 findings / 36 false — the flood the
+  old memory entry warned about. Recall path is todo14 (type-position captures), NOT a detector tweak.
+- **Reflector corruption gated**: modifier captures (@isExported/@isAsync + python @isKinetic, go
+  @isFlow) can no longer overwrite a node's kind and demote it to ATOM. DEFINITION_CAPTURES already
+  existed (capture-tags.ts:33); the branch just never consulted it. Swift async/visibility DNA
+  unlocked; regression guard asserts no node ever has kind async/exported/static/abstract.
+- **Abstract classes extract** (4 were invisible — distinct `abstract_class_declaration` node type),
+  **import aliases register** (`import { main as x }` was stored as `main` while code used `x`),
+  **provider dispatch maps derive from `provider.extensions`** (.cxx/.hxx no longer found-then-dropped),
+  **FS-fallback whitelist derives from providers** (.env never matched via extname — fixed),
+  **prism-core deduped**, **`conducks list` is honest** (reads `.conducks/links.json`),
+  **GQLParser deleted** (zero callers, double-proven).
+- Suite grew 99 → 152, all green. Layer gate stayed green through every change. docs-lint 35 governed.
 
 ## Next, in order
-1. **todo11 — port heritage co-capture to typescript/tsx/javascript/go** (the Java pattern is the
-   template; the swift agent's traps apply: `is*` captures can overwrite `kind`, and
-   `query.matches()` is NOT ordered by pattern index). Then re-derive STALE_IMPORT.
-2. **`reflector.ts:368` modifier-capture corruption** — a `@isExported` on a class demotes it to
-   ATOM (live-verified), which makes prune deletion possible. Gate the kind branch on a
-   DEFINITION_CAPTURES set; spec is in the swift agent's report / todo13 close-out. Blocks Swift
-   async/visibility DNA.
-3. **todo07 — workspace rollout**, unchanged.
-4. Smaller recorded specs: derive the non-Git FS discovery whitelist from registered providers
-   (`chronicle-interface.ts:71` omits `.rs .tsx .cs .c .cpp .php .swift`); duplicated
-   `prism-core.ts` (parsing vs persistence copies, both live); `conducks list` is a hardcoded stub;
-   `GQLParser` has zero callers — wire `--gql` or retire it.
+1. **todo14 — type-position captures** (`array_type`, `as_expression`, `type_predicate`,
+   `union_type`), then un-exclude type targets in `findStaleImports` and re-prove the tsc subset.
+   Touches ADR 0016 territory — probe-first, keep type-only-imports 4/4 byte-identical.
+2. **Decide the `.js` provider tie** (memory.md): registry says TypeScriptProvider, worker says
+   JavaScriptProvider — same file, two grammars depending on execution path. JavaScriptProvider is
+   the honest owner now its query compiles.
+3. **todo07 — workspace rollout** (unchanged; out of scope for CONDUCKS-only runs).
+4. Small recorded specs: `GraphTraversal.traverseUpstream` static call emits no CALLS edge
+   (adjacency-list.ts:367); `pulse-worker.ts:93 extensionToGrammar` is dead; `infraSuffixes`
+   (reflector.ts:258) proven dead but left per deletion policy; java could take the clause-split for
+   its heritage captures — DONE inline actually; tests/legacy still holds GQL references in two
+   archived files (ignored by tsc+jest).

@@ -9,7 +9,7 @@ export const TSX_QUERIES = `
   (export_statement source: (string) @source) @isImport
   ;; Per-binding capture
   (import_statement
-    (import_clause (named_imports (import_specifier name: (identifier) @name)))
+    (import_clause (named_imports (import_specifier name: (identifier) @name alias: (identifier)? @alias)))
     source: (string) @source) @isImport
 
   ;; --- Atoms (L6: Persistence & State) ---
@@ -19,6 +19,9 @@ export const TSX_QUERIES = `
 
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (type_identifier) @name) @isStruct
+  ;; 'abstract class' is (abstract_class_declaration), a DIFFERENT node type — without this an
+  ;; abstract class was extracted only when it had heritage (the heritage patterns below).
+  (abstract_class_declaration name: (type_identifier) @name) @isStruct
   (interface_declaration name: (type_identifier) @name) @isInterface
   (type_alias_declaration name: (type_identifier) @name) @isInterface
   (enum_declaration name: (identifier) @name) @isEnum
@@ -26,10 +29,29 @@ export const TSX_QUERIES = `
   (function_declaration name: (identifier) @name) @isFunction
   (method_definition name: (_) @name) @isMethod
 
-  ;; Heritage: extends/implements
-  (class_heritage (extends_clause (_) @heritage))
-  (class_heritage (implements_clause (_) @heritage))
-  (extends_type_clause (_) @heritage)
+  ;; Heritage: extends / implements (EXTENDS + IMPLEMENTS edges)
+  ;; Identical grammar family to typescript (tree-sitter-typescript 0.23.2 exposes tsx as a second
+  ;; language over the same node types) — the shapes were re-probed against the TSX grammar, not
+  ;; assumed. See typescript/queries.ts for the full rationale: @name MUST be co-captured or
+  ;; reflector.ts:438 drops the @heritage capture, and an interface uses (extends_type_clause),
+  ;; never (class_heritage). 'abstract class' is its own node type. The capture NAME carries the
+  ;; relation type: @heritage_extends -> EXTENDS, @heritage_implements -> IMPLEMENTS (the clause is
+  ;; known here, so HeritageProcessor's target-name heuristic must not re-guess it).
+  (class_declaration
+    name: (type_identifier) @name
+    (class_heritage (extends_clause value: (_) @heritage_extends))) @isStruct
+  (class_declaration
+    name: (type_identifier) @name
+    (class_heritage (implements_clause (_) @heritage_implements))) @isStruct
+  (abstract_class_declaration
+    name: (type_identifier) @name
+    (class_heritage (extends_clause value: (_) @heritage_extends))) @isStruct
+  (abstract_class_declaration
+    name: (type_identifier) @name
+    (class_heritage (implements_clause (_) @heritage_implements))) @isStruct
+  (interface_declaration
+    name: (type_identifier) @name
+    (extends_type_clause type: (_) @heritage_extends)) @isInterface
 
   ;; --- Type positions (ADR 0016) ---
   (type_annotation (type_identifier) @pulse_type_target)
@@ -76,6 +98,7 @@ export const TSX_QUERIES = `
   ;; --- Modifiers (DNA flags) ---
   (export_statement (function_declaration name: (identifier) @name) @isExported) @isFunction
   (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
+  (export_statement (abstract_class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
   (function_declaration "async" name: (identifier) @name) @isAsync @isFunction
   (abstract_method_signature name: (_) @name) @isAbstract @isMethod

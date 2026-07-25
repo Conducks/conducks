@@ -1,4 +1,4 @@
-import { PrismSpectrum } from "@/lib/core/persistence/prism-core.js";
+import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { mapToCanonical } from "@/lib/core/parsing/taxonomy.js";
 import path from "node:path";
 

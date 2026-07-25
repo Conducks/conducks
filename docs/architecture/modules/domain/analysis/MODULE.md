@@ -12,7 +12,7 @@ the same cycle data serves an audit, an advisor and a guard with three different
 top.
 
 **Deferred / not built:** a query planner. `query-service` answers a fixed set of questions with
-hand-written SQL and graph walks; there is no general query language beyond the small GQL parser.
+hand-written SQL and graph walks; there is no general query language.
 Adequate while the question set is known.
 
 ## Parts

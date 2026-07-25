@@ -104,8 +104,35 @@ export const GO_QUERIES = `
   ;; Interface Methods (L5)
   (method_elem name: (field_identifier) @name) @isMethod
 
-  ;; Embedded Structs (L4 Inheritance)
-  (field_declaration type: [(type_identifier) (pointer_type) (slice_type) (map_type) (call_expression)] @heritage)
+  ;; Embedding IS Go's inheritance (EXTENDS / IMPLEMENTS edges).
+  ;; Go has no extends/implements keyword. The only structural "is-a" the source states outright is
+  ;; EMBEDDING, so that is what heritage means here:
+  ;;   - struct embedding  'type Service struct { Base; *Logger }'  -> Service EXTENDS Base, Logger
+  ;;   - interface embedding 'type ReadWriter interface { Reader }'  -> ReadWriter EXTENDS Reader
+  ;; NOT recorded as heritage: a named field ('db *sql.DB' is composition-by-reference, not is-a) and
+  ;; implicit interface satisfaction (nothing in the syntax says it — that needs type inference).
+  ;;
+  ;; The old pattern was '(field_declaration type: [...] @heritage)' — doubly wrong: STANDALONE, so
+  ;; reflector.ts:438 dropped every capture (no co-captured @name -> no node); and it matched EVERY
+  ;; struct field, so had it worked, 'name string' would have made a struct "extend" string.
+  ;;
+  ;; tree-sitter-go 0.25 shapes (verified by compile probe):
+  ;;   - an EMBEDDED struct field is a (field_declaration) with NO 'name:' field, only 'type:'; a
+  ;;     leading '*' is an anonymous token, so '*Logger' still yields a bare (type_identifier).
+  ;;     Queries cannot assert a field is ABSENT, so the leading '.' anchor does the work: it pins
+  ;;     the type to the FIRST named child, which only holds for an embedded field (a named field
+  ;;     puts (field_identifier) there). Probed: 'name string' and 'm map[string]int' do not match.
+  ;;   - an EMBEDDED interface is a (type_elem), a sibling of (method_elem); a qualified embed like
+  ;;     'io.Closer' is a (qualified_type), whose text carries the full dotted path.
+  (type_spec
+    name: (type_identifier) @name
+    type: (struct_type
+      (field_declaration_list
+        (field_declaration . type: [(type_identifier) (qualified_type) (generic_type)] @heritage)))) @isStruct
+  (type_spec
+    name: (type_identifier) @name
+    type: (interface_type
+      (type_elem [(type_identifier) (qualified_type) (generic_type)] @heritage))) @isInterface
 
   ;; --- Execution Logic ---
   (go_statement (call_expression function: [(identifier) (selector_expression)] @kinesis_target)) @isConcurrent

@@ -2,7 +2,7 @@
  * Conducks — Canonical Prism Types
  *
  * Single source of truth for PrismSpectrum, SpectrumNode, and related shapes.
- * Both parsing/prism-core.ts and persistence/prism-core.ts re-export from here.
+ * parsing/prism-core.ts re-exports from here.
  */
 
 /**

@@ -2,7 +2,7 @@ import { ConducksNode, ConducksEdge, ConducksAdjacencyList } from "./adjacency-l
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { Logger } from "../utils/logger.js";
-import { PrismRequest } from "@/lib/core/persistence/prism-core.js";
+import { PrismRequest } from "@/lib/core/parsing/prism-core.js";
 import { StructuralRanker } from "../../core/graph/algorithms/ranker.js";
 import { Worker } from "node:worker_threads";
 import os from "node:os";

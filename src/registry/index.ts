@@ -6,7 +6,7 @@ import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, RegressionGuard } from "@/lib/domain/governance/index.js";
-import { IntelligenceService, ConducksSearch, GQLParser, FederatedLinker } from "@/lib/domain/intelligence/index.js";
+import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard } from "@/lib/domain/analysis/docs-grammar.js";
 import { parseIstanbul, bindCoverage, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
@@ -71,28 +71,42 @@ let ignoreManager = new IgnoreManager(process.cwd());
 
 // 2. Bridge Layer (Registry Infrastructure)
 const synapseRegistry = new SynapseRegistry();
-synapseRegistry.registerProvider('.py', PYTHON_SUITE.provider);
-synapseRegistry.registerProvider('.ts', TYPESCRIPT_SUITE.provider);
-synapseRegistry.registerProvider('.tsx', new TSXProvider());
-synapseRegistry.registerProvider('.js', TYPESCRIPT_SUITE.provider);
-synapseRegistry.registerProvider('.jsx', new TSXProvider());
-synapseRegistry.registerProvider('.go', new GoProvider());
-synapseRegistry.registerProvider('.rs', new RustProvider());
-synapseRegistry.registerProvider('.java', new JavaProvider());
-synapseRegistry.registerProvider('.cs', new CSharpProvider());
-synapseRegistry.registerProvider('.cpp', new CPPProvider());
-synapseRegistry.registerProvider('.h', new CPPProvider());
-synapseRegistry.registerProvider('.hpp', new CPPProvider());
-synapseRegistry.registerProvider('.cc', new CPPProvider());
-synapseRegistry.registerProvider('.php', new PHPProvider());
-synapseRegistry.registerProvider('.rb', new RubyProvider());
-synapseRegistry.registerProvider('.rake', new RubyProvider());
-synapseRegistry.registerProvider('.swift', new SwiftProvider());
-synapseRegistry.registerProvider('.c', new CProvider());
+
+// Dispatch is DERIVED from each provider's own `extensions` array (CONDUCKS-2 guarantees the field).
+// The hand-written list this replaces had drifted from the providers: CPPProvider declares
+// .cxx/.hxx but neither was registered, so once FS discovery started finding those files they were
+// dispatched to nothing and silently dropped.
+// List order = precedence: the FIRST provider to claim a pattern keeps it, which is why CPPProvider
+// stays ahead of CProvider — both declare .h, and .h belonged to C++ in the hand-written list.
+const tsxProvider = new TSXProvider();
+const providerPrecedence = [
+  PYTHON_SUITE.provider,
+  TYPESCRIPT_SUITE.provider,
+  tsxProvider,
+  new GoProvider(),
+  new RustProvider(),
+  new JavaProvider(),
+  new CSharpProvider(),
+  new CPPProvider(),
+  new PHPProvider(),
+  new RubyProvider(),
+  new SwiftProvider(),
+  new CProvider(),
+];
+const claimedPatterns = new Set<string>();
+for (const provider of providerPrecedence) {
+  for (const pattern of (provider as any).extensions ?? []) {
+    if (claimedPatterns.has(pattern)) continue;
+    claimedPatterns.add(pattern);
+    synapseRegistry.registerProvider(pattern, provider);
+  }
+}
+// One deliberate exception to the derivation: .jsx is declared by TypeScriptProvider, but only the
+// TSX grammar parses JSX, so .jsx keeps the TSX provider it has always had.
+synapseRegistry.registerProvider('.jsx', tsxProvider);
 
 // 3. Domain Component Instantiation (Lazy/Updatable)
 let search = new ConducksSearch(graph.getGraph());
-const gql = new GQLParser();
 let federation = new FederatedLinker(process.cwd());
 const advisor = new ConducksAdvisor();
 const sentinel = new ConducksSentinel();
@@ -114,7 +128,7 @@ let conducksCore = new Conducks();
 (conducksCore as any).graph = graph;
 (conducksCore as any).persistence = persistence;
 let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, persistence);
-let intelligence = new IntelligenceService(graph, search, gql, federation);
+let intelligence = new IntelligenceService(search, federation);
 let evolution = new EvolutionService(graph, persistence);
 const manifest = new ManifestService(manifestEngine);
 
@@ -149,7 +163,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
   const effectiveRoot = chronicle.getProjectDir();
   federation = new FederatedLinker(effectiveRoot);
   search = new ConducksSearch(graph.getGraph());
-  intelligence = new IntelligenceService(graph, search, gql, federation);
+  intelligence = new IntelligenceService(search, federation);
 }
 
 /**
@@ -189,7 +203,6 @@ export const registry = {
   },
   query: {
     query: (q: string, limit?: number) => intelligence.query(q, limit),
-    parseGQL: (query: string) => intelligence.parseGQL(query),
     link: (projectPath: string) => intelligence.link(projectPath),
     resonate: () => graph.resonate(),
     get graph() { return graph; },

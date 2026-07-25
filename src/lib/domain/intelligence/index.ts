@@ -1,5 +1,4 @@
 import { ConducksSearch } from "./search-engine.js";
-import { GQLParser } from "./gql-parser.js";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { ConducksComponent } from "@/contracts/types.js";
 
@@ -9,11 +8,9 @@ import { ConducksComponent } from "@/contracts/types.js";
 export class IntelligenceService implements ConducksComponent {
   public readonly id = 'intelligence-service';
   public readonly type = 'analyzer';
-  public readonly description = 'Encapsulates global structural search, graph query parsing (GQL), and cross-project federated linking.';
+  public readonly description = 'Encapsulates global structural search and cross-project federated linking.';
   constructor(
-    private readonly graph: any,
     public readonly search: ConducksSearch,
-    public readonly gql: GQLParser,
     public readonly federation: FederatedLinker
   ) {}
 
@@ -25,13 +22,6 @@ export class IntelligenceService implements ConducksComponent {
   }
 
   /**
-   * Parses a structural query string into a GQL result set.
-   */
-  public parseGQL(query: string) {
-    return this.gql.query(this.graph.getGraph(), query);
-  }
-
-  /**
    * Links a neighboring repository to the current Synapse.
    */
   public async link(projectPath: string) {
@@ -40,5 +30,4 @@ export class IntelligenceService implements ConducksComponent {
 }
 
 export { ConducksSearch } from "./search-engine.js";
-export { GQLParser } from "./gql-parser.js";
 export { FederatedLinker } from "@/lib/core/graph/linker-federated.js";

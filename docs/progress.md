@@ -1,5 +1,20 @@
 # Progress — conducks
 
+## 2026-07-25 · heritage everywhere + STALE_IMPORT ships (todo11 closed, todo14 opened)
+- Five opus agents + inline: heritage co-capture ported to TS/TSX/JS/Go (JavaScript's whole query
+  had NEVER compiled — every .js file was Gnosis file-only); EXTENDS/IMPLEMENTS now clause-driven
+  with the name heuristic demoted to fallback; abstract classes extract; import aliases register;
+  java/js clause-split. Fresh vault: IMPLEMENTS 84, EXTENDS 18.
+- STALE_IMPORT fires after a year of being unreachable: affirmative-absence design, 1 finding /
+  0 FP on conducks vs tsc's 75 (ungated variant measured at 80/36 — the flood). Prune surface:
+  26 ORPHAN / 5 UNUSED_EXPORT / 1 STALE_IMPORT. Recall gap = query coverage, tracked as todo14.
+- Reflector modifier-capture corruption gated (classes were demotable to ATOM; python/go flow
+  markers had the same bug). Swift async/visibility DNA shipped with the #match?-unbound-capture
+  trap documented in memory.md.
+- Provider dispatch + FS discovery both derive from provider.extensions now (.cxx/.hxx were being
+  found then dropped; .env never matched). prism-core deduped; conducks list honest; GQLParser
+  deleted (zero callers). Suite 99 → 152 green; layer gate green throughout.
+
 ## 2026-07-25 · layer contract enforced + three languages revived (todo06, todo13)
 - ADR 0005 enforced for real: 74 illegal cross-layer edges routed through composition (registry
   facades; structural type in `cli/shared/error.ts` — the rule counts type-only imports AND calls;

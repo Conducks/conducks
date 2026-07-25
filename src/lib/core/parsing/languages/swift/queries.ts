@@ -15,25 +15,30 @@ export const SWIFT_QUERIES = `
   (import_declaration (identifier) @source) @isImport
 
   ;; --- Nominal Types (all one node type, split by declaration_kind) ---
-  (class_declaration declaration_kind: "class" name: (type_identifier) @name) @isClass
-  (class_declaration declaration_kind: "actor" name: (type_identifier) @name) @isClass
-  (class_declaration declaration_kind: "struct" name: (type_identifier) @name) @isStruct
-  (class_declaration declaration_kind: "enum" name: (type_identifier) @name) @isEnum
+  ;; VISIBILITY (@isExported): the optional group must select the public-ish keywords with an
+  ;; anonymous-token ALTERNATION, never a (#match?) predicate. A predicate over an unbound optional
+  ;; capture FAILS instead of passing vacuously, which silently drops every declaration that has no
+  ;; visibility modifier (probed: 2 of 5 funcs survived). The alternation keeps one match per
+  ;; declaration and binds @isExported only for public / open / package.
+  (class_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? declaration_kind: "class" name: (type_identifier) @name) @isClass
+  (class_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? declaration_kind: "actor" name: (type_identifier) @name) @isClass
+  (class_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? declaration_kind: "struct" name: (type_identifier) @name) @isStruct
+  (class_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? declaration_kind: "enum" name: (type_identifier) @name) @isEnum
   ;; An extension's name is a (user_type) — capturing the inner (type_identifier) double-matches on
   ;; a qualified target like 'extension String.SubSequence'.
-  (class_declaration declaration_kind: "extension" name: (user_type) @name) @isStruct
-  (protocol_declaration name: (type_identifier) @name) @isInterface
-  (typealias_declaration name: (type_identifier) @name) @isInterface
+  (class_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? declaration_kind: "extension" name: (user_type) @name) @isStruct
+  (protocol_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? name: (type_identifier) @name) @isInterface
+  (typealias_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? name: (type_identifier) @name) @isInterface
   (associatedtype_declaration name: (type_identifier) @name) @isInterface
 
   ;; --- Behavior ---
-  ;; NO @isAsync / @isExported here on purpose. Both are reflector-level dead ends today:
-  ;;   - within a match the LAST 'is*' capture wins node.kind, so a modifier capture that lands after
-  ;;     the definition capture rewrites a function into kind 'async'/'exported' (canonical ATOM);
-  ;;   - a separate modifier-only pattern cannot win either, because query.matches() is NOT ordered by
-  ;;     pattern index, and dna is filled by whichever match reaches the symbol first.
-  ;; Re-add once reflector.ts excludes modifier captures from the kind branch (see todo13 report).
-  (function_declaration name: (simple_identifier) @name) @isFunction
+  ;; @isAsync / @isExported ride the SAME pattern as @isFunction on purpose: dna is filled from the
+  ;; match that CREATES the node, and query.matches() is NOT ordered by pattern index, so a separate
+  ;; modifier-only pattern would set the flag only by luck. Both are quantified (?) so a plain
+  ;; non-async, non-public func still produces exactly one match. Safe only because reflector.ts now
+  ;; gates the kind branch on DEFINITION_CAPTURES — before that, @isAsync overwrote kind with 'async'
+  ;; (canonical ATOM) and demoted the symbol. See todo13.
+  (function_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? name: (simple_identifier) @name "async"? @isAsync) @isFunction
   (init_declaration name: _ @name) @isFunction
   (deinit_declaration "deinit" @name) @isFunction
   (protocol_function_declaration name: (simple_identifier) @name) @isMethod

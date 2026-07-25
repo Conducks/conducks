@@ -37,7 +37,7 @@ With Conducks:     getUserById at src/services/user.ts line 42, called by 7 plac
 
 - Node.js 20 or higher (LTS 20/22 recommended). Node 23+ works but needs `npm run bootstrap` — see the [native build note](#native-build-note-node-23).
 - A C/C++ toolchain for the native `tree-sitter` build (Xcode Command Line Tools on macOS, `build-essential` on Linux)
-- Git. Conducks discovers files via `git ls-files`; outside a Git repo it falls back to a filesystem scan that only picks up `.py .js .ts .java .kt .go .rb .json .txt .md .env` and `Dockerfile`.
+- Git. Conducks discovers files via `git ls-files`; outside a Git repo it falls back to a filesystem scan covering every extension the language providers declare, plus `.json .txt .md .env` and `Dockerfile`.
 
 ### 1. Clone and build
 
@@ -227,7 +227,7 @@ conducks record --type [vision|architecture|implementation|handover|conventions|
 **Federation**
 
 ```bash
-conducks list                     # List all federated projects
+conducks list                     # Show the anchored workspace and any linked federated projects
 conducks link <path>              # Link a foundation synapse
 conducks resonance <path>         # Compare structure to another project
 ```
