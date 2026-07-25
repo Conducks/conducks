@@ -31,7 +31,13 @@ export class CallProcessor {
         : afterThis;
 
       // 1. Resolve Local Bindings (Imports/Aliases)
-      const resolvedPath = context.resolveLocalBinding(lowTarget);
+      let resolvedPath = context.resolveLocalBinding(lowTarget);
+      // Class-qualified static call (GraphTraversal.traverseUpstream): the full dotted form is
+      // never a binding, but the OBJECT segment is — and the method node id is exactly
+      // `path::classname.method`, so resolving the object resolves the call.
+      if (!resolvedPath && !startsWithThis && lowTarget.includes('.')) {
+        resolvedPath = context.resolveLocalBinding(lowTarget.split('.')[0]);
+      }
       if (resolvedPath) {
         targetId = `${resolvedPath}::${lowTarget}`;
       }
@@ -60,6 +66,10 @@ export class CallProcessor {
    * e.g. In Python `new User()` or Java `new User()` or Go `User{}`
    */
   public isConstructor(name: string, provider: any): boolean {
+    // A dotted name is never a constructor — `new X.Y()` arrives via the new_expression pattern.
+    // Without this, every capitalized static/namespace call (Math.random, JSON.parse,
+    // GraphTraversal.traverseUpstream) was typed CONSTRUCTS instead of CALLS.
+    if (name.includes('.')) return false;
     // Basic heuristic: Starts with uppercase (capitalized class)
     return /^[A-Z]/.test(name);
   }

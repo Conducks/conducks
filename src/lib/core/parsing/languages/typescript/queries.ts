@@ -72,6 +72,14 @@ export const TYPESCRIPT_QUERIES = `
   (type_annotation (type_identifier) @pulse_type_target)
   (type_annotation (generic_type name: (type_identifier) @pulse_type_target))
   (type_arguments (type_identifier) @pulse_type_target)
+  ;; todo14: type positions the above missed — each captures only its DIRECT type_identifier
+  ;; children; nesting (Bar[] inside a union, Foo[] inside as) is covered by the sibling patterns.
+  (constraint (type_identifier) @pulse_type_target)
+  (type_arguments (generic_type name: (type_identifier) @pulse_type_target))
+  (array_type (type_identifier) @pulse_type_target)
+  (as_expression (type_identifier) @pulse_type_target)
+  (type_predicate type: (type_identifier) @pulse_type_target)
+  (union_type (type_identifier) @pulse_type_target)
   
   ;; --- Infrastructure (L3-L4: Entry Points) ---
   ;; Decorators: @Controller('/path'), @Get('/path')
@@ -111,4 +119,10 @@ export const TYPESCRIPT_QUERIES = `
 
   ;; --- Metadata & Debt ---
   (comment) @comment
+
+
+  ;; Value-uses invisible to call/assignment patterns (todo14 FP closure):
+  ;; a local re-export is a USE of the binding; iterating a collection reads it.
+  (export_statement (export_clause (export_specifier name: (identifier) @ref_value)))
+  (for_in_statement right: (identifier) @ref_value)
 `;

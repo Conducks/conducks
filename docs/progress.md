@@ -1,5 +1,15 @@
 # Progress — conducks
 
+## 2026-07-25 · todo14 closed: STALE_IMPORT recall 1 → 18/0FP + call-edge truth (single-thread)
+- Four type-position captures (array/as/predicate/union) + four FP-closure captures (constraint,
+  nested generic, type re-export, for-of reads), every one probed first; canary suite added.
+  Subset re-validated: 18 findings, 0 false positives vs tsc's 75+5.
+- `isConstructor` no longer types dotted calls as CONSTRUCTS; dotted static calls resolve via the
+  object segment — `GraphTraversal.traverseUpstream` carries its first CALLS edge.
+- `.js`/`.jsx` → JavaScriptProvider in both maps (it was absent from registry precedence entirely);
+  dead `extensionToGrammar` and the dead reflector suffix-override removed with tombstones.
+- Suite 158 green ×2; audit/guard/docs-lint clean on a clean re-pulsed vault.
+
 ## 2026-07-25 · heritage everywhere + STALE_IMPORT ships (todo11 closed, todo14 opened)
 - Five opus agents + inline: heritage co-capture ported to TS/TSX/JS/Go (JavaScript's whole query
   had NEVER compiled — every .js file was Gnosis file-only); EXTENDS/IMPLEMENTS now clause-driven

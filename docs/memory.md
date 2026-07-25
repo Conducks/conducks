@@ -21,12 +21,12 @@
 - Gotcha: `findStaleImports` (`evolution/dead-code.ts`, shipped 2026-07-25) reports a binding only on
   affirmative absence across every evidence class (CALLS/CONSTRUCTS/ACCESSES, TYPE_REFERENCE +
   isTypeOnly, EXTENDS/IMPLEMENTS, DEPENDS_ON/VIRTUAL_LINK, identifier-in-arguments), gated by
-  import-site calibration and a value-kind-targets-only filter. On conducks: 1 finding vs tsc's 75 —
-  a strict subset, 0 false positives. The measured ungated variant produced 80 findings with 36 FALSE.
+  import-site calibration and a value-kind-targets-only filter. On conducks: 18 findings vs tsc's 75+5 —
+  a strict subset, 0 false positives (was 1 before the todo14 type-position captures). The measured ungated variant produced 80 findings with 36 FALSE.
   Namespace/side-effect/default/unresolved imports are structurally invisible (no per-binding edge),
   never "missed".
 - Why: every residual false positive traced to missing type-position captures, not detector logic —
-  recall is a query-coverage problem (todo14), and prune must err toward under-reporting because a
+  recall was a query-coverage problem (todo14, closed), and prune must err toward under-reporting because a
   false "dead" is a deleted caller.
 - Applies: `evolution/dead-code.ts` (`USAGE_EVIDENCE_EDGES`, `PRUNABLE_BINDING_KINDS`),
   `tests/unit/domain/stale-import.test.ts`. Any recall change re-runs the tsc-subset validation.
@@ -238,19 +238,6 @@
   failures under `--runInBand` are expected noise, not regressions. Plain `npm test` is already
   serial. (The java suite additionally runs its reflector in a `tsx` child process — belt and
   braces, and a portable pattern if isolation ever breaks again.)
-
-## `.js` files are dispatched to DIFFERENT providers in the main thread vs the worker
-- Gotcha: `registry/index.ts` maps `.js` → TypeScriptProvider while `pulse-worker.ts` maps `.js` →
-  JavaScriptProvider — both providers declare `.js` in their `extensions`, and the two derivation
-  loops resolve the tie oppositely (registry: first claim wins; worker: last claim wins). So the same
-  `.js` file parses under different grammars depending on whether the pulse ran threaded or not.
-  Deriving both maps from `provider.extensions` (2026-07-25) made the maps honest but could not
-  resolve this tie — it is a decision, not a derivation.
-- Why: TypeScriptProvider's grammar parses most JS, so the divergence is usually invisible; it shows
-  up exactly on syntax where the grammars differ. Note the JS query itself never compiled until
-  2026-07-25, which masked all of this — every `.js` file was a file-only node regardless of provider.
-- Applies: `registry/index.ts` provider loop, `pulse-worker.ts` provider loop. Pick one owner for
-  `.js` (JavaScriptProvider is the honest choice now its query works) and make both maps agree.
 
 ## A `#match?` predicate over an unbound optional capture FAILS — it is not vacuously true
 - Gotcha: `(modifiers (visibility_modifier) @cap (#match? @cap "^(public|open)$"))?` silently drops

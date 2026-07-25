@@ -255,11 +255,11 @@ export class ConducksReflector implements ConducksComponent {
             const defCapture = match.captures.find((c: any) => DEFINITION_CAPTURES.has(c.name));
             let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
 
-            const infraSuffixes = ['Service', 'Router', 'Controller', 'Registry', 'Store', 'Runner', 'Manager', 'Engine', 'Writer', 'Reporter', 'Provider', 'Client'];
-            if (infraSuffixes.some(s => name.endsWith(s))) {
-              initialKind = 'infra';
-            }
-
+            // NOTE: a name-suffix infra override used to sit here — deleted 2026-07-25 as provably
+            // dead: a node-creating match always carries a definition capture, whose kind assignment
+            // (the DEFINITION_CAPTURES-gated branch below) overwrites initialKind unconditionally.
+            // The LIVE suffix heuristic is the one in the Gnosis regex fallback (~:770), which has
+            // no captures to defer to.
             // IS_INFRA included so multi-line infra (decorators, providers) get a real span.
             // Note: single-line @isInfra hook patterns (useState/useEffect array_pattern) still
             // collapse to ~1 line — resolving those needs a variable_declarator walk (deferred, low value).

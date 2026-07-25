@@ -13,7 +13,7 @@ import { TypeScriptBindings } from "./bindings.js";
 export class TypeScriptProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "typescript-provider";
   public readonly version = "3.0.0";
-  public readonly extensions = [".ts", ".js", ".jsx"];
+  public readonly extensions = [".ts"];  // .js/.jsx belong to JavaScriptProvider — its grammar parses them natively (incl. JSX), and the worker path always dispatched them there
   public readonly langId = "typescript";
   public readonly importSemantics: ImportSemantics = 'named';
 

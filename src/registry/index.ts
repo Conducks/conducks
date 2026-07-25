@@ -29,6 +29,7 @@ import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { PYTHON_SUITE } from "@/lib/core/parsing/languages/python/index.js";
 import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/languages/typescript/index.js";
 import { TSXProvider } from "@/lib/core/parsing/languages/tsx/index.js";
+import { JavaScriptProvider } from "@/lib/core/parsing/languages/javascript/index.js";
 import { GoProvider } from "@/lib/core/parsing/languages/go/index.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { RustProvider } from "@/lib/core/parsing/languages/rust/index.js";
@@ -83,6 +84,7 @@ const providerPrecedence = [
   PYTHON_SUITE.provider,
   TYPESCRIPT_SUITE.provider,
   tsxProvider,
+  new JavaScriptProvider(),   // sole claimant of .js/.jsx — was never in this list; .js used to ride on the TS provider's claim
   new GoProvider(),
   new RustProvider(),
   new JavaProvider(),
@@ -101,9 +103,8 @@ for (const provider of providerPrecedence) {
     synapseRegistry.registerProvider(pattern, provider);
   }
 }
-// One deliberate exception to the derivation: .jsx is declared by TypeScriptProvider, but only the
-// TSX grammar parses JSX, so .jsx keeps the TSX provider it has always had.
-synapseRegistry.registerProvider('.jsx', tsxProvider);
+// No exceptions to the derivation: .js/.jsx resolve to JavaScriptProvider (their only claimant),
+// matching what the worker path always did — both maps now agree by construction.
 
 // 3. Domain Component Instantiation (Lazy/Updatable)
 let search = new ConducksSearch(graph.getGraph());

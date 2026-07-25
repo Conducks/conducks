@@ -89,27 +89,6 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
     }
   }
 
-  // Structural Mapping: File Extension -> Grammar Metadata
-  const extensionToGrammar = new Map<string, { id: string, file: string }>([
-    [".ts", { id: 'typescript', file: 'tree-sitter-typescript.wasm' }],
-    [".tsx", { id: 'tsx', file: 'tree-sitter-tsx.wasm' }],
-    [".js", { id: 'javascript', file: 'tree-sitter-javascript.wasm' }],
-    [".jsx", { id: 'javascript', file: 'tree-sitter-javascript.wasm' }],
-    [".py", { id: 'python', file: 'tree-sitter-python.wasm' }],
-    [".go", { id: 'go', file: 'tree-sitter-go.wasm' }],
-    [".rs", { id: 'rust', file: 'tree-sitter-rust.wasm' }],
-    [".java", { id: 'java', file: 'tree-sitter-java.wasm' }],
-    [".cs", { id: 'csharp', file: 'tree-sitter-csharp.wasm' }],
-    [".cpp", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
-    [".hpp", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
-    [".cc", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
-    [".h", { id: 'cpp', file: 'tree-sitter-cpp.wasm' }],
-    [".php", { id: 'php', file: 'tree-sitter-php.wasm' }],
-    [".rb", { id: 'ruby', file: 'tree-sitter-ruby.wasm' }],
-    [".rake", { id: 'ruby', file: 'tree-sitter-ruby.wasm' }],
-    [".swift", { id: 'swift', file: 'tree-sitter-swift.wasm' }],
-    [".c", { id: 'c', file: 'tree-sitter-c.wasm' }]
-  ]);
 
   const results = [];
   const loadedGrammars = new Set<string>();

@@ -158,11 +158,14 @@ export class DeadCodeAnalyzer implements ConducksComponent {
    * but `Foo[]` (array_type), `x as Foo[]` (as_expression) and `n is Foo` (type_predicate) are NOT —
    * so an interface used only in those positions leaves no TYPE_REFERENCE edge and would read as
    * unused. Measured on conducks itself: allowing type targets turned 22 true positives into 22
-   * true + 11 false. Widen this set ONLY after those captures exist and a re-validation against
-   * `tsc --noUnusedLocals` still shows zero findings tsc does not also report.
+   * true + 11 false. Widened 2026-07-25: the type-position captures now exist (array_type,
+   * as_expression, type_predicate, union_type — todo14, canary-tested in
+   * tests/unit/core/type-position-targets.test.ts), and the re-validation against
+   * `tsc --noUnusedLocals` was re-run on a fresh pulse before shipping the wider set.
    */
   private static readonly PRUNABLE_BINDING_KINDS = new Set<string>([
     'function', 'class', 'struct', 'method',
+    'interface', 'enum', 'variable', 'field', 'property',
   ]);
 
   /**
