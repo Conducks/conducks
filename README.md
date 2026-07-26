@@ -35,11 +35,31 @@ With Conducks:     getUserById at src/services/user.ts line 42, called by 7 plac
 
 ### Prerequisites
 
-- Node.js 20 or higher (LTS 20/22 recommended). Node 23+ works but needs `npm run bootstrap` — see the [native build note](#native-build-note-node-23).
-- A C/C++ toolchain for the native `tree-sitter` build (Xcode Command Line Tools on macOS, `build-essential` on Linux)
+- Node.js 20 or higher (LTS 20/22 recommended).
 - Git. Conducks discovers files via `git ls-files`; outside a Git repo it falls back to a filesystem scan covering every extension the language providers declare, plus `.json .txt .md .env` and `Dockerfile`.
+- **Optional:** a C/C++ toolchain, for full-fidelity parsing. Without one Conducks still installs and
+  still analyzes, at lower fidelity — see [parsing fidelity](#parsing-fidelity-native-vs-fallback).
 
-### 1. Clone and build
+### 1. Install
+
+```bash
+npm i -g conducks
+```
+
+That is the whole install. The native `tree-sitter` bindings are **optional dependencies**: npm
+builds them if your machine has a C/C++ toolchain and skips them if it does not, so the install never
+fails on a missing compiler. Check which parse path you got:
+
+```bash
+conducks doctor
+```
+
+`[✓] Parse path: native tree-sitter, all 13 grammars induced` is full fidelity.
+`[!] Parse path: Gnosis regex fallback` means the bindings did not build — Conducks works, but see
+[parsing fidelity](#parsing-fidelity-native-vs-fallback) for what you lose and how to fix it.
+
+<details>
+<summary>From source instead (contributors)</summary>
 
 ```bash
 git clone https://github.com/conducks/conducks
@@ -48,11 +68,11 @@ npm run bootstrap && npm run build
 npm link
 ```
 
-`npm run bootstrap` installs dependencies and, on Node 23+, forces the C++20 flag the native
-`tree-sitter` build needs (see the [native build note](#native-build-note-node-23)). On Node LTS
-20/22, plain `npm install --legacy-peer-deps` works too.
+`npm run bootstrap` installs dependencies and, on Node 23+, sets the C++20 flag the native build
+needs (see [parsing fidelity](#parsing-fidelity-native-vs-fallback)). On Node LTS 20/22, plain
+`npm install --legacy-peer-deps` works too.
 
-After `npm link`, the `conducks` command is available globally. The built entry point is at `build/src/interfaces/cli/index.js` inside the repo folder — you'll need that path for the MCP config below.
+</details>
 
 ### 2. Index your project
 
@@ -66,8 +86,8 @@ conducks analyze    # parses the codebase and builds the graph in .conducks/
 `analyze` is what creates the structural vault (`.conducks/conducks-synapse.db`). From here you can
 use the CLI directly or connect it to an AI agent via MCP.
 
-> `conducks setup` also tries to auto-register Conducks in Claude Desktop, but it writes
-> `<current-dir>/build/index.js` — a path that does not exist. Configure MCP by hand as shown below.
+`conducks setup` also auto-registers Conducks in Claude Desktop, resolving the CLI entry point from
+its own install location. If your agent is not Claude Desktop, configure it by hand as shown below.
 
 ### 3a. Use the CLI
 
@@ -85,41 +105,42 @@ conducks mirror           # Open the visual graph dashboard on port 3333
 
 ### 3b. Use it with an AI agent (MCP)
 
-Add the following to your agent's MCP config. Replace `/absolute/path/to/conducks` with the path where you cloned the repo (run `pwd` inside the folder to get it).
-
-**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+A global install puts `conducks` on your `PATH`, so the config needs no paths — the same block works
+for **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`),
+**Antigravity** (`~/.gemini/antigravity/mcp_config.json`), and any other stdio MCP client:
 
 ```json
 {
 	"mcpServers": {
 		"conducks": {
-			"command": "node",
-			"args": [
-				"/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
-				"mcp"
-			],
+			"command": "conducks",
+			"args": ["mcp"],
 			"disabled": false
 		}
 	}
 }
 ```
 
-**Antigravity** (`~/.gemini/antigravity/mcp_config.json`):
+<details>
+<summary>Installed from source instead?</summary>
+
+`npm link` also puts `conducks` on your `PATH`, so the block above still works. If your client cannot
+resolve commands from `PATH`, point it at the built entry directly — run `pwd` in the repo for the
+absolute path:
 
 ```json
 {
 	"mcpServers": {
 		"conducks": {
 			"command": "node",
-			"args": [
-				"/absolute/path/to/conducks/build/src/interfaces/cli/index.js",
-				"mcp"
-			],
+			"args": ["/absolute/path/to/conducks/build/src/interfaces/cli/index.js", "mcp"],
 			"disabled": false
 		}
 	}
 }
 ```
+
+</details>
 
 The server reads the workspace root from `--root <path>`, else from the `CONDUCKS_WORKSPACE_ROOT`
 environment variable, else from the current working directory. The default transport is stdio; pass
@@ -267,19 +288,35 @@ compile, Conducks does not error out — it degrades that file to the **Gnosis**
 single file-level node and no symbols. Counts drop silently, so a language that looks "supported" can
 be contributing nothing. Run with `CONDUCKS_DEBUG=1` to see the fallback messages.
 
-### Native build note (Node 23+)
+### Parsing fidelity: native vs fallback
 
-Conducks parses with **native** `tree-sitter` Node bindings (runtime `tree-sitter@0.25`). On newer
-Node releases (23/24/25) the V8 headers require C++20, but tree-sitter's `binding.gyp` defaults to
-C++17 — a plain `npm install` then fails with `"C++20 or later required."`.
-**`npm run bootstrap` handles this automatically** (it sets `CXXFLAGS=-std=c++20` on Node ≥ 23, then
-installs). To do it manually:
+Conducks parses with **native** `tree-sitter` Node bindings (runtime `tree-sitter@0.25`). They are
+**optional dependencies**, so a machine without a C/C++ toolchain still installs Conducks — it just
+runs on the Gnosis fallback described above, which emits one file-level node per file and no symbols.
+Run `conducks doctor` to see which path is live; it prints the toolchain command for your platform
+when the native path is missing.
+
+To get the native path:
+
+| platform | install the toolchain with |
+| --- | --- |
+| macOS | `xcode-select --install` |
+| Debian/Ubuntu | `apt install build-essential` |
+| Windows | Visual Studio Build Tools (C++ workload) |
+
+Then reinstall: `npm i -g conducks`.
+
+**Node 23+ needs one extra flag.** The V8 headers require C++20 while tree-sitter's `binding.gyp`
+defaults to C++17, so the native build fails with `"C++20 or later required."` — and because the
+bindings are optional, npm reports that as a skipped optional dependency rather than an error, leaving
+you silently on the fallback. Node LTS 20/22 build without the flag. From source,
+`npm run bootstrap` sets it automatically on Node ≥ 23; manually:
 
 ```bash
 CXXFLAGS="-std=c++20" npm install --legacy-peer-deps   # do NOT also set CFLAGS — it breaks the C compile
 ```
 
-Node LTS 20/22 build without the flag. The grammar's language-ABI must match the runtime.
+The grammar's language-ABI must match the runtime.
 
 ---
 

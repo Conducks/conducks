@@ -1,4 +1,4 @@
-import Parser from "tree-sitter";
+import type Parser from "tree-sitter";
 
 /**
  * Conducks — Swift Field and Complexity Extractor 🏺 🟦

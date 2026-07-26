@@ -4,13 +4,31 @@
 depends on it and its failures are silent.
 
 **Responsibility:** loading a tree-sitter grammar, holding one parser per language, and compiling
-queries. It is the only place that knows grammars are native modules rather than WASM.
+queries. It is the only place that knows grammars are native modules rather than WASM, and the only
+place that touches the `tree-sitter` package at runtime.
 
 **Boundaries:** it loads and hands back a parser. It knows nothing about captures or conducks'
 taxonomy.
 
 **Deferred / not built:** no per-grammar version pinning or capability probing. A grammar either
 loads or the language is marked unavailable.
+
+## The binding is OPTIONAL, so it may only be reached lazily
+
+`tree-sitter` and the 12 grammar packages are `optionalDependencies` (ADR 0027): the core package
+ships no prebuilds, so it compiles at install time and is simply ABSENT on a machine with no C++
+toolchain. Every runtime use goes through `loadNative()` — a cached `require` inside a `try/catch` —
+and `isNativeAvailable()` answers whether the path is live. With no binding, every language is marked
+unavailable and the reflector's Gnosis regex extractor carries the analysis.
+
+**Never value-import `tree-sitter` anywhere.** ESM resolves static imports before the first line of a
+module runs, so a `try/catch` inside the module cannot protect it: an absent optional dep kills the
+CLI at load with `ERR_MODULE_NOT_FOUND`, before any fallback exists to run. `import type` is fine — it
+erases. This held by accident for a long time (`Parser` happened to appear only in type positions in
+12 files) and is now pinned by `tests/unit/core/parsing/optional-native-binding.test.ts`.
+
+There is no WASM path and no `resources/grammars/` directory. A 20 MB set of `.wasm` files lived there
+long after anything stopped loading them; ADR 0027 removed them.
 
 ## Native, not WASM — so ABI compatibility is a real constraint
 

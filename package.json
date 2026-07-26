@@ -24,7 +24,7 @@
 		"README.md"
 	],
 	"scripts": {
-		"build": "rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/lib/core/parsing/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/interfaces/cli/",
+		"build": "rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/",
 		"start": "node ./build/src/interfaces/cli/index.js mirror",
 		"demo": "npm run build && npm run start",
 		"clean": "rm -rf build data .conducks",
@@ -49,7 +49,10 @@
 		"express": "^4.18.2",
 		"fs-extra": "^11.3.2",
 		"marked": "^5.1.2",
-		"slugify": "^1.6.6",
+		"slugify": "^1.6.6"
+	},
+	"optionalDependencies": {
+		"ajv": "^8.12.0",
 		"tree-sitter": "^0.25.0",
 		"tree-sitter-c": "0.24.1",
 		"tree-sitter-c-sharp": "0.23.1",
@@ -63,9 +66,6 @@
 		"tree-sitter-rust": "0.24.0",
 		"tree-sitter-swift": "0.7.1",
 		"tree-sitter-typescript": "0.23.2"
-	},
-	"optionalDependencies": {
-		"ajv": "^8.12.0"
 	},
 	"devDependencies": {
 		"@types/cors": "^2.8.17",
@@ -82,5 +82,13 @@
 		"tsx": "^4.21.0",
 		"typescript": "^5.3.3",
 		"vitest": "^4.1.2"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Conducks/conducks.git"
+	},
+	"homepage": "https://github.com/Conducks/conducks#readme",
+	"bugs": {
+		"url": "https://github.com/Conducks/conducks/issues"
 	}
 }

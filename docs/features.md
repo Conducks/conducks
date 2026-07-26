@@ -177,8 +177,16 @@
 - Intent: Lets a coding agent use conducks as a tool rather than as a human-operated CLI, with every tool annotated read-only so a host can reason about safety before calling. (ADR 0007.)
 
 ## Environment & Vault Check — `conducks doctor`
-- Purpose: Verify the machine can actually run conducks — Node version, the DuckDB binding, the tree-sitter grammars — and report whether a vault exists and how old its last pulse is.
-- Intent: Most "conducks is broken" reports are environment, not logic. One command that names the failing prerequisite is cheaper than reading a stack trace.
+- Purpose: Verify the machine can actually run conducks — Node version, the DuckDB binding, WHICH parse path is live and how many grammars induced — and report whether a vault exists, how old its last pulse is, and whether a newer release exists.
+- Intent: Most "conducks is broken" reports are environment, not logic. One command that names the failing prerequisite is cheaper than reading a stack trace. Since the native bindings are optional, the parse path is now a fact the user cannot infer — a silent fallback looks identical to a working install until symbol counts are questioned.
+
+## Degraded Parsing Without a Toolchain — automatic, reported by `conducks doctor`
+- Purpose: Analyze a codebase even where the native `tree-sitter` bindings could not be built, by falling through to the Gnosis regex extractor per file.
+- Intent: `npm i -g conducks` must work on a machine with no C++ toolchain, and the core `tree-sitter` package ships no prebuilds — so the bindings are optional and their absence has to be a supported state, not a crash. Lower fidelity is a worse answer; a dead CLI is no answer.
+
+## Update Notice — reported by `conducks doctor`
+- Purpose: Compare the installed version against the latest GitHub release and hand back the upgrade command that matches how this copy was installed.
+- Intent: It TELLS and never upgrades — a tool that rewrites its own install unprompted is a supply-chain surprise. It is also the only outbound network call in conducks, so it is cached for 24h in `~/.conducks/`, times out in 2s, swallows every failure, and can be switched off with `CONDUCKS_NO_UPDATE_CHECK=1`.
 
 ## Vault Clean / Reset — `conducks clean`
 - Purpose: Drop the vault and clear stuck process locks so a fresh pulse can run.

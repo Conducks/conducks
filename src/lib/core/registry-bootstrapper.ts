@@ -11,7 +11,6 @@ import fsSync from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const resourcesDir = path.resolve(__dirname, "../../resources/grammars");
 
 /**
  * Conducks — Registry Bootstrapper (Capability Layer)

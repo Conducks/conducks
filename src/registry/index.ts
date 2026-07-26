@@ -49,7 +49,6 @@ import path from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const resourcesDir = path.resolve(__dirname, "../resources/grammars");
 
 // No logic allowed here as per Rule 11.
 

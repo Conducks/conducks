@@ -1,4 +1,4 @@
-import Parser from "tree-sitter";
+import type Parser from "tree-sitter";
 import { PrismSpectrum, SpectrumNode } from "../../core/parsing/prism-core.js";
 import { ConducksProvider } from "../../core/parsing/providers/base.js";
 import { grammars } from "../../core/parsing/grammar-registry.js";

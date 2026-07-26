@@ -106,6 +106,8 @@ export class HelpCommand implements ConducksCommand {
     console.log("");
 
     console.log(` \x1b[2mRun 'conducks analyze' to synchronize structural resonance before querying.\x1b[0m`);
-    console.log(` \x1b[2mDetailed Documentation: ./docs/mechanics.md\x1b[0m\n`);
+    // Not a repo-relative path: the tarball ships only [build, config, LICENSE, README.md], so a
+    // globally installed conducks has no docs/ to point at (todo16 Phase 2).
+    console.log(` \x1b[2mDetailed Documentation: https://github.com/Conducks/conducks#readme\x1b[0m\n`);
   }
 }

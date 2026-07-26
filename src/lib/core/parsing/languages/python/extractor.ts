@@ -1,4 +1,4 @@
-import Parser from "tree-sitter";
+import type Parser from "tree-sitter";
 
 /**
  * Conducks — Python Field and Visibility Extractor (Suite v3) 🐍

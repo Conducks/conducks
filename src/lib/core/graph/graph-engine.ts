@@ -43,7 +43,6 @@ export class ConducksGraph {
     const chunkSize = Math.ceil(unitCount / coreCount);
     const isTs = __filename.endsWith('.ts');
     const workerScript = path.resolve(__dirname, `../parsing/pulse-worker.${isTs ? 'ts' : 'js'}`);
-    const grammarDir = path.resolve(__dirname, "../../../resources/grammars");
     const workerPromises = [];
 
     for (let i = 0; i < unitCount; i += chunkSize) {
@@ -51,7 +50,7 @@ export class ConducksGraph {
 
       const p = new Promise<void>((resolve, reject) => {
         const worker = new Worker(workerScript, {
-          workerData: { units: chunk, grammarDir },
+          workerData: { units: chunk },
           execArgv: isTs ? ["--import", "tsx"] : []
         });
 

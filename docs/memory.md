@@ -259,3 +259,30 @@
 - Gotcha: "disconnected by accident" and "deliberately not wired yet" look identical to the graph — both are zero incoming edges.
 - Why: deleting the second kind destroys a capability nobody decided to drop, and git history will not tell the next reader which it was. `clustering/daac.ts` is the live example: 149 lines of directory-aware clustering, unwired, more capable than the `mirror.engine.detectCluster()` heuristic that replaced it, with no ADR either way.
 - Applies: before deleting an orphan, answer "was this disconnected, or never connected?" A capability with no recorded decision gets an ADR line first. — ADR 0026
+
+## Native tree-sitter is the ONLY parse path — the 20 MB of `.wasm` was never loaded
+- Gotcha: `src/resources/grammars/` held 14 `.wasm` files and five call sites computed a path to it, so
+  it read as a live WASM engine. Nothing loaded any of them: `web-tree-sitter` was not even installed,
+  the `resourceDir`/`grammarDir` values were passed into workers and destructured (`pulse-worker.ts:27`)
+  but never used, and the only real consumer was an `existsSync` throw on `tree-sitter-python.wasm` in
+  `conducks-core.pulse()`. Deleting the dir dropped the tarball from 22.9 MB to 1.6 MB unpacked with
+  no behaviour change — verified by a full pulse (1404 nodes, 3592 edges).
+- Why: the engine moved from WASM to native bindings for speed, and the WASM assets plus their path
+  plumbing were left behind. A path that is computed but unread is invisible to `prune` (it is not a
+  symbol) and to the type checker (it is a valid string), so only tracing every consumer finds it.
+- Applies: grammars are induced by `GrammarRegistry.loadLanguage()` via `require('tree-sitter-<lang>')`
+  — native, always. If a WASM path is ever wanted again it is a new build, not a revival. — ADR 0027
+
+## `tree-sitter` is an OPTIONAL dep, so a VALUE import of it is a latent crash
+- Gotcha: `import Parser from 'tree-sitter'` compiled away in 12 files because `Parser` appeared only
+  in type positions — the invariant held by luck. Add one value use (`new Parser()`) and the import
+  becomes real; on a machine with no C++ toolchain the package is absent and ESM kills the whole CLI
+  at load with `ERR_MODULE_NOT_FOUND`, before any fallback can run. The core package ships NO
+  prebuilds (`tree-sitter@0.25.0`, latest as of 2026-07-26), so absence is the normal case, not an edge one.
+- Why: ESM resolves every static import before the first line of a module executes, so a `try/catch`
+  inside the module cannot protect it. Only `import type` (erased) or a lazy `require` inside a
+  function is safe. The 12 grammar packages DO ship prebuilds for 6 platforms — only the core compiles.
+- Applies: every use of the binding goes through `GrammarRegistry.loadNative()`; ask
+  `grammars.isNativeAvailable()` rather than assuming. Absent binding → Gnosis regex extractor, measured
+  at 25 nodes/32 edges against native's 26/27 on the same two-file fixture. Pinned by
+  `tests/unit/core/parsing/optional-native-binding.test.ts`, which fails on any value import. — ADR 0027

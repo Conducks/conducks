@@ -47,7 +47,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isTs = __filename.endsWith('.ts');
 const workerPath = path.resolve(__dirname, `../../core/parsing/pulse-worker.${isTs ? 'ts' : 'js'}`);
-const resourceDir = path.resolve(__dirname, "../../../resources/grammars");
 
 /**
  * Conducks — Analyze Orchestrator
@@ -334,11 +333,10 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       
       logger.info(`🛡️ [Conducks] Wave ${batchNum}/${totalBatches}: Inducing ${chunk.length} units...`);
       const inductionResults = await this.runParallelPulse(
-        chunk, 
-        false, 
-        allPaths, 
-        context.exportState().registry,
-        resourceDir
+        chunk,
+        false,
+        allPaths,
+        context.exportState().registry
       );
 
       for (const res of inductionResults) {
@@ -503,16 +501,14 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     files: Array<{ path: string, source: string }>,
     discoveryMode: boolean,
     allPaths: string[],
-    globalSymbols?: Record<string, any>,
-    requestedGrammarDir?: string
+    globalSymbols?: Record<string, any>
   ): Promise<any[]> {
     const unitCount = files.length;
     if (unitCount === 0) return [];
 
-    const workerScript = isTs 
+    const workerScript = isTs
       ? path.resolve(__dirname, `../../core/parsing/pulse-worker.ts`)
       : path.resolve(__dirname, `../../core/parsing/pulse-worker.js`);
-    const finalResourceDir = requestedGrammarDir || resourceDir;
 
     let tsxLoader: string | null = null;
     if (isTs) {
@@ -541,7 +537,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
             const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
             const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
             
-            fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, resourceDir: finalResourceDir, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
+            fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
             
             spawnSync('node', [
               '--no-warnings',

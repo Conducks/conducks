@@ -1,4 +1,4 @@
-import Parser from 'tree-sitter';
+import type Parser from 'tree-sitter';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -16,8 +16,38 @@ export class GrammarRegistry {
   private isolatedParsers: Map<string, Parser> = new Map();
   private unavailableLanguages: Set<string> = new Set();
   private require = createRequire(import.meta.url);
+  private nativeParser: any | undefined;
+  private nativeLoadFailed = false;
 
   private constructor() {}
+
+  /**
+   * Loads the native `tree-sitter` binding on demand.
+   *
+   * `tree-sitter` is an OPTIONAL dependency: its core package ships no prebuilds, so it compiles
+   * from source at install time and is simply absent on a machine without a C++ toolchain. A static
+   * import would crash module load there, so every runtime use goes through here and a missing
+   * binding degrades to the Gnosis regex extractor instead. See ADR 0027.
+   */
+  private loadNative(): any | undefined {
+    if (this.nativeParser) return this.nativeParser;
+    if (this.nativeLoadFailed) return undefined;
+    try {
+      this.nativeParser = this.require('tree-sitter');
+      return this.nativeParser;
+    } catch (err) {
+      this.nativeLoadFailed = true;
+      this.log('[Conducks Parser] Native binding unavailable — all languages fall back to Gnosis.', err);
+      return undefined;
+    }
+  }
+
+  /**
+   * Whether the native binding could be loaded. `false` means every file goes through Gnosis.
+   */
+  public isNativeAvailable(): boolean {
+    return this.loadNative() !== undefined;
+  }
 
   public static getInstance(): GrammarRegistry {
     if (!GrammarRegistry.instance) {
@@ -43,6 +73,12 @@ export class GrammarRegistry {
     await this.init();
     
     if (this.languages.has(langId) || this.unavailableLanguages.has(langId)) return;
+
+    // No native binding means no grammar can be induced at all — mark it and let Gnosis take over.
+    if (!this.loadNative()) {
+      this.unavailableLanguages.add(langId);
+      return;
+    }
 
     try {
       // Native Module Induction 🧬
@@ -103,9 +139,12 @@ export class GrammarRegistry {
     const lang = this.languages.get(langId);
     if (!lang) return undefined;
 
+    const NativeParser = this.loadNative();
+    if (!NativeParser) return undefined;
+
     let parser = this.isolatedParsers.get(langId);
     if (!parser) {
-      parser = new Parser();
+      parser = new NativeParser() as Parser;
       this.isolatedParsers.set(langId, parser);
     }
 
@@ -164,11 +203,13 @@ export class GrammarRegistry {
    */
   public createQuery(lang: any, source: string): any {
     const nativeLang = (lang as any).language || lang;
+    const NativeParser = this.loadNative();
+    if (!NativeParser) return undefined;
     // 🛡️ [Conducks Resilience Bridge] v4.0
     // Parser.Query crashes with 'reading 166' on grammar ABI mismatches.
     // Bypass the JS wrapper and use the native binding directly.
     try {
-      return new Parser.Query(nativeLang, source);
+      return new NativeParser.Query(nativeLang, source);
     } catch (err) {
       try {
         const tsPath = path.dirname(this.require.resolve('tree-sitter/package.json'));

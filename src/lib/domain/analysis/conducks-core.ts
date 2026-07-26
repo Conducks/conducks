@@ -88,15 +88,6 @@ export class Conducks implements ConducksComponent {
     console.error("[ConducksCore] Initializing grammars...");
     await grammars.init();
     console.error("[ConducksCore] Grammars initialized.");
-    // Conducks: High-Fidelity Resource Discovery
-    const grammarDir = path.resolve(__dirname, "../../../resources/grammars");
-
-    const wasmPath = path.join(grammarDir, "tree-sitter-python.wasm");
-    if (!fs.existsSync(wasmPath)) {
-      throw new Error(`Critical dependency missing: ${wasmPath}`);
-    }
-
-    console.error(`[ConducksCore] Loading grammar: ${wasmPath}`);
     await grammars.loadLanguage("python");
     console.error(`[ConducksCore] Grammar loaded.`);
 

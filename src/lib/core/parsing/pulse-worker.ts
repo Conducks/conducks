@@ -24,7 +24,7 @@ import fs from 'node:fs';
  */
 
 async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = false) {
-  const { units, allPaths, discoveryMode, globalSymbols, resourceDir } = data;
+  const { units, allPaths, discoveryMode, globalSymbols } = data;
 
   // The reflector lives in the DOMAIN layer; this worker is in CORE. A static import would be a
   // core → domain edge (ADR 0005). This file is a process entry point, not a core primitive — it is

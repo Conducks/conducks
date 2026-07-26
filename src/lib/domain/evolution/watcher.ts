@@ -1,4 +1,3 @@
-import Parser from "tree-sitter";
 import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
@@ -117,10 +116,8 @@ export class ConducksWatcher implements ConducksComponent {
    */
   public async init(): Promise<void> {
     if (this.isInitialized) return;
-    const ParserClass = (Parser as any).default || (Parser as any).Parser || Parser;
-    if (typeof ParserClass.init === 'function') {
-      await ParserClass.init();
-    }
+    // No parser bootstrap needed: the native binding has no static init() — that was the
+    // web-tree-sitter (WASM) API, and grammars are induced lazily by GrammarRegistry.
     this.isInitialized = true;
   }
 

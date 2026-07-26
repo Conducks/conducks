@@ -1,4 +1,4 @@
-import Parser from "tree-sitter";
+import type Parser from "tree-sitter";
 import { ConducksNode, ConducksEdge } from "@/lib/core/graph/adjacency-list.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 
