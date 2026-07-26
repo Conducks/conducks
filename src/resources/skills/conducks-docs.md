@@ -86,15 +86,17 @@ is genuinely unit-local, it is still a root `todoNN.md` — say which unit in it
 and nothing below it. This is the single most common way a monorepo's docs rot:
 
 ```
-conducks docs-lint            # repo root → lints root docs/ ONLY
-conducks docs-lint app        # → lints app/docs/
-conducks docs-lint admin      # → lints admin/docs/
+conducks docs-lint            # repo root → lints root docs/ ONLY, and NAMES the trees it skipped
+conducks docs-lint --units    # root + every unit docs/, fails if ANY of them fails  ← the CI gate
+conducks docs-lint app        # just that one unit
 ```
 
-Measured on a real monorepo: the root run reported **43 governed docs clean** while 45 files across
-four unit `docs/` folders were never opened. "Clean" meant "clean at root". Lint every unit, or the
-units are ungoverned. `conducks monitor` reports each registered project, so registering the units
-gives you the sweep in one command.
+Measured on a real monorepo: the root run reported **43 governed docs clean and exited 0** while a
+broken phase sat unread in `app/docs/`. "Clean" meant "clean at root". Use `--units` in CI and in your
+pre-commit hook, or the units are ungoverned.
+
+`docs-status` and `conducks_docs` have no `--units` — a board is one project's table of open work, and
+merging four units' todos into one list would lose which unit each belongs to. Ask per unit.
 
 ---
 

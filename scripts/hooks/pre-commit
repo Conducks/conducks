@@ -30,7 +30,9 @@ if [ ! -f "$CLI" ]; then
   exit 0
 fi
 
-if ! node "$CLI" docs-lint; then
+# --units so a monorepo gate covers every unit docs/ tree, not just the root one. A gate that
+# silently checks less than it appears to is the failure mode this hook exists to prevent.
+if ! node "$CLI" docs-lint --units; then
   printf '\n\033[31m[pre-commit] docs-lint failed — commit aborted.\033[0m\n' >&2
   printf 'Fix the violations above, or bypass deliberately with: git commit --no-verify\n' >&2
   exit 1

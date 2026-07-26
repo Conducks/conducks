@@ -92,3 +92,40 @@ describe('unit docs discovery', () => {
     });
   });
 });
+
+/**
+ * `docs-lint --units` is the monorepo CI gate: it must FAIL when any single unit fails, not just the
+ * root. A gate that silently checks less than it appears to is the failure mode the whole notice
+ * exists to prevent — measured on a real repo, root exited 0 with a broken phase in `app/docs/`.
+ */
+describe('--units aggregation', () => {
+  let root = '';
+
+  const write = (rel: string, body: string) => {
+    const full = path.join(root, rel);
+    mkdirSync(path.dirname(full), { recursive: true });
+    writeFileSync(full, body);
+  };
+
+  const GOOD_TODO = '# todo01 — a thing\n\nStatus: doing\n- Acceptance: it works\n\n## Phase 1 — p\n- [ ] the open task\n';
+  const BAD_TODO = '# todo01 — a thing\n\nStatus: doing\n- Acceptance: it works\n\n## Phase 1 — p\nprose, no tasks\n';
+
+  beforeEach(() => { root = mkdtempSync(path.join(tmpdir(), 'conducks-agg-')); });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('sees every unit that the root run would skip', () => {
+    write('docs/todos/todo01.md', GOOD_TODO);
+    write('app/docs/todos/todo01.md', BAD_TODO);
+    write('admin/docs/todos/todo01.md', GOOD_TODO);
+
+    // The command lints root + each of these. The discovery is what makes that possible at all.
+    expect(findUnitDocs(root).map(u => u.unit).sort()).toEqual(['admin', 'app']);
+  });
+
+  it('the notice names the unit holding the break, so a root-only run is not misleading', () => {
+    write('docs/todos/todo01.md', GOOD_TODO);
+    write('app/docs/todos/todo01.md', BAD_TODO);
+
+    expect(unitDocsNotice(root).join('\n')).toMatch(/conducks docs-lint app/);
+  });
+});
