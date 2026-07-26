@@ -79,6 +79,31 @@ function countMarkdown(dir: string, depth = 0): number {
   return n;
 }
 
+/** One docs tree to read: the repository root, or a unit inside it. */
+export interface DocsTree {
+  /** `(root)` for the top tree, otherwise the unit path relative to the root — `app`, `packages/core`. */
+  label: string;
+  /** Absolute path to pass to `buildBoard` — the folder CONTAINING `docs/`, not `docs/` itself. */
+  path: string;
+  /** True for the repository root. */
+  isRoot: boolean;
+}
+
+/**
+ * Every docs tree under `root`, root first.
+ *
+ * The ONE resolver behind the CLI and the MCP tool, so all three surfaces agree on what "this
+ * project's docs" means. A single-repo project returns exactly one tree and behaves as it always did;
+ * a monorepo returns the root plus each unit, and nothing has to know which case it is in.
+ */
+export function resolveDocsTrees(root: string): DocsTree[] {
+  const abs = path.resolve(root);
+  return [
+    { label: "(root)", path: abs, isRoot: true },
+    ...findUnitDocs(abs).map(u => ({ label: u.unit, path: path.join(abs, u.unit), isRoot: false })),
+  ];
+}
+
 /** The reminder line(s) a docs command prints when unit docs exist beside the tree it scanned. */
 export function unitDocsNotice(root: string): string[] {
   const units = findUnitDocs(root);

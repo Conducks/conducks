@@ -2,6 +2,7 @@ import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
+import { resolveDocsTrees } from "@/lib/domain/analysis/unit-docs.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
@@ -732,6 +733,11 @@ state. Open the todo or the ADR before acting on it.
 layer="all" (default) also returns the constraints to load once per session — conventions (rules)
 and memory (gotchas), compacted to one line each. layer="board" omits them for repeat calls.
 
+MONOREPO: a repo that keeps a docs/ per deployable unit returns {trees:{"(root)":…, "app":…}} —
+one board per tree, kept SEPARATE because an address like todo01#P2 only resolves inside its own
+tree and merging them would lose which unit each belongs to. A single-repo project returns the board
+directly, unwrapped. scope="root" forces the single-tree shape; scope="<unit path>" reads one unit.
+
 WHEN TO USE: at session start, and whenever you pick up work — "what is on the table, what is
 waiting, which decisions still have unbuilt parts" without opening every doc.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
@@ -741,22 +747,55 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
         path: { type: "string", description: "Optional: the project root." },
         layer: { type: "string", enum: ["all", "board"], description: "all = threads + constraints (session start). board = open threads only." },
         recent: { type: "number", description: "How many recent decisions to list (default 4, 0 for none). Derived from ADR dates — there is no progress file." },
-        raw: { type: "boolean", description: "Return the full unprojected board (every doc, every entry). Large." }
+        raw: { type: "boolean", description: "Return the full unprojected board (every doc, every entry). Large." },
+        scope: { type: "string", description: "Monorepo only. Omit for every tree (root + each unit). 'root' = the root tree alone. A unit path ('app', 'packages/core') = that unit alone." }
       }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ path: customPath, layer, recent, raw }: any) => {
+    handler: async ({ path: customPath, layer, recent, raw, scope }: any) => {
       try {
         // DOCS LAYER: markdown only. No anchor, no graph, no DuckDB — this answers on a folder that
         // was never analyzed, and takes no connection for another agent to queue behind.
         const root = resolveDocsRoot(customPath);
-        if (raw) {
-          const board = registry.docs.board(root);
-          return mcpOk(board, { nodeCount: board.todos.length + board.decisions.length });
+        const depth = typeof recent === "number" ? recent : 4;
+        const readOne = (target: string) => raw
+          ? registry.docs.board(target)
+          : registry.docs.view(target, layer === "board" ? "board" : "all", depth);
+
+        // Every docs tree by default. A monorepo hides most of its authored intent in unit folders,
+        // and a tool that silently reads only the root reports a fraction of the open work as if it
+        // were all of it — the same failure the CLI had.
+        let trees = resolveDocsTrees(root);
+        if (scope === "root") trees = trees.slice(0, 1);
+        else if (typeof scope === "string" && scope.length > 0) {
+          const hit = trees.find(t => t.label === scope);
+          if (!hit) {
+            return mcpErr('UNKNOWN_SCOPE', `No docs tree "${scope}".`,
+              `Available: ${trees.map(t => t.label).join(", ")}.`, false);
+          }
+          trees = [hit];
         }
-        const view = registry.docs.view(root, layer === "board" ? "board" : "all",
-          typeof recent === "number" ? recent : 4);
-        return mcpOk(view, { nodeCount: (view.open as unknown[]).length + (view.unlinkedWork as unknown[]).length });
+
+        // Single tree — including every non-monorepo project — returns the board directly, so the
+        // common shape never changes and no caller has to unwrap a one-entry map.
+        if (trees.length === 1) {
+          const one = readOne(trees[0].path);
+          const count = raw
+            ? (one as any).todos.length + (one as any).decisions.length
+            : ((one as any).open as unknown[]).length + ((one as any).unlinkedWork as unknown[]).length;
+          return mcpOk(one, { nodeCount: count });
+        }
+
+        const byTree: Record<string, unknown> = {};
+        let nodeCount = 0;
+        for (const tree of trees) {
+          const view = readOne(tree.path);
+          byTree[tree.label] = view;
+          nodeCount += raw
+            ? (view as any).todos.length + (view as any).decisions.length
+            : ((view as any).open as unknown[]).length + ((view as any).unlinkedWork as unknown[]).length;
+        }
+        return mcpOk({ monorepo: true, trees: byTree }, { nodeCount });
       } catch (err: any) {
         return mcpErr('DOCS_FAILED', err.message, 'Check the docs/ folder follows the conducks-docs grammar.', true);
       }

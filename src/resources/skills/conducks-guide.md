@@ -53,6 +53,7 @@ conducks_docs         the open threads in the authored docs, rooted at the decis
                       layer="all" (default) also returns conventions + memory, the constraints to
                       load once per session; layer="board" omits them for repeat calls;
                       raw=true returns the full unprojected board.
+                      MONOREPO: returns one board per unit tree, kept separate — see below.
 ```
 
 ### Code layer
@@ -108,11 +109,14 @@ conducks_rename       graph-verified rename across all structural references.
 Before editing anything: `conducks_impact`. Before deleting anything: `conducks_prune`, then
 `conducks_impact` on the flagged symbol to confirm nothing calls it.
 
-**In a monorepo, look for a `docs/` per unit.** `conducks_docs` reads ONE docs tree — the one at the
-path you give it — and does not walk into `app/docs`, `packages/*/docs` and so on. Ask for each unit's
-root separately, or you are reading a fraction of the authored intent and will not know it. The
-decisions and todos live at the repository root; the living docs (features, conventions, memory,
-architecture) live in the unit they describe.
+**In a monorepo, `conducks_docs` returns one board per unit.** It reads the root docs tree and each
+unit's, and hands them back separately as `{monorepo: true, trees: {"(root)": …, "app": …}}` — a single
+repo returns the board unwrapped, so the common shape never changes. `scope="root"` or `scope="app"`
+reads one tree when you know which you want.
+
+They are not merged on purpose: `todo01#P2` is an address inside its own tree, and two units may each
+have a `todo01`. Read the tree that owns the work. Decisions and todos live at the repository root; the
+living docs (features, conventions, memory, architecture) live in the unit they describe.
 
 ## The other conducks skills
 

@@ -84,3 +84,87 @@ describe('MCP docs layer — markdown only, no graph', () => {
     });
   });
 });
+
+/**
+ * A monorepo keeps a `docs/` per deployable unit, and a docs tree resolves from ONE path. A tool that
+ * silently reads only the root reports a fraction of the authored intent as if it were all of it — the
+ * same failure the CLI had, where a root run said "43 governed docs clean" and exited 0 while a broken
+ * phase sat unread in `app/docs/`.
+ *
+ * Trees are returned SEPARATE, never merged: `todo01#P2` only resolves inside its own tree, and merging
+ * would lose which unit each address belongs to.
+ */
+describe('conducks_docs — monorepo and single repo', () => {
+  let mono = '';
+  let single = '';
+  const prevRoot = process.env.CONDUCKS_WORKSPACE_ROOT;
+
+  const seed = (base: string, rel: string) => {
+    const dir = path.join(base, rel, 'docs', 'todos');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'todo01.md'),
+      '# todo01 — work\n\nStatus: doing\n- Acceptance: it works\n\n## Phase 1 — p\n- [ ] the open task\n');
+  };
+
+  beforeAll(() => {
+    mono = mkdtempSync(path.join(tmpdir(), 'conducks-mono-'));
+    seed(mono, '.');
+    seed(mono, 'app');
+    seed(mono, 'packages/core');
+
+    single = mkdtempSync(path.join(tmpdir(), 'conducks-single-'));
+    seed(single, '.');
+  });
+
+  afterAll(() => {
+    if (prevRoot === undefined) delete process.env.CONDUCKS_WORKSPACE_ROOT;
+    else process.env.CONDUCKS_WORKSPACE_ROOT = prevRoot;
+    rmSync(mono, { recursive: true, force: true });
+    rmSync(single, { recursive: true, force: true });
+  });
+
+  const call = async (root: string, args: Record<string, unknown> = {}) => {
+    process.env.CONDUCKS_WORKSPACE_ROOT = root;
+    const res = await synapseTools.conducks_docs.handler({ path: root, layer: 'board', ...args });
+    return (res as { data?: unknown }).data ?? res;
+  };
+
+  it('returns one board per tree for a monorepo', async () => {
+    const out = await call(mono) as { monorepo?: boolean; trees?: Record<string, unknown> };
+
+    expect(out.monorepo).toBe(true);
+    expect(Object.keys(out.trees ?? {}).sort()).toEqual(['(root)', 'app', 'packages/core']);
+  });
+
+  it('returns the board UNWRAPPED for a single repo — the common shape never changes', async () => {
+    const out = await call(single) as Record<string, unknown>;
+
+    expect(out.monorepo).toBeUndefined();
+    expect(out.trees).toBeUndefined();
+    expect(out).toHaveProperty('open');
+    expect(out).toHaveProperty('health');
+  });
+
+  it('scope="root" gives the single-tree shape even in a monorepo', async () => {
+    const out = await call(mono, { scope: 'root' }) as Record<string, unknown>;
+
+    expect(out.trees).toBeUndefined();
+    expect(out).toHaveProperty('open');
+  });
+
+  it('scope=<unit> reads exactly that unit', async () => {
+    const out = await call(mono, { scope: 'app' }) as Record<string, unknown>;
+
+    expect(out.trees).toBeUndefined();
+    expect(out).toHaveProperty('open');
+  });
+
+  it('an unknown scope is refused, and the error names the trees that exist', async () => {
+    process.env.CONDUCKS_WORKSPACE_ROOT = mono;
+    const res = await synapseTools.conducks_docs.handler({ path: mono, scope: 'nope' }) as any;
+
+    expect(res.error?.code).toBe('UNKNOWN_SCOPE');
+    expect(res.error?.suggestion).toMatch(/app/);
+    expect(res.error?.retryable).toBe(false);
+  });
+});

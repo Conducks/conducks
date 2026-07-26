@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
+import { resolveDocsTrees } from "@/lib/domain/analysis/unit-docs.js";
 import chalk from "chalk";
 
 /**
@@ -24,11 +25,26 @@ export class DocsStatusCommand implements ConducksCommand {
     const posArg = args.find(a => !a.startsWith("--"));
     const root = posArg ? (posArg.startsWith("/") ? posArg : path.resolve(process.cwd(), posArg)) : process.cwd();
 
-    const board = registry.docs.board(root);
+    // Recursive by default: a monorepo keeps a docs/ per unit, and reading only the root shows a
+    // fraction of the open work. Trees are kept SEPARATE, not merged — a merged board loses which unit
+    // each todo belongs to, and `todo01#P1` is only an address within its own tree.
+    const rootOnly = args.includes("--root-only");
+    const trees = rootOnly ? resolveDocsTrees(root).slice(0, 1) : resolveDocsTrees(root);
 
-    if (useJson) { console.log(JSON.stringify(board, null, 2)); return; }
+    if (useJson) {
+      const payload = trees.length === 1
+        ? registry.docs.board(trees[0].path)
+        : Object.fromEntries(trees.map(t => [t.label, registry.docs.board(t.path)]));
+      console.log(JSON.stringify(payload, null, 2));
+      return;
+    }
 
-    console.log(chalk.bold("\n--- 📄 Conducks Docs Status ---\n"));
+    for (const tree of trees) this.renderTree(tree.label, trees.length > 1, registry.docs.board(tree.path), showAll);
+  }
+
+  /** Renders ONE docs tree. `labelled` is false for a single-repo project, where a header is noise. */
+  private renderTree(label: string, labelled: boolean, board: ReturnType<Registry["docs"]["board"]>, showAll: boolean): void {
+    console.log(chalk.bold(labelled ? `\n--- 📄 Conducks Docs Status — ${label} ---\n` : "\n--- 📄 Conducks Docs Status ---\n"));
 
     const phaseLine = (p: PhaseRow, indent = "    ") => {
       const count = chalk.dim(`${p.done}/${p.total}`.padEnd(6));

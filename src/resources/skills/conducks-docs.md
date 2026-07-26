@@ -81,22 +81,23 @@ that cannot say which it means. A unit's `docs/` carries the LIVING set (`featur
 `conventions.md`, `memory.md`, `architecture/`, `handover.md`); the RECORD set stays at root. If a todo
 is genuinely unit-local, it is still a root `todoNN.md` — say which unit in its title.
 
-**Each `docs/` root is scanned SEPARATELY, and the tools do not walk into unit folders.**
-`conducks docs-lint` and `docs-status` resolve ONE `docs/` — the one under the path you give them —
-and nothing below it. This is the single most common way a monorepo's docs rot:
+**Every tree is read, and they stay separate.** `docs-lint`, `docs-status` and `conducks_docs` are
+recursive: they read the root `docs/` AND each unit `docs/`. A single-repo project has one tree and
+behaves exactly as it always did, so nothing has to know which case it is in.
 
 ```
-conducks docs-lint            # repo root → lints root docs/ ONLY, and NAMES the trees it skipped
-conducks docs-lint --units    # root + every unit docs/, fails if ANY of them fails  ← the CI gate
-conducks docs-lint app        # just that one unit
+conducks docs-lint              # root + every unit; fails if ANY tree fails   ← the CI gate
+conducks docs-lint --root-only  # the root tree alone
+conducks docs-lint app          # just that unit
 ```
 
-Measured on a real monorepo: the root run reported **43 governed docs clean and exited 0** while a
-broken phase sat unread in `app/docs/`. "Clean" meant "clean at root". Use `--units` in CI and in your
-pre-commit hook, or the units are ungoverned.
+They are never MERGED into one board. `todo01#P2` is an address inside its own tree, and two units may
+each hold a `todo01`; merging would make every address ambiguous and hide which unit owes the work. So
+`docs-status --json` returns a map keyed by tree, and `conducks_docs` returns
+`{monorepo: true, trees: {"(root)": …, "app": …}}` — with `scope="root"` or `scope="app"` to read one.
 
-`docs-status` and `conducks_docs` have no `--units` — a board is one project's table of open work, and
-merging four units' todos into one list would lose which unit each belongs to. Ask per unit.
+This mattered: before it was recursive, a root run reported **43 governed docs clean and exited 0**
+while a broken phase sat unread in `app/docs/`. "Clean" meant "clean at root", and nothing said so.
 
 ---
 

@@ -18,26 +18,29 @@ graph and needs `conducks analyze` first.
 - `conducks doctor` — environment check: Node, DuckDB, **which parse path is live** (native vs Gnosis fallback), vault age, and whether a newer release exists
 
 ## Docs (the conducks-docs grammar)
-- `conducks docs-status [--json] [--all]` — open work: each ADR with unfinished phases, the next task in each, what is blocked
-- `conducks docs-lint [--units]` — validate against the grammar; **exits 1** on violation (the CI gate)
-  - `--units` lints the root AND every unit `docs/` in one pass, failing if ANY tree fails. In a monorepo this is the one you want: without it the gate passes while every unit goes unread
+- `conducks docs-status [--json] [--all] [--root-only]` — open work: each ADR with unfinished phases, the next task in each, what is blocked
+- `conducks docs-lint [--root-only]` — validate against the grammar; **exits 1** on violation (the CI gate)
 - `conducks bootstrap-docs [name]` — scaffold the grammar file set into `docs/`
 - `conducks monitor [--json] [--stale]` — every registered project: graph freshness, docs violations, architecture notes describing changed code
   - `--dismiss <module>` = "checked, still accurate"; `--dismiss <module> --intent <adr|todo|path>` when an enhancement landed, and the address must exist
 
-**In a monorepo, use `--units`.** These commands resolve ONE `docs/` — the one under the path you give
-them — and never walk below it, so a plain root run reports "clean" while every unit's docs go unread.
-Measured on a real monorepo: root said 43 governed docs clean and exited 0 while a broken phase sat in
-`app/docs/`. `conducks docs-lint --units` reads root + every unit and fails on any of them:
+**Both docs commands are RECURSIVE.** A monorepo keeps a `docs/` per deployable unit, so they read the
+root tree AND every unit tree. A single-repo project has one tree and its output is unchanged — you
+never have to know which case you are in.
 
 ```
-✓ (root)         — 43 governed docs conform to the grammar.
-✓ admin          — 3 governed docs conform to the grammar.
-✖ app            — 1 file(s) violate the grammar:
-✓ packages/core  — 3 governed docs conform to the grammar.
+✓ (root)            43 governed docs conform to the grammar.
+✓ admin             3 governed docs conform to the grammar.
+✖ app               1 file(s) violate the grammar:
+✓ packages/core     3 governed docs conform to the grammar.
 ```
 
-`docs-status` is still per-tree — pass it a unit path to read that unit's board.
+`docs-lint` fails if ANY tree fails, which is what makes it a real gate: the old root-only behaviour
+reported 43 docs clean and exited 0 while a broken phase sat unread in `app/docs/`.
+
+Trees stay SEPARATE, never merged — `todo01#P2` only resolves inside its own tree, and merging would
+lose which unit an address belongs to. `docs-status --json` returns a map keyed by tree for a monorepo,
+and the bare board for a single repo. `--root-only` on either command restores the single-tree run.
 
 ## Coverage & drift (the overlay)
 - `conducks coverage <coverage-final.json> [--all] [--json]` — per-function fill % + branch coverage
