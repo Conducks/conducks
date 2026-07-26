@@ -54,8 +54,14 @@ import, so only the return direction can clear it):
 
 ## Phase 4 — deferred, not dropped (ADR 0017)
 - Builds: 0017
-- [ ] Surface symbol-level mutual-call tangles as their own finding, separate from ARCH-3, with its
-      own severity. ADR 0017 removed them from ARCH-3 deliberately; they are currently reported
-      nowhere
+- [x] Built as **ARCH-6**, a DISCOVERY rather than a violation, so it never fails an audit — mutual
+      recursion is legal and only a human can tell it from a knot. Traverses `CALLS` and nothing else,
+      via a new `onlyTypes` option on `detectCycles`: expressing "follow CALLS only" as an ignore-list
+      means naming every other edge type and going stale the moment one is added. Self-recursion
+      (length 1) is excluded. Unlike ARCH-3 it does NOT require the cycle to span files — a single-file
+      knot is exactly what ARCH-3 refuses to look at. Measured on conducks: **2** tangles
+      (`readFile -> readSingleFile`, `findNearestTsconfig -> resolve`) against 199 unfiltered cycles,
+      so the signal is specific enough to act on. Rendered by `conducks audit`; pinned by
+      `tests/unit/domain/governance/mutual-call-tangle.test.ts`
 - [ ] Other languages are type-blind: Python/Rust/Java/C# have no `pulse_type_target` capture, so
       `isTypeOnly` never fires for them. Either add the captures or document the limit per language

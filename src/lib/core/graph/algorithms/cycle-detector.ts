@@ -7,9 +7,20 @@ import { ConducksAdjacencyList, NodeId } from "../adjacency-list.js";
  * Linear time complexity: O(V + E).
  */
 export class CycleDetector {
-  public static detect(graph: ConducksAdjacencyList, options: { ignoreTypes?: string[], ignoreTypeOnly?: boolean } = {}): NodeId[][] {
+  /**
+   * `onlyTypes` restricts the traversal to one relationship, rather than removing many.
+   *
+   * Added for ARCH-6 (symbol-level mutual-call tangles): expressing "follow CALLS and nothing else"
+   * as an ignore-list means naming every other edge type, and going stale the moment a new one is
+   * added — silently widening a finding nobody re-checked.
+   */
+  public static detect(
+    graph: ConducksAdjacencyList,
+    options: { ignoreTypes?: string[], ignoreTypeOnly?: boolean, onlyTypes?: Set<string> } = {}
+  ): NodeId[][] {
     const ignoreTypes = options.ignoreTypes || [];
     const ignoreTypeOnly = options.ignoreTypeOnly === true;
+    const onlyTypes = options.onlyTypes;
     const cycles: NodeId[][] = [];
     let index = 0;
     const stack: NodeId[] = [];
@@ -26,6 +37,7 @@ export class CycleDetector {
 
       const neighbors = graph.getNeighbors(nodeId, 'downstream');
       for (const edge of neighbors) {
+        if (onlyTypes && !onlyTypes.has(edge.type)) continue;
         if (ignoreTypes.includes(edge.type)) continue;
         // ADR 0016: a type-only import is erased at compile time — not a runtime cycle.
         if (ignoreTypeOnly && edge.properties?.isTypeOnly === true) continue;

@@ -188,6 +188,10 @@
 - Purpose: Expose the query and analysis surface to MCP-compatible agent hosts as typed tools.
 - Intent: Lets a coding agent use conducks as a tool rather than as a human-operated CLI, with every tool annotated read-only so a host can reason about safety before calling. (ADR 0007.)
 
+## Mutual Call Tangles (ARCH-6) — reported by `conducks audit`
+- Purpose: Name the groups of symbols that call each other in a loop — `a → b → a` — separately from module import cycles, including tangles that live inside a single file.
+- Intent: ADR 0017 removed these from ARCH-3 because a module cycle and two functions calling each other are different facts, which left them reported nowhere. They are a DISCOVERY and never fail an audit: mutual recursion is legal, a knot of six symbols with no entry order is worth a look, and only a human can tell those apart.
+
 ## Environment & Vault Check — `conducks doctor`
 - Purpose: Verify the machine can actually run conducks — Node version, the DuckDB binding, WHICH parse path is live and how many grammars induced — and report whether a vault exists, how old its last pulse is, and whether a newer release exists.
 - Intent: Most "conducks is broken" reports are environment, not logic. One command that names the failing prerequisite is cheaper than reading a stack trace. Since the native bindings are optional, the parse path is now a fact the user cannot infer — a silent fallback looks identical to a working install until symbol counts are questioned.

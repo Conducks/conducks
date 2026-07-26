@@ -76,6 +76,31 @@ export class GovernanceService implements ConducksComponent {
       });
     }
 
+    // 1a. Symbol-level mutual-call tangles (ARCH-6), a DISCOVERY and not a violation.
+    //
+    // ADR 0017 removed these from ARCH-3 on purpose: a module import cycle and two functions calling
+    // each other are different facts, and conflating them made ARCH-3 fire on ordinary mutual
+    // recursion. Removing them left them reported NOWHERE, so a real tangle — a knot of symbols with
+    // no entry order — became invisible. This reports them under their own name and severity.
+    //
+    // CALLS only: no containment, no type references, no imports. Self-recursion (length 1) is
+    // excluded — it is a normal shape, not a tangle. Unlike ARCH-3 this does NOT require the cycle to
+    // span files: mutual calls inside one file are exactly the case ARCH-3 refuses to look at.
+    const tangles = this.graph.detectCycles({ onlyTypes: new Set(['CALLS']) })
+      .filter(c => c.length > 1);
+
+    for (const tangle of tangles.slice(0, 20)) {
+      const names = tangle.map(id => {
+        const n = this.graph.getNode(id);
+        return String(n?.properties.name || id.split('::').pop() || id);
+      });
+      discoveries.push({
+        id: tangle[0],
+        type: 'TANGLE',
+        message: `ARCH-6: Mutual call tangle (${tangle.length} symbols): ${names.join(" -> ")}`
+      });
+    }
+
     // 1b. Self-import detection (distinct from ARCH-3 module cycles).
     // A file that imports/re-exports from its own module path — e.g. `export * from './self'` —
     // is a degenerate self-reference (dead stub / accidental barrel loop), not a cross-file

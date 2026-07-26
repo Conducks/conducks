@@ -67,6 +67,17 @@ export class AuditCommand implements ConducksCommand {
         .forEach((v: any) => console.log(`  - ${v.message}`));
     }
 
+    // 2a. Mutual-call tangles (ARCH-6) — reported, never a failure. ADR 0017 took these OUT of ARCH-3
+    // because a module import cycle and two functions calling each other are different facts; that left
+    // them reported nowhere. They are informational: mutual recursion is legal, a knot of six symbols
+    // with no entry order is worth a look, and only a human can tell those apart.
+    const tangles = (auditData.discoveries || []).filter((d: any) => d.type === 'TANGLE');
+    if (tangles.length > 0) {
+      console.log(`\n\x1b[33m🪢 [Mutual Calls] ${tangles.length} symbol tangle(s) — informational, not a violation:\x1b[0m`);
+      tangles.slice(0, 10).forEach((d: any) => console.log(`  - ${d.message}`));
+      if (tangles.length > 10) console.log(`  ... and ${tangles.length - 10} more.`);
+    }
+
     // 2b. Self-imports (ARCH-4) — a file importing/re-exporting from itself (degenerate, not a cycle)
     const selfImports = auditData.violations.filter((v: any) => v.type === 'SELF_IMPORT');
     if (selfImports.length > 0) {
