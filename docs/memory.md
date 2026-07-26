@@ -350,3 +350,15 @@
 - Applies: during a pulse use the docs layer (`conducks_docs`, `docs-status`, `docs-lint`) — it takes no
   connection and is the only surface that keeps working. The `[code layer]` tool tag states this so an
   agent reads a lock error as "wait", not as "conducks is broken". — ADR 0032, amends 0023
+
+## The staleness bypass never skipped the graph load — `initialize` loads it first
+- Gotcha: `isStalenessBypass` in `src/interfaces/cli/index.ts` reads as "these commands skip the graph",
+  and it does not. It guards a `persistence.load()` in `main` that runs AFTER `registry.initialize()`,
+  and initialize performs its own `newPersistence.load(graph)` (`registry-bootstrapper.ts:180`). Every
+  command on that list was still loading the whole graph, one call earlier where the flag could not see
+  it — `conducks docs-lint` printed `Structural graph loaded (2088 nodes)` before parsing markdown.
+- Why: the bypass was added for the staleness WARNING, not for the load, and the load later moved into
+  the bootstrapper. Two mechanisms with overlapping names, one of which silently stopped mattering.
+- Applies: skipping graph work means being in `NEEDS_NO_REGISTRY` (skips `initialize` entirely), not in
+  `STALENESS_BYPASS`. The first must stay a subset of the second. `registry.initialize()` costs 138ms on
+  conducks and 393ms on a 13k-node repo — it scales with the DuckDB read. — ADR 0033

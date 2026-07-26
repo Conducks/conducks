@@ -50,6 +50,35 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
 });
 
 /**
+ * Commands that must NOT have the persisted graph loaded and staleness-checked before they run.
+ *
+ * Two reasons land a command here: it writes the graph (`analyze`, `clean`), or it does not read it.
+ */
+export const STALENESS_BYPASS = new Set([
+  'analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback',
+  'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
+]);
+
+/**
+ * Commands that need no structural engine AT ALL — no grammars, no vault, no graph (ADR 0033).
+ *
+ * This is the CLI's half of the docs/code split ADR 0023 made on the MCP surface. These answer from
+ * authored markdown and the filesystem: `docs-status` and `docs-lint` call `buildBoard`, which walks
+ * `docs/`; `bootstrap-docs` writes template files; `monitor` opens each REGISTERED project's vault
+ * read-only itself and never touches the current one; `help` prints a list it was handed.
+ *
+ * Skipping `registry.initialize()` skips loading 12 tree-sitter grammars and reading the whole graph
+ * out of DuckDB — work these commands then never use. `STALENESS_BYPASS` alone was not enough: it
+ * skips the load in `main`, but `initialize` performs its own load before that check is ever reached.
+ *
+ * MUST be a subset of `STALENESS_BYPASS`. A command here but not there would skip the init and then be
+ * asked for a graph nobody loaded — asserted by `tests/unit/interfaces/cli/no-registry-commands.test.ts`.
+ */
+export const NEEDS_NO_REGISTRY = new Set([
+  'help', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
+]);
+
+/**
  * Conducks — Modular Conducks CLI v2.0.0
  */
 export async function main() {
@@ -113,13 +142,15 @@ export async function main() {
   const command = commands.find(c => c.id === commandId);
   
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor'].includes(commandId);
+  const isStalenessBypass = STALENESS_BYPASS.has(commandId);
+  // Commands that answer from markdown and the filesystem alone: skip the engine entirely (ADR 0033).
+  const needsNoRegistry = NEEDS_NO_REGISTRY.has(commandId);
 
   if (command) {
     try {
       // Lazy load heavy dependencies (WASM, grammars) only upon execution
-      await registry.initialize(isReadCommand, targetPath, isReadCommand);
-      
+      if (!needsNoRegistry) await registry.initialize(isReadCommand, targetPath, isReadCommand);
+
       if (!isStalenessBypass) {
         await persistence.load(registry.query.graph.getGraph());
         const status = registry.audit.status();
