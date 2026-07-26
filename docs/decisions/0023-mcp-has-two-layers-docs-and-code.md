@@ -1,9 +1,14 @@
 # 0023 — The MCP surface has two layers, and the line is a dependency boundary
 
 Status: Accepted
+- Amended by: 0032
 - Enforced by: tests/unit/interfaces/tools/docs-layer.test.ts
 - Date: 2026-07-26
 - Promoted: docs/conventions.md CONDUCKS-24
+
+> **Amended by 0032.** Measured: this split is stronger than "a docs call should not queue behind a
+> lock". DuckDB's lock is exclusive for the whole file, so during a pulse every code-layer call FAILS —
+> a docs call is the only kind that still works. N concurrent readers are safe when no writer holds it.
 
 ## Context
 The 14 MCP tools were one flat list, and `conducks_docs` sat in it as "the one about docs". It was

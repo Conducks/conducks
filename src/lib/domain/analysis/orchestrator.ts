@@ -6,6 +6,7 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { sameFamily } from "@/lib/core/graph/import-resolver.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import path from "node:path";
@@ -478,6 +479,17 @@ export class AnalyzeOrchestrator implements ConducksComponent {
 
     // Phase 4: Final Metadata Sync
     if (this.persistence) {
+      // Seed the hash gate for every file this pulse analyzed (todo17 Phase 1). Without this the
+      // watcher has nothing to compare against after a fresh `analyze`, so the first save of every
+      // file re-parses it — the gate would only start paying off on the second edit.
+      // `pulseIncomplete` suppresses it: recording hashes for a pulse that did not finish would mark
+      // files as analyzed that never were, and the gate would then skip them forever.
+      if (!pulseIncomplete) {
+        for (const file of normalizedFiles) {
+          await this.persistence.setFileHash(file.path, FileHashGate.hash(file.source), Buffer.byteLength(file.source));
+        }
+      }
+
       await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
       
       // Conducks Pulse Hardening: Ensure pulse record knows total count.

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { synapseTools } from '@/interfaces/tools/tools/synapse.js';
 import { kineticTools } from '@/interfaces/tools/tools/kinetic.js';
+import { ToolRegistry } from '@/registry/tool-registry.js';
 
 /**
  * ADR 0023 — the docs/code split is a DEPENDENCY boundary, not a label. A docs tool reads authored
@@ -53,5 +54,33 @@ describe('MCP docs layer — markdown only, no graph', () => {
     expect(code.length).toBeGreaterThan(10);
     // Every tool declares its side explicitly — an unset layer would silently default to code.
     for (const t of Object.values(all)) expect((t as { layer?: string }).layer).toBeDefined();
+  });
+
+  /**
+   * The advertised description is the ONLY place an agent learns the vault's concurrency limit, and the
+   * limit is counter-intuitive: many agents can read one vault at once, but while a pulse writes it every
+   * read FAILS rather than queues (measured — ADR 0032). An agent that does not know that reads a lock
+   * error as "conducks is broken" and stops calling the tool.
+   */
+  describe('the advertised tool list states the concurrency limit', () => {
+    const toolRegistry = new ToolRegistry();
+    for (const tool of Object.values({ ...synapseTools, ...kineticTools })) toolRegistry.register(tool as never);
+    const advertised = toolRegistry.getTools();
+
+    it('warns on every code-layer tool that a running pulse makes reads fail, not queue', () => {
+      const code = advertised.filter(t => !(t.description ?? '').includes('[docs layer'));
+      expect(code.length).toBeGreaterThan(10);
+      for (const t of code) {
+        expect(t.description).toMatch(/FAILS? rather than queue/i);
+        expect(t.description).toMatch(/conducks_docs/);          // and what still works meanwhile
+      }
+    });
+
+    it('tells an agent the docs layer is safe for any number of concurrent callers', () => {
+      const docs = advertised.filter(t => (t.description ?? '').includes('[docs layer'));
+      expect(docs).toHaveLength(1);
+      expect(docs[0].description).toMatch(/concurrent/i);
+      expect(docs[0].description).toMatch(/opens no database/);
+    });
   });
 });

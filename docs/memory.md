@@ -314,3 +314,39 @@
 - Applies: any change to `loadDocs`, `loadGovernance` or `window.onDocsPulse` needs a real browser to
   verify — `conducks mirror`, then click the document icon. If this ever deserves automation, install a
   real headless browser; do not simulate one.
+
+## `nodes.fingerprint` cannot answer "did this file change" — it is per SYMBOL
+- Gotcha: `fingerprint` is a SHA-256 of `path|name|dna` per symbol (`reflector.ts:288`), written for the
+  drift engine. It looks like a file hash and is not one: a file with no symbols has none at all, and a
+  comment-only edit changes no fingerprint while still needing a re-parse to move every line number below
+  it. File-level freshness lives in the separate `file_hashes` table added by ADR 0030.
+- Why: the two hashes answer different questions — "is this the same symbol as before" versus "are these
+  the same bytes as before". Sharing one column would have made comment edits invisible to the watcher.
+- Applies: anything asking whether a file needs re-parsing goes through `FileHashGate`
+  (`core/persistence/file-hash-gate.ts`), never through a fingerprint or an mtime. A `purgeUnits` that
+  drops a file's nodes MUST also `forgetFileHash` it, or the file is permanently skipped while having no
+  nodes. — ADR 0030
+
+## The hash gate costs 0.7ms and saves 236ms — and every unknown must resolve to "changed"
+- Gotcha: measured on a 1200-file / 13,244-node repo — gate verdict 0.7ms cold, 0.007ms warm (in-process
+  cache), against 236ms for the parse-and-global-relink it skips. 331x. On conducks itself, 200 unchanged
+  saves were dismissed in 27ms total. A full `analyze` seeds the table, but ONLY when the pulse completed:
+  seeding an incomplete pulse marks files as analyzed that never were, and they would then be skipped
+  forever.
+- Why: the gate may cost time, never correctness. A wrongly skipped file is a silently stale graph — the
+  one failure conducks exists to prevent — while a wrongly parsed file costs 236ms. So a missing hash, an
+  unreadable vault or any thrown error all fall through to doing the work.
+- Applies: `FileHashGate.hasChanged` returns false ONLY on an exact match. Never add a fast path that
+  returns false on an error or a partial read. Record the hash AFTER the parse succeeds, never before. — ADR 0030
+
+## A pulse locks EVERY reader out of the vault — reads fail, they do not queue
+- Gotcha: DuckDB's file lock is exclusive for the whole database. Measured: 6 concurrent READ_ONLY agents
+  query one vault fine (6-8ms each, parallel), but while any writer holds it BOTH a second writer and a
+  plain reader fail immediately with `IO Error: Could not set lock on file`. A `conducks analyze` takes
+  minutes, so every code-layer tool call in every agent fails for its duration.
+- Why: read-only is about what THIS connection may do, not about sharing — it does not opt out of the
+  file lock. The 3-attempt/500ms retry in `ensureVaultOpen` recovers a collision with a short incremental
+  save and cannot possibly recover one with a full pulse.
+- Applies: during a pulse use the docs layer (`conducks_docs`, `docs-status`, `docs-lint`) — it takes no
+  connection and is the only surface that keeps working. The `[code layer]` tool tag states this so an
+  agent reads a lock error as "wait", not as "conducks is broken". — ADR 0032, amends 0023

@@ -78,21 +78,46 @@ export class SynapsePersistence {
       try {
         await new Promise((resolve, reject) => {
           const db = new duckdb.Database(dbPath, { access_mode: this.readOnly ? 'READ_ONLY' : 'READ_WRITE' }, (err) => {
-            if (err) {
-              logger.error(`🛡️ [Vault Error] Could not anchor synapse at ${dbPath}. Vault may be locked or busy.`, err);
-              return reject(err);
-            }
+            if (err) return reject(err);
             this.db = db;
             this.initializeSchema().then(() => resolve(db)).catch(reject);
           });
         });
         return this.db!;
       } catch (err) {
-        if (attempt === maxAttempts) throw err;
+        // Log ONCE, on the last attempt. Logging per attempt printed the same wall of DuckDB text
+        // three times and buried the one line that matters.
+        if (attempt === maxAttempts) {
+          logger.error(this.explainOpenFailure(err, dbPath));
+          throw err;
+        }
         await new Promise(r => setTimeout(r, retryDelay));
       }
     }
     throw new Error('🛡️ [Vault Error] Failed to open database after all attempts');
+  }
+
+  /**
+   * Turns DuckDB's lock error into the fact the caller needs.
+   *
+   * MEASURED (todo17 Phase 4): DuckDB's file lock is exclusive for the whole file. N concurrent
+   * READ_ONLY openers are fine — six agents queried this vault in parallel in 6-8ms each — but while
+   * ANY writer holds it, a read-only open FAILS outright. It does not queue and it does not wait, so
+   * "your call is behind a pulse" is the only useful thing to say, and the raw message never says it.
+   */
+  private explainOpenFailure(err: unknown, dbPath: string): string {
+    const raw = String((err as { message?: string })?.message ?? err);
+    if (/Could not set lock|Conflicting lock/i.test(raw)) {
+      const pid = raw.match(/PID (\d+)/)?.[1];
+      return [
+        `🛡️ [Vault Locked] Another process is WRITING this vault${pid ? ` (PID ${pid})` : ""}, so it cannot be read right now.`,
+        `  That is almost always a running 'conducks analyze' — one writer at a time, by design.`,
+        `  Wait for it to finish and retry. Docs-layer tools (docs-status, docs-lint, conducks_docs)`,
+        `  take no connection and keep working throughout.`,
+        `  Vault: ${dbPath}`,
+      ].join("\n");
+    }
+    return `🛡️ [Vault Error] Could not anchor synapse at ${dbPath}: ${raw}`;
   }
 
   private async initializeSchema(): Promise<void> {
@@ -155,10 +180,23 @@ export class SynapsePersistence {
       value TEXT
     );`;
 
+    // A content hash per analyzed FILE, so a save can be dismissed by one string comparison before any
+    // parsing happens (todo17 Phase 1). Deliberately NOT the `nodes.fingerprint` column: that is a
+    // per-SYMBOL hash of `path|name|dna` used by the drift engine, so it cannot answer "did this file
+    // change" — a file with no symbols has no fingerprint at all, and an edit that adds a comment
+    // changes no fingerprint while still needing a re-parse to move line numbers.
+    const fileHashSql = `CREATE TABLE IF NOT EXISTS file_hashes (
+      file VARCHAR PRIMARY KEY,
+      hash VARCHAR,
+      sizeBytes BIGINT,
+      updatedAt BIGINT
+    );`;
+
     await run(nodesSql);
     await run(edgesSql);
     await run(pulsesSql);
     await run(metaSql);
+    await run(fileHashSql);
 
     // Kinetic columns — safe to run on existing databases (DuckDB IF NOT EXISTS)
     await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS blame_age_days INTEGER;`);
@@ -293,6 +331,13 @@ export class SynapsePersistence {
     try {
       if (owned) await this.run(`BEGIN TRANSACTION`);
       await this.run(`DELETE FROM edges WHERE sourceId IN (SELECT id FROM nodes WHERE unitId IN (${placeholders}))`, lowered);
+      // Drop the content hashes of the purged files BEFORE their nodes go, while the subquery can still
+      // find them. Leaving a hash behind is the sharp edge of the hash gate (ADR 0030): the file would
+      // look "already analyzed" to the gate and be skipped forever, while having no nodes at all.
+      await this.run(
+        `DELETE FROM file_hashes WHERE file IN (SELECT DISTINCT file FROM nodes WHERE unitId IN (${placeholders}))`,
+        lowered
+      );
       await this.run(`DELETE FROM nodes WHERE unitId IN (${placeholders})`, lowered);
       if (owned) await this.run(`COMMIT`);
     } catch (err) {
@@ -347,6 +392,45 @@ export class SynapsePersistence {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       db.all(sql, ...(params as any[]), (err: duckdb.DuckDbError | null, rows: duckdb.TableData) => err ? rej(err) : res(rows as unknown as T[]));
     });
+  }
+
+  /**
+   * The stored content hash for a file, or undefined if it has never been analyzed.
+   *
+   * Keys are lowercased absolute paths, matching `nodes.file` (CONDUCKS-4 — ids and paths are
+   * lowercase-normalized for APFS). A caller passing a differently-cased path gets a miss, which
+   * costs a re-parse rather than a wrong answer.
+   */
+  public async getFileHash(file: string): Promise<string | undefined> {
+    const rows = await this.query<{ hash: string }>(
+      "SELECT hash FROM file_hashes WHERE file = ?",
+      [file.toLowerCase()]
+    );
+    return rows[0]?.hash;
+  }
+
+  /** Every stored hash, for a caller that is about to check many files (a full pulse, or the monitor). */
+  public async getAllFileHashes(): Promise<Map<string, string>> {
+    const rows = await this.query<{ file: string; hash: string }>("SELECT file, hash FROM file_hashes");
+    return new Map(rows.map(r => [r.file, r.hash]));
+  }
+
+  /**
+   * Records the hash of a file that was just analyzed. Silent no-op on a read-only connection — a
+   * missing hash only costs a redundant parse next time, so it must never fail the caller.
+   */
+  public async setFileHash(file: string, hash: string, sizeBytes: number): Promise<void> {
+    if (this.readOnly) return;
+    await this.run(
+      "INSERT OR REPLACE INTO file_hashes (file, hash, sizeBytes, updatedAt) VALUES (?, ?, ?, ?)",
+      [file.toLowerCase(), hash, sizeBytes, Date.now()]
+    );
+  }
+
+  /** Drops a hash so the file is re-analyzed next time — used when its nodes are purged. */
+  public async forgetFileHash(file: string): Promise<void> {
+    if (this.readOnly) return;
+    await this.run("DELETE FROM file_hashes WHERE file = ?", [file.toLowerCase()]);
   }
 
   public async updateRanks(nodeRanks: Array<{ id: string, gravity: number, isEntryPoint?: boolean }>): Promise<void> {

@@ -24,6 +24,18 @@
 - Purpose: Keep the graph in sync while a developer is actively editing, re-inducting only the file that changed.
 - Intent: Full pulses are too slow to run on every save, and a graph that is only correct right after a manual `analyze` is a graph nobody trusts.
 
+## Hash-Gated Saves — automatic, inside `conducks watch`
+- Purpose: Dismiss a file event whose content is byte-identical to what the graph already holds, before any parsing happens.
+- Intent: An autosave, a formatter run on focus loss and a `git checkout` all fire change events carrying nothing new, and the full incremental job costs the same for those as for a real edit — 236ms against 0.7ms to ask. The gate may cost time and never correctness, so every unknown falls through to doing the work.
+
+## Cross-Project Monitor — `conducks monitor`
+- Purpose: One report over every project that has run `conducks setup`: whether its graph is behind its code (which files, and which modules), whether its docs break the grammar, and which architecture notes describe code that has changed since they were last reviewed.
+- Intent: Conducks is a platform, and each project was an island — nothing knew which projects existed, so nothing could answer "which of my repos has fallen behind". It reports and exits 0 by decision: a monitor that analyzes, edits or fails a build gets switched off, and then it reports nothing at all.
+
+## Module Doc Review — `conducks monitor --dismiss`, surfaced by `conducks docs-status`
+- Purpose: Flag an architecture note whose module changed, and let the flag be cleared either as "checked, still accurate" or with the address of the ADR, todo or note where an enhancement's intent landed.
+- Intent: A bug fix should not demand a doc edit, but a change that adds a capability and records nothing has thrown away the reason it was made. The dismissal is bound to the hash of the code it was checked against, so it expires when the module changes again — an escape hatch, not a mute button.
+
 ## Docs Board — `conducks docs-status`, MCP `conducks_docs`
 - Purpose: Show the open threads in the authored docs — each decision that still owes work, the todo phases building it, the next task in each, and what is blocked by what — without opening every file.
 - Intent: Finding what an accepted decision left unbuilt otherwise means reading every record bottom-up. It is a summary and a set of links, never a copy of the docs: every line is an address (`todo09#P2`) or a state, so it cannot drift into a second version of them.

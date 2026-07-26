@@ -37,6 +37,7 @@ import { DoctorCommand } from "./commands/doctor.js";
 import { CoverageCommand } from "./commands/coverage.js";
 import { CoverageViewCommand } from "./commands/coverage-view.js";
 import { DocsStatusCommand } from "./commands/docs-status.js";
+import { MonitorCommand } from "./commands/monitor.js";
 import { DocsLintCommand } from "./commands/docs-lint.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
 import { LedgerCommand } from "./commands/ledger.js";
@@ -104,7 +105,7 @@ export async function main() {
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
     new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(),
-    new SupplyChainCommand(), new LedgerCommand()
+    new SupplyChainCommand(), new LedgerCommand(), new MonitorCommand()
   ];
 
   commands.push(new HelpCommand(commands));
@@ -112,7 +113,7 @@ export async function main() {
   const command = commands.find(c => c.id === commandId);
   
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs'].includes(commandId);
+  const isStalenessBypass = ['analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback', 'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor'].includes(commandId);
 
   if (command) {
     try {

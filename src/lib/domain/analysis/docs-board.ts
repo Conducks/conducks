@@ -12,7 +12,8 @@
  * Two severities: `lint` breaks the grammar and fails the gate; `warns` is hygiene (a done todo not
  * yet promoted, an ADR nobody linked, a `Status:` claim the checkboxes contradict) and reports only.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import {
   GOVERNED, REL, type DocType, inferType, parseBody, shape, lint,
@@ -25,6 +26,11 @@ export interface DocsBoard {
   warns: Array<{ file: string; errs: string[] }>;
   /** ADRs with no `- Builds:` phase and no `- Enforced by:` — nothing proves they were ever built. */
   unlinked: string[];
+  /**
+   * Architecture notes reviewed against their module's code that have DRIFTED since (todo17 Phase 3).
+   * Absent on a project with no recorded reviews.
+   */
+  reviews?: Array<{ module: string; moduleDoc: string; intent?: string }>;
 }
 
 /**
@@ -73,6 +79,9 @@ export function agentView(board: DocsBoard, layer: "all" | "board" = "all", rece
       warnings: board.warns.reduce((a, w) => a + w.errs.length, 0),
       adrsWithNoBuildLink: board.unlinked,
       handover: handover ? { state: handover.state, title: handover.title } : null,
+      // An architecture note whose module changed after it was last reviewed. An agent about to act on
+      // that note must know it describes older code (todo17 Phase 3).
+      ...(board.reviews?.length ? { staleModuleNotes: board.reviews.map(r => r.moduleDoc) } : {}),
     },
   };
 
@@ -134,7 +143,56 @@ export function buildBoard(root: string): DocsBoard {
   linkDecisions(board);
   for (const x of crossCheckDecisions(board.decisions)) mergeLint(board, x.file, "decision", x.errs);
   hygiene(board);
+  board.reviews = driftedReviews(root);
   return board;
+}
+
+/**
+ * Architecture notes that WERE reviewed against their module's code and have drifted since (todo17
+ * Phase 3). Belongs on the board rather than in a separate report: an authored note going stale is a
+ * docs fact, and a report nobody opens is not a gate.
+ *
+ * Only modules with a recorded review appear. A note that has never been reviewed is not evidence of
+ * anything — flagging every note on a first run would make the board noise, and the caller who wants
+ * "changed since the last pulse" wants `conducks monitor`, which has the vault to answer it.
+ *
+ * Reads `.conducks/doc-reviews.json` and hashes files. No DuckDB, no registry, no anchor — the docs
+ * layer takes no connection (CONDUCKS-24).
+ */
+function driftedReviews(root: string): Array<{ module: string; moduleDoc: string; intent?: string }> {
+  let reviews: Record<string, string>;
+  try {
+    reviews = JSON.parse(readFileSync(path.join(root, ".conducks", "doc-reviews.json"), "utf8"));
+  } catch {
+    return [];
+  }
+  if (typeof reviews !== "object" || reviews === null) return [];
+
+  const out: Array<{ module: string; moduleDoc: string; intent?: string }> = [];
+  for (const [module, record] of Object.entries(reviews)) {
+    if (typeof record !== "string") continue;
+    const [reviewedHash, intent] = record.split("|");
+    const doc = path.join("docs", "architecture", "modules", module.replace(/^src\/(lib\/)?/, ""), "MODULE.md");
+    // existsSync, NOT statSyncSafe — that helper answers isDirectory(), so it is always false for a file.
+    if (!existsSync(path.join(root, doc))) continue;
+    if (moduleHashOf(path.join(root, module)) !== reviewedHash) out.push({ module, moduleDoc: doc, intent });
+  }
+  return out.sort((a, b) => a.module.localeCompare(b.module));
+}
+
+/** Combined hash of the source files directly in a directory. Must match ProjectMonitor.moduleHash. */
+function moduleHashOf(dir: string): string {
+  const exts = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java",
+    ".cs", ".cpp", ".cc", ".c", ".h", ".hpp", ".php", ".rb", ".swift"]);
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(dir).filter(f => exts.has(path.extname(f))).sort();
+  } catch { return ""; }
+  const parts = entries.map(f => {
+    try { return createHash("sha256").update(readFileSync(path.join(dir, f), "utf8")).digest("hex"); }
+    catch { return ""; }
+  });
+  return createHash("sha256").update(parts.join("|")).digest("hex");
 }
 
 /**

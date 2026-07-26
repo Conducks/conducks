@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
 
 /**
  * FIX 3: Remove the `registry` import entirely.
@@ -54,14 +55,22 @@ export class ConducksWatcher implements ConducksComponent {
   private ignoreManager: IgnoreManager;
   private isInitialized = false;
   private autoPulse = false;
+  /** Undefined when no persistence was injected — then every event is treated as a change. */
+  private hashGate?: FileHashGate;
+  /** Saves dismissed by the hash gate, so `watch` can report what it did not do. */
+  private skippedUnchanged = 0;
 
   constructor(
     private rootDir: string,
     private graph: ConducksGraph,
     private options: WatcherOptions = {}
-  ) { 
+  ) {
     this.ignoreManager = new IgnoreManager(this.rootDir);
+    if (this.options.persistence) this.hashGate = new FileHashGate(this.options.persistence);
   }
+
+  /** How many file events were dismissed as byte-identical since this watcher started. */
+  public get unchangedSkips(): number { return this.skippedUnchanged; }
 
   /**
    * Enables or disables automatic structural pulsing to the database.
@@ -137,11 +146,23 @@ export class ConducksWatcher implements ConducksComponent {
   private async handlePulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
     if (!filePath || event === "unlink") {
       // Logic to prune stale synapse nodes would go here
+      if (filePath && event === "unlink") await this.hashGate?.forget(path.resolve(filePath));
       return;
     }
 
     try {
       const source = await fs.readFile(filePath, "utf-8");
+
+      // 0. The hash gate (todo17 Phase 1). An autosave, a formatter run on focus loss and a branch
+      // switch all fire change events carrying content the graph already holds; everything below —
+      // a git subprocess, a grammar load, a parse, a global re-link — costs the same for those as for
+      // a real edit. One string comparison in front of it dismisses them. A miss falls through to the
+      // work, so this can only cost time, never correctness.
+      if (this.hashGate && !(await this.hashGate.hasChanged(path.resolve(filePath), source))) {
+        this.skippedUnchanged++;
+        console.error(`[Watcher] unchanged, skipped: ${path.basename(filePath)}`);
+        return;
+      }
 
       // 1. Kinetic Diff Extraction (Phase 5.7)
       let changedLines: number[] = [];
@@ -225,7 +246,11 @@ export class ConducksWatcher implements ConducksComponent {
         await this.options.persistence.save(this.graph.getGraph());
       }
 
-      // 6. Notify pulse subscriber (web mirror wires this in — dependency inversion, no domain→web import)
+      // 6. Record the hash — AFTER the pulse and the save, never before. Recording first would make a
+      // parse that threw look complete, and those nodes would stay missing until the file changed again.
+      await this.hashGate?.record(path.resolve(filePath), source);
+
+      // 7. Notify pulse subscriber (web mirror wires this in — dependency inversion, no domain→web import)
       this.options.onPulse?.({ event, filePath });
     } catch (err: any) {
       console.error(`[Watcher] Pulse error for ${path.basename(filePath)}: ${err?.message || err}`);

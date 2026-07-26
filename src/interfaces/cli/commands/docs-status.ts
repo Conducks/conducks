@@ -95,6 +95,16 @@ export class DocsStatusCommand implements ConducksCommand {
     if (board.unlinked.length) {
       console.log(chalk.dim(`\n  ${board.unlinked.length} ADR(s) with no build link or enforcing test: `) + chalk.dim(board.unlinked.join(" ")));
     }
+    if (board.reviews?.length) {
+      // A note that WAS checked against its module and no longer matches it. On the board rather than
+      // in a separate report, because a stale architecture note is a docs fact (todo17 Phase 3).
+      console.log(chalk.yellow(`\n  ⚠ ${board.reviews.length} architecture note(s) describe code that has changed since:`));
+      for (const r of board.reviews) {
+        const why = r.intent ? chalk.dim(` (intent: ${r.intent})`) : "";
+        console.log(chalk.dim(`      ${r.moduleDoc}`) + chalk.dim(` ← ${r.module}`) + why);
+      }
+      console.log(chalk.dim(`      still accurate? conducks monitor --dismiss <module>`));
+    }
     if (board.warns.length) {
       const n = board.warns.reduce((a, w) => a + w.errs.length, 0);
       console.log(chalk.yellow(`\n  ⚠ ${n} hygiene warning(s):`));

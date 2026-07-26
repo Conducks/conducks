@@ -97,13 +97,18 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
    * tool-name change — renaming would break every skill and saved client config to say something a
    * prefix already says. `[docs]` reads markdown and needs no analysis; `[code]` answers from the
    * graph and needs a pulse first (ADR 0023).
+   *
+   * The code tag also states the concurrency limit, MEASURED rather than assumed (todo17 Phase 4):
+   * N agents can read one vault at the same time, but a running `analyze` locks them ALL out — the
+   * call fails, it does not queue. An agent that knows this waits; an agent that does not reads the
+   * failure as "conducks is broken".
    */
   getTools(): MCPTool[] {
     return this.getAll().map((tool) => {
       const layer = (tool as { layer?: string }).layer ?? 'code';
       const tag = layer === 'docs'
-        ? '[docs layer — authored markdown; works with no analysis, opens no database]'
-        : '[code layer — the structural graph; run `conducks analyze` first]';
+        ? '[docs layer — authored markdown; works with no analysis, opens no database, safe for any number of concurrent agents]'
+        : '[code layer — the structural graph; run `conducks analyze` first. Concurrent reads by many agents are safe, but while a pulse is WRITING the vault every read FAILS rather than queues — retry once it finishes, or use conducks_docs meanwhile]';
       return {
         name: tool.name,
         description: `${tag}\n${tool.description || ''}`,
