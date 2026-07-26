@@ -28,7 +28,9 @@ Status: current
   reports 0 hygiene warnings.
 
 ## Next, in order
-1. **Nothing is committed.** The whole session sits in the working tree — review `git status` first.
+1. **Merge or keep the branch.** This work is committed as `25a5ef5` on
+   `docs/link-graph-and-platform-prep`, not on `main` — 78 files, 3054 insertions. `main` is one
+   fast-forward behind (`git checkout main && git merge --ff-only docs/link-graph-and-platform-prep`).
 2. **todo16** — make `npm i -g conducks` work: settle native-vs-WASM grammars, trim the dependency
    chain, fix the README install section, then claim the npm name (`conducks` is still free).
 3. **todo17** — always-on monitoring: hash-gated incremental parsing, then a cross-project monitor,
