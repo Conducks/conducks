@@ -229,6 +229,19 @@ export function lint(type: DocType, body: Body, src?: string): string[] {
       const n = Number(RE.phase.exec(p.head)![1]);
       if (seen.has(n)) errs.push(`duplicate \`## Phase ${n}\` — phase numbers address a phase and must be unique in the file`);
       seen.add(n);
+
+      // A phase with no `- [ ]` / `- [x]` lines cannot express state: the checkbox IS the task's state,
+      // so the board can only render it as `0/0 → (no open task)`. That reads as "nothing to do" whether
+      // the phase is finished, not started, or written as prose — three different facts collapsed into
+      // one silent, wrong answer. Raise it instead of rendering it.
+      if (p.tasks.length === 0) {
+        // The marker is often wrapped in backticks (`` `[✅ DONE 2026-07-18]` ``), so match it anywhere
+        // in the heading rather than anchoring to the end.
+        const marker = /\[[^\]]*(?:✅|✓|DONE|done|COMPLETE|complete)[^\]]*\]/.test(p.head)
+          ? " A `[✅ DONE]` marker in the heading is not a task — state is derived from checkboxes only, and a marker is a second copy of the same fact that drifts."
+          : "";
+        errs.push(`\`## Phase ${n}\` has no tasks — a phase needs at least one \`- [ ]\` or \`- [x]\`, or it cannot report progress.${marker}`);
+      }
     }
   }
   if (type === "decision") {

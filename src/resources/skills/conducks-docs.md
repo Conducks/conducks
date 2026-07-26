@@ -176,9 +176,37 @@ survives the linter.
 — its tasks vanish from `docs-status` and `todoNN#P2b` addresses nothing. When a phase splits, give the
 new half the next free integer and put `(was Phase 2b)` in its title so older references still trace.
 
+**Every phase carries at least one `- [ ]` or `- [x]`.** The checkbox is the ONLY thing that carries a
+task's state — there is no other mechanism, and none can be invented. A phase with no checkboxes has no
+state to report, so the board can only print `0/0 → (no open task)`, which reads as "nothing to do"
+whether the phase is finished, not started, or written as prose. `docs-lint` fails it.
+
+Finished a phase? Tick its boxes:
+
+```markdown
+## Phase 1 — remove the upward import           ✅ every task is a checkbox
+- [x] `setAuthInitializer` hook added
+- [x] KNOWN allowlist emptied, gate green
+
+## Phase 1 — remove the upward import `[✅ DONE 2026-07-18]`    ❌ lint error
+Shipped via the setAuthInitializer hook. Gate green, both apps typecheck.
+```
+
+The second form loses twice. Its prose is unreachable — nothing can address a task inside it — and the
+`[✅ DONE]` marker is a SECOND copy of a fact the checkboxes already hold, so the two drift and no reader
+can tell which is current. State is derived, never announced (one fact, one place). Put the date and the
+narrative in the paragraph under the tasks, where they explain rather than compete.
+
+**What the grammar does NOT read.** Nothing here is a hint or a convention that a tool half-understands
+— an unrecognised line is simply prose. These carry NO meaning to `docs-lint`, `docs-status` or
+`conducks_docs`, so never encode state in them: emoji or `[DONE]` markers in a heading, `~~strikethrough~~`,
+bold or ALL-CAPS words like **DONE**, HTML comments, nested or indented checkboxes under another task,
+a `Status:` line anywhere except directly under the title, and any field key the standard does not list.
+If you want a fact read, it is a `Status:`, a `- Key: value`, or a `- [ ]` — there is no fourth way.
+
 `docs-lint` fails a wrapped value, a `Status:` outside its file's vocabulary, a missing or misspelled
-required section, and two phases sharing a number. It cannot see a phase numbered `2b` — that one shows
-up only as a silent gap in `docs-status`.
+required section, two phases sharing a number, and a phase with no tasks. It cannot see a phase numbered
+`2b` — that one shows up only as a silent gap in `docs-status`.
 
 ---
 
@@ -306,6 +334,18 @@ compares it against the checkboxes and reports the gap.
 
 When a todo closes, promote its surviving facts, then move it to `completed/`. Its `- Builds:` link
 goes with it, so give the ADR an `- Enforced by:` pointing at the test that now proves it.
+
+**`completed/` is NOT scanned.** `docs-lint`, `docs-status` and `conducks_docs` skip it, along with
+`legacy/`, `archive/` and `agent-runs/`. The board answers "what is open", and a closed todo has no open
+work by definition — scanning it would add a page of finished phases to every reading of the table.
+
+Two consequences follow, and both are deliberate:
+
+- **A file in `completed/` is no longer linted.** Move it only once it is genuinely finished. If it still
+  has open tasks, it is not complete; leave it in `todos/` and let `Status:` say `doing`.
+- **Its `- Builds: NNNN` disappears from the graph.** The ADR it built will start reporting as "no build
+  link" unless it carries an `- Enforced by:`. That is why the promote step is not optional: the test
+  becomes the standing proof once the todo that wrote it is filed away.
 
 ### `handover.md` — the first file the next session reads
 

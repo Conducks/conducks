@@ -125,3 +125,49 @@ describe('docs-grammar — line-atomic values', () => {
     expect(t.nextTask).toBe('the next thing');
   });
 });
+
+/**
+ * A phase with no checkboxes cannot report progress: the checkbox IS the task's state, so the board can
+ * only print `0/0 → (no open task)`. That reads as "nothing to do" whether the phase is finished, not
+ * started, or written as prose — three different facts collapsed into one silent, wrong answer.
+ *
+ * Found on mentorseed, where three todos marked phases done with `[✅ DONE 2026-07-18]` in the heading
+ * and carried no tasks at all. Lint passed; the board showed 0/0 for 23 phases.
+ */
+describe('docs-grammar — a phase must carry tasks', () => {
+  const todo = (phases: string) =>
+    `# todo01 — a thing\n\nStatus: doing\n- Acceptance: it works\n\n${phases}`;
+
+  const lintTodo = (body: string) => lint('todo', parseBody(body), body);
+
+  it('fails a phase with no checkboxes', () => {
+    const errs = lintTodo(todo('## Phase 1 — do it\nSome prose about what happened.\n'));
+    expect(errs.join(' ')).toMatch(/`## Phase 1` has no tasks/);
+  });
+
+  it('names the `[✅ DONE]` marker when that is what replaced the tasks', () => {
+    const errs = lintTodo(todo('## Phase 1 — do it `[✅ DONE 2026-07-18]`\nShipped via the hook.\n'));
+    const joined = errs.join(' ');
+    expect(joined).toMatch(/has no tasks/);
+    expect(joined).toMatch(/marker in the heading is not a task/);
+  });
+
+  it('accepts a phase whose tasks are all done — ticked boxes, not a heading marker', () => {
+    const errs = lintTodo(todo('## Phase 1 — do it\n- [x] shipped the hook\n- [x] gate green\n'));
+    expect(errs.join(' ')).not.toMatch(/has no tasks/);
+  });
+
+  it('accepts a phase carrying a field alongside its tasks', () => {
+    const errs = lintTodo(todo('## Phase 1 — do it\n- Builds: 0001\n- [ ] the open task\n'));
+    expect(errs.join(' ')).not.toMatch(/has no tasks/);
+  });
+
+  it('reports every empty phase, not just the first', () => {
+    const errs = lintTodo(todo('## Phase 1 — a\nprose\n\n## Phase 2 — b\nprose\n\n## Phase 3 — c\n- [ ] real\n'));
+    const empties = errs.filter(e => /has no tasks/.test(e));
+    expect(empties).toHaveLength(2);
+    expect(errs.join(' ')).toMatch(/Phase 1/);
+    expect(errs.join(' ')).toMatch(/Phase 2/);
+    expect(errs.join(' ')).not.toMatch(/`## Phase 3` has no tasks/);
+  });
+});
