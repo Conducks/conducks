@@ -15,6 +15,28 @@ const NON_CODE_EXTENSIONS = ['.json', '.txt', '.md'];
  */
 const NON_CODE_FILENAMES = ['Dockerfile', '.env'];
 
+/**
+ * Extensions git discovery refuses outright: binary or media files that cannot carry a symbol.
+ *
+ * A DENYLIST, not the provider allowlist `getDiscoverySurface()` builds, for two reasons. Deriving the
+ * allowlist means importing all 13 language providers, and this is the HOT path — the providers are
+ * loaded dynamically precisely so they stay off it (see `getDiscoverySurface`, and the ESM cycle it
+ * documents). And a denylist fails SAFE: an unknown extension is still analyzed, so a language added
+ * later is never silently skipped, whereas a stale allowlist would drop it.
+ *
+ * Measured on mentorseed before this existed: 53 `.png` and `.svg` files were read as UTF-8 and given
+ * graph nodes — noise in the graph, a wasted read each, and a skew in any per-file ratio taken from the
+ * unit count (1,041 "units" against 692 actual code files).
+ */
+const BINARY_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.avif', '.tiff', '.svg',
+  '.woff', '.woff2', '.ttf', '.otf', '.eot',
+  '.pdf', '.zip', '.gz', '.tar', '.tgz', '.bz2', '.7z', '.rar',
+  '.mp3', '.mp4', '.wav', '.ogg', '.webm', '.mov', '.avi',
+  '.wasm', '.node', '.dylib', '.so', '.dll', '.exe', '.bin', '.class', '.jar',
+  '.db', '.sqlite', '.sqlite3', '.lock',
+]);
+
 interface DiscoverySurface {
   extensions: Set<string>;
   filenames: Set<string>;
@@ -125,6 +147,7 @@ export class ChronicleInterface {
             .filter(f => f.trim().length > 0)
             .map(f => path.resolve(this.projectDir, f))
             .filter(f => !f.includes('/node_modules/') && !f.includes('/.git/'))
+            .filter(f => !BINARY_EXTENSIONS.has(path.extname(f).toLowerCase()))
             .forEach(f => allFiles.add(f));
         } catch { /* Silent fail for individual git commands */ }
       }

@@ -25,7 +25,7 @@ describe('ARCH-6 — mutual call tangles', () => {
   };
 
   const auditOf = (graph: ConducksAdjacencyList) =>
-    new GovernanceService(graph, new ConducksAdvisor(graph), new ConducksSentinel()).audit();
+    new GovernanceService(graph, new ConducksAdvisor(), new ConducksSentinel()).audit();
 
   it('reports two functions that call each other', () => {
     const { graph, addNode, addEdge } = build();

@@ -8,9 +8,10 @@ import { TypeScriptBindings } from "../typescript/bindings.js";
 /**
  * Conducks — JavaScript Language Provider 🏺 🟨
  *
- * JS-only variant of TypeScriptProvider. Uses tree-sitter-javascript.wasm
- * and a query set that omits TS-only nodes (interface, type alias, declare,
- * type parameters, abstract, decorators). Adds CommonJS require() support.
+ * JS-only variant of TypeScriptProvider. Uses the NATIVE `tree-sitter-javascript`
+ * binding (there is no WASM path — ADR 0027) and a query set that omits TS-only
+ * nodes (interface, type alias, declare, type parameters, abstract, decorators).
+ * Adds CommonJS require() support.
  */
 export class JavaScriptProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "javascript-provider";

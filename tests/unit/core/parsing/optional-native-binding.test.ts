@@ -50,7 +50,13 @@ describe('native tree-sitter stays optional', () => {
   it('no .wasm grammar ships in src — the WASM path was removed, not merely unused', () => {
     // A 20 MB resources/grammars dir survived long after anything stopped loading it (ADR 0027).
     expect(existsSync(path.join(srcRoot, 'resources', 'grammars'))).toBe(false);
-    expect(tsFiles(srcRoot).filter(f => /\.wasm['"]/.test(readFileSync(f, 'utf8')))
+
+    // Matches a GRAMMAR reference (`tree-sitter-python.wasm`, `resources/grammars`), not the bare
+    // string `.wasm`. Conducks legitimately names that extension in other contexts — git discovery
+    // denylists it so a user's compiled wasm artifact is never read as source — and banning the
+    // substring outright made this guard fire on an unrelated, correct change.
+    const grammarRef = /tree-sitter[\w-]*\.wasm|resources[/\\]grammars/;
+    expect(tsFiles(srcRoot).filter(f => grammarRef.test(readFileSync(f, 'utf8')))
       .map(f => path.relative(srcRoot, f))).toEqual([]);
   });
 });

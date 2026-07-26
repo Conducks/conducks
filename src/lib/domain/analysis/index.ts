@@ -106,6 +106,34 @@ export class AnalysisService implements ConducksComponent {
       dirtyFiles = dirtyFiles.filter(f => f.startsWith(targetRoot));
     }
 
+    // Reconcile BEFORE the no-changes gate: units the vault holds that discovery no longer returns.
+    //
+    // The per-unit purge later only covers files being RE-analyzed. A file that was deleted,
+    // gitignored, or dropped from the discovery surface is in neither list — and deleting a file makes
+    // no OTHER file dirty, so the gate below returned "already at 100% resonance" and the dead symbols
+    // survived every subsequent pulse. The graph kept answering with symbols from files that are gone.
+    // Measured on mentorseed: 53 image units persisted through a full `analyze --force`, and only a
+    // `clean` cleared them.
+    //
+    // Skipped for `--staged`, where discovery returns ONLY the staged files: reconciling against that
+    // subset would purge the entire rest of the project.
+    if (!options.staged) {
+      const discovered = new Set(filteredFiles.map(f => f.toLowerCase()));
+      const known = await this.persistence.query<{ file: string }>(
+        "SELECT DISTINCT file FROM nodes WHERE canonicalKind = 'UNIT' AND file IS NOT NULL"
+      );
+      // Scoped runs stay in scope — a subfolder analyze must not delete the rest of the vault.
+      const scope = targetRoot.toLowerCase();
+      const vanished = known
+        .map(r => r.file)
+        .filter(f => f && f.startsWith(scope) && !discovered.has(f));
+
+      if (vanished.length > 0) {
+        logger.info(`🛡️ [Persistence] Reconciling: purging ${vanished.length} unit(s) no longer discoverable.`);
+        await this.persistence.purgeUnits(vanished.map(f => `${f}::unit`));
+      }
+    }
+
     if (dirtyFiles.length === 0 && !options.force) {
       logger.warn("No changes detected. Structural Synapse is already at 100% resonance.");
       return { success: true, files: 0 };
@@ -139,6 +167,7 @@ export class AnalysisService implements ConducksComponent {
     logger.info(`🛡️ [Persistence] Purging structural DNA for ${dirtyFiles.length} units...`);
     const unitIds = dirtyFiles.map(f => `${f.toLowerCase()}::unit`);
     await this.persistence.purgeUnits(unitIds);
+
 
     // 2.5 Discover Sub-Repositories for Multi-Project Resonance
     const bootstrapper = (this as any).registry?.bootstrapper || (this.orchestrator as any).registry?.bootstrapper;

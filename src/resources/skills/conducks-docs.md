@@ -154,7 +154,31 @@ Status: <value>         life state, one line
 second line — there is no continuation rule, so a wrapped line matches nothing and is dropped in
 silence. Needs a paragraph? Put it in a `##` section. Prose wraps freely.
 
-`docs-lint` fails a wrapped value, and a `Status:` outside its file's vocabulary.
+**One line per KEY, too.** A field key appears at most ONCE in a file. Repeat it and the last line
+silently wins — the earlier ones are not merged and not warned about. Multiple values go on the one
+line, comma-separated:
+
+```
+- Amended by: 0012, 0018, 0023        ✅ three refs, one line
+- Amended by: 0012 (checkout)         ❌ two lines: the first is dropped,
+- Amended by: 0018 (pricing)             and 0012 then reads as unstamped
+```
+
+Only the leading ref list is parsed, so prose may follow it. A per-ref note has nowhere to live on that
+line — put those in the paragraph under the fields, where a reader looking for the *why* already is.
+
+**Headings the grammar reads must match EXACTLY.** `## Context` is a required section; `## Context — the
+measured problem` is a different heading and counts as missing. Same for `## Decision` and
+`## Consequences`. Put the qualifier in the section's first sentence — it reads better there and it
+survives the linter.
+
+**A phase number is a plain integer.** `## Phase 2b` matches no phase at all: not an error, *invisible*
+— its tasks vanish from `docs-status` and `todoNN#P2b` addresses nothing. When a phase splits, give the
+new half the next free integer and put `(was Phase 2b)` in its title so older references still trace.
+
+`docs-lint` fails a wrapped value, a `Status:` outside its file's vocabulary, a missing or misspelled
+required section, and two phases sharing a number. It cannot see a phase numbered `2b` — that one shows
+up only as a silent gap in `docs-status`.
 
 ---
 
@@ -208,14 +232,20 @@ finds it inconvenient.
 ```markdown
 # NNNN — <title>
 Status: Accepted | Superseded by NNNN
-- Amended by: NNNN (<what changed>)
+- Amended by: NNNN, NNNN          one line, however many refs
 - Enforced by: <the test or symbol that proves it is built>
 - Date: <ISO>
+
+<what each amendment changed, in prose>
 
 ## Context
 ## Decision
 ## Consequences
 ```
+
+Those three section names are matched EXACTLY — `## Context — what we measured` counts as no `## Context`
+at all. And a key is written once: a second `- Amended by:` line silently replaces the first, which shows
+up later as a back-stamp the linter says is missing on a record that plainly has it.
 
 An ADR is PROSE — the story of why a call was made. Keep checkboxes and numbered requirement lists
 out of it; bulleting a decision into a spec makes a worse record. The work that implements it is a
@@ -226,9 +256,12 @@ Only a supersede kills a record. Every other cross-record link is a FIELD, stamp
 
 | on this record | on the other record |
 |---|---|
-| `- Amended by: NNNN` | `- Amends: NNNN` |
+| `- Amended by: NNNN, NNNN` | `- Amends: NNNN` |
 | `- Superseded by: NNNN` | `- Supersedes: NNNN` |
 | `- Resolved by: NNNN` | `- Resolves: NNNN` |
+
+Amended twice? Both refs on the one `- Amended by:` line, and what each one changed goes in the prose
+under the fields — never a second line with the same key.
 
 An amended ADR stays `Accepted` and stays binding — part of it changed, so read the amendment too.
 
@@ -261,7 +294,10 @@ Status: todo | doing | done | blocked
 built across phases in several todos. Keep a phase to ONE coherent chunk with one owner ADR or none —
 serving two decisions means it is two phases.
 
-Phase numbers are unique inside a file: `todoNN#PN` is an address other files point at.
+Phase numbers are unique inside a file, and they are plain integers: `todoNN#PN` is an address other
+files point at. `## Phase 2b` is worse than a duplicate — it is not read as a phase at all, so its tasks
+never reach `docs-status` and nothing can link to it. Splitting a phase means taking the next free
+integer, with `(was Phase 2b)` in the title to keep older references traceable.
 
 **State is derived.** The checkbox is the task's state. A phase's state is its checkboxes. Blocked is
 an unmet `- Depends:`, or a stated `- Blocked by:` for a cause no phase can express. An ADR's build
