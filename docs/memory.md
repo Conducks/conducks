@@ -362,3 +362,19 @@
 - Applies: skipping graph work means being in `NEEDS_NO_REGISTRY` (skips `initialize` entirely), not in
   `STALENESS_BYPASS`. The first must stay a subset of the second. `registry.initialize()` costs 138ms on
   conducks and 393ms on a 13k-node repo — it scales with the DuckDB read. — ADR 0033
+
+## A one-line class was parented by its own method — and that corrupted the node ID
+- Gotcha: `getScopeAt` (`domain/analysis/reflector.ts`) resolved a declaration's scope from ROWS alone
+  and excluded only the declaration's own NAME. On `export class Widget { run(): void {} }` the class and
+  its method have identical start and end rows, so while resolving `Widget` its own method `run` passed
+  the row test and became its parent: id `::run.widget` instead of `::widget`. Multi-line code hid it
+  completely — there the class's start row falls outside the method's range and is filtered naturally.
+- Why: the scope chain is what the node ID is BUILT from, so an inverted chain is a wrong identity, not
+  merely a wrong parent pointer. The IMPORTS edge pointed at `::widget`, no node had that id, and
+  `prune` silently skipped the binding — an unused import of any one-line class was unreportable. A
+  wrong id is invisible to every gate: it type-checks, it persists, and every id-keyed consumer just
+  finds nothing.
+- Applies: the scope map now carries `startCol`/`endCol`, and `getScopeAt` takes the declaration's own
+  span and refuses any scope CONTAINED by it. Both the id (`scopedId`) and `parentId` use it — fixing
+  only `parentId` leaves the identity wrong. On conducks the remaining "class parented by a method"
+  cases are 3 genuinely local types declared inside a method body, which is correct. — todo10#P2

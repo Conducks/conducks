@@ -32,8 +32,16 @@ import, so only the return direction can clear it):
 - [x] **No type evidence.** `ranker.ts:1` imported `ConducksNode` and never used it — a genuine
       unused import, removed. The conservative rule correctly refused to guess (covered by a test)
 - [x] Re-measured: 267 of 1237 IMPORTS edges now type-only (was 213)
-- [ ] Dead-code should flag an unused import like `ranker.ts`'s directly — it took a manual read to
-      find, which is exactly what the tool is for
+- [x] It does now, and finding out why it did not exposed a deeper bug. `findStaleImports` was already
+      wired into `prune` and already allowed type kinds (`interface`, `enum`, widened by todo14) — but an
+      unused import of a ONE-LINE class was never reported. Cause: `getScopeAt` resolved a declaration's
+      scope from ROWS alone and excluded only its own NAME, so for
+      `export class Widget { run(): void {} }` the class's own method shared the row, passed the test,
+      and became the class's parent — id `::run.widget` instead of `::widget`. The import edge pointed at
+      `::widget`, which no node had, so the binding could never be resolved and was silently skipped.
+      Fixed by carrying columns in the scope map and excluding any scope the declaration CONTAINS.
+      Verified on a fixture: the id is `::widget` with `::widget.run` under it, and prune reports both
+      stale imports. Pinned by `tests/unit/core/languages/one-line-scope-chain.test.ts`
 
 ## Phase 3 — the registry hub: was never a real finding
 - Builds: 0016

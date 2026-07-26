@@ -174,7 +174,13 @@ export class ConducksReflector implements ConducksComponent {
     context.clearLocalBindings();
 
     // === Pass 1: Build Scope Map ===
-    type ScopeEntry = { name: string; startRow: number; endRow: number };
+    // Columns are carried, not just rows: a one-line declaration
+    // (`export class Widget { run(): void {} }`) gives the class and its method IDENTICAL start and
+    // end rows, so a row-only ordering cannot tell container from member and the scope chain can
+    // invert — producing `run.widget` instead of `widget.run`. That corrupts the node ID, and every
+    // id-keyed consumer with it: the import edge pointed at `::widget` while the node was stored as
+    // `::run.widget`, so prune could never resolve it and silently never reported the unused import.
+    type ScopeEntry = { name: string; startRow: number; startCol: number; endRow: number; endCol: number };
     const scopeMap: ScopeEntry[] = [];
 
     for (const match of matches) {
@@ -195,23 +201,52 @@ export class ConducksReflector implements ConducksComponent {
           scopeMap.push({
             name,
             startRow: rangeNode.startPosition.row,
-            endRow: rangeNode.endPosition.row
+            startCol: rangeNode.startPosition.column,
+            endRow: rangeNode.endPosition.row,
+            endCol: rangeNode.endPosition.column
           });
         }
       }
     }
 
-    const getScopeAt = (row: number, excludeName?: string): string => {
+    /** True when position (aRow,aCol) is at or before (bRow,bCol). */
+    const atOrBefore = (aRow: number, aCol: number, bRow: number, bCol: number): boolean =>
+      aRow < bRow || (aRow === bRow && aCol <= bCol);
+
+    /**
+     * `self` is the span of the declaration whose parent is being resolved. Any scope that sits
+     * INSIDE it is a member, not a container, and must not become its parent.
+     *
+     * Excluding by name alone was not enough. On `export class Widget { run(): void {} }` the class
+     * and its method share one row, so `run` passed the row test while resolving `Widget`'s parent
+     * and the chain came out `run.widget` — the class parented by its own method. Multi-line code
+     * hid it: there, the class's start row falls outside the method's range and it is filtered
+     * naturally.
+     */
+    const getScopeAt = (
+      row: number,
+      excludeName?: string,
+      self?: { startRow: number; startCol: number; endRow: number; endCol: number }
+    ): string => {
       // Find all scopes that organically encapsulate the row
       const enclosing = scopeMap.filter(s => {
         if (excludeName && s.name === excludeName) return false;
-        return row >= s.startRow && row <= s.endRow;
+        if (row < s.startRow || row > s.endRow) return false;
+        if (self && atOrBefore(self.startRow, self.startCol, s.startRow, s.startCol)
+                 && atOrBefore(s.endRow, s.endCol, self.endRow, self.endCol)) {
+          return false;   // s is contained by the declaration being resolved
+        }
+        return true;
       });
 
-      // Sort by absolute encapsulation (largest container first)
+      // Sort by absolute encapsulation (largest container first). Columns break the tie when two
+      // scopes share a row — without them a one-line class and its method are indistinguishable and
+      // the chain can come out reversed.
       enclosing.sort((a, b) => {
         if (a.startRow !== b.startRow) return a.startRow - b.startRow;
-        return b.endRow - a.endRow;
+        if (a.startCol !== b.startCol) return a.startCol - b.startCol;
+        if (a.endRow !== b.endRow) return b.endRow - a.endRow;
+        return b.endCol - a.endCol;
       });
 
       const names: string[] = [];
@@ -239,7 +274,23 @@ export class ConducksReflector implements ConducksComponent {
       let node: any;
       if (matchNameCap && matchNameCap.node) {
         const name = matchNameCap.node.text;
-        const scope = getScopeAt(currentMatchRow, name);
+        // The declaration's own span, so a scope it CONTAINS cannot be mistaken for its parent.
+        // This has to be known HERE, not just where parentId is built below: the scope chain is what
+        // the node ID is made of, and an inverted chain (`run.widget`) is a wrong identity, not just
+        // a wrong parent pointer — the import edge then points at an id no node has.
+        const declIsScoped = match.captures.some((c: any) =>
+          c.name === CaptureTags.IS_FUNCTION || c.name === CaptureTags.IS_CLASS ||
+          c.name === CaptureTags.IS_STRUCT || c.name === CaptureTags.IS_METHOD ||
+          c.name === CaptureTags.IS_INTERFACE || c.name === CaptureTags.IS_ENUM ||
+          c.name === CaptureTags.IS_INFRA);
+        const declRange = (declIsScoped && matchNameCap.node.parent) ? matchNameCap.node.parent : matchNameCap.node;
+        const declSpan = {
+          startRow: declRange.startPosition.row,
+          startCol: declRange.startPosition.column,
+          endRow: declRange.endPosition.row,
+          endCol: declRange.endPosition.column,
+        };
+        const scope = getScopeAt(currentMatchRow, name, declSpan);
         const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
         const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
         
@@ -270,7 +321,7 @@ export class ConducksReflector implements ConducksComponent {
             }
 
             const canonical = mapToCanonical(initialKind);
-            const parentScopeName = getScopeAt(currentMatchRow, name);
+            const parentScopeName = getScopeAt(currentMatchRow, name, declSpan);
             const parentScopePrefix = parentScopeName ? `${parentScopeName.toLowerCase()}.` : '';
             const parentId = parentScopeName
               ? `${file.path.toLowerCase()}::${parentScopePrefix.toLowerCase()}`.slice(0, -1)
