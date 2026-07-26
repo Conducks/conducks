@@ -89,10 +89,10 @@ Status: doing
 - [x] A11 — mirror.engine.ts accessed private graph.outEdges directly — added public getOutEdges() accessor
 
 ## Phase 6 — TIER 5: Quality / hygiene
-- [ ] Q1 — scratch/ directory committed to git (2,104 lines of debug scripts, absolute paths) — needs .gitignore + history scrub
+- [x] Q1 — `scratch/` is out of the working tree: `git ls-files scratch` returns 0 and `.gitignore:45` ignores it. The HISTORY still contains it, and a history rewrite is deliberately NOT done here — it rewrites every commit hash, which is Said's call and worth deciding before the first publish rather than after. The exposure is absolute paths in old debug scripts, not secrets
 - [x] Q2 — src/resources/tools-archive/ dead duplicate of skills-generator/ — deleted
-- [ ] Q3 — 1.7% test coverage (3 of 174 source files) — needs 80 archived tests restored, target 60%+
-- [ ] Q4 — 80+ archived tests never restored (tests/legacy/archived-tests/) — needs audit, restore valid ones, document rest
+- [x] Q3 — the 1.7% figure is stale. MEASURED 2026-07-26: **26.81% statements, 22.64% branches, 27.34% functions** across 291 tests in 35 suites (was 3 test files). The 60% target is NOT met and is carried by todo02#P2, which owns the coverage climb — this item existed to restore the archived tests, and that is done
+- [x] Q4 — DONE by todo18#P3 (ADR 0028 era, 2026-07-26). All 77 archived files were triaged by RUNNING them, not reading them: 17 suites passed, 7 of those covered subjects with no other test and were ported into the real suite, 10 were 8-line import smoke tests and were dropped. The 60 failures were classified as stale APIs and expectations before anything was deleted, and the folder is out of the repo
 - [x] Q5 — structural.test.ts:138 null access crash — added null guard
 - [x] Q6 — console.error used for non-error logging in bootstrapper — replaced with logger.info/console.log
 - [x] Q7 — 177 `: any` casts despite strict:true — progressively typed highest-use paths

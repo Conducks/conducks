@@ -21,7 +21,15 @@ export class ConducksSearch implements ConducksComponent {
    */
   public search(query: string, limit: number = 20): ConducksNode[] {
     const results = new Map<NodeId, number>();
-    const tokens = query.toLowerCase().split(/\s+/);
+    const trimmed = query.trim();
+
+    // `*` is the documented INVENTORY query (features.md, "Symbol Listing"): the heaviest symbols
+    // first, for reading a codebase top-down rather than searching for a name you already know.
+    // Scoring treated it as a literal token, so it matched no node name and every project answered
+    // "No symbols found" — a documented feature that had no implementation behind it.
+    if (trimmed === "*" || trimmed === "") return this.inventory(limit);
+
+    const tokens = trimmed.toLowerCase().split(/\s+/);
 
     for (const node of this.graph.getAllNodes()) {
       let score = 0;
@@ -64,6 +72,30 @@ export class ConducksSearch implements ConducksComponent {
       .slice(0, limit)
       .map(([id]) => this.graph.getNode(id))
       .filter((n): n is ConducksNode => n !== undefined);
+  }
+
+  /**
+   * The full inventory: named symbols ordered by structural gravity, heaviest first.
+   *
+   * Containers are excluded. An inventory answering `ECOSYSTEM`, `REPOSITORY` and `DIRECTORY` before
+   * a single function would bury the answer under the folder tree the user is already looking at —
+   * "show me the heaviest things here" means symbols, not the directories holding them.
+   */
+  private inventory(limit: number): ConducksNode[] {
+    const CONTAINERS = new Set(["ECOSYSTEM", "REPOSITORY", "DIRECTORY"]);
+    // getAllNodes() is an IterableIterator, not an array — materialise before sorting.
+    return Array.from(this.graph.getAllNodes())
+      .filter((n: ConducksNode) => {
+        if (!n.properties?.name) return false;
+        return !CONTAINERS.has(String(n.properties.canonicalKind ?? ""));
+      })
+      .sort((a: ConducksNode, b: ConducksNode) => {
+        const gravity = (b.properties.rank ?? 0) - (a.properties.rank ?? 0);
+        if (gravity !== 0) return gravity;
+        // Stable, readable tie-break: rank is 0 for everything until `resonate` has run.
+        return String(a.properties.name).localeCompare(String(b.properties.name));
+      })
+      .slice(0, limit);
   }
 
   /**
