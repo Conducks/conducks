@@ -43,11 +43,15 @@ export interface ProjectReport {
     analyzed: boolean;
     /** Files whose content differs from what the vault last analyzed. */
     changed: number;
-    /** Files on disk the vault has never seen. */
+    /**
+     * Files on disk the vault has never analyzed. A COVERAGE gap, not staleness — `analyze` is
+     * incremental by mtime, so a file untouched since before the last pulse never enters a wave.
+     */
     added: number;
     /** Files the vault knows that are gone from disk. */
     removed: number;
     tracked: number;
+    /** The graph holds something WRONG: changed or removed. Never set by `added` alone. */
     stale: boolean;
   };
   docs: {
@@ -131,7 +135,15 @@ export class ProjectMonitor {
         if (!fs.existsSync(key)) base.graph.removed++;
       }
 
-      base.graph.stale = base.graph.changed + base.graph.added + base.graph.removed > 0;
+      // STALE means the graph holds something WRONG: content that changed under it, or nodes for a file
+      // that is gone. It deliberately excludes `added`.
+      //
+      // `analyze` is incremental by mtime (`domain/analysis/index.ts:87`), so a file whose mtime predates
+      // the last pulse is never in a wave and never gets a hash — on conducks itself that is 46 files,
+      // mostly `scripts/`. Counting those as staleness reported "graph behind" immediately after a
+      // successful full pulse, which reads as a bug and trains the reader to ignore the line. They are a
+      // real coverage gap and are reported as exactly that, separately.
+      base.graph.stale = base.graph.changed + base.graph.removed > 0;
       base.drift = this.moduleDrift(project.root, changedPaths);
     } catch (err: any) {
       return { ...base, unavailable: `vault unreadable: ${err?.message ?? err}` };

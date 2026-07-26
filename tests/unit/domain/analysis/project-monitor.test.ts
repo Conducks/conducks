@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
 import { ProjectRegistry } from '@/lib/domain/federation/project-registry.js';
+import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { FileHashGate } from '@/lib/core/persistence/file-hash-gate.js';
 
 /**
  * The monitor reports; it never fixes (todo17 Phases 2-3, ADR 0030). These cover the parts that decide
@@ -64,6 +66,46 @@ describe('ProjectMonitor', () => {
     const ghost = reports.find(r => r.name === 'ghost')!;
 
     expect(ghost.unavailable).toMatch(/does not exist/);
+  });
+
+  /**
+   * These two run against a REAL vault, because the distinction they check lives in the comparison
+   * between stored hashes and disk — a hand-built report object would only restate the expectation.
+   */
+  describe('against a real vault', () => {
+    const seed = async (hashed: Array<[string, string]>) => {
+      const persistence = new SynapsePersistence(project);
+      for (const [rel, body] of hashed) {
+        write(rel, body);
+        await persistence.setFileHash(path.join(project, rel), FileHashGate.hash(body), Buffer.byteLength(body));
+      }
+      await persistence.close();
+    };
+
+    it('does NOT call a project stale for files the graph has never analyzed', async () => {
+      await seed([['src/a.ts', 'export const a = 1;']]);
+      // Never hashed: `analyze` is incremental by mtime, so a file untouched since the last pulse never
+      // enters a wave. Counting these as staleness reported "graph behind" right after a full pulse.
+      write('scripts/tool.ts', 'export const t = 1;');
+      write('scripts/other.ts', 'export const o = 1;');
+
+      const [report] = await monitor.reportAll();
+
+      expect(report.graph.analyzed).toBe(true);
+      expect(report.graph.added).toBe(2);        // the coverage gap IS reported
+      expect(report.graph.changed).toBe(0);
+      expect(report.graph.stale).toBe(false);    // …but it is not staleness
+    });
+
+    it('does call it stale when analyzed content actually changed', async () => {
+      await seed([['src/a.ts', 'export const a = 1;']]);
+      write('src/a.ts', 'export const a = 2;');
+
+      const [report] = await monitor.reportAll();
+
+      expect(report.graph.changed).toBe(1);
+      expect(report.graph.stale).toBe(true);
+    });
   });
 
   it('hashes a module from the files directly in it, and changes when one of them changes', () => {

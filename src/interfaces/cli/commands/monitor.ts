@@ -92,10 +92,12 @@ export class MonitorCommand implements ConducksCommand {
         continue;
       }
 
+      // `added` is coverage, not staleness — see ProjectMonitor. Saying "behind" for a file `analyze`
+      // would not have picked up either reports a problem the reader cannot act on.
       const graph = !r.graph.analyzed
         ? chalk.yellow("never analyzed")
         : r.graph.stale
-          ? chalk.yellow(`graph behind: ${r.graph.changed} changed, ${r.graph.added} new, ${r.graph.removed} gone`)
+          ? chalk.yellow(`graph behind: ${r.graph.changed} changed, ${r.graph.removed} gone`)
           : chalk.green(`graph current (${r.graph.tracked} files)`);
 
       const docs = r.docs.violations > 0
@@ -106,6 +108,10 @@ export class MonitorCommand implements ConducksCommand {
 
       console.log(`${label} ${graph}  ${chalk.dim("·")}  ${docs}`);
       console.log(chalk.dim(`  ${r.root}`));
+      if (r.graph.analyzed && r.graph.added > 0) {
+        console.log(chalk.dim(`  ${r.graph.added} file(s) the graph has never analyzed — 'analyze' is incremental by mtime, so`));
+        console.log(chalk.dim(`  a file untouched since the last pulse never enters a wave. 'conducks analyze --force' if it matters.`));
+      }
 
       const needing = r.drift.filter(d => d.needsDocReview);
       if (needing.length > 0) {
