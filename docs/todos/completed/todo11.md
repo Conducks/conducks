@@ -1,5 +1,6 @@
 # todo11 — record inheritance, then ship STALE_IMPORT
 Status: done
+- Promoted: docs/memory.md (STALE_IMPORT is a strict tsc subset; inheritance edges); docs/features.md (Dead Code / prune)
 - Acceptance: the graph carries EXTENDS/IMPLEMENTS edges for TS classes, and `conducks prune`
   STALE_IMPORT findings match `tsc --noUnusedLocals` with ~0 false positives.
 

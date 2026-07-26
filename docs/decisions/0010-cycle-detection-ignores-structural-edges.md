@@ -1,5 +1,6 @@
 # 0010 — cycle detection ignores structural edges (Node/TS false-positive fix)
 Status: Accepted
+- Enforced by: tests/unit/domain/governance/audit.test.ts
 - Date: 2026-07-18
 - Amended by: 0016, 0017
 - Promoted: docs/architecture/modules/domain/governance/MODULE.md ("The one lesson this module keeps relearning"); docs/memory.md ("A cycle/hub finding is only as good as the edge types it counts")

@@ -1,5 +1,7 @@
 # 0018 — Skills are the guidance surface; they may name only live MCP tools
 Status: Accepted
+- Amended by: 0022, 0025 (skills install globally by default, not per repo)
+- Enforced by: tests/unit/interfaces/tools/skills-tool-surface.test.ts
 - Date: 2026-07-25
 - Promoted: docs/conventions.md CONDUCKS-9 (§3 derived tool count, §4 skills↔tools test). §1, §2, §5 NOT yet promoted.
 

@@ -1,29 +1,38 @@
-# Handover — 2026-07-25
+# Handover — 2026-07-26
 Status: current
 
 ## Where it stands
-- **todo14 closed** (single-thread, no subagents). STALE_IMPORT recall 1 → **18 findings, 0 false
-  positives**, strict subset of tsc's 75+5. The 4 first-pass FPs were each a distinct capture gap —
-  generic constraint, nested generic in type_arguments, local type re-export, for-of reads — all
-  probed and closed. Canary suite pins every type position + isTypeOnly classification.
-- **`isConstructor` fixed**: every capitalized dotted call (Math.random, JSON.parse) was typed
-  CONSTRUCTS; dotted is never a constructor. Dotted static calls resolve via the object segment —
-  `GraphTraversal.traverseUpstream` finally carries a CALLS edge (weighted distance 1.00 verified).
-  Governance unchanged by the bulk edge-type shift (audit + guard clean, prune stable).
-- **`.js`/`.jsx` settled on JavaScriptProvider in BOTH maps.** JavaScriptProvider was never in the
-  registry precedence list — `.js` had ridden on the TS provider's claim. The undefined-dispatch
-  window this opened was caught by live verification and never landed.
-- **Dead code deleted with proof**: `extensionToGrammar` (sole ref = its own definition) and the
-  reflector's node-creation suffix override (definition captures always win; the LIVE Gnosis
-  fallback heuristic at reflector.ts:~770 is untouched and marked).
-- Suite 152 → **158**, all gates green: typecheck 0 · audit confirmed · guard layer-clean ·
-  docs-lint clean.
+- **The docs are a link graph now** (ADR 0019, 0020). Line-atomic grammar: a value is the whole line
+  and never wraps. A record carries its own state — `Status:` is life-state only, relations are
+  both-ends fields, and `decisions/README.md` holds no index. The phase is the unit of linkage:
+  `- Builds: NNNN` up to a decision, `- Depends: todoNN#PN` sideways. Phase state, blocked, and an
+  ADR's build state are all derived; a todo's `Status:` is a claim lint checks against the checkboxes.
+- **The board returns open threads only**, rooted at the ADRs that own them — ~3.7k tokens at session
+  start, ~1.4k after (`layer: "board"`), against 18k raw. `conducks_docs` is the docs LAYER: markdown
+  only, no graph, no database, works on a project that was never analyzed (ADR 0023).
+- **`progress.md` is retired** (ADR 0024) — recent activity is derived from ADR dates
+  (`recent: <n>`). The old file is archived in `docs/legacy/`.
+- **Skills: 8 → 4** (ADR 0025) — `conducks-guide`, `conducks-workflows` (explore·debug·impact·
+  refactor·audit), `conducks-docs`, `conducks-cli`. Written for someone else's project: no internal
+  record numbers, no paths from this repo presented as universal, instructions rather than
+  prohibitions. Installed GLOBALLY by default now (ADR 0022): `~/.claude/skills`, `--local` pins a
+  repo copy, retired names are deleted from every scope on sync.
+- **`analyze` guards its root** (ADR 0021): `ask` for a root with no project marker or over 25k
+  files, `ask-twice` (type the folder name) for OS trees, home, cloud-sync folders, dependency dirs,
+  and any folder whose subfolders are themselves projects. Nothing is forbidden; no TTY means no.
+- **Dead code**: `dynamic-loader.ts` and `config-detector.ts` removed with their resource;
+  `daac.ts` and `parsing/language-plugin.ts` deliberately left pending a decision (ADR 0026).
+- **Docs are watched** — `conducks watch` and `conducks mirror` re-lint on save and pulse the result
+  to the mirror's Docs panel. Log-only; `docs-lint` remains the exit-code gate.
+- Gates: **186 tests** · typecheck 0 · `audit` clean · `docs-lint` clean (40 governed docs) · board
+  reports 0 hygiene warnings.
 
 ## Next, in order
-1. **todo07 — workspace rollout** (needs the scope lift; it pulses other repos).
-2. `tests/legacy` still holds two archived files referencing deleted GQL symbols (ignored by
-   tsc+jest; cosmetic).
-3. Recall beyond 18: the remaining tsc-only findings are mostly type-declaration imports used in
-   positions the graph still cannot see (satisfies, mapped types, template-literal types) plus
-   non-import locals tsc counts and we do not. Diminishing returns — extend only with the same
-   probe → canary → subset-revalidation loop.
+1. **Nothing is committed.** The whole session sits in the working tree — review `git status` first.
+2. **todo16** — make `npm i -g conducks` work: settle native-vs-WASM grammars, trim the dependency
+   chain, fix the README install section, then claim the npm name (`conducks` is still free).
+3. **todo17** — always-on monitoring: hash-gated incremental parsing, then a cross-project monitor,
+   then code-change-implies-doc-check. Only the docs watcher exists today.
+4. **todo18** — the two open dead-code questions (ADR 0026), a pre-commit hook for `docs-lint`, the
+   global-vs-local skill scope call, and clearing `tests/legacy/`.
+5. **todo10#P2 / todo10#P4** are the only other decision-linked work open.

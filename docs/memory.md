@@ -249,3 +249,13 @@
   capture bound only for the listed keywords.
 - Applies: any `*/queries.ts` pattern combining `?` optionality with a predicate. Probe both the
   with-modifier and without-modifier cases before shipping (see `swift/queries.ts`).
+
+## Verify a prune finding by SYMBOL, never by import path
+- Gotcha: matching an import path (`grep "python/resolver.js"`) misses relative imports (`from "./resolver.js"`), so a live module reads as an orphan. `PythonResolver` was nearly deleted this way — `python/index.ts:4` imports it relatively and instantiates it on line 21.
+- Why: an import path is written differently by every caller (aliased, relative, barrel re-export); the symbol name is not. `grep -rn "\bSymbolName\b" src tests scripts` excluding the defining file is the audit that cannot be fooled by import style.
+- Applies: every `conducks prune` ORPHAN before any deletion. See ADR 0026 for the four findings this method resolved, two of which were not deletable.
+
+## An unreferenced module is a question, not a finding
+- Gotcha: "disconnected by accident" and "deliberately not wired yet" look identical to the graph — both are zero incoming edges.
+- Why: deleting the second kind destroys a capability nobody decided to drop, and git history will not tell the next reader which it was. `clustering/daac.ts` is the live example: 149 lines of directory-aware clustering, unwired, more capable than the `mirror.engine.detectCluster()` heuristic that replaced it, with no ADR either way.
+- Applies: before deleting an orphan, answer "was this disconnected, or never connected?" A capability with no recorded decision gets an ADR line first. — ADR 0026

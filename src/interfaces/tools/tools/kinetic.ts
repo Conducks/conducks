@@ -39,6 +39,7 @@ export const kineticTools: Record<string, Tool> = {
   conducks_impact: {
     id: "conducks-impact",
     name: "conducks_impact",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Analyze the structural blast radius of a symbol. Maps upstream/downstream impact.
@@ -107,6 +108,7 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
   conducks_trace: {
     id: "conducks-trace",
     name: "conducks_trace",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Trace granular execution or data flow from a starting symbol.
@@ -167,6 +169,7 @@ AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.`,
   conducks_diff: {
     id: "conducks-diff",
     name: "conducks_diff",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Historical structural diff between the current graph and previous states.
@@ -266,6 +269,7 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
   conducks_rename: {
     id: "conducks-rename",
     name: "conducks_rename",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Graph-Verified Renaming (Refactor). Safely renames a symbol across all structural references.

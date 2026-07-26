@@ -92,6 +92,16 @@ export class MirrorServer {
       }
     });
 
+    // Docs board — todo progress and ADR states, parsed from the authored markdown grammar.
+    // Same source as `conducks docs-status`; the graph is not touched.
+    this.app.get('/api/docs', (req, res) => {
+      try {
+        res.json(registry.docs.board());
+      } catch (err) {
+        res.status(500).json({ error: String(err) });
+      }
+    });
+
     // Conducks SSE Heartbeat
     this.app.get('/api/pulse', (req, res) => {
       res.setHeader('Content-Type', 'text/event-stream');
@@ -149,5 +159,11 @@ export function initGlobalMirror(gateway: GatewayService) {
   try {
     registry.evolution.watcher?.setPulseSubscriber((pulse) => globalMirror?.broadcastPulse(pulse));
   } catch { /* watcher not active in this context — mirror still serves static/gateway data */ }
+  // Same inversion for the docs watcher: editing a doc refreshes the Docs panel without a click.
+  try {
+    const docsWatcher = registry.docs.watcher;
+    docsWatcher.setPulseSubscriber((pulse) => globalMirror?.broadcastPulse(pulse));
+    docsWatcher.start();
+  } catch { /* no docs/ in this project — the panel still serves on demand */ }
   return globalMirror;
 }

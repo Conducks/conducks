@@ -12,6 +12,19 @@ function validatePath(customPath: string, projectRoot: string): string {
 }
 
 /**
+ * Resolve a caller-supplied path against the workspace root WITHOUT touching the graph.
+ *
+ * The docs layer reads markdown and nothing else: it must answer on a folder that was never
+ * analyzed, must not open DuckDB, and must not hold a connection other agents queue behind.
+ * `ensureAnchor` cannot give it that — it boots the whole registry. So the path check, which is the
+ * only part the docs layer needs, lives on its own.
+ */
+export function resolveDocsRoot(customPath?: string): string {
+  const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  return customPath ? validatePath(customPath, projectRoot) : projectRoot;
+}
+
+/**
  * [Conducks Anchor Check] 🏺
  * Ensures the structural registry is aligned to the correct workspace root
  * before executing any tool. This prevents "Detached Root" errors when

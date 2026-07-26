@@ -13,7 +13,35 @@ Two surfaces:
 Nothing works until the graph exists. Run `conducks analyze [path]` first (see `conducks-cli`).
 Most tool responses carry `indexStaleness` — if it says stale, re-analyze before trusting output.
 
+## Two layers
+
+The tool surface has two halves, and the difference is what each NEEDS, not what each is about:
+
+| layer | reads | needs `conducks analyze` first? |
+|---|---|---|
+| **docs** | the authored markdown under `docs/` | **no** — works on any folder, opens no database, holds no lock |
+| **code** | the structural graph in `.conducks/` | **yes** — an unanalyzed project has nothing to answer from |
+
+Start a session on the docs layer: it tells you what is on the table and what the binding decisions
+are, instantly, before any pulse has run. Reach for the code layer once you need wiring.
+
+Each tool's MCP description is prefixed `[docs layer]` or `[code layer]` so the split survives into
+any client.
+
 ## The 14 tools, by the question they answer
+
+### Docs layer
+
+```
+conducks_docs         the open threads in the authored docs, rooted at the decisions that own
+                      them: each ADR with unfinished work, the todo phases building it, the next
+                      task in each, and what is blocked by what. Finished work is omitted.
+                      layer="all" (default) also returns conventions + memory, the constraints to
+                      load once per session; layer="board" omits them for repeat calls;
+                      raw=true returns the full unprojected board.
+```
+
+### Code layer
 
 **"Where is it? What exists?"**
 ```
@@ -49,12 +77,6 @@ conducks_coverage     overlay an istanbul coverage-final.json onto function span
                       function with no callers is dead, one that was covered and went dark broke
 ```
 
-**"What is the state of the work?"**
-```
-conducks_docs         progress board parsed from the authored docs — todo %, ADR states,
-                      feature/memory/convention counts, grammar violations
-```
-
 **Mutation (the only one that writes source)**
 ```
 conducks_rename       graph-verified rename across all structural references.
@@ -74,13 +96,8 @@ Before editing anything: `conducks_impact`. Before deleting anything: `conducks_
 
 ## The other conducks skills
 
-```
-conducks-cli              every CLI command — analyze, coverage, docs, guard, lifecycle
-conducks-exploring        entering new code: architecture, symbol context, dependency mapping
-conducks-impact-analysis  safety before an edit — what depends on this, what will break
-conducks-refactoring      structural evolution and graph-verified rename/move/extract
-conducks-debugging        following execution flow and tracing an error to its source
-conducks-governance       pre-commit integrity checks and architecture validation
-conducks-docs             the documentation standard — docs hold authored intent only; how
-                          code is wired is queried from the graph, never written to a file
-```
+| skill | use it for |
+|---|---|
+| `conducks-workflows` | explore · debug · impact · refactor · audit — the probe sequence for each |
+| `conducks-docs` | the documentation standard: what goes where, and how each file is structured |
+| `conducks-cli` | the terminal command surface |

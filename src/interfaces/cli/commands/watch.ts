@@ -39,8 +39,14 @@ export class WatchCommand implements ConducksCommand {
     console.log('[Watch] Step 5: calling watcher.start()...');
     watcher.start();
 
+    // The docs half of the same heartbeat: a governed doc changing re-lints the tree. Reports only —
+    // the exit-code surface stays on `conducks docs-lint` for CI (ADR 0020, todo15).
+    const docsWatcher = registry.docs.watcher;
+    docsWatcher.start();
+
     console.log("\n\x1b[32m🔭 Conducks Watcher — Live Mirror Mode (Read-Only) active.\x1b[0m");
     console.log("\x1b[34m- Changes update the in-memory Visual Mirror instantly.\x1b[0m");
+    console.log("\x1b[34m- docs/ is watched too: grammar + link violations report on write.\x1b[0m");
     console.log("\x1b[33m- Note: Run 'conducks analyze' to persist new symbols to disk.\x1b[0m");
 
     // FIX 5: Keep the process alive until a termination signal is received.
@@ -50,6 +56,7 @@ export class WatchCommand implements ConducksCommand {
       const shutdown = async (signal: string) => {
         console.log(`\n\x1b[33m[Conducks Watch] Received ${signal}. Shutting down watcher...\x1b[0m`);
         try {
+          await docsWatcher.stop();
           await watcher.stop();
         } catch (err: any) {
           console.error(`[Conducks Watch] Error during watcher shutdown: ${err?.message || err}`);

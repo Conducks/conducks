@@ -1,5 +1,7 @@
 # 0016 — Type-only imports are not runtime dependencies (amends 0010)
 Status: Accepted
+- Enforced by: tests/unit/core/type-only-imports.test.ts
+- Amends: 0010 (which counted type-only imports as dependency edges)
 - Date: 2026-07-20
 - Amended by: 0017
 - Promoted: docs/architecture/modules/core/graph/algorithms/MODULE.md ("They look like a circular dependency and are not"); docs/architecture/modules/domain/governance/sentinel/MODULE.md ("`max_fans` counts runtime fan-in only")

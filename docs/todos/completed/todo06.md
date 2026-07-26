@@ -1,5 +1,6 @@
 # todo06 — layer boundary cleanup (Clean Architecture)
 Status: done
+- Promoted: docs/conventions.md CONDUCKS-22 (the layer contract, enforced); ADR 0005 `- Enforced by:` the sentinel rule
 - Acceptance: conducks self-analysis shows zero illegal cross-layer edges, enforced by `conducks guard`
 
 **REOPENED 2026-07-25.** This was marked done on an acceptance criterion that was never met. `conducks
@@ -34,7 +35,7 @@ phase-1 work below did land; the enforcement did not. See `docs/memory.md` and A
 - [x] wire the never-run sentinel evaluator into `conducks guard`; verified fires on injected violation, clean when passing
 - [x] ADR 0005 — the layer contract
 
-## Phase 4 — discovered while wiring guard (pre-existing, NOT layer regressions)
+## Phase 5 — discovered while wiring guard (pre-existing, NOT layer regressions)
 - [x] no_cycles: 0 — the 1 exposed cycle was a singleton intra-file false positive; fixed the DETECTOR (skip same-file cycles), not the code (singleton is correct)
 - [x] rank_violations: 0 — all 36 were false positives: 32 scratch/.wasm (excluded via .conducksignore), 4 function-uses-class (refined rule to skip symbol-level pairs; layer_boundaries is the real check)
 - [x] "dead files" RETRACTED — false positive: base.ts (ConducksRegistry) used by 21 files, dynamic-loader by 4, via re-export through tool-registry. NOT dead. Verify-before-delete caught it.

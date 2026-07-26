@@ -1,5 +1,6 @@
 # todo14 — type-position captures: close the recall gap in TYPE_REFERENCE
 Status: done
+- Promoted: docs/memory.md (the `#match?` unbound-capture trap; type-position captures); tests/unit/core/type-position-targets.test.ts
 - Acceptance: `array_type`, `as_expression`, `type_predicate` and `union_type` positions emit `pulse_type_target` in typescript/tsx (probed patterns, canary-tested), the type-only-imports suite still passes byte-identically, STALE_IMPORT's tsc-subset validation is re-run — and with the new evidence, type-declaration targets can be un-excluded from `findStaleImports` (raising recall from 1 finding toward the measured ~23) while staying a strict subset of `tsc --noUnusedLocals`.
 
 The STALE_IMPORT pass (2026-07-25) shipped deliberately under-reporting: 1 finding, 0 false

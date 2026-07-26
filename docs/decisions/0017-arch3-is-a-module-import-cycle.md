@@ -1,5 +1,7 @@
 # 0017 — ARCH-3 means a module import cycle (amends 0016)
 Status: Accepted
+- Enforced by: tests/unit/domain/governance/audit.test.ts
+- Amends: 0016, 0010 (both scoped ARCH-3 by edge type; this ADR settles which edges it means)
 - Date: 2026-07-20
 - Promoted: docs/architecture/modules/domain/governance/MODULE.md (Deferred — the call-cycle finding); docs/architecture/modules/core/graph/algorithms/MODULE.md ("Filtering is the caller's job"); docs/memory.md
 

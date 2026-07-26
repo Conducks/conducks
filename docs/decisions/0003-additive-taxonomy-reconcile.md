@@ -1,6 +1,6 @@
 # 0003 — Additive taxonomy reconcile (PACKAGE/STATEMENT/BRANCH/DIRECTORY)
-Status: Amended by 0012 — this ADR recorded only the *additions*; it omitted that they diverged from
-the original 9-kind design (ATOM was meant to be a cross-cutting attribute, not a first-class kind).
+Status: Accepted
+- Amended by: 0012 (this ADR recorded only the *additions*, omitting that they diverged from the original 9-kind design — ATOM was meant to be a cross-cutting attribute, not a first-class kind)
 - Date: 2026-07-17
 
 ## Context

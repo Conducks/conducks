@@ -13,12 +13,12 @@
 - `conducks coverage-view <cov.json> [--out x.html] [--watch]` — self-contained HTML overlay, live re-render
 
 ## Docs (conducks-docs grammar)
-- `conducks docs-status [--json]` — progress board parsed from the markdown (todo %, ADR states)
+- `conducks docs-status [--json] [--all]` — open work from the docs: each ADR with unfinished phases, the next task in each, what is blocked
 - `conducks docs-lint` — validate docs against the grammar; exits 1 on violation (CI gate)
 - `conducks bootstrap-docs [name]` — scaffold the grammar file set into docs/
 
 ## Architecture governance
-- `conducks guard [--threshold=N] [--force]` — layer contract (ADR 0005) + cycles + rank rules; blocks violations
+- `conducks guard [--threshold=N] [--force]` — layer contract + cycles + rank rules; blocks violations
 - `conducks audit [--fallback] [--history=<window>]` / `advise` — structural audit + advice
 - `conducks status --blueprint` — integrity readout (cycles/orphans/violations) printed to stdout; writes nothing
 - `conducks drift [prevPulseId]` / `diff` — structural change between pulses

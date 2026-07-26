@@ -1,6 +1,6 @@
 import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
-import { ensureAnchor } from "../shared/anchor.js";
+import { ensureAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 
 /**
@@ -47,6 +47,7 @@ export const synapseTools: Record<string, Tool> = {
   conducks_query: {
     id: "conducks-query",
     name: "conducks_query",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Search the structural graph for symbols and concepts by name or pattern.
@@ -142,6 +143,7 @@ Returns:
   conducks_status: {
     id: "conducks-status",
     name: "conducks_status",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Structural health and system manifest generation. Maps hotspots and entry points.
@@ -209,6 +211,7 @@ Modes:
   conducks_audit: {
     id: "conducks-audit",
     name: "conducks_audit",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Audit architectural integrity. Detects circular dependencies, god objects, and violations.
@@ -318,6 +321,7 @@ Modes:
   conducks_explain: {
     id: "conducks-explain",
     name: "conducks_explain",
+    layer: "code",
     type: "tool",
     version: "2.1.0",
     description: `Deep dive into technical risk and behavior for a specific symbol.
@@ -377,6 +381,7 @@ AFTER THIS: Use conducks_trace to see how data flows through this symbol.`,
   conducks_context: {
     id: "conducks-context",
     name: "conducks_context",
+    layer: "code",
     type: "tool",
     version: "1.0.0",
     description: `Collect structural context around a symbol within a given graph radius.
@@ -538,6 +543,7 @@ Budget: nodes are scored and added highest-first until budget is exhausted or di
   conducks_graph_query: {
     id: "conducks-graph-query",
     name: "conducks_graph_query",
+    layer: "code",
     type: "tool",
     version: "1.0.0",
     description: `Execute a raw SELECT query against the Conducks DuckDB graph store.
@@ -586,6 +592,7 @@ AFTER THIS: Use conducks_explain for deeper analysis of returned symbols.`,
   conducks_flows: {
     id: "conducks-flows",
     name: "conducks_flows",
+    layer: "code",
     type: "tool",
     version: "2.0.0",
     description: `List all logical execution flows in the codebase. Each flow is a named entry point and the symbols it calls.
@@ -645,6 +652,7 @@ Returns: list of flows, each with a name, entry symbol, and member count.`,
   conducks_prune: {
     id: "conducks-prune",
     name: "conducks_prune",
+    layer: "code",
     type: "tool",
     version: "1.0.0",
     description: `Find dead code: orphaned symbols, unused exports, and stale imports.
@@ -711,23 +719,44 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
   conducks_docs: {
     id: "conducks-docs",
     name: "conducks_docs",
+    layer: "docs",
     type: "tool",
     version: "1.0.0",
-    description: `Progress board parsed straight from the project's authored docs (conducks-docs grammar):
-todo phases/%, ADR states, feature/memory/convention counts, and any grammar violations.
+    description: `The open threads in the project's authored docs, rooted at the decisions that own
+them: each ADR with unfinished work, the todo phases building it, and the next task in each — plus
+what is blocked and by what. Finished work is omitted: this is the table, not the history.
 
-WHEN TO USE: Check what work is in flight and its status without reading every doc.`,
+A SUMMARY AND LINKS, NOT A REPLACEMENT: every entry is an address (todo09#P2, a file path) or a
+state. Open the todo or the ADR before acting on it.
+
+layer="all" (default) also returns the constraints to load once per session — conventions (rules)
+and memory (gotchas), compacted to one line each. layer="board" omits them for repeat calls.
+
+WHEN TO USE: at session start, and whenever you pick up work — "what is on the table, what is
+waiting, which decisions still have unbuilt parts" without opening every doc.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     inputSchema: {
       type: "object",
-      properties: { path: { type: "string", description: "Optional: the project root." } }
+      properties: {
+        path: { type: "string", description: "Optional: the project root." },
+        layer: { type: "string", enum: ["all", "board"], description: "all = threads + constraints (session start). board = open threads only." },
+        recent: { type: "number", description: "How many recent decisions to list (default 4, 0 for none). Derived from ADR dates — there is no progress file." },
+        raw: { type: "boolean", description: "Return the full unprojected board (every doc, every entry). Large." }
+      }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ path: customPath }: any) => {
+    handler: async ({ path: customPath, layer, recent, raw }: any) => {
       try {
-        await ensureAnchor(customPath, true);
-        const board = registry.docs.board(customPath);
-        return mcpOk(board, { nodeCount: board.todos.length + board.decisions.length });
+        // DOCS LAYER: markdown only. No anchor, no graph, no DuckDB — this answers on a folder that
+        // was never analyzed, and takes no connection for another agent to queue behind.
+        const root = resolveDocsRoot(customPath);
+        if (raw) {
+          const board = registry.docs.board(root);
+          return mcpOk(board, { nodeCount: board.todos.length + board.decisions.length });
+        }
+        const view = registry.docs.view(root, layer === "board" ? "board" : "all",
+          typeof recent === "number" ? recent : 4);
+        return mcpOk(view, { nodeCount: (view.open as unknown[]).length + (view.unlinkedWork as unknown[]).length });
       } catch (err: any) {
         return mcpErr('DOCS_FAILED', err.message, 'Check the docs/ folder follows the conducks-docs grammar.', true);
       }
@@ -738,6 +767,7 @@ WHEN TO USE: Check what work is in flight and its status without reading every d
   conducks_coverage: {
     id: "conducks-coverage",
     name: "conducks_coverage",
+    layer: "code",
     type: "tool",
     version: "1.0.0",
     description: `Overlay an istanbul coverage-final.json onto the graph: per-function fill % and

@@ -92,12 +92,24 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
 
   // ── Querying ─────────────────────────────────────────────────────────────────
 
+  /**
+   * MCP has no namespaces, so the docs/code split is surfaced as a description prefix rather than a
+   * tool-name change — renaming would break every skill and saved client config to say something a
+   * prefix already says. `[docs]` reads markdown and needs no analysis; `[code]` answers from the
+   * graph and needs a pulse first (ADR 0023).
+   */
   getTools(): MCPTool[] {
-    return this.getAll().map((tool) => ({
-      name: tool.name,
-      description: tool.description || '',
-      inputSchema: tool.inputSchema,
-    }));
+    return this.getAll().map((tool) => {
+      const layer = (tool as { layer?: string }).layer ?? 'code';
+      const tag = layer === 'docs'
+        ? '[docs layer — authored markdown; works with no analysis, opens no database]'
+        : '[code layer — the structural graph; run `conducks analyze` first]';
+      return {
+        name: tool.name,
+        description: `${tag}\n${tool.description || ''}`,
+        inputSchema: tool.inputSchema,
+      };
+    });
   }
 
   // ── Request handling ─────────────────────────────────────────────────────────

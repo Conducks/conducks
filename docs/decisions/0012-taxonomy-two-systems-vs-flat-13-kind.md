@@ -1,5 +1,6 @@
 # 0012 — Taxonomy: two-system design vs the flat 13-kind code (open reconcile)
 Status: Accepted
+- Amends: 0003 (which recorded the additions without recording the divergence)
 - Resolved by: 0013 (the open reconcile is now decided — cut DATA, edge-gate ATOM)
 - Date: 2026-07-19
 - Promoted: docs/architecture/modules/core/parsing/taxonomy/MODULE.md (the two orthogonal systems); docs/memory.md ("Taxonomy enum lists 13 kinds but the persisted graph has 9")

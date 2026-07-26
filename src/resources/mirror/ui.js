@@ -31,8 +31,204 @@ function initUI() {
       if (item.id === 'dock-governance') {
         loadGovernance();
       }
+      if (item.id === 'dock-docs') {
+        loadDocs();
+      }
     });
   });
+
+  // The docs watcher re-lints on write and pulses; redraw only when the panel is actually open,
+  // so an editor save does not cost a fetch nobody is looking at.
+  window.onDocsPulse = (pulse) => {
+    const slate = document.getElementById('slate-docs');
+    if (!slate || slate.style.display === 'none') return;
+    loadDocs();
+    const stamp = document.getElementById('docs-stamp');
+    if (stamp) stamp.textContent = pulse.filePath + ' \u2192 ' + (pulse.violations ? pulse.violations + ' violation(s)' : 'clean');
+  };
+
+  // 1a. 📄 DOCS PANEL — what is in flight (todo phases) and which decisions still bind.
+  // Reads /api/docs, the same board `conducks docs-status` prints. Nothing here touches the graph.
+  async function loadDocs() {
+    const panel = document.getElementById('docs-panel');
+    if (!panel) return;
+    panel.innerHTML = '';
+
+    const stamp = document.createElement('p');
+    stamp.id = 'docs-stamp';
+    stamp.style.cssText = 'font-size:10px;opacity:.4;margin-bottom:8px;';
+    stamp.textContent = 'live \u2014 re-lints on write';
+    panel.appendChild(stamp);
+
+    let data;
+    try {
+      const resp = await fetch('/api/docs');
+      data = await resp.json();
+    } catch (err) {
+      const errMsg = document.createElement('p');
+      errMsg.textContent = 'Failed to load docs board.';
+      errMsg.style.color = '#e53e3e';
+      panel.appendChild(errMsg);
+      return;
+    }
+
+    const section = (title, count) => {
+      const s = document.createElement('section');
+      s.className = 'deck-section';
+      const h = document.createElement('div');
+      h.className = 'section-header';
+      const t = document.createElement('span');
+      t.className = 'section-title';
+      t.textContent = title;
+      h.appendChild(t);
+      if (count !== undefined) {
+        const b = document.createElement('div');
+        b.className = 'section-badge';
+        b.textContent = String(count);
+        h.appendChild(b);
+      }
+      s.appendChild(h);
+      return s;
+    };
+
+    const STATE_COLOUR = { done: '#48bb78', blocked: '#e53e3e', doing: '#d69e2e', todo: '#4299e1' };
+
+    const phaseRow = (p, colour) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:8px;align-items:baseline;padding:4px 0 4px 12px;';
+      const addr = document.createElement('span');
+      addr.textContent = p.addr;
+      addr.style.cssText = 'font-size:10px;font-family:monospace;opacity:.8;flex-shrink:0;color:' + colour + ';';
+      const count = document.createElement('span');
+      count.textContent = p.done + '/' + p.total;
+      count.style.cssText = 'font-size:10px;opacity:.45;flex-shrink:0;';
+      const text = document.createElement('span');
+      if (p.state === 'blocked') {
+        text.textContent = '\u26d4 waits ' + (p.blockedBy || []).join(', ');
+        text.style.color = STATE_COLOUR.blocked;
+      } else {
+        text.textContent = p.next ? '\u2192 ' + p.next : '\u2192 (no open task)';
+      }
+      text.style.cssText += ';font-size:10px;opacity:.7;line-height:1.4;';
+      row.appendChild(addr); row.appendChild(count); row.appendChild(text);
+      return row;
+    };
+
+    const groupCard = (headline, tag, tagColour, phases) => {
+      const item = document.createElement('div');
+      item.className = 'metric-pill';
+      item.style.cssText = 'display:block;padding:10px 12px;margin-bottom:6px;';
+      const top = document.createElement('div');
+      top.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      const name = document.createElement('span');
+      name.textContent = headline;
+      name.style.cssText = 'font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      top.appendChild(name);
+      if (tag) {
+        const badge = document.createElement('span');
+        badge.textContent = tag;
+        badge.style.cssText = 'font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:4px;color:white;flex-shrink:0;background:' + tagColour + ';';
+        top.appendChild(badge);
+      }
+      item.appendChild(top);
+      phases.forEach(p => item.appendChild(phaseRow(p, tagColour)));
+      return item;
+    };
+
+    // DECISIONS THAT STILL OWE WORK — the question that otherwise costs a walk through every record.
+    const owing = (data.decisions || []).filter(d => d.buildState === 'partial' || d.buildState === 'unbuilt');
+    if (owing.length) {
+      const s = section('Decisions with open work', owing.length);
+      owing.forEach(d => {
+        const dead = /^superseded$/i.test(d.state || '');
+        const tag = dead ? 'superseded \u00b7 ' + d.buildState : d.buildState;
+        const card = groupCard(d.id + '  ' + String(d.title).replace(/^\d+\s*\u2014\s*/, ''), tag,
+          dead ? STATE_COLOUR.blocked : STATE_COLOUR.doing,
+          (d.builtBy || []).filter(p => p.state !== 'done'));
+        if (d.enforcedBy) {
+          const e = document.createElement('div');
+          e.textContent = 'enforced by: ' + d.enforcedBy;
+          e.style.cssText = 'font-size:10px;opacity:.45;padding:4px 0 0 12px;';
+          card.appendChild(e);
+        }
+        s.appendChild(card);
+      });
+      panel.appendChild(s);
+    }
+
+    // OPEN WORK NOBODY LINKED TO A DECISION — valid, but it should be a deliberate choice.
+    const unlinkedWork = (data.todos || [])
+      .filter(t => !/^done$/i.test(t.state || ''))
+      .map(t => ({ t: t, phases: (t.phases || []).filter(p => p.state !== 'done' && !(p.builds || []).length) }))
+      .filter(x => x.phases.length);
+    if (unlinkedWork.length) {
+      const s = section('Open work, no decision linked', unlinkedWork.length);
+      unlinkedWork.forEach(x => s.appendChild(groupCard(
+        x.t.id + '  ' + String(x.t.title).replace(/^\S+\s*\u2014\s*/, ''),
+        x.t.done + '/' + x.t.total, STATE_COLOUR.todo, x.phases)));
+      panel.appendChild(s);
+    }
+
+    if (!owing.length && !unlinkedWork.length) {
+      const s = section('Open work', 0);
+      const ok = document.createElement('p');
+      ok.textContent = 'Nothing open. Every phase is finished.';
+      ok.style.cssText = 'font-size:11px;opacity:.5;margin-top:8px;';
+      s.appendChild(ok);
+      panel.appendChild(s);
+    }
+
+    // HYGIENE — true findings that do not break the grammar, so they never fail the gate.
+    const warns = data.warns || [];
+    if (warns.length || (data.unlinked || []).length) {
+      const s = section('Hygiene', warns.reduce((a, w) => a + w.errs.length, 0));
+      warns.forEach(w => w.errs.forEach(e => {
+        const row = document.createElement('div');
+        row.style.cssText = 'font-size:10px;opacity:.6;line-height:1.4;margin-bottom:4px;';
+        const f = document.createElement('span');
+        f.textContent = w.file + ': ';
+        f.style.opacity = '.6';
+        row.appendChild(f);
+        row.appendChild(document.createTextNode(e));
+        s.appendChild(row);
+      }));
+      if ((data.unlinked || []).length) {
+        const row = document.createElement('div');
+        row.textContent = data.unlinked.length + ' ADR(s) with no build link or enforcing test: ' + data.unlinked.join(' ');
+        row.style.cssText = 'font-size:10px;opacity:.5;line-height:1.4;margin-top:6px;';
+        s.appendChild(row);
+      }
+      panel.appendChild(s);
+    }
+
+    // GRAMMAR — a violating doc is a doc the board is reading wrong, so it is stated here.
+    const lint = data.lint || [];
+    const lintSection = section('Grammar', lint.length);
+    if (lint.length) {
+      lint.forEach(l => {
+        const item = document.createElement('div');
+        item.className = 'metric-pill';
+        item.style.cssText = 'display:block;padding:8px 12px;margin-bottom:4px;';
+        const f = document.createElement('div');
+        f.textContent = l.file;
+        f.style.cssText = 'font-size:10px;color:#e53e3e;font-weight:700;';
+        item.appendChild(f);
+        (l.errs || []).forEach(e => {
+          const p = document.createElement('div');
+          p.textContent = e;
+          p.style.cssText = 'font-size:10px;opacity:.6;line-height:1.4;margin-top:2px;';
+          item.appendChild(p);
+        });
+        lintSection.appendChild(item);
+      });
+    } else {
+      const ok = document.createElement('p');
+      ok.textContent = 'Grammar clean — run `conducks docs-lint` in CI.';
+      ok.style.cssText = 'font-size:11px;opacity:.5;margin-top:8px;';
+      lintSection.appendChild(ok);
+    }
+    panel.appendChild(lintSection);
+  }
 
   // 1b. 🛡️ GOVERNANCE PANEL
   async function loadGovernance() {

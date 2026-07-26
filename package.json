@@ -20,12 +20,11 @@
 	"files": [
 		"build",
 		"config",
-		"docs",
 		"LICENSE",
 		"README.md"
 	],
 	"scripts": {
-		"build": "tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/lib/core/parsing/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/interfaces/cli/",
+		"build": "rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/lib/core/parsing/ && cp build/src/resources/grammars/tree-sitter.wasm build/src/interfaces/cli/",
 		"start": "node ./build/src/interfaces/cli/index.js mirror",
 		"demo": "npm run build && npm run start",
 		"clean": "rm -rf build data .conducks",

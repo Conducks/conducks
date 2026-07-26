@@ -46,11 +46,25 @@ export interface ToolAnnotations {
 }
 
 /**
+ * Which half of conducks a tool belongs to. MCP has no namespaces, so the split is carried as data
+ * and surfaced in the description rather than baked into tool names (renaming would break every
+ * skill and saved client config for cosmetic gain).
+ *
+ * The line is a DEPENDENCY boundary, not a category: a `docs` tool reads authored markdown and must
+ * work on a folder that was never analyzed — no graph, no DuckDB, no lock. A `code` tool answers
+ * from the structural graph and needs a pulse first.
+ */
+export type ToolLayer = "docs" | "code";
+
+/**
  * Interface for a functional tool that can be executed via MCP or CLI.
  */
 export interface Tool extends ConducksComponent {
   /** The unique name of the tool for command-line/RPC invocation */
   readonly name: string;
+
+  /** Which layer this tool belongs to — defaults to "code" when unset. */
+  readonly layer?: ToolLayer;
 
   /** JSON Schema for the tool's input arguments */
   readonly inputSchema: any;

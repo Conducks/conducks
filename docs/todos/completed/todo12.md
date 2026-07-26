@@ -1,5 +1,6 @@
 # todo12 — Skills + docs truth pass across the CONDUCKS repo group (single orchestrated run)
 Status: done
+- Promoted: docs/conventions.md CONDUCKS-14, CONDUCKS-15 (skills ship structural guidance only; one editable copy)
 - Acceptance: every `conducks_*` name in `src/resources/skills/*.md` exists in the registered MCP surface (enforced by a test), no skill instructs a behaviour banned by ADR 0011/0015, the tool count is derived from one place, `website/docs` carries the full governed set, and typecheck + suite + `docs-lint` are green in both repos with nothing that worked before broken.
 
 Runs as ONE orchestrated pass. Main thread orchestrates, gates, and commits; it does not build.

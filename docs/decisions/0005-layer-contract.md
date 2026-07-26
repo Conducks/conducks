@@ -1,5 +1,6 @@
 # 0005 — Clean Architecture layer contract
 Status: Accepted
+- Enforced by: sentinel rule `layer_boundaries` (src/lib/domain/governance/sentinel-rules.ts)
 - Date: 2026-07-17
 - Promoted: enforced as a default rule since 2026-07-25 (todo06 Phase 4 — the gate had never actually run before then); current state in `architecture/README.md` and `governance/sentinel/MODULE.md`. A second launcher exception (cli → mcp) was added beside cli → web.
 

@@ -36,6 +36,9 @@
       <button class="dock-item" id="dock-trace" title="Trace">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
       </button>
+      <button class="dock-item" id="dock-docs" title="Docs — todos & decisions">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+      </button>
       <button class="dock-item" id="dock-governance" title="Governance">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
       </button>
@@ -110,6 +113,16 @@
               <input type="range" id="ctrl-spread" class="deck-slider" min="500" max="10000" step="100" value="2000">
             </div>
            </section>
+        </div>
+      </div>
+
+      <!-- DOCS -->
+      <div id="slate-docs" style="display: none;">
+        <header class="slate-header">
+          <h2 class="slate-title">Docs</h2>
+        </header>
+        <div class="slate-body" id="docs-panel">
+          <p class="text-dim text-[10px] uppercase tracking-wider">Loading...</p>
         </div>
       </div>
 

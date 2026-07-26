@@ -88,6 +88,11 @@ sse.onmessage = (event) => {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => refreshSynapse(), 300);
   }
+  // A docs pulse carries no graph change — only the Docs panel needs to redraw, and only if it is
+  // the visible slate. `window.onDocsPulse` is set by ui.js; guarded so the two files stay independent.
+  if (data.event === 'docs' && typeof window.onDocsPulse === 'function') {
+    window.onDocsPulse(data);
+  }
 };
 
 function applyForces() {

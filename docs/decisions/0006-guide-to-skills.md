@@ -1,5 +1,6 @@
 # 0006 — conducks_guide → native skills; kill the skills-generator junk drawer
 Status: Accepted
+- Enforced by: tests/unit/interfaces/tools/skills-tool-surface.test.ts
 - Date: 2026-07-18
 
 ## Context

@@ -73,7 +73,8 @@ when a module's intent stops being obvious from its source.
   [reflector](modules/domain/analysis/reflector/MODULE.md) ·
   [orchestrator](modules/domain/analysis/orchestrator/MODULE.md) ·
   [coverage](modules/domain/analysis/coverage/MODULE.md) ·
-  [docs-grammar](modules/domain/analysis/docs-grammar/MODULE.md)
+  [docs-grammar](modules/domain/analysis/docs-grammar/MODULE.md) ·
+  [docs-board](modules/domain/analysis/docs-board/MODULE.md)
 - [governance](modules/domain/governance/MODULE.md) —
   [sentinel](modules/domain/governance/sentinel/MODULE.md)
 - [evolution](modules/domain/evolution/MODULE.md)

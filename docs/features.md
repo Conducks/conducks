@@ -24,6 +24,14 @@
 - Purpose: Keep the graph in sync while a developer is actively editing, re-inducting only the file that changed.
 - Intent: Full pulses are too slow to run on every save, and a graph that is only correct right after a manual `analyze` is a graph nobody trusts.
 
+## Docs Board — `conducks docs-status`, MCP `conducks_docs`
+- Purpose: Show the open threads in the authored docs — each decision that still owes work, the todo phases building it, the next task in each, and what is blocked by what — without opening every file.
+- Intent: Finding what an accepted decision left unbuilt otherwise means reading every record bottom-up. It is a summary and a set of links, never a copy of the docs: every line is an address (`todo09#P2`) or a state, so it cannot drift into a second version of them.
+
+## Docs Grammar Gate — `conducks docs-lint`, live via `conducks watch`
+- Purpose: Fail a doc that breaks the standard — a wrapped value, a duplicate phase number, a link pointing at a record that does not exist, a supersede that abandons unbuilt work — and report hygiene separately without failing.
+- Intent: A standard nothing enforces is advice. Hygiene is split from grammar because a gate that fails on housekeeping gets switched off.
+
 ## Mirror Live Sync — `conducks mirror` (with `conducks watch` running)
 - Purpose: Push graph changes to connected dashboard clients as they land, so the picture on screen matches the code on disk.
 - Intent: A dashboard that needs a manual refresh loses the value of watch mode — the two are meant to be used together.

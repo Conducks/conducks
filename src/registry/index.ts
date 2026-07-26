@@ -8,7 +8,8 @@ import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, RegressionGuard } from "@/lib/domain/governance/index.js";
 import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
-import { buildBoard } from "@/lib/domain/analysis/docs-grammar.js";
+import { buildBoard, agentView } from "@/lib/domain/analysis/docs-board.js";
+import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
 import { parseIstanbul, bindCoverage, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
@@ -132,6 +133,7 @@ let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, pers
 let intelligence = new IntelligenceService(search, federation);
 let evolution = new EvolutionService(graph, persistence);
 const manifest = new ManifestService(manifestEngine);
+let docsWatcher: DocsWatcher | null = null;
 
 // 5. Lifecycle Management
 export async function initializeRegistry(readOnly: boolean = true, root?: string, lazy: boolean = readOnly) {
@@ -231,7 +233,15 @@ export const registry = {
     createFallbackDetector: () => new FallbackDetector()
   },
   docs: {
-    board: (root?: string) => buildBoard(root || chronicle.getProjectDir() || process.cwd())
+    board: (root?: string) => buildBoard(root || chronicle.getProjectDir() || process.cwd()),
+    // The agent projection: open threads + (optionally) the read-once constraint set.
+    view: (root?: string, layer: "all" | "board" = "all", recent = 4) =>
+      agentView(buildBoard(root || chronicle.getProjectDir() || process.cwd()), layer, recent),
+    // One watcher per process: `mirror` and `watch` both ask for it, neither owns it.
+    get watcher() {
+      docsWatcher ??= new DocsWatcher(chronicle.getProjectDir() || process.cwd());
+      return docsWatcher;
+    }
   },
   coverage: {
     // Query BEHAVIOR node spans, then range-join the istanbul report onto them (domain logic).

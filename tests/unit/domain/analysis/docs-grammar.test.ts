@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
-import { inferType, parseBody, shape, lint } from '@/lib/domain/analysis/docs-grammar.js';
+import { inferType, parseBody, shape, lint, readStatus, readRelations } from '@/lib/domain/analysis/docs-grammar.js';
+import { crossCheckDecisions } from '@/lib/domain/analysis/docs-board.js';
 
 // Gate 2 (conducks-docs): the parser must classify EVERY file/folder the standard defines —
 // no part of the format reads as "unknown". "unknown" is reserved for files not in the standard.
@@ -25,18 +26,21 @@ describe('docs-grammar — full-format classification', () => {
     expect(inferType('app/docs/architecture/kernel.MODULE.md')).toBe('architecture');
   });
 
-  it('keeps map/drift as derived — pure wiring, query it, never author it', () => {
+  it('keeps map/drift/progress as derived — query it, never author it', () => {
     expect(inferType('docs/map.md')).toBe('derived');
     expect(inferType('docs/drift.md')).toBe('derived');
+    // ADR 0024: what shipped is already carried by dated ADRs and closed todos, so a progress file
+    // is a third copy. Existing ones classify as derived — never governed, never linted, never read.
+    expect(inferType('docs/progress.md')).toBe('derived');
   });
 
-  it('still classifies the six governed types', () => {
+  it('still classifies the governed types', () => {
     expect(inferType('docs/todos/todo01.md')).toBe('todo');
     expect(inferType('docs/decisions/0001-x.md')).toBe('decision');
     expect(inferType('docs/features.md')).toBe('features');
     expect(inferType('docs/memory.md')).toBe('memory');
     expect(inferType('docs/conventions.md')).toBe('conventions');
-    expect(inferType('docs/progress.md')).toBe('progress');
+    expect(inferType('docs/handover.md')).toBe('handover');
   });
 
   it('lints handover for a missing Status and shapes it when present', () => {
@@ -44,5 +48,80 @@ describe('docs-grammar — full-format classification', () => {
     const shaped = shape('handover', parseBody('# Handover — 2026-07-18\nStatus: current\n\n## Where it stands\n'), 'docs/handover.md');
     expect(shaped.status).toBe('current');
     expect(shaped.sections).toContain('Where it stands');
+  });
+});
+
+// The grammar is LINE-ATOMIC: the value is the whole line after its marker, never split on
+// whitespace, and never continued onto a second line.
+describe('docs-grammar — line-atomic values', () => {
+  const ADR = (status: string) => `# 0003 — x\nStatus: ${status}\n- Date: 2026-07-17\n\n## Context\nc\n## Decision\nd\n## Consequences\nq\n`;
+
+  it('keeps the whole status line and derives state + refs from it', () => {
+    expect(readStatus('Amended by 0016, 0017')).toEqual({
+      status: 'Amended by 0016, 0017', state: 'Amended', statusRefs: ['0016', '0017'],
+    });
+    expect(readStatus('Accepted')).toEqual({ status: 'Accepted', state: 'Accepted', statusRefs: [] });
+    expect(readStatus(null)).toEqual({ status: null, state: null, statusRefs: [] });
+  });
+
+  it('does not truncate a superseded ADR to its first word — the ref survives', () => {
+    const d = shape('decision', parseBody(ADR('Superseded by 0012')), 'decisions/0003-x.md');
+    expect(d.status).toBe('Superseded by 0012');   // whole line, not "Superseded"
+    expect(d.state).toBe('Superseded');
+    expect(d.statusRefs).toEqual(['0012']);
+  });
+
+  it('flags a value wrapped onto the next line — it would otherwise be dropped in silence', () => {
+    const wrapped = '# 0003 — x\nStatus: Amended by 0012 — a reason that runs on\nand wraps here.\n- Date: 2026-07-17\n\n## Context\nc\n## Decision\nd\n## Consequences\nq\n';
+    const errs = lint('decision', parseBody(wrapped), wrapped);
+    expect(errs.some(e => e.startsWith('value wrapped'))).toBe(true);
+    // …and a well-formed file stays clean (no false positive on ordinary prose)
+    expect(lint('decision', parseBody(ADR('Accepted')), ADR('Accepted'))).toEqual([]);
+  });
+
+  it('rejects a status value outside its type vocabulary', () => {
+    expect(lint('decision', parseBody(ADR('banana')), ADR('banana')).join()).toContain('not a valid decision status');
+    // Amendment is a relation, not a life state — it belongs in a field, so Status must reject it.
+    expect(lint('decision', parseBody(ADR('Amended by 0012')), ADR('Amended by 0012')).join()).toContain('not a valid decision status');
+    expect(lint('decision', parseBody(ADR('Superseded by 0009')), ADR('Superseded by 0009'))).toEqual([]);
+    const todo = (s: string) => `# todo01 — x\nStatus: ${s}\n- Acceptance: it works\n\n## Phase 1 — p\n- [x] a\n`;
+    expect(lint('todo', parseBody(todo('doing')), todo('doing'))).toEqual([]);
+    expect(lint('todo', parseBody(todo('in progress')), todo('in progress')).join()).toContain('not a valid todo status');
+  });
+
+  it('ignores primitives inside a fenced block — a ``` sample is illustration, not grammar', () => {
+    const body = parseBody('# x\n\n## Real\n```markdown\n## Fake\nStatus: done\n- [ ] fake task\n```\n');
+    expect(body.sections.map(s => s.head)).toEqual(['Real']);
+    expect(body.status).toBeNull();
+  });
+
+  it('reads cross-ADR relations from the fields, and leaves an amended record binding', () => {
+    const src = '# 0010 — x\nStatus: Accepted\n- Amended by: 0016, 0017 (both rescoped it — note the 9999 in this prose)\n- Date: 2026-07-18\n\n## Context\nc\n## Decision\nd\n## Consequences\nq\n';
+    const d = shape('decision', parseBody(src), 'decisions/0010-x.md');
+    expect(d.amendedBy).toEqual(['0016', '0017']);   // the trailing prose is not harvested for refs
+    expect(d.id).toBe('0010');
+    expect(d.status).toBe('Accepted');               // amended ≠ dead: still binding
+    expect(d.state).toBe('Amended');                 // …but grouped apart on the board
+    expect(readRelations({ 'Promoted': 'docs/memory.md (see 1234)' }).amends).toEqual([]);
+  });
+
+  it('fails a one-way or dangling ADR stamp — the drift an index used to hide', () => {
+    const adr = (id: string, fields: Record<string, string>) =>
+      shape('decision', { title: `${id} — x`, status: 'Accepted', fields, sections: [] }, `decisions/${id}-x.md`);
+
+    expect(crossCheckDecisions([adr('0001', { 'Amended by': '0002' }), adr('0002', {})])[0].errs[0])
+      .toContain('ADR 0002 needs `- Amends: 0001`');
+    expect(crossCheckDecisions([adr('0003', { 'Supersedes': '0099' })])[0].errs[0])
+      .toContain('does not exist');
+    // Stamped at both ends → clean.
+    expect(crossCheckDecisions([adr('0001', { 'Amended by': '0002' }), adr('0002', { 'Amends': '0001' })])).toEqual([]);
+  });
+
+  it('surfaces the live phase and the next open task, not just the total %', () => {
+    const src = '# todo01 — x\nStatus: doing\n\n## Phase 1 — done bit\n- [x] a\n\n## Phase 2 — live bit\n- [x] b\n- [ ] the next thing\n';
+    const t = shape('todo', parseBody(src), 'todos/todo01.md');
+    expect(t.overallPct).toBe(67);
+    expect(t.activePhase).toBe('Phase 2 — live bit');
+    expect(t.nextTask).toBe('the next thing');
   });
 });

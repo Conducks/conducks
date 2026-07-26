@@ -1,5 +1,6 @@
 # todo09 — Taxonomy reconcile (C0) + tracked design debt
 Status: blocked
+- Blocked by: offline — the vuln-surface task needs an advisory DB (`npm audit` / GitHub advisories), unreachable in this environment
 - Progress: Phase 1+2 done · Phase 3 largely done — only externally-blocked items remain (vuln
   surface needs a network advisory DB; live overlay needs a target app; EXPRESSION is a no-op marker).
 - Open items are ONLY: vuln surface (needs an advisory DB / network), live cross-service overlay
@@ -27,6 +28,7 @@ persist, and (c) DATA's param info already lives in the parent BEHAVIOR's `dna.p
 attribute migration was needed. Runs inside the pulse transaction → commits atomically with `save()`,
 rolls back with `abortPulse()`. `mapToCanonical` + the enum left intact (DATA still tagged at
 emission, pruned at the end). No reflector change.
+- Builds: 0013
 - [x] Cut DATA nodes — `pruneTaxonomy` deletes all `canonicalKind='DATA'` nodes. Verified DATA=0.
 - [x] Edge-gate ATOM — keep an ATOM only if it carries a non-structural reference edge (type NOT IN
       `STRUCTURAL_EDGE_TYPES`); demote the rest. Verified ATOM 3561 → 227.
@@ -36,6 +38,7 @@ emission, pruned at the end). No reflector change.
       (External-repo re-verify still worth doing once, but conducks itself is a real TS monorepo.)
 
 ## Phase 2 — keep the features that read ATOM working on the surviving set ✅
+- Builds: 0013
 - [x] prune/dead-code (`dead-code.ts:107`) — runs, reports orphans; no crash on smaller set.
 - [x] query (`query-service.ts:439`) — `query "spectrum"` returns the surviving edge-carrying ATOM
       (`targetId`) alongside STRUCTURE/BEHAVIOR. Meaningful set only, no crash.
@@ -108,7 +111,7 @@ emission, pruned at the end). No reflector change.
         public API for a zero-caller flag is destructive. Accept as known-benign orphan.
       - External boundary tagging (path.*/fs.*/logger.* — the 280+ correctly-dangling calls) is the
         System 2 supply-chain item above, NOT a linker bug.
-## Phase 3 — the exact 16 `prune` findings still open (enumerated so they're directly actionable)
+## Phase 4 — the exact 16 `prune` findings still open (enumerated so they're directly actionable)
 Not dead code — each verified alive or intentional (see memory.md "prune is advisory-only").
 9 UNUSED_EXPORT — used in-file, over-exported. Dropped the `export` keyword (grep-verified 0 importers):
 - [x] `globalMirror` — mirror-server.ts (was `export let`)

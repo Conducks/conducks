@@ -1,5 +1,6 @@
 # 0014 — System 2: boundary-origin classification (implement ADR 0012's second system)
 Status: Accepted
+- Enforced by: tests/unit/core/boundary-classifier.test.ts
 - Date: 2026-07-19
 - Implements: the "System 2 — data-flow / boundary nodes tagged by origin" half of ADR 0012.
 - Depends on: the edge-properties persist fix (memory.md) — origin tags ride on edge properties.

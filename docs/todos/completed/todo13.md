@@ -1,5 +1,6 @@
 # todo13 — revive Java, PHP and Swift extraction (query files fail to compile)
 Status: done
+- Promoted: docs/memory.md (per-language query-compile traps for Java/PHP/Swift); tests/unit/core/languages/*.test.ts per language
 - Acceptance: a real pulse over fixture files in each language produces named symbol nodes (classes/functions/methods), not a single file-only node — proven by a committed test per language that parses a fixture through the real grammar and asserts extraction.
 
 Proven dead on a 12-language test repo (2026-07-25): each query file fails `tree-sitter` query

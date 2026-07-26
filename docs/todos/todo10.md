@@ -8,6 +8,7 @@ Status: doing
   each remaining finding is confirmed genuine with evidence; cross-checked against `madge`.
 
 ## Phase 1 — ARCH-3 as a module import cycle (ADR 0017)
+- Builds: 0017
 - [x] Restrict the audit's cycle detection to import-level via `IMPORT_CYCLE_IGNORED_EDGE_TYPES`
       (containment + TYPE_REFERENCE + CALLS/CONSTRUCTS/ACCESSES); all four `detectCycles` call
       sites now share one definition
@@ -23,6 +24,7 @@ Status: doing
 Two separate causes stop `algorithms/* → adjacency-list` imports from qualifying as type-only, which
 is what actually keeps the cycle alive (`adjacency-list → cycle-detector` is a genuine runtime
 import, so only the return direction can clear it):
+- Builds: 0016
 - [x] **Case collision.** Fixed by preserving the pre-lowercase name: producers now carry
       `metadata.original` (flow assignments, reference-as-value ACCESSES) and the import binding
       carries `bindingNameRaw`. The classifier matches case-sensitively and falls back to
@@ -34,6 +36,7 @@ import, so only the return direction can clear it):
       find, which is exactly what the tool is for
 
 ## Phase 3 — the registry hub: was never a real finding
+- Builds: 0016
 - [x] Measured after the Phase 2 fix: `::unit` 74 raw → **14** runtime fan-in, `::registry` 77 raw →
       **37**, both well under the limit of 50. The intermediate reading of 60 was a partially-fixed
       state, not a real number. The registry is a DI type contract that almost every CLI command
@@ -42,6 +45,7 @@ import, so only the return direction can clear it):
       registry" recommendation is not acted on later — it was an artifact of counting type imports
 
 ## Phase 4 — deferred, not dropped (ADR 0017)
+- Builds: 0017
 - [ ] Surface symbol-level mutual-call tangles as their own finding, separate from ARCH-3, with its
       own severity. ADR 0017 removed them from ARCH-3 deliberately; they are currently reported
       nowhere

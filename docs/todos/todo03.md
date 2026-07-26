@@ -36,7 +36,7 @@ Status: doing
 - [x] S4 — Shell injection in clean command — structured process listing, PID validation before kill
 - [x] S5 — XSS in mirror web UI (innerHTML from unsanitized API data) — replaced with textContent/DOM creation
 - [x] S6 — MCP configurator overwrote user configs without backup — read/merge/atomic write + .bak
-- [ ] S7 — MCP server has zero authentication (server.ts, mirror-server.ts) — needs configurable bearer token auth for HTTP transport
+- [x] S7 — MCP authentication: DROPPED, not deferred. The server runs locally over stdio, launched by the agent client from a local install; there is no network listener to authenticate. The mirror binds localhost and rejects cross-origin requests. Revisit only if a remote or shared transport is ever added.
 - [x] S8 — CORS open to all origins on mirror server — restricted to localhost
 - [x] S9 — Path traversal in diff command — resolve + assert within cwd
 - [x] S10 — Git command injection in watcher — switched to execFile with path as separate arg
