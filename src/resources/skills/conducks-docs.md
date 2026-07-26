@@ -74,6 +74,28 @@ unit; the content stays in the unit.
 
 Todo slices link UP to their epic. Nothing links sideways.
 
+**`decisions/` and `todos/` belong at the ROOT, and only there.** A decision that binds one unit still
+binds the seam it sits on, and an ADR number is a global address — `0014` must mean one record in the
+whole repository, not one per unit. Two `decisions/` folders give you two ADR 0014s and a `- Builds:`
+that cannot say which it means. A unit's `docs/` carries the LIVING set (`features.md`,
+`conventions.md`, `memory.md`, `architecture/`, `handover.md`); the RECORD set stays at root. If a todo
+is genuinely unit-local, it is still a root `todoNN.md` — say which unit in its title.
+
+**Each `docs/` root is scanned SEPARATELY, and the tools do not walk into unit folders.**
+`conducks docs-lint` and `docs-status` resolve ONE `docs/` — the one under the path you give them —
+and nothing below it. This is the single most common way a monorepo's docs rot:
+
+```
+conducks docs-lint            # repo root → lints root docs/ ONLY
+conducks docs-lint app        # → lints app/docs/
+conducks docs-lint admin      # → lints admin/docs/
+```
+
+Measured on a real monorepo: the root run reported **43 governed docs clean** while 45 files across
+four unit `docs/` folders were never opened. "Clean" meant "clean at root". Lint every unit, or the
+units are ungoverned. `conducks monitor` reports each registered project, so registering the units
+gives you the sweep in one command.
+
 ---
 
 ## Architecture — one note per module
@@ -153,6 +175,25 @@ Status: <value>         life state, one line
 **One line in, one fact out.** A value is the WHOLE line after its marker. It never wraps onto a
 second line — there is no continuation rule, so a wrapped line matches nothing and is dropped in
 silence. Needs a paragraph? Put it in a `##` section. Prose wraps freely.
+
+**Leave a BLANK LINE after your last task or field, before any paragraph.** A prose line sitting
+directly under a `- [ ]` or `- Key:` reads as a continuation of that value — which the grammar does not
+allow, so it is dropped, and `docs-lint` fails the file for a wrapped value. This is the single easiest
+mistake to make when writing a phase, because the prose feels like it belongs to the task:
+
+```markdown
+- [x] moved the service to `packages/product`      ❌ the paragraph below is read as
+Both apps typecheck and the gate is green.            part of this task's value, and dropped
+
+- [x] moved the service to `packages/product`      ✅ blank line — task and prose are
+                                                       two separate things
+Both apps typecheck and the gate is green.
+```
+
+**`###` is NOT a section — its tasks belong to the `##` above it.** Only `## ` opens a section, so a
+`### A1 — subheading` is just prose with a heading shape. Tasks written under it still count toward the
+enclosing `## Phase N`, which is what lets a long phase group its work under sub-headings without
+inventing a nested phase. Use it freely; just remember the phase owns the count.
 
 **One line per KEY, too.** A field key appears at most ONCE in a file. Repeat it and the last line
 silently wins — the earlier ones are not merged and not warned about. Multiple values go on the one

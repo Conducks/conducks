@@ -28,6 +28,20 @@ are, instantly, before any pulse has run. Reach for the code layer once you need
 Each tool's MCP description is prefixed `[docs layer]` or `[code layer]` so the split survives into
 any client.
 
+**While a pulse is running, every code-layer call FAILS.** Not queues — fails, with a lock error. The
+vault takes one writer at a time and that writer excludes readers entirely, so for the minutes an
+`analyze` takes on a large repo, the whole code layer is unavailable. Many agents reading at once is
+fine; a writer is what stops everyone.
+
+Read the error and wait, rather than concluding conducks is broken:
+
+```
+🛡️ [Vault Locked] Another process is WRITING this vault (PID 1234)…
+```
+
+The docs layer holds no connection and keeps working throughout — during a pulse it is the only surface
+you have. That is the split earning its keep, not a consolation prize.
+
 ## The 14 tools, by the question they answer
 
 ### Docs layer
@@ -93,6 +107,12 @@ conducks_rename       graph-verified rename across all structural references.
 
 Before editing anything: `conducks_impact`. Before deleting anything: `conducks_prune`, then
 `conducks_impact` on the flagged symbol to confirm nothing calls it.
+
+**In a monorepo, look for a `docs/` per unit.** `conducks_docs` reads ONE docs tree — the one at the
+path you give it — and does not walk into `app/docs`, `packages/*/docs` and so on. Ask for each unit's
+root separately, or you are reading a fraction of the authored intent and will not know it. The
+decisions and todos live at the repository root; the living docs (features, conventions, memory,
+architecture) live in the unit they describe.
 
 ## The other conducks skills
 
