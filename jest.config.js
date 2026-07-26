@@ -36,7 +36,6 @@ export default {
 			},
 			testMatch: ['**/tests/**/*.test.ts'],
 			testPathIgnorePatterns: [
-				'<rootDir>/tests/legacy/archived-tests/',
 				'<rootDir>/tests/persistence/',
 				// Abandoned agent worktrees keep their own stale copy of the suite, but moduleNameMapper
 				// resolves '@/' to the real <rootDir>/src — so they run outdated expectations against

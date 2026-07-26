@@ -6,12 +6,16 @@ import fsExtra from 'fs-extra';
 import { ConducksInstaller } from '@/lib/domain/federation/conducks-installer.js';
 
 /**
- * Conducks is a platform, so the skills belong in ~/.claude/skills — one copy, every project. A repo
- * may still pin its own. The rule that matters: sync NEVER deletes, and any scope already holding an
- * older copy is refreshed whether or not it was asked for (CONDUCKS-15 — a stale skill that still
- * loads is worse than none).
+ * Conducks is a platform, so the skills have ONE home: `~/.claude/skills` (ADR 0029). A repo-local
+ * copy is not a pin — Claude Code discovers both directories, so a project holding both loads every
+ * skill twice. The rules that matter:
+ *
+ *  - sync installs globally and PRUNES a local copy, because a duplicate is a defect
+ *  - it never touches a skill conducks does not own, in either scope
+ *  - the global copy is refreshed in place, never deleted and recreated (CONDUCKS-15 — a stale skill
+ *    that still loads is worse than none)
  */
-describe('conducks-installer — global and local scopes', () => {
+describe('conducks-installer — global is the only scope', () => {
   let project = '';
   let home = '';
   let fs: typeof fsExtra;
@@ -27,6 +31,9 @@ describe('conducks-installer — global and local scopes', () => {
     return inst;
   };
 
+  const globalSkill = (name: string) => path.join(home, '.claude', 'skills', name, 'SKILL.md');
+  const localSkill = (name: string) => path.join(project, '.claude', 'skills', name, 'SKILL.md');
+
   beforeEach(() => {
     project = mkdtempSync(path.join(tmpdir(), 'conducks-proj-'));
     home = mkdtempSync(path.join(tmpdir(), 'conducks-home-'));
@@ -37,63 +44,90 @@ describe('conducks-installer — global and local scopes', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('installs globally by default and reports created vs unchanged', async () => {
-    const inst = installerFor(project);
-    const first = await inst.sync(['global']);
-    expect(first).toHaveLength(1);
-    expect(first[0].scope).toBe('global');
-    expect(first[0].created.length).toBeGreaterThan(0);
-    expect(first[0].updated).toEqual([]);
-    expect(existsSync(path.join(home, '.claude', 'skills', 'conducks-docs', 'SKILL.md'))).toBe(true);
-    // Nothing was written into the project.
-    expect(existsSync(path.join(project, '.claude', 'skills'))).toBe(false);
+  it('installs globally and writes nothing into the project', async () => {
+    const reports = await installerFor(project).sync();
 
-    // Re-running claims no work it did not do.
-    const second = await inst.sync(['global']);
+    expect(reports).toHaveLength(1);
+    expect(reports[0].scope).toBe('global');
+    expect(reports[0].created.length).toBeGreaterThan(0);
+    expect(reports[0].updated).toEqual([]);
+    expect(existsSync(globalSkill('conducks-docs'))).toBe(true);
+    expect(existsSync(path.join(project, '.claude', 'skills'))).toBe(false);
+  });
+
+  it('claims no work it did not do on a second run', async () => {
+    const inst = installerFor(project);
+    await inst.sync();
+    const second = await inst.sync();
+
     expect(second[0].created).toEqual([]);
     expect(second[0].updated).toEqual([]);
     expect(second[0].unchanged.length).toBeGreaterThan(0);
   });
 
-  it('installs locally when asked, and to both when both are asked', async () => {
-    const inst = installerFor(project);
-    const local = await inst.sync(['local']);
-    expect(local.map(r => r.scope)).toEqual(['local']);
-    expect(existsSync(path.join(project, '.claude', 'skills', 'conducks-docs', 'SKILL.md'))).toBe(true);
-
-    const both = await installerFor(project).sync(['global', 'local']);
-    expect(both.map(r => r.scope).sort()).toEqual(['global', 'local']);
-  });
-
-  it('refreshes a stale copy in a scope nobody asked for, in place, without deleting', async () => {
-    const inst = installerFor(project);
-    const stale = path.join(project, '.claude', 'skills', 'conducks-docs', 'SKILL.md');
+  it('prunes a repo-local copy, because it would load twice against the global one', async () => {
+    const stale = localSkill('conducks-docs');
     mkdirSync(path.dirname(stale), { recursive: true });
     writeFileSync(stale, 'an old version from a previous conducks release');
-    // A file the installer does not own, in the same tree — it must survive untouched.
-    const foreign = path.join(project, '.claude', 'skills', 'my-own-skill', 'SKILL.md');
-    mkdirSync(path.dirname(foreign), { recursive: true });
-    writeFileSync(foreign, 'mine');
 
-    const reports = await inst.sync(['global']);            // local NOT requested
-    const localReport = reports.find(r => r.scope === 'local')!;
-    expect(localReport).toBeDefined();                       // …but refreshed anyway
-    expect(localReport.updated).toContain('conducks-docs');  // updated in place, not recreated
-    expect(readFileSync(stale, 'utf-8')).toContain('name: conducks-docs');
-    expect(readFileSync(foreign, 'utf-8')).toBe('mine');
+    const reports = await installerFor(project).sync();
+    const local = reports.find(r => r.scope === 'local');
+
+    expect(local).toBeDefined();
+    expect(local!.superseded).toContain('conducks-docs');
+    expect(existsSync(stale)).toBe(false);
+    // The global copy is the one that survives, and it is current.
+    expect(readFileSync(globalSkill('conducks-docs'), 'utf-8')).toContain('name: conducks-docs');
+  });
+
+  it('leaves a skill conducks does not own alone in the local directory it prunes', async () => {
+    const mine = localSkill('my-own-skill');
+    mkdirSync(path.dirname(mine), { recursive: true });
+    writeFileSync(mine, 'mine');
+    const stale = localSkill('conducks-docs');
+    mkdirSync(path.dirname(stale), { recursive: true });
+    writeFileSync(stale, 'old');
+
+    await installerFor(project).sync();
+
+    expect(existsSync(stale)).toBe(false);
+    expect(readFileSync(mine, 'utf-8')).toBe('mine');
+    // Pruning is per-skill, so the shared directory itself must survive.
+    expect(existsSync(path.join(project, '.claude', 'skills'))).toBe(true);
+  });
+
+  it('reports no local scope at all when there is nothing to prune', async () => {
+    const reports = await installerFor(project).sync();
+    expect(reports.map(r => r.scope)).toEqual(['global']);
+  });
+
+  it('refreshes the global copy in place rather than deleting it', async () => {
+    const inst = installerFor(project);
+    await inst.sync();
+    writeFileSync(globalSkill('conducks-docs'), 'hand-edited, and out of date');
+
+    const reports = await inst.sync();
+
+    expect(reports[0].updated).toContain('conducks-docs');
+    expect(reports[0].created).not.toContain('conducks-docs');
+    expect(readFileSync(globalSkill('conducks-docs'), 'utf-8')).toContain('name: conducks-docs');
   });
 
   it('uninstall clears every scope that has them and leaves foreign skills alone', async () => {
     const inst = installerFor(project);
-    await inst.sync(['global', 'local']);
-    const foreign = path.join(project, '.claude', 'skills', 'my-own-skill', 'SKILL.md');
+    await inst.sync();
+    // A local copy predating the global-only rule is exactly what uninstall must still reach.
+    mkdirSync(path.dirname(localSkill('conducks-docs')), { recursive: true });
+    writeFileSync(localSkill('conducks-docs'), 'old local copy');
+    const foreign = localSkill('my-own-skill');
     mkdirSync(path.dirname(foreign), { recursive: true });
     writeFileSync(foreign, 'mine');
 
     const reports = await inst.remove();
+
     expect(reports.map(r => r.scope).sort()).toEqual(['global', 'local']);
-    for (const r of reports) expect(r.removed.length).toBeGreaterThan(0);
     expect(existsSync(path.join(home, '.claude', 'skills', 'conducks-docs'))).toBe(false);
+    expect(existsSync(path.join(project, '.claude', 'skills', 'conducks-docs'))).toBe(false);
     expect(existsSync(foreign)).toBe(true);
   });
 

@@ -257,8 +257,22 @@
 
 ## An unreferenced module is a question, not a finding
 - Gotcha: "disconnected by accident" and "deliberately not wired yet" look identical to the graph — both are zero incoming edges.
-- Why: deleting the second kind destroys a capability nobody decided to drop, and git history will not tell the next reader which it was. `clustering/daac.ts` is the live example: 149 lines of directory-aware clustering, unwired, more capable than the `mirror.engine.detectCluster()` heuristic that replaced it, with no ADR either way.
-- Applies: before deleting an orphan, answer "was this disconnected, or never connected?" A capability with no recorded decision gets an ADR line first. — ADR 0026
+- Why: deleting the second kind destroys a capability nobody decided to drop, and git history will not tell the next reader which it was. `clustering/daac.ts` was the example — and asking the question is what killed it: 149 lines that READ as more capable than `mirror.engine.detectCluster()` and MEASURED as a no-op (501 files → 501 clusters). Capability is a measurement, not an impression of the source. Deleted by ADR 0028.
+- Applies: before deleting an orphan, answer "was this disconnected, or never connected?" A capability with no recorded decision gets an ADR line first — and the answer comes from RUNNING it, not from reading it. — ADR 0026, amended by 0028
+
+## A graph-fixture test that invents its own node-id shape asserts nothing
+- Gotcha: `daac.test.ts` was green for months over broken code. The fixture built nodes with
+  `id: '/repo/src/auth/service.ts'` — id equal to the file path — which is the one arrangement in which
+  DAAC's `getNeighbors(filePath)` lookup resolves. The real producer never emits that shape: ids are
+  `directory::<abs-path>`, `repository::<name>`, `<file>::unit`, and of 1936 nodes in the live vault
+  ZERO have a `file` value that is also a node id. The fixture was shaped to the bug, so the test
+  confirmed the bug.
+- Why: a fixture written by the same person, in the same sitting, from the same misunderstanding as the
+  code will encode that misunderstanding twice and call the agreement a pass. Type checking cannot help:
+  `NodeId` is `string` (`adjacency-list.ts:8`), so a file path satisfies it.
+- Applies: any test that hand-builds a `ConducksAdjacencyList`. Construct ids the way the producer
+  does, and prefer `getNeighborsByFilePath()` (`adjacency-list.ts:346`) when the input really is a path
+  — that method exists because the translation is needed. — CONDUCKS-28, ADR 0028
 
 ## Native tree-sitter is the ONLY parse path — the 20 MB of `.wasm` was never loaded
 - Gotcha: `src/resources/grammars/` held 14 `.wasm` files and five call sites computed a path to it, so
@@ -286,3 +300,17 @@
   `grammars.isNativeAvailable()` rather than assuming. Absent binding → Gnosis regex extractor, measured
   at 25 nodes/32 edges against native's 26/27 on the same two-file fixture. Pinned by
   `tests/unit/core/parsing/optional-native-binding.test.ts`, which fails on any value import. — ADR 0027
+
+## The mirror's Docs panel has NO automated coverage, deliberately
+- Gotcha: `loadDocs()` in `src/resources/mirror/ui.js` builds the panel with raw DOM calls, and nothing
+  in the suite exercises it — `tests/unit/interfaces/tools/docs-layer.test.ts` covers the `/api/docs`
+  payload only. It was verified by hand on 2026-07-26: `#dock-docs` → `loadDocs()` → 174 nodes in
+  `#docs-panel` with real board content, driven through the real `ui.js` against the live API on a
+  throwaway DOM shim (no jsdom, no playwright, no puppeteer installed).
+- Why: the shim was not kept. A hand-written `document` stub is exactly the fixture-shaped-to-the-code
+  trap that CONDUCKS-28 exists for — it would pass because its author read the renderer, and it would
+  keep passing after a change that breaks a real browser. A fake DOM asserting a fake contract is worse
+  than an honest gap.
+- Applies: any change to `loadDocs`, `loadGovernance` or `window.onDocsPulse` needs a real browser to
+  verify — `conducks mirror`, then click the document icon. If this ever deserves automation, install a
+  real headless browser; do not simulate one.

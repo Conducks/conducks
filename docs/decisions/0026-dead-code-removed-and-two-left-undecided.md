@@ -1,9 +1,16 @@
 # 0026 — Two dead modules removed; DAAC and the old plugin base need a decision, not a delete
 
 Status: Accepted
+- Amended by: 0028
 - Enforced by: `conducks prune` (the finding list this ADR resolves)
 - Date: 2026-07-26
 - Promoted: docs/memory.md (the symbol-grep audit and the two open questions)
+
+> **Amended by 0028.** Both open questions are now closed. `parsing/language-plugin.ts` stays.
+> `clustering/daac.ts` is DELETED — and this record's description of it as "the more capable of the
+> two" was wrong: measured against the live graph it is a no-op that returns one cluster per file,
+> because it looks up edges by file path in a graph keyed by node id. The rule this ADR set still
+> holds; the claim it made in passing did not.
 
 ## Context
 `conducks prune` reports 18 ORPHAN and 5 UNUSED_EXPORT findings on conducks itself. Most are known

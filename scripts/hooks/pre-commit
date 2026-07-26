@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Conducks — docs grammar gate (todo18 Phase 2)
+#
+# The docs watcher reports violations and never fails, by design: an always-on process that blocks
+# work gets turned off. A commit is the other end of that trade — it is the moment a violation stops
+# being the author's problem and becomes the next reader's, so this is where the gate bites.
+#
+# Installed by pointing git at this directory, not by copying a file into .git/hooks:
+#
+#     git config core.hooksPath scripts/hooks
+#
+# That way the hook is version-controlled and every clone gets the same one after a single command.
+# `npm run hooks` does it for you.
+
+set -e
+
+# Only docs changes can break the docs grammar. Skip the check entirely otherwise, so a commit that
+# touches no markdown pays nothing.
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -q '^docs/.*\.md$'; then
+  exit 0
+fi
+
+CLI="build/src/interfaces/cli/index.js"
+
+# An unbuilt tree cannot lint. Warn rather than block: refusing to commit because of a missing build
+# artifact would punish the author for something unrelated to what they changed.
+if [ ! -f "$CLI" ]; then
+  printf '\033[33m[pre-commit] skipped docs-lint — %s not built (run: npm run build)\033[0m\n' "$CLI" >&2
+  exit 0
+fi
+
+if ! node "$CLI" docs-lint; then
+  printf '\n\033[31m[pre-commit] docs-lint failed — commit aborted.\033[0m\n' >&2
+  printf 'Fix the violations above, or bypass deliberately with: git commit --no-verify\n' >&2
+  exit 1
+fi

@@ -10,34 +10,30 @@ import fs from "fs-extra";
 export class SetupCommand implements ConducksCommand {
   public id = "setup";
   public description = "Configure MCP and install skills";
-  public usage = "conducks setup [--global] [--local]";
+  public usage = "conducks setup";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks Setup] Initializing Environment...\x1b[0m");
 
     // 1. Sync Conducks skills (read straight from resources/skills/ — static content).
-    // Global by default: the skills describe how to drive conducks itself, not this repo, so one
-    // copy in ~/.claude/skills serves every project. `--local` pins a copy in this repo instead;
-    // both flags together install to both. Any scope that already holds an older copy is refreshed
-    // regardless — a stale skill that still loads is worse than none (CONDUCKS-15).
-    const wantLocal = args.includes("--local");
-    const wantGlobal = args.includes("--global") || !wantLocal;
-    const scopes: Array<"global" | "local"> = [
-      ...(wantGlobal ? ["global" as const] : []),
-      ...(wantLocal ? ["local" as const] : []),
-    ];
-
+    // Global ONLY (ADR 0029): the skills describe how to drive conducks itself, not this repo, so one
+    // copy in ~/.claude/skills serves every project. A repo-local copy is not a pin, it is a second
+    // copy Claude Code also discovers — every skill would load twice. Sync prunes one if it finds it.
     const installer = registry.federation.createInstaller(process.cwd());
-    for (const report of await installer.sync(scopes)) {
+    for (const report of await installer.sync()) {
       const bits = [
         report.created.length ? `${report.created.length} added` : "",
         report.updated.length ? `${report.updated.length} updated` : "",
         report.unchanged.length ? `${report.unchanged.length} already current` : "",
         report.retired.length ? `${report.retired.length} retired` : "",
+        report.superseded.length ? `${report.superseded.length} removed` : "",
       ].filter(Boolean).join(", ");
-      const asked = scopes.includes(report.scope);
-      console.log(`✅ Skills (${report.scope}) → ${report.dir}: ${bits}` +
-        (asked ? "" : "  \x1b[90m(refreshed: an older copy was already there)\x1b[0m"));
+      if (report.scope === "local") {
+        console.log(`🧹 Skills (local) → ${report.dir}: ${bits}` +
+          `  \x1b[90m(duplicate of the global copy — it would load twice)\x1b[0m`);
+      } else {
+        console.log(`✅ Skills (global) → ${report.dir}: ${bits}`);
+      }
     }
 
     const configurator = registry.federation.createMCPConfigurator();

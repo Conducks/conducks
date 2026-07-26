@@ -2,9 +2,14 @@
 
 Status: Accepted
 - Amends: 0018 (which established skills as the guidance surface; this sets what they contain)
+- Amended by: 0029
 - Enforced by: tests/unit/interfaces/tools/skills-tool-surface.test.ts
 - Date: 2026-07-26
 - Promoted: docs/conventions.md CONDUCKS-26
+
+> **Amended by 0029.** This record left the install scope open and the installer supported two. It is
+> now one: `~/.claude/skills` only. A repo-local copy is a duplicate that loads twice, not a pin, and
+> `conducks setup` prunes one if it finds it.
 
 ## Context
 Conducks shipped eight skills. Five of them — exploring, debugging, impact-analysis, refactoring,
