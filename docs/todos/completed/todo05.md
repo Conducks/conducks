@@ -1,5 +1,5 @@
 # todo05 — Bug Fixes, MCP Quality, CLI Quality
-Status: doing
+Status: done
 - Acceptance: all TIER 9–11 audit items fixed, build + full test suite green, and the Go tree-sitter ABI mismatch resolved.
 
 ## Phase 1 — TIER 9: Bug fixes (from codebase audit)
