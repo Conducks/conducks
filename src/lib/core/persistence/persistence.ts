@@ -587,10 +587,15 @@ export class SynapsePersistence {
           resolve();
         });
       });
-      const timeout = new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error('DB close timed out after 5s')), 5000)
-      );
-      return Promise.race([closePromise, timeout]);
+      // The timer MUST be cleared when the close wins the race. `Promise.race` settles on the first
+      // promise, but a pending setTimeout keeps Node's event loop alive until it fires — so an
+      // instant, successful close still held the process open for the full 5 seconds. Every command
+      // that opened a vault paid it: `conducks query` printed its answer at 451ms and exited at 5.5s.
+      let timer: NodeJS.Timeout;
+      const timeout = new Promise<void>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('DB close timed out after 5s')), 5000);
+      });
+      return Promise.race([closePromise, timeout]).finally(() => clearTimeout(timer));
     }
   }
 }
