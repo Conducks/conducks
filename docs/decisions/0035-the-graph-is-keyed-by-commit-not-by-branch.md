@@ -1,0 +1,106 @@
+# 0035 — the graph is keyed by commit, not by branch
+Status: Accepted
+- Date: 2026-07-27
+
+## Context
+
+Conducks has no git identity. `grep -rn "branch" src/lib/` returns nothing but unrelated words —
+`branch` as a taxonomy kind, `branchNodes` in complexity counters. The vault holds ONE graph, and
+`nodes.id` is a PRIMARY KEY written with `INSERT OR REPLACE`, so exactly one row per symbol exists at
+any moment. `pulses.commitHash` is recorded and never read by anything.
+
+That model means one thing: the graph is *the working tree as of the last pulse*. Check out another
+branch and the graph silently describes code that is no longer on disk. Nothing warns. Every
+question — impact, cycles, dead code, coverage — is answered confidently from the wrong tree.
+
+It is also why `conducks drift` and `conducks audit --history` cannot work. `DriftEngine.compare()`
+self-joins `nodes` on `c.pulseId != p.pulseId`, which is unsatisfiable when the table holds one row
+per id; `AuditService` has the same root cause through `LAG() OVER (PARTITION BY n.id)`, where every
+partition has exactly one row so `LAG` is always NULL. Two shipped, documented features that cannot
+fire. There is no second version to diff against, because the schema cannot hold one.
+
+The plumbing to fix it already exists and is unused for this purpose. `ChronicleInterface` reads
+blobs out of git directly — `git show :0:<path>` for the index, `git diff --cached` for staged files.
+The same call reads any ref.
+
+Three shapes were considered.
+
+**A snapshot per branch, with main pinned as the diff baseline.** Rejected. Pinning `main` is wrong
+for anyone branching off `develop` or stacking branches, and a layer per branch name accumulates
+forever — branches are cheap, frequently abandoned, and a name-keyed layer has no natural death.
+
+**The last N commits per branch.** Rejected. N is arbitrary and answers no question anyone asks. The
+useful comparisons are working-tree-versus-HEAD and branch-versus-its-merge-target; neither is "two
+commits ago". Reaching for depth here builds a worse git alongside the real one.
+
+**Layers keyed by commit hash, with branch names as pointers.** Chosen. This is git's own model, and
+adopting it rather than paraphrasing it is what makes the rest fall out.
+
+## Decision
+
+**A layer is keyed by commit hash. A branch name is a pointer to one**, exactly as in git.
+
+The consequence that decides everything else: **a commit is immutable, so a commit-keyed layer can
+never go stale.** It does not need refreshing, invalidating, or reconciling. Only one layer is
+mutable, and it is the one that is cheap to rebuild.
+
+```
+commit-keyed layers   many · immutable · never stale · content-addressed
+branch pointers       names resolving to a commit, reconciled against git
+uncommitted           the ONE mutable layer: working tree + index over its commit
+```
+
+**Three layers by name, and those are the names.** `main`/`branch`/`uncommitted` was the first
+draft; it is wrong because it privileges `main`. The layers are `target`, `current` and
+`uncommitted`, and `target` is resolved per branch from the upstream tracking ref
+(`branch.<name>.merge`), falling back to `git merge-base`. Nothing is pinned.
+
+**There is no fallback when the target cannot be resolved.** The command says so and refuses. A diff
+against the wrong baseline is the failure mode this project keeps shipping (CONDUCKS-13), and a
+silently-wrong diff is worse than no diff.
+
+**Any ref can be pulsed without checking it out.** The chronicle already reads blobs from git; the
+same path reads an arbitrary commit. Building a layer therefore does not disturb the working tree,
+and the objection that only one branch can be checked out at a time does not apply.
+
+**A layer is content-addressed.** Two branches sharing most of their code share most of their rows.
+Without this, every branch multiplies the vault, and the vault is already the expensive part.
+
+**Branch layers are garbage, collected against git.** Conducks never decides what to keep. On each
+pulse it reconciles pointers against `git for-each-ref`; a layer no reachable pointer names is
+collected. An abandoned branch therefore costs nothing, and rebuilding after abandonment is cheap
+because the target's layer is already held and the new branch is target-plus-diff.
+
+**Deep history stays git's job.** Conducks holds what git cannot answer cheaply — the semantic graph
+of what is live now, plus the baselines being compared. "What did this look like three commits ago"
+is a checkout followed by a pulse, not a stored layer.
+
+**N-way diff is a query, not a feature.** Once layers are commit-keyed, comparing two is picking two
+and comparing three is picking three. Three is the interesting number: merge-base, mine, theirs
+answers *what breaks if I merge* semantically — not which lines conflict, but whose change to a
+function collides with whose change to its callers. Textual merge conflict is a solved problem;
+semantic merge impact is not, and it is the thing this model is worth building for.
+
+## Consequences
+
+`nodes.id` stops being a bare PRIMARY KEY. Every read path currently assumes one row per id and must
+learn to resolve through a layer. This is the largest schema change the project has taken, and it
+lands `drift` and `audit --history` as a side effect rather than as separate work — history is not a
+feature bolted on, it is what having more than one layer means.
+
+The pulse must know its commit, its branch, and its resolved target. The watcher must invalidate on
+branch switch, not only on file change — today it would keep serving the previous branch's graph.
+
+Pulsing an unchecked-out ref reads every file through git. One `git show` per file is process-spawn
+per file and would be unusably slow; it needs `git cat-file --batch` or `git archive` streaming. This
+must be MEASURED before the design is committed to — the cost of pulsing a ref is the one number
+that decides whether many layers are practical, and this project has a documented habit of shipping
+what nobody measured.
+
+A cheap guard lands FIRST and independently: record the branch on the pulse and refuse to answer
+from a graph pulsed on a different one. One column and one refusal, turning a silent wrong answer
+into "your graph is from `main`, you are on `feature/x`, re-analyze". It is useful on its own and it
+is not thrown away by the layer work.
+
+Storage is already slow and expensive before any of this. Layers make the cost model worse if
+content-addressing is not real. That is a separate problem and it is a prerequisite, not a footnote.
