@@ -1,7 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
-import { resolveDocsTrees } from "@/lib/domain/analysis/unit-docs.js";
+import { buildTrees } from "@/lib/domain/analysis/docs-board.js";
 import chalk from "chalk";
 
 /**
@@ -11,9 +11,9 @@ import chalk from "chalk";
  * safe: a doc that deviates (missing Status, no Phase sections, missing an ADR section) is rejected
  * before it can break the extractor. Exits non-zero on any violation, so it works as a CI gate.
  *
- * RECURSIVE BY DEFAULT. A monorepo keeps a `docs/` per deployable unit, and a docs tree is resolved
- * from ONE path — nothing walks below it. So the old root-only default reported "clean" and exited 0
- * while every unit went unread: measured on a real repo, 43 governed docs clean at root with a broken
+ * RECURSIVE BY DEFAULT. A monorepo keeps a `docs/` per service, and a docs tree is resolved from ONE
+ * path — nothing walks below it. So the old root-only default reported "clean" and exited 0 while
+ * every service went unread: measured on a real repo, 43 governed docs clean at root with a broken
  * phase sitting in `app/docs/`. A gate that silently checks less than it appears to is worse than no
  * gate. Now every tree is linted and ANY failure fails the run.
  *
@@ -24,21 +24,19 @@ export class DocsLintCommand implements ConducksCommand {
   public description = "Validate authored docs against the conducks-docs grammar (CI gate)";
   public usage = "conducks docs-lint [--root-only] [path]";
 
-  public async execute(args: string[], registry: Registry): Promise<void> {
+  public async execute(args: string[], _registry: Registry): Promise<void> {
     const posArg = args.find(a => !a.startsWith("--"));
     const root = posArg ? (posArg.startsWith("/") ? posArg : path.resolve(process.cwd(), posArg)) : process.cwd();
     const rootOnly = args.includes("--root-only");
 
-    const trees = rootOnly ? resolveDocsTrees(root).slice(0, 1) : resolveDocsTrees(root);
+    const trees = buildTrees(root, { rootOnly });
     const single = trees.length === 1;
 
-    let violations = 0;
-    const reports = trees.map(tree => {
-      const board = registry.docs.board(tree.path);
+    const reports = trees.map(({ label, board }) => {
       const governed = board.todos.length + board.decisions.length + board.other.filter(o => o.entries).length;
-      violations += board.lint.length;
-      return { tree, board, governed };
+      return { label, board, governed };
     });
+    const violations = reports.reduce((n, r) => n + r.board.lint.length, 0);
 
     // One tree: keep the original single-line shape. Grouping a lone result under a header is noise.
     if (single) {
@@ -58,12 +56,12 @@ export class DocsLintCommand implements ConducksCommand {
     }
 
     console.log(chalk.bold(`\n--- 📄🛡️  Conducks Docs Lint — ${trees.length} docs trees ---\n`));
-    for (const { tree, board, governed } of reports) {
+    for (const { label, board, governed } of reports) {
       if (board.lint.length === 0) {
-        console.log(chalk.green(`  ✓ ${tree.label.padEnd(18)}`) + chalk.dim(`${governed} governed docs conform to the grammar.`));
+        console.log(chalk.green(`  ✓ ${label.padEnd(18)}`) + chalk.dim(`${governed} governed docs conform to the grammar.`));
         continue;
       }
-      console.log(chalk.red(`  ✖ ${tree.label.padEnd(18)}`) + chalk.dim(`${board.lint.length} file(s) violate the grammar:`));
+      console.log(chalk.red(`  ✖ ${label.padEnd(18)}`) + chalk.dim(`${board.lint.length} file(s) violate the grammar:`));
       for (const l of board.lint) {
         console.log(chalk.red(`      ⚠ ${l.file}`) + chalk.dim(` [${l.type}]`));
         for (const e of l.errs) console.log(`          ${e}`);

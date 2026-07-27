@@ -171,3 +171,44 @@ describe('docs-grammar — a phase must carry tasks', () => {
     expect(errs.join(' ')).not.toMatch(/`## Phase 3` has no tasks/);
   });
 });
+
+/**
+ * `- Depends:` is same-tree only (conducks-docs §6). Cross-service coupling goes through a root epic
+ * and nowhere else: an inline cross-tree dep is invisible from the other tree, so that side ships
+ * without knowing it was depended on. It also parses as nothing, so it reads as NO dependency at all.
+ */
+describe('- Depends: does not cross a docs tree', () => {
+  const todo = (dep: string) =>
+    `# todo01 — a thing\nStatus: doing\n- Acceptance: it works\n\n## Phase 1 — p\n- [x] done\n\n## Phase 2 — q\n- Depends: ${dep}\n- [ ] blocked\n`;
+
+  it('accepts a bare same-tree address', () => {
+    expect(lint('todo', parseBody(todo('todo01#P1')))).toEqual([]);
+  });
+
+  it('fails a service-qualified address', () => {
+    expect(lint('todo', parseBody(todo('app:todo42#P1'))).join('\n')).toMatch(/crosses a docs tree/);
+  });
+
+  it('fails a root-qualified address', () => {
+    expect(lint('todo', parseBody(todo('(root):todo41#P1'))).join('\n')).toMatch(/crosses a docs tree/);
+  });
+
+  it('names the root epic as the way to express the coupling instead', () => {
+    expect(lint('todo', parseBody(todo('admin:todo43#P2'))).join('\n')).toMatch(/root epic that lists both slices/);
+  });
+});
+
+/** `modules/` replaced `architecture/modules/`; both still classify as authored architecture. */
+describe('module notes classify as architecture', () => {
+  it('classifies a note under the new modules/ path', () => {
+    expect(inferType('docs/modules/core/parsing/MODULE.md')).toBe('architecture');
+  });
+
+  it('still classifies a note under the legacy architecture/ path', () => {
+    expect(inferType('docs/architecture/modules/core/MODULE.md')).toBe('architecture');
+  });
+
+  it('classifies the graph file itself', () => {
+    expect(inferType('app/docs/architecture.md')).toBe('architecture');
+  });
+});

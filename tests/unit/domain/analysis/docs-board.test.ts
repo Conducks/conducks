@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { buildBoard, agentView } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard, agentView, crossTreeLint, treeShapeLint } from '@/lib/domain/analysis/docs-board.js';
 
 // The cross-file half of the standard: what a phase builds, what it waits on, and what an old
 // decision left unbuilt — facts no single file can hold, so they can only be tested on a tree.
@@ -108,5 +108,107 @@ describe('docs-board — links between docs', () => {
     expect(w).toContain("still in `todos/`");
     expect(b.lint.find(l => l.file.includes('todo03'))).toBeUndefined();   // hygiene never fails the gate
     rmSync(path.join(root, 'docs', 'todos', 'todo03.md'));
+  });
+});
+
+/**
+ * Numbers are per tree (conducks-docs §4): `app` and `admin` may each hold a `todo123` and they are
+ * different records, so no collision check is possible. What CAN be wrong is an address — a wrong
+ * tree label, or a record that was renamed or moved to `completed/`. Left unchecked, `- [ ] app:todo42`
+ * in a root epic reads as real, open work forever.
+ */
+describe('cross-tree addresses', () => {
+  let root: string;
+
+  const build = (label: string, rel: string, body: string) => {
+    const dir = path.join(root, label === '(root)' ? '' : label, 'docs', path.dirname(rel));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, path.basename(rel)), body);
+  };
+
+  const todo = (id: string, extra = '') =>
+    `# ${id} — a thing\nStatus: doing\n- Acceptance: it works\n\n## Phase 1 — p\n${extra}- [ ] the task\n`;
+
+  beforeAll(() => {
+    root = mkdtempSync(path.join(tmpdir(), 'conducks-cross-'));
+    build('(root)', 'todos/todo41.md',
+      '# todo41 — payouts move behind one port\nStatus: doing\n- Acceptance: both read through the port\n\n' +
+      '## Phase 1 — the two slices, in order\n- [x] app:todo42\n- [ ] admin:todo99\n');
+    build('app', 'todos/todo42.md', todo('todo42'));
+    build('admin', 'todos/todo43.md', todo('todo43'));
+  });
+
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  const boards = () => [
+    { label: '(root)', board: buildBoard(root) },
+    { label: 'app', board: buildBoard(path.join(root, 'app')) },
+    { label: 'admin', board: buildBoard(path.join(root, 'admin')) },
+  ];
+
+  it('resolves an address that names a real record in another tree', () => {
+    const errs = crossTreeLint(boards()).flatMap(x => x.errs);
+    expect(errs.join('\n')).not.toMatch(/app:todo42/);
+  });
+
+  it('fails an address pointing at a record that does not exist in the named tree', () => {
+    const found = crossTreeLint(boards());
+    expect(found).toHaveLength(1);
+    expect(found[0].label).toBe('(root)');
+    expect(found[0].errs[0]).toMatch(/admin:todo99.*does not exist in `admin`/);
+  });
+
+  it('fails an address naming a tree that does not exist at all', () => {
+    build('(root)', 'todos/todo44.md', todo('todo44', '- Builds: 0001\n') + '\nblocked on billing:todo01.\n');
+    const found = crossTreeLint(boards()).find(x => x.file.includes('todo44'));
+    expect(found?.errs[0]).toMatch(/names docs tree `billing`, which does not exist/);
+  });
+
+  it('reads the SAME number in two trees as two different records, not a collision', () => {
+    build('app', 'todos/todo50.md', todo('todo50'));
+    build('admin', 'todos/todo50.md', todo('todo50'));
+    // Both exist, neither is addressed from elsewhere: nothing to report.
+    expect(crossTreeLint(boards()).flatMap(x => x.errs).join('\n')).not.toMatch(/todo50/);
+  });
+});
+
+/**
+ * Where a file SITS, as opposed to what is inside it. `walkDocs` skips README entirely and a
+ * `conventions.md` in a service tree parses perfectly — so neither is reachable from the grammar.
+ */
+describe('tree shape', () => {
+  let root: string;
+  const w = (rel: string, body = '# doc\n') => {
+    const full = path.join(root, rel);
+    mkdirSync(path.dirname(full), { recursive: true });
+    writeFileSync(full, body);
+  };
+
+  beforeAll(() => { root = mkdtempSync(path.join(tmpdir(), 'conducks-shape-')); });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('fails a root-only file sitting in a service tree', () => {
+    w('docs/conventions.md');
+    w('docs/memory.md');
+    const { errs } = treeShapeLint(root, false);
+    expect(errs.map(e => e.file).sort()).toEqual(['conventions.md', 'memory.md']);
+    expect(errs[0].errs[0]).toMatch(/ROOT-ONLY/);
+  });
+
+  it('allows the same files at the root tree', () => {
+    expect(treeShapeLint(root, true).errs).toEqual([]);
+  });
+
+  it('fails a README anywhere in the tree', () => {
+    w('docs/README.md');
+    expect(treeShapeLint(root, true).errs[0].errs[0]).toMatch(/not part of the standard/);
+  });
+
+  it('warns rather than fails on a derived file inherited from before the standard', () => {
+    rmSync(path.join(root, 'docs', 'README.md'));
+    w('docs/progress.md');
+    const { errs, warns } = treeShapeLint(root, true);
+    expect(errs).toEqual([]);
+    expect(warns[0].errs[0]).toMatch(/derived, not authored/);
   });
 });

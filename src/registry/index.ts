@@ -23,7 +23,7 @@ import {
   type CoverageResult,
   type CoverageSnapshot,
 } from "@/lib/domain/analysis/coverage-baseline.js";
-import { ManifestService, ManifestEngine } from "@/lib/domain/manifest/index.js";
+import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/manifest/index.js";
 import { MirrorEngine } from "@/lib/domain/visual/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
@@ -177,7 +177,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
 export const registry = {
   events: events,
   status: {
-    bootstrap: (root: string, name: string) => manifest.bootstrap(root, name),
+    bootstrap: (root: string, name: string, kind?: TreeKind) => manifest.bootstrap(root, name, kind),
     record: (root: string, name: string, type: string, content: string) => manifest.record(root, name, type, content),
     health: () => governance.status()
   },

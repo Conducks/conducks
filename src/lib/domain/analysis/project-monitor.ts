@@ -159,7 +159,7 @@ export class ProjectMonitor {
    * "core/parsing changed" rather than listing forty files.
    *
    * The note path mirrors the source path — `src/lib/core/parsing` →
-   * `docs/architecture/modules/core/parsing/MODULE.md` — so the mapping is a path translation, with the
+   * `docs/modules/core/parsing/MODULE.md` — so the mapping is a path translation, with the
    * `src/lib/` prefix dropped because the notes are organised by layer, not by source root.
    */
   private moduleDrift(root: string, changedPaths: string[]): ModuleDrift[] {
@@ -194,7 +194,7 @@ export class ProjectMonitor {
     // src/lib/core/parsing -> core/parsing ; src/interfaces/cli -> interfaces/cli
     let rel = moduleDir.replace(/^src\/(lib\/)?/, "");
     while (rel && rel !== "." && rel !== "/") {
-      const candidate = path.join("docs", "architecture", "modules", rel, "MODULE.md");
+      const candidate = path.join("docs", "modules", rel, "MODULE.md");
       if (fs.existsSync(path.join(root, candidate))) return candidate;
       const parent = path.dirname(rel);
       if (parent === rel) break;

@@ -168,3 +168,45 @@ describe('conducks_docs — monorepo and single repo', () => {
     expect(res.error?.retryable).toBe(false);
   });
 });
+
+/**
+ * Before `buildTrees`, `conducks_docs` read `registry.docs.board` / `.view` directly — the raw board,
+ * with neither `treeShapeLint` nor `crossTreeLint` applied. A `docs/README.md` (fails `docs-lint`:
+ * "not part of the standard") and a root epic's `- [ ] admin:todo99` pointing at nothing both read as
+ * clean from this tool, so `health.grammarViolations` under-reported and an agent trusting the MCP
+ * surface never saw either. This proves both checks now land here too.
+ */
+describe('conducks_docs — carries docs-lint\'s checks (treeShapeLint, crossTreeLint)', () => {
+  let root = '';
+  const prevRoot = process.env.CONDUCKS_WORKSPACE_ROOT;
+
+  beforeAll(() => {
+    root = mkdtempSync(path.join(tmpdir(), 'conducks-docslayer-checks-'));
+    mkdirSync(path.join(root, 'docs', 'decisions'), { recursive: true });
+    writeFileSync(path.join(root, 'docs', 'decisions', '0001-x.md'),
+      '# 0001 — a decision\nStatus: Accepted\n- Date: 2026-07-26\n\n## Context\nc\n## Decision\nd\n## Consequences\nq\n');
+    // walkDocs skips README.md entirely — only treeShapeLint (via buildTrees) catches this.
+    writeFileSync(path.join(root, 'docs', 'README.md'), '# not part of the standard\n');
+  });
+
+  afterAll(() => {
+    if (prevRoot === undefined) delete process.env.CONDUCKS_WORKSPACE_ROOT;
+    else process.env.CONDUCKS_WORKSPACE_ROOT = prevRoot;
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('raw board.lint includes the misplaced README', async () => {
+    process.env.CONDUCKS_WORKSPACE_ROOT = root;
+    const res = await synapseTools.conducks_docs.handler({ path: root, raw: true });
+    const board = (res as { data?: any }).data ?? res;
+    expect(board.lint.some((l: { file: string; errs: string[] }) =>
+      l.file === 'README.md' && l.errs.some((e: string) => e.includes('not part of the standard')))).toBe(true);
+  });
+
+  it('the agent view\'s health.grammarViolations counts it too', async () => {
+    process.env.CONDUCKS_WORKSPACE_ROOT = root;
+    const res = await synapseTools.conducks_docs.handler({ path: root, layer: 'board' });
+    const view = (res as { data?: any }).data ?? res;
+    expect(view.health.grammarViolations).toBeGreaterThan(0);
+  });
+});

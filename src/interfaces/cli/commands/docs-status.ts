@@ -1,7 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
-import { resolveDocsTrees } from "@/lib/domain/analysis/unit-docs.js";
+import { buildTrees } from "@/lib/domain/analysis/docs-board.js";
 import chalk from "chalk";
 
 /**
@@ -19,7 +19,7 @@ export class DocsStatusCommand implements ConducksCommand {
   public description = "Open work in the docs, rooted at the ADRs that own it";
   public usage = "conducks docs-status [--json] [--all] [path]";
 
-  public async execute(args: string[], registry: Registry): Promise<void> {
+  public async execute(args: string[], _registry: Registry): Promise<void> {
     const useJson = args.includes("--json");
     const showAll = args.includes("--all");
     const posArg = args.find(a => !a.startsWith("--"));
@@ -27,19 +27,21 @@ export class DocsStatusCommand implements ConducksCommand {
 
     // Recursive by default: a monorepo keeps a docs/ per unit, and reading only the root shows a
     // fraction of the open work. Trees are kept SEPARATE, not merged — a merged board loses which unit
-    // each todo belongs to, and `todo01#P1` is only an address within its own tree.
+    // each todo belongs to, and `todo01#P1` is only an address within its own tree. Both `treeShapeLint`
+    // and `crossTreeLint` are already applied by `buildTrees`, so a misplaced file or a dangling
+    // `app:todo42` shows up here exactly as it does from `docs-lint`.
     const rootOnly = args.includes("--root-only");
-    const trees = rootOnly ? resolveDocsTrees(root).slice(0, 1) : resolveDocsTrees(root);
+    const trees = buildTrees(root, { rootOnly });
 
     if (useJson) {
       const payload = trees.length === 1
-        ? registry.docs.board(trees[0].path)
-        : Object.fromEntries(trees.map(t => [t.label, registry.docs.board(t.path)]));
+        ? trees[0].board
+        : Object.fromEntries(trees.map(t => [t.label, t.board]));
       console.log(JSON.stringify(payload, null, 2));
       return;
     }
 
-    for (const tree of trees) this.renderTree(tree.label, trees.length > 1, registry.docs.board(tree.path), showAll);
+    for (const { label, board } of trees) this.renderTree(label, trees.length > 1, board, showAll);
   }
 
   /** Renders ONE docs tree. `labelled` is false for a single-repo project, where a header is noise. */

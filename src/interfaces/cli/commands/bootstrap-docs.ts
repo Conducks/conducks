@@ -6,25 +6,29 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 /**
  * Conducks — Bootstrap Documentation Command
  *
- * Scaffolds the conducks-docs grammar file set (features.md, conventions.md, memory.md,
- * progress.md, todos/todo01.md) flat under docs/. No architecture file is written — ADR 0011
- * removed generated architecture output. Every scaffolded file passes `conducks docs-lint`
- * by construction.
+ * Scaffolds the conducks-docs create-now set flat under docs/: features.md, architecture.md,
+ * todos/todo01.md, plus handover.md at a root tree, and the empty decisions/ and todos/completed/
+ * folders. `architecture.md` is a SKELETON a person fills — conducks writes no generated structure
+ * (ADR 0011). `conventions.md`, `memory.md` and MODULE.md notes are create-when-first-needed and are
+ * deliberately not scaffolded. Every file written passes `conducks docs-lint` by construction.
+ *
+ * `--service` writes the service shape: no handover.md, since constraints are root-only.
  */
 export class BootstrapDocsCommand implements ConducksCommand {
   public id = "bootstrap-docs";
   public description = "Scaffold the conducks-docs grammar file set into docs/";
-  public usage = "conducks bootstrap-docs [project_name]";
+  public usage = "conducks bootstrap-docs [project_name] [--service]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-    const projectName = args[0] || path.basename(projectRoot);
+    const kind = args.includes("--service") ? "service" as const : "root" as const;
+    const projectName = args.find(a => !a.startsWith("--")) || path.basename(projectRoot);
 
     try {
-      console.log(`[Manifest] Bootstrapping documentation for: ${projectName}...`);
+      console.log(`[Manifest] Bootstrapping ${kind} documentation for: ${projectName}...`);
 
       // The manifest facade lives on registry.status (bootstrap/record).
-      const created = await registry.status.bootstrap(projectRoot, projectName);
+      const created = await registry.status.bootstrap(projectRoot, projectName, kind);
 
       if (created.length === 0) {
         console.log(`✅ Documentation for ${projectName} is already up to standard.`);

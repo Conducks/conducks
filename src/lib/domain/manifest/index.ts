@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { ManifestEngine } from "./manifest-engine.js";
+import { ManifestEngine, type TreeKind } from "./manifest-engine.js";
 import { ConducksComponent } from "@/contracts/types.js";
 
 /**
@@ -19,9 +19,13 @@ export class ManifestService implements ConducksComponent {
    * Bootstraps the conducks-docs grammar file set for a project.
    * Writes only files that don't already exist on disk.
    */
-  public async bootstrap(projectRoot: string, projectName: string): Promise<string[]> {
-    const files = this.engine.computeBootstrap(projectRoot, projectName);
+  public async bootstrap(projectRoot: string, projectName: string, kind: TreeKind = 'root'): Promise<string[]> {
+    const { files, dirs } = this.engine.computeBootstrap(projectRoot, projectName, kind);
     const created: string[] = [];
+
+    // Empty folders first: `decisions/` and `todos/completed/` hold no file yet but must exist, or the
+    // first ADR and the first closed todo each land wherever their author guesses.
+    for (const dir of dirs) await fs.mkdir(dir, { recursive: true });
 
     for (const file of files) {
       // Each file may live in a subdir (e.g. todos/todo01.md) — ensure its own parent.
@@ -53,4 +57,4 @@ export class ManifestService implements ConducksComponent {
   }
 }
 
-export { ManifestEngine } from "./manifest-engine.js";
+export { ManifestEngine, type TreeKind } from "./manifest-engine.js";

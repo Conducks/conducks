@@ -64,8 +64,9 @@ export function inferType(fp: string): DocType {
   // Architecture is AUTHORED, not derived: a human explaining a module/subsystem's purpose, layer,
   // boundaries, and deferred design — the WHY the code can't tell you (see sofie's per-module
   // MODULE.md). It is free-form (no skeleton), never lint-flagged, and must NEVER be auto-generated.
-  // file-OR-folder: `architecture.md`, an `architecture/` folder, or per-module `MODULE.md`.
-  if (/architecture\.md$/.test(fp) || /\/architecture\//.test(fp) || /MODULE\.md$/.test(fp)) return "architecture";
+  // file-OR-folder: `architecture.md` (the graph and its contract), a per-module `MODULE.md` under
+  // `modules/`, or the legacy `architecture/` folder that predates the split.
+  if (/architecture\.md$/.test(fp) || /\/architecture\//.test(fp) || /\/modules\//.test(fp) || /MODULE\.md$/.test(fp)) return "architecture";
   // `map.md` / `drift.md` are pure wiring — that IS derived structure; don't author it, query the
   // graph (audit / impact / trace / coverage) instead. `progress.md` joined them (ADR 0024): what
   // shipped and when is already carried by dated ADRs and closed todos, so it is a query, not a file.
@@ -242,6 +243,14 @@ export function lint(type: DocType, body: Body, src?: string): string[] {
           : "";
         errs.push(`\`## Phase ${n}\` has no tasks — a phase needs at least one \`- [ ]\` or \`- [x]\`, or it cannot report progress.${marker}`);
       }
+
+      // `- Depends:` never crosses a tree. Cross-service coupling goes through a root epic and nowhere
+      // else: an inline cross-tree dep is invisible from the other tree, so that side ships without
+      // knowing it was depended on. It would also parse as nothing here, and read as no dependency.
+      const dep = p.fields.Depends;
+      const crossed = dep?.match(/(\(root\)|[A-Za-z][\w.\-/]*):todo\d+#P\d+/);
+      if (crossed)
+        errs.push(`\`- Depends: ${crossed[0]}\` crosses a docs tree — \`- Depends:\` is same-tree only. Express cross-service coupling as a root epic that lists both slices.`);
     }
   }
   if (type === "decision") {

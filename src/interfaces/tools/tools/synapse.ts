@@ -2,7 +2,7 @@ import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
-import { resolveDocsTrees } from "@/lib/domain/analysis/unit-docs.js";
+import { buildTrees, agentView } from "@/lib/domain/analysis/docs-board.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
@@ -736,7 +736,10 @@ and memory (gotchas), compacted to one line each. layer="board" omits them for r
 MONOREPO: a repo that keeps a docs/ per deployable unit returns {trees:{"(root)":…, "app":…}} —
 one board per tree, kept SEPARATE because an address like todo01#P2 only resolves inside its own
 tree and merging them would lose which unit each belongs to. A single-repo project returns the board
-directly, unwrapped. scope="root" forces the single-tree shape; scope="<unit path>" reads one unit.
+directly, unwrapped. scope="root" forces the single-tree shape and, like docs-lint --root-only, skips
+cross-tree address checks since no other tree is loaded to check against. scope="<unit path>" reads
+one unit but every tree is still built and cross-checked first, so a cross-tree address inside that
+unit is still resolved correctly.
 
 WHEN TO USE: at session start, and whenever you pick up work — "what is on the table, what is
 waiting, which decisions still have unbuilt parts" without opening every doc.`,
@@ -758,17 +761,26 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
         // was never analyzed, and takes no connection for another agent to queue behind.
         const root = resolveDocsRoot(customPath);
         const depth = typeof recent === "number" ? recent : 4;
-        const readOne = (target: string) => raw
-          ? registry.docs.board(target)
-          : registry.docs.view(target, layer === "board" ? "board" : "all", depth);
+        const project = (board: ReturnType<typeof buildTrees>[number]["board"]) => raw
+          ? board
+          : agentView(board, layer === "board" ? "board" : "all", depth);
 
-        // Every docs tree by default. A monorepo hides most of its authored intent in unit folders,
-        // and a tool that silently reads only the root reports a fraction of the open work as if it
-        // were all of it — the same failure the CLI had.
-        let trees = resolveDocsTrees(root);
-        if (scope === "root") trees = trees.slice(0, 1);
-        else if (typeof scope === "string" && scope.length > 0) {
-          const hit = trees.find(t => t.label === scope);
+        // Every docs tree, ALWAYS, WITH both docs checks already applied (the merged lint is what
+        // makes `board.lint.length` — `agentView`'s `health.grammarViolations` — correct here too). A
+        // monorepo hides most of its authored intent in unit folders, and a tool that silently reads
+        // only the root reports a fraction of the open work as if it were all of it — the same failure
+        // the CLI had.
+        let trees = buildTrees(root);
+
+        // `scope` narrows only what is RETURNED, never what is built — and `"root"` is not special,
+        // it is just one more tree label. Every tree is built and cross-checked first, so an address
+        // that names another tree is still resolved against the full set. Building the scoped tree
+        // alone would make a broken `admin:todo99` read as clean purely because `admin` was never
+        // loaded — the "silently reports clean" failure this whole layer exists to avoid. That costs
+        // one pass over the other trees; reporting a dangling address as fine costs more.
+        if (typeof scope === "string" && scope.length > 0) {
+          const label = scope === "root" ? "(root)" : scope;
+          const hit = trees.find(t => t.label === label);
           if (!hit) {
             return mcpErr('UNKNOWN_SCOPE', `No docs tree "${scope}".`,
               `Available: ${trees.map(t => t.label).join(", ")}.`, false);
@@ -779,7 +791,7 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
         // Single tree — including every non-monorepo project — returns the board directly, so the
         // common shape never changes and no caller has to unwrap a one-entry map.
         if (trees.length === 1) {
-          const one = readOne(trees[0].path);
+          const one = project(trees[0].board);
           const count = raw
             ? (one as any).todos.length + (one as any).decisions.length
             : ((one as any).open as unknown[]).length + ((one as any).unlinkedWork as unknown[]).length;
@@ -788,9 +800,9 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
 
         const byTree: Record<string, unknown> = {};
         let nodeCount = 0;
-        for (const tree of trees) {
-          const view = readOne(tree.path);
-          byTree[tree.label] = view;
+        for (const { label, board } of trees) {
+          const view = project(board);
+          byTree[label] = view;
           nodeCount += raw
             ? (view as any).todos.length + (view as any).decisions.length
             : ((view as any).open as unknown[]).length + ((view as any).unlinkedWork as unknown[]).length;

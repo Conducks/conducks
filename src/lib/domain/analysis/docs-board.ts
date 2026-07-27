@@ -18,6 +18,7 @@ import path from "node:path";
 import {
   GOVERNED, REL, type DocType, inferType, parseBody, shape, lint,
 } from "@/lib/domain/analysis/docs-grammar.js";
+import { resolveDocsTrees } from "@/lib/domain/analysis/service-docs.js";
 
 export interface DocsBoard {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,7 +32,23 @@ export interface DocsBoard {
    * Absent on a project with no recorded reviews.
    */
   reviews?: Array<{ module: string; moduleDoc: string; intent?: string }>;
+  /**
+   * Qualified addresses found anywhere in this tree's docs — `app:todo42`, `(root):todo41`,
+   * `packages/core:0014`. Collected here, resolved by `crossTreeLint` once every tree is built, since
+   * no single tree can know what another one holds.
+   */
+  crossRefs: Array<{ file: string; addr: string }>;
 }
+
+/**
+ * A qualified address: a tree label, a colon, then a record.
+ *
+ * Numbers are PER TREE (conducks-docs §4) — `app` and `admin` may each hold a `todo123`, and they are
+ * different records. So an address is unqualified inside its own tree and carries `tree:` everywhere
+ * else. The tree label is the service path as conducks prints it (`app`, `packages/core`) or
+ * `(root)`.
+ */
+const CROSS_REF = /(\(root\)|[A-Za-z][\w.\-/]*):(todo\d+(?:#P\d+)?|\d{4})\b/g;
 
 /**
  * The agent-facing projection: open threads, rooted at the decisions that own them, plus the
@@ -124,7 +141,7 @@ function walkDocs(dir: string): string[] {
 /** Resolve the docs dir for a target path, parse every file, then link them. */
 export function buildBoard(root: string): DocsBoard {
   const docsDir = statSyncSafe(path.join(root, "docs")) ? path.join(root, "docs") : root;
-  const board: DocsBoard = { todos: [], decisions: [], other: [], lint: [], warns: [], unlinked: [] };
+  const board: DocsBoard = { todos: [], decisions: [], other: [], lint: [], warns: [], unlinked: [], crossRefs: [] };
   for (const fp of walkDocs(docsDir)) {
     const type = inferType(fp);
     const src = readFileSync(fp, "utf8");
@@ -134,6 +151,9 @@ export function buildBoard(root: string): DocsBoard {
       const errs = lint(type, body, src);
       if (errs.length) board.lint.push({ file: rel, type, errs });
     }
+    // Read from the RAW source, not the parsed body: an epic addresses its slices in checkbox text
+    // (`- [x] app:todo42`) and a slice points up at its epic in prose. Neither is a field.
+    for (const m of src.matchAll(CROSS_REF)) board.crossRefs.push({ file: rel, addr: m[0] });
     const shaped = shape(type, body, rel);
     if (type === "todo") board.todos.push(shaped);
     else if (type === "decision") board.decisions.push(shaped);
@@ -145,6 +165,151 @@ export function buildBoard(root: string): DocsBoard {
   hygiene(board);
   board.reviews = driftedReviews(root);
   return board;
+}
+
+/** Files that exist at most once in a repo, at the ROOT tree. */
+const ROOT_ONLY = ["conventions.md", "memory.md", "handover.md"];
+
+/** Derived output that must never be authored — what shipped is already carried by ADRs and todos. */
+const DERIVED_FILES = ["progress.md", "map.md", "drift.md"];
+
+/**
+ * Shape of the tree itself, as opposed to the grammar inside its files.
+ *
+ * Checks what `buildBoard` structurally cannot: `walkDocs` skips `README.md` entirely, so a README is
+ * invisible to every other pass, and a `conventions.md` sitting in a service tree parses perfectly
+ * while being in the wrong place. Both are answered by reading the directory, not the documents.
+ *
+ * Returns errors (fail the gate) and warns (report only) separately: a misplaced file is a real
+ * breakage, but a legacy `progress.md` inherited from before the standard should not block a commit.
+ */
+export function treeShapeLint(root: string, isRoot: boolean): { errs: Array<{ file: string; errs: string[] }>; warns: Array<{ file: string; errs: string[] }> } {
+  const docsDir = statSyncSafe(path.join(root, "docs")) ? path.join(root, "docs") : root;
+  const errs: Array<{ file: string; errs: string[] }> = [];
+  const warns: Array<{ file: string; errs: string[] }> = [];
+
+  if (!isRoot) {
+    for (const name of ROOT_ONLY) {
+      if (!existsSync(path.join(docsDir, name))) continue;
+      // Constraints load once per session. Split across services, an agent reading one tree cannot
+      // know whether it has them all — and it has no way to find out that it doesn't.
+      errs.push({ file: name, errs: [`\`${name}\` is ROOT-ONLY and must not live in a service tree — move its entries to the root \`${name}\`, naming the service in each entry`] });
+    }
+  }
+
+  for (const name of DERIVED_FILES) {
+    if (!existsSync(path.join(docsDir, name))) continue;
+    warns.push({ file: name, errs: [`\`${name}\` is derived, not authored — it is never read or linted. Ask \`conducks docs-status\` instead, and move this file to \`legacy/\``] });
+  }
+
+  // A README duplicates what the standard already says, drifts from it, and is skipped by every read —
+  // so it is the one doc guaranteed to be both wrong and unnoticed.
+  for (const fp of walkReadmes(docsDir)) {
+    errs.push({ file: path.relative(docsDir, fp), errs: ["`README.md` is not part of the standard — the docs have no map file. Put what it holds in `features.md`, or delete it"] });
+  }
+  return { errs, warns };
+}
+
+/** Every README under a docs tree, skipping the archive dirs nothing links into. */
+function walkReadmes(dir: string): string[] {
+  const out: string[] = [];
+  let entries: string[];
+  try { entries = readdirSync(dir); } catch { return out; }
+  for (const e of entries) {
+    const fp = path.join(dir, e);
+    if (statSync(fp).isDirectory()) {
+      if (/(completed|legacy|agent-runs|archive)$/.test(fp)) continue;
+      out.push(...walkReadmes(fp));
+    } else if (e.toLowerCase() === "readme.md") {
+      out.push(fp);
+    }
+  }
+  return out;
+}
+
+/** One built tree, labelled — what `crossTreeLint` needs to resolve addresses between trees. */
+export interface LabelledBoard { label: string; board: DocsBoard }
+
+/**
+ * Resolve every qualified address across all trees, and fail the ones that point at nothing.
+ *
+ * This is the gate that replaces global numbering. Numbers are per tree, so a duplicate across trees
+ * is CORRECT and no collision check is possible or wanted. What can still be wrong is an address:
+ * a wrong tree label, or a record that was renamed, moved to `completed/`, or never existed. Left
+ * unchecked, `- [ ] app:todo42` in a root epic reads as real work forever.
+ *
+ * Runs only once every tree is built, because no single tree can see another's records.
+ */
+export function crossTreeLint(trees: LabelledBoard[]): Array<{ label: string; file: string; errs: string[] }> {
+  const known = new Map<string, Set<string>>();
+  for (const { label, board } of trees) {
+    const ids = new Set<string>();
+    for (const t of board.todos) {
+      ids.add(t.id);
+      for (const p of t.phases ?? []) ids.add(p.addr);
+    }
+    for (const d of board.decisions) if (d.id) ids.add(d.id);
+    known.set(label, ids);
+  }
+
+  const out: Array<{ label: string; file: string; errs: string[] }> = [];
+  for (const { label, board } of trees) {
+    const byFile = new Map<string, string[]>();
+    for (const { file, addr } of board.crossRefs) {
+      const [treeLabel, record] = splitAddr(addr);
+      const ids = known.get(treeLabel);
+      const err = !ids
+        ? `\`${addr}\` names docs tree \`${treeLabel}\`, which does not exist (trees: ${[...known.keys()].join(", ")})`
+        : !ids.has(record)
+          ? `\`${addr}\` points at \`${record}\`, which does not exist in \`${treeLabel}\` — renamed, moved to completed/, or never written`
+          : null;
+      if (err) byFile.set(file, [...(byFile.get(file) ?? []), err]);
+    }
+    for (const [file, errs] of byFile) out.push({ label, file, errs });
+  }
+  return out;
+}
+
+/** `packages/core:todo09#P2` → ["packages/core", "todo09#P2"]. Split at the LAST colon: a label may not hold one, but be explicit. */
+function splitAddr(addr: string): [string, string] {
+  const i = addr.lastIndexOf(":");
+  return [addr.slice(0, i), addr.slice(i + 1)];
+}
+
+/**
+ * Every docs tree, fully checked — the ONE builder behind `docs-lint`, `docs-status`, and
+ * `conducks_docs`, so the three surfaces cannot disagree on what counts as a violation.
+ *
+ * Before this, `docs-lint` was the only surface running `treeShapeLint` and `crossTreeLint`;
+ * `docs-status` and `conducks_docs` called `buildBoard` alone. A `conventions.md` sitting in a
+ * service tree, or an `- [ ] app:todo42` pointing at nothing, failed the CLI gate but read as clean
+ * from `docs-status` and from the MCP tool an agent actually queries.
+ *
+ * Both checks are merged into the board's own `lint`/`warns` here, not returned alongside it, so a
+ * caller cannot forget to apply one and end up back in the same split.
+ */
+export function buildTrees(root: string, opts?: { rootOnly?: boolean }): LabelledBoard[] {
+  const trees = opts?.rootOnly ? resolveDocsTrees(root).slice(0, 1) : resolveDocsTrees(root);
+
+  const labelled: LabelledBoard[] = trees.map(tree => {
+    const board = buildBoard(tree.path);
+    // Where a file SITS, not what is inside it — buildBoard cannot see this.
+    const shapeResult = treeShapeLint(tree.path, tree.isRoot);
+    for (const s of shapeResult.errs) board.lint.push({ file: s.file, type: "prose", errs: s.errs });
+    board.warns.push(...shapeResult.warns);
+    return { label: tree.label, board };
+  });
+
+  // A lone tree has no other tree to address into. Running crossTreeLint anyway would read every
+  // legitimate `app:todo42` written in a single-repo project as naming a tree that does not exist.
+  if (labelled.length > 1) {
+    for (const x of crossTreeLint(labelled)) {
+      const target = labelled.find(t => t.label === x.label);
+      if (target) target.board.lint.push({ file: x.file, type: "todo", errs: x.errs });
+    }
+  }
+
+  return labelled;
 }
 
 /**
@@ -172,7 +337,7 @@ function driftedReviews(root: string): Array<{ module: string; moduleDoc: string
   for (const [module, record] of Object.entries(reviews)) {
     if (typeof record !== "string") continue;
     const [reviewedHash, intent] = record.split("|");
-    const doc = path.join("docs", "architecture", "modules", module.replace(/^src\/(lib\/)?/, ""), "MODULE.md");
+    const doc = path.join("docs", "modules", module.replace(/^src\/(lib\/)?/, ""), "MODULE.md");
     // existsSync, NOT statSyncSafe — that helper answers isDirectory(), so it is always false for a file.
     if (!existsSync(path.join(root, doc))) continue;
     if (moduleHashOf(path.join(root, module)) !== reviewedHash) out.push({ module, moduleDoc: doc, intent });
