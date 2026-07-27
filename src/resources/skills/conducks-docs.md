@@ -1,310 +1,423 @@
-<!-- description: The documentation standard for every project. Docs hold AUTHORED intent only — features, conventions, memory, decisions, todos, handover, and authored architecture (one note per module, explaining what it does and why). How code is WIRED (calls, imports, cycles, dead code, coverage) is never written to a file; query it from the conducks graph. Covers the folder layout, the per-file structure, the ADR↔todo link graph, and the line grammar. Use when creating, moving, or reviewing any doc, bootstrapping docs/, writing an ADR or todo, or deciding where a fact goes. -->
+<!-- description: The documentation standard for every project, single repo or monorepo. Docs hold AUTHORED intent only: features, an architecture graph, per-module notes, conventions, memory, decisions, todos, handover. How code is WIRED (calls, imports, cycles, dead code, coverage) is never written to a file; query it from the conducks graph. Covers which files exist at repo root versus inside each service, per-tree ADR and todo numbering and how addresses cross trees, the exact line grammar the parser reads, and what docs-lint fails on. Use when creating, moving, or reviewing any doc, bootstrapping docs/, writing an ADR or todo, or deciding where a fact goes. -->
 
 # conducks-docs
 
-**Author intent. Query wiring.**
+**Author intent. Query wiring.** A doc holds what code cannot say: why a thing exists, what was
+decided, what bites you, what a module is for. Wiring is queried, never written — it is wrong by the
+next commit.
 
-A doc holds what code cannot say: why a thing exists, what was decided, what bites you, what a module
-is for. Wiring — who calls what, imports, cycles, dead code, coverage — comes from the graph:
+| question | ask |
+|---|---|
+| cycles, dead code | `conducks audit`, `conducks prune` |
+| what breaks if X changes | `conducks impact X` |
+| X's dependency chain | `conducks trace X` |
+| test fill per function | `conducks coverage` |
+| entry points, hotspots | `conducks status --mode map` |
 
-```
-conducks audit      cycles · dead code
-conducks impact X   what breaks if X changes
-conducks trace X    X's dependency chain
-conducks coverage   test fill per function
-```
-
-Write wiring into markdown and it is wrong by the next commit. Query it instead.
-
----
-
-## The bar
-
-Write for a reader with zero context — a fresh agent, or you in six months. The chat is gone; the doc
-is what survives. **A fact that lives only in a conversation does not exist.**
-
-A doc passes when someone holding only the repo can:
-- say what the thing is and why it exists,
-- see the decision and the option that was rejected,
-- tell current state from intended state when they differ ("code does X, we meant Y"),
-- do the next thing, with `file:line` anchors.
-
-Write it the turn you decide it. An ADR for a choice, `memory.md` for a trap, a todo for work.
+Sections are numbered so docs can cite them. Add at the end; renumbering breaks citations.
 
 ---
 
-## Where a fact goes
+## §1 The bar
 
-Two questions:
+Write for a reader holding only the repo. **A fact that lives only in a conversation does not exist.**
 
-1. **Can conducks compute it from the code?** Yes → query it. No → write it.
-2. **When it goes wrong, do you fix it or write a new one?** Fix → *living*. New → *record*.
+A doc passes when that reader can:
 
-| | living (overwrite in place) | record (frozen; stamp and supersede) |
+1. say what the thing is and why it exists
+2. see the decision **and the option rejected**
+3. tell current state from intended where they differ — say so: "code does X, we meant Y"
+4. do the next thing, with a `file:line` anchor
+
+Naming a service is not an anchor. `packages/product/finance/FinanceService.ts:132` is.
+
+Write it the turn you decide it: a choice → ADR, a trap → `memory.md`, work → a todo.
+
+---
+
+## §2 Where a fact goes
+
+**Q1 — can conducks compute it?** Yes → query it. No → write it.
+
+**Q2 — when it becomes wrong, do you fix it or write a new one?**
+
+| | living — overwrite in place | record — frozen |
 |---|---|---|
-| | `features` `conventions` `memory` `architecture/` `handover` | `decisions/` `todos/` |
+| | `features` `architecture` `modules/` `conventions` `memory` `handover` | `decisions/` `todos/` |
 
-**memory vs conventions:** a rule you must FOLLOW → `conventions.md`. A surprise you must KNOW →
-`memory.md`. Once a rule prevents a trap, delete the memory entry — one home per fact.
+A record's only permitted mutation is a **stamp**: a status line, or a pointer to where truth moved.
+Changing its reasoning or outcome is forbidden.
+
+**Q3 — who owns it?** Can you name one service that must change if this line becomes false?
+
+| case | goes to |
+|---|---|
+| one service must change | that service's tree |
+| two services touched | the one that must change if it is wrong — not everyone who reads it |
+| no owner | root — this is what root is for |
+| schema or column semantics | `database/docs/` |
+| adding or removing a service | create/delete its tree **and** its root index entry, same change |
+
+**Apply ownership one fact at a time, never a whole file.** A file is not owned; each line in it is.
+
+**`memory` vs `conventions`:** a rule you must FOLLOW → `conventions.md`. A surprise you must KNOW →
+`memory.md`. Once a rule prevents a trap, delete the memory entry — a resolved gotcha is a deleted
+gotcha, not one labelled "resolved".
 
 ---
 
-## Layout
+## §3 Layout
+
+**Which shape.** Split only at 2+ services. One service → one flat `docs/` at the repo root, and no
+root tree above it. A `packages/` folder is not the test; ownership is (see Monorepo below). Adding
+the second service is what creates the root tree.
+
+### Single repo
 
 ```
 docs/
-├── README.md         the map: state · read-order · what each doc holds
-├── features.md       what each capability is FOR + why          (living)
-├── conventions.md    binding rules, IDed, with reasons          (living)
-├── memory.md         traps the code cannot show                 (living)
-├── architecture/     one note per module — see below            (living)
-├── decisions/        one ADR per numbered file                  (record)
-├── todos/            todoNN.md · completed/                     (record)
-├── handover.md       snapshot for the next session; overwritten (living, dated)
-└── <soft>/           product/ business/ design/ — free prose, never linted
+├── features.md       what each capability is for, and why       living
+├── architecture.md   the module graph + the contract its arrows obey  living
+├── conventions.md    binding rules, IDed, with reasons          living
+├── memory.md         traps the code cannot show                 living
+├── modules/          one note per module                        living
+├── decisions/        one ADR per numbered file                  record
+├── todos/            todoNN.md + completed/                     record
+├── handover.md       snapshot for the next session              living, dated
+└── <soft>/           product/ business/ design/ — prose, not grammar-linted
+                       (`product/` holds SPECS, which outrank the code — §8)
 ```
 
-**Monorepo:** the same set inside each independently deployable unit, plus a root `docs/` for
-cross-cutting intent. Use the split only with 2+ deployable units. One unit → one flat `docs/`.
+### Monorepo
 
-**Root vs unit:** a fact lives next to the code that must change when the fact becomes wrong. Ask:
-*can you name one unit that would change if this line became false?* Yes → that unit. No → it is a
-seam between units, and seams belong at root. Root `features.md` is an INDEX linking down to each
-unit; the content stays in the unit.
-
-Todo slices link UP to their epic. Nothing links sideways.
-
-**`decisions/` and `todos/` belong at the ROOT, and only there.** A decision that binds one unit still
-binds the seam it sits on, and an ADR number is a global address — `0014` must mean one record in the
-whole repository, not one per unit. Two `decisions/` folders give you two ADR 0014s and a `- Builds:`
-that cannot say which it means. A unit's `docs/` carries the LIVING set (`features.md`,
-`conventions.md`, `memory.md`, `architecture/`, `handover.md`); the RECORD set stays at root. If a todo
-is genuinely unit-local, it is still a root `todoNN.md` — say which unit in its title.
-
-**Every tree is read, and they stay separate.** `docs-lint`, `docs-status` and `conducks_docs` are
-recursive: they read the root `docs/` AND each unit `docs/`. A single-repo project has one tree and
-behaves exactly as it always did, so nothing has to know which case it is in.
+A **service** is a part with its own owner: `app`, `admin`, `database`, `packages/core`,
+`packages/product`. The test is **ownership, not whether it boots** — `database` never runs, but when
+a schema fact is wrong, `database` is what changes.
 
 ```
-conducks docs-lint              # root + every unit; fails if ANY tree fails   ← the CI gate
-conducks docs-lint --root-only  # the root tree alone
-conducks docs-lint app          # just that unit
+docs/                    ROOT — what no single service owns
+├── features.md          index only; links down, states no facts of its own
+├── architecture.md      the service graph + the contract between services
+├── conventions.md       rules the whole codebase follows      ROOT ONLY
+├── memory.md            traps that span services              ROOT ONLY
+├── handover.md                                                ROOT ONLY
+├── decisions/           ADRs for seams
+├── todos/               epics for codependent work only
+└── <soft>/              product/ business/ design/ — ROOT ONLY, never inside a service
+
+app/docs/                SERVICE — same for admin, database, packages/*
+├── features.md          what this service does
+├── architecture.md      this service's module graph + its layer contract
+├── modules/             MODULE.md notes
+├── decisions/           this service's own ADRs
+└── todos/               this service's work + completed/
 ```
 
-They are never MERGED into one board. `todo01#P2` is an address inside its own tree, and two units may
-each hold a `todo01`; merging would make every address ambiguous and hide which unit owes the work. So
-`docs-status --json` returns a map keyed by tree, and `conducks_docs` returns
-`{monorepo: true, trees: {"(root)": …, "app": …}}` — with `scope="root"` or `scope="app"` to read one.
+**Root vs service — no file appears in both columns except by design:**
 
-This mattered: before it was recursive, a root run reported **43 governed docs clean and exited 0**
-while a broken phase sat unread in `app/docs/`. "Clean" meant "clean at root", and nothing said so.
+| file | root | service | if both exist |
+|---|---|---|---|
+| `features.md` | index only, no facts | the facts | root links down; a fact is in exactly one |
+| `architecture.md` | the service graph | that service's module graph | same shape, one altitude apart |
+| `modules/` | — | yes | root has no modules; it owns no code |
+| `decisions/` | seam ADRs | that service's ADRs | numbered per tree; cross-tree refs are `app:0014` (§4) |
+| `todos/` | codependent epics only | that service's work | epic points down, slice points up |
+| `conventions.md` | yes | **never** | — |
+| `memory.md` | yes | **never** | — |
+| `handover.md` | yes | **never** | — |
+
+Root-only for `conventions` / `memory` / `handover`: constraints load once per session, and split
+across services an agent cannot know it has them all.
+
+**No `README.md`.** Root is never the general version of a service doc — a capability in exactly one
+service still gets its root link.
+
+**Links run one way.** Root links down. Todo slices link up to their epic. Nothing sideways.
+
+### Bootstrapping a new tree
+
+Create the FULL folder set, with real files, at the moment the tree is created — do not wait for facts
+to arrive. An empty `docs/` gives the next reader nothing to find and nowhere to put what they learn.
+
+| create now, even if thin | create when first needed |
+|---|---|
+| `features.md`, `architecture.md`, `handover.md` (root only) | `modules/<path>/MODULE.md` — one per module that earns a note |
+| `decisions/`, `todos/` (folders) | `conventions.md`, `memory.md` (root only) — once there is a rule or a trap |
+
+`conducks bootstrap-docs [name]` writes the root set; `--service` writes the service set. A file with
+one placeholder entry is correct; a file that does not exist is not. Never create `progress.md`,
+`map.md` or `drift.md` (§8).
+
+**Declare the services.** `conducks.json` at the repo root — `{ "services": ["app", "packages/core"] }`
+— is what makes a service a service. Without it conducks guesses from "does this folder hold a
+`docs/`?", which cannot tell an owner from a folder that happens to hold documentation, and misses a
+service whose docs are not written yet — exactly when the reminder matters most.
 
 ---
 
-## Architecture — one note per module
+## §4 Numbering and addresses
 
-**Mirror the source tree.** The folder layout under `architecture/modules/` matches your source
-layout, nested as deep as the source is. Finding the note for a piece of code is then a path
-translation, not a search.
+**Numbers are per tree.** Each tree counts its own: next = highest **in that tree** + 1. `app` and
+`admin` may both hold a `todo123`, and they are different records — a record belongs to the tree it
+sits in, and a service extracted tomorrow keeps its own numbering intact.
+
+**An address carries its tree when it crosses one.**
 
 ```
-docs/architecture/
-├── README.md                                 index · layer contract · confusions · removed modules
-└── modules/<path mirroring src>/MODULE.md
+todo123#P2          inside the same tree — the tree is implied
+app:todo123#P2      from another tree, or from root
+app:0014            an ADR in the app tree
+(root):todo41       an epic at root, referenced from a service
 ```
 
-Two file shapes:
+Unqualified inside its own tree, `tree:` prefixed everywhere else. A bare `todo123` written from a
+different tree points at nothing and cannot be resolved — `docs-lint` fails it.
+
+The tree label is the service path as `conducks` prints it: `app`, `admin`, `packages/core`, and
+`(root)` for the repository root.
+
+**Filenames.** ADRs are `NNNN-kebab-title.md`, zero-padded to 4 (`0014-native-grammars-optional.md`).
+Todos are `todoNN.md`, zero-padded to 2 (`todo09.md`), growing a digit past 99. The slug is the title
+lowercased, non-alphanumerics collapsed to `-`, trimmed to roughly six words.
+
+**Never rename a record.** The number and slug are how everything cites it. A wrong title is
+superseded, not relabelled.
+
+---
+
+## §5 The line grammar
+
+Five per-line primitives, no frontmatter:
+
+```
+# Title                 one per file, first line
+Status: <value>         life state, one line, directly under the title
+## Section              a heading
+- [ ] task              open, or - [x] done
+- Key: value            a field
+```
+
+**Exact syntax the parser requires.** Measured against the regexes, not inferred:
+
+| primitive | must be | tolerated | silently NOT read |
+|---|---|---|---|
+| `# Title` | `#` + at least one space, first line | — | `#Title` (no space) |
+| `Status: value` | **column 0**, no leading whitespace | `Status:value` (no space after colon) | any indented `Status:` |
+| `## Section` | exactly two `#` + a space | — | `###` (never a section — see below) |
+| `- [ ] task` | `-`, brackets, one of `space` `x` `X` | `-[x]`, indented, `[X]` | — |
+| `- Key: value` | **key starts with A–Z** | `-Key:v`, indented, multi-word (`Blocked by`) | `- builds:` — lowercase key parses as NOTHING |
+
+A key may hold letters, digits, spaces, `.`, `/`, `-`. It must START uppercase: `- builds: 0027` is
+prose, not a field, and nothing warns you.
+
+Content inside ``` or ~~~ fences is skipped entirely — examples in a fenced block never parse as real
+tasks or fields.
+
+| rule | detail |
+|---|---|
+| **A value is the whole line** | No continuation exists. A wrapped line matches nothing and is dropped silently. Need a paragraph? Use a `##` section. Prose wraps freely. |
+| **Blank line after the last task/field** | An UNINDENTED prose line directly under `- [ ]` or `- Key:` is read as a continuation, dropped, and fails lint. Indented continuation lines, and lines starting `#` `>` `\|` `-` `1.` `![` `<`, are allowed — so a multi-line bullet is fine, a flush-left paragraph is not. |
+| **One key per file** | A repeated key: the last silently wins. Earlier ones are not merged, not warned. Multiple values go on one line, comma-separated. |
+| **ADR ref fields read the LEADING refs only** | On `- Amended by:`, `- Supersedes:`, `- Builds:` and the other ADR relation keys, the parser takes the four-digit refs at the START of the value and stops at the first non-ref. Trailing prose is allowed and ignored: `- Amended by: 0012, 0018 — both on checkout` is valid. A note attaching to ONE ref still goes in the paragraph below; there is no per-ref slot on the line. |
+| **`- Depends:` is the exception — it scans the WHOLE line** | Every `todoNN#PN` anywhere in the value is read as a real dependency, including inside trailing prose. So `- Depends: todo09#P3 (todo10#P1 landed first)` silently declares TWO dependencies. Put no phase address in a `- Depends:` note. |
+| **Read headings match exactly** | `## Context — the measured problem` is not `## Context`; it counts as missing. Put qualifiers in the first sentence. |
+| **Phase numbers are plain integers** | `## Phase 2b` matches no phase — not an error, *invisible*. Its tasks never reach `docs-status`, and `todoNN#P2b` addresses nothing. Split → next free integer + `(was Phase 2b)` in the title. |
+| **`###` is not a section** | Only `## ` opens one. Tasks under a `###` count toward the enclosing `## Phase N`. This is how a long phase groups work without a nested phase. |
+| **Every phase carries ≥1 checkbox** | The checkbox is the only carrier of task state. A phase without one reports `0/0 (no open task)` — which reads as "nothing to do" whether it is finished, not started, or prose. Lint fails it. |
+
+```markdown
+WRONG                                          RIGHT
+- [x] moved service to packages/product        - [x] moved service to packages/product
+Both apps typecheck.                           
+                                               Both apps typecheck.
+
+- Amended by: 0012 (checkout)                  - Amended by: 0012, 0018
+- Amended by: 0018 (pricing)                   
+  first line dropped; 0012 reads unstamped     per-ref notes go in the prose below
+
+## Phase 1 — remove the import `[DONE]`        ## Phase 1 — remove the import
+Shipped via the hook. Gate green.              - [x] setAuthInitializer hook added
+                                               - [x] KNOWN allowlist emptied, gate green
+```
+
+**State is derived, never announced.** A `[DONE]` marker is a second copy of what the checkboxes
+already hold, and its prose is unaddressable. Date and narrative go in the paragraph under the tasks.
+
+**Not read — an unrecognised line is prose.** Never encode state in: emoji or `[DONE]` in a heading ·
+strikethrough · bold or ALL-CAPS DONE · HTML comments · nested/indented checkboxes · a `Status:` not
+directly under the title · any field key not listed in this standard. A fact is read only as a
+`Status:`, a `- Key: value`, or a `- [ ]`. **There is no fourth way.**
+
+**Only six types are linted:** `todos` · `decisions` · `features` · `conventions` · `memory` ·
+`handover`. `architecture.md`, `MODULE.md` and the soft folders are parsed but NOT grammar-checked —
+a broken heading there fails nothing, so the structures above are conventions you keep, not gates.
+
+**`docs-lint` FAILS the gate on:** a missing `# Title` · a missing `Status:` on a todo, decision or
+handover · a `Status:` outside its file's vocabulary · a wrapped value · a todo with no `## Phase N`
+section · a todo with no `- Acceptance:` · two phases sharing a number · a phase with no tasks · a
+missing or misspelled `## Context` / `## Decision` / `## Consequences` · a `- Builds:` or `- Depends:`
+pointing at an ADR or phase that does not exist · a relation stamped on one end only · superseding a
+record that still has open phases without `- Inherits:` · a cross-tree address that resolves to
+nothing. It cannot see `## Phase 2b` — that is a silent gap in `docs-status`.
+
+**It WARNS without failing on** (hygiene — true findings that break no grammar): `Status: done` still
+sitting in `todos/` · `Status: done` with unchecked tasks · `Status: doing` with everything checked ·
+`Status: blocked` with neither an unmet `- Depends:` nor a `- Blocked by:` · ADRs with no build link
+and no `- Enforced by:`, reported as one aggregated list rather than one line each. A warning is the
+gap between your claim and the checkboxes — fix it in the same turn or it becomes noise you learn to
+ignore.
+
+---
+
+## §6 Each file
+
+### `features.md`
+
+```markdown
+# Features — <service>
+
+## <Capability> — `<command or entry point that runs it>`
+- Purpose: what it is for, in one line the code cannot say
+- Intent: why it exists, or the tradeoff taken
+
+## Tunables
+| knob | default | file:line | effect |
+```
+
+Name the entry point in the heading. Add `## Tunables` once the service has defaults, thresholds or
+gates. Update when an ADR and its todos finish. **Root `features.md` is an index only.**
+
+### `architecture.md` — the graph, and the rules its arrows obey
+
+Nothing else. A diagram, the node-to-module links, the contract, the enforcing test.
+
+````markdown
+# Architecture — <service>
+
+```mermaid
+flowchart TD
+  cli[interfaces/cli] --> reg[registry]
+  reg --> core[core/parsing]
+  reg --> dom[domain/analysis]
+  dom --> core
+```
+
+| node | note |
+|---|---|
+| `interfaces/cli` | [modules/interfaces/cli/MODULE.md](./modules/interfaces/cli/MODULE.md) |
+| `core/parsing` | [modules/core/parsing/MODULE.md](./modules/core/parsing/MODULE.md) |
+
+## Contract
+1. Nothing under `core/` imports from `interfaces/`.
+2. `registry` is the only composition point.
+- Enforced by: tests/unit/core/scope-guard.test.ts
+````
+
+A node links to its MODULE.md **if it has one**. Notes are written only where intent is not obvious
+(see `modules/`), so a node with no note leaves the link cell empty — that is normal, not a gap. A
+contract states its enforcing test.
+
+**Root level** — the same shape one altitude up: services as nodes, the contracts between them, what
+crosses each boundary, the direction data flows. It owns no service's internals.
+
+Mermaid, so it stays text.
+
+**Authored, never generated.** This is the real shape one level above the code. Conducks cannot
+produce it — naming the parts is judgement. Everything below it (calls, imports, cycles, dead code)
+stays queried.
+
+**Where each fact goes:**
+
+| the fact is about | goes to |
+|---|---|
+| the shape, or which arrows are legal | `architecture.md` |
+| exactly one module | that module's `MODULE.md` |
+| a trap, a name collision, a deleted module | `memory.md` |
+
+*Layer* is the one word both files use. `architecture.md` holds the **contract** — which dependencies
+are legal, whole tree. A MODULE.md `**Layer:**` says **where that one module sits in it**. About to
+repeat a rule in a MODULE.md? It belongs in `architecture.md`.
+
+### `modules/<path>/MODULE.md`
+
+**Mirror the source tree** — layout under `modules/` matches source layout, nested as deep. Finding a
+note is a path translation, not a search.
 
 | form | for |
 |---|---|
 | `modules/<path>/MODULE.md` | a folder-shaped module or part |
 | `modules/<path>/<name>.MODULE.md` | a single file whose intent needs its own note |
 
-**Write a note when intent stops being obvious from the code — never to complete a set.** A module
-with no note simply did not need one. That is the whole granularity rule; module size does not enter
-into it.
-
-**A part earns its own note when its intent differs from its parent's.** Once parts have their own
-notes, the parent becomes a link-only overview that repeats none of them — one place per fact.
-
-### What a MODULE.md says
+**Write a note when intent stops being obvious from the code, never to complete a set.** Size does not
+enter into it. A part earns its own note when its intent differs from its parent's; the parent then
+becomes a link-only overview.
 
 ```markdown
 # <module> — <one line: what it is>
 
-**Layer:** where it sits, what it may and may not depend on, and what that buys
-**Responsibility:** what it OWNS; what it explicitly does not
+**Layer:** where this module sits in the contract — the node it is in `architecture.md`
+**Responsibility:** what it owns; what it explicitly does not
 **Boundaries:** the seams — what crosses in and out, and the rule at each
 **Deferred / not built:** designed, chosen not to build, and why
 
-## Sub-modules            (only when parts have their own notes)
+## Sub-modules            only when parts have their own notes
 - [part](./part/MODULE.md) — one line each
 
-## Traps                  (optional)
+## Traps                  optional
 - the thing that looks wrong and is not, or looks fine and bites
 ```
 
-The prose after those fields carries the why: rejected alternatives, correctness notes, the incident
-that produced a rule. Write it as instructions and consequences a newcomer can act on.
+Prose after those fields carries rejected alternatives, correctness notes, the incident that produced
+a rule. No symbol maps or call lists — ask `conducks trace` / `conducks impact`.
 
-Keep symbol maps and call lists out — ask `conducks trace` and `conducks impact` for those, fresh
-each time. Keep the capability catalogue in `features.md`. A MODULE.md and a feature entry are
-different obligations, not different zoom levels: the feature says what the system offers; the module
-says what one part owns, refuses, assumes, and breaks on.
+Feature = what the system offers. Module = what one part owns, refuses, assumes, breaks on.
 
-### What `architecture/README.md` carries
-
-1. **The index**, grouped by the role parts play in this system (surfaces · core · agents · services
-   · plugins — whatever the roles are here), one line each.
-2. **This project's layer contract**: the dependency direction as a diagram, the binding rules
-   numbered, and the test that enforces them. A contract with no named enforcer is a wish.
-3. **Names that collide.** When one word means several things in the codebase, give each its own row
-   in a table. This is the highest-value paragraph in most architecture docs.
-4. **Removed modules — do not re-add.** A deleted module with a surviving note gets re-created by the
-   next person who reads it. Say what went and why.
-
-## The line grammar
-
-Five per-line primitives, no frontmatter:
-
-```
-# Title                 one per file, first line
-Status: <value>         life state, one line
-## Section              a heading
-- [ ] task              open · - [x] done
-- Key: value            a field
-```
-
-**One line in, one fact out.** A value is the WHOLE line after its marker. It never wraps onto a
-second line — there is no continuation rule, so a wrapped line matches nothing and is dropped in
-silence. Needs a paragraph? Put it in a `##` section. Prose wraps freely.
-
-**Leave a BLANK LINE after your last task or field, before any paragraph.** A prose line sitting
-directly under a `- [ ]` or `- Key:` reads as a continuation of that value — which the grammar does not
-allow, so it is dropped, and `docs-lint` fails the file for a wrapped value. This is the single easiest
-mistake to make when writing a phase, because the prose feels like it belongs to the task:
+### `conventions.md` — root only
 
 ```markdown
-- [x] moved the service to `packages/product`      ❌ the paragraph below is read as
-Both apps typecheck and the gate is green.            part of this task's value, and dropped
-
-- [x] moved the service to `packages/product`      ✅ blank line — task and prose are
-                                                       two separate things
-Both apps typecheck and the gate is green.
-```
-
-**`###` is NOT a section — its tasks belong to the `##` above it.** Only `## ` opens a section, so a
-`### A1 — subheading` is just prose with a heading shape. Tasks written under it still count toward the
-enclosing `## Phase N`, which is what lets a long phase group its work under sub-headings without
-inventing a nested phase. Use it freely; just remember the phase owns the count.
-
-**One line per KEY, too.** A field key appears at most ONCE in a file. Repeat it and the last line
-silently wins — the earlier ones are not merged and not warned about. Multiple values go on the one
-line, comma-separated:
-
-```
-- Amended by: 0012, 0018, 0023        ✅ three refs, one line
-- Amended by: 0012 (checkout)         ❌ two lines: the first is dropped,
-- Amended by: 0018 (pricing)             and 0012 then reads as unstamped
-```
-
-Only the leading ref list is parsed, so prose may follow it. A per-ref note has nowhere to live on that
-line — put those in the paragraph under the fields, where a reader looking for the *why* already is.
-
-**Headings the grammar reads must match EXACTLY.** `## Context` is a required section; `## Context — the
-measured problem` is a different heading and counts as missing. Same for `## Decision` and
-`## Consequences`. Put the qualifier in the section's first sentence — it reads better there and it
-survives the linter.
-
-**A phase number is a plain integer.** `## Phase 2b` matches no phase at all: not an error, *invisible*
-— its tasks vanish from `docs-status` and `todoNN#P2b` addresses nothing. When a phase splits, give the
-new half the next free integer and put `(was Phase 2b)` in its title so older references still trace.
-
-**Every phase carries at least one `- [ ]` or `- [x]`.** The checkbox is the ONLY thing that carries a
-task's state — there is no other mechanism, and none can be invented. A phase with no checkboxes has no
-state to report, so the board can only print `0/0 → (no open task)`, which reads as "nothing to do"
-whether the phase is finished, not started, or written as prose. `docs-lint` fails it.
-
-Finished a phase? Tick its boxes:
-
-```markdown
-## Phase 1 — remove the upward import           ✅ every task is a checkbox
-- [x] `setAuthInitializer` hook added
-- [x] KNOWN allowlist emptied, gate green
-
-## Phase 1 — remove the upward import `[✅ DONE 2026-07-18]`    ❌ lint error
-Shipped via the setAuthInitializer hook. Gate green, both apps typecheck.
-```
-
-The second form loses twice. Its prose is unreachable — nothing can address a task inside it — and the
-`[✅ DONE]` marker is a SECOND copy of a fact the checkboxes already hold, so the two drift and no reader
-can tell which is current. State is derived, never announced (one fact, one place). Put the date and the
-narrative in the paragraph under the tasks, where they explain rather than compete.
-
-**What the grammar does NOT read.** Nothing here is a hint or a convention that a tool half-understands
-— an unrecognised line is simply prose. These carry NO meaning to `docs-lint`, `docs-status` or
-`conducks_docs`, so never encode state in them: emoji or `[DONE]` markers in a heading, `~~strikethrough~~`,
-bold or ALL-CAPS words like **DONE**, HTML comments, nested or indented checkboxes under another task,
-a `Status:` line anywhere except directly under the title, and any field key the standard does not list.
-If you want a fact read, it is a `Status:`, a `- Key: value`, or a `- [ ]` — there is no fourth way.
-
-`docs-lint` fails a wrapped value, a `Status:` outside its file's vocabulary, a missing or misspelled
-required section, two phases sharing a number, and a phase with no tasks. It cannot see a phase numbered
-`2b` — that one shows up only as a silent gap in `docs-status`.
-
----
-
-## Each file, and how to structure it
-
-### `features.md` — what the system offers, and why that is worth having
-
-```markdown
-# Features — <unit>
-
-## <Capability> — `<the command or entry point that runs it>`
-- Purpose: what it is FOR, in one line the code cannot say
-- Intent: why it exists / the tradeoff taken
-
-## Tunables
-| knob | default | file:line | effect |
-```
-
-Name the entry point in the heading — a capability nobody can invoke is not findable. Add
-`## Tunables` once the unit has defaults, thresholds or gates, so they stay findable instead of
-buried in whichever record created them.
-
-Update it when an ADR and its todos are finished and the capability is real.
-
-### `conventions.md` — the rules, IDed so they can be cited
-
-```markdown
-# Conventions — <unit>
+# Conventions — <repo>
 
 ## <PREFIX>-1 — <short title>
-- Rule: <the binding rule, stated as an instruction>
-- Reason: <what went wrong without it>
+- Rule: the binding rule, stated as an instruction
+- Reason: what went wrong without it
 ```
 
-The reason keeps the rule alive: a rule with no cost attached gets dropped by the next person who
-finds it inconvenient.
+State the cost in `Reason:` — a rule without one gets dropped as inconvenient.
 
-### `memory.md` — the traps
+**A rule that binds only one service still lives here.** Name the scope in the rule itself
+(`- Rule: in packages/core, ...`). `conventions.md` is root-only, and `architecture.md` holds the graph
+and its contract — nothing else — so there is no service-level rules file. Two exceptions, both
+narrower than a rule:
+
+| the rule is about | goes to |
+|---|---|
+| which dependencies are legal | that service's `architecture.md` `## Contract` |
+| one module's own behaviour | that module's `MODULE.md` under `**Boundaries:**` |
+
+### `memory.md` — root only
 
 ```markdown
-# Memory — <unit>
+# Memory — <repo>
 
 ## <short title>
-- Gotcha: <what looks wrong, or the constraint>
-- Why: <the reason the code cannot show>
-- Applies: <file / area>
+- Gotcha: what looks wrong, or the constraint
+- Why: the reason the code cannot show
+- Applies: file or area, and which service
 ```
 
-### `decisions/NNNN-title.md` — one decision, frozen
+Two kinds of entry belong here that look like architecture and are not:
+
+- **Names that collide.** One word meaning several things in the codebase, one entry each. Usually the
+  highest-value thing in the file.
+- **Removed modules — do not re-add.** A deleted module has no MODULE.md left to hold the warning, so
+  without an entry here the next reader re-creates it. Say what went and why.
+
+### `decisions/NNNN-title.md`
 
 ```markdown
 # NNNN — <title>
 Status: Accepted | Superseded by NNNN
-- Amended by: NNNN, NNNN          one line, however many refs
+- Amended by: NNNN, NNNN
 - Enforced by: <the test or symbol that proves it is built>
 - Date: <ISO>
 
@@ -315,42 +428,37 @@ Status: Accepted | Superseded by NNNN
 ## Consequences
 ```
 
-Those three section names are matched EXACTLY — `## Context — what we measured` counts as no `## Context`
-at all. And a key is written once: a second `- Amended by:` line silently replaces the first, which shows
-up later as a back-stamp the linter says is missing on a record that plainly has it.
+**One decision per numbered file.** Two calls in one record cannot be superseded separately — the
+second dies with the first.
 
-An ADR is PROSE — the story of why a call was made. Keep checkboxes and numbered requirement lists
-out of it; bulleting a decision into a spec makes a worse record. The work that implements it is a
-todo, and the granularity lives there.
+An ADR is **prose**, and must state **what was not chosen**. Checkboxes and requirement lists belong
+in the todo that implements it.
 
-`Status:` carries life state only, and it is the one line of an accepted ADR that may change later.
-Only a supersede kills a record. Every other cross-record link is a FIELD, stamped on BOTH ends:
+`Status:` carries life state only and is the one line of an accepted ADR that may change. Only a
+supersede kills a record. Every other link is a field **stamped on both ends**:
 
-| on this record | on the other record |
+| this record | the other record |
 |---|---|
 | `- Amended by: NNNN, NNNN` | `- Amends: NNNN` |
 | `- Superseded by: NNNN` | `- Supersedes: NNNN` |
 | `- Resolved by: NNNN` | `- Resolves: NNNN` |
 
-Amended twice? Both refs on the one `- Amended by:` line, and what each one changed goes in the prose
-under the fields — never a second line with the same key.
+| relation | means |
+|---|---|
+| **amends** | part of the record changed. The amended ADR stays `Accepted` and stays binding — read both. |
+| **supersedes** | the whole record is replaced. It is dead; do not act on it. |
+| **resolves** | the record left a question open (a deferred call, an either/or); this one answers it. The original stays `Accepted` and stays correct. |
 
-An amended ADR stays `Accepted` and stays binding — part of it changed, so read the amendment too.
+**Superseding a half-built record:** add `- Inherits: NNNN (the part never built)` so the remainder
+keeps an owner. Lint requires it when the superseded record still has unfinished work.
 
-**Superseding a half-built record:** the reasoning dies, the shipped code does not. Say what carried
-over — `- Inherits: NNNN (the part never built)` — so the remainder keeps an owner. `docs-lint`
-requires it when the superseded record still has unfinished work.
-
-`decisions/README.md` says what the folder is FOR and how to write a record. Keep the list and the
-per-record state out of it; ask `conducks docs-status` for those.
-
-### `todos/todoNN.md` — the work
+### `todos/todoNN.md`
 
 ```markdown
 # todoNN — <title>
 Status: todo | doing | done | blocked
-- Acceptance: <one line, testable>
-- Blocked by: <external cause, when no phase explains it>
+- Acceptance: one line, testable
+- Blocked by: external cause, when no phase explains it
 
 ## Phase 1 — <title>
 - Builds: NNNN            the ADR this phase implements
@@ -358,40 +466,65 @@ Status: todo | doing | done | blocked
 - [x] done task
 
 ## Phase 2 — <title>
-- Depends: todoNN#P1      the phase that must finish first
+- Depends: todoNN#P1      the phase that must finish first — same tree only
 - [ ] open task
 ```
 
+**`- Depends:` never crosses trees.** It takes a bare `todoNN#PN` inside its own tree, never a
+qualified `app:todoNN#PN`. Cross-service coupling goes through a root epic (§4) and nowhere else —
+two paths to the same fact would disagree. Reason: an inline cross-tree dep is invisible from the
+other tree, so one side ships without knowing.
+
 **The phase is the unit of linkage.** One todo may serve several decisions or none; one ADR may be
-built across phases in several todos. Keep a phase to ONE coherent chunk with one owner ADR or none —
-serving two decisions means it is two phases.
+built across phases in several todos. Keep a phase to one coherent chunk with one owner ADR or none —
+serving two decisions means it is two phases. Phase numbers are unique in a file; `todoNN#PN` is an
+address others point at.
 
-Phase numbers are unique inside a file, and they are plain integers: `todoNN#PN` is an address other
-files point at. `## Phase 2b` is worse than a duplicate — it is not read as a phase at all, so its tasks
-never reach `docs-status` and nothing can link to it. Splitting a phase means taking the next free
-integer, with `(was Phase 2b)` in the title to keep older references traceable.
+**State is derived.** Checkbox = task state. Phase state = its checkboxes. Blocked = an unmet
+`- Depends:` or a stated `- Blocked by:`. An ADR's build state = the phases claiming it plus
+`- Enforced by:`. Percent done = checked ÷ total. `Status:` is your claim, and lint compares it
+against the checkboxes. Find every slice of an epic with `conducks docs-status`, or
+`grep -rln "todoNN" */docs/`.
 
-**State is derived.** The checkbox is the task's state. A phase's state is its checkboxes. Blocked is
-an unmet `- Depends:`, or a stated `- Blocked by:` for a cause no phase can express. An ADR's build
-state comes from the phases that claim it plus `- Enforced by:`. Keep `Status:` as your claim — lint
-compares it against the checkboxes and reports the gap.
+**Never trust a done task without a test that could have failed.** A test with no assertions reads as
+coverage and is worse than none. Questions that change *what gets built* go in a **Phase 0** that
+blocks everything below it.
 
-When a todo closes, promote its surviving facts, then move it to `completed/`. Its `- Builds:` link
-goes with it, so give the ADR an `- Enforced by:` pointing at the test that now proves it.
+**Codependent work across services gets a root epic — nothing else does.** An app-only fix lives in
+`app/docs/todos/`. The epic is how a cross-service dependency is expressed: it holds no work of its
+own, just the slice order, one checkbox per slice addressed as `tree:todoNN`, and why they are coupled.
+Each slice opens with a line pointing up at the epic (`(root):todo41`), so the link is stamped at both
+ends and either end can be found from the other.
 
-**`completed/` is NOT scanned.** `docs-lint`, `docs-status` and `conducks_docs` skip it, along with
-`legacy/`, `archive/` and `agent-runs/`. The board answers "what is open", and a closed todo has no open
-work by definition — scanning it would add a page of finished phases to every reading of the table.
+```markdown
+# todo41 — payouts move behind one port
+Status: doing
+- Acceptance: app and admin both read payouts through the port; neither writes the table directly.
 
-Two consequences follow, and both are deliberate:
+## Phase 1 — the two slices, in order
+- [x] app:todo42
+- [ ] admin:todo43
 
-- **A file in `completed/` is no longer linted.** Move it only once it is genuinely finished. If it still
-  has open tasks, it is not complete; leave it in `todos/` and let `Status:` say `doing`.
-- **Its `- Builds: NNNN` disappears from the graph.** The ADR it built will start reporting as "no build
-  link" unless it carries an `- Enforced by:`. That is why the promote step is not optional: the test
-  becomes the standing proof once the todo that wrote it is filed away.
+admin lands after app: the port has to exist before admin can point at it.
+```
 
-### `handover.md` — the first file the next session reads
+An ADR cannot hold this: it is frozen, and joint status moves.
+
+**On close, in order:**
+
+1. Promote surviving facts — rule to `conventions.md`, trap to `memory.md`, capability to `features.md`.
+2. Give the ADR an `- Enforced by:` pointing at the test that now proves it. The `- Builds:` link leaves
+   the graph with the file, so without this the ADR reports as unbuilt.
+3. Set `Status: done`.
+4. Move the file to `completed/`.
+
+**`completed/` is not scanned** (nor `legacy/`, `archive/`, `agent-runs/`). Two consequences:
+
+- A file there is **no longer linted**. Open tasks → leave it in `todos/` with `Status: doing`.
+- Its `- Builds:` leaves the graph, so the ADR reports **no build link** unless it carries an
+  `- Enforced by:`.
+
+### `handover.md` — root only
 
 ```markdown
 # Handover — <ISO-date>
@@ -401,50 +534,47 @@ Status: current | stale
 ## Next, in order
 ```
 
-Overwrite it at the end of a working session and re-stamp the date. Two sections, ≤15 lines. Did not
-touch it this session? Set `Status: stale` — a handover that admits it is old beats one that lies.
-
-### `docs/README.md` — the map of the docs
-
-```markdown
-# <unit> — docs
-
-**State:** <one line: what works today>
-**Read in order:** handover.md → todos/ (active) → memory.md
-
-| doc | holds |
-|---|---|
-```
-
-A README says what a folder is FOR and how to read it. Keep per-record state out of it — that is
-derivable, and a hand-kept copy drifts.
+Overwrite at session end and re-stamp the date — never appended. Two sections, ≤15 lines. Untouched
+this session? Set `Status: stale`.
 
 ### No progress file
 
-What shipped and when comes from the dated ADRs and the closed todos. Ask for it with
-`conducks docs-status`, or `conducks_docs` with `recent: <n>`. An existing `progress.md` counts as
-derived — unread, unlinted — and belongs in `legacy/`.
+What shipped and when comes from dated ADRs and closed todos: `conducks docs-status`, or
+`conducks_docs` with `recent: <n>`. An existing `progress.md` is derived — unread, unlinted — and
+belongs in `legacy/`.
 
 ---
 
-## Reading the docs without reading every doc
+## §7 Reading and enforcing
 
-`conducks_docs` / `conducks docs-status` is a summary and a set of links. Open the todo and the ADR
-before acting on them — the tool saves the search, not the reading.
+**Every tree is read; trees stay separate.** `docs-lint`, `docs-status` and `conducks_docs` are
+recursive: root plus every service. A single repo has one tree and behaves identically, so nothing has
+to know which case it is in.
 
-Every line it returns is an address (`todo09#P2`, a file path) or a state. It copies no prose, so it
-stays a pointer into the docs rather than a second version of them.
+```
+conducks docs-lint              root + every service; fails if any tree fails
+conducks docs-lint --root-only  the root tree alone
+conducks docs-lint app          one service
+```
 
-| | holds | when |
+Trees are **never merged**: `todo123` in `app` and `todo123` in `admin` are different records, so a
+merged board would collide two real todos under one address. `docs-status --json`
+returns a map keyed by tree; `conducks_docs` returns `{monorepo: true, trees: {...}}`, with
+`scope="root"` or `scope="app"` for one.
+
+Both return a **summary and links** — every line is an address (`todo09#P2`, a file path) or a state.
+Open the todo and the ADR before acting.
+
+| budget | holds | when |
 |---|---|---|
-| read once | conventions · memory · handover | session start — load the constraints and keep them |
+| read once | conventions, memory, handover | session start — load the constraints and keep them |
 | read often | the ADR → todo → phase → task tree, open items only | every time you pick up work |
-| on demand | features · architecture | when you need a capability or a module's intent |
+| on demand | features, architecture, modules | when you need a capability or a module's intent |
 
 ```
 0013  taxonomy reconcile · Accepted · unbuilt
-  todo09#P1  2/3  → edge-gate the write path
-  todo09#P2  0/2  ⛔ waits todo09#P1
+  todo09#P1  2/3  -> edge-gate the write path
+  todo09#P2  0/2  waits todo09#P1
   enforced by: tests/unit/taxonomy.test.ts (FAILING)
 ```
 
@@ -452,24 +582,15 @@ Finished work is absent by design: this is the table, not the history.
 
 ---
 
-## Rules
+## §8 Rules
 
-- **Promote on close.** A record freezes the why; what is TRUE NOW moves to a living file the same
-  turn. ADR accepted → the rule to `conventions.md`, the trap to `memory.md`, the capability to
-  `features.md`. Todo done → promote, then file it in `completed/`. The living line states today's
-  state and cites the record; it does not restate the reasoning. A pointer is not a duplicate.
-- **One docs root per unit.** A governed filename outside it is invisible to the tooling.
-- **Generated output stays out of the tree.** Blueprints, dumps and pulse summaries live in the tool
-  vault (`.conducks/`) and are gitignored.
-- **ADRs:** one decision per numbered file. The body is frozen; `Status:` and the relation fields
-  stay editable. Replace → stamp both ends. Part changed → amend, and the amended record stays
-  `Accepted`. The RECORD carries the state.
-- **Todos:** the number is global (next = highest anywhere + 1). A multi-unit job gets an epic that
-  holds the only status table; each slice points up to it.
-- **Architecture is authored.** A person writes a MODULE.md. Scope it to one module, mirror the
-  source path, index it from `architecture/README.md`, and leave wiring to the graph.
-- **The code outranks the doc.** When they disagree the doc is wrong — fix it in the change that
-  revealed it. Code comments count as docs.
-- **A `[DONE]` needs a test that could have failed.**
-- **One fact, one place.** Derive whatever can be derived. Where a claim is kept anyway, let lint
-  compare it against the truth and treat the gap as the finding.
+| | rule |
+|---|---|
+| **Promote on close** | A record freezes the why; what is true now moves to a living file the same turn. ADR accepted → rule to `conventions.md`, trap to `memory.md`, capability to `features.md`. Todo done → the ordered steps in §6. A living line citing a record is not a duplicate; a second copy of the reasoning is. **If a new session must read a closed record to learn how the system behaves today, the promotion never happened.** |
+| **One docs root per service** | A governed filename outside one is invisible to the tooling. |
+| **Numbers are per tree** | An address crossing a tree carries it: `app:todo123#P2`. See §4. |
+| **Generated output stays out** | Blueprints, dumps, pulse summaries live in `.conducks/`, gitignored. Never author `map.md`, `drift.md` or `progress.md` — all three are derived and classify as unread. A generated `.md` at the repo root outranks authored docs by accident and is stale within a commit. |
+| **Architecture is authored** | A person writes `architecture.md` and every MODULE.md. Wiring is queried. |
+| **Code outranks the doc** | Except a doc explicitly marked a **spec**, which decides what the code should do. `docs/product/*.md` are specs; everything else describes. A doc neither marked a spec nor matching the code is wrong — fix it in the change that revealed it. Code comments count as docs. |
+| **`archive/` and `legacy/` are the last stop** | Nothing live links into them. Promote anything still true before moving; the move is one-way. |
+| **One fact, one place** | Derive what can be derived. Where a claim is kept anyway, let lint compare it against the truth and treat the gap as the finding. |

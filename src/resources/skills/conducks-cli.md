@@ -20,13 +20,14 @@ graph and needs `conducks analyze` first.
 ## Docs (the conducks-docs grammar)
 - `conducks docs-status [--json] [--all] [--root-only]` — open work: each ADR with unfinished phases, the next task in each, what is blocked
 - `conducks docs-lint [--root-only]` — validate against the grammar; **exits 1** on violation (the CI gate)
-- `conducks bootstrap-docs [name]` — scaffold the grammar file set into `docs/`
+- `conducks bootstrap-docs [name] [--service]` — scaffold the grammar file set into `docs/`; `--service` omits the root-only files
 - `conducks monitor [--json] [--stale]` — every registered project: graph freshness, docs violations, architecture notes describing changed code
   - `--dismiss <module>` = "checked, still accurate"; `--dismiss <module> --intent <adr|todo|path>` when an enhancement landed, and the address must exist
 
-**Both docs commands are RECURSIVE.** A monorepo keeps a `docs/` per deployable unit, so they read the
-root tree AND every unit tree. A single-repo project has one tree and its output is unchanged — you
-never have to know which case you are in.
+**Both docs commands are RECURSIVE.** A monorepo keeps a `docs/` per service, so they read the root
+tree AND every service tree. Declare the services in `conducks.json` (`{"services": ["app", …]}`);
+without it they are guessed from which folders hold a `docs/`. A single-repo project has one tree and
+its output is unchanged — you never have to know which case you are in.
 
 ```
 ✓ (root)            43 governed docs conform to the grammar.
