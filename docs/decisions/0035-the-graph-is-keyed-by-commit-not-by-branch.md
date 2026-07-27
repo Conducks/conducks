@@ -122,3 +122,23 @@ is not thrown away by the layer work.
 
 Storage is already slow and expensive before any of this. Layers make the cost model worse if
 content-addressing is not real. That is a separate problem and it is a prerequisite, not a footnote.
+Measured: 235 MB for 2,373 nodes and 12,755 edges — roughly 100 KB per node, four JSON columns each.
+
+**Without git there are no layers, and that is not a broken mode.** Every layer is keyed by a commit,
+so a project with no repository has no commits and no layers. It degrades to exactly today's
+conducks: one flat graph, change detected by hashing on access rather than by two `stat` calls. Drift
+and three-way merge are unavailable there, because the versions they compare do not exist. Everything
+git adds is ADDITIVE — nothing that works today stops working without it, and no command may require
+a repository to answer.
+
+Two cases the model must not be read as forbidding. **Several projects can be active at once**;
+nothing here makes "current" a global singleton, and a layer set is per project. And **cross-project
+concurrency is free** — vaults are separate files with separate locks, so two projects being used
+simultaneously never interact. The concurrency that hurts is two writers on ONE project, which is a
+present bug rather than a consequence of this record: a pulse locks readers out and reads fail rather
+than queue.
+
+Three cases have no answer yet and are recorded in todo21 Phase 0 rather than decided here: git
+worktrees give one repository two vaults, detached HEAD leaves "current branch" undefined while the
+commit key still works, and a monorepo must not invent a second answer to "what is a project" beside
+the one `conducks.json` already gives the docs.

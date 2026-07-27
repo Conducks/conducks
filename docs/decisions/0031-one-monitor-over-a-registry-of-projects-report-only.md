@@ -1,6 +1,7 @@
 # 0031 — One monitor over a registry of projects, and it only ever reports
 
 Status: Accepted
+- Amended by: 0036
 - Enforced by: `tests/unit/domain/analysis/project-monitor.test.ts`
 - Date: 2026-07-26
 - Promoted: docs/features.md (`conducks monitor`, project registry); docs/conventions.md CONDUCKS-29

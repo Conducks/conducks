@@ -487,8 +487,59 @@ against the checkboxes. Find every slice of an epic with `conducks docs-status`,
 `grep -rln "todoNN" */docs/`.
 
 **Never trust a done task without a test that could have failed.** A test with no assertions reads as
-coverage and is worse than none. Questions that change *what gets built* go in a **Phase 0** that
-blocks everything below it.
+coverage and is worse than none.
+
+**A todo may carry a `## Context` section.** `- Acceptance:` is one line and one line cannot describe
+a large job — what it is for, what it rests on, what was ruled out. Put that in a `## Context`
+directly under the fields, before Phase 1. It is prose, it is not a phase, and nothing counts it.
+Write it whenever the phase titles alone would not tell a stranger what this todo is.
+
+### The unsolved problem is a task, and it lives in Phase 0
+
+Not every task is work. Some are questions nobody has answered yet, and the answer changes what gets
+built. Those go in a **Phase 0** that everything below `- Depends:` on:
+
+```markdown
+## Phase 0 — decide before building
+- [ ] Measure the cost of X. If it is over Nms the design in Phase 2 does not hold
+- [ ] Two agents on one project: reads FAIL during a write. No solution yet — record what breaks
+
+## Phase 2 — build it
+- Depends: todo20#P0
+```
+
+This is the note-keeping place. A problem with no solution is written as an open task, in its own
+words, and REVISED IN PLACE when the answer arrives — a task's text is not frozen. Recording the
+problem before the answer is the point: an unwritten problem is rediscovered, and rediscovering it
+costs more than the note did.
+
+**A Phase 0 task is not a defect.** Do not turn one into a `[-]` because it is unsolved. Drop it only
+when the question stops mattering, and say why.
+
+### How to size, group and divide
+
+The failure is a todo that describes a whole quarter and a todo that describes one afternoon, sitting
+in the same folder addressed the same way.
+
+| you have | make it |
+|---|---|
+| one decision, one chunk of work | one ADR, one todo, phases inside it |
+| one decision, work that splits by concern | one ADR, one todo, ONE PHASE PER CONCERN |
+| several decisions that only make sense together | several ADRs, ONE todo — a phase per ADR, each `- Builds:` its own |
+| work depending on an unanswered question | Phase 0 for the question, `- Depends:` from the phases it gates |
+| codependent work across services | a root epic (below) |
+
+**There is no sub-ADR, and there must not be.** A decision that needs sub-decisions is several ADRs —
+"one decision per file" is what lets each be superseded on its own. What GROUPS them is the todo: a
+todo whose phases each `- Builds:` a different ADR is the epic for those decisions, and
+`conducks docs-status` renders exactly that tree. Reach for a nested record and you have built a
+second grouping mechanism beside the one that already works.
+
+**Size a phase by what fails together.** If half of it can ship while the other half is still broken,
+it is two phases. If a reviewer would have to read both halves to judge either, it is one.
+
+**Order phases by what unblocks what, never by how the work feels.** The board reads top to bottom
+and `- Depends:` is the only thing that makes an order real.
 
 **Codependent work across services gets a root epic — nothing else does.** An app-only fix lives in
 `app/docs/todos/`. The epic is how a cross-service dependency is expressed: it holds no work of its
