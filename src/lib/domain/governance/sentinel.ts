@@ -1,5 +1,13 @@
 import fs from 'node:fs/promises';
 import { ConducksAdjacencyList, ConducksNode, NON_RUNTIME_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
+import { CanonicalKind } from "@/lib/core/parsing/taxonomy.js";
+
+/**
+ * What a rule's `matchLabel` may name. A node's `label` IS its canonical kind, so anything outside
+ * this set matches zero nodes — and a rule that matches zero nodes passes silently, which is how
+ * both of this repo's shipped rules sat dead behind a green audit.
+ */
+const VALID_MATCH_LABELS = new Set<string>(Object.values(CanonicalKind));
 
 /**
  * Conducks — Sentinel Policy Engine
@@ -52,6 +60,21 @@ export class ConducksSentinel implements ConducksComponent {
           report.success = false;
           report.violations.push({ nodeId: 'global', ruleId: rule.id, message: violation });
         }
+        continue;
+      }
+
+      // A `matchLabel` naming something the taxonomy does not produce matches NOTHING, and a rule
+      // that matches nothing reports success — the failure mode CONDUCKS-13 exists to refuse. Both
+      // of this repo's own shipped rules said `"class"`, a raw language token, while nodes carry the
+      // canonical kind (`STRUCTURE`). They were permanent no-ops and `conducks audit` said clean.
+      // Raise it rather than evaluate a rule that cannot fire.
+      if (rule.matchLabel && !VALID_MATCH_LABELS.has(rule.matchLabel)) {
+        report.success = false;
+        report.violations.push({
+          nodeId: 'global',
+          ruleId: rule.id,
+          message: `matchLabel "${rule.matchLabel}" is not a canonical kind, so this rule can never match a node. Use one of: ${[...VALID_MATCH_LABELS].join(', ')}`,
+        });
         continue;
       }
 

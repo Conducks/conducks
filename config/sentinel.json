@@ -3,14 +3,14 @@
     "id": "require-conducks-component",
     "type": "require_heritage",
     "matchPath": "src/lib/domain/",
-    "matchLabel": "class",
+    "matchLabel": "STRUCTURE",
     "target": "ConducksComponent"
   },
   {
     "id": "domain-visibility-rule",
     "type": "require_export",
     "matchPath": "src/lib/domain/",
-    "matchLabel": "class"
+    "matchLabel": "STRUCTURE"
   },
   {
     "id": "hub-overload-prevention",

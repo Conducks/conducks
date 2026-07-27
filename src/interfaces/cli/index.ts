@@ -134,7 +134,10 @@ export async function main() {
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
     new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(),
-    new SupplyChainCommand(), new LedgerCommand(), new MonitorCommand()
+    // `link` was imported and never instantiated, so `conducks link <path>` answered
+    // `Unknown command "link"` while FederatedLinker underneath worked fine. Nothing caught it:
+    // the import satisfied the compiler and no test drove the command surface.
+    new SupplyChainCommand(), new LedgerCommand(), new MonitorCommand(), new LinkCommand()
   ];
 
   commands.push(new HelpCommand(commands));

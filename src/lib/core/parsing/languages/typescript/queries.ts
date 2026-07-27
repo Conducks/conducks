@@ -114,6 +114,12 @@ export const TYPESCRIPT_QUERIES = `
   (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement (abstract_class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
+  ;; Interfaces and type aliases were MISSING here, so an exported type or interface produced a node
+  ;; with isExport absent. Anything keyed off isExport then read every exported type as private — on
+  ;; conducks itself that was 55 of 98 STRUCTURE nodes under domain/, and the domain-visibility-rule
+  ;; sentinel rule reported each one as a violation the moment that rule was made to fire at all.
+  (export_statement (interface_declaration name: (type_identifier) @name) @isExported) @isInterface
+  (export_statement (type_alias_declaration name: (type_identifier) @name) @isExported) @isInterface
   (function_declaration "async" name: (identifier) @name) @isAsync @isFunction
   (abstract_method_signature name: (_) @name) @isAbstract @isMethod
 
