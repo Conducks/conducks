@@ -5,7 +5,10 @@ build/
 
 # Storage directory (user data)
 storage/
-coverage/
+# Anchored: an unanchored `coverage/` matches at ANY depth, and it silently swallowed
+# docs/modules/domain/analysis/coverage/MODULE.md — an authored doc, untracked for as long as the
+# module has been named that. Test output lands at the repo root, so the anchor loses nothing.
+/coverage/
 # OS files
 .DS_Store
 .DS_Store?
