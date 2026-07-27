@@ -198,6 +198,91 @@ describe('- Depends: does not cross a docs tree', () => {
   });
 });
 
+/**
+ * ADR 0034: the checkbox carries task state, and there are four — `[ ]` pending, `[x]`/`[X]`
+ * complete, `[>]` deferred, `[-]` dropped. Before this, `[~]` (todo09's own invented marker) matched
+ * no rule and vanished as silent prose; the parser must now reject anything outside the four rather
+ * than dropping it.
+ */
+describe('docs-grammar — ADR 0034: four checkbox states', () => {
+  const todo = (phase: string) => `# todo01 — x\nStatus: doing\n- Acceptance: it works\n\n${phase}`;
+
+  it('parses all four markers into distinct states', () => {
+    const body = parseBody(todo(
+      '## Phase 1 — p\n- [ ] pending one\n- [x] complete one\n- [X] complete two\n' +
+      '- [>] deferred one — waiting on the vendor patch\n- [-] dropped one — decided against it\n',
+    ));
+    const tasks = body.sections[0].tasks;
+    expect(tasks.map(t => t.state)).toEqual(['pending', 'complete', 'complete', 'deferred', 'dropped']);
+    // `done` is derived from state, never a second fact — only `complete` is done.
+    expect(tasks.map(t => t.done)).toEqual([false, true, true, false, false]);
+  });
+
+  it('excludes deferred from the denominator but surfaces its count', () => {
+    const src = todo(
+      '## Phase 3 — the binder\n- [x] a\n- [x] b\n- [x] c\n- [ ] d\n' +
+      '- [>] e — pushed to next sprint\n- [-] f — decided against it\n',
+    );
+    const t = shape('todo', parseBody(src), 'todos/todo01.md');
+    // 3 complete + 1 pending = 4; the deferred one leaves the denominator, the dropped one leaves
+    // the arithmetic entirely — neither is counted in `total`.
+    expect(t.phases[0].done).toBe(3);
+    expect(t.phases[0].total).toBe(4);
+    expect(t.phases[0].deferred).toBe(1);
+  });
+
+  it('a phase whose only remaining work is deferred is done, not blocked, not stuck at 0%', () => {
+    const src = todo('## Phase 2 — parked\n- [x] shipped the core bit\n- [>] the rest — waiting on upstream\n');
+    const t = shape('todo', parseBody(src), 'todos/todo01.md');
+    expect(t.phases[0].total).toBe(1);
+    expect(t.phases[0].done).toBe(1);
+    expect(t.phases[0].pct).toBe(100);
+  });
+
+  it('fails an unrecognised checkbox marker, naming the four legal ones', () => {
+    const src = todo('## Phase 1 — p\n- [~] half done\n- [x] fine\n');
+    const errs = lint('todo', parseBody(src), src);
+    expect(errs.join(' ')).toMatch(/unrecognised checkbox marker/);
+    expect(errs.join(' ')).toMatch(/\[ \]/);
+    expect(errs.join(' ')).toMatch(/\[x\][^[]*\[X\]/);
+    expect(errs.join(' ')).toMatch(/\[>\]/);
+    expect(errs.join(' ')).toMatch(/\[-\]/);
+  });
+
+  it('does not mistake ordinary prose in brackets for a broken checkbox', () => {
+    const src = todo('## Phase 1 — p\n- [see below] this is a bullet, not a checkbox\n- [x] real task\n');
+    const errs = lint('todo', parseBody(src), src);
+    expect(errs.join(' ')).not.toMatch(/unrecognised checkbox marker/);
+  });
+
+  it('fails a `[>]` with no stated reason', () => {
+    const src = todo('## Phase 1 — p\n- [>] ship the retry\n');
+    const errs = lint('todo', parseBody(src), src);
+    expect(errs.join(' ')).toMatch(/is deferred with no reason/);
+  });
+
+  it('fails a `[-]` with no stated reason', () => {
+    const src = todo('## Phase 1 — p\n- [-] ship the retry\n');
+    const errs = lint('todo', parseBody(src), src);
+    expect(errs.join(' ')).toMatch(/is dropped with no reason/);
+  });
+
+  it('accepts a `[>]`/`[-]` whose reason follows an em-dash', () => {
+    const src = todo(
+      '## Phase 1 — p\n- [>] ship the retry — waiting on the vendor rate-limit fix\n' +
+      '- [-] add the cache — decided the extra complexity is not worth it\n',
+    );
+    const errs = lint('todo', parseBody(src), src);
+    expect(errs.join(' ')).not.toMatch(/no reason/);
+  });
+
+  it('reads `- Blocked by:` at PHASE level, exactly as `- Depends:`/`- Builds:` already are', () => {
+    const src = todo('## Phase 3 — waiting on the outside world\n- Blocked by: CVE database offline\n- [ ] cannot start\n');
+    const t = shape('todo', parseBody(src), 'todos/todo01.md');
+    expect(t.phases[0].blockedReason).toBe('CVE database offline');
+  });
+});
+
 /** `modules/` replaced `architecture/modules/`; both still classify as authored architecture. */
 describe('module notes classify as architecture', () => {
   it('classifies a note under the new modules/ path', () => {

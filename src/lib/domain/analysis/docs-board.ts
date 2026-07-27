@@ -62,7 +62,13 @@ const CROSS_REF = /(\(root\)|[A-Za-z][\w.\-/]*):(todo\d+(?:#P\d+)?|\d{4})\b/g;
 export function agentView(board: DocsBoard, layer: "all" | "board" = "all", recentCount = 4): Record<string, unknown> {
   const phase = (p: PhaseLike) => ({
     at: p.addr, done: `${p.done}/${p.total}`,
-    ...(p.state === "blocked" ? { blockedBy: p.blockedBy } : { next: p.next }),
+    // Deferred stays visible even though it already left the denominator above — dropping it here too
+    // would make a parked task disappear from the one surface an agent actually reads (ADR 0034).
+    ...(p.deferred ? { deferred: p.deferred } : {}),
+    // Blocked has two causes now: an unmet `- Depends:` (blockedBy, addresses) or a phase-level
+    // `- Blocked by:` (blockedReason, prose) — a phase can be blocked by the latter with no Depends
+    // at all, so blockedBy alone would silently report nothing.
+    ...(p.state === "blocked" ? { blockedBy: p.blockedBy.length ? p.blockedBy : [p.blockedReason].filter(Boolean) } : { next: p.next }),
   });
 
   const open = board.decisions
@@ -117,8 +123,8 @@ export function agentView(board: DocsBoard, layer: "all" | "board" = "all", rece
 }
 
 interface PhaseLike {
-  addr: string; done: number; total: number; next: string | null;
-  state: string; blockedBy: string[]; builds: string[];
+  addr: string; done: number; total: number; deferred: number; next: string | null;
+  state: string; blockedBy: string[]; blockedReason: string | null; builds: string[];
 }
 
 /** Walk a docs tree, skipping archive dirs (records/superseded material is not linted). */
@@ -378,7 +384,15 @@ function linkPhases(board: DocsBoard): void {
         if (!target) { mergeLint(board, t.file, "todo", [`\`- Depends: ${addr}\` points at a phase that does not exist`]); continue; }
         if (target.pct < 100) p.blockedBy.push(addr);
       }
-      p.state = p.blockedBy.length ? "blocked" : p.total && p.done === p.total ? "done" : p.done ? "doing" : "todo";
+      // A phase-level `- Blocked by:` blocks ON ITS OWN — todo09#P3 is blocked on a network advisory
+      // database with no `- Depends:` to express that, and the other 21 tasks in the same file are not
+      // blocked at all (ADR 0034), so this must not require blockedBy to be non-empty.
+      const owed = p.total - p.done;
+      p.state = (p.blockedBy.length || p.blockedReason) ? "blocked"
+        // Nothing owed: either every real task is checked, or the only tasks left are deferred/dropped
+        // — neither holds the phase open forever, so both read as "done" (ADR 0034).
+        : owed > 0 ? (p.done ? "doing" : "todo")
+        : (p.total > 0 || p.deferred > 0) ? "done" : "todo";
     }
     t.blocked = t.phases.some((p: { state: string }) => p.state === "blocked");
     // The live phase is the first one that is neither finished nor waiting — what can start NOW.
@@ -455,8 +469,22 @@ function hygiene(board: DocsBoard): void {
       warn(board, t.file, `\`Status: done\` but ${t.total - t.done} task(s) are unchecked`);
     if (claim === "doing" && t.total && t.done === t.total)
       warn(board, t.file, "`Status: doing` but every task is checked");
+    // `t.blocked` already covers a phase-level `- Blocked by:` (ADR 0034) because `linkPhases` sets a
+    // phase's state to "blocked" on either cause — so nothing extra is needed here, only the comment:
+    // a todo with a Blocked-by phase and Status: blocked is telling the truth, not lying.
     if (claim === "blocked" && !t.blocked && !t.blockedReason)
       warn(board, t.file, "`Status: blocked` with neither an unmet `- Depends:` nor a `- Blocked by:` — an unstated blocker is invisible to whoever could clear it");
+    // Deferring is legal; deferring your way to "done" is not the same thing as finishing. A todo
+    // whose every task is `[>]` owes nothing, so it reads 100% and drops off the board — the exact
+    // "0/0 means nothing to do" ambiguity the empty-phase rule exists to refuse, reached through
+    // deferral instead of prose. Nothing was built, so say so rather than let it close silently.
+    if (t.deferred && !t.done)
+      warn(board, t.file, `every task is deferred (${t.deferred}) and none is complete — this is a deferral, not a completion; keep it open, or drop the tasks with a reason if it is not coming back`);
+    // Closing a todo files it in `completed/`, which nothing scans. Deferred work is work someone is
+    // still meant to pick up, so filing it there is a silent delete dressed as a completion — the
+    // task survives in git and in no board. Re-home it into a live todo, or admit it is dropped.
+    if (claim === "done" && t.deferred)
+      warn(board, t.file, `\`Status: done\` with ${t.deferred} deferred task(s) — \`completed/\` is not scanned, so closing this buries them. Move them to a live todo, or change them to \`[-]\` with a reason`);
   }
   // Aggregated, not one warning per file: on a repo that predates the link fields this is every
   // ADR at once, and a wall of identical lines is noise that trains you to ignore the channel.

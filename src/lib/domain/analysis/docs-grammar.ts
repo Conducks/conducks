@@ -23,11 +23,24 @@ const RE = {
   title: /^#\s+(.+?)\s*$/,
   status: /^Status:\s*(.+?)\s*$/,
   section: /^##\s+(.+?)\s*$/,
-  task: /^\s*-\s*\[([ xX])\]\s*(.+?)\s*$/,
+  // Four markers (ADR 0034): ` ` pending, `x`/`X` complete, `>` deferred, `-` dropped. Anything else
+  // in the bracket is an unrecognised marker — caught separately, from the raw source, by
+  // `unrecognisedMarkers` below, because by the time a line fails THIS regex it has already stopped
+  // being a task and would otherwise vanish as silent prose (`[~]` in todo09, before this ADR).
+  task: /^\s*-\s*\[([ xX>-])\]\s*(.+?)\s*$/,
   field: /^\s*-\s*([A-Z][\w .\/-]*?):\s*(.+?)\s*$/,
   fence: /^\s*(```|~~~)/,
   phase: /^Phase\s+(\d+)\b/i,
 };
+
+/**
+ * The one place a marker character turns into a state and back. `done` on `Task` is a DERIVED
+ * convenience (`state === "complete"`), never a second source of truth — the failure mode ADR 0034
+ * is closing is exactly two places recording the same fact and drifting apart.
+ */
+export type TaskState = "pending" | "complete" | "deferred" | "dropped";
+const MARKER_TO_STATE: Record<string, TaskState> = { " ": "pending", x: "complete", X: "complete", ">": "deferred", "-": "dropped" };
+const STATE_TO_MARKER: Record<TaskState, string> = { pending: " ", complete: "x", deferred: ">", dropped: "-" };
 
 /**
  * Status vocabulary per type — the leading token of the status line (conducks-docs §"How to
@@ -51,7 +64,8 @@ export const REL: Record<string, { key: string; mirror: string }> = {
   "resolves": { key: "resolves", mirror: "resolvedBy" },
 };
 
-export interface Section { head: string; tasks: Array<{ done: boolean; text: string }>; fields: Record<string, string>; }
+export interface Task { state: TaskState; done: boolean; text: string; }
+export interface Section { head: string; tasks: Task[]; fields: Record<string, string>; }
 export interface Body { title: string | null; status: string | null; fields: Record<string, string>; sections: Section[]; }
 
 export function inferType(fp: string): DocType {
@@ -94,7 +108,11 @@ export function parseBody(src: string): Body {
     if ((m = RE.title.exec(line)) && !out.title) { out.title = m[1]; continue; }
     if ((m = RE.status.exec(line)) && !out.status && !cur) { out.status = m[1]; continue; }
     if ((m = RE.section.exec(line))) { cur = { head: m[1], tasks: [], fields: {} }; out.sections.push(cur); continue; }
-    if ((m = RE.task.exec(line)) && cur) { cur.tasks.push({ done: m[1].toLowerCase() === "x", text: m[2] }); continue; }
+    if ((m = RE.task.exec(line)) && cur) {
+      const state = MARKER_TO_STATE[m[1]];
+      cur.tasks.push({ state, done: state === "complete", text: m[2] });
+      continue;
+    }
     if ((m = RE.field.exec(line))) { (cur ? cur.fields : out.fields)[m[1]] = m[2]; continue; }
   }
   return out;
@@ -152,16 +170,31 @@ export function shape(type: DocType, body: Body, file: string): any {
     const id = todoId(file);
     const phases = body.sections.filter(s => RE.phase.test(s.head)).map(s => {
       const num = Number(RE.phase.exec(s.head)![1]);
-      const done = s.tasks.filter(t => t.done).length;
+      const done = s.tasks.filter(t => t.state === "complete").length;
+      const pending = s.tasks.filter(t => t.state === "pending").length;
+      const deferred = s.tasks.filter(t => t.state === "deferred").length;
+      // ADR 0034: deferred leaves the DENOMINATOR (it is not owed by this phase, so it must not hold
+      // the phase open at 3/5 forever) but stays a visible count; dropped leaves the arithmetic
+      // entirely (it is a record of a decision, not outstanding work). `total` is therefore
+      // done+pending only — never s.tasks.length, which would count all four states.
+      const total = done + pending;
       return {
         // `todoNN#PN` is the address other files point at — the phase is the unit of linkage.
-        addr: `${id}#P${num}`, num, phase: s.head, done, total: s.tasks.length,
-        pct: s.tasks.length ? Math.round(done / s.tasks.length * 100) : 0,
-        next: s.tasks.find(t => !t.done)?.text ?? null,
+        addr: `${id}#P${num}`, num, phase: s.head, done, total, deferred,
+        // A phase with nothing owed (no pending tasks) reads as 100%, whether that is because every
+        // task is complete or because the only tasks left are deferred — a deferred-only phase is not
+        // "0% done", it is "nothing left for this phase to do" (ADR 0034).
+        pct: total ? Math.round(done / total * 100) : deferred ? 100 : 0,
+        next: s.tasks.find(t => t.state === "pending")?.text ?? null,
         builds: refsIn(s.fields.Builds), depends: addrsIn(s.fields.Depends),
+        // `- Blocked by:` read at PHASE level too, exactly as `- Depends:`/`- Builds:` already are
+        // (ADR 0034) — todo09#P3 is blocked on a network advisory database and 21 of its 24 tasks are
+        // not, so the file-level field alone marks the whole todo blocked when only one phase is.
+        blockedReason: s.fields["Blocked by"] || null,
       };
     });
     const done = phases.reduce((a, p) => a + p.done, 0), total = phases.reduce((a, p) => a + p.total, 0);
+    const deferred = phases.reduce((a, p) => a + p.deferred, 0);
     // The live phase is the first one not fully checked — "what is in progress", not just how much.
     const active = phases.find(p => p.pct < 100) || null;
     return {
@@ -170,7 +203,7 @@ export function shape(type: DocType, body: Body, file: string): any {
       // An external blocker (no network, a third-party release, a decision someone else owes) is a
       // real cause that no `- Depends:` can express — but it must still be STATED, not just claimed.
       blockedReason: body.fields["Blocked by"] || null,
-      overallPct: total ? Math.round(done / total * 100) : 0, done, total, phases,
+      overallPct: total ? Math.round(done / total * 100) : deferred ? 100 : 0, done, total, deferred, phases,
       activePhase: active ? active.phase : null, nextTask: active ? active.next : null,
     };
   }
@@ -216,6 +249,43 @@ function wrappedValues(src: string): string[] {
   return errs;
 }
 
+/**
+ * `[~]` was invented once for todo09, matched no rule, parsed as prose, and vanished — nobody could
+ * tell "half done" was ever recorded (ADR 0034). By the time `parseBody` has run, the line is already
+ * gone, so this reads the RAW source instead — the only place the bad marker still exists.
+ *
+ * The boundary: a bracket right after a `-` list marker that holds EXACTLY ONE character is an
+ * attempted checkbox and must be one of the four legal ones. A bracket holding more than one
+ * character (`- [see below]`) is never an attempted checkbox — the regex requires a single char
+ * between the brackets, so ordinary prose reusing bracket syntax is never caught.
+ */
+const LEGAL_MARKERS = [" ", "x", "X", ">", "-"];
+function unrecognisedMarkers(src: string): string[] {
+  const errs: string[] = [];
+  let fenced = false;
+  for (const line of src.split("\n")) {
+    if (RE.fence.test(line)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+    const m = /^\s*-\s*\[([^\]])\]/.exec(line);
+    if (m && !LEGAL_MARKERS.includes(m[1]))
+      errs.push(`\`${line.trim().slice(0, 60)}\` uses an unrecognised checkbox marker \`[${m[1]}]\` — the four legal markers are \`[ ]\` pending, \`[x]\`/\`[X]\` complete, \`[>]\` deferred, \`[-]\` dropped`);
+  }
+  return errs;
+}
+
+/**
+ * `[>]`/`[-]` with no reason is the same silent parking `## Deferred` sections were rejected for
+ * (ADR 0034) — a marker that just says "not now" with nothing else is unaddressable six months later.
+ * The rule: an em-dash separated clause. `- [>] ship the retry — waiting on the vendor's rate-limit
+ * fix` passes; `- [>] ship the retry` (no em-dash, or an em-dash with nothing after it) fails. This
+ * does not catch a reason that just restates the task text — that needs judgment no regex has — but
+ * it does close the actual failure this ADR names: a marker with NO stated reason at all.
+ */
+function hasReason(text: string): boolean {
+  const i = text.lastIndexOf("—");
+  return i !== -1 && text.slice(i + 1).trim().length > 0;
+}
+
 export function lint(type: DocType, body: Body, src?: string): string[] {
   const errs: string[] = [];
   if (!body.title) errs.push("missing `# Title`");
@@ -251,6 +321,12 @@ export function lint(type: DocType, body: Body, src?: string): string[] {
       const crossed = dep?.match(/(\(root\)|[A-Za-z][\w.\-/]*):todo\d+#P\d+/);
       if (crossed)
         errs.push(`\`- Depends: ${crossed[0]}\` crosses a docs tree — \`- Depends:\` is same-tree only. Express cross-service coupling as a root epic that lists both slices.`);
+
+      // A parked task with no stated reason is the same as a deleted one six months later (ADR 0034).
+      for (const t of p.tasks) {
+        if ((t.state === "deferred" || t.state === "dropped") && !hasReason(t.text))
+          errs.push(`\`- [${STATE_TO_MARKER[t.state]}] ${t.text.slice(0, 50)}\` is ${t.state} with no reason — add \` — why\` (an em-dash separated clause); a parked task with no stated reason is a deleted one nobody can find`);
+      }
     }
   }
   if (type === "decision") {
@@ -263,7 +339,7 @@ export function lint(type: DocType, body: Body, src?: string): string[] {
   const vocab = STATUS_VOCAB[type];
   if (vocab && body.status && !vocab.test(body.status.trim()))
     errs.push(`\`Status: ${body.status.slice(0, 40)}\` is not a valid ${type} status (${VOCAB_HINT[type]})`);
-  if (src) errs.push(...wrappedValues(src));
+  if (src) errs.push(...wrappedValues(src), ...unrecognisedMarkers(src));
   return errs;
 }
 

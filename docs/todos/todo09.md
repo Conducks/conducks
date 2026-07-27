@@ -46,13 +46,14 @@ emission, pruned at the end). No reflector change.
 - [x] Regression: full suite 43/43 green; typecheck 0 errors. No feature silently lost data.
 
 ## Phase 3 — tracked design debt (recovered from chat, do not lose again)
+- Blocked by: offline — the vuln-surface task needs an advisory DB (`npm audit` / GitHub advisories), unreachable in this environment
 - [x] **PREREQUISITE BUG — edge properties never persist.** FIXED 2026-07-19. `persistence.saveEdges` (`persistence.ts:265`)
       reads `e.metadata`/`e.weight`/`e.metadata?.line`, but flushAndClear passes `ConducksEdge` objects
       with `.properties`/`.confidence` (no `.metadata`/`.weight`). Result: EVERY edge row has
       `properties={}`, `weight=1.0`, `lineNumber=0` (verified 2026-07-19, incl. CALLS with `arguments`).
       Fix: `e.metadata`→`e.properties`, `e.metadata?.line`→`e.properties?.line`, drop/derive `weight`.
       Fixed in saveEdges (reads e.properties). Verified CALLS persist arguments; suite 43/43. **Unblocks System 2 below.**
-- [~] System 2 — boundary-node origin/version tagging (ADR 0014). CORE DONE 2026-07-19:
+- [x] System 2 — boundary-node origin/version tagging (ADR 0014). CORE DONE 2026-07-19:
       `boundary-classifier.ts` (pure, unit-tested) classifies each import internal/stdlib/dependency;
       reflector tags origin/package on IMPORTS; orchestrator emits durable `ecosystem::<pkg>` boundary
       nodes + origin-tagged DEPENDS_ON edges for externals (previously the dep surface was INVISIBLE —
@@ -66,7 +67,7 @@ emission, pruned at the end). No reflector change.
       - [ ] Vuln surface — BLOCKED offline: needs an advisory DB / `npm audit` (network). Deferred
         until conducks has a sanctioned data source; the boundary node + version are ready to carry it.
       - [x] WORKSPACE_LEDGER — DONE (conducks ledger; see item below).
-- [~] **Edge resolution for dynamic/interface/entry-point dispatch** — PARTIAL (2026-07-19).
+- [>] **Edge resolution for dynamic/interface/entry-point dispatch** — PARTIAL (2026-07-19).
       DONE: method-call resolution + dead-code accuracy.
       - `linker-intra.ts` step 3c: dangling `receiver.method` targets now resolve the METHOD segment
         against the source file's IMPORTED units only (import-scoping is the safety rail — a bare
@@ -119,15 +120,15 @@ Not dead code — each verified alive or intentional (see memory.md "prune is ad
 - [x] `buildMRO`, `resolveMethodInMRO` — languages/python/resolver.ts
 - [x] `snapshotKey`, `buildSnapshot` — analysis/coverage-baseline.ts
 - [x] `inferUnit`, `walkDocs` — analysis/docs-grammar.ts
-- [~] `getDefaultRules` — governance/sentinel-rules.ts: KEPT. It IS re-exported via a barrel
+- [x] `getDefaultRules` — governance/sentinel-rules.ts: KEPT. It IS re-exported via a barrel
       (`export { … } from`), so the UNUSED_EXPORT flag is a false positive — leaving `export`.
 7 ORPHAN — live via a path static analysis can't draw (resolved individually below):
-- [~] `chronicle`, `diff`, `graphEngine`, `watcher` — registry getters. WON'T-FIX (reasoned): see the
+- [-] `chronicle`, `diff`, `graphEngine`, `watcher` — registry getters. WON'T-FIX (reasoned): see the
       "DROPPED (deliberate, with reason)" block above — flood-prone member-read / fiddly accessor
       grammar for 4 proven-benign symbols. Recipe recorded if ever revisited.
 - [x] `initializeRegistry` — CONNECTED via object-value capture (`(pair value: (identifier))`); now
       referenced (flipped to a benign same-file UNUSED_EXPORT — it is the dynamically-called DI entry).
-- [~] `initUI` — WON'T-FIX (reasoned): ui.js browser-asset top-level callback; grouped with the getters above.
+- [-] `initUI` — WON'T-FIX (reasoned): ui.js browser-asset top-level callback; grouped with the getters above.
 - [x] `isSupported` — language-plugin.ts:51: DECISION = KEEP. It is language-plugin API surface
       (base-class contract method); removing public API for a zero-caller flag is destructive for
       no gain. Accept the flag as a known-benign orphan.
@@ -136,7 +137,7 @@ Not dead code — each verified alive or intentional (see memory.md "prune is ad
       grade from the graph: nodes/edges/density, kind distribution, third-party surface, orphan
       dead-weight, with the score deductions shown. On conducks: Grade B (88/100), density 4.45,
       −12 for 6 (documented-benign) orphans. Reuses persistence queries + prune; suite 47/47.
-- [ ] (see todo01) live cross-service overlay / coverage click-through — CANNOT do on conducks: needs
+- [>] (see todo01) live cross-service overlay / coverage click-through — CANNOT do on conducks: needs
       a running multi-service TARGET app to emit live coverage/trace. Deferred to a target-app project
       by design (ADR 0012 static⊕live overlay) — not buildable against conducks-analyzing-itself.
-- [ ] EXPRESSION kind: stays dropped per ADR 0013 — this item is a marker, not work, unless a real query need appears.
+- [-] EXPRESSION kind: stays dropped per ADR 0013 — this item is a marker, not work, unless a real query need appears.

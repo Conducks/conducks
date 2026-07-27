@@ -48,10 +48,21 @@ export class DocsStatusCommand implements ConducksCommand {
   private renderTree(label: string, labelled: boolean, board: ReturnType<Registry["docs"]["board"]>, showAll: boolean): void {
     console.log(chalk.bold(labelled ? `\n--- 📄 Conducks Docs Status — ${label} ---\n` : "\n--- 📄 Conducks Docs Status ---\n"));
 
+    // `3/4 · 1 deferred` (ADR 0034) — deferred already left the `p.done/p.total` denominator, so
+    // without this suffix a parked task would be invisible here even though it is still real work
+    // someone owes, just not this phase.
+    const countOf = (p: { done: number; total: number; deferred: number }) =>
+      `${p.done}/${p.total}` + (p.deferred ? ` · ${p.deferred} deferred` : "");
+
     const phaseLine = (p: PhaseRow, indent = "    ") => {
-      const count = chalk.dim(`${p.done}/${p.total}`.padEnd(6));
-      if (p.state === "blocked")
-        return `${indent}${p.addr.padEnd(14)} ${count} ${chalk.red("⛔ waits " + p.blockedBy.join(", "))}`;
+      const count = chalk.dim(countOf(p).padEnd(6));
+      if (p.state === "blocked") {
+        // Two causes now (ADR 0034): an unmet `- Depends:` names phase addresses, a phase-level
+        // `- Blocked by:` names a reason instead — blockedBy alone would print "waits " with nothing
+        // after it for the second cause.
+        const cause = p.blockedBy.length ? p.blockedBy.join(", ") : (p.blockedReason ?? "");
+        return `${indent}${p.addr.padEnd(14)} ${count} ${chalk.red("⛔ waits " + cause)}`;
+      }
       const next = p.next ? chalk.dim("→ ") + String(p.next).slice(0, 68) : chalk.dim("→ (no open task)");
       return `${indent}${p.addr.padEnd(14)} ${count} ${next}`;
     };
@@ -97,7 +108,7 @@ export class DocsStatusCommand implements ConducksCommand {
       }
       console.log(chalk.bold("\n  All todos"));
       for (const t of board.todos) {
-        console.log(`  ${t.id.padEnd(8)} ${String(t.overallPct).padStart(3)}%  ${chalk.dim(t.done + "/" + t.total)}  ${t.state || "—"}`);
+        console.log(`  ${t.id.padEnd(8)} ${String(t.overallPct).padStart(3)}%  ${chalk.dim(countOf(t))}  ${t.state || "—"}`);
       }
       console.log();
     }
@@ -138,6 +149,6 @@ export class DocsStatusCommand implements ConducksCommand {
 }
 
 interface PhaseRow {
-  addr: string; done: number; total: number; next: string | null;
-  state: string; blockedBy: string[]; builds: string[];
+  addr: string; done: number; total: number; deferred: number; next: string | null;
+  state: string; blockedBy: string[]; blockedReason: string | null; builds: string[];
 }

@@ -1,5 +1,6 @@
 # todo07 — workspace rollout: run conducks on the drifting repos
-Status: todo
+Status: blocked
+- Blocked by: out of scope for this session — every task targets other repositories (mycvpath, orchestrator, dual_chatbot, assistant, mentorseed, envoy-mail, growth-ops, Said-Foundation, medical_chatbot_2, interview, unnamed-C-level), not this one; still intended, not dropped
 - Acceptance: conducks analyze + drift + docs-status has run on each active workspace repo, and the drift ledger is live data (not a one-time swarm snapshot)
 
 ## Phase 1 — highest-rot repos first

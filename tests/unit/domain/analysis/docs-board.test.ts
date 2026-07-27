@@ -112,6 +112,45 @@ describe('docs-board — links between docs', () => {
 });
 
 /**
+ * ADR 0034: a phase-level `- Blocked by:` blocks THAT PHASE without needing a `- Depends:` — todo09#P3
+ * is blocked on a network advisory database and 21 of its 24 tasks are not, so the file-level field
+ * alone (the only carrier before this ADR) would mark the whole todo blocked when only one phase is.
+ */
+describe('docs-board — ADR 0034: phase-level `- Blocked by:`', () => {
+  let root: string;
+
+  beforeAll(() => {
+    root = mkdtempSync(path.join(tmpdir(), 'conducks-blockedby-'));
+    mkdirSync(path.join(root, 'docs', 'todos'), { recursive: true });
+    writeFileSync(path.join(root, 'docs', 'todos', 'todo09.md'),
+      '# todo09 — advisories\nStatus: doing\n- Acceptance: it works\n\n' +
+      '## Phase 1 — unrelated work\n- [ ] carry on as normal\n\n' +
+      '## Phase 3 — needs the CVE feed\n- Blocked by: CVE database offline\n- [ ] cannot start\n');
+  });
+
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('blocks the phase carrying `- Blocked by:` and leaves its sibling untouched', () => {
+    const b = buildBoard(root);
+    const phases = b.todos[0].phases;
+    const p1 = phases.find((p: { addr: string }) => p.addr === 'todo09#P1');
+    const p3 = phases.find((p: { addr: string }) => p.addr === 'todo09#P3');
+    expect(p3.state).toBe('blocked');
+    expect(p3.blockedReason).toBe('CVE database offline');
+    expect(p1.state).not.toBe('blocked');
+  });
+
+  it('does not warn `Status: blocked with neither Depends nor Blocked by` when only a phase has one', () => {
+    writeFileSync(path.join(root, 'docs', 'todos', 'todo09.md'),
+      '# todo09 — advisories\nStatus: blocked\n- Acceptance: it works\n\n' +
+      '## Phase 3 — needs the CVE feed\n- Blocked by: CVE database offline\n- [ ] cannot start\n');
+    const b = buildBoard(root);
+    const w = b.warns.find(x => x.file.includes('todo09'));
+    expect(w?.errs.join(' ') ?? '').not.toMatch(/neither an unmet/);
+  });
+});
+
+/**
  * Numbers are per tree (conducks-docs §4): `app` and `admin` may each hold a `todo123` and they are
  * different records, so no collision check is possible. What CAN be wrong is an address — a wrong
  * tree label, or a record that was renamed or moved to `completed/`. Left unchecked, `- [ ] app:todo42`
@@ -210,5 +249,84 @@ describe('tree shape', () => {
     const { errs, warns } = treeShapeLint(root, true);
     expect(errs).toEqual([]);
     expect(warns[0].errs[0]).toMatch(/derived, not authored/);
+  });
+});
+
+/**
+ * Deferring is legal. Deferring your way to "done" is not finishing.
+ *
+ * A todo whose every task is `[>]` owes nothing, so it reads 100% and drops off the open board —
+ * the same "0/0 means nothing to do" ambiguity the empty-phase rule refuses, reached through
+ * deferral instead of prose. It must not close silently.
+ */
+describe('a todo that deferred everything', () => {
+  let root: string;
+  const w = (rel: string, body: string) => {
+    const full = path.join(root, 'docs', rel);
+    mkdirSync(path.dirname(full), { recursive: true });
+    writeFileSync(full, body);
+  };
+
+  beforeAll(() => { root = mkdtempSync(path.join(tmpdir(), 'conducks-deferall-')); });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  const warnsOf = (file: string) =>
+    buildBoard(root).warns.filter(w => w.file === file).flatMap(w => w.errs).join('\n');
+
+  it('warns when every task is deferred and none is complete', () => {
+    w('todos/todo01.md',
+      '# todo01 — all pushed\nStatus: done\n- Acceptance: nothing was built\n\n' +
+      '## Phase 1 — p\n- [>] first — pushed\n- [>] second — also pushed\n');
+    expect(warnsOf('todos/todo01.md')).toMatch(/this is a deferral, not a completion/);
+  });
+
+  it('does NOT warn when real work finished and only the remainder was deferred', () => {
+    w('todos/todo02.md',
+      '# todo02 — shipped most of it\nStatus: done\n- Acceptance: the port exists\n\n' +
+      '## Phase 1 — p\n- [x] built the port\n- [>] the nice-to-have — pushed, low value\n');
+    expect(warnsOf('todos/todo02.md')).not.toMatch(/deferral, not a completion/);
+  });
+
+  it('drops a `[-]` task from the arithmetic entirely, unlike a deferral', () => {
+    w('todos/todo03.md',
+      '# todo03 — one dropped\nStatus: doing\n- Acceptance: it works\n\n' +
+      '## Phase 1 — p\n- [x] done it\n- [-] never doing this — decided against\n');
+    const t = buildBoard(root).todos.find(x => x.id === 'todo03');
+    expect(`${t.done}/${t.total}`).toBe('1/1');
+    expect(t.deferred ?? 0).toBe(0);
+  });
+});
+
+/**
+ * `completed/` is not scanned. So a deferred task filed there is work nobody will ever be shown
+ * again — a silent delete wearing a completion's clothes. Closing must not be the way deferred work
+ * disappears.
+ */
+describe('closing a todo that still holds deferred work', () => {
+  let root: string;
+  const w = (rel: string, body: string) => {
+    const full = path.join(root, 'docs', rel);
+    mkdirSync(path.dirname(full), { recursive: true });
+    writeFileSync(full, body);
+  };
+
+  beforeAll(() => { root = mkdtempSync(path.join(tmpdir(), 'conducks-closedefer-')); });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  const warnsOf = (file: string) =>
+    buildBoard(root).warns.filter(x => x.file === file).flatMap(x => x.errs).join('\n');
+
+  it('warns that completed/ would bury the deferred tasks', () => {
+    w('todos/todo01.md',
+      '# todo01 — shipped, with a remainder\nStatus: done\n- Acceptance: the port exists\n\n' +
+      '## Phase 1 — p\n- [x] built the port\n- [>] the overlay — needs a separate instrumented app\n');
+    expect(warnsOf('todos/todo01.md')).toMatch(/completed\/` is not scanned, so closing this buries them/);
+  });
+
+  it('does not warn when the remainder was dropped rather than deferred', () => {
+    w('todos/todo02.md',
+      '# todo02 — shipped, remainder abandoned\nStatus: done\n- Acceptance: the port exists\n\n' +
+      '## Phase 1 — p\n- [x] built the port\n- [-] the overlay — decided against, no target app\n');
+    expect(warnsOf('todos/todo02.md')).not.toMatch(/buries them/);
   });
 });

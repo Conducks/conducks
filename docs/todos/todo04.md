@@ -18,7 +18,7 @@ Status: doing
 - [x] LC4 — PHP: namespace alias (`use A as B`) resolution, trait method conflict (`insteadof`) capture
 - [x] LC5 — Ruby: metaprogramming patterns (attr_accessor/reader/writer, define_method, method_missing, Rails DSL like belongs_to/has_many/validates)
 - [x] LC6 — C#: LINQ query expressions, delegate declarations, event handler capture
-- [ ] LC7 — Language coverage targets: run Conducks against Go stdlib, a Rust crate (tokio), Spring Boot Java app, Laravel PHP app, Rails Ruby app; verify edge/node ratio > 0.8 for most codebases
+- [>] LC7 — Language coverage targets: run Conducks against Go stdlib, a Rust crate (tokio), Spring Boot Java app, Laravel PHP app, Rails Ruby app; verify edge/node ratio > 0.8 for most codebases — needs five external repos cloned and a network connection, not available in this environment
 
 ## Phase 3 — TIER 8: Differentiation features (Conducks-only capabilities)
 - [x] DF1 — Per-symbol kinetic score as first-class DuckDB columns (blame_age_days, churn_count_90d, entropy_score, last_author) — queryable, joinable
