@@ -50,6 +50,35 @@ export const JAVA_QUERIES = `
     interfaces: (super_interfaces
       (type_list (type_identifier) @heritage_implements))) @isEnum
   
+  ;; --- Type positions (todo10 Phase 4) ---
+  ;; Probed against tree-sitter-java 0.23.5 (node-types.json + a live parse, see docs/memory.md).
+  ;; field/local-var/parameter/method all expose a \`type:\` field; generic args are reached the same
+  ;; way TS reaches them — matched independent of parent, so nested generics resolve at every depth.
+  ;; scoped_type_identifier (java.util.Optional) IS recursive in this grammar (unlike Rust's), so it
+  ;; is anchored to a parent \`type:\`/argument slot rather than captured blanket — a blanket capture
+  ;; would double-emit the partial prefix (e.g. both "java.util.Optional" AND "java.util") as
+  ;; separate targets for the same reference.
+  (field_declaration type: (type_identifier) @pulse_type_target)
+  (field_declaration type: (generic_type (type_identifier) @pulse_type_target))
+  (field_declaration type: (generic_type (scoped_type_identifier) @pulse_type_target))
+  (field_declaration type: (scoped_type_identifier) @pulse_type_target)
+  (local_variable_declaration type: (type_identifier) @pulse_type_target)
+  (local_variable_declaration type: (generic_type (type_identifier) @pulse_type_target))
+  (local_variable_declaration type: (generic_type (scoped_type_identifier) @pulse_type_target))
+  (formal_parameter type: (type_identifier) @pulse_type_target)
+  (formal_parameter type: (generic_type (type_identifier) @pulse_type_target))
+  (method_declaration type: (type_identifier) @pulse_type_target)
+  (method_declaration type: (generic_type (type_identifier) @pulse_type_target))
+  (type_arguments (type_identifier) @pulse_type_target)
+  (type_arguments (generic_type (type_identifier) @pulse_type_target))
+  (type_arguments (scoped_type_identifier) @pulse_type_target)
+  ;; Generic bounds: class Repo<T extends Comparable<T>>
+  (type_bound (type_identifier) @pulse_type_target)
+  (type_bound (generic_type (type_identifier) @pulse_type_target))
+  ;; checked exceptions: throws java.io.IOException
+  (throws (type_identifier) @pulse_type_target)
+  (throws (scoped_type_identifier) @pulse_type_target)
+
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Spring Boot / JAX-RS Route Annotations: @GetMapping("/")
   (annotation

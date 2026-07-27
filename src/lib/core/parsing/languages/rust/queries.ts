@@ -48,6 +48,34 @@ export const RUST_QUERIES = `
     body: (declaration_list
       (function_item name: (identifier) @name) @isMethod))
   
+  ;; --- Type positions (todo10 Phase 4) ---
+  ;; Probed against tree-sitter-rust 0.24.0 (node-types.json + a live parse, see docs/memory.md).
+  ;; Every real type position (field, parameter, let-binding, return type, const/static) exposes a
+  ;; \`type:\` (or \`return_type:\`) field, so each is anchored to its own node instead of a blanket
+  ;; (type_identifier) capture — a blanket capture would also fire on the struct/trait/enum's OWN
+  ;; name node (also a type_identifier), producing a self-referencing edge. generic_type's name and
+  ;; type_arguments' members are matched independent of the parent that holds them, so Vec<HashMap
+  ;; <K, Box<V>>> resolves at every nesting depth via the same two rules.
+  (field_declaration type: (type_identifier) @pulse_type_target)
+  (field_declaration type: (reference_type type: (type_identifier) @pulse_type_target))
+  (parameter type: (type_identifier) @pulse_type_target)
+  (parameter type: (reference_type type: (type_identifier) @pulse_type_target))
+  (let_declaration type: (type_identifier) @pulse_type_target)
+  (let_declaration type: (reference_type type: (type_identifier) @pulse_type_target))
+  (function_item return_type: (type_identifier) @pulse_type_target)
+  (const_item type: (type_identifier) @pulse_type_target)
+  (static_item type: (type_identifier) @pulse_type_target)
+  (pointer_type type: (type_identifier) @pulse_type_target)
+  (generic_type type: (type_identifier) @pulse_type_target)
+  (type_arguments (type_identifier) @pulse_type_target)
+  ;; Trait bounds: fn f<T: Clone + Shape>(...) — each bound is a real type dependency.
+  (trait_bounds (type_identifier) @pulse_type_target)
+  ;; dyn Trait: Box<dyn Shape>
+  (dynamic_type trait: (type_identifier) @pulse_type_target)
+  ;; Scoped type paths (std::fmt::Result) are their own node and NOT recursive the way Java's
+  ;; scoped_type_identifier is — a blanket capture here does not double-count the partial prefix.
+  (scoped_type_identifier) @pulse_type_target
+
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Route Attributes: #[get("/")]
   (attribute_item

@@ -27,6 +27,31 @@ export const CSHARP_QUERIES = `
   
   (namespace_declaration [(identifier) (qualified_name)] @name) @isPackage
   
+  ;; --- Type positions (todo10 Phase 4) ---
+  ;; Probed against tree-sitter-c-sharp 0.23.1 (node-types.json + a live parse, see docs/memory.md).
+  ;; C#'s grammar has no concrete \`type\` wrapper node (it's a hidden supertype) — the \`type:\` field
+  ;; on variable_declaration/parameter/method_declaration(returns)/property_declaration points
+  ;; DIRECTLY at the identifier/generic_name/qualified_name, so each position is anchored to its own
+  ;; field like Rust/Java rather than Python's uniform wrapper. qualified_name (System.Nullable<int>)
+  ;; is captured whole, matching how @source already treats dotted names in this file.
+  (variable_declaration type: (identifier) @pulse_type_target)
+  (variable_declaration type: (generic_name (identifier) @pulse_type_target))
+  (variable_declaration type: (qualified_name) @pulse_type_target)
+  (parameter type: (identifier) @pulse_type_target)
+  (parameter type: (generic_name (identifier) @pulse_type_target))
+  (method_declaration returns: (identifier) @pulse_type_target)
+  (method_declaration returns: (generic_name (identifier) @pulse_type_target))
+  (property_declaration type: (identifier) @pulse_type_target)
+  (property_declaration type: (generic_name (identifier) @pulse_type_target))
+  (type_argument_list (identifier) @pulse_type_target)
+  (type_argument_list (generic_name (identifier) @pulse_type_target))
+  (type_argument_list (qualified_name) @pulse_type_target)
+  ;; Generic constraints: class Repo<T> where T : IComparable<T>
+  (type_parameter_constraint type: (identifier) @pulse_type_target)
+  (type_parameter_constraint type: (generic_name (identifier) @pulse_type_target))
+  ;; Nullable value types: int? -> only meaningful for a named (non-primitive) type
+  (nullable_type type: (identifier) @pulse_type_target)
+
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; ASP.NET / Web API Attribute Routes: [HttpGet("/")]
   (attribute

@@ -19,9 +19,30 @@ export const PYTHON_QUERIES = `
   (function_definition name: (identifier) @name) @isFunction
   
   ;; Heritage: class Child(Parent):
-  (class_definition 
+  (class_definition
     superclasses: (argument_list [(identifier) (attribute)] @heritage))
-  
+
+  ;; --- Type positions (todo10 Phase 4) ---
+  ;; Every annotation position (typed_parameter, typed_default_parameter, variable annotation,
+  ;; return_type) is wrapped in a single grammar node: (type ...). That wrapper is uniform across
+  ;; every position, unlike TypeScript where each position is its own node shape — so one small set
+  ;; of patterns anchored on (type ...) covers parameters, return types, and variable annotations
+  ;; at once. Probed against tree-sitter-python 0.25.0 node-types.json + a live parse (see
+  ;; docs/memory.md): a bare name is (type (identifier)); a dotted name (pkg.Mod) is
+  ;; (type (attribute)); List[str]/Dict[str,int] is (type (generic_type name: (identifier))) with
+  ;; the args reached because each arg is ITSELF wrapped in (type ...), so the same patterns match
+  ;; recursively at every nesting depth without extra rules.
+  (type (identifier) @pulse_type_target)
+  (type (attribute) @pulse_type_target)
+  (type (generic_type (identifier) @pulse_type_target))
+  ;; PEP 604 unions (int | str): the grammar has NO union node for this syntax, it's a plain
+  ;; binary_operator, so only depth-1 operands are captured — 'A | B | C' chains lose the innermost
+  ;; operand (nested binary_operator isn't itself wrapped in 'type'). Documented limit, not a lie:
+  ;; the common 'X | None' / 'X | Y' cases resolve; deep chains under-capture rather than error.
+  (type (binary_operator left: (identifier) @pulse_type_target right: (identifier) @pulse_type_target))
+  (type (binary_operator left: (attribute) @pulse_type_target right: (identifier) @pulse_type_target))
+  (type (binary_operator left: (identifier) @pulse_type_target right: (attribute) @pulse_type_target))
+
   ;; --- Infrastructure (L4: Entry Points & Metadata) ---
   (decorator
     [(call

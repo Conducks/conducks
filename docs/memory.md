@@ -402,3 +402,32 @@
   note or force a directory to exist for documentation's sake.
 - Applies: every such note opens by naming the files it speaks for, so the mapping is stated rather
   than inferred from the folder name. Preserve that opening line when editing one.
+
+## `scoped_type_identifier` recurses in Java and does not in Rust — same capture, opposite shape
+- Gotcha: a blanket `(scoped_type_identifier) @pulse_type_target` is CORRECT for Rust and WRONG for
+  Java. Java's node nests: `java.util.Optional` contains `java.util` as a child `scoped_type_identifier`,
+  so a blanket capture emits BOTH as separate type targets. Measured: `["java.util.Optional",
+  "java.util.Optional", "java.util", …, "java.io.IOException", "java.io.IOException", "java.io"]` from
+  one field and one throws clause. Rust's module path is a separate `scoped_identifier`, so the same
+  blanket pattern there captures each path exactly once.
+- Why: the capture name and the intent are identical across the two languages, so the pattern reads as
+  portable and is not. Copying Rust's working blanket capture onto Java silently doubles every dotted
+  type and invents a target for every package prefix — no error, no warning, just wrong edges.
+- Applies: Java anchors on a parent field (`field_declaration type:`, `type_arguments`, `throws`, …)
+  instead of blanket. `tests/unit/core/languages/type-reference-java.test.ts` asserts
+  `java.util.Optional` IS captured and `java.util` is NOT — that pair is what catches the regression.
+
+## Type positions have no common shape across grammars — probe each one
+- Gotcha: the four grammars express "here is a type" three different ways. Python wraps every
+  annotation position in a uniform `(type …)` node, so one pattern set covers parameters, returns and
+  variables. C#'s `type` is a HIDDEN supertype with no concrete node at all — the `type:` / `returns:`
+  fields point straight at `identifier` / `generic_name` / `qualified_name`, so a `(type …)` pattern
+  matches nothing. Rust and Java need field anchors (`type:`, `returns:`) because a bare
+  `(type_identifier)` also matches the struct or class's OWN declaration name.
+- Why: a query that matches nothing does not error — it yields zero, and the analyzer above it reports
+  nothing forever while looking healthy. This repo has shipped that bug four times (CONDUCKS-13).
+- Applies: Python cannot fully capture PEP 604 unions — `X | Y` is a plain `binary_operator` with no
+  type wrapper, so depth-1 operands resolve and chained `A | B | C` under-captures the inner ones.
+  Known and accepted, not a bug to re-find. Every language's capture is pinned by a
+  `tests/unit/core/languages/type-reference-<lang>.test.ts` asserting a NON-ZERO edge count against
+  the real grammar in a child process.
