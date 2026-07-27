@@ -88,8 +88,26 @@ learn to resolve through a layer. This is the largest schema change the project 
 lands `drift` and `audit --history` as a side effect rather than as separate work — history is not a
 feature bolted on, it is what having more than one layer means.
 
-The pulse must know its commit, its branch, and its resolved target. The watcher must invalidate on
-branch switch, not only on file change — today it would keep serving the previous branch's graph.
+The pulse must know its commit, its branch, and its resolved target.
+
+**`watch` and `monitor` are affected differently, and conflating them would break ADR 0031.**
+
+`conducks watch` is per-project, live, and WRITES. Under layers it only ever writes the `uncommitted`
+layer: a file save is a micro-pulse into the mutable layer, and a commit collapses that layer into a
+new commit-keyed one. Commit layers are immutable, so live watching cannot corrupt the expensive
+data — append-only by construction. It must also invalidate on branch switch rather than only on file
+change; today it would keep micro-pulsing into a graph describing the branch you left.
+
+`conducks monitor` is cross-project, READ-ONLY, and reports (ADR 0031, CONDUCKS-29). It opens each
+registered vault read-only and never analyzes. Branch identity gives it a new freshness dimension it
+cannot currently express: a project whose vault was pulsed on one branch while the checkout is on
+another is not "stale" in the file-hash sense — every hash may match — yet every answer from it is
+wrong. That is a distinct report line, not a variant of the existing staleness count.
+
+What monitor must NOT gain is the ability to fix it. ADR 0031 rejected triggering an analysis on
+finding staleness, because an unattended process that can start a two-minute pulse is a process people
+kill, and a switched-off monitor reports nothing at all. That rejection holds unchanged here: a
+branch mismatch is reported and left, exactly like every other finding it surfaces.
 
 Pulsing an unchecked-out ref reads every file through git. One `git show` per file is process-spawn
 per file and would be unusably slow; it needs `git cat-file --batch` or `git archive` streaming. This

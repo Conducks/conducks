@@ -14,8 +14,10 @@ this project has shipped features nobody measured. Phase 3 does not start until 
 - Builds: 0035
 - [ ] `pulses` records the branch alongside the commit it already records
 - [ ] A read command whose vault was pulsed on a different branch REFUSES and names both branches, rather than answering from the wrong tree
-- [ ] The watcher invalidates on branch switch, not only on file change
+- [ ] `conducks watch` invalidates on branch switch, not only on file change — today it keeps micro-pulsing into a graph describing the branch you left
+- [ ] `conducks monitor` reports a branch mismatch as its own line, distinct from file staleness: every hash can match while every answer is still wrong. REPORT ONLY — it must not pulse to fix it (ADR 0031 rejected that, CONDUCKS-29)
 - [ ] Test: pulse on one branch, switch, assert the refusal fires and names both
+- [ ] Test: a registered project whose vault branch differs from its checkout appears in `monitor` with matching file hashes and a branch-mismatch line
 
 Ships independently and is not thrown away by the layer work. Today switching branch gives
 confidently wrong answers to every question with no warning.
