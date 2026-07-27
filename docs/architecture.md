@@ -1,0 +1,71 @@
+# Architecture — conducks
+
+```mermaid
+flowchart TD
+  contracts[contracts]
+  core_parsing[core/parsing]
+  core_graph[core/graph]
+  core_persistence[core/persistence]
+  domain_analysis[domain/analysis]
+  domain_governance[domain/governance]
+  domain_evolution[domain/evolution]
+  registry[registry]
+  cli[interfaces/cli]
+  mcp[interfaces/tools]
+  web[interfaces/web]
+
+  core_parsing --> contracts
+  core_graph --> contracts
+  core_persistence --> contracts
+  domain_analysis --> core_parsing
+  domain_analysis --> core_graph
+  domain_analysis --> core_persistence
+  domain_analysis --> contracts
+  domain_governance --> core_graph
+  domain_governance --> contracts
+  domain_evolution --> core_graph
+  domain_evolution --> contracts
+  registry --> domain_analysis
+  registry --> domain_governance
+  registry --> domain_evolution
+  registry --> core_graph
+  registry --> core_persistence
+  registry --> contracts
+  cli --> registry
+  mcp --> registry
+  web --> domain_analysis
+  web --> core_graph
+  cli -.->|launcher| web
+```
+
+| node | note |
+|---|---|
+| `contracts` | |
+| `core/parsing` | [modules/core/parsing/MODULE.md](./modules/core/parsing/MODULE.md) |
+| `core/graph` | [modules/core/graph/MODULE.md](./modules/core/graph/MODULE.md) |
+| `core/persistence` | [modules/core/persistence/MODULE.md](./modules/core/persistence/MODULE.md) |
+| `domain/analysis` | [modules/domain/analysis/MODULE.md](./modules/domain/analysis/MODULE.md) |
+| `domain/governance` | [modules/domain/governance/MODULE.md](./modules/domain/governance/MODULE.md) |
+| `domain/evolution` | [modules/domain/evolution/MODULE.md](./modules/domain/evolution/MODULE.md) |
+| `registry` | [modules/registry/MODULE.md](./modules/registry/MODULE.md) |
+| `interfaces/cli` | [modules/interfaces/cli/MODULE.md](./modules/interfaces/cli/MODULE.md) |
+| `interfaces/tools` | [modules/interfaces/tools/MODULE.md](./modules/interfaces/tools/MODULE.md) |
+| `interfaces/web` | |
+
+## Contract
+1. Dependencies run downward only: contracts ← core ← domain ← composition (registry) ← interfaces (cli, mcp, web).
+2. `contracts` imports nothing.
+3. `core` imports contracts only.
+4. `domain` imports core + contracts.
+5. `registry` is the only composition point; it imports domain + core + contracts.
+6. Interfaces never import each other, with two encoded exceptions: `cli → web` (the `mirror` command launches the web server — a launcher edge, not logic coupling) and `web → domain`/`core` directly.
+- Enforced by: tests/unit/domain/governance/layer-contract.test.ts
+
+`conducks guard` evaluates the `layer_boundaries` sentinel rule
+(`src/lib/domain/governance/sentinel-rules.ts:181`) on every run and hard-blocks any upward edge —
+imports and calls, type-only imports included.
+
+The test guards the rule STAYING ON, not just the table being right. That is the failure that
+happened: the contract existed as ADR 0005 plus a disabled rule for months while ~71 illegal edges
+accumulated, true on paper and false in the graph (CONDUCKS-22). It also runs a synthetic `core →
+domain` edge through the real evaluator, so the rule silently no-opping fails the suite too.

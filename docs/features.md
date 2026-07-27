@@ -116,6 +116,10 @@
 - Purpose: Compare structural entropy against a historical baseline and exit non-zero when the codebase has decayed past a threshold the team picks.
 - Intent: Catches architectural regressions, not just failing tests, before they merge — the threshold is the team's tolerance made explicit.
 
+## Layer Contract Enforcement — `conducks guard`
+- Purpose: Hard-block any dependency edge that runs upward across the architecture's layers — contracts → core → domain → composition → interfaces — on every run, catching imports and calls alike, type-only imports included.
+- Intent: A layer contract nobody enforces is a diagram, not a rule. Enforced since 2026-07-25, after routing 74 pre-existing illegal edges through composition to reach a clean baseline (ADR 0005).
+
 ## Graph-Verified Rename — `conducks rename <symbol> <newName>`
 - Purpose: Rename a symbol across every proven caller in one operation, showing the plan before it writes.
 - Intent: Text-based renames miss references and over-match unrelated ones; verifying against the call graph first means the edit set is the one the graph can defend.

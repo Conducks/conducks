@@ -378,3 +378,27 @@
   span and refuses any scope CONTAINED by it. Both the id (`scopedId`) and `parentId` use it — fixing
   only `parentId` leaves the identity wrong. On conducks the remaining "class parented by a method"
   cases are 3 genuinely local types declared inside a method body, which is correct. — todo10#P2
+
+## A module with NO `MODULE.md` is a decision, not a gap — do not complete the set
+- Gotcha: most modules have an authored note under `docs/modules/`; a dozen deliberately have none —
+  `kinetic`, `metrics`, `intelligence`, `federation`, `manifest`, `visual`, `web`, `core/algorithms`,
+  `core/git`, `core/mirror`, `core/utils`, `parsing/providers`, `contracts`. The gap is the answer:
+  each is small or self-describing, so its source already says what a note would.
+- Why: notes are written where intent stops being obvious from the code — never to make the coverage
+  look even. A note added to complete the set restates the source, then drifts from it, and the next
+  reader has two descriptions and no way to tell which is current. The rule is intent, not size: a
+  large obvious module needs none, a ten-line one with a non-obvious reason to exist does.
+- Applies: `docs/modules/`. Add a note when a module's intent stops being obvious, and expect the list
+  above to shrink for that reason only. `docs/architecture.md` leaves the link cell empty for these.
+
+## A "part" with its own note is a unit of intent, not a directory
+- Gotcha: several `MODULE.md` notes speak for a GROUP of flat sibling files rather than a folder, so
+  the note path does not always mirror a real directory — `linkers/` covers `graph/linker*.ts` plus
+  `import-resolver.ts`; `orchestrator/` covers `orchestrator.ts`, `micro-pulse.ts` and `pipeline.ts`;
+  `sentinel/` covers `sentinel*.ts` plus `guard.ts`. Others cover exactly one file (`taxonomy.ts`,
+  `grammar-registry.ts`, `docs-grammar.ts`, `reflector.ts`).
+- Why: a part earns its own note when its intent differs from its parent's, and intent does not follow
+  the folder layout. Splitting by directory instead would either merge two unrelated jobs into one
+  note or force a directory to exist for documentation's sake.
+- Applies: every such note opens by naming the files it speaks for, so the mapping is stated rather
+  than inferred from the folder name. Preserve that opening line when editing one.
