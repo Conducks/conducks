@@ -1,5 +1,5 @@
 # todo10 — finish the type-aware governance pass (ADR 0016 + 0017)
-Status: doing
+Status: done
 - Result: `conducks audit` on conducks is CLEAN — 0 circular dependencies, 0 hub overloads.
   Cross-checked against `madge`: on compiled JS both report 0. `madge` on TS *source* still reports
   3, which is the type-erasure blind spot ADR 0016 describes — conducks is the more accurate of the
@@ -63,5 +63,15 @@ import, so only the return direction can clear it):
       (`readFile -> readSingleFile`, `findNearestTsconfig -> resolve`) against 199 unfiltered cycles,
       so the signal is specific enough to act on. Rendered by `conducks audit`; pinned by
       `tests/unit/domain/governance/mutual-call-tangle.test.ts`
-- [ ] Other languages are type-blind: Python/Rust/Java/C# have no `pulse_type_target` capture, so
-      `isTypeOnly` never fires for them. Either add the captures or document the limit per language
+- [x] Other languages are type-blind: Python/Rust/Java/C# have no `pulse_type_target` capture, so
+      `isTypeOnly` never fires for them. Either add the captures or document the limit per language.
+      Captures ADDED for all four. `reflect` already had a language-agnostic
+      `pulse_type_target -> TYPE_REFERENCE` branch (`reflector.ts:566`), so the whole fix was per
+      language `queries.ts` — nothing outside `core/parsing` changed. Each is pinned by
+      `tests/unit/core/languages/type-reference-<lang>.test.ts`, which compiles the query against the
+      REAL installed grammar in a child process and asserts a NON-ZERO edge count: a query that
+      matches nothing yields zero silently, which is how four earlier features shipped dead
+      (CONDUCKS-13). Verified failable — disabling the captures turns 20 assertions red.
+      Two grammar traps recorded in `memory.md`: Java's `scoped_type_identifier` recurses and Rust's
+      does not, so Rust's blanket capture double-emits every package prefix if copied to Java; and
+      Python cannot fully express PEP 604 chained unions.

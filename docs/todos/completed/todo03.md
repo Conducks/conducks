@@ -1,5 +1,5 @@
 # todo03 — Full Codebase Audit Findings
-Status: doing
+Status: done
 - Acceptance: all TIER 0–5 audit findings (audit-full-2026-06-20, 88 items documented, ~164 total found) fixed or explicitly resolved with a documented correction.
 
 ## Phase 1 — TIER 0: Parse→graph pipeline (blocks all downstream analysis)
@@ -76,7 +76,18 @@ Status: doing
 - [x] C21 — blueprint-generator.ts hardcoded relative path + unsafe JSON.parse — ESM-safe URL resolution + try/catch
 
 ## Phase 5 — TIER 4: Architecture / design
-- [ ] A1 — God Object orchestrator (505 lines, 12+ responsibilities) — needs extraction into GrammarLoader, PulseScheduler, WorkerPool, ReflectionPipeline
+- [x] A1 — God Object orchestrator (505 lines, 12+ responsibilities) — needs extraction into GrammarLoader, PulseScheduler, WorkerPool, ReflectionPipeline.
+      640 lines by the time it was done (it grew) -> **235**. Three collaborators, not the four
+      suggested: `graph-skeleton-builder` (224), `worker-pool` (154), `reflection-pipeline` (163).
+      `GrammarLoader` was two lines delegating to the shared `grammars` singleton — not a class.
+      `PulseScheduler` was refused deliberately: the wave loop threads shared counters through one
+      atomic pulse, so extracting it moves the same code behind an equal-sized parameter list. That
+      is the made-up boundary, and sequencing a pulse is what the orchestrator is FOR.
+      Public surface unchanged — constructor params, `analyze`, `setPersistence`, `resonate` and
+      `context` all identical, and neither `AnalysisService` nor `conducks-core.ts` needed a change.
+      Characterization tests were written FIRST (there were none: the orchestrator had zero direct
+      unit coverage), then one collaborator extracted at a time with typecheck + suite green between
+      each. Pinned by `tests/unit/domain/analysis/orchestrator.test.ts`.
 - [x] A2 — 11 language plugins had inconsistent interfaces — defined ILanguagePlugin, all plugins implement it
 - [x] A3 — src/types/domain.ts had only 1 type, 177 `any` casts elsewhere — moved shared domain types in
 - [x] A4 — `(graph as any).nodes` encapsulation breach x3 — added public accessors on GraphEngine

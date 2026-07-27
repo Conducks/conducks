@@ -1,7 +1,16 @@
 # domain/analysis/orchestrator — the pulse
 
 **Part of:** [domain/analysis](../MODULE.md). Includes `micro-pulse` (single-file re-analysis for the
-watcher) and `pipeline` (topological batching).
+watcher), `pipeline` (topological batching), and three collaborators split out of the orchestrator
+when it reached 640 lines (todo03#P5): `graph-skeleton-builder` (the L0-L3 containment hierarchy,
+built before any file is parsed), `worker-pool` (dispatch to spawned subprocesses, or the main-thread
+fallback when `CONDUCKS_WORKERS=0`), and `reflection-pipeline` (one file's spectrum becoming edges:
+self-import, external boundary, cross-file, per-binding).
+
+The wave loop stayed in `orchestrator.ts` deliberately. Chunking, flush, kinetic-column writes, the
+circuit breaker and the final metadata sync thread shared counters through ONE atomic pulse, so
+splitting them would move the same code behind a parameter list of equal size without reducing
+coupling. Sequencing a full analysis is what this module is FOR; it is not a separable collaborator.
 
 **Responsibility:** sequencing a full analysis. It builds the ecosystem → repository → directory
 skeleton, runs discovery and induction waves across worker threads, and owns the final resolution

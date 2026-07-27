@@ -431,3 +431,19 @@
   Known and accepted, not a bug to re-find. Every language's capture is pinned by a
   `tests/unit/core/languages/type-reference-<lang>.test.ts` asserting a NON-ZERO edge count against
   the real grammar in a child process.
+
+## `@/`-aliased self-imports are not detected — the relative form is fine
+- Gotcha: `isSelfImportSpecifier` (`domain/analysis/reflection-pipeline.ts:21`) compares an
+  extension-stripped file path against the specifier. The RELATIVE branch resolves the specifier
+  first and strips its extension too, so `import './a.js'` inside `a.ts` IS caught. The `@/` branch
+  does not: it compares `rel[1]` (already extension-stripped, e.g. `a`) against
+  `specifier.slice(2)` (raw, e.g. `a.js`), so `import '@/a.js'` inside `src/a.ts` returns false and
+  the self-import is emitted as an ordinary cross-file edge to itself.
+- Why: the two branches look symmetrical and are not, so reading one and assuming the other is the
+  natural mistake — a report on this file initially claimed the relative branch was broken and the
+  alias branch merely similar; measured, it is the reverse. Verified directly: `./a.js` → true,
+  `./a` → true, `@/a` → true, `@/a.js` → **false**.
+- Applies: only bites a codebase that writes `@/` aliases WITH an explicit extension, which is why it
+  has not shown up on conducks itself. Fix is to strip the extension off `specifier.slice(2)` before
+  comparing. Not fixed when found, because it was discovered mid-refactor and a behaviour fix does
+  not belong in a structural change.

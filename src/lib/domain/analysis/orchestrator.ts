@@ -1,47 +1,21 @@
 import { ConducksPipeline } from "@/lib/core/parsing/pipeline.js";
+import { GraphSkeletonBuilder } from "@/lib/domain/analysis/graph-skeleton-builder.js";
+import { WorkerPool } from "@/lib/domain/analysis/worker-pool.js";
+import { ReflectionPipeline } from "@/lib/domain/analysis/reflection-pipeline.js";
 import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
-import { sameFamily } from "@/lib/core/graph/import-resolver.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
-import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/contracts/types.js";
-
-/**
- * A self-import: an import/re-export whose specifier resolves back to its own file — e.g.
- * `export * from './self'` or an `@/alias` pointing at the current file. The resolver often can't
- * bind these (they'd be a self-edge), so they vanish; detect them here so the audit can flag ARCH-4.
- *
- * GENERAL (any language): a RELATIVE specifier is resolved against the file's dir and compared
- * exactly — no heuristic. LANGUAGE-CENTERED (TS/JS convention): the `@/` path alias maps to the
- * project `src/` root; resolve it against the file's own `src/`-relative path and compare exactly.
- * Other languages' alias schemes would add their own branch here (or, better, be pre-resolved by
- * their language plugin's import resolver).
- */
-function isSelfImportSpecifier(specifier: string, filePath: string): boolean {
-  const noExt = (p: string) => p.replace(/\.(tsx?|jsx?|py)$/i, "").replace(/\\/g, "/");
-  const self = noExt(filePath);
-  if (specifier.startsWith(".")) return noExt(path.resolve(path.dirname(filePath), specifier)) === self;
-  if (specifier.startsWith("@/")) {
-    const rel = self.match(/\/src\/(.+)$/);           // TS/JS: @/x === <src>/x
-    return rel ? rel[1] === specifier.slice(2) : false;
-  }
-  return false;
-}
-import type { PrismSpectrum } from "@/types/prism-types.js";
 import { logger } from "@/lib/core/utils/logger.js";
-import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
 import { Worker } from "node:worker_threads";
-import { fork, spawnSync } from "node:child_process";
-import fs from "node:fs";
-import { createRequire } from "node:module";
-import os from "node:os";
+import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +34,9 @@ export class AnalyzeOrchestrator implements ConducksComponent {
   public readonly type = "analyzer";
 
   public context = new AnalyzeContext();
+  private skeletonBuilder = new GraphSkeletonBuilder();
+  private workerPool: WorkerPool;
+  private reflectionPipeline: ReflectionPipeline;
 
   constructor(
     private registry: SynapseRegistry<ConducksComponent>,
@@ -68,7 +45,12 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     private persistence?: SynapsePersistence,
     private reflector: ConducksReflector = new ConducksReflector(),
     private ignoreManager?: IgnoreManager
-  ) { }
+  ) {
+    // Parameter properties (this.registry) are only bound once the constructor body runs, so this
+    // can't be a field initializer above — it would read `this.registry` before assignment.
+    this.workerPool = new WorkerPool(this.registry);
+    this.reflectionPipeline = new ReflectionPipeline(this.registry, this.reflector);
+  }
 
   /**
    * Conducks Re-Anchoring 🛡️
@@ -105,201 +87,14 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     const workspaceRoot: string = options.workspaceRoot || path.resolve(process.cwd());
     const projectRoots: string[] = cliProjectRoots.length > 0 ? cliProjectRoots.map((r: string) => path.resolve(r)) : [workspaceRoot];
 
-    // 1. Create the Unified ecosystem Node (Rank 0)
-    const ecosystemId = "ecosystem::global";
-    this.graph.getGraph().addNode({
-      id: ecosystemId,
-      label: "Ecosystem",
-      properties: {
-        name: path.basename(workspaceRoot),
-        filePath: workspaceRoot,
-        canonicalKind: 'ECOSYSTEM',
-        canonicalRank: 0
-      }
-    });
-
-    // 2. Create repository Nodes (Rank 1)
-    const projectMap = new Map<string, string>(); // filePath -> projectRoot
-    for (const root of projectRoots) {
-      const rootId = path.basename(root).toLowerCase();
-      const repoId = `repository::${rootId}`;
-      this.graph.getGraph().addNode({
-        id: repoId,
-        label: "Repository",
-        properties: {
-          name: path.basename(root),
-          filePath: root,
-          canonicalKind: 'REPOSITORY',
-          canonicalRank: 1,
-          parentId: ecosystemId // Oracle DNA: Hierarchical Link
-        }
-      });
-
-      // Materialize Ecosystem -> Repository Link
-      this.graph.getGraph().addEdge({
-        id: `member::${repoId}->${ecosystemId}`,
-        sourceId: repoId,
-        targetId: ecosystemId,
-        type: 'MEMBER_OF',
-        confidence: 1.0,
-        properties: {}
-      });
-
-      // Populate Project Map for Unit assignment
-      for (const file of normalizedFiles) {
-        if (file.path.startsWith(root) || file.path === root) {
-          const existing = projectMap.get(file.path);
-          if (!existing || root.length > existing.length) {
-            projectMap.set(file.path, root);
-          }
-        }
-      }
-    }
- 
-    // === Phase 0.1: Recursive Directory Population 🏺 ===
-    const directoryIds = new Set<string>();
-    for (const file of normalizedFiles) {
-      let currentDir = path.dirname(file.path);
-      const root = projectMap.get(file.path) || workspaceRoot;
-      const rootId = path.basename(root).toLowerCase();
-      
-      while (currentDir.startsWith(root) && currentDir !== root) {
-        const canonicalDir = canonicalize(currentDir);
-        if (directoryIds.has(canonicalDir)) break;
-        
-        const dirId = `directory::${canonicalDir}`;
-        const parentDir = path.dirname(currentDir);
-        const parentId = parentDir.startsWith(root) && parentDir !== root ? 
-          `directory::${canonicalize(parentDir)}` : 
-          `repository::${rootId}`;
-
-        this.graph.getGraph().addNode({
-          id: dirId,
-          label: "Directory",
-          properties: {
-            name: path.basename(currentDir),
-            filePath: canonicalDir,
-            canonicalKind: 'DIRECTORY',
-            canonicalRank: 2,
-            parentId
-          }
-        });
-
-        // Materialize Directory -> Parent Link
-        this.graph.getGraph().addEdge({
-          id: `member::${dirId}->${parentId}`,
-          sourceId: dirId,
-          targetId: parentId,
-          type: 'MEMBER_OF',
-          confidence: 1.0,
-          properties: {}
-        });
-        
-        directoryIds.add(canonicalDir);
-        currentDir = parentDir;
-      }
-    }
-
-    // Phase 0.2: Legendary Anchor (Taxonomy Guide) 🏺
-    this.graph.getGraph().addNode({
-      id: 'ecosystem::legend',
-      label: 'Legend',
-      properties: {
-        name: 'Structural Legend',
-        canonicalKind: 'ECOSYSTEM',
-        canonicalRank: -1,
-        parentId: 'ecosystem::global'
-      }
-    });
-    this.graph.getGraph().addEdge({
-      id: 'member::legend->global',
-      sourceId: 'ecosystem::legend',
-      targetId: 'ecosystem::global',
-      type: 'MEMBER_OF',
-      confidence: 1.0,
-      properties: {}
-    });
-
-    const layers = [
-      { id: 'L0', name: 'ECOSYSTEM', rank: 0 },
-      { id: 'L1', name: 'REPOSITORY', rank: 1 },
-      { id: 'L2', name: 'DIRECTORY', rank: 2 },
-      { id: 'L3', name: 'UNIT', rank: 3 },
-      { id: 'L4', name: 'INFRA', rank: 4 },
-      { id: 'L5', name: 'STRUCTURE', rank: 5 },
-      { id: 'L6', name: 'BEHAVIOR', rank: 6 },
-      { id: 'L7', name: 'ATOM', rank: 7 },
-      { id: 'L8', name: 'DATA', rank: 8 }
-    ];
-
-    for (const layer of layers) {
-      this.graph.getGraph().addNode({
-        id: `taxonomy::${layer.id.toLowerCase()}`,
-        label: 'Taxonomy',
-        properties: {
-          name: layer.name,
-          canonicalKind: layer.name,
-          canonicalRank: layer.rank,
-          parentId: 'ecosystem::legend'
-        }
-      });
-      this.graph.getGraph().addEdge({
-        id: `member::taxonomy::${layer.id.toLowerCase()}->legend`,
-        sourceId: `taxonomy::${layer.id.toLowerCase()}`,
-        targetId: 'ecosystem::legend',
-        type: 'MEMBER_OF',
-        confidence: 1.0,
-        properties: {}
-      });
-    }
+    // Phase 0 + Pass 1: L0-L3 containment skeleton (ecosystem/repository/directory/unit) and the
+    // taxonomy legend — must exist before a single file is parsed (see graph-skeleton-builder.ts).
+    const projectMap = this.skeletonBuilder.build(this.graph, normalizedFiles, workspaceRoot, projectRoots);
 
     // Adaptive Memory Pressure Calculation
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
     const isLargeProject = normalizedFiles.length > 100;
     const useShallowMode = memoryUsage > 1000 || isLargeProject;
-
-    // === Pass 1: Global Identity Discovery 🏺 ===
-    // We build the entire containment graph before induction.
-    logger.info(`🛡️ [Conducks] [Pass 1] Structural Discovery: Mapping ${normalizedFiles.length} units (Parallel)...`);
-      
-    for (const file of normalizedFiles) {
-        const filePath = canonicalize(file.path);
-        const unitId = `${filePath}::unit`;
-        const projectRoot = projectMap.get(file.path) || workspaceRoot;
-        const rootName = path.basename(projectRoot).toLowerCase();
-        
-        // File -> Parent Directory link
-        const fileDir = path.dirname(file.path);
-        const relativeDir = path.relative(projectRoot, fileDir);
-        const parentId = relativeDir === '' || relativeDir === '.' ? 
-           `repository::${rootName}` : 
-           `directory::${canonicalize(fileDir)}`;
-
-       this.graph.getGraph().addNode({
-         id: unitId,
-         label: "File",
-         properties: {
-           name: path.basename(file.path),
-           filePath: filePath,
-           rawPath: file.path, 
-           projectRelativePath: getProjectRelativePath(file.path, workspaceRoot),
-           canonicalKind: 'UNIT',
-           canonicalRank: 3,
-           parentId,
-           rootId: `repository::${rootName}`
-         }
-       });
-
-        // Materialize Unit -> Directory/Repository Link
-        this.graph.getGraph().addEdge({
-          id: `member::${unitId}->${parentId}`,
-          sourceId: unitId,
-          targetId: parentId,
-          type: 'MEMBER_OF',
-          confidence: 1.0,
-          properties: {}
-        });
-    }
 
     let totalNodes = 0;
     let totalEdges = 0;
@@ -333,7 +128,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       const batchNum = Math.floor(i / CHUNK_SIZE) + 1;
       
       logger.info(`🛡️ [Conducks] Wave ${batchNum}/${totalBatches}: Inducing ${chunk.length} units...`);
-      const inductionResults = await this.runParallelPulse(
+      const inductionResults = await this.workerPool.run(
         chunk,
         false,
         allPaths,
@@ -341,92 +136,14 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       );
 
       for (const res of inductionResults) {
-        if (!res.success || !res.spectrum) continue;
-        
-        const filePath = canonicalize(res.path);
-        const unitId = `${filePath}::unit`;
-        const projectRoot = projectMap.get(res.path) || workspaceRoot;
-        const rootId = `repository::${path.basename(projectRoot).toLowerCase()}`;
-
-        // 3.1 Local Induction (Symbols)
-        this.graph.ingestSpectrum(res.path, res.spectrum, useShallowMode, unitId, rootId);
-
-        // 3.2 Global Neural Binding (Imports -> Units)
-        const provider = this.registry.getProvider(res.path);
-        for (const rel of res.spectrum.relationships) {
-          if (rel.type === 'IMPORTS' && rel.metadata?.isRaw) {
-            const specifier = rel.metadata.specifier;
-            const emitSelfEdge = () => this.graph.getGraph().addEdge({
-              id: `SELF::${unitId}`, sourceId: unitId, targetId: unitId,
-              type: 'IMPORTS', confidence: 1.0, properties: { specifier, selfImport: true }
-            });
-            // Self-import (e.g. `export * from './self'`): emit a durable unit → unit self-edge so
-            // the audit flags it as ARCH-4, and skip normal linkage (it would never bind to self).
-            // Keyed strictly off the SPECIFIER (a relative or `@/` path pointing at this file) — NOT
-            // off resolution, because the fuzzy resolver matches a bare package name (`context`,
-            // `routing`) to a same-named local file and would report a false self-import.
-            if (isSelfImportSpecifier(specifier, filePath)) { emitSelfEdge(); continue; }
-
-            // System 2 (ADR 0012): an external import (stdlib/dependency) is a BOUNDARY. It never
-            // resolves to an in-repo node, and during streaming no ECOSYSTEM node exists yet, so the
-            // old code dropped it entirely — the dependency surface was invisible. Emit a durable
-            // boundary node + a DEPENDS_ON edge tagged with origin/package: the supply-chain surface.
-            const origin = rel.metadata.origin;
-            if (origin && origin !== 'internal') {
-              const pkg = (rel.metadata.package as string | null) || specifier.replace(/^node:/, '');
-              const boundaryId = `ecosystem::${pkg.toLowerCase()}`;
-              if (!this.graph.getGraph().getNode(boundaryId)) {
-                this.graph.getGraph().addNode({
-                  id: boundaryId, label: 'ECOSYSTEM', isShallow: true,
-                  properties: {
-                    name: pkg, filePath: '', canonicalKind: 'ECOSYSTEM', canonicalRank: 0,
-                    origin, package: origin === 'dependency' ? pkg : null, isBoundary: true,
-                  } as any,
-                });
-              }
-              this.graph.getGraph().addEdge({
-                id: `DEP::${unitId}->${boundaryId}`, sourceId: unitId, targetId: boundaryId,
-                type: 'DEPENDS_ON', confidence: 1.0,
-                properties: { specifier, origin, package: rel.metadata.package },
-              });
-              continue;
-            }
-
-            const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
-            // B2 fix: guard both linkage and targetId before accessing fields
-            // Never bind across language families (e.g. a .py import resolving to a .tsx/.go file by basename).
-            if (linkage && linkage.targetId && sameFamily(res.path, linkage.targetId)) {
-              this.graph.getGraph().addEdge({
-                id: `NEURAL::${unitId}->${linkage.targetId}`,
-                sourceId: unitId,
-                targetId: linkage.targetId.includes('::') ? linkage.targetId : `${linkage.targetId}::unit`,
-                type: linkage.type,
-                confidence: 1.0,
-                // isTypeOnly (ADR 0016): erased by the compiler, so excluded from cycle/hub findings.
-                properties: { specifier, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true }
-              });
-            }
-          }
-
-          // Per-binding IMPORTS: file::unit → target_file::unit::bindingName
-          if (rel.type === 'IMPORTS' && rel.metadata?.isRawBinding) {
-            const specifier = rel.metadata.specifier;
-            const bindingName = rel.metadata.bindingName as string;
-            const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
-            if (linkage && linkage.type === 'IMPORTS' && linkage.targetId && sameFamily(res.path, linkage.targetId)) {
-              const fileBase = linkage.targetId.includes('::') ? linkage.targetId.split('::')[0] : linkage.targetId;
-              const targetNodeId = `${fileBase}::${bindingName}`;
-              this.graph.getGraph().addEdge({
-                id: `BIND::${unitId}->${targetNodeId}`,
-                sourceId: unitId,
-                targetId: targetNodeId,
-                type: 'IMPORTS',
-                confidence: 0.9,
-                properties: { specifier, bindingName, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true }
-              });
-            }
-          }
-        }
+        this.reflectionPipeline.apply(res, {
+          graph: this.graph,
+          context,
+          allPaths,
+          projectMap,
+          workspaceRoot,
+          useShallowMode,
+        });
       }
 
       // Flush Chunk to Vault & Clear RAM
@@ -503,128 +220,6 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     logger.info(`🛡️ [Conducks] Structural Resonance Complete. Pulse ${pulseId} is now frozen in the vault.`);
     logger.info(`🛡️ [Conducks] Synapse Reflection: ${totalNodes} Nodes, ${totalEdges} Edges across ${totalBatches} induction waves.`);
     return { pulseId, nodeCount: totalNodes, edgeCount: totalEdges };
-  }
-
-  /**
-   * Runs a parallel pulse across workers.
-   * Optimized for Native Structural Induction. 🛡️ 🔨 🏎️
-   */
-  private async runParallelPulse(
-    files: Array<{ path: string, source: string }>,
-    discoveryMode: boolean,
-    allPaths: string[],
-    globalSymbols?: Record<string, any>
-  ): Promise<any[]> {
-    const unitCount = files.length;
-    if (unitCount === 0) return [];
-
-    const workerScript = isTs
-      ? path.resolve(__dirname, `../../core/parsing/pulse-worker.ts`)
-      : path.resolve(__dirname, `../../core/parsing/pulse-worker.js`);
-
-    let tsxLoader: string | null = null;
-    if (isTs) {
-      try {
-        const require = createRequire(import.meta.url);
-        tsxLoader = require.resolve('tsx');
-      } catch {
-        tsxLoader = 'tsx'; // Fallback
-      }
-    }
-
-    const workerCount = parseInt(process.env.CONDUCKS_WORKERS ?? String(Math.max(1, os.cpus().length - 1)), 10);
-    const skipWorker = workerCount <= 0 || (!isTs && tsxLoader === null);
-    if (!skipWorker) {
-      // NOTE: tsxLoader is null when running compiled JS; tsxLoader! below will throw if workerCount>0 in that mode.
-      const coreCount = workerCount;
-      const chunkSize = Math.ceil(unitCount / coreCount);
-      const results: Array<{ success: boolean; path: string; spectrum?: PrismSpectrum; state?: unknown }> = [];
-
-      for (let i = 0; i < unitCount; i += chunkSize) {
-        const chunk = files.slice(i, i + chunkSize);
-
-        const spawnWorker = async (chunk: string[]) => {
-          return new Promise<any[]>((resolve) => {
-            
-            const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
-            const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
-            
-            fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
-            
-            spawnSync('node', [
-              '--no-warnings',
-              '--import', tsxLoader!,
-              workerScript,
-              tempInput
-            ], {
-              env: { ...process.env, CONDUCKS_WORKER_MODE: 'spawn' },
-              stdio: 'inherit'
-            });
-
-            if (fs.existsSync(tempOutput)) {
-              try {
-                const results = JSON.parse(fs.readFileSync(tempOutput, 'utf8'));
-                fs.unlinkSync(tempInput);
-                fs.unlinkSync(tempOutput);
-                resolve(results);
-              } catch (e) {
-                resolve([]);
-              }
-            } else {
-              resolve([]);
-            }
-          });
-        };
-
-        const resultChunk = await spawnWorker(chunk as any);
-        results.push(...resultChunk);
-      }
-      return results;
-    }
-
-    // Main thread fallback for debug or small batches
-    const reflector = new ConducksReflector();
-    const results = [];
-    const providerMap = new Map<string, any>();
-    const loadedGrammars = new Set<string>();
-    
-    for (const file of files) {
-      try {
-        const ext = path.extname(file.path);
-        let provider = providerMap.get(ext);
-        if (!provider) {
-          provider = this.registry.getProvider(file.path);
-          if (provider) providerMap.set(ext, provider);
-        }
-
-        if (!provider) {
-          results.push({ success: false, path: file.path });
-          continue;
-        }
-
-        // Load native grammar if not already loaded for this langId
-        const langId = provider.langId;
-        if (langId && !loadedGrammars.has(langId)) {
-          await grammars.loadLanguage(langId);
-          loadedGrammars.add(langId);
-        }
-
-        const context = new AnalyzeContext();
-        if (discoveryMode) context.setDiscoveryMode(true);
-        if (globalSymbols) {
-          for (const [id, sym] of Object.entries(globalSymbols)) {
-            context.registerGlobalSymbol(id, sym);
-          }
-        }
-
-        const res = await reflector.reflect(file, provider, context, allPaths);
-        results.push({ path: file.path, spectrum: res, state: context.exportState(), success: true });
-      } catch (err) {
-        console.error(`🛡️ [MainThread Error] ${file.path}:`, err);
-        results.push({ success: false, path: file.path });
-      }
-    }
-    return results;
   }
 
   /**
