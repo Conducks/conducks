@@ -228,6 +228,11 @@
 - Purpose: Keep structural extraction producing CALLS and IMPORTS edges when a Tree-sitter grammar cannot load in a given environment.
 - Intent: Precision is worth trading for a graph that still has edges — an environment-specific grammar failure should cost accuracy, not the whole language.
 
+## Language Extraction — built by `conducks analyze`
+
+- Purpose: Thirteen language front-ends (C, C++, C#, Go, Java, JavaScript, PHP, Python, Ruby, Rust, Swift, TypeScript, TSX), each capturing the constructs that carry that language's structure rather than a shared lowest common denominator — Go goroutines and channels as spawner-to-spawned edges, Rust lifetimes and trait impls as IMPLEMENTS and CONSTRAINS, Swift property wrappers and protocol conformance, PHP namespace aliases and `insteadof` trait conflicts, Ruby metaprogramming and Rails DSL (`attr_accessor`, `define_method`, `belongs_to`), C# LINQ and delegates.
+- Intent: A graph that only understands functions and imports says the same thing about every codebase. What a Rails app IS lives in its DSL, and what a Go service IS lives in its concurrency, so a per-language capture is the difference between a call graph and a description.
+
 ## Tunables
 
 | knob | default | file:line | effect |
