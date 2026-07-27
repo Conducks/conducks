@@ -1,5 +1,6 @@
 # 0009 — hard/soft docs, architecture file-or-folder, uninstall symmetry
 Status: Accepted
+- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts (soft-default, architecture file-or-folder); tests/unit/domain/federation/installer-scope.test.ts ("uninstall clears every scope that has them and leaves foreign skills alone")
 - Amended by: 0015 (architecture reclassified from "derived" to AUTHORED)
 - Date: 2026-07-18
 

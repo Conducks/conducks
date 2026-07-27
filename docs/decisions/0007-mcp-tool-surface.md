@@ -1,5 +1,6 @@
 # 0007 — MCP tool surface: parity with CLI analysis, no speculative tools
 Status: Accepted
+- Enforced by: tests/unit/domain/analysis/coverage-bind.test.ts (shared coverage-bind.ts module); symbol `conducks_docs`/`conducks_coverage` tool registrations (src/interfaces/tools/tools/synapse.ts:722,820)
 - Date: 2026-07-18
 - Promoted: docs/architecture/modules/interfaces/tools/MODULE.md (Boundaries — parity with the CLI, no speculative tools)
 

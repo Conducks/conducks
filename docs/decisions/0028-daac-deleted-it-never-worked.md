@@ -1,6 +1,7 @@
 # 0028 — DAAC is deleted: it was never a working capability, and its test proved the bug instead of the behaviour
 
 Status: Accepted
+- Enforced by: tests/unit/adr-invariants.test.ts (no daac module anywhere under src/, and the replacement `mirror.engine.ts` still there)
 - Amends: 0026
 - Date: 2026-07-26
 - Promoted: docs/memory.md (the corrected claim, and the fixture-shaped-to-the-bug trap)

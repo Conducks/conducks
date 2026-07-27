@@ -1,5 +1,6 @@
 # 0011 — kill derived-doc generation; structure is queried, never written
 Status: Accepted
+- Enforced by: tests/unit/adr-invariants.test.ts (no context-gen/blueprint/visualize command or generator module returns)
 - Amended by: 0019 (extends the ban to hand-authored derived docs — the ADR index)
 - Date: 2026-07-19
 - Promoted: docs/features.md ("Integrity Blueprint — `conducks status --blueprint`" — stdout-only, never persisted); docs/architecture/modules/domain/analysis/docs-grammar/MODULE.md

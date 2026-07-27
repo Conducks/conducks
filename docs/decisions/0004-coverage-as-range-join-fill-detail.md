@@ -1,5 +1,6 @@
 # 0004 — Coverage as a range-join onto node line-spans, shown as fill detail
 Status: Accepted
+- Enforced by: tests/unit/domain/analysis/coverage-bind.test.ts
 - Date: 2026-07-17
 - Promoted: docs/architecture/modules/domain/analysis/coverage/MODULE.md ("Coverage is a range-join, not a lookup")
 

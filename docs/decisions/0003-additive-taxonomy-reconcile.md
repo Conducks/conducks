@@ -1,5 +1,6 @@
 # 0003 — Additive taxonomy reconcile (PACKAGE/STATEMENT/BRANCH/DIRECTORY)
 Status: Accepted
+- Enforced by: tests/unit/adr-invariants.test.ts (every established kind still present, its name still its value; adding a kind is allowed)
 - Amended by: 0012 (this ADR recorded only the *additions*, omitting that they diverged from the original 9-kind design — ATOM was meant to be a cross-cutting attribute, not a first-class kind)
 - Date: 2026-07-17
 

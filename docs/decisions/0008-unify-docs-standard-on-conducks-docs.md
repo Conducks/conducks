@@ -1,5 +1,6 @@
 # 0008 — unify the docs standard on conducks-docs; retire docs-rules
 Status: Accepted
+- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts
 - Date: 2026-07-18
 
 ## Context

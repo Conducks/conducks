@@ -1,5 +1,6 @@
 # 0002 — Three-layer dependency stack, downward-only imports
 Status: Accepted
+- Enforced by: tests/unit/domain/governance/layer-contract.test.ts (downward-only import shape, now the 5-layer contract of ADR 0005 that subsumes this rule)
 - Date: 2026-07-17
 
 ## Context

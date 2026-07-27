@@ -51,11 +51,8 @@ Status: current
    session's sandbox — and it was untracked and gitignored, so git cannot restore it:
    `rm -rf "/private/tmp/claude-501/-Users-saidmustafasaid-Documents-Gospel-Of-Technology-CONDUCKS/2cfa8148-8594-4d7c-89e0-641b2043dcb7/scratchpad/legacy-removed-2026-07-26"`
    Do it once you are satisfied with the 7 ported suites.
-3. **todo19** — a command that needs no graph should not boot one. `monitor`, `docs-status` and
-   `docs-lint` all still pay `registry.initialize()`. Surfaced by this work, deliberately not fixed in
-   it: it changes the CLI's init contract.
-4. **todo10#P2 / todo10#P4** and **todo03** are the remaining decision-linked work.
-5. **Scratch artefacts from this session** live in the same scratchpad: a synthetic 1200-file repo
+3. **todo10#P2 / todo10#P4** and **todo03** are the remaining decision-linked work.
+4. **Scratch artefacts from this session** live in the same scratchpad: a synthetic 1200-file repo
    (`bigrepo/`) used for the hash-gate measurement, and the probe scripts behind every number quoted
    in ADRs 0028 and 0030-0032. Disposable — the numbers are recorded in the ADRs and `memory.md`.
 

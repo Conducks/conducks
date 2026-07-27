@@ -1,5 +1,6 @@
 # 0001 — Derive structure, author intent
 Status: Accepted
+- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts ("keeps map/drift/progress as derived — query it, never author it")
 - Date: 2026-07-17
 
 ## Context
