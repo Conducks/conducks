@@ -3,6 +3,7 @@ import { registry } from "@/registry/index.js";
 import { ensureAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 import { buildTrees, agentView } from "@/lib/domain/analysis/docs-board.js";
+import { buildFilterQuery, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
@@ -60,6 +61,11 @@ AFTER THIS: Use conducks_explain to analyze risk or conducks_trace to trace exec
 Modes:
 - fuzzy (default): Natural language or partial name matching.
 - template: Execute named Oracle Standard SQL templates (e.g., 'find_usages', 'hotspots', 'dead_code').
+- filter: Typed filter object -> parameterised SQL, no raw SQL surface. Pass \`filter\`:
+  { conditions: [{ field, operator, value }], limit? }. field must be one of the allowed
+  node columns (e.g. canonicalKind, risk, file, name); operator is one of eq|neq|gt|gte|lt|lte|
+  like|in; value is bound as a parameter, never interpolated. Unknown fields/operators are
+  rejected, not passed through. Results capped at 20 rows to stay under the response budget.
 
 Returns:
 - symbols: matching nodes ranked by gravity with entry points prioritized
@@ -74,18 +80,55 @@ Returns:
       type: "object",
       properties: {
         q: { type: "string", description: "Symbol name, pattern, or search concept (for fuzzy mode)." },
-        mode: { type: "string", enum: ["fuzzy", "template"], default: "fuzzy", description: "Query modality." },
+        mode: { type: "string", enum: ["fuzzy", "template", "filter"], default: "fuzzy", description: "Query modality." },
         template: { type: "string", description: "The named Oracle template to execute (for template mode)." },
         params: { type: "object", description: "Parameters for the Oracle template (as a JSON object)." },
+        filter: {
+          type: "object",
+          description: "Typed filter object for filter mode: { conditions: [{ field, operator, value }], limit? }.",
+          properties: {
+            conditions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  field: { type: "string", description: "Node column to filter on (e.g. canonicalKind, risk, file, name)." },
+                  operator: { type: "string", enum: ["eq", "neq", "gt", "gte", "lt", "lte", "like", "in"] },
+                  value: { description: "Value to compare against. Array of strings/numbers for operator 'in'." }
+                },
+                required: ["field", "operator", "value"]
+              }
+            },
+            limit: { type: "number", minimum: 1, maximum: 20, description: "Max results (default 10, max 20)." }
+          }
+        },
         // MCP1: numeric bounds
         limit: { type: "number", default: 10, minimum: 1, maximum: 500, description: "Max results to return." },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ q, mode, template, params, limit, path: customPath }: any) => {
+    handler: async ({ q, mode, template, params, filter, limit, path: customPath }: any) => {
       try {
         await ensureAnchor(customPath, true);
+
+        // 0. [Mode: Filter] Typed filter object -> parameterised SQL. No raw SQL surface: field
+        // names and operators are validated against fixed allowlists in filter-builder.ts, and
+        // every value is bound as a `?` parameter — never interpolated into the query text.
+        if (mode === 'filter') {
+          let compiled: { sql: string; params: unknown[] };
+          try {
+            compiled = buildFilterQuery(filter as QueryFilter);
+          } catch (validationErr: any) {
+            if (validationErr instanceof FilterValidationError) {
+              return mcpErr('INVALID_FILTER', validationErr.message, 'Check field names against the allowed list and operator against eq|neq|gt|gte|lt|lte|like|in.', false);
+            }
+            throw validationErr;
+          }
+          const rows = await (registry.infrastructure.persistence as any).query(compiled.sql, compiled.params);
+          const appliedLimit = Math.min(Math.max(1, filter?.limit ?? FILTER_DEFAULT_LIMIT), FILTER_MAX_LIMIT);
+          return mcpOk({ filter, symbols: rows }, { nodeCount: rows.length, truncated: rows.length >= appliedLimit });
+        }
 
         // 1. [Mode: Templates] Discovery - Lists available Oracle queries
         if (mode === 'template' && !template) {

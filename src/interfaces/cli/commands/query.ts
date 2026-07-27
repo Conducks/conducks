@@ -1,14 +1,15 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
+import { buildFilterQuery, FilterValidationError, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 
 /**
  * Conducks — Query Command
  */
 export class QueryCommand implements ConducksCommand {
   public id = "query";
-  public description = "Search code (use --mode template --template <id> for Oracle patterns)";
-  public usage = "conducks query <pattern> [--mode fuzzy|template] [--template <id>] [--limit <n>] [--json]";
+  public description = "Search code (use --mode template --template <id> for Oracle patterns, or --mode filter --filter <json>)";
+  public usage = "conducks query <pattern> [--mode fuzzy|template|filter] [--template <id>] [--filter <json>] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const modeIdx = args.indexOf('--mode');
@@ -17,16 +18,60 @@ export class QueryCommand implements ConducksCommand {
     const templateIdx = args.indexOf('--template');
     const templateId = templateIdx !== -1 ? args[templateIdx + 1] : null;
 
+    const filterIdx = args.indexOf('--filter');
+    const filterJson = filterIdx !== -1 ? args[filterIdx + 1] : null;
+
     const limitIdx = args.indexOf('--limit');
     const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10;
 
     const useJson = args.includes('--json');
 
-    const query = args.filter(a => !a.startsWith('--') && a !== mode && a !== templateId && a !== String(limit)).join(" ");
+    const query = args.filter(a => !a.startsWith('--') && a !== mode && a !== templateId && a !== filterJson && a !== String(limit)).join(" ");
 
     await syncGraph(registry);
 
-    if (mode === 'template' && templateId) {
+    if (mode === 'filter') {
+      if (!filterJson) {
+        console.error('Mode "filter" requires --filter \'{"conditions":[...]}\' (a typed filter object as JSON).');
+        process.exit(1);
+        return;
+      }
+
+      let filter: QueryFilter;
+      try {
+        filter = JSON.parse(filterJson);
+      } catch {
+        console.error('Invalid --filter JSON.');
+        process.exit(1);
+        return;
+      }
+
+      try {
+        const { sql, params } = buildFilterQuery(filter);
+        const rows = await (registry as any).infrastructure.persistence.query(sql, params);
+
+        if (useJson) {
+          process.stdout.write(JSON.stringify(rows, null, 2) + '\n');
+          return;
+        }
+
+        console.log(`\n\x1b[1m--- Filtered Query ---\x1b[0m`);
+        if (rows.length === 0) {
+          console.log("No structural matches found for this filter.");
+          return;
+        }
+        rows.forEach((r: any) => {
+          console.log(`\x1b[36m${r.name}\x1b[0m [${r.canonicalKind || '?'}] - \x1b[2m${r.file || ''}\x1b[0m`);
+        });
+      } catch (err) {
+        if (err instanceof FilterValidationError) {
+          console.error(`Filter Error: ${err.message}`);
+        } else {
+          console.error(`Filter Error: ${(err as Error).message}`);
+        }
+        process.exit(1);
+      }
+    } else if (mode === 'template' && templateId) {
       try {
         const params = query ? query.split(" ").filter(p => p.length > 0) : [];
         const results = await registry.analyze.query.execute(templateId, params, limit);
