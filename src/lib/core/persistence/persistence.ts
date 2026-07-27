@@ -364,7 +364,13 @@ export class SynapsePersistence {
         await this.run(`INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`, [key, String(value)]);
       }
       await this.run(`INSERT OR REPLACE INTO pulses (id, timestamp, commitHash, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?, ?)`, [
-        pulseId, Date.now(), headHash, options.nodeCount || graph.nodeCount(), options.edgeCount || graph.edgeCount(), JSON.stringify(Object.fromEntries(metadata))
+        // `stats` is a GETTER on ConducksAdjacencyList — there is no nodeCount()/edgeCount() method,
+        // and calling one threw for every caller that omitted the counts. That was the watcher: both
+        // its auto-pulse and its writer save() call sites pass no options, so every incremental save
+        // died with "graph.nodeCount is not a function", got logged by the watcher's catch, and the
+        // delta was never written to the vault. The two callers that pass counts explicitly never hit
+        // this line, which is why it survived.
+        pulseId, Date.now(), headHash, options.nodeCount ?? graph.stats?.nodeCount ?? 0, options.edgeCount ?? graph.stats?.edgeCount ?? 0, JSON.stringify(Object.fromEntries(metadata))
       ]);
       await this.run(`COMMIT`);   // publishes the pulse (owned tx, or the big inPulse tx)
       this.inPulse = false;
