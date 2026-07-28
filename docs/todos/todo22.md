@@ -29,4 +29,4 @@ are the same shape at the level of the gates themselves.
 - [ ] `AuditResult.status` declares `INSUFFICIENT_DATA` at `audit-service.ts:90` and never returns it, so the branch at `audit.ts:30` is unreachable. It becomes reachable only when drift works (todo20#P4) — until then it is dead code that reads as handled
 
 ## Phase 4 — 0035 has a consequence no phase claims
-- [ ] ADR 0035 states that a project without git degrades to today's conducks: one flat graph, no layers, nothing broken. The only task proving it is `todo21.md:44`, which sits under a phase tagged `- Builds: 0036`. So the consequence has no phase claiming its own ADR. Move it, or add one — an ADR whose consequences nobody carries reports as built when it is not
+- [x] ADR 0035 states that a project without git degrades to today's conducks: one flat graph, no layers, nothing broken. The only task proving it sat in todo21 under a phase tagged `- Builds: 0036`, so 0035 had a consequence no phase claimed. Moved into `todo20#P2`, which builds 0035

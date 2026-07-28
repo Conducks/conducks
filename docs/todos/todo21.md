@@ -41,7 +41,6 @@ rows in 235 MB is real and is a DISK problem (Phase 4).
 - Builds: 0036
 - [ ] A watcher attaches to a SESSION using a project, and dies with it. Being in `~/.conducks/projects.json` never causes a watcher
 - [ ] Inactive projects are asked, not watched: `stat` on `.git/HEAD` and `.git/index`. Two syscalls per project, no filesystem watcher, no background hash scan
-- [ ] A project with NO git degrades to today's conducks — hash scan on access, one flat graph, no layers. Not a broken mode
 - [ ] Test: twenty registered projects and one open session creates exactly one watcher
 
 ## Phase 3 — merge the surfaces

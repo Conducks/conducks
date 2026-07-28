@@ -27,6 +27,7 @@ confidently wrong answers to every question with no warning.
 - [ ] Resolve a branch's target from the upstream tracking ref (`branch.<name>.merge`), falling back to `git merge-base`
 - [ ] When neither resolves, say so and refuse — no defaulting to `main`
 - [ ] Test: a branch off a non-main parent resolves to that parent, and an unresolvable target refuses instead of guessing
+- [ ] A project with NO git answers every question it answers today: hash scan on access, one flat graph, no layers, no drift. ADR 0035 states this and no phase claimed it — it sat in todo21 under a phase building 0036, so 0035 reported a consequence nobody carried. Test: a directory with no `.git` pulses, queries and lints exactly as it does now
 
 ## Phase 3 — commit-keyed layers
 - Builds: 0035
