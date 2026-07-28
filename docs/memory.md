@@ -532,3 +532,15 @@
   `DELETE` + `INSERT ... FROM range(n)` reaches in 1.2, and the first version of this test made the
   whole unit suite 16x slower (22s to 352s) for no extra coverage. What is under test is what DuckDB
   does with deleted row versions, not how rows are handed to it.
+
+## Six concurrent MCP tool calls race the vault connection — "Database was already closed"
+- Gotcha: firing several `tools/call` requests at one MCP server without waiting for each reply
+  produces `❌ Database was already closed` on some of them, and different ones each run. Sequential
+  calls — which is how a real client drives stdio MCP — all succeed. So a probe that fans out will
+  blame whatever code it is testing for a fault it created itself.
+- Why: the read-only path closes the persistence after each load, and a second call arriving mid-close
+  finds the handle gone. This is NOT the same as the pulse lock in `todo21#P0` (that is one writer
+  excluding readers across PROCESSES); this is concurrent calls inside ONE server.
+- Applies: cost me a wrong diagnosis while working `todo21#P5` — a reverted change looked broken
+  because the probe was concurrent. Drive MCP probes one request at a time, awaiting each reply,
+  before concluding anything about the code under test.
