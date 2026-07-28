@@ -596,3 +596,18 @@
   actually reads saves 10 ms and no memory. The four `JSON.parse` calls per node (`metadata`,
   `kinetic`, `dna`, `signature`) cost 5.5 MB against 0.7 MB held as raw strings — a real 8x on that
   slice, and still a small share of the total.
+
+## The loaded graph retains 21 MB — the other ~180 MB is V8 arena, not a data-structure problem
+- Gotcha: `load()` leaves RSS at ~199 MB on this repo's 2,402 nodes and 12,697 edges, and the
+  intuitive conclusion — that the in-memory shape is wasteful — is wrong. Force two GCs after a
+  load: heap goes 53 MB → **21 MB** while RSS does not move. The graph RETAINS 21 MB. The rest is
+  arena V8 grew to hold transient garbage during the load and has not returned to the OS.
+- Why: it invalidates every representation rewrite before someone spends a week on one. Measured,
+  not assumed: `Set<Edge>` versus `Array<Edge>` for both edge indexes is 1.8 MB against 1.7 MB —
+  the adjacency structures are not the cost. Narrowing `SELECT *` to the 18 columns `load()` reads
+  saves 10 ms and no memory. A typed-array rewrite would target the 21 MB and could not reach the
+  ~180 MB that is the real figure.
+- Applies: the only levers that work are not loading at all (ADR 0038's deferral, `statusFromVault()`)
+  and reducing transient garbage. Streaming rows into the graph instead of materialising them first
+  measured 111 MB peak → 98 MB, but `db.each`'s completion callback never fires in duckdb 1.4.4 and
+  `load()` hangs — use the `stream()` async-iterator API if you pick this up (`todo21#P5`).

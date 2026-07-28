@@ -65,5 +65,9 @@ traversals as recursive CTEs was dropped for this reason: the neighbourhood at t
 the graph (1,976 of 2,402 nodes at depth 3), so SQL would read the same rows and add a second set of
 native buffers.
 
-`Open:` what replaces object-per-node plus Maps. Typed arrays with an id→index table is the
-candidate. It is a larger job than the conversions above and is carried by `todo21#P5`.
+`Open:` what replaces object-per-node plus Maps — ANSWERED 2026-07-28, nothing does. Measured after
+this record was written: the loaded graph retains 21 MB of heap (53 MB before a forced GC, 21 MB
+after, with RSS unmoved at 199 MB), so the ~180 MB gap is V8 arena grown for transient garbage and
+never returned, not a data-structure cost. `Set` versus `Array` for both edge indexes is 1.8 MB
+against 1.7 MB. A typed-array rewrite would target the 21 MB and could not reach the rest. Recorded
+in `memory.md`; `todo21#P5` carries the one remaining lever, streaming rows during load.
