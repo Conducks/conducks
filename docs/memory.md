@@ -579,3 +579,20 @@
   now uses. The in-memory `status()` is still wrong for any caller that loaded from a vault rather
   than having just analyzed — if anything else starts depending on graph-level metadata after a
   load, restore the table in `load()` rather than working around it a second time.
+
+## The graph's memory is V8 arena growth, NOT the rows — so SQL traversal does not fix it
+- Gotcha: loading 2,402 nodes and 12,697 edges costs ~130 MB, and the intuitive fixes do not touch
+  it. Attributed step by step (rss/heap): baseline 58/6 → vault open 73/6 → `SELECT * FROM nodes`
+  105/16 → `SELECT * FROM edges` 113/26 → **addNode all 173/29** → addEdge all 188/44. The jump is
+  `addNode`: +60 MB RSS against +3 MB heapUsed, so it is V8 arena growth plus adjacency-list Map
+  overhead. DuckDB's own result buffers are ~37 MB more.
+- Why: it kills the obvious plan. Rewriting impact/trace/flows as recursive CTEs reads the SAME rows
+  — the neighbourhood at the default depth IS the graph, 1,976 of 2,402 nodes at depth 3 — and adds
+  a second set of native result buffers. `analyzeImpact` is weighted Dijkstra rather than BFS, so
+  the rewrite also risks quiet disagreement, for a win that was never there. Measured before
+  writing any of it.
+- Applies: what DOES help is not materialising at all (deferral, `statusFromVault()`), or a leaner
+  representation than object-per-node plus Maps. Narrowing `SELECT *` to the 18 columns `load()`
+  actually reads saves 10 ms and no memory. The four `JSON.parse` calls per node (`metadata`,
+  `kinetic`, `dna`, `signature`) cost 5.5 MB against 0.7 MB held as raw strings — a real 8x on that
+  slice, and still a small share of the total.
