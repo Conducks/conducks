@@ -1,4 +1,4 @@
-<!-- description: The documentation standard for every project, single repo or monorepo. Docs hold AUTHORED intent only: features, an architecture graph, per-module notes, conventions, memory, decisions, todos, handover. How code is WIRED (calls, imports, cycles, dead code, coverage) is never written to a file; query it from the conducks graph. Covers which files exist at repo root versus inside each service, per-tree ADR and todo numbering and how addresses cross trees, the exact line grammar the parser reads, and what docs-lint fails on. Use when creating, moving, or reviewing any doc, bootstrapping docs/, writing an ADR or todo, or deciding where a fact goes. -->
+<!-- description: The documentation standard for every project, single repo or monorepo. Docs hold AUTHORED intent only: features, an architecture graph, per-module notes, conventions, memory, decisions, todos, handover. How code is WIRED (calls, imports, cycles, dead code, coverage) is never written to a file; query it from the conducks graph. Covers which files exist at repo root versus inside each service, per-tree ADR and todo numbering and how addresses cross trees, the exact line grammar the parser reads, and what docs-lint fails on. Use when creating, moving, or reviewing any doc, bootstrapping docs/, writing an ADR or todo, or deciding where a fact goes. Reach for this whenever something learned needs to survive the session — a decision made, a trap hit, work to track, a gotcha worth recording — even when the user never says "docs", "ADR" or "todo", and says only "write this down", "make a note of that", "track this", "remember this" or "we decided X". Also use it before editing an existing todo, decision, features, conventions, memory or handover file, because those are grammar-linted and a wrong line fails the build. -->
 
 # conducks-docs
 
@@ -18,6 +18,21 @@ Sections and subsections are numbered so anything can cite one rule: `conducks-d
 the end of a section; never renumber** — a citation that silently points at the wrong rule is worse
 than no citation, and it has happened. (The `###` numbering here is prose structure in this standard.
 Inside a governed doc `###` still opens nothing — §5.1.)
+
+**Where to look.** Most tasks need two or three of these, not the whole file.
+
+| you are about to | read |
+|---|---|
+| decide where a fact goes | §2 |
+| create a docs tree, or add a service | §3 · §3.3 bootstraps it |
+| number an ADR or todo, or reference one across trees | §4 |
+| write any governed line, or debug why lint rejects one | §5 · §5.1 syntax · §5.4 what fails |
+| mark a task done, deferred or dropped | §5.2 |
+| write a todo | §6.7 shape · **§6.8 what a task says** · §6.9 unanswered questions · §6.10 sizing |
+| write an ADR | §6.6 — including where an open question goes |
+| write features, architecture, a MODULE.md, conventions or memory | §6.1–§6.5 |
+| close a todo or accept an ADR | §6.10 "On close" · §8 promote-on-close |
+| run or read the tooling | §7 |
 
 ---
 
@@ -782,13 +797,16 @@ Finished work is absent by design: this is the table, not the history.
 
 ## §8 Rules
 
+The eight that decide arguments. The first five restate a rule from above, deliberately — this is the
+list to re-read when a change feels ambiguous, and each points back at the section holding the detail.
+
 | | rule |
 |---|---|
-| **Promote on close** | A record freezes the why; what is true now moves to a living file the same turn. ADR accepted → rule to `conventions.md`, trap to `memory.md`, capability to `features.md`. Todo done → the ordered steps in §6.10. A living line citing a record is not a duplicate; a second copy of the reasoning is. **If a new session must read a closed record to learn how the system behaves today, the promotion never happened.** |
-| **One docs root per service** | A governed filename outside one is invisible to the tooling. |
-| **Numbers are per tree** | An address crossing a tree carries it: `app:todo123#P2`. See §4. |
-| **Generated output stays out** | Blueprints, dumps, pulse summaries live in `.conducks/`, gitignored. Never author `map.md`, `drift.md` or `progress.md` — all three are derived and classify as unread. A generated `.md` at the repo root outranks authored docs by accident and is stale within a commit. |
-| **Architecture is authored** | A person writes `architecture.md` and every MODULE.md. Wiring is queried. |
+| **Promote on close** (§6.10) | A record freezes the why; what is true now moves to a living file the same turn. ADR accepted → rule to `conventions.md`, trap to `memory.md`, capability to `features.md`. Todo done → the ordered steps in §6.10. A living line citing a record is not a duplicate; a second copy of the reasoning is. **If a new session must read a closed record to learn how the system behaves today, the promotion never happened.** |
+| **One docs root per service** (§3) | A governed filename outside one is invisible to the tooling. |
+| **Numbers are per tree** (§4) | An address crossing a tree carries it: `app:todo123#P2`. |
+| **Generated output stays out** (§6.12) | Blueprints, dumps, pulse summaries live in `.conducks/`, gitignored. Never author `map.md`, `drift.md` or `progress.md` — all three are derived and classify as unread. A generated `.md` at the repo root outranks authored docs by accident and is stale within a commit. |
+| **Architecture is authored** (§6.2) | A person writes `architecture.md` and every MODULE.md. Wiring is queried. |
 | **Code outranks the doc** | Except a doc explicitly marked a **spec**, which decides what the code should do. `docs/product/*.md` are specs; everything else describes. A doc neither marked a spec nor matching the code is wrong — fix it in the change that revealed it. Code comments count as docs. |
 | **`archive/` and `legacy/` are the last stop** | Nothing live links into them. Promote anything still true before moving; the move is one-way. |
 | **One fact, one place** | Derive what can be derived. Where a claim is kept anyway, let lint compare it against the truth and treat the gap as the finding. |
