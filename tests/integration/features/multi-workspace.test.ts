@@ -54,10 +54,13 @@ describe('Multi-workspace domain integration (link)', () => {
     rmRepo(unanalyzed);
   });
 
-  it('BUG: conducks link is unreachable via the real CLI entry point', () => {
-    const { combined, status } = runCli(['link', neighbor], { cwd: host, allowFail: true });
-    expect(status).not.toBe(0);
-    expect(combined).toContain('Unknown command "link"');
+  // Written first as a bug pin: `LinkCommand` was imported and never instantiated, so the command
+  // answered `Unknown command "link"` while FederatedLinker underneath worked. Now inverted to pin
+  // the FIX. A test that asserts a bug still exists fails the moment someone repairs it, which
+  // reads as a regression and is the opposite of what a regression test is for.
+  it('conducks link reaches the real CLI entry point', () => {
+    const { combined } = runCli(['link', neighbor], { cwd: host, allowFail: true });
+    expect(combined).not.toContain('Unknown command "link"');
   });
 
   it('the underlying FederatedLinker DOES work when driven directly — proves this is a wiring bug, not a logic bug', () => {

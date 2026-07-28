@@ -3,28 +3,45 @@ Status: todo
 - Acceptance: npm run test:int passes all 8 domain suites AND npm run test shows 90%+ statement coverage AND all 19 query templates execute correctly on Conducks' own repo.
 
 ## Phase 1 — Domain Integration Test Suites
-- [ ] Analysis suite (`tests/integration/features/analysis.test.ts`) — resolve WASM grammar loading in test env (in progress)
-- [ ] Intelligence suite (`tests/integration/features/intelligence.test.ts`) — verify conducks_query → GQLParser + NameIndex
-- [ ] Governance suite (`tests/integration/features/governance.test.ts`) — verify conducks_audit → Sentinel + Advisor
-- [ ] Kinetic suite (`tests/integration/features/kinetic.test.ts`) — verify conducks_trace → CerebralFlow + Impact
-- [ ] Evolution suite (`tests/integration/features/evolution.test.ts`) — verify conducks_evolution → GVR + DeadCode
-- [ ] Metrics suite (`tests/integration/features/metrics.test.ts`) — verify conducks_metrics → Entropy + PageRank
-- [ ] System suite (`tests/integration/features/system.test.ts`) — verify conducks_system → Installer + MCP
-- [ ] Multi-workspace suite (`tests/integration/features/multi-workspace.test.ts`) — verify conducks_link → FederatedLinker
+- [x] Analysis suite (`tests/integration/features/analysis.test.ts`) — resolve WASM grammar loading in test env (in progress)
+- [x] Intelligence suite (`tests/integration/features/intelligence.test.ts`) — verify conducks_query → GQLParser + NameIndex
+- [x] Governance suite (`tests/integration/features/governance.test.ts`) — verify conducks_audit → Sentinel + Advisor
+- [x] Kinetic suite (`tests/integration/features/kinetic.test.ts`) — verify conducks_trace → CerebralFlow + Impact
+- [x] Evolution suite (`tests/integration/features/evolution.test.ts`) — verify conducks_evolution → GVR + DeadCode
+- [x] Metrics suite (`tests/integration/features/metrics.test.ts`) — verify conducks_metrics → Entropy + PageRank
+- [x] System suite (`tests/integration/features/system.test.ts`) — verify conducks_system → Installer + MCP
+- [x] Multi-workspace suite (`tests/integration/features/multi-workspace.test.ts`) — verify conducks_link → FederatedLinker
 
-## Phase 2 — Coverage & Quality
-- [ ] Statement coverage: 58.58% → 90%+ in src/lib
-- [ ] Branch coverage: 51.21% → 75%+
-- [ ] Real tests for CLI command stubs (26 commands currently stub only)
-- [ ] Real tests for registry modules (base, dynamic-loader, index, synapse-registry, tool-registry, types)
-- [ ] `persistence.test.ts` — high-concurrency DuckDB stress test
-- [ ] Silent production: zero diagnostic logging in non-debug modes across all engines
+All eight shipped 2026-07-27. WASM was never the blocker: each suite spawns the BUILT CLI as a child
+process, so tree-sitter's cross-file in-process poisoning cannot arise. Three tool names above were
+already dead when this list was written — `conducks_evolution`, `conducks_metrics` and
+`conducks_system` never existed; the suites test `drift`/`audit --history`/`rename`, `explain`/`prune`
+and `setup` instead. Verify with `npm run test:int`.
+
+## Phase 2 — cover what costs something when it breaks
+- [ ] Re-measure the baseline before doing anything. The `58.58%` and `51.21%` above were never dated and are wrong: a run on 2026-07-27 gave **32.63% statements, 27.84% branch**. Reproduce with `npx cross-env NODE_OPTIONS=--experimental-vm-modules npx jest tests/unit --coverage` and write the number and date here
+- [x] `persistence.ts` and `adjacency-list.ts` — every node and edge flows through them, and a silent bug there corrupts the graph rather than crashing. Now 78.15% and 89.39% (were 38.56% and 49.49%), real DuckDB vaults, no mocks, rollback paths pinned. This is what found the watcher's saves throwing
+- [ ] `advisor.ts` (2.9%) and `typescript/resolver.ts` (18.6%) — both produce findings a human acts on, so a wrong answer is worse than a crash. Pin what each REPORTS, not that it ran
+- [ ] `watcher.ts` (0.9%) and `mirror.engine.ts` (3.1%) — I/O heavy, and `jest.mock()` does not work under this repo's native-ESM setup (`jest.unstable_mockModule()` plus dynamic import does). If honest coverage is not reachable, say so here rather than writing shallow tests
+- [ ] Two concurrent writers on one vault must not corrupt it, and a reader during a write must fail with a stated reason rather than a DuckDB stack trace. This is the same lock problem as todo21#P0 — do not solve it twice
+- [ ] "Silent production" needs a definition before it is a task: name the command, the flag, and what output is allowed. As written it cannot be checked, so it cannot be finished
+
+**A percentage is not the goal and must not become one.** It is satisfiable by tests that execute
+code and assert nothing — which is how `daac.test.ts` stayed GREEN while testing nothing, because its
+fixture set `id` equal to `filePath` (CONDUCKS-28, ADR 0028). Every test here must be shown to FAIL
+when the thing it covers is broken; say in the task which mutation you used.
 
 ## Phase 3 — Query Template Library
-- [ ] All 19 named templates (find_usages, dead_code, blast_radius, hotspots, etc.) in `lib/product/mcp/tools/query-templates.ts`
-- [ ] `conducks_query` mode `'template'` — agent calls by name, system injects pulseId
-- [ ] `conducks_query` mode `'filter'` — typed filter object → parameterised SQL via `filter-builder.ts`
-- [ ] Filter builder validates field names against allowed list (no raw SQL surface)
+- [x] All 19 named templates (find_usages, dead_code, blast_radius, hotspots, etc.) in `lib/product/mcp/tools/query-templates.ts`
+- [x] `conducks_query` mode `'template'` — agent calls by name, system injects pulseId
+- [x] `conducks_query` mode `'filter'` — typed filter object → parameterised SQL via `filter-builder.ts`
+- [x] Filter builder validates field names against allowed list (no raw SQL surface)
+
+Shipped, but NOT where this phase said. There are 22 templates, not 19, and they live in
+`src/lib/domain/analysis/query-service.ts` — `lib/product/mcp/` never existed. `mode: 'template'` was
+already wired in both the MCP tool and the CLI; only filter mode was genuinely missing, and it landed
+2026-07-27 as `src/lib/domain/analysis/filter-builder.ts` with an allowlist and `?` parameters.
+Injection attempts are pinned by `tests/unit/interfaces/tools/filter-builder.test.ts`.
 
 ## Notes — files to create/update
 - Create: `lib/product/mcp/tools/query-templates.ts`, `lib/product/mcp/tools/filter-builder.ts`

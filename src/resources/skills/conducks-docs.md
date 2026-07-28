@@ -489,6 +489,39 @@ against the checkboxes. Find every slice of an epic with `conducks docs-status`,
 **Never trust a done task without a test that could have failed.** A test with no assertions reads as
 coverage and is worse than none.
 
+### What a task says: the PROBLEM and the PROOF, never the code
+
+A task states what is wrong and how you will know it is fixed. It does not state which lines to
+write. Whoever picks it up can read the code; what they cannot recover is why it is wrong and what
+"done" means.
+
+| write | do not write |
+|---|---|
+| the symptom, and where it bites | a diff, or a file to open and edit |
+| the evidence it is real — a number, a `file:line`, a failing case | a guess dressed as a fact |
+| what proves it fixed | "make it work" |
+| the constraint that rules an approach out | the approach itself, when more than one would do |
+
+```markdown
+❌ In persistence.ts, wrap the setTimeout in a clearTimeout on line 591
+
+✅ Every command that opens a vault hangs ~5s after printing its answer.
+   `close()` races the close against a 5s timeout and never clears the losing
+   timer, so the event loop stays alive. Measured: answer at 451ms, exit at
+   5.5s. Fixed when a command that opens a vault exits in under a second.
+```
+
+The first is worthless six months later, when line 591 is something else. The second still reads
+correctly, still says what to check, and leaves the fix to whoever is holding the code.
+
+**State the evidence, not the hunch.** "The vault seems bloated" is not a task. "The vault holds
+8.76 MB of rows in 235 MB, proven by rewriting it; `VACUUM` and `CHECKPOINT` were each measured and
+neither reclaims" is one — and it stops the next person re-running the same eliminations.
+
+**A task an agent cannot verify is not done, it is claimed.** Every task should name what a reader
+runs to check it. If nothing can be run, say so and say why, rather than leaving the reader to assume
+a test exists.
+
 **A todo may carry a `## Context` section.** `- Acceptance:` is one line and one line cannot describe
 a large job — what it is for, what it rests on, what was ruled out. Put that in a `## Context`
 directly under the fields, before Phase 1. It is prose, it is not a phase, and nothing counts it.
