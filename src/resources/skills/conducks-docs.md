@@ -539,7 +539,7 @@ Status: todo | doing | done | blocked
 ```
 
 **`- Depends:` never crosses trees.** It takes a bare `todoNN#PN` inside its own tree, never a
-qualified `app:todoNN#PN`. Cross-service coupling goes through a root epic (§4) and nowhere else —
+qualified `app:todoNN#PN`. Cross-service coupling goes through a root epic (§6.10) and nowhere else —
 two paths to the same fact would disagree. Reason: an inline cross-tree dep is invisible from the
 other tree, so one side ships without knowing.
 
@@ -739,7 +739,7 @@ Finished work is absent by design: this is the table, not the history.
 
 | | rule |
 |---|---|
-| **Promote on close** | A record freezes the why; what is true now moves to a living file the same turn. ADR accepted → rule to `conventions.md`, trap to `memory.md`, capability to `features.md`. Todo done → the ordered steps in §6. A living line citing a record is not a duplicate; a second copy of the reasoning is. **If a new session must read a closed record to learn how the system behaves today, the promotion never happened.** |
+| **Promote on close** | A record freezes the why; what is true now moves to a living file the same turn. ADR accepted → rule to `conventions.md`, trap to `memory.md`, capability to `features.md`. Todo done → the ordered steps in §6.10. A living line citing a record is not a duplicate; a second copy of the reasoning is. **If a new session must read a closed record to learn how the system behaves today, the promotion never happened.** |
 | **One docs root per service** | A governed filename outside one is invisible to the tooling. |
 | **Numbers are per tree** | An address crossing a tree carries it: `app:todo123#P2`. See §4. |
 | **Generated output stays out** | Blueprints, dumps, pulse summaries live in `.conducks/`, gitignored. Never author `map.md`, `drift.md` or `progress.md` — all three are derived and classify as unread. A generated `.md` at the repo root outranks authored docs by accident and is stale within a commit. |
