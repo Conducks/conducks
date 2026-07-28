@@ -47,7 +47,10 @@ A doc passes when that reader can:
 3. tell current state from intended where they differ — say so: "code does X, we meant Y"
 4. do the next thing, with a `file:line` anchor
 
-Naming a service is not an anchor. `packages/product/finance/FinanceService.ts:132` is.
+Naming a service is not an anchor. `packages/product/finance/FinanceService.ts:132` is. When you do
+not have the line — the source you are writing from named a file and no more — give the file and the
+symbol (`upload-handler.ts::uploadWithRetry`), which survives an edit that a line number would not.
+Do not invent a line number to satisfy the shape.
 
 Write it the turn you decide it: a choice → ADR, a trap → `memory.md`, work → a todo.
 
@@ -553,6 +556,12 @@ todo nor a resolving ADR is a decision that quietly rots: the reader cannot tell
 answered elsewhere or forgotten. That is why the todo is written in the same turn (§1) — a record
 cannot grow the reference later, so there must be something to name while you are still writing.
 
+**When you genuinely cannot write the todo in that turn** — you are scoped to one file, the todo tree
+belongs to another service, or you are reviewing rather than authoring — say so inside the `Open:`
+paragraph: *"no todo carries this yet."* The rule exists to stop questions vanishing silently, and a
+gap someone wrote down is one the next reader can close. Never let the rule push you into inventing a
+todo number that does not exist, which would fail lint and point at nothing.
+
 **`- Builds:` is the one link that is NOT stamped on both ends.** It lives on the todo phase and
 points UP at the ADR; the ADR carries no reciprocal field. The reason is that an ADR is frozen and a
 todo is not — a phase may be added, split or dropped long after the decision, and a frozen record
@@ -674,9 +683,16 @@ WRONG                                          RIGHT
 - [>] ... — deferred pending Phase 0           (no second phase exists yet)
 ```
 
-Phase 0's task carries both candidates and **the threshold that decides between them**, so the
-question is answerable rather than merely open. The winning phase is written when the answer lands —
-which is the same rule as everywhere else here: a record states what is true, not what might be.
+Phase 0's task carries both candidates and, **when one is known, the threshold that decides between
+them** — that is what makes the question answerable rather than merely open. The winning phase is
+written when the answer lands, which is the same rule as everywhere else here: a record states what
+is true, not what might be.
+
+**If you do not have the threshold, say that — never invent one.** "Under 5s at p99" reads as a
+number somebody chose, and the next reader will act on it as if someone did. When nobody has, write
+*"no threshold set yet; this measurement sets it"* and name what the measurement must produce for the
+choice to be makeable. A fabricated threshold is the guess-dressed-as-a-fact §6.8 rules out, and it
+is worse than an admitted gap because it looks decided.
 
 ### §6.10 How to size, group and divide
 
