@@ -447,3 +447,22 @@
   has not shown up on conducks itself. Fix is to strip the extension off `specifier.slice(2)` before
   comparing. Not fixed when found, because it was discovered mid-refactor and a behaviour fix does
   not belong in a structural change.
+
+## DuckDB never reclaims deleted rows — every purge-and-reinsert grows the vault forever
+- Gotcha: `DELETE` + `INSERT` (which is what `purgeUnits()` then re-insert does, and what
+  `INSERT OR REPLACE` compiles to) leaves the old row versions in their row groups permanently.
+  Nothing in DuckDB reclaims them in place: `VACUUM`, `VACUUM ANALYZE`, `CHECKPOINT` and
+  `FORCE CHECKPOINT` were each measured and each left the file byte-identical. The ONLY reclamation
+  is rewriting into a fresh database.
+- Why: the file is a high-water mark of every row ever written, not a picture of the rows that exist.
+  `duckdb_tables().estimated_size` is what exposes it — this vault reported ~284,123 edge rows
+  against 12,694 real, and ~59,469 node rows against 2,373, so 235.51 MB was holding 8.76 MB of data.
+  Reproduced synthetically to be sure it is the mechanism and not a coincidence: 40 cycles of
+  deleting and re-inserting the same 12,000 rows grew the estimate by exactly 12,000 per cycle and
+  the file from 1.01 MB to 6.26 MB — linear, unbounded, with a CHECKPOINT after every cycle.
+- Applies: rewriting the whole vault into a fresh database took **76 ms** for 235 MB, which is cheap
+  enough to run automatically after a pulse rather than as a maintenance command. But reclaiming is
+  only half: the leak is proportional to how many rows each pulse rewrites, so a live watcher doing a
+  micro-pulse per file save leaks continuously. Line-level updates (todo21#P1) are what stop the
+  churn; compaction only mops it up. Note this is invisible to latency — DuckDB opened the bloated
+  235 MB file in 7 ms, the same as the 8.76 MB copy.

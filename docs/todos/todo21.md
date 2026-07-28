@@ -53,12 +53,17 @@ rows in 235 MB is real and is a DISK problem (Phase 4).
 - [ ] Every command answers correctly with NOTHING running. A daemon is an accelerator, never a requirement — CI has no daemon, and a gate that needs one cannot gate a pull request
 
 ## Phase 4 — the vault is 27x its own contents
-- [ ] Reclaim on a schedule: rewriting the vault into a fresh database takes 235.51 MB to 8.76 MB, same rows. Decide WHEN — after a full pulse, on a size ratio, or an explicit `conducks compact`
-- [ ] Find the root cause, or record that it is unknown. Four candidates were measured and ELIMINATED: the data itself (8.76 MB), indexes and primary keys (+2.25 MB), pulse churn (synthetic full-table rewrites stabilise at 1.26 MB and never grow), and the historical peak (6,594 nodes against 2,373 now — under 3x, not 27x). Something else allocates blocks and never returns them
+- [x] ROOT CAUSE FOUND: DuckDB never reclaims deleted row versions. `duckdb_tables().estimated_size` reported ~284,123 edge rows against 12,694 real and ~59,469 node rows against 2,373. Reproduced: 40 cycles of deleting and re-inserting the same 12,000 rows grew the estimate by exactly 12,000 each time and the file 1.01 MB to 6.26 MB, linear and unbounded, with a CHECKPOINT after every cycle. `VACUUM`, `VACUUM ANALYZE`, `CHECKPOINT` and `FORCE CHECKPOINT` each left the file byte-identical. Recorded in `memory.md`
+- [ ] Compact by rewriting into a fresh database and swapping — the only thing that reclaims. Measured at **76 ms** for 235 MB, cheap enough to run after a pulse rather than as a maintenance command. Needs to be crash-safe: write the new file, fsync, rename over the old one
+- [ ] Stop the churn at its source, which is the half compaction cannot fix. Every `purgeUnits()` plus re-insert leaks in proportion to the rows it rewrites, so a live watcher doing a micro-pulse per save leaks continuously. This is Phase 1, and the leak makes it more urgent than its speed argument alone
 - [ ] Eager loading costs 214 ms per command — the whole vault is deserialised before anything is answered. Real, worth removing, and NOT the latency anyone noticed
 
 **This is a DISK problem, not a speed problem, and the difference was measured.** DuckDB opens the
 235 MB file in 7 ms — identical to an 8.76 MB copy of the same rows. Queries are already fast.
+
+**But it grows without bound, which is what makes it more than housekeeping.** The vault is a
+high-water mark of every row ever written. It never shrinks on its own, and every pulse adds to it in
+proportion to the rows it rewrites — so the live engine of ADR 0036 would leak on every file save.
 
 It still matters, for three reasons that have nothing to do with latency: twenty projects at this
 ratio is gigabytes; ADR 0035 layers multiply whatever a vault costs, so content-addressing on a 27x
