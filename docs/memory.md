@@ -482,3 +482,15 @@
   one of the four was done while no todo declared `- Builds: 0034`. Both ADRs read normally on the
   board throughout. Until `todo22#P4` lands, reading an ADR's Consequences against its phases is a
   MANUAL step — do it when an ADR flips to `built`, not after.
+
+## The conducks-docs standard is ungoverned — nothing checks it against the parser it describes
+- Gotcha: `src/resources/skills/conducks-docs.md` is the spec every project follows, and `docs-lint`
+  cannot see it. Lint governs six file types — `todos`, `decisions`, `features`, `conventions`,
+  `memory`, `handover` — and the standard is none of them, and lives outside `docs/` besides.
+- Why: it drifted. ADR 0034 widened `RE.task` to `[ xX>-]` and made a reasonless `[>]`/`[-]` fail the
+  gate. The standard kept documenting two states, listed `space x X` as the whole marker set in its
+  own syntax table, and used `[-]` in §6 without defining it anywhere. Anyone following the document
+  would have written docs the linter rejects, for a reason the document does not mention.
+- Applies: when you change the grammar, changing the parser is half the job — `docs-grammar.ts` and
+  the standard have to move together, and only a human is checking. `todo22#P4` carries the fix; the
+  cheap 80% is a test asserting the standard's documented marker set equals `MARKER_TO_STATE`'s keys.

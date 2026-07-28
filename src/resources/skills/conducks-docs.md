@@ -193,7 +193,7 @@ Five per-line primitives, no frontmatter:
 # Title                 one per file, first line
 Status: <value>         life state, one line, directly under the title
 ## Section              a heading
-- [ ] task              open, or - [x] done
+- [ ] task              one of four states — see below
 - Key: value            a field
 ```
 
@@ -204,7 +204,7 @@ Status: <value>         life state, one line, directly under the title
 | `# Title` | `#` + at least one space, first line | — | `#Title` (no space) |
 | `Status: value` | **column 0**, no leading whitespace | `Status:value` (no space after colon) | any indented `Status:` |
 | `## Section` | exactly two `#` + a space | — | `###` (never a section — see below) |
-| `- [ ] task` | `-`, brackets, one of `space` `x` `X` | `-[x]`, indented, `[X]` | — |
+| `- [ ] task` | `-`, brackets, one of `space` `x` `X` `>` `-` | `-[x]`, indented, `[X]` | any other marker — it FAILS lint, it is not ignored |
 | `- Key: value` | **key starts with A–Z** | `-Key:v`, indented, multi-word (`Blocked by`) | `- builds:` — lowercase key parses as NOTHING |
 
 A key may hold letters, digits, spaces, `.`, `/`, `-`. It must START uppercase: `- builds: 0027` is
@@ -243,6 +243,42 @@ Shipped via the hook. Gate green.              - [x] setAuthInitializer hook add
 **State is derived, never announced.** A `[DONE]` marker is a second copy of what the checkboxes
 already hold, and its prose is unaddressable. Date and narrative go in the paragraph under the tasks.
 
+### The checkbox carries the state, and there are exactly four
+
+A task's state lives in its marker and nowhere else. There is no `## Deferred` section, no `[~]`, no
+ALL-CAPS note doing the job instead (ADR 0034).
+
+| marker | means | counted in the denominator | needs a reason |
+|---|---|---|---|
+| `- [ ]` | open — owed, nobody has done it | yes | no |
+| `- [x]` | done — and provable | yes | no |
+| `- [>]` | deferred — still owed, not now | **yes** | **yes** |
+| `- [-]` | dropped — not coming back | **no** | **yes** |
+
+**Deferred stays in the denominator; dropped leaves entirely.** That difference is the whole point.
+`[>]` keeps the work visible as unpaid, so a todo cannot reach 100% by parking what is hard. `[-]` is
+a decision not to carry something, and it stops being owed — which is exactly why it costs a reason.
+
+**A `[>]` or `[-]` with no reason FAILS lint.** Write the reason as an em-dash clause **on the task's
+own line**:
+
+```markdown
+- [>] Publish to npm — deferred to Said, not the agent: publishing spends a name once
+- [-] EXPRESSION kind — dropped per ADR 0013 unless a real query need appears
+```
+
+**The reason must be on the same line as the marker.** An indented continuation line is legal
+markdown and renders fine, but the parser reads a task's text as its own line only — so a reason
+pushed onto the next line is invisible and the task fails lint as reasonless. This is the most common
+way the check surprises someone.
+
+**A parked task with no stated reason is a deleted one nobody can find.** Six months later there is
+no way to tell a hard problem someone chose to postpone from one that was quietly abandoned, and the
+board reports the same number for both.
+
+**`[>]` is not a defect.** An unanswered question in Phase 0 is not deferred work — leave it `[ ]`.
+Reach for `[>]` when the work is real, understood, and blocked on something named.
+
 **Not read — an unrecognised line is prose.** Never encode state in: emoji or `[DONE]` in a heading ·
 strikethrough · bold or ALL-CAPS DONE · HTML comments · nested/indented checkboxes · a `Status:` not
 directly under the title · any field key not listed in this standard. A fact is read only as a
@@ -258,11 +294,14 @@ section · a todo with no `- Acceptance:` · two phases sharing a number · a ph
 missing or misspelled `## Context` / `## Decision` / `## Consequences` · a `- Builds:` or `- Depends:`
 pointing at an ADR or phase that does not exist · a relation stamped on one end only · superseding a
 record that still has open phases without `- Inherits:` · a cross-tree address that resolves to
-nothing. It cannot see `## Phase 2b` — that is a silent gap in `docs-status`.
+nothing · **an unknown checkbox marker** · **a `[>]` or `[-]` with no stated reason**. It cannot see
+`## Phase 2b` — that is a silent gap in `docs-status`.
 
 **It WARNS without failing on** (hygiene — true findings that break no grammar): `Status: done` still
 sitting in `todos/` · `Status: done` with unchecked tasks · `Status: doing` with everything checked ·
-`Status: blocked` with neither an unmet `- Depends:` nor a `- Blocked by:` · ADRs with no build link
+`Status: blocked` with neither an unmet `- Depends:` nor a `- Blocked by:` · **every task deferred and
+none complete** — a deferral is not a completion · **`Status: done` with deferred tasks still in it**,
+because `completed/` is not scanned and closing the file buries them · ADRs with no build link
 and no `- Enforced by:`, reported as one aggregated list rather than one line each. A warning is the
 gap between your claim and the checkboxes — fix it in the same turn or it becomes noise you learn to
 ignore.
