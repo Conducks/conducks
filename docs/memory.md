@@ -510,3 +510,21 @@
   graph per open project. The fix is `todo21#P4` — stop materialising the whole graph to answer a
   read-only query. Grammars were the obvious suspect and are innocent: 14 MB, 21 ms for all twelve,
   and the MCP tool surface never parses (`registry.analyze.*` appears 0 times in it).
+
+## Compacting a vault has two traps: the stale WAL, and a rewrite that GROWS a young vault
+- Gotcha: `compact()` rewrites into a temp file and renames it over the vault. Two things break it
+  that are invisible until they bite. DuckDB replays `<db>.wal` on the next open by FILENAME, so the
+  OLD vault's write-ahead log sitting beside the swapped-in file is replayed against a database that
+  already has those tables — the vault then refuses to open with "Table with name nodes already
+  exists". And on a young vault the rows are still in the WAL, so the `.db` file is a ~12 KB stub
+  while a materialised database has a floor near 1 MB: the rewrite makes it BIGGER.
+- Why: both are silent successes. The WAL case only shows up on the NEXT open, which may be another
+  process or another day. The growth case never errors at all — it just inflates every small project
+  on every pulse, which is exactly what "run it after a pulse rather than as a chore" would have
+  done. `compact()` removes both logs as part of the swap, and keeps the rewrite only when it came
+  out smaller.
+- Applies: `bloatRatio()` is the cheap trigger — one query over `duckdb_tables().estimated_size`
+  against real counts, 11 ms on a 246 MB vault, so `reclaimVault()` can run on every pulse and a
+  healthy vault pays nothing. This repo measured 23.1x before the first compaction: 235.3 MB → 12.8 MB.
+  Do NOT build a churn test on `saveNodes` alone — that is `INSERT OR REPLACE`, which reuses blocks
+  and shows no growth. Only `purgeUnits()` + insert leaks, which is what a real pulse does.

@@ -13,6 +13,8 @@ import type { ConducksComponent } from "../../../contracts/types.js";
  * Implements the Oracle Standard for structural health monitoring.
  */
 
+
+
 export class SynapsePersistence {
   private static instance: SynapsePersistence;
   private db: duckdb.Database | null = null;
@@ -576,6 +578,116 @@ export class SynapsePersistence {
     if (setClauses.length === 0) return;
     params.push(nodeId.toLowerCase());
     await this.run(`UPDATE nodes SET ${setClauses.join(', ')} WHERE id = ?`, params);
+  }
+
+  /**
+   * Reclaim the vault by rewriting it into a fresh database and swapping the file in.
+   *
+   * DuckDB never reclaims deleted row versions in place. `purgeUnits()` + re-insert leaves the old
+   * versions in their row groups permanently, and `VACUUM`, `VACUUM ANALYZE`, `CHECKPOINT` and
+   * `FORCE CHECKPOINT` were each measured and each left the file byte-identical (ADR 0036,
+   * `memory.md`). Rewriting is the ONLY thing that reclaims: `duckdb_tables().estimated_size`
+   * reported 285,868 edge rows against 12,590 real, and this took 235.3 MB to 14.0 MB in 100 ms
+   * with every table, every row count and the content hashes of `nodes` and `edges` unchanged.
+   *
+   * Crash safety is the whole design. The rewrite goes to a sibling temp file, is closed so DuckDB
+   * flushes it, and only then replaced by an atomic `rename` — a crash at any point leaves either
+   * the old vault or the new one intact, never a half-written vault. The temp file is removed on
+   * any failure, so a crashed compaction costs disk once and not forever.
+   *
+   * Returns the before/after byte sizes so a caller can report what it saved. Returns null when
+   * there is no vault, or when the rewrite came out no smaller than the original — see the
+   * young-vault case inline.
+   */
+  /**
+   * How many row versions DuckDB is carrying per row that actually exists.
+   *
+   * `duckdb_tables().estimated_size` counts versions, not rows, so it is the only thing that sees
+   * the leak: this repo's vault reported 285,868 edges against 12,590 real. One cheap query answers
+   * "is a rewrite worth 100 ms" without doing the rewrite to find out, which is what lets a watcher
+   * call this on every pulse and pay almost nothing on a healthy vault.
+   *
+   * Returns 1 for a clean vault, and null when there is nothing to measure.
+   */
+  public async bloatRatio(): Promise<number | null> {
+    const rows = await this.query<{ estimated: number; actual: number }>(`
+      SELECT (SELECT sum(estimated_size) FROM duckdb_tables() WHERE table_name IN ('nodes','edges')) AS estimated,
+             (SELECT count(*) FROM nodes) + (SELECT count(*) FROM edges) AS actual`);
+    const estimated = Number(rows[0]?.estimated ?? 0);
+    const actual = Number(rows[0]?.actual ?? 0);
+    if (!actual) return null;
+    return Math.max(1, estimated / actual);
+  }
+
+  public async compact(): Promise<{ before: number; after: number } | null> {
+    if (this.readOnly) {
+      throw new Error('🛡️ [Persistence] COMPACT BLOCKED: cannot rewrite a read-only vault.');
+    }
+    if (this.inPulse) {
+      // A pulse holds rows this rewrite would not see. Compacting mid-write is how you publish a
+      // vault that is missing the very symbols the pulse was recording.
+      throw new Error('🛡️ [Persistence] COMPACT BLOCKED: a pulse is in flight.');
+    }
+
+    const dbPath = path.join(path.resolve(this.vaultPath, '.conducks'), 'conducks-synapse.db');
+    if (!fs.existsSync(dbPath)) return null;
+
+    const before = fs.statSync(dbPath).size;
+    const tmpPath = `${dbPath}.compact-${process.pid}`;
+    fs.rmSync(tmpPath, { force: true });
+
+    try {
+      await this.ensureVaultOpen();
+
+      // `COPY FROM DATABASE <src> TO <dst>` needs the SOURCE by name, and DuckDB names a
+      // file-backed database after its file stem — not `memory`, which is the plausible guess and
+      // fails with "Catalog memory does not exist". Read the name instead of assuming it: the stem
+      // changes with the filename, and a temp-file rename would silently break a hardcoded one.
+      const [{ database_name: source }] = await this.query<{ database_name: string }>(
+        `SELECT database_name FROM duckdb_databases() WHERE path IS NOT NULL LIMIT 1`);
+
+      // ATTACH + COPY FROM DATABASE reproduces schema and data together, so this does not have to
+      // know which tables exist — a table added later is carried without touching this method.
+      await this.run(`ATTACH '${tmpPath.replace(/'/g, "''")}' AS compacted`);
+      await this.run(`COPY FROM DATABASE "${source}" TO compacted`);
+      await this.run(`DETACH compacted`);
+
+      // A rewrite is not always a win, and this is the case that surprises: on a young vault most
+      // rows are still in the write-ahead log, so the .db file is tiny — 12 KB in the test that
+      // caught this — while a properly materialised database has a floor around 1 MB. Compacting
+      // there GROWS the file. Since this is meant to run after a pulse rather than as a chore,
+      // that would quietly inflate every small project. Measure the result and keep the smaller
+      // file; the rewrite is cheap enough (100 ms for 235 MB) to pay for the answer.
+      const rewritten = fs.statSync(tmpPath).size;
+      if (rewritten >= before) {
+        fs.rmSync(tmpPath, { force: true });
+        fs.rmSync(`${tmpPath}.wal`, { force: true });
+        return null;
+      }
+
+      // Close BEFORE the swap: DuckDB flushes on close, and renaming a file the process still holds
+      // open leaves the old inode alive and the reclaimed space unreclaimed.
+      await this.close();
+      fs.renameSync(tmpPath, dbPath);
+
+      // The write-ahead log belongs to the database that was just replaced, and DuckDB replays
+      // `<db>.wal` on the NEXT open by filename alone. Leaving it turns a successful compaction
+      // into a vault that will not open: it replays CREATE TABLE nodes against a database that
+      // already has one, and the open fails with "Table with name nodes already exists". Both logs
+      // go — the old vault's, and any the rewrite produced under the temp name.
+      fs.rmSync(`${dbPath}.wal`, { force: true });
+      fs.rmSync(`${tmpPath}.wal`, { force: true });
+
+      const after = fs.statSync(dbPath).size;
+      logger.info(`🛡️ [Vault] Compacted ${(before / 1048576).toFixed(1)} MB → ${(after / 1048576).toFixed(1)} MB`);
+      return { before, after };
+    } catch (err) {
+      // Never leave a partial rewrite behind. The vault itself is untouched until the rename, so
+      // failing here costs nothing but the temp file.
+      fs.rmSync(tmpPath, { force: true });
+      fs.rmSync(`${tmpPath}.wal`, { force: true });
+      throw err;
+    }
   }
 
   public async close(): Promise<void> {

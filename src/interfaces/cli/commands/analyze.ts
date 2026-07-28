@@ -45,6 +45,23 @@ export class AnalyzeCommand implements ConducksCommand {
         process.exit(1);
       }
       throw err;
+    }
+
+    // Reclaim the vault now the pulse has published. A pulse purges and re-inserts every unit it
+    // touched, and DuckDB keeps the old row versions forever — so the file grows on every analyze
+    // whether or not the code changed. Doing it here rather than as a maintenance command is the
+    // point: a chore nobody runs is a vault nobody reclaims. The check is one query and the rewrite
+    // only runs when it will pay, so a clean vault costs ~10 ms.
+    try {
+      const reclaimed = await registry.infrastructure.reclaimVault();
+      if (reclaimed) {
+        const mb = (n: number) => (n / 1048576).toFixed(1);
+        console.log(`🛡️  [Vault] Reclaimed ${mb(reclaimed.before)} MB → ${mb(reclaimed.after)} MB`);
+      }
+    } catch (err: any) {
+      // Never fail a good pulse over housekeeping. The graph is already committed; a vault that is
+      // merely too big still answers every question correctly.
+      console.error(`⚠️  [Vault] Compaction skipped: ${err.message}`);
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed
       await closePersistence(registry);

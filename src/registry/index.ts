@@ -287,6 +287,19 @@ export const registry = {
   infrastructure: {
     get graphEngine() { return graph; },
     get persistence() { return persistence; },
+    /**
+     * Reclaim the vault if it has decayed enough to be worth the rewrite.
+     *
+     * DuckDB never reclaims deleted row versions, so a vault grows without bound as pulses purge
+     * and re-insert. The check is one query (11 ms on a 246 MB vault) and the rewrite only runs
+     * when it will actually pay — so a watcher can call this after every pulse and a healthy vault
+     * costs almost nothing. Returns null when nothing was done.
+     */
+    reclaimVault: async (minRatio = 3): Promise<{ before: number; after: number } | null> => {
+      const ratio = await persistence.bloatRatio();
+      if (ratio === null || ratio < minRatio) return null;
+      return persistence.compact();
+    },
     get chronicle() { return chronicle; },
     get registry() { return synapseRegistry; },
     get logger() { return logger; },
