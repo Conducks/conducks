@@ -204,19 +204,30 @@ Status: <value>         life state, one line, directly under the title
 | `# Title` | `#` + at least one space, first line | — | `#Title` (no space) |
 | `Status: value` | **column 0**, no leading whitespace | `Status:value` (no space after colon) | any indented `Status:` |
 | `## Section` | exactly two `#` + a space | — | `###` (never a section — see below) |
-| `- [ ] task` | `-`, brackets, one of `space` `x` `X` `>` `-` | `-[x]`, indented, `[X]` | any other marker — it FAILS lint, it is not ignored |
+| `- [ ] task` | `-`, brackets, one of `space` `x` `X` `>` `-` | `-[x]`, `[X]`, any indentation | any other marker — it FAILS lint, it is not ignored |
 | `- Key: value` | **key starts with A–Z** | `-Key:v`, indented, multi-word (`Blocked by`) | `- builds:` — lowercase key parses as NOTHING |
 
 A key may hold letters, digits, spaces, `.`, `/`, `-`. It must START uppercase: `- builds: 0027` is
 prose, not a field, and nothing warns you.
+
+**`Status:` has one vocabulary per file type, and a value outside it FAILS lint.** Three types carry
+one; the rest have no `Status:` at all.
+
+| file | vocabulary |
+|---|---|
+| `todos/todoNN.md` | `todo` · `doing` · `done` · `blocked` |
+| `decisions/NNNN-*.md` | `Accepted` · `Superseded by NNNN` — an amendment is an `- Amended by:` field, never a status |
+| `handover.md` | `current` · `stale` |
+| everything else | no `Status:` line |
 
 Content inside ``` or ~~~ fences is skipped entirely — examples in a fenced block never parse as real
 tasks or fields.
 
 | rule | detail |
 |---|---|
-| **A value is the whole line** | No continuation exists. A wrapped line matches nothing and is dropped silently. Need a paragraph? Use a `##` section. Prose wraps freely. |
-| **Blank line after the last task/field** | An UNINDENTED prose line directly under `- [ ]` or `- Key:` is read as a continuation, dropped, and fails lint. Indented continuation lines, and lines starting `#` `>` `\|` `-` `1.` `![` `<`, are allowed — so a multi-line bullet is fine, a flush-left paragraph is not. |
+| **A value is the whole line** | No continuation exists. The wrapped part is not merged into the value — it is lost, and lint FAILS the file for it. Need a paragraph? Use a `##` section. Prose wraps freely. |
+| **Blank line after the last task/field** | An UNINDENTED prose line directly under `- [ ]` or `- Key:` is the wrap above: not merged, and lint fails. Indented continuation lines, and lines starting `#` `>` `\|` `-` `1.` `![` `<`, pass lint — but they are still not part of the value, so nothing that must be READ may live there. A multi-line bullet is fine for prose; a flush-left paragraph is not. |
+| **Indenting a checkbox does NOT nest it** | The parser accepts any leading whitespace, so an indented `- [ ]` is a full sibling task under the same phase. Indent for readability if you like; you get no hierarchy from it, and its checkbox counts in the phase total exactly like every other. Real grouping inside a long phase is a `###` heading. |
 | **One key per file** | A repeated key: the last silently wins. Earlier ones are not merged, not warned. Multiple values go on one line, comma-separated. |
 | **ADR ref fields read the LEADING refs only** | On `- Amended by:`, `- Supersedes:`, `- Builds:` and the other ADR relation keys, the parser takes the four-digit refs at the START of the value and stops at the first non-ref. Trailing prose is allowed and ignored: `- Amended by: 0012, 0018 — both on checkout` is valid. A note attaching to ONE ref still goes in the paragraph below; there is no per-ref slot on the line. |
 | **`- Depends:` is the exception — it scans the WHOLE line** | Every `todoNN#PN` anywhere in the value is read as a real dependency, including inside trailing prose. So `- Depends: todo09#P3 (todo10#P1 landed first)` silently declares TWO dependencies. Put no phase address in a `- Depends:` note. |
@@ -246,7 +257,7 @@ already hold, and its prose is unaddressable. Date and narrative go in the parag
 ### The checkbox carries the state, and there are exactly four
 
 A task's state lives in its marker and nowhere else. There is no `## Deferred` section, no `[~]`, no
-ALL-CAPS note doing the job instead (ADR 0034).
+ALL-CAPS note doing the job instead.
 
 | marker | means | counted in the denominator | needs a reason |
 |---|---|---|---|
@@ -263,8 +274,8 @@ a decision not to carry something, and it stops being owed — which is exactly 
 own line**:
 
 ```markdown
-- [>] Publish to npm — deferred to Said, not the agent: publishing spends a name once
-- [-] EXPRESSION kind — dropped per ADR 0013 unless a real query need appears
+- [>] Publish the package — deferred to a human, not an agent: publishing spends a name once
+- [-] Second cache tier — dropped: the measured hit rate never justified a second tier
 ```
 
 **The reason must be on the same line as the marker.** An indented continuation line is legal
@@ -280,9 +291,9 @@ board reports the same number for both.
 Reach for `[>]` when the work is real, understood, and blocked on something named.
 
 **Not read — an unrecognised line is prose.** Never encode state in: emoji or `[DONE]` in a heading ·
-strikethrough · bold or ALL-CAPS DONE · HTML comments · nested/indented checkboxes · a `Status:` not
-directly under the title · any field key not listed in this standard. A fact is read only as a
-`Status:`, a `- Key: value`, or a `- [ ]`. **There is no fourth way.**
+strikethrough · bold or ALL-CAPS DONE · HTML comments · indentation, which carries no meaning · a
+`Status:` not directly under the title · any field key not listed in this standard. A fact is read
+only as a `Status:`, a `- Key: value`, or a `- [ ]`. **There is no fourth way.**
 
 **Only six types are linted:** `todos` · `decisions` · `features` · `conventions` · `memory` ·
 `handover`. `architecture.md`, `MODULE.md` and the soft folders are parsed but NOT grammar-checked —
@@ -549,20 +560,21 @@ write. Whoever picks it up can read the code; what they cannot recover is why it
 | the constraint that rules an approach out | the approach itself, when more than one would do |
 
 ```markdown
-❌ In persistence.ts, wrap the setTimeout in a clearTimeout on line 591
+❌ In db-client.ts, wrap the setTimeout in a clearTimeout on line 591
 
-✅ Every command that opens a vault hangs ~5s after printing its answer.
-   `close()` races the close against a 5s timeout and never clears the losing
-   timer, so the event loop stays alive. Measured: answer at 451ms, exit at
-   5.5s. Fixed when a command that opens a vault exits in under a second.
+✅ Every command that opens the database hangs ~5s after printing its answer.
+   The close path races the close against a 5s timeout and never clears the
+   losing timer, so the event loop stays alive. Measured: answer at 451ms,
+   exit at 5.5s. Fixed when such a command exits in under a second.
 ```
 
 The first is worthless six months later, when line 591 is something else. The second still reads
 correctly, still says what to check, and leaves the fix to whoever is holding the code.
 
-**State the evidence, not the hunch.** "The vault seems bloated" is not a task. "The vault holds
-8.76 MB of rows in 235 MB, proven by rewriting it; `VACUUM` and `CHECKPOINT` were each measured and
-neither reclaims" is one — and it stops the next person re-running the same eliminations.
+**State the evidence, not the hunch.** "The store seems bloated" is not a task. "The store holds
+8.7 MB of rows in 235 MB, proven by rewriting it; the two documented reclaim commands were each
+measured and neither shrinks the file" is one — and it stops the next person re-running the same
+eliminations.
 
 **A task an agent cannot verify is not done, it is claimed.** Every task should name what a reader
 runs to check it. If nothing can be run, say so and say why, rather than leaving the reader to assume
