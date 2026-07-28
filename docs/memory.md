@@ -527,4 +527,8 @@
   against real counts, 11 ms on a 246 MB vault, so `reclaimVault()` can run on every pulse and a
   healthy vault pays nothing. This repo measured 23.1x before the first compaction: 235.3 MB → 12.8 MB.
   Do NOT build a churn test on `saveNodes` alone — that is `INSERT OR REPLACE`, which reuses blocks
-  and shows no growth. Only `purgeUnits()` + insert leaks, which is what a real pulse does.
+  and shows no growth. Only DELETE-then-insert leaks, which is what a real pulse does. Drive that
+  churn with SET-BASED SQL, not `saveNodes()`: row-by-row writes cost 80 SECONDS for a state raw
+  `DELETE` + `INSERT ... FROM range(n)` reaches in 1.2, and the first version of this test made the
+  whole unit suite 16x slower (22s to 352s) for no extra coverage. What is under test is what DuckDB
+  does with deleted row versions, not how rows are handed to it.
