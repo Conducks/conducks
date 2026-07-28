@@ -44,7 +44,7 @@ rows in 235 MB is real and is a DISK problem (Phase 4).
 - [ ] `persistence.load()` still reloads the entire graph at the end of every pulse, 108 ms, so PageRank can run on the full node set — the orchestrator flushes and clears the in-memory graph during analysis. Either the analysis stops clearing what it just built, or the reload becomes incremental. Fixed when a one-file pulse does not re-read 2,400 nodes it already had
 - [ ] `graph.resonate()` recomputes PageRank across the whole graph for a one-line edit (41 ms). Cheaper than the writes were, and correct — a rank IS global — so measure whether an incremental approximation is worth its complexity before assuming it is
 - [ ] Use tree-sitter's incremental re-parse: `tree.edit()` then `parse(src, oldTree)`. Nothing uses it today — `grep -rn "parse(.*oldTree|\.edit(" src/lib/core/parsing/` is empty
-- [ ] Diff the symbol set and touch only changed rows, instead of `purgeUnits(file)` + re-insert. This is the real win and the real difficulty; the parse half is nearly free
+- [ ] Diff the symbol set and touch only changed rows, instead of `purgeUnits(file)` + re-insert. Worth **31-75 ms** of an 807 ms edit, measured — this task previously claimed it was "the real win" and the parse half "nearly free", and both halves of that were backwards. Kept because it also stops the per-edit churn that ADR 0037 can only mop up, which is a correctness argument rather than a speed one. Do it AFTER `orchestrator.analyze`, not before
 - [ ] Measure the per-edit cost after. The merge in Phase 3 is licensed by this number and by nothing else
 
 ## Phase 2 — watched is not registered

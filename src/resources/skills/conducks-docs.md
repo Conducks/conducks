@@ -687,6 +687,32 @@ correctly, still says what to check, and leaves the fix to whoever is holding th
 measured and neither shrinks the file" is one — and it stops the next person re-running the same
 eliminations.
 
+**A claim about WHERE a cost is must carry its number, or say it has none.** This is the sharp edge
+of the rule above, because it does not feel like a hunch when you write it. A design session produces
+real understanding, and "this is the real win, the other half is nearly free" reads as knowledge
+rather than as a guess — so it goes in unmarked, and whoever picks the todo up optimises the half it
+named. Both halves of that sentence were wrong in this project's own todo: the "real win" was 3-7% of
+the cost and the "nearly free" half was the single biggest phase.
+
+Mark it or measure it. Either form is honest:
+
+```markdown
+❌ Diff the symbol set instead of re-inserting. This is the real win;
+   the parse half is nearly free
+
+✅ UNMEASURED: the DB write looks like the cost, and the parse half looks
+   cheap. Split the pulse into parse / extract / write and time each
+   before optimising any of them — nothing here is measured yet
+
+✅ The DB write is 31-75 ms of a 807 ms edit, and `orchestrator.analyze`
+   is 423 ms of it. Attack the parse half
+```
+
+**A prediction is not evidence, and "obviously" is not a measurement.** If the work needed to check
+is smaller than the work being planned, do the check first — it is cheaper to measure a bottleneck
+than to remove the wrong one. When it genuinely cannot be checked yet, the claim belongs in Phase 0
+as a question, not in a build phase as a premise.
+
 **A task an agent cannot verify is not done, it is claimed.** Every task should name what a reader
 runs to check it. If nothing can be run, say so and say why, rather than leaving the reader to assume
 a test exists.
