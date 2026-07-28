@@ -473,6 +473,12 @@ Feature = what the system offers. Module = what one part owns, refuses, assumes,
 
 State the cost in `Reason:` — a rule without one gets dropped as inconvenient.
 
+**PREFIX is one token, the same for every rule in the file, and it never changes.** Use the repo or
+product name (`CONDUCKS-1`, `ACME-7`) — not a per-rule topic, which is the tempting mistake: `DATE-1`
+beside `AUTH-1` gives two counters, two namespaces, and a renumbering the first time a rule changes
+subject. The ID is an address other docs cite, so it must survive the rule being reworded. Numbers run
+1, 2, 3 within the file and are never reused, exactly like an ADR number.
+
 **A rule that binds only one service still lives here.** Name the scope in the rule itself
 (`- Rule: in packages/core, ...`). `conventions.md` is root-only, and `architecture.md` holds the graph
 and its contract — nothing else — so there is no service-level rules file. Two exceptions, both
@@ -762,6 +768,11 @@ second grouping mechanism beside the one that already works.
 **Size a phase by what fails together.** If half of it can ship while the other half is still broken,
 it is two phases. If a reviewer would have to read both halves to judge either, it is one.
 
+**A root epic carries its open question in `## Context`, never a Phase 0.** The epic holds no work,
+so it has no phase for a question to sit in, and a Phase 0 there would be work the epic is not allowed
+to own. Say what is undecided, what it turns on and who owns the answer, in prose. If the question
+must be tracked as work, it belongs to the slice that will answer it.
+
 **A Phase 0 gates only what says it does.** Phase 0 has no special power: a later phase waits for it
 because it carries `- Depends: todoNN#P0`, and for no other reason. Work that does not turn on the
 answer — a separate bug in the same area, a fix that ships either way — carries no `- Depends:` and
@@ -788,6 +799,19 @@ Status: doing
 
 admin lands after app: the port has to exist before admin can point at it.
 ```
+
+**A slice that does not exist yet gets a description, not an address.** `- [ ] app:todo42` naming a
+todo nobody has written is the invented reference §1 rules out, and here it also fails lint. Write what
+the slice must achieve, and swap in `tree:todoNN` when that todo exists — the checkbox is the same
+line either way:
+
+```markdown
+- [ ] billing exposes the port                 before it exists
+- [ ] packages/billing:todo08                  after that todo is written
+```
+
+The epic is the one file that legitimately outlives its own addresses, because it is written first, at
+the moment the coupling is known and before anyone has picked up a slice.
 
 An ADR cannot hold this: it is frozen, and joint status moves.
 
