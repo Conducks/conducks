@@ -230,7 +230,7 @@ tasks or fields.
 
 | rule | detail |
 |---|---|
-| **A value is the whole line** | No continuation exists. The wrapped part is not merged into the value — it is lost, and lint FAILS the file for it. Need a paragraph? Use a `##` section. Prose wraps freely. |
+| **A value is the whole line** | Applies to BOTH a `- Key: value` and a `- [ ] task` — each is read as its own single line. No continuation exists. The wrapped part is not merged in; it is lost, and lint FAILS the file for it. So a long task belongs on one long line, however wide. Need a paragraph? Use a `##` section, or the prose under the tasks. Prose wraps freely. |
 | **Blank line after the last task/field** | An UNINDENTED prose line directly under `- [ ]` or `- Key:` is the wrap above: not merged, and lint fails. Indented continuation lines, and lines starting `#` `>` `\|` `-` `1.` `![` `<`, pass lint — but they are still not part of the value, so nothing that must be READ may live there. A multi-line bullet is fine for prose; a flush-left paragraph is not. |
 | **Indenting a checkbox does NOT nest it** | The parser accepts any leading whitespace, so an indented `- [ ]` is a full sibling task under the same phase. Indent for readability if you like; you get no hierarchy from it, and its checkbox counts in the phase total exactly like every other. Real grouping inside a long phase is a `###` heading. |
 | **One key per file** | A repeated key: the last silently wins. Earlier ones are not merged, not warned. Multiple values go on one line, comma-separated. |
@@ -318,9 +318,10 @@ does not exist, or a record that does not exist in it · an unknown checkbox mar
 with no stated reason · **a `- Depends:` that crosses a tree** — it fails even when the address
 resolves, because the order it claims is not one this tree can keep · **`conventions.md`,
 `memory.md` or `handover.md` inside a service tree** — they are root-only, and split across services
-an agent reading one tree cannot know it is missing the rest · **any `README.md` under a docs tree**,
-outside `completed/` `legacy/` `archive/` `agent-runs/`. It cannot see `## Phase 2b` — that is a
-silent gap in `docs-status`.
+an agent reading one tree cannot know it is missing the rest · **any `README.md` INSIDE a docs tree**,
+outside `completed/` `legacy/` `archive/` `agent-runs/` — your repository's own root `README.md` is
+untouched and always fine, because the walk starts at `docs/` and never climbs above it. It cannot
+see `## Phase 2b` — that is a silent gap in `docs-status`.
 
 ### §5.5 What it warns on
 
@@ -520,6 +521,29 @@ supersede kills a record. Every other link is a field **stamped on both ends**:
 **Superseding a half-built record:** add `- Inherits: NNNN (the part never built)` so the remainder
 keeps an owner. Lint requires it when the superseded record still has unfinished work.
 
+**An ADR may leave a question open, and must say so where it can be found.** A decision often settles
+the main call and leaves a smaller one unanswered — a rotation scheme, a migration order, an
+either/or nobody has costed. The record is frozen, so it cannot grow the answer later. Write the open
+question as its own paragraph at the end of `## Consequences`, opening with **`Open:`**, and say what
+would answer it. Then either:
+
+| the open question is | do |
+|---|---|
+| work someone will do | write the todo **in the same turn**, then name it in the `Open:` paragraph as plain prose (`carried by todo14#P2`) |
+| a decision someone will make | a later ADR that answers it, stamped `- Resolves: NNNN` against this record's `- Resolved by: NNNN` |
+
+The second is what **resolves** is for, and it is the only relation that leaves both records
+`Accepted` — the original stays correct, it was simply incomplete. An open question with neither a
+todo nor a resolving ADR is a decision that quietly rots: the reader cannot tell whether it was
+answered elsewhere or forgotten. That is why the todo is written in the same turn (§1) — a record
+cannot grow the reference later, so there must be something to name while you are still writing.
+
+**`- Builds:` is the one link that is NOT stamped on both ends.** It lives on the todo phase and
+points UP at the ADR; the ADR carries no reciprocal field. The reason is that an ADR is frozen and a
+todo is not — a phase may be added, split or dropped long after the decision, and a frozen record
+cannot follow it. So the ADR mentions a todo only in prose, and `conducks docs-status` derives the
+link from the todo side. Never write `- Builds:` in a decision record.
+
 ### §6.7 `todos/todoNN.md`
 
 ```markdown
@@ -617,6 +641,27 @@ costs more than the note did.
 
 **A Phase 0 task is not a defect.** Do not turn one into a `[-]` because it is unsolved. Drop it only
 when the question stops mattering, and say why.
+
+**When Phase 0 chooses between designs, DO NOT WRITE THE LOSING PHASE.** A phase describes work that
+will happen. Writing both candidate designs as phases and parking one is the trap: `[>]` means *still
+owed*, so the board counts a phase that will never be built as unpaid work — the exact dishonesty
+`[>]` exists to prevent, and `[-]` is no better, because nothing was decided against yet.
+
+```markdown
+WRONG                                          RIGHT
+## Phase 0 — measure, then choose              ## Phase 0 — measure, then choose
+- [ ] Measure direct-to-storage upload         - [ ] Measure direct-to-storage upload
+                                                     latency. Under 5s at p99 → move the
+## Phase 2 — fix the streaming                       upload off the server; over → fix the
+- [>] ... — deferred pending Phase 0                 streaming in place. Write Phase 1
+                                                     once the number says which
+## Phase 3 — presigned URLs
+- [>] ... — deferred pending Phase 0           (no second phase exists yet)
+```
+
+Phase 0's task carries both candidates and **the threshold that decides between them**, so the
+question is answerable rather than merely open. The winning phase is written when the answer lands —
+which is the same rule as everywhere else here: a record states what is true, not what might be.
 
 ### §6.10 How to size, group and divide
 
