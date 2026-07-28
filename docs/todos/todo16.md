@@ -1,6 +1,7 @@
 # todo16 — make conducks installable: one command, no build chain
 
-Status: doing
+Status: blocked
+- Blocked by: the only work left is the publish itself, which is Said's to run and not an agent's — decided 2026-07-26; everything gating it is green
 - Acceptance: `npm i -g conducks` succeeds on a clean machine with no compiler flags and no build tools, and `conducks analyze .` works immediately afterwards
 
 Conducks is meant to be a platform every project uses, but installing it meant cloning the repo and
@@ -33,5 +34,5 @@ built (ADR 0027). What remains is the publish itself, which is Said's to run.
 - [x] cached at `~/.conducks/update-check.json`, 24h TTL. Global, NOT the project vault: the installed version is the same whichever repo you run in, so a per-project cache would re-ask once per project. This is also the `~/.conducks/` home todo17#P2 wants for `projects.json`
 - [x] the check is the FIRST and only outbound call in conducks, so it is deliberately weak: 2s timeout, no retry, every failure swallowed, `CONDUCKS_NO_UPDATE_CHECK=1` to disable. Covered by `tests/unit/domain/federation/update-check.test.ts` (9 cases, all off the cache — no test hits the network)
 - [x] a 404 (no release published) is reported as its own state, not as a failed check. The repo has no releases today, so collapsing the two would have made `doctor` warn on every run until the first release
-- [ ] SAID PUBLISHES, not the agent — deliberate, decided 2026-07-26. Claim the name with `npm publish --tag next`: it reserves `conducks` while leaving `npm i -g conducks` resolving to nothing. Everything it gates is green — tarball clean, `doctor` honest about the parse path, gates passing
-- [ ] publish `latest`, then cut a matching GitHub release so the update notice has something to compare against — until a release exists `doctor` reports "no release published yet"
+- [>] Claim the name with `npm publish --tag next`: it reserves `conducks` while leaving `npm i -g conducks` resolving to nothing. Everything it gates is green — tarball clean, `doctor` honest about the parse path, gates passing — deferred to Said, not the agent, decided 2026-07-26: publishing is irreversible and spends a name once
+- [>] Publish `latest`, then cut a matching GitHub release so the update notice has something to compare against — until a release exists `doctor` reports "no release published yet" — deferred to Said with the task above, same reason
