@@ -21,9 +21,9 @@ Status: current
   hygiene warning, which is correct (`todo07` is wholly deferred).
 
 ## Next, in order
-1. **`todo21#P0`** — 6 open questions, and 3 need a DECISION rather than a measurement: git
-   worktrees (two vaults describing one repo), monorepo scoping (`packages/api` — its own project or
-   part of one), and the concurrent-agent lock, which has no solution yet. 0036 and 0037 both wait here.
+1. **`todo21#P1`** — line-level updates. A one-line edit costs **~1.0 s** over a 369 ms unchanged
+   pulse, measured; that is the number to beat. It also stops the vault churn at source, so it
+   closes ADR 0037's last task and unblocks `#P3`. `todo21#P0` is 4/6 and no longer blocking.
 2. **`todo21#P1`** — line-level updates. It stops the vault churn at source, so it closes ADR 0037's
    last task as well as unblocking `#P3`.
 3. **`todo22#P2`/`#P3`** — two rule engines share the name "sentinel", and ~58 findings fire

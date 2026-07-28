@@ -23,12 +23,13 @@ DuckDB opens the 235 MB vault in 7 ms, so storage was never the latency. The vau
 rows in 235 MB is real and is a DISK problem (Phase 4).
 
 ## Phase 0 — questions with no answer yet
+- Builds: 0039
 - [x] What does a one-line edit cost today, end to end? MEASURED 2026-07-28 on this repo: an unchanged `analyze` is **369 ms** (the hash gate skipping everything), one added line makes it **1374 ms** — so an edit costs **~1.0 s** over baseline, for one file out of ~470. That is the number Phase 1 has to beat, and it is the budget a per-save watcher would pay. Reproduce by timing `conducks analyze --yes` before and after touching one file. NOT yet broken down between re-parse, `purgeUnits()` and re-insert — do that first in Phase 1, because the parse half is expected to be nearly free and the diff-the-symbols half is the real work
 - [ ] ANSWERED, moved to Phase 4: the vault is 27x its contents, `INSERT OR REPLACE` churn is NOT the cause, and it costs disk rather than time
-- [ ] Two agents on one project: a pulse locks readers OUT and reads FAIL rather than queue. This is a live bug today, not a future one, and it is the blocker for conducks being what agents use while other agents work. NO SOLUTION YET — candidates are a tiny write window, or serving reads from a snapshot
-- [ ] Git worktrees: two checkouts of one repo, each with its own `.conducks/`. It accidentally works, but two vaults then describe one repository. Decide whether that is correct or a bug before layers make it structural
+- [x] Two agents on one project: a pulse locks readers OUT and reads FAIL rather than queue. DECIDED 2026-07-28, ADR 0040: readers are served from a snapshot — a pulse writes a new file, readers continue against the previous one, the swap is an atomic rename. Shrinking the write window was rejected because it keeps the failure mode and makes it rarer, which is harder to reason about; making readers queue was rejected because a hang is worse than an error for an agent with a timeout. The mechanism is ADR 0037's write-fsync-rename path, already built
+- [x] Git worktrees: DECIDED 2026-07-28, ADR 0039 — a vault describes the tree beside it, so a linked worktree gets its own and that is correct rather than tolerated. A shared per-repository vault was rejected because it moves the lock from per-tree to per-repository, which is the opposite of why worktrees exist
 - [ ] Detached HEAD has no branch name. Layers key on the commit so they are fine, but "current branch" is undefined and the branch guard has nothing to compare against
-- [ ] Monorepo: is `packages/api` its own project or part of one? `conducks.json` already answers this for docs services. The vault must use the SAME answer, not invent a second one
+- [x] Monorepo: DECIDED 2026-07-28, ADR 0039 — the vault boundary is whatever `conducks.json` declares for the docs layer. One declaration, two consumers. Deriving it from `package.json` was rejected because a boundary two subsystems compute independently is one that drifts. STILL OPEN inside that: one vault per service, or one vault whose rows carry a service column
 
 ## Phase 1 — line-level update
 - Builds: 0036
@@ -44,7 +45,7 @@ rows in 235 MB is real and is a DISK problem (Phase 4).
 - [ ] Test: twenty registered projects and one open session creates exactly one watcher
 
 ## Phase 3 — merge the surfaces
-- Builds: 0036
+- Builds: 0036, 0040
 - Depends: todo21#P1
 - [ ] One engine; `watch` and `monitor` become surfaces over it
 - [ ] One module-hash implementation. ADR 0031 records two that must agree — collapse them
@@ -88,3 +89,11 @@ an uncleared `setTimeout` in `persistence.close()` keeping the event loop alive 
 - [-] Replace object-per-node plus Maps with typed arrays and an id→index table — dropped: it targets the 21 MB the graph actually holds and cannot touch the ~180 MB of arena that is the real number. Rewriting the core graph structure for a fraction of 21 MB is not worth the risk
 - [>] Stream rows into the graph instead of materialising them first — deferred, not dropped: measured at 111 MB peak materialised against 98 MB streamed for the nodes, real but 6% of the total. Attempted and reverted because `db.each`'s completion callback never fires in duckdb 1.4.4 and `load()` hung; it needs the `stream()` async-iterator API. Worth doing when something else touches this path
 - [ ] The domain services (`governance`, `search`, `kinetic`, `metrics`) capture `graph.getGraph()` at construction, so the accessor guard cannot see them — a service reading the empty graph stays silent. That is why `needsGraph` is opt-out rather than opt-in, and it is the thing to fix if the guard is ever to be the only defence
+
+## Phase 6 — readers never fail during a pulse
+- Builds: 0040
+- [ ] A read that arrives mid-pulse currently FAILS: DuckDB's file lock is exclusive for the whole file, and a read-only open is refused outright rather than queued. Reproduce by running `conducks analyze` in one shell and any read command in another. Fixed when that read returns the previous pulse's answer instead of an error
+- [ ] The write goes to a sibling file and lands by atomic rename, which is `compact()`'s path used for a different reason — so this reuses a mechanism that is already crash-proven rather than inventing a second one. Verify the crash property the same way: a kill at any point leaves either the old vault or the new one, never a half-written vault
+- [ ] Decide what a reader holding the OLD file does when the swap lands. On POSIX the rename does not disturb an open handle and the reader finishes against the old inode, which is correct — but that is reasoning, not a measurement, and Windows does not behave that way. Test it before relying on it
+- [ ] `conducks_status` must say which pulse a reader is answering from, or "one pulse stale" becomes invisible rather than acceptable. It already reports staleness against git; this is the same field answering a second question
+

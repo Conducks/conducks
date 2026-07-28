@@ -3,6 +3,7 @@
 Status: Accepted
 - Amends: 0023
 - Enforced by: `tests/unit/interfaces/tools/docs-layer.test.ts`
+- Amended by: 0040 (readers are served from a snapshot, so the measured lock no longer fails a read)
 - Date: 2026-07-26
 - Promoted: docs/memory.md (the measurement); the `[code layer]` tool-description tag
 
