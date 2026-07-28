@@ -59,6 +59,7 @@ flowchart TD
 4. `domain` imports core + contracts.
 5. `registry` is the only composition point; it imports domain + core + contracts.
 6. Interfaces never import each other, with two encoded exceptions: `cli → web` (the `mirror` command launches the web server — a launcher edge, not logic coupling) and `web → domain`/`core` directly.
+7. The structural graph is not materialised by `registry.initialize()`. A path that walks it calls `ensureGraphLoaded()` first; a path that can answer from the vault does that instead (CONDUCKS-30, ADR 0038).
 - Enforced by: .github/workflows/main.yml (the `Enforce Layer Contract` step, `conducks guard` on the graph `analyze` just wrote)
 
 `conducks guard` evaluates the `layer_boundaries` sentinel rule on this repo's real graph and

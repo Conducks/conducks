@@ -204,9 +204,17 @@
 - Purpose: Analyze a codebase even where the native `tree-sitter` bindings could not be built, by falling through to the Gnosis regex extractor per file.
 - Intent: `npm i -g conducks` must work on a machine with no C++ toolchain, and the core `tree-sitter` package ships no prebuilds — so the bindings are optional and their absence has to be a supported state, not a crash. Lower fidelity is a worse answer; a dead CLI is no answer.
 
+## Deferred Graph Load — every read path
+- Purpose: The structural graph materialises when something walks it, not when a process starts. A docs-only MCP session holds 92 MB instead of 435 MB; `conducks_status` holds 104 MB.
+- Intent: The MCP stdio transport spawns one server per client SESSION, so the cost multiplies by however many sessions are open — three was 1.3 GB. Anything that walks the graph calls `ensureGraphLoaded()`; anything answering from SQL or files does not. Forgetting is loud on purpose, because a deferred graph reads as an EMPTY one. See ADR 0038.
+
 ## Update Notice — reported by `conducks doctor`
 - Purpose: Compare the installed version against the latest GitHub release and hand back the upgrade command that matches how this copy was installed.
 - Intent: It TELLS and never upgrades — a tool that rewrites its own install unprompted is a supply-chain surprise. It is also the only outbound network call in conducks, so it is cached for 24h in `~/.conducks/`, times out in 2s, swallows every failure, and can be switched off with `CONDUCKS_NO_UPDATE_CHECK=1`.
+
+## Vault Compaction — runs inside `conducks analyze`
+- Purpose: Rewrite the vault into a fresh database and swap it in, reclaiming the space DuckDB never returns. This repo's vault went 235.3 MB to 12.8 MB on the first pulse after it landed.
+- Intent: It is a PULSE STEP and deliberately not a `conducks compact` command — a vault that only shrinks when someone remembers is a vault that grows, and the people worst affected never read the docs. A cheap `bloatRatio()` check (11 ms) gates the rewrite, so a healthy vault pays almost nothing, and the rewrite keeps its output only if it came out smaller. See ADR 0037.
 
 ## Vault Clean / Reset — `conducks clean`
 - Purpose: Drop the vault and clear stuck process locks so a fresh pulse can run.
