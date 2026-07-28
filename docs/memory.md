@@ -494,3 +494,19 @@
 - Applies: when you change the grammar, changing the parser is half the job — `docs-grammar.ts` and
   the standard have to move together, and only a human is checking. `todo22#P4` carries the fix; the
   cheap 80% is a test asserting the standard's documented marker set equals `MARKER_TO_STATE`'s keys.
+
+## One MCP server per SESSION is the stdio transport, not a conducks choice — and each costs 435 MB
+- Gotcha: three `conducks ... mcp` processes running at once is correct, not a leak. The MCP stdio
+  transport has the CLIENT spawn the server as a subprocess and talk over pipes, and a pipe is
+  point-to-point — two clients cannot share one stdio server. Check `ps -eo pid,ppid` before
+  assuming a leak: a real orphan has PPID 1, and conducks does not produce them (tested — spawn over
+  a pipe, SIGKILL the parent, and the child exits even after anchoring a vault).
+- Why: the count is fine but the SIZE is not. Measured 2026-07-28: bare node 45 MB → registry import
+  68 MB → `initialize()` 233 MB → 435 MB after one query. The graph load is ~165 MB of that, for
+  2,381 nodes and 12,590 edges. Idle servers report ~42 MB in `ps` only because macOS evicts their
+  pages; an active session holds the full 435 MB.
+- Applies: the fix is NOT a shared daemon. ADR 0036 permits a daemon only as an accelerator, a
+  shared server makes the vault-lock problem worse rather than better, and it would still hold one
+  graph per open project. The fix is `todo21#P4` — stop materialising the whole graph to answer a
+  read-only query. Grammars were the obvious suspect and are innocent: 14 MB, 21 ms for all twelve,
+  and the MCP tool surface never parses (`registry.analyze.*` appears 0 times in it).
