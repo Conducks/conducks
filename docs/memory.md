@@ -611,3 +611,19 @@
   and reducing transient garbage. Streaming rows into the graph instead of materialising them first
   measured 111 MB peak → 98 MB, but `db.each`'s completion callback never fires in duckdb 1.4.4 and
   `load()` hangs — use the `stream()` async-iterator API if you pick this up (`todo21#P5`).
+
+## A unit's own row has `unitId = NULL`, so purging by `unitId` alone leaves it behind forever
+- Gotcha: a UNIT node IS the unit, so it belongs to no unit and its `unitId` column is NULL. Only its
+  CHILDREN carry the id. `purgeUnits()` matched on `unitId` alone, which deleted every child and left
+  the unit row standing — and a surviving row is found again by the next reconcile, purged again, and
+  found again. `analyze` reported "purging 46 unit(s) no longer discoverable" on every single pulse,
+  forever, for files deleted weeks earlier.
+- Why: it cost correctness as well as churn. The graph kept answering with 44 files that were not on
+  disk — old `docs/architecture/modules/` paths, a deleted skill, a todo moved to `completed/`. And
+  it is unbounded DELETE+INSERT against a store that never reclaims deleted row versions (ADR 0037),
+  so the vault grew on every pulse of an otherwise IDLE repo. Fixed by matching `id` as well; the ids
+  passed in are `<file>::unit`, which is exactly the unit row's own id.
+- Applies: the test that missed this built children only — every fixture node carried a `unitId`, so
+  the case where the column is NULL was never exercised. When a table has a row that is the PARENT of
+  the thing being keyed on, test the parent explicitly. Verified after the fix: purge runs once then
+  never again, phantom files 44 → 1, vault steady at 28.26 MB across five consecutive pulses.

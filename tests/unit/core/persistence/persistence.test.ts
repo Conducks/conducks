@@ -196,6 +196,32 @@ describe('SynapsePersistence', () => {
 
       expect(await persistence.getFileHash('src/a.ts')).toBeUndefined();
       expect(await persistence.getFileHash('src/b.ts')).toBe('hash-b');
+
+      // NOTE: every node above is a CHILD — it carries a `unitId`. The unit's OWN row does not, and
+      // that gap is the whole of the next test.
+    });
+
+    it('deletes the UNIT row itself, whose own unitId is NULL', async () => {
+      // A unit's row IS the unit, so it belongs to no unit and `unitId` is NULL. Matching only on
+      // `unitId` deleted every child and left that row behind — and because the row survived,
+      // `analyze`'s reconcile found the same file "no longer discoverable" on EVERY pulse, purged
+      // its already-absent children, and found it again next time. Unbounded churn against a store
+      // that never reclaims deleted row versions (ADR 0037), while the graph kept answering with
+      // 44 files that were not on disk. The fixture that missed it built children only.
+      await persistence.saveNodes(
+        [
+          { id: 'src/gone.ts::unit', label: 'file', properties: { name: 'gone.ts', filePath: 'src/gone.ts', canonicalKind: 'UNIT' } },
+          { id: 'src/gone.ts::fn', label: 'function', properties: { name: 'fn', filePath: 'src/gone.ts', canonicalKind: 'BEHAVIOR', unitId: 'src/gone.ts::unit' } },
+        ],
+        'pulse1'
+      );
+      const before = await persistence.query<{ id: string }>('SELECT id FROM nodes');
+      expect(before).toHaveLength(2);
+
+      await persistence.purgeUnits(['src/gone.ts::unit']);
+
+      // Both rows, not just the child. A survivor here is re-purged forever.
+      expect(await persistence.query('SELECT id FROM nodes')).toHaveLength(0);
     });
 
     it('is a no-op for an empty unit list', async () => {

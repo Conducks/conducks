@@ -332,15 +332,24 @@ export class SynapsePersistence {
 
     try {
       if (owned) await this.run(`BEGIN TRANSACTION`);
-      await this.run(`DELETE FROM edges WHERE sourceId IN (SELECT id FROM nodes WHERE unitId IN (${placeholders}))`, lowered);
+      // A unit's own row has `unitId = NULL` — it IS the unit, so it belongs to none. Matching only
+      // on `unitId` therefore deleted every CHILD and left the UNIT row behind, and the consequences
+      // were not subtle: `analyze`'s reconcile found the same 46 units "no longer discoverable" on
+      // EVERY pulse, purged their (already absent) children, and found them again next time. That is
+      // unbounded churn against a store that never reclaims deleted row versions (ADR 0037), and the
+      // graph meanwhile kept answering with 44 files that do not exist on disk.
+      // The ids passed in ARE the unit ids (`<file>::unit`), so matching `id` too is exact.
+      const owns = `(unitId IN (${placeholders}) OR id IN (${placeholders}))`;
+      const both = [...lowered, ...lowered];
+      await this.run(`DELETE FROM edges WHERE sourceId IN (SELECT id FROM nodes WHERE ${owns})`, both);
       // Drop the content hashes of the purged files BEFORE their nodes go, while the subquery can still
       // find them. Leaving a hash behind is the sharp edge of the hash gate (ADR 0030): the file would
       // look "already analyzed" to the gate and be skipped forever, while having no nodes at all.
       await this.run(
-        `DELETE FROM file_hashes WHERE file IN (SELECT DISTINCT file FROM nodes WHERE unitId IN (${placeholders}))`,
-        lowered
+        `DELETE FROM file_hashes WHERE file IN (SELECT DISTINCT file FROM nodes WHERE ${owns})`,
+        both
       );
-      await this.run(`DELETE FROM nodes WHERE unitId IN (${placeholders})`, lowered);
+      await this.run(`DELETE FROM nodes WHERE ${owns}`, both);
       if (owned) await this.run(`COMMIT`);
     } catch (err) {
       if (owned) { try { await this.run('ROLLBACK'); } catch {} }
