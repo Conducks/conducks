@@ -2,7 +2,7 @@
  * Conducks — Docs Grammar Parser 📄
  *
  * Parses authored markdown docs into structured data straight from the body — no YAML.
- * Implements the conducks-docs skill §4 grammar: five primitives (# Title, Status:,
+ * Implements the conducks-docs skill §5 grammar: five primitives (# Title, Status:,
  * ## Section, - [ ] task, - Key: value), type inferred from path. This is the single
  * source of truth for both `docs-status` (extract) and `docs-lint` (validate).
  *

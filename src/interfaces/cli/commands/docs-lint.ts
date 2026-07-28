@@ -7,7 +7,7 @@ import chalk from "chalk";
 /**
  * Conducks — Docs Lint Command 📄🛡️
  *
- * Validates every governed doc against the conducks-docs §4 grammar. This is what makes body-parsing
+ * Validates every governed doc against the conducks-docs §5 grammar. This is what makes body-parsing
  * safe: a doc that deviates (missing Status, no Phase sections, missing an ADR section) is rejected
  * before it can break the extractor. Exits non-zero on any violation, so it works as a CI gate.
  *

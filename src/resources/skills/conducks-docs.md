@@ -14,7 +14,10 @@ next commit.
 | test fill per function | `conducks coverage` |
 | entry points, hotspots | `conducks status --mode map` |
 
-Sections are numbered so docs can cite them. Add at the end; renumbering breaks citations.
+Sections and subsections are numbered so anything can cite one rule: `conducks-docs §6.8`. **Add at
+the end of a section; never renumber** — a citation that silently points at the wrong rule is worse
+than no citation, and it has happened. (The `###` numbering here is prose structure in this standard.
+Inside a governed doc `###` still opens nothing — §5.1.)
 
 ---
 
@@ -72,7 +75,7 @@ gotcha, not one labelled "resolved".
 root tree above it. A `packages/` folder is not the test; ownership is (see Monorepo below). Adding
 the second service is what creates the root tree.
 
-### Single repo
+### §3.1 Single repo
 
 ```
 docs/
@@ -88,7 +91,7 @@ docs/
                        (`product/` holds SPECS, which outrank the code — §8)
 ```
 
-### Monorepo
+### §3.2 Monorepo
 
 A **service** is a part with its own owner: `app`, `admin`, `database`, `packages/core`,
 `packages/product`. The test is **ownership, not whether it boots** — `database` never runs, but when
@@ -134,7 +137,7 @@ service still gets its root link.
 
 **Links run one way.** Root links down. Todo slices link up to their epic. Nothing sideways.
 
-### Bootstrapping a new tree
+### §3.3 Bootstrapping a new tree
 
 Create the FULL folder set, with real files, at the moment the tree is created — do not wait for facts
 to arrive. An empty `docs/` gives the next reader nothing to find and nowhere to put what they learn.
@@ -197,7 +200,9 @@ Status: <value>         life state, one line, directly under the title
 - Key: value            a field
 ```
 
-**Exact syntax the parser requires.** Measured against the regexes, not inferred:
+### §5.1 Exact syntax the parser requires
+
+Measured against the regexes, not inferred:
 
 | primitive | must be | tolerated | silently NOT read |
 |---|---|---|---|
@@ -254,7 +259,7 @@ Shipped via the hook. Gate green.              - [x] setAuthInitializer hook add
 **State is derived, never announced.** A `[DONE]` marker is a second copy of what the checkboxes
 already hold, and its prose is unaddressable. Date and narrative go in the paragraph under the tasks.
 
-### The checkbox carries the state, and there are exactly four
+### §5.2 The checkbox carries the state, and there are exactly four
 
 A task's state lives in its marker and nowhere else. There is no `## Deferred` section, no `[~]`, no
 ALL-CAPS note doing the job instead.
@@ -290,10 +295,14 @@ board reports the same number for both.
 **`[>]` is not a defect.** An unanswered question in Phase 0 is not deferred work — leave it `[ ]`.
 Reach for `[>]` when the work is real, understood, and blocked on something named.
 
-**Not read — an unrecognised line is prose.** Never encode state in: emoji or `[DONE]` in a heading ·
+### §5.3 What is not read
+
+**An unrecognised line is prose.** Never encode state in: emoji or `[DONE]` in a heading ·
 strikethrough · bold or ALL-CAPS DONE · HTML comments · indentation, which carries no meaning · a
 `Status:` not directly under the title · any field key not listed in this standard. A fact is read
 only as a `Status:`, a `- Key: value`, or a `- [ ]`. **There is no fourth way.**
+
+### §5.4 What docs-lint fails on
 
 **Only six types are linted:** `todos` · `decisions` · `features` · `conventions` · `memory` ·
 `handover`. `architecture.md`, `MODULE.md` and the soft folders are parsed but NOT grammar-checked —
@@ -313,7 +322,9 @@ an agent reading one tree cannot know it is missing the rest · **any `README.md
 outside `completed/` `legacy/` `archive/` `agent-runs/`. It cannot see `## Phase 2b` — that is a
 silent gap in `docs-status`.
 
-**It WARNS without failing on** (hygiene — true findings that break no grammar): `Status: done` still
+### §5.5 What it warns on
+
+**Hygiene — true findings that break no grammar:** `Status: done` still
 sitting in `todos/` · `Status: done` with unchecked tasks · `Status: doing` with everything checked ·
 `Status: blocked` with neither an unmet `- Depends:` nor a `- Blocked by:` · **every task deferred and
 none complete** — a deferral is not a completion · **`Status: done` with deferred tasks still in it**,
@@ -328,7 +339,7 @@ ignore.
 
 ## §6 Each file
 
-### `features.md`
+### §6.1 `features.md`
 
 ```markdown
 # Features — <service>
@@ -344,7 +355,7 @@ ignore.
 Name the entry point in the heading. Add `## Tunables` once the service has defaults, thresholds or
 gates. Update when an ADR and its todos finish. **Root `features.md` is an index only.**
 
-### `architecture.md` — the graph, and the rules its arrows obey
+### §6.2 `architecture.md` — the graph, and the rules its arrows obey
 
 Nothing else. A diagram, the node-to-module links, the contract, the enforcing test.
 
@@ -395,7 +406,7 @@ stays queried.
 are legal, whole tree. A MODULE.md `**Layer:**` says **where that one module sits in it**. About to
 repeat a rule in a MODULE.md? It belongs in `architecture.md`.
 
-### `modules/<path>/MODULE.md`
+### §6.3 `modules/<path>/MODULE.md`
 
 **Mirror the source tree** — layout under `modules/` matches source layout, nested as deep. Finding a
 note is a path translation, not a search.
@@ -429,7 +440,7 @@ a rule. No symbol maps or call lists — ask `conducks trace` / `conducks impact
 
 Feature = what the system offers. Module = what one part owns, refuses, assumes, breaks on.
 
-### `conventions.md` — root only
+### §6.4 `conventions.md` — root only
 
 ```markdown
 # Conventions — <repo>
@@ -451,7 +462,7 @@ narrower than a rule:
 | which dependencies are legal | that service's `architecture.md` `## Contract` |
 | one module's own behaviour | that module's `MODULE.md` under `**Boundaries:**` |
 
-### `memory.md` — root only
+### §6.5 `memory.md` — root only
 
 ```markdown
 # Memory — <repo>
@@ -469,7 +480,7 @@ Two kinds of entry belong here that look like architecture and are not:
 - **Removed modules — do not re-add.** A deleted module has no MODULE.md left to hold the warning, so
   without an entry here the next reader re-creates it. Say what went and why.
 
-### `decisions/NNNN-title.md`
+### §6.6 `decisions/NNNN-title.md`
 
 ```markdown
 # NNNN — <title>
@@ -509,7 +520,7 @@ supersede kills a record. Every other link is a field **stamped on both ends**:
 **Superseding a half-built record:** add `- Inherits: NNNN (the part never built)` so the remainder
 keeps an owner. Lint requires it when the superseded record still has unfinished work.
 
-### `todos/todoNN.md`
+### §6.7 `todos/todoNN.md`
 
 ```markdown
 # todoNN — <title>
@@ -546,7 +557,7 @@ against the checkboxes. Find every slice of an epic with `conducks docs-status`,
 **Never trust a done task without a test that could have failed.** A test with no assertions reads as
 coverage and is worse than none.
 
-### What a task says: the PROBLEM and the PROOF, never the code
+### §6.8 What a task says: the PROBLEM and the PROOF, never the code
 
 A task states what is wrong and how you will know it is fixed. It does not state which lines to
 write. Whoever picks it up can read the code; what they cannot recover is why it is wrong and what
@@ -585,7 +596,7 @@ a large job — what it is for, what it rests on, what was ruled out. Put that i
 directly under the fields, before Phase 1. It is prose, it is not a phase, and nothing counts it.
 Write it whenever the phase titles alone would not tell a stranger what this todo is.
 
-### The unsolved problem is a task, and it lives in Phase 0
+### §6.9 The unsolved problem is a task, and it lives in Phase 0
 
 Not every task is work. Some are questions nobody has answered yet, and the answer changes what gets
 built. Those go in a **Phase 0** that everything below `- Depends:` on:
@@ -607,7 +618,7 @@ costs more than the note did.
 **A Phase 0 task is not a defect.** Do not turn one into a `[-]` because it is unsolved. Drop it only
 when the question stops mattering, and say why.
 
-### How to size, group and divide
+### §6.10 How to size, group and divide
 
 The failure is a todo that describes a whole quarter and a todo that describes one afternoon, sitting
 in the same folder addressed the same way.
@@ -666,7 +677,7 @@ An ADR cannot hold this: it is frozen, and joint status moves.
 - Its `- Builds:` leaves the graph, so the ADR reports **no build link** unless it carries an
   `- Enforced by:`.
 
-### `handover.md` — root only
+### §6.11 `handover.md` — root only
 
 ```markdown
 # Handover — <ISO-date>
@@ -679,7 +690,7 @@ Status: current | stale
 Overwrite at session end and re-stamp the date — never appended. Two sections, ≤15 lines. Untouched
 this session? Set `Status: stale`.
 
-### No progress file
+### §6.12 No progress file
 
 What shipped and when comes from dated ADRs and closed todos: `conducks docs-status`, or
 `conducks_docs` with `recent: <n>`. An existing `progress.md` is derived — unread, unlinted — and
