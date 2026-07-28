@@ -50,7 +50,9 @@ A doc passes when that reader can:
 Naming a service is not an anchor. `packages/product/finance/FinanceService.ts:132` is. When you do
 not have the line — the source you are writing from named a file and no more — give the file and the
 symbol (`upload-handler.ts::uploadWithRetry`), which survives an edit that a line number would not.
-Do not invent a line number to satisfy the shape.
+When you do not have the file either, name the symbol and say the location is unknown. **Never invent
+a path, a line or a symbol to satisfy the shape** — a wrong anchor costs the next reader the search
+plus the time spent trusting it, which is worse than an admitted gap they can close in one grep.
 
 Write it the turn you decide it: a choice → ADR, a trap → `memory.md`, work → a todo.
 
@@ -504,16 +506,31 @@ Two kinds of entry belong here that look like architecture and are not:
 ```markdown
 # NNNN — <title>
 Status: Accepted | Superseded by NNNN
-- Amended by: NNNN, NNNN
 - Enforced by: <the test or symbol that proves it is built — a repo-relative path>
 - Date: <YYYY-MM-DD, the day it was DECIDED>
+- Amended by: NNNN, NNNN        OPTIONAL — only once an amendment exists
 
-<what each amendment changed, in prose>
+<what each amendment changed, in prose — omit this too when there are none>
 
 ## Context
-## Decision
-## Consequences
+## Decision                     the call, and what was NOT chosen, and why
+## Consequences                 what it costs, and any `Open:` question (below)
 ```
+
+**`- Enforced by:` names a test that would FAIL if the decision were reversed.** That is the whole
+criterion, and it is the same one §6.7 applies to a done task: a test that passes either way proves
+nothing was built. A broad suite that merely exercises the feature does not qualify — point at the
+case that pins THIS call. If no such test exists yet, leave the field off and let the record report
+as unbuilt, which is true, rather than claim a proof that would survive the decision being undone.
+
+**Omit a field you have nothing to put in — never write it empty.** Every relation field
+(`- Amended by:`, `- Supersedes:`, `- Resolved by:` …) appears only once that relation is real. A key
+with an empty value is not a placeholder the tooling understands; it is a field whose value is the
+empty string, and it reads to the next person as a link that exists.
+
+**The rejected option goes under `## Decision`, not `## Context`.** Context is the situation that
+forced a choice; Decision is the choice, which includes the roads not taken. Splitting them puts half
+the reasoning where nobody looks for it.
 
 **One decision per numbered file.** Two calls in one record cannot be superseded separately — the
 second dies with the first.
@@ -556,11 +573,20 @@ todo nor a resolving ADR is a decision that quietly rots: the reader cannot tell
 answered elsewhere or forgotten. That is why the todo is written in the same turn (§1) — a record
 cannot grow the reference later, so there must be something to name while you are still writing.
 
-**When you genuinely cannot write the todo in that turn** — you are scoped to one file, the todo tree
-belongs to another service, or you are reviewing rather than authoring — say so inside the `Open:`
-paragraph: *"no todo carries this yet."* The rule exists to stop questions vanishing silently, and a
-gap someone wrote down is one the next reader can close. Never let the rule push you into inventing a
-todo number that does not exist, which would fail lint and point at nothing.
+**When you cannot write the owner in that turn, name the gap instead.** You may be scoped to one
+file, the todo tree may belong to another service, or you may be reviewing rather than authoring.
+Say which case you are in, inside the `Open:` paragraph:
+
+| the open question is | and you cannot create its owner now | write |
+|---|---|---|
+| work someone will do | no todo exists yet | *"no todo carries this yet"* |
+| a decision someone will make | the resolving ADR is not written | *"a later ADR must answer this; none does yet"* |
+
+**Never invent the number.** A `- Resolved by: 0042` or a `carried by todo14#P2` pointing at a record
+nobody wrote fails lint and, worse, reads as an answer that exists. The stamp goes on when the other
+record does — the ADR that answers this one adds `- Resolves:` and you add `- Resolved by:` then, which
+is the one edit a frozen record is allowed (§2). A gap someone wrote down is one the next reader can
+close; an invented reference is one nobody can.
 
 **`- Builds:` is the one link that is NOT stamped on both ends.** It lives on the todo phase and
 points UP at the ADR; the ADR carries no reciprocal field. The reason is that an ADR is frozen and a
@@ -573,8 +599,8 @@ link from the todo side. Never write `- Builds:` in a decision record.
 ```markdown
 # todoNN — <title>
 Status: todo | doing | done | blocked
-- Acceptance: one line, testable
-- Blocked by: external cause, when no phase explains it
+- Acceptance: one line, testable — the whole todo's done-condition
+- Blocked by: external cause, when no phase explains it        OPTIONAL
 
 ## Phase 1 — <title>
 - Builds: NNNN            the ADR this phase implements
@@ -585,6 +611,12 @@ Status: todo | doing | done | blocked
 - Depends: todoNN#P1      the phase that must finish first — same tree only
 - [ ] open task
 ```
+
+**If `- Acceptance:` will not fit one readable line, the todo is two todos.** It states when the WHOLE
+file is done, so several independent outcomes joined by "and" is a sizing signal, not a formatting
+problem — §6.10. Where the outcomes genuinely belong together, name the shared condition rather than
+listing each: "no job is stuck, retried or slow to poll" beats three clauses with numbers in them,
+and the numbers live in the phase tasks that prove them.
 
 **`- Depends:` never crosses trees.** It takes a bare `todoNN#PN` inside its own tree, never a
 qualified `app:todoNN#PN`. Cross-service coupling goes through a root epic (§6.10) and nowhere else —
@@ -715,6 +747,12 @@ second grouping mechanism beside the one that already works.
 
 **Size a phase by what fails together.** If half of it can ship while the other half is still broken,
 it is two phases. If a reviewer would have to read both halves to judge either, it is one.
+
+**A Phase 0 gates only what says it does.** Phase 0 has no special power: a later phase waits for it
+because it carries `- Depends: todoNN#P0`, and for no other reason. Work that does not turn on the
+answer — a separate bug in the same area, a fix that ships either way — carries no `- Depends:` and
+proceeds immediately. Do not gate everything behind the question just because the question is first
+in the file; that stalls work nobody was waiting on.
 
 **Order phases by what unblocks what, never by how the work feels.** The board reads top to bottom
 and `- Depends:` is the only thing that makes an order real.
