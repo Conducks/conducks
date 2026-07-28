@@ -194,7 +194,7 @@ Five per-line primitives, no frontmatter:
 
 ```
 # Title                 one per file, first line
-Status: <value>         life state, one line, directly under the title
+Status: <value>         life state, one line, before the first `##` section
 ## Section              a heading
 - [ ] task              one of four states — see below
 - Key: value            a field
@@ -207,7 +207,7 @@ Measured against the regexes, not inferred:
 | primitive | must be | tolerated | silently NOT read |
 |---|---|---|---|
 | `# Title` | `#` + at least one space, first line | — | `#Title` (no space) |
-| `Status: value` | **column 0**, no leading whitespace | `Status:value` (no space after colon) | any indented `Status:` |
+| `Status: value` | **column 0**, and **before the first `## ` section** | `Status:value` (no space after colon), a blank line between it and the title | any indented `Status:`; a `Status:` after the first section, which is read as prose |
 | `## Section` | exactly two `#` + a space | — | `###` (never a section — see below) |
 | `- [ ] task` | `-`, brackets, one of `space` `x` `X` `>` `-` | `-[x]`, `[X]`, any indentation | any other marker — it FAILS lint, it is not ignored |
 | `- Key: value` | **key starts with A–Z** | `-Key:v`, indented, multi-word (`Blocked by`) | `- builds:` — lowercase key parses as NOTHING |
@@ -299,7 +299,7 @@ Reach for `[>]` when the work is real, understood, and blocked on something name
 
 **An unrecognised line is prose.** Never encode state in: emoji or `[DONE]` in a heading ·
 strikethrough · bold or ALL-CAPS DONE · HTML comments · indentation, which carries no meaning · a
-`Status:` not directly under the title · any field key not listed in this standard. A fact is read
+`Status:` placed after the first `## ` section · any field key not listed in this standard. A fact is read
 only as a `Status:`, a `- Key: value`, or a `- [ ]`. **There is no fourth way.**
 
 ### §5.4 What docs-lint fails on
@@ -486,8 +486,8 @@ Two kinds of entry belong here that look like architecture and are not:
 # NNNN — <title>
 Status: Accepted | Superseded by NNNN
 - Amended by: NNNN, NNNN
-- Enforced by: <the test or symbol that proves it is built>
-- Date: <ISO>
+- Enforced by: <the test or symbol that proves it is built — a repo-relative path>
+- Date: <YYYY-MM-DD, the day it was DECIDED>
 
 <what each amendment changed, in prose>
 
