@@ -293,15 +293,22 @@ handover · a `Status:` outside its file's vocabulary · a wrapped value · a to
 section · a todo with no `- Acceptance:` · two phases sharing a number · a phase with no tasks · a
 missing or misspelled `## Context` / `## Decision` / `## Consequences` · a `- Builds:` or `- Depends:`
 pointing at an ADR or phase that does not exist · a relation stamped on one end only · superseding a
-record that still has open phases without `- Inherits:` · a cross-tree address that resolves to
-nothing · **an unknown checkbox marker** · **a `[>]` or `[-]` with no stated reason**. It cannot see
-`## Phase 2b` — that is a silent gap in `docs-status`.
+record that still has open phases without `- Inherits:` · a cross-tree address naming a tree that
+does not exist, or a record that does not exist in it · an unknown checkbox marker · a `[>]` or `[-]`
+with no stated reason · **a `- Depends:` that crosses a tree** — it fails even when the address
+resolves, because the order it claims is not one this tree can keep · **`conventions.md`,
+`memory.md` or `handover.md` inside a service tree** — they are root-only, and split across services
+an agent reading one tree cannot know it is missing the rest · **any `README.md` under a docs tree**,
+outside `completed/` `legacy/` `archive/` `agent-runs/`. It cannot see `## Phase 2b` — that is a
+silent gap in `docs-status`.
 
 **It WARNS without failing on** (hygiene — true findings that break no grammar): `Status: done` still
 sitting in `todos/` · `Status: done` with unchecked tasks · `Status: doing` with everything checked ·
 `Status: blocked` with neither an unmet `- Depends:` nor a `- Blocked by:` · **every task deferred and
 none complete** — a deferral is not a completion · **`Status: done` with deferred tasks still in it**,
-because `completed/` is not scanned and closing the file buries them · ADRs with no build link
+because `completed/` is not scanned and closing the file buries them · **a `progress.md`, `map.md` or
+`drift.md`** — derived files, never read and never linted; ask `conducks docs-status` and move them to
+`legacy/` · ADRs with no build link
 and no `- Enforced by:`, reported as one aggregated list rather than one line each. A warning is the
 gap between your claim and the checkboxes — fix it in the same turn or it becomes noise you learn to
 ignore.
