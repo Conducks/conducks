@@ -627,3 +627,19 @@
   the case where the column is NULL was never exercised. When a table has a row that is the PARENT of
   the thing being keyed on, test the parent explicitly. Verified after the fix: purge runs once then
   never again, phantom files 44 → 1, vault steady at 28.26 MB across five consecutive pulses.
+
+## Where a one-line edit's time actually goes, per phase
+- Gotcha: `todo21#P1` was written around "purge-and-reinsert is the real win". It is not. Instrumented
+  on a real 2-unit pulse: `orchestrator.analyze` **423 ms**, `persistence.load()` **116 ms**,
+  `resonate()` **39 ms**, `updateRanks` **170 ms**, `IntraLinker.resolve()` **48 ms** — 796 ms against
+  the 807 ms an edit measures. The DB write for the edited file itself is 31-75 ms, 3-7% of it.
+- Why: two optimisations were sized wrong before this was measured. The symbol diff the phase called
+  "the real win" is worth at most 75 ms, and the whole-graph tail is worth ~380 ms. `persistence.load()`
+  is NOT a bug — `flushAndClear` deliberately clears the in-memory graph during analysis so a large
+  repo's memory stays bounded, and PageRank then needs the full set back.
+- Applies: `updateRanks` writing only what moved took 329 ms → 170 ms, and it helps the real case
+  rather than only an idle one — a real pulse moves 1048 of 2384 ranks and leaves 1336 (the
+  zero-gravity nodes) alone. The remaining 170 ms is inherent to a global rank: every node PageRank
+  reaches shifts when the graph changes. `orchestrator.analyze` is the next target and must be split
+  into parse / extract / resolve / flush before anything is optimised, because this phase has already
+  been wrong twice about which half matters.
