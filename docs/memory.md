@@ -466,3 +466,19 @@
   micro-pulse per file save leaks continuously. Line-level updates (todo21#P1) are what stop the
   churn; compaction only mops it up. Note this is invisible to latency — DuckDB opened the bloated
   235 MB file in 7 ms, the same as the 8.76 MB copy.
+
+## `built` on the board means "every linked phase is done", NOT "the whole decision is carried"
+- Gotcha: `linkDecisions()` in `docs-board.ts:417` derives an ADR's `buildState` from the phases that
+  declare `- Builds: NNNN` and nothing else — `unlinked` when none link it, `built` when all the ones
+  that do are done. It never reads the ADR's `## Consequences`. An ADR with five consequences whose
+  single linked phase covers one of them reports `built`, and the board is then confidently wrong.
+- Why: the link graph is between an ADR and a PHASE, and a phase is not required to say which
+  consequence it carries. So the two halves — what a decision promised, and what someone claimed —
+  are never compared. `crossCheckDecisions()` checks relation stamps mirror each other, which is a
+  different property and does not cover this.
+- Applies: it has happened twice in two days and a human caught it both times. ADR 0035 stated that a
+  project without git degrades to today's conducks, and the only task proving it sat under a phase
+  building 0036. ADR 0034 stated that four todos migrate their parked tasks to `[>]`/`[-]`, and only
+  one of the four was done while no todo declared `- Builds: 0034`. Both ADRs read normally on the
+  board throughout. Until `todo22#P4` lands, reading an ADR's Consequences against its phases is a
+  MANUAL step — do it when an ADR flips to `built`, not after.

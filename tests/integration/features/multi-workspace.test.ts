@@ -9,22 +9,18 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 // design (CONDUCKS-8) and linking writes `.conducks/links.json`, so it was always meant to be
 // CLI-only, same as `setup`.
 //
-// PRODUCTION BUG FOUND (reported, not fixed — src/interfaces/cli is owned by another agent right
-// now, and out of this agent's scope regardless): `conducks link` is UNREACHABLE. It is not a logic
-// bug — it is a missing wiring line. src/interfaces/cli/index.ts:16 imports `LinkCommand`, but the
-// `commands: ConducksCommand[]` array built at index.ts:127-136 never instantiates it (every other
-// imported command class appears there; `LinkCommand` is the only import with no matching `new
-// XCommand()`). The CLI's command lookup (`commands.find(c => c.id === commandId)`) therefore never
-// finds "link", and `conducks link <path>` always exits with "Unknown command \"link\"" — verified
-// live below. `conducks help` does not list it either, for the same reason.
+// This suite was written against a production bug, now FIXED: `conducks link` was unreachable.
+// index.ts imported `LinkCommand` and the `commands: ConducksCommand[]` array never instantiated
+// it, so `commands.find(c => c.id === commandId)` never found "link" and every invocation exited
+// with `Unknown command "link"`. `conducks help` omitted it for the same reason. The fix was the
+// missing `new LinkCommand()`, landed 2026-07-27.
 //
-// This suite proves two separate things, deliberately kept apart:
-//  1. The bug itself, at the real CLI entry point (the first test below) — this is a regression
-//     test: registering LinkCommand in index.ts will make it start failing, which is correct.
-//  2. That the underlying domain logic (FederatedLinker) is NOT broken — only unreachable — by
-//     driving it directly in a child process (same isolation pattern as
-//     tests/unit/core/languages/java-extraction.test.ts), proving the fix is a one-line wiring
-//     change, not a deeper defect.
+// The suite still proves two separate things, deliberately kept apart:
+//  1. That the command REACHES the real CLI entry point (the first test below) — it pins the
+//     wiring, so deleting the registration line makes it fail again.
+//  2. That the underlying domain logic (FederatedLinker) works when driven directly in a child
+//     process (same isolation pattern as tests/unit/core/languages/java-extraction.test.ts). That
+//     separation is what proved the original defect was one missing line and not a deeper one.
 describe('Multi-workspace domain integration (link)', () => {
   let host: string;
   let neighbor: string;
