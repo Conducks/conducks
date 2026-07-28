@@ -643,3 +643,18 @@
   reaches shifts when the graph changes. `orchestrator.analyze` is the next target and must be split
   into parse / extract / resolve / flush before anything is optimised, because this phase has already
   been wrong twice about which half matters.
+
+## The worker pool never spawns a worker in the shipped binary — analysis is single-threaded
+- Gotcha: `WorkerPool.run()` looks like a parallel fan-out and is not one for any installed copy.
+  `isTs = __filename.endsWith('.ts')` (`worker-pool.ts:16`); under compiled JS that is false, so
+  `tsxLoader` is never resolved and stays null, and `skipWorker = workerCount <= 0 || (!isTs &&
+  tsxLoader === null)` is ALWAYS true. The `spawnSync` fan-out runs only under `tsx`, which is
+  development. Do not read the pool code and conclude analysis is parallel.
+- Why: proven rather than inferred, because the code reads the other way. `CONDUCKS_WORKERS=0` and
+  the default land within 10 ms of each other across four runs (964/966/971/975 ms), and a full
+  `analyze --force` holds ~14% CPU on a multi-core machine. If the pool were engaging, forcing it off
+  would change something.
+- Applies: `workerPool.run` is 274 ms of the 423 ms `orchestrator.analyze` costs on a 5-unit pulse —
+  so the parse IS the cost, it is just not parallel. Also note the fan-out is sequential even where it
+  does run: each chunk goes through `spawnSync`, which blocks until that process exits, so the dev
+  path pays N process boots one after another. Measure a `tsx` run before assuming it helps there.
