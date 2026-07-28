@@ -108,7 +108,11 @@ Returns:
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ q, mode, template, params, filter, limit, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath, true);
+        // Only FUZZY mode walks the graph — it resolves names against in-memory nodes. `template`
+        // and `filter` compile to SQL and read through persistence, so they must not pay the
+        // ~165 MB graph load. Derived from the mode rather than hardcoded, because getting it
+        // wrong for fuzzy would return an empty result set with no error.
+        await ensureAnchor(customPath, true, (mode ?? 'fuzzy') === 'fuzzy');
 
         // 0. [Mode: Filter] Typed filter object -> parameterised SQL. No raw SQL surface: field
         // names and operators are validated against fixed allowlists in filter-builder.ts, and

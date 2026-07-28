@@ -285,7 +285,29 @@ export const registry = {
     createUpdateCheck: () => new UpdateCheck(),
   },
   infrastructure: {
-    get graphEngine() { return graph; },
+    get graphEngine() {
+      // A deferred graph reads as an EMPTY one, and every caller then reports zero nodes, zero
+      // flows, symbol-not-found — with no error anywhere. That is CONDUCKS-13 at full size, and it
+      // was measured: four of six MCP tools broke this way and three broke silently. Anything that
+      // WALKS the graph must `await registry.infrastructure.ensureGraphLoaded()` first; this makes
+      // forgetting a loud failure at the call site instead of a wrong answer downstream.
+      if (bootstrapper.graphIsDeferred) {
+        throw new Error(
+          '🛡️ [Registry] The structural graph is not materialised. This path walks the graph, so it ' +
+          'must `await registry.infrastructure.ensureGraphLoaded()` first — or answer from SQL, ' +
+          'which is why the load is deferred (todo21#P5).');
+      }
+      return graph;
+    },
+    /**
+     * Materialise the graph if `initialize({lazy})` deferred it.
+     *
+     * Anything that walks the graph calls this first. Anything that answers from SQL must not —
+     * that is the entire point, and it is what keeps a read-only server off a 165 MB load it never
+     * uses. The CURRENT persistence is passed in, because the connection the deferral was recorded
+     * on may already be closed.
+     */
+    ensureGraphLoaded: () => bootstrapper.ensureGraphLoaded(persistence),
     get persistence() { return persistence; },
     /**
      * Reclaim the vault if it has decayed enough to be worth the rewrite.

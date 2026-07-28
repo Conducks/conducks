@@ -30,7 +30,11 @@ export function resolveDocsRoot(customPath?: string): string {
  * before executing any tool. This prevents "Detached Root" errors when
  * the MCP server is launched from an arbitrary directory.
  */
-export async function ensureAnchor(customPath?: string, readOnly: boolean = true): Promise<void> {
+export async function ensureAnchor(
+  customPath?: string,
+  readOnly: boolean = true,
+  needsGraph: boolean = true,
+): Promise<void> {
   const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
   const root = customPath ? validatePath(customPath, projectRoot) : projectRoot;
   const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
@@ -44,4 +48,9 @@ export async function ensureAnchor(customPath?: string, readOnly: boolean = true
   if (rootChanged || modeChanged) {
     await registry.initialize(readOnly, root);
   }
+
+  // Opt-OUT, deliberately. Forgetting to materialise a graph a tool walks is SILENT: the domain
+  // services hold their own reference from construction, so they see an empty graph and report zero
+  // nodes with no error. A tool must be PROVEN to touch no graph before it passes false.
+  if (needsGraph) await registry.infrastructure.ensureGraphLoaded();
 }

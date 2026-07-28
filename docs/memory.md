@@ -544,3 +544,22 @@
 - Applies: cost me a wrong diagnosis while working `todo21#P5` — a reverted change looked broken
   because the probe was concurrent. Drive MCP probes one request at a time, awaiting each reply,
   before concluding anything about the code under test.
+
+## The graph load is DEFERRED — anything that walks it must ask, and forgetting is loud on purpose
+- Gotcha: `registry.initialize()` no longer materialises the structural graph for a read-only
+  caller. Anything that WALKS it — traversal, whole-graph scans, name resolution against in-memory
+  nodes — must `await registry.infrastructure.ensureGraphLoaded()` first. In the MCP surface that is
+  `ensureAnchor(path, readOnly, needsGraph)`, and `needsGraph` defaults to TRUE: a tool must be
+  proven graph-free before it opts out.
+- Why: a deferred graph reads as an EMPTY one, not as an error. Measured on the first attempt: four
+  of six MCP tools broke and THREE broke silently — `conducks_status` reported `nodeCount: 0`,
+  `conducks_flows` reported zero flows, impact and trace said SYMBOL_NOT_FOUND, and nothing logged a
+  thing. The `graphEngine` accessor now throws while a load is pending so a missed call site fails
+  at the call site. It is NOT a complete defence: `governance`, `search`, `kinetic` and `metrics`
+  capture `graph.getGraph()` at construction and never touch the accessor, which is exactly why
+  `needsGraph` is opt-out.
+- Applies: the deferred loader takes the CURRENT persistence rather than capturing one — the
+  read-only path closes its connection after loading, so a captured handle is dead by the time
+  anyone needs the graph (`Database was already closed`). Per-session cost on this repo: docs-only
+  90 MB, filter/template query 109 MB, graph-walking tool ~220 MB, against 435 MB for everything
+  before. `conducks_query` derives `needsGraph` from its mode, because only fuzzy walks memory.

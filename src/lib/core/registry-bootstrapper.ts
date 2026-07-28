@@ -23,6 +23,30 @@ export class RegistryBootstrapper {
   private isGrammarInitialized = false;
 
   /**
+   * Set when `lazy` deferred the graph load; null once the graph is materialised.
+   *
+   * It takes the persistence to load FROM rather than capturing one, because the connection this
+   * decision was made on may be closed by the time anyone needs the graph — the read-only path
+   * closes after every load. Resolving it at call time means the loader always uses whatever the
+   * registry currently holds, and `load()` reopens a closed vault on its own.
+   */
+  private pendingLoad: ((p: SynapsePersistence) => Promise<void>) | null = null;
+
+  /** True while a graph load has been deferred and not yet run. */
+  public get graphIsDeferred(): boolean { return this.pendingLoad !== null; }
+
+  /**
+   * Materialise the graph if something deferred it. A no-op once loaded, so any number of callers
+   * cost one load.
+   */
+  public async ensureGraphLoaded(persistence: SynapsePersistence): Promise<void> {
+    const pending = this.pendingLoad;
+    if (!pending) return;
+    this.pendingLoad = null;
+    await pending(persistence);
+  }
+
+  /**
    * Autonomously resolves the nearest project root.
    */
   public discoverRoot(startPath: string): string {
@@ -126,6 +150,8 @@ export class RegistryBootstrapper {
     }
   ): Promise<void> {
     const { readOnly, root, lazy } = options;
+    // A previous root's deferred load must never survive into this one.
+    this.pendingLoad = null;
     const { graph, persistence, ignoreManager, federation, updatePersistence, updateIgnoreManager } = context;
 
     if (!this.isGrammarInitialized) {
@@ -176,6 +202,18 @@ export class RegistryBootstrapper {
       const newIgnoreManager = new IgnoreManager(effectiveRoot);
       updateIgnoreManager(newIgnoreManager);
       
+      // Materialising the graph costs ~165 MB and 146 ms for 2,381 nodes and 12,590 edges, and a
+      // read-only caller frequently never walks it. `lazy` defers that to the first caller who
+      // does — which is what the flag always promised: it was destructured here and never read, so
+      // every read-only process paid a full load to answer questions that touched no node.
+      if (lazy) {
+        this.pendingLoad = async (current) => {
+          await current.load(graph.getGraph());
+          await federation.hydrate(graph.getGraph());
+        };
+        return;
+      }
+
       // FIX: Use the updated instance for the initial load
       try {
         await newPersistence.load(graph.getGraph());
@@ -189,6 +227,14 @@ export class RegistryBootstrapper {
       return; // Wave complete
     }
     
+    if (lazy) {
+      this.pendingLoad = async (current) => {
+        await current.load(graph.getGraph());
+        await federation.hydrate(graph.getGraph());
+      };
+      return;
+    }
+
     // Fallback: Default load if no re-connection was needed
     try {
       await persistence.load(graph.getGraph());
