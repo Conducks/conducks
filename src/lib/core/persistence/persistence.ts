@@ -653,6 +653,21 @@ export class SynapsePersistence {
     return Math.max(1, estimated / actual);
   }
 
+  /**
+   * Compact, but only once the vault has decayed enough to be worth the rewrite.
+   *
+   * The gate lives HERE rather than in composition because it is the load-bearing half: too high a
+   * threshold and the vault grows forever behind a check that always says "healthy", too low and
+   * every pulse pays a rewrite it does not need. A rule that important has to be reachable by a test
+   * that points at a real vault — with it in the registry, a test could only re-implement it and
+   * would then pass while the shipped wiring was broken. Composition just calls this.
+   */
+  public async reclaimIfBloated(minRatio = 3): Promise<{ before: number; after: number } | null> {
+    const ratio = await this.bloatRatio();
+    if (ratio === null || ratio < minRatio) return null;
+    return this.compact();
+  }
+
   public async compact(): Promise<{ before: number; after: number } | null> {
     if (this.readOnly) {
       throw new Error('🛡️ [Persistence] COMPACT BLOCKED: cannot rewrite a read-only vault.');

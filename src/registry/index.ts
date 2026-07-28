@@ -320,11 +320,7 @@ export const registry = {
      * when it will actually pay — so a watcher can call this after every pulse and a healthy vault
      * costs almost nothing. Returns null when nothing was done.
      */
-    reclaimVault: async (minRatio = 3): Promise<{ before: number; after: number } | null> => {
-      const ratio = await persistence.bloatRatio();
-      if (ratio === null || ratio < minRatio) return null;
-      return persistence.compact();
-    },
+    reclaimVault: (minRatio = 3) => persistence.reclaimIfBloated(minRatio),
     get chronicle() { return chronicle; },
     get registry() { return synapseRegistry; },
     get logger() { return logger; },

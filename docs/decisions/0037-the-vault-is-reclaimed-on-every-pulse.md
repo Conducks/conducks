@@ -1,6 +1,6 @@
 # 0037 — the vault is reclaimed on every pulse, not by a command someone remembers
 Status: Accepted
-- Enforced by: tests/unit/core/persistence/compact.test.ts (a churned vault shrinks and keeps every row; the WAL is removed so the swapped vault still opens; a young vault is declined rather than grown)
+- Enforced by: tests/unit/core/persistence/compact.test.ts (a churned vault shrinks and keeps every row; the WAL is removed so the swapped vault still opens; a young vault is declined rather than grown; bloatRatio rises with churn); tests/unit/registry/reclaim-vault.test.ts (the gate declines a healthy vault, fires on a decayed one, and is idempotent so a pulse step never rewrites twice)
 - Date: 2026-07-28
 
 ## Context

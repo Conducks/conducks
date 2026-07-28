@@ -176,6 +176,31 @@ describe('SynapsePersistence.compact — reclaims what DuckDB will not', () => {
     await after.close();
   }, 60000);
 
+  it('bloatRatio reports ~1 on a clean vault and rises with churn', async () => {
+    const root = mkRoot();
+    const p = new SynapsePersistence(root, false);
+    await churn(p, 1, 500);
+    await p.run('CHECKPOINT');
+    const clean = await p.bloatRatio();
+    expect(clean).not.toBeNull();
+    expect(clean!).toBeLessThan(2);
+
+    // The cheap gate the whole design rests on: it must SEE the leak, or `reclaimVault()` never
+    // fires and the vault grows forever behind a check that always says "healthy".
+    await churn(p, 40, 500);
+    await p.run('CHECKPOINT');
+    expect((await p.bloatRatio())!).toBeGreaterThan(5);
+    await p.close();
+  }, 60000);
+
+  it('bloatRatio returns null rather than dividing by an empty vault', async () => {
+    const root = mkRoot();
+    const p = new SynapsePersistence(root, false);
+    await p.query('SELECT 1');
+    expect(await p.bloatRatio()).toBeNull();
+    await p.close();
+  }, 60000);
+
   it('returns null when there is no vault to compact', async () => {
     const root = mkRoot();
     const p = new SynapsePersistence(root, false);
