@@ -556,6 +556,14 @@ supersede kills a record. Every other link is a field **stamped on both ends**:
 **Superseding a half-built record:** add `- Inherits: NNNN (the part never built)` so the remainder
 keeps an owner. Lint requires it when the superseded record still has unfinished work.
 
+**Every relation is a TWO-FILE change, and the new record alone does not compile.** Writing
+`- Supersedes: 0004` without adding `- Superseded by: 0011` to ADR 0004 fails lint on both counts: the
+stamp is one-ended, and if 0004 does not exist the reference dangles. So if you cannot edit the other
+record in this turn — it belongs to another service, or you are scoped to one file — **you cannot
+declare the relation yet**. Write the record without the relation field and say in prose which record
+it is meant to replace, so the stamp can be added on both ends at once. This is the one thing you
+cannot half-do: a one-ended stamp is how a superseded ADR keeps reading as current.
+
 **An ADR may leave a question open, and must say so where it can be found.** A decision often settles
 the main call and leaves a smaller one unanswered — a rotation scheme, a migration order, an
 either/or nobody has costed. The record is frozen, so it cannot grow the answer later. Write the open
@@ -580,7 +588,13 @@ Say which case you are in, inside the `Open:` paragraph:
 | the open question is | and you cannot create its owner now | write |
 |---|---|---|
 | work someone will do | no todo exists yet | *"no todo carries this yet"* |
-| a decision someone will make | the resolving ADR is not written | *"a later ADR must answer this; none does yet"* |
+| a decision this team will make | the resolving ADR is not written | *"a later ADR must answer this; none does yet"* |
+| a decision someone ELSE makes — commercial, legal, a customer call | it may never become an ADR here | *"waiting on <who>; not an engineering call"* — name the owner, not a record |
+
+The third row matters because not every open question resolves into a record you control. A migration
+window or a pricing call is still a real dependency, and naming who owns it is what lets the next
+reader chase it. What you must never do is leave it unattributed, which reads as an oversight rather
+than a wait.
 
 **Never invent the number.** A `- Resolved by: 0042` or a `carried by todo14#P2` pointing at a record
 nobody wrote fails lint and, worse, reads as an answer that exists. The stamp goes on when the other
