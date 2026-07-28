@@ -219,8 +219,11 @@ Modes:
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ mode, file, path: customPath }: any) => {
       try {
-        await ensureAnchor(customPath, true);
-        const status = registry.audit.status();
+        // `pulse` re-parses a file and needs a graph to write into. The other two modes report
+        // counts and staleness, which are `count(*)` and two rows of `metadata` — so they must not
+        // pay the ~165 MB graph load to answer "is my index stale".
+        await ensureAnchor(customPath, true, mode === "pulse");
+        const status = mode === "pulse" ? registry.audit.status() : await registry.audit.statusFromVault();
 
         if (mode === "map") {
           const hotspots = await registry.analyze.query.execute('hotspots', [10]);

@@ -393,6 +393,50 @@ export class GovernanceService implements ConducksComponent {
   /**
    * Calculates the current structural health status.
    */
+  /**
+   * The same answer as `status()`, read from the vault instead of the in-memory graph.
+   *
+   * Everything this reports is already a column or a row: the counts are `count(*)`, and the
+   * framework and last-pulsed commit are rows in `metadata`. Materialising 2,381 nodes and 12,590
+   * edges to read three numbers costs ~165 MB and 146 ms, which is what a read-only MCP session was
+   * paying to answer "is my index stale". Prefer this on any read path; `status()` stays for
+   * callers that already hold a materialised graph and would otherwise pay a round trip for nothing.
+   */
+  public async statusFromVault() {
+    if (!this.persistence) return this.status();
+
+    const [counts] = await this.persistence.query<{ nodes: number; edges: number }>(
+      'SELECT (SELECT count(*) FROM nodes) AS nodes, (SELECT count(*) FROM edges) AS edges');
+    const meta = await this.persistence.query<{ key: string; value: string }>(
+      "SELECT key, value FROM metadata WHERE key IN ('framework', 'lastAnalyzedCommit')");
+    const byKey = new Map(meta.map(m => [m.key, m.value]));
+
+    const lastCommit = byKey.get('lastAnalyzedCommit') || 'none';
+    const currentHead = chronicle.getHeadHash();
+    const isStale = Boolean(currentHead && lastCommit !== 'none' && currentHead !== lastCommit);
+
+    return {
+      status: 'ready',
+      projectName: path.basename(chronicle.getProjectDir() || 'unknown'),
+      framework: byKey.get('framework') || 'generic',
+      staleness: {
+        stale: isStale,
+        lastAnalyzedCommit: lastCommit,
+        currentHead: currentHead || 'non-git',
+        commitsBehind: isStale ? chronicle.getCommitsBehind(lastCommit) : 0,
+      },
+      stats: {
+        nodeCount: Number(counts?.nodes ?? 0),
+        edgeCount: Number(counts?.edges ?? 0),
+        // `density` is derived from the two counts the graph already tracked; computing it here
+        // keeps the shape identical for every caller rather than making them branch on the source.
+        density: Number(counts?.nodes ?? 0) > 1
+          ? Number(counts?.edges ?? 0) / (Number(counts.nodes) * (Number(counts.nodes) - 1))
+          : 0,
+      },
+    };
+  }
+
   public status() {
     const lastCommit = chronicle.getLastPulsedCommit(this.graph) || "none";
     const currentHead = chronicle.getHeadHash();

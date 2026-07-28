@@ -563,3 +563,19 @@
   anyone needs the graph (`Database was already closed`). Per-session cost on this repo: docs-only
   90 MB, filter/template query 109 MB, graph-walking tool ~220 MB, against 435 MB for everything
   before. `conducks_query` derives `needsGraph` from its mode, because only fuzzy walks memory.
+
+## `load()` never restores graph-level metadata — so staleness could never fire in a read-only process
+- Gotcha: `SynapsePersistence.load()` restores the `metadata` JSON COLUMN on each node and never
+  reads the `metadata` TABLE. So after a load into a fresh process, `graph.getMetadata('framework')`
+  and `graph.getMetadata('lastAnalyzedCommit')` are both `undefined` — verified against the real
+  vault while the table held `express` and a real commit hash.
+- Why: it makes `GovernanceService.status()` quietly wrong in a way nothing surfaces. Framework
+  reports `generic`. Worse, staleness is computed as
+  `head && lastCommit !== "none" && head !== lastCommit`, and with the commit missing `lastCommit`
+  falls back to `"none"` — so the expression is ALWAYS false. Every read-only process reported
+  "not stale" regardless of how far behind the index was, which is the one thing `conducks_status`
+  exists to tell you.
+- Applies: `statusFromVault()` reads the table directly and is immune, which is what `conducks_status`
+  now uses. The in-memory `status()` is still wrong for any caller that loaded from a vault rather
+  than having just analyzed — if anything else starts depending on graph-level metadata after a
+  load, restore the table in `load()` rather than working around it a second time.
