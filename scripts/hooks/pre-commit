@@ -30,9 +30,11 @@ if [ ! -f "$CLI" ]; then
   exit 0
 fi
 
-# --units so a monorepo gate covers every unit docs/ tree, not just the root one. A gate that
-# silently checks less than it appears to is the failure mode this hook exists to prevent.
-if ! node "$CLI" docs-lint --units; then
+# Every docs tree, root plus each service — which is what `docs-lint` does with no argument. It
+# used to be called with `--units`, a flag the command never had: it parsed as neither a path nor
+# a known switch and was silently dropped. The behaviour was right by accident, which is worse than
+# wrong, because the flag read as proof of intent. Narrow it with `--root-only` if you ever need to.
+if ! node "$CLI" docs-lint; then
   printf '\n\033[31m[pre-commit] docs-lint failed — commit aborted.\033[0m\n' >&2
   printf 'Fix the violations above, or bypass deliberately with: git commit --no-verify\n' >&2
   exit 1

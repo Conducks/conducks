@@ -1,7 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
+import { FilterValidationError } from "@/contracts/types.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
-import { buildFilterQuery, FilterValidationError, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 
 /**
  * Conducks — Query Command
@@ -37,7 +37,9 @@ export class QueryCommand implements ConducksCommand {
         return;
       }
 
-      let filter: QueryFilter;
+      // The filter shape is whatever composition accepts — read off the registry rather than
+      // imported from domain, so the CLI names no type the layer contract forbids it to reach.
+      let filter: Parameters<Registry["query"]["buildFilter"]>[0];
       try {
         filter = JSON.parse(filterJson);
       } catch {
@@ -47,7 +49,7 @@ export class QueryCommand implements ConducksCommand {
       }
 
       try {
-        const { sql, params } = buildFilterQuery(filter);
+        const { sql, params } = registry.query.buildFilter(filter);
         const rows = await (registry as any).infrastructure.persistence.query(sql, params);
 
         if (useJson) {

@@ -1,7 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
-import { buildTrees } from "@/lib/domain/analysis/docs-board.js";
 import chalk from "chalk";
 
 /**
@@ -19,7 +18,7 @@ export class DocsStatusCommand implements ConducksCommand {
   public description = "Open work in the docs, rooted at the ADRs that own it";
   public usage = "conducks docs-status [--json] [--all] [path]";
 
-  public async execute(args: string[], _registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const useJson = args.includes("--json");
     const showAll = args.includes("--all");
     const posArg = args.find(a => !a.startsWith("--"));
@@ -31,7 +30,7 @@ export class DocsStatusCommand implements ConducksCommand {
     // and `crossTreeLint` are already applied by `buildTrees`, so a misplaced file or a dangling
     // `app:todo42` shows up here exactly as it does from `docs-lint`.
     const rootOnly = args.includes("--root-only");
-    const trees = buildTrees(root, { rootOnly });
+    const trees = registry.docs.trees(root, { rootOnly });
 
     if (useJson) {
       const payload = trees.length === 1

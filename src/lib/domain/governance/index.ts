@@ -294,6 +294,12 @@ export class GovernanceService implements ConducksComponent {
           const layerOf = (file: string): string | null => {
             if (!file) return null;
             const f = file.toLowerCase();
+            // A layer contract governs what SHIPS. A unit test imports the unit it tests — that is
+            // the definition of one — and `tests/unit/interfaces/tools/filter-builder.test.ts`
+            // classifies as `mcp` on its path while actually testing a `domain` module. Routing it
+            // through the registry to satisfy the rule would convert every unit test into an
+            // integration test, which is a worse codebase bought with a greener gate.
+            if (/(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f)) return null;
             for (const [name, frag] of LAYER_FRAGMENTS) if (f.includes(frag)) return name; // order matters
             return null;
           };

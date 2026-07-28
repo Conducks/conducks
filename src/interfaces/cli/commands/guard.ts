@@ -32,6 +32,21 @@ export class GuardCommand implements ConducksCommand {
       const ruleReport = (registry.audit as any).rules() as { violations: Array<{ ruleId: string; severity: string; message: string }> };
       const layerViolations = ruleReport.violations.filter(v => v.ruleId === 'layer_boundaries');
 
+      // Other enabled sentinel rules (cycles, rank inversions) are surfaced as findings, not
+      // hard-blocked here — they are tracked separately and predate the layer split.
+      //
+      // Reported BEFORE the layer gate exits, deliberately. Exiting first hid this line whenever
+      // the contract was violated, so a reader who most needed the full picture — the build is
+      // already red — was the one reader who never saw whether 0 or 400 other findings sat behind
+      // it. A gate that hides its own scope cannot be trusted to have checked everything.
+      const otherErrors = ruleReport.violations.filter(v => v.ruleId !== 'layer_boundaries');
+      if (otherErrors.length > 0) {
+        const byRule: Record<string, number> = {};
+        for (const v of otherErrors) byRule[v.ruleId] = (byRule[v.ruleId] || 0) + 1;
+        console.log('⚠️  Other structural findings (pre-existing, tracked): ' +
+          Object.entries(byRule).map(([k, n]) => `${k}=${n}`).join(', '));
+      }
+
       // The layer contract is the hard gate — it's the one this guard was built to enforce.
       if (layerViolations.length > 0) {
         console.error('\n❌ Layer contract violated (ADR 0005):');
@@ -40,16 +55,6 @@ export class GuardCommand implements ConducksCommand {
         process.exit(1);
       }
       console.log('✅ Layer contract clean.');
-
-      // Other enabled sentinel rules (cycles, rank inversions) are surfaced as findings, not
-      // hard-blocked here — they are tracked separately and predate the layer split.
-      const otherErrors = ruleReport.violations.filter(v => v.ruleId !== 'layer_boundaries');
-      if (otherErrors.length > 0) {
-        const byRule: Record<string, number> = {};
-        for (const v of otherErrors) byRule[v.ruleId] = (byRule[v.ruleId] || 0) + 1;
-        console.log('⚠️  Other structural findings (pre-existing, tracked): ' +
-          Object.entries(byRule).map(([k, n]) => `${k}=${n}`).join(', '));
-      }
 
       // 3. Structural Regression Scan
       logger.info(`🛡️ [Guard] Scanning structural delta (Threshold: ${threshold})...`);

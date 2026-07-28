@@ -3,7 +3,6 @@ import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "fs-extra";
-import { ProjectRegistry } from "@/lib/domain/federation/project-registry.js";
 
 /**
  * Conducks — Setup Command
@@ -40,7 +39,7 @@ export class SetupCommand implements ConducksCommand {
     // 2. Record this root in ~/.conducks/projects.json (todo17 Phase 2). `setup` is the one command
     // every project runs first, so it is the only place that can know a project exists without asking.
     // Idempotent — a second setup refreshes the timestamp rather than adding a duplicate.
-    const projects = new ProjectRegistry();
+    const projects = registry.federation.createProjectRegistry();
     const { added, total } = projects.register(process.cwd());
     console.log(added
       ? `📌 Project registered → ${projects.path} (${total} total). See: conducks monitor`

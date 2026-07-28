@@ -2,8 +2,6 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import chalk from "chalk";
-import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
-import { ProjectRegistry } from "@/lib/domain/federation/project-registry.js";
 
 /**
  * Conducks — Cross-Project Monitor Command
@@ -21,13 +19,13 @@ export class MonitorCommand implements ConducksCommand {
   public description = "Report graph, docs and module freshness across every registered project";
   public usage = "conducks monitor [--json] [--stale] [--dismiss <module> [--intent <adr|todo|path>] [path]]";
 
-  public async execute(args: string[], _registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const useJson = args.includes("--json");
     const onlyStale = args.includes("--stale");
     const dismissIdx = args.indexOf("--dismiss");
 
-    const registry = new ProjectRegistry();
-    const monitor = new ProjectMonitor(registry);
+    const projects = registry.federation.createProjectRegistry();
+    const monitor = registry.federation.createProjectMonitor(projects);
 
     if (dismissIdx !== -1) {
       const moduleDir = args[dismissIdx + 1];
@@ -66,14 +64,14 @@ export class MonitorCommand implements ConducksCommand {
     const reports = await monitor.reportAll();
 
     if (useJson) {
-      console.log(JSON.stringify({ registry: registry.path, projects: reports }, null, 2));
+      console.log(JSON.stringify({ registry: projects.path, projects: reports }, null, 2));
       return;
     }
 
     if (reports.length === 0) {
       console.log(chalk.bold("\n--- 🛰️  Conducks Monitor ---\n"));
       console.log("  No projects registered yet.");
-      console.log(chalk.dim(`  Run 'conducks setup' inside a project — it records the root in ${registry.path}\n`));
+      console.log(chalk.dim(`  Run 'conducks setup' inside a project — it records the root in ${projects.path}\n`));
       return;
     }
 
@@ -127,10 +125,10 @@ export class MonitorCommand implements ConducksCommand {
 
     if (onlyStale && shown.length === 0) console.log(chalk.green("  Every registered project is current.\n"));
 
-    const missing = registry.missingRoots();
+    const missing = projects.missingRoots();
     if (missing.length > 0) {
       console.log(chalk.dim(`  ${missing.length} registered root(s) no longer exist on disk — reported, not removed.`));
-      console.log(chalk.dim(`  Edit or delete ${registry.path} to forget them.\n`));
+      console.log(chalk.dim(`  Edit or delete ${projects.path} to forget them.\n`));
     }
   }
 }

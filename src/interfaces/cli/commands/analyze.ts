@@ -1,7 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
-import { assessRoot, explainScope } from "@/lib/core/utils/scope-guard.js";
 import readline from "node:readline/promises";
 import { basename } from "node:path";
 
@@ -25,7 +24,7 @@ export class AnalyzeCommand implements ConducksCommand {
 
     // A pulse over the wrong root (a typo'd `~/Documents`) costs hours and writes a vault into a
     // folder that is not a project. Ask first; `--yes` skips the question for scripts.
-    if (!args.includes('--yes') && !(await confirmScope(targetPath))) {
+    if (!args.includes('--yes') && !(await confirmScope(targetPath, registry))) {
       console.error("\n[Conducks] Aborted — nothing was analyzed.\n");
       process.exit(1);
     }
@@ -59,12 +58,12 @@ export class AnalyzeCommand implements ConducksCommand {
  * With no TTY — a script, an agent, CI — an unanswerable question is a NO: silence must never start
  * an hours-long write.
  */
-async function confirmScope(targetPath: string): Promise<boolean> {
-  const scope = assessRoot(targetPath);
+async function confirmScope(targetPath: string, registry: Registry): Promise<boolean> {
+  const scope = registry.infrastructure.assessScope(targetPath);
   if (scope.level === "ok") return true;
 
   console.error("\n\x1b[33m⚠️  [Conducks] This does not look like one project root.\x1b[0m");
-  console.error(explainScope(scope));
+  console.error(registry.infrastructure.explainScope(scope));
 
   if (!process.stdin.isTTY) {
     console.error("\nNo terminal to confirm on — pass `--yes` if this really is the intended root.\n");

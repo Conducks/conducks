@@ -1,9 +1,7 @@
-import { Tool } from "@/contracts/types.js";
+import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
-import { buildTrees, agentView } from "@/lib/domain/analysis/docs-board.js";
-import { buildFilterQuery, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
@@ -118,7 +116,7 @@ Returns:
         if (mode === 'filter') {
           let compiled: { sql: string; params: unknown[] };
           try {
-            compiled = buildFilterQuery(filter as QueryFilter);
+            compiled = registry.query.buildFilter(filter as Parameters<typeof registry.query.buildFilter>[0]);
           } catch (validationErr: any) {
             if (validationErr instanceof FilterValidationError) {
               return mcpErr('INVALID_FILTER', validationErr.message, 'Check field names against the allowed list and operator against eq|neq|gt|gte|lt|lte|like|in.', false);
@@ -804,16 +802,16 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
         // was never analyzed, and takes no connection for another agent to queue behind.
         const root = resolveDocsRoot(customPath);
         const depth = typeof recent === "number" ? recent : 4;
-        const project = (board: ReturnType<typeof buildTrees>[number]["board"]) => raw
+        const project = (board: ReturnType<typeof registry.docs.trees>[number]["board"]) => raw
           ? board
-          : agentView(board, layer === "board" ? "board" : "all", depth);
+          : registry.docs.viewOf(board, layer === "board" ? "board" : "all", depth);
 
         // Every docs tree, ALWAYS, WITH both docs checks already applied (the merged lint is what
         // makes `board.lint.length` — `agentView`'s `health.grammarViolations` — correct here too). A
         // monorepo hides most of its authored intent in unit folders, and a tool that silently reads
         // only the root reports a fraction of the open work as if it were all of it — the same failure
         // the CLI had.
-        let trees = buildTrees(root);
+        let trees = registry.docs.trees(root);
 
         // `scope` narrows only what is RETURNED, never what is built — and `"root"` is not special,
         // it is just one more tree label. Every tree is built and cross-checked first, so an address

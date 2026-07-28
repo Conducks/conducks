@@ -3,8 +3,6 @@ import type { Registry } from "@/registry/index.js";
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { grammars } from "@/lib/core/parsing/grammar-registry.js";
-import { UpdateCheck } from "@/lib/domain/federation/update-check.js";
 
 /**
  * Conducks — Doctor Command
@@ -16,7 +14,7 @@ export class DoctorCommand implements ConducksCommand {
   public description = "Check environment health for Conducks";
   public usage = "conducks doctor";
 
-  public async execute(_args: string[], _registry: Registry): Promise<void> {
+  public async execute(_args: string[], registry: Registry): Promise<void> {
     const ok = (msg: string) => console.log(`[✓] ${msg}`);
     const fail = (msg: string) => console.log(`[✗] ${msg}`);
     const warn = (msg: string) => console.log(`[!] ${msg}`);
@@ -42,13 +40,13 @@ export class DoctorCommand implements ConducksCommand {
     // The native binding is an OPTIONAL dependency (ADR 0027): `tree-sitter` ships no prebuilds, so
     // it compiles at install time and is absent wherever there is no C++ toolchain. Conducks still
     // analyzes there, through the Gnosis regex extractor — at lower fidelity. Say which one is running.
-    if (grammars.isNativeAvailable()) {
+    if (registry.infrastructure.isNativeGrammarAvailable()) {
       const languages = [
         'typescript', 'tsx', 'javascript', 'python', 'go', 'rust',
         'java', 'csharp', 'cpp', 'php', 'ruby', 'swift', 'c',
       ];
-      await Promise.all(languages.map(id => grammars.loadLanguage(id)));
-      const missing = languages.filter(id => grammars.isLanguageUnavailable(id));
+      await Promise.all(languages.map(id => registry.infrastructure.loadGrammar(id)));
+      const missing = languages.filter(id => registry.infrastructure.isGrammarUnavailable(id));
       if (missing.length === 0) {
         ok(`Parse path: native tree-sitter, all ${languages.length} grammars induced`);
       } else {
@@ -100,7 +98,7 @@ export class DoctorCommand implements ConducksCommand {
 
     // 7. Version notice. Reported, never acted on — see UpdateCheck for why this is the one
     // outbound call and how it stays cheap. `null` means "no information", not "up to date".
-    const update = await new UpdateCheck().check();
+    const update = await registry.federation.createUpdateCheck().check();
     if (!update) {
       ok('Version: update check skipped');
     } else if (update.release === 'unreachable') {

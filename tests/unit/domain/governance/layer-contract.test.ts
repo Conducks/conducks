@@ -133,4 +133,36 @@ describe('layer_boundaries — synthetic upward edge is blocked', () => {
     expect(report.violations.filter(v => v.ruleId === 'layer_boundaries')).toHaveLength(0);
     expect(report.success).toBe(true);
   });
+
+  // A unit test imports the unit it tests — that is what makes it a unit test. But a test file's
+  // PATH carries an interface fragment (`tests/unit/interfaces/tools/filter-builder.test.ts`), so
+  // the rule classified it as `mcp` reaching into `domain` and blocked the build. Routing test
+  // imports through the registry to satisfy the contract would convert every unit test into an
+  // integration test: a worse codebase bought with a greener gate. Tests are excluded instead.
+  //
+  // This is a deliberate narrowing of an enforcement rule, which is the move that deserves the
+  // most scrutiny in this file — so it is pinned from both sides. The exclusion must cover test
+  // files, and it must NOT leak into production code that merely has "test" in its name.
+  it('does not block a test file importing the domain module it tests', () => {
+    const { graph, addNode, addEdge } = build();
+    addNode('/repo/tests/unit/interfaces/tools/filter-builder.test.ts::unit', 'filter-builder.test.ts', '/repo/tests/unit/interfaces/tools/filter-builder.test.ts');
+    addNode('/repo/src/lib/domain/analysis/filter-builder.ts::unit', 'filter-builder.ts', '/repo/src/lib/domain/analysis/filter-builder.ts');
+    addEdge('e1', '/repo/tests/unit/interfaces/tools/filter-builder.test.ts::unit', '/repo/src/lib/domain/analysis/filter-builder.ts::unit');
+
+    const report = auditOf(graph);
+    expect(report.violations.filter(v => v.ruleId === 'layer_boundaries')).toHaveLength(0);
+  });
+
+  it('still blocks PRODUCTION code whose name merely contains "test"', () => {
+    const { graph, addNode, addEdge } = build();
+    // `test-runner.ts` ships. Only a `.test.`/`.spec.` suffix or a `tests/` directory is a test.
+    addNode('/repo/src/interfaces/cli/commands/test-runner.ts::unit', 'test-runner.ts', '/repo/src/interfaces/cli/commands/test-runner.ts');
+    addNode('/repo/src/lib/domain/analysis/docs-board.ts::unit', 'docs-board.ts', '/repo/src/lib/domain/analysis/docs-board.ts');
+    addEdge('e1', '/repo/src/interfaces/cli/commands/test-runner.ts::unit', '/repo/src/lib/domain/analysis/docs-board.ts::unit');
+
+    const report = auditOf(graph);
+    const violations = report.violations.filter(v => v.ruleId === 'layer_boundaries');
+    expect(violations).toHaveLength(1);
+    expect(violations[0].message).toMatch(/cli → domain/);
+  });
 });

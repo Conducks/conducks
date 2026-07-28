@@ -59,17 +59,11 @@ export interface QueryFilter {
   limit?: number;
 }
 
-export class FilterValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'FilterValidationError';
-  }
-}
-
-// MCP9-style response budget: keep filter results comfortably under the 8KB orchestrator cap
-// (see synapse.ts's conducks_query — same budget the template/fuzzy modes already respect).
-export const FILTER_MAX_LIMIT = 20;
-export const FILTER_DEFAULT_LIMIT = 10;
+// The error and the budget are shared vocabulary and live in `contracts` — both domain (which
+// throws and enforces) and the interfaces (which catch and clamp) must be able to name them.
+// Re-exported here so the compiler and its vocabulary still arrive together for domain callers.
+export { FilterValidationError, FILTER_MAX_LIMIT, FILTER_DEFAULT_LIMIT } from "@/contracts/types.js";
+import { FilterValidationError, FILTER_MAX_LIMIT, FILTER_DEFAULT_LIMIT } from "@/contracts/types.js";
 
 /**
  * Validate a typed filter and compile it to parameterised SQL. Throws FilterValidationError on

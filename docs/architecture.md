@@ -59,11 +59,21 @@ flowchart TD
 4. `domain` imports core + contracts.
 5. `registry` is the only composition point; it imports domain + core + contracts.
 6. Interfaces never import each other, with two encoded exceptions: `cli → web` (the `mirror` command launches the web server — a launcher edge, not logic coupling) and `web → domain`/`core` directly.
-- Enforced by: tests/unit/domain/governance/layer-contract.test.ts
+- Enforced by: .github/workflows/main.yml (the `Enforce Layer Contract` step, `conducks guard` on the graph `analyze` just wrote)
 
-`conducks guard` evaluates the `layer_boundaries` sentinel rule
-(`src/lib/domain/governance/sentinel-rules.ts:181`) on every run and hard-blocks any upward edge —
-imports and calls, type-only imports included.
+`conducks guard` evaluates the `layer_boundaries` sentinel rule on this repo's real graph and
+hard-blocks any upward edge — imports and calls alike. CI is the only place it runs: the pre-commit
+hook cannot afford a full re-analysis, and guard reading a stale graph would gate yesterday's code.
+
+`tests/unit/domain/governance/layer-contract.test.ts` pins the RULE, not this repo — it audits a
+synthetic graph against the default ruleset and uses a nonexistent root to stay isolated. It cannot
+see a live violation, and for most of this project's life it was cited here as though it could,
+while three real violations stood (CONDUCKS-13: a check that evaluates to nothing reports success).
+
+Test files are outside the contract. A unit test imports the unit it tests, so
+`tests/unit/interfaces/tools/filter-builder.test.ts` classifies as `mcp` by path while testing a
+`domain` module. Routing those through the registry would turn every unit test into an integration
+test — a worse codebase bought with a greener gate.
 
 The test guards the rule STAYING ON, not just the table being right. That is the failure that
 happened: the contract existed as ADR 0005 plus a disabled rule for months while ~71 illegal edges

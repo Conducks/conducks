@@ -8,7 +8,15 @@ import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, RegressionGuard } from "@/lib/domain/governance/index.js";
 import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
-import { buildBoard, agentView } from "@/lib/domain/analysis/docs-board.js";
+import { buildBoard, agentView, buildTrees } from "@/lib/domain/analysis/docs-board.js";
+// Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
+// exists because a CLI command or an MCP tool used to reach past this layer for it.
+import { assessRoot, explainScope } from "@/lib/core/utils/scope-guard.js";
+import { grammars } from "@/lib/core/parsing/grammar-registry.js";
+import { UpdateCheck } from "@/lib/domain/federation/update-check.js";
+import { ProjectRegistry } from "@/lib/domain/federation/project-registry.js";
+import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
+import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
 import { parseIstanbul, bindCoverage, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
@@ -208,7 +216,11 @@ export const registry = {
     link: (projectPath: string) => intelligence.link(projectPath),
     resonate: () => graph.resonate(),
     get graph() { return graph; },
-    get diff() { return diffEngine; }
+    get diff() { return diffEngine; },
+    // Typed-filter compilation — the LOGIC routes through composition. Its vocabulary (the
+    // error class, the limit constants) does not: it lives in `contracts`, which every layer may
+    // import, because both sides need to name it. See contracts/types.ts.
+    buildFilter: (filter: QueryFilter) => buildFilterQuery(filter),
   },
   rename: {
     rename: (symbolId: string, newName: string, dryRun?: boolean) => evolution.rename(symbolId, newName, dryRun),
@@ -233,9 +245,17 @@ export const registry = {
   },
   docs: {
     board: (root?: string) => buildBoard(root || chronicle.getProjectDir() || process.cwd()),
+    // Every tree — root plus each service (§7). `docs-lint`, `docs-status` and the MCP docs tool
+    // all read the monorepo through this one call.
+    trees: (root?: string, options?: { rootOnly?: boolean; only?: string }) =>
+      buildTrees(root || chronicle.getProjectDir() || process.cwd(), options),
     // The agent projection: open threads + (optionally) the read-once constraint set.
     view: (root?: string, layer: "all" | "board" = "all", recent = 4) =>
       agentView(buildBoard(root || chronicle.getProjectDir() || process.cwd()), layer, recent),
+    // Same projection over a board the caller already built — `trees()` returns one board per
+    // tree, and re-deriving each from disk would parse the whole monorepo a second time.
+    viewOf: (board: Parameters<typeof agentView>[0], layer: "all" | "board" = "all", recent = 4) =>
+      agentView(board, layer, recent),
     // One watcher per process: `mirror` and `watch` both ask for it, neither owns it.
     get watcher() {
       docsWatcher ??= new DocsWatcher(chronicle.getProjectDir() || process.cwd());
@@ -259,7 +279,10 @@ export const registry = {
   federation: {
     createInstaller: (root: string) => new ConducksInstaller(root),
     createMCPConfigurator: () => new MCPConfigurator(),
-    createLinker: (root: string) => new FederatedLinker(root)
+    createLinker: (root: string) => new FederatedLinker(root),
+    createProjectRegistry: () => new ProjectRegistry(),
+    createProjectMonitor: (projects: ProjectRegistry) => new ProjectMonitor(projects),
+    createUpdateCheck: () => new UpdateCheck(),
   },
   infrastructure: {
     get graphEngine() { return graph; },
@@ -268,7 +291,14 @@ export const registry = {
     get registry() { return synapseRegistry; },
     get logger() { return logger; },
     createLogger: (scope?: string) => new Logger(scope),
-    createPersistence: (dbPath: string, readOnly?: boolean) => new SynapsePersistence(dbPath, readOnly)
+    createPersistence: (dbPath: string, readOnly?: boolean) => new SynapsePersistence(dbPath, readOnly),
+    // `doctor` reports which parse path is live; `analyze` reports what it is about to walk.
+    // Both are questions about the engine, asked before any engine work happens.
+    isNativeGrammarAvailable: () => grammars.isNativeAvailable(),
+    loadGrammar: (id: string) => grammars.loadLanguage(id),
+    isGrammarUnavailable: (id: string) => grammars.isLanguageUnavailable(id),
+    assessScope: (root: string) => assessRoot(root),
+    explainScope: (scope: ReturnType<typeof assessRoot>) => explainScope(scope),
   },
   mirror: {
     getVisualWave: (layers?: number[], clusters?: string[], spread?: number) => (mirrorEngine as any).getVisualWave(layers, clusters, spread),

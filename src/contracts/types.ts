@@ -86,3 +86,24 @@ export interface RegistryConfig {
   /** Maximum number of components allowed (optional) */
   maxComponents?: number;
 }
+
+/**
+ * Typed-filter vocabulary — the contract between the filter compiler (domain) and the surfaces
+ * that call it (CLI, MCP).
+ *
+ * These live in `contracts` rather than beside the compiler because BOTH sides need to name them:
+ * domain throws the error and enforces the cap, interfaces catch the error to tell a user's bad
+ * filter from a real fault, and clamp their own input to the cap before asking. A shared name that
+ * only one layer may import is not a contract — it forces the other side to string-match an error
+ * message, or to route a constant through composition, which is what happened here first.
+ */
+export class FilterValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FilterValidationError';
+  }
+}
+
+/** Response budget: keeps filter results under the 8KB orchestrator cap. */
+export const FILTER_MAX_LIMIT = 20;
+export const FILTER_DEFAULT_LIMIT = 10;

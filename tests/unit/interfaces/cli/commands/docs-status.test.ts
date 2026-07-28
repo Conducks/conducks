@@ -4,12 +4,20 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DocsStatusCommand } from '@/interfaces/cli/commands/docs-status.js';
 import { DocsLintCommand } from '@/interfaces/cli/commands/docs-lint.js';
-import { buildBoard } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard, buildTrees } from '@/lib/domain/analysis/docs-board.js';
 
 // A working `registry.docs.board` stand-in — the pre-fix `docs-status` reads it directly, so the
 // stub must behave like the real thing rather than throw, or a failure here would just be a crash,
 // not proof that the merged checks were missing.
-const fakeRegistry = { docs: { board: (r?: string) => buildBoard(r as string) } } as never;
+// The real builders behind a fake registry: these suites assert what the BOARD reports, so
+// stubbing the builder would let the stub decide the answer. Composition is the only thing faked,
+// because the commands now reach domain through it (ADR 0005) rather than importing it directly.
+const fakeRegistry = {
+  docs: {
+    board: (r?: string) => buildBoard(r as string),
+    trees: (r?: string, o?: { rootOnly?: boolean }) => buildTrees(r as string, o),
+  },
+} as never;
 
 /**
  * Before `buildTrees`, `docs-status` built its board straight from `registry.docs.board` — the raw

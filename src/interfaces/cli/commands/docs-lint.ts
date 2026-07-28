@@ -1,7 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
-import { buildTrees } from "@/lib/domain/analysis/docs-board.js";
 import chalk from "chalk";
 
 /**
@@ -24,12 +23,12 @@ export class DocsLintCommand implements ConducksCommand {
   public description = "Validate authored docs against the conducks-docs grammar (CI gate)";
   public usage = "conducks docs-lint [--root-only] [path]";
 
-  public async execute(args: string[], _registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     const posArg = args.find(a => !a.startsWith("--"));
     const root = posArg ? (posArg.startsWith("/") ? posArg : path.resolve(process.cwd(), posArg)) : process.cwd();
     const rootOnly = args.includes("--root-only");
 
-    const trees = buildTrees(root, { rootOnly });
+    const trees = registry.docs.trees(root, { rootOnly });
     const single = trees.length === 1;
 
     const reports = trees.map(({ label, board }) => {

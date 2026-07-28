@@ -6,6 +6,7 @@
  * never with caller input concatenated into the SQL string.
  */
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { buildFilterQuery } from '@/lib/domain/analysis/filter-builder.js';
 
 const queryMock = jest.fn(async (_sql: string, _params: unknown[] = []) => [
   { id: 'n1', name: 'Foo', file: 'a.ts', canonicalKind: 'BEHAVIOR', canonicalRank: 2, risk: 0.1, gravity: 0.2 },
@@ -21,6 +22,12 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
       chronicle: { getProjectDir: () => '/fake/root' },
     },
     audit: { status: statusMock },
+    // The REAL compiler, deliberately. This suite asserts that an invalid filter is refused
+    // before any SQL reaches persistence — a stubbed compiler would decide that outcome itself
+    // and the assertion would prove nothing. Only persistence is faked, because that is the
+    // boundary being watched. The tool reaches the compiler through composition (ADR 0005), so
+    // the mock has to expose it here.
+    query: { buildFilter: buildFilterQuery },
   },
 }));
 

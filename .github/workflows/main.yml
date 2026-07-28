@@ -34,7 +34,18 @@ jobs:
       
     - name: Analyze Architecture
       run: node ./build/src/interfaces/cli/index.js analyze
-      
+
+    # The layer contract (ADR 0005) is enforced HERE and nowhere else. It runs directly after
+    # `analyze` because it reads the graph that step just wrote — on a stale graph it would report
+    # on code nobody pushed. The pre-commit hook deliberately does NOT run it: a hook cannot afford
+    # a full re-analysis, and a gate answering from yesterday's graph is the failure this gate exists
+    # to catch.
+    - name: Enforce Layer Contract
+      run: node ./build/src/interfaces/cli/index.js guard
+
+    - name: Lint Authored Docs
+      run: node ./build/src/interfaces/cli/index.js docs-lint
+
     - name: Run Integrity Tests
       run: npm test -- --runInBand
       env:
