@@ -168,6 +168,66 @@ describe('SynapsePersistence', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
+  // updateRanks — writes only what changed
+  // ---------------------------------------------------------------------------------------------
+  describe('updateRanks', () => {
+    const seedTwo = async () => {
+      await persistence.saveNodes(
+        [
+          { id: 'src/a.ts::a', label: 'function', properties: { name: 'a', filePath: 'src/a.ts', canonicalKind: 'BEHAVIOR', gravity: 0.25 } },
+          { id: 'src/b.ts::b', label: 'function', properties: { name: 'b', filePath: 'src/b.ts', canonicalKind: 'BEHAVIOR', gravity: 0.50 } },
+        ],
+        'pulse1'
+      );
+    };
+    const gravityOf = async (id: string) => {
+      const r = await persistence.query<{ gravity: number }>('SELECT gravity FROM nodes WHERE id = ?', [id]);
+      return Number(r[0].gravity);
+    };
+
+    it('writes a rank that genuinely moved', async () => {
+      await seedTwo();
+      await persistence.updateRanks([
+        { id: 'src/a.ts::a', gravity: 0.9 },
+        { id: 'src/b.ts::b', gravity: 0.50 },
+      ]);
+      expect(await gravityOf('src/a.ts::a')).toBeCloseTo(0.9, 5);
+      expect(await gravityOf('src/b.ts::b')).toBeCloseTo(0.50, 5);
+    });
+
+    it('writes an isEntryPoint flip even when gravity is unchanged', async () => {
+      await seedTwo();
+      await persistence.updateRanks([{ id: 'src/a.ts::a', gravity: 0.25, isEntryPoint: true }]);
+      const r = await persistence.query<{ isEntryPoint: boolean }>(
+        'SELECT isEntryPoint FROM nodes WHERE id = ?', ['src/a.ts::a']);
+      expect(Boolean(r[0].isEntryPoint)).toBe(true);
+    });
+
+    it('treats a float32 round-trip as unchanged, not as a write', async () => {
+      await seedTwo();
+      // `gravity` is a REAL column, so a float64 recomputed in JS never comes back bit-identical.
+      // Comparing exactly found 1,048 of 2,380 rows "changed" on a graph where nothing had moved,
+      // which is what made writing the whole set look unavoidable. A relative 1e-7 is float32's
+      // own precision: below it the difference is storage, above it the rank actually moved.
+      const stored = await gravityOf('src/a.ts::a');
+      const noise = stored * (1 + 1e-9);
+      expect(noise).not.toBe(stored);              // genuinely a different float64
+      await persistence.updateRanks([{ id: 'src/a.ts::a', gravity: noise }]);
+      expect(await gravityOf('src/a.ts::a')).toBeCloseTo(stored, 6);
+    });
+
+    it('writes a row it has never seen rather than guessing it is unchanged', async () => {
+      await seedTwo();
+      await persistence.saveNodes(
+        [{ id: 'src/c.ts::c', label: 'function', properties: { name: 'c', filePath: 'src/c.ts', canonicalKind: 'BEHAVIOR' } }],
+        'pulse1'
+      );
+      await persistence.updateRanks([{ id: 'src/c.ts::c', gravity: 0.75 }]);
+      expect(await gravityOf('src/c.ts::c')).toBeCloseTo(0.75, 5);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
   // purgeUnits
   // ---------------------------------------------------------------------------------------------
   describe('purgeUnits', () => {
