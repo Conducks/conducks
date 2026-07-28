@@ -23,7 +23,7 @@ DuckDB opens the 235 MB vault in 7 ms, so storage was never the latency. The vau
 rows in 235 MB is real and is a DISK problem (Phase 4).
 
 ## Phase 0 — questions with no answer yet
-- [ ] What does a one-line edit cost today, end to end? Today it re-reads the file, re-parses it, calls `purgeUnits([unitId])` and re-inserts every symbol. Measure it before designing the replacement
+- [x] What does a one-line edit cost today, end to end? MEASURED 2026-07-28 on this repo: an unchanged `analyze` is **369 ms** (the hash gate skipping everything), one added line makes it **1374 ms** — so an edit costs **~1.0 s** over baseline, for one file out of ~470. That is the number Phase 1 has to beat, and it is the budget a per-save watcher would pay. Reproduce by timing `conducks analyze --yes` before and after touching one file. NOT yet broken down between re-parse, `purgeUnits()` and re-insert — do that first in Phase 1, because the parse half is expected to be nearly free and the diff-the-symbols half is the real work
 - [ ] ANSWERED, moved to Phase 4: the vault is 27x its contents, `INSERT OR REPLACE` churn is NOT the cause, and it costs disk rather than time
 - [ ] Two agents on one project: a pulse locks readers OUT and reads FAIL rather than queue. This is a live bug today, not a future one, and it is the blocker for conducks being what agents use while other agents work. NO SOLUTION YET — candidates are a tiny write window, or serving reads from a snapshot
 - [ ] Git worktrees: two checkouts of one repo, each with its own `.conducks/`. It accidentally works, but two vaults then describe one repository. Decide whether that is correct or a bug before layers make it structural
