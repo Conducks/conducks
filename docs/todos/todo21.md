@@ -17,12 +17,14 @@ ADR 0036 decides they become one engine, and decides the ORDER: line-level updat
 second. The report-only rule of 0031 holds until the cost that justified it is measured away. This
 todo is that work plus the questions that gate it.
 
-Numbers from the session, so nobody re-measures them by accident: query 5.9s wall for 1.0s CPU at
-19% utilisation; vault 235 MB for 2,373 nodes and 12,755 edges.
+Numbers from the session, so nobody re-measures them by accident. A query took 5.9s wall for 1.0s of
+CPU — that was an uncleared timer in `persistence.close()`, now fixed, and commands run in 0.12-0.54s.
+DuckDB opens the 235 MB vault in 7 ms, so storage was never the latency. The vault holding 8.76 MB of
+rows in 235 MB is real and is a DISK problem (Phase 4).
 
 ## Phase 0 — questions with no answer yet
 - [ ] What does a one-line edit cost today, end to end? Today it re-reads the file, re-parses it, calls `purgeUnits([unitId])` and re-inserts every symbol. Measure it before designing the replacement
-- [ ] Is the 235 MB vault real weight or dead tuples? Pulse a FRESH vault of the same code and compare. `INSERT OR REPLACE` churn across repeated pulses is the suspect, and content-addressing is pointless if the baseline is mostly garbage
+- [ ] ANSWERED, moved to Phase 4: the vault is 27x its contents, `INSERT OR REPLACE` churn is NOT the cause, and it costs disk rather than time
 - [ ] Two agents on one project: a pulse locks readers OUT and reads FAIL rather than queue. This is a live bug today, not a future one, and it is the blocker for conducks being what agents use while other agents work. NO SOLUTION YET — candidates are a tiny write window, or serving reads from a snapshot
 - [ ] Git worktrees: two checkouts of one repo, each with its own `.conducks/`. It accidentally works, but two vaults then describe one repository. Decide whether that is correct or a bug before layers make it structural
 - [ ] Detached HEAD has no branch name. Layers key on the commit so they are fine, but "current branch" is undefined and the branch guard has nothing to compare against
@@ -50,10 +52,20 @@ Numbers from the session, so nobody re-measures them by accident: query 5.9s wal
 - [ ] Liveness marker, so a DEAD watcher does not look identical to no watcher. They mean opposite things and both render as drift today
 - [ ] Every command answers correctly with NOTHING running. A daemon is an accelerator, never a requirement — CI has no daemon, and a gate that needs one cannot gate a pull request
 
-## Phase 4 — the 5 seconds that are not compute
-- [ ] Every command deserializes the whole vault before answering anything. Push queries into DuckDB instead of walking a rehydrated in-memory graph
-- [ ] Promote what is queried out of the four JSON columns per node (`dna`, `signature`, `kinetic`, `metadata`) into real columns; drop what nothing reads
-- [ ] Target: a symbol query answers in well under a second. A COLD PULSE is not in scope and never will be — parsing 1,800 files is inherently seconds
+## Phase 4 — the vault is 27x its own contents
+- [ ] Reclaim on a schedule: rewriting the vault into a fresh database takes 235.51 MB to 8.76 MB, same rows. Decide WHEN — after a full pulse, on a size ratio, or an explicit `conducks compact`
+- [ ] Find the root cause, or record that it is unknown. Four candidates were measured and ELIMINATED: the data itself (8.76 MB), indexes and primary keys (+2.25 MB), pulse churn (synthetic full-table rewrites stabilise at 1.26 MB and never grow), and the historical peak (6,594 nodes against 2,373 now — under 3x, not 27x). Something else allocates blocks and never returns them
+- [ ] Eager loading costs 214 ms per command — the whole vault is deserialised before anything is answered. Real, worth removing, and NOT the latency anyone noticed
 
-Not caused by the engine and not fixed by it, but it is the difference between a tool that feels
-instant and one that does not, and it gates nothing else — so it can run in parallel with Phase 1.
+**This is a DISK problem, not a speed problem, and the difference was measured.** DuckDB opens the
+235 MB file in 7 ms — identical to an 8.76 MB copy of the same rows. Queries are already fast.
+
+It still matters, for three reasons that have nothing to do with latency: twenty projects at this
+ratio is gigabytes; ADR 0035 layers multiply whatever a vault costs, so content-addressing on a 27x
+baseline addresses mostly waste; and a tool distributed through npm and brew leaves this on other
+people's disks.
+
+Recorded because the investigation was wrong three times before it was right: `npx tsx` overhead,
+vault size, and grammar loading were each measured and each innocent. The 5.5s every command paid was
+an uncleared `setTimeout` in `persistence.close()` keeping the event loop alive — fixed, 5.49s to
+0.54s. Do not re-derive that.
