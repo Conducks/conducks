@@ -658,3 +658,20 @@
   so the parse IS the cost, it is just not parallel. Also note the fan-out is sequential even where it
   does run: each chunk goes through `spawnSync`, which blocks until that process exits, so the dev
   path pays N process boots one after another. Measure a `tsx` run before assuming it helps there.
+
+## `analyze` OOMs on ordinary projects — one transaction pins the whole pulse
+- Gotcha: `conducks analyze` produces an EMPTY vault and exits non-zero on projects of a few hundred
+  files. Measured 2026-07-29 on copies of three real projects: `assistant` (554 source files) and
+  `reference-project` (2948) both fail, `mentorseed` (660) succeeds — so it is not a simple count.
+  The vault is created and `SELECT count(*) FROM nodes` returns 0.
+- Why: `beginPulse()` wraps the ENTIRE analyze in one transaction that only commits in `save()`, so
+  DuckDB holds every uncommitted row pinned and cannot spill. It exhausts its default budget — 80% of
+  RAM, 19.1 GiB on a 24 GB machine — during the DISCOVERY flush, before wave 1. `SET memory_limit`
+  does NOT help: at 2 GB it fails identically with "failed to pin block (1.8 GiB/1.8 GiB used)".
+  Pinned pages are the problem, not the ceiling.
+- Applies: the error message points at the wrong thing, which is why this survived. The OOM is logged
+  once for the discovery pass; every wave after it reports `TransactionContext Error: Current
+  transaction is aborted`, and that is what the CLI prints as fatal. Debugging starts on transactions
+  and never reaches memory. The single transaction is DELIBERATE — it is what makes an interrupted
+  analyze roll back rather than leave a partial graph — so this is a tradeoff to decide, not a bug to
+  patch. `todo22#P5`.

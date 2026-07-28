@@ -12,6 +12,54 @@ import { ConducksProvider } from "@/lib/core/parsing/providers/base.js";
  */
 export class ImportProcessor {
   /**
+   * The canonical form of every project path, cached against the array it was built from.
+   *
+   * This Set used to be rebuilt INSIDE `resolve()`, which runs once per import specifier — so a
+   * project of N files with M imports each paid N*M canonicalize calls over N paths. Measured on a
+   * 2,948-file project that is roughly 70 million calls for work whose answer never changes during a
+   * pulse, and it is why the per-file cost grew with project size instead of staying flat.
+   *
+   * Keyed by array IDENTITY, not by content: the orchestrator builds `allPaths` once per pulse and
+   * hands the same reference to every unit, so identity is exact and free. A different array — a
+   * second pulse, a different scope — misses and rebuilds, which is correct rather than stale.
+   * WeakMap so the cache dies with the array and never pins a project's paths in memory.
+   */
+  private static canonicalCache = new WeakMap<string[], Set<string>>();
+
+  /**
+   * Project paths grouped by basename, for the fuzzy fallback.
+   *
+   * That fallback scanned every path in the project for each import it could not resolve exactly —
+   * the SECOND linear scan per specifier, and the one that runs precisely for the imports the fast
+   * paths already failed on. Grouping by basename once turns it into a map lookup plus a walk of the
+   * few files that share a name. Cached the same way and for the same reason as the canonical set.
+   */
+  private static basenameCache = new WeakMap<string[], Map<string, string[]>>();
+
+  private static basenameIndexFor(allPaths: string[]): Map<string, string[]> {
+    let index = ImportProcessor.basenameCache.get(allPaths);
+    if (!index) {
+      index = new Map();
+      for (const p of allPaths) {
+        const base = path.basename(p);
+        const bucket = index.get(base);
+        if (bucket) bucket.push(p); else index.set(base, [p]);
+      }
+      ImportProcessor.basenameCache.set(allPaths, index);
+    }
+    return index;
+  }
+
+  private static canonicalSetFor(allPaths: string[]): Set<string> {
+    let set = ImportProcessor.canonicalCache.get(allPaths);
+    if (!set) {
+      set = new Set(allPaths.map(p => canonicalize(p)));
+      ImportProcessor.canonicalCache.set(allPaths, set);
+    }
+    return set;
+  }
+
+  /**
    * Conducks Resolution Algorithm:
    * 1. Resolve specifier relative to importer.
    * 2. Infer extensions/index files.
@@ -61,7 +109,7 @@ export class ImportProcessor {
         '/index.ts', '/index.tsx', '/index.js' // Node-style indices
       ];
 
-      const canonicalPaths = new Set(allPaths.map(p => canonicalize(p)));
+      const canonicalPaths = ImportProcessor.canonicalSetFor(allPaths);
 
       for (const absoluteBase of bases) {
         for (const ext of candidates) {
@@ -76,6 +124,13 @@ export class ImportProcessor {
 
     // 4. Fuzzy Module Fallback (For languages with less strict relative paths)
     const baseName = path.basename(specifier);
+    // Exact basename first — the overwhelmingly common case, and now a map hit rather than a scan.
+    const exact = ImportProcessor.basenameIndexFor(allPaths).get(baseName);
+    if (exact && exact.length) return exact[0];
+    // The original matched on startsWith, so a prefix match must still resolve. Only reached when
+    // the exact bucket misses, which is rare, and the ORDER is preserved: the previous loop returned
+    // the first path in `allPaths` whose basename started with the specifier's, so this walks
+    // `allPaths` in the same order rather than the index's insertion order.
     for (const p of allPaths) {
       if (path.basename(p).startsWith(baseName)) {
         return p;
