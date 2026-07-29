@@ -22,6 +22,10 @@ describe('docs-board — links between docs', () => {
     w('decisions/0002-partial.md', adr('0002', 'half built'));
     w('decisions/0003-enforced.md', adr('0003', 'proven by a test', '- Enforced by: tests/x.test.ts::rule holds\n'));
     w('decisions/0004-orphan.md', adr('0004', 'nobody linked this'));
+    // An ADR whose open question a successor took over. It has no `- Builds:` phase and no
+    // `- Enforced by:` on purpose — the successor carries the work, so demanding proof here asks it
+    // to show work it deliberately handed on.
+    w('decisions/0006-handed-on.md', adr('0006', 'resolved elsewhere', '- Resolved by: 0007\n'));
 
     w('todos/todo01.md',
       '# todo01 — the work\nStatus: doing\n- Acceptance: everything green\n\n' +
@@ -44,6 +48,10 @@ describe('docs-board — links between docs', () => {
     expect(b.unlinked).toContain('0004');
     // …but an `- Enforced by:` artifact counts as a link, so it is not reported as unproven.
     expect(b.unlinked).not.toContain('0003');
+    // …and neither does an ADR a successor resolved. This was a PERMANENT false positive: ADR 0012
+    // is `Status: Accepted` with `- Resolved by: 0013` and was reported on every single run. A
+    // warning that can never be cleared trains the reader to skip the whole line.
+    expect(b.unlinked).not.toContain('0006');
   });
 
   it('derives blocked from an unmet `- Depends:` and names the blocker', () => {

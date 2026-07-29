@@ -488,8 +488,15 @@ function hygiene(board: DocsBoard): void {
   }
   // Aggregated, not one warning per file: on a repo that predates the link fields this is every
   // ADR at once, and a wall of identical lines is noise that trains you to ignore the channel.
+  // `- Resolved by:` exempts an ADR for the same reason `superseded` does: the open question it
+  // recorded now belongs to the successor, so demanding a build link here asks it to prove work it
+  // deliberately handed on. ADR 0012 is the case — `Status: Accepted` with `- Resolved by: 0013` —
+  // and it was reported on EVERY run and always would have been. A warning that is permanently
+  // wrong is worse than no warning: it teaches the reader to skip the line, which is the same
+  // failure as the untriaged findings this todo already tracks.
   board.unlinked = board.decisions
-    .filter(d => d.buildState === "unlinked" && !d.enforcedBy && !/^superseded$/i.test(d.state || ""))
+    .filter(d => d.buildState === "unlinked" && !d.enforcedBy
+      && !d.resolvedBy?.length && !/^superseded$/i.test(d.state || ""))
     .map(d => d.id);
 }
 
