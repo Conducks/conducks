@@ -260,15 +260,60 @@ export class SynapsePersistence {
     }
   }
 
+  /**
+   * The largest number of bound parameters one statement may carry.
+   *
+   * The node driver passes parameters through `Function.prototype.apply`, so a big enough batch
+   * overflows the JS call stack rather than failing in the database. Measured: 26 columns x 2000
+   * rows = 52,000 params throws `RangeError: Maximum call stack size exceeded`; 13,000 is fine.
+   * The cap is on PARAMETERS rather than rows because the two tables have very different widths —
+   * a row count safe for 10-column edges is not safe for 26-column nodes.
+   */
+  private static readonly MAX_BOUND_PARAMS = 10000;
+
+  /**
+   * Insert rows in batches instead of one statement per row.
+   *
+   * DuckDB allocates transaction-local storage PER STATEMENT and coalesces none of it until the
+   * COMMIT, so inside the atomic pulse (which by design does not commit until the end) a row-by-row
+   * writer costs ~885 KB per row instead of ~0.8 KB. Measured on a 26-column table, 20,000 rows:
+   * 17,281 MB in one open transaction against 15 MB when each statement self-commits — and 169 MB
+   * for the same rows batched 500 at a time inside the SAME transaction. That is why this batches
+   * rather than committing more often: the cost is per statement, so batching buys the memory back
+   * WITHOUT giving up the rollback-on-kill guarantee that the single transaction exists to provide.
+   *
+   * Rows are deduplicated on their first column, last one winning. `INSERT OR REPLACE` applied one
+   * row at a time lets a later row overwrite an earlier one; the same two rows inside a single
+   * multi-row statement would instead try to update one row twice and fail. Deduplicating here
+   * preserves the row-by-row semantics exactly.
+   */
+  private async insertBatched(table: string, columns: string[], rows: unknown[][]): Promise<void> {
+    if (!rows.length) return;
+
+    const deduped = new Map<unknown, unknown[]>();
+    for (const row of rows) deduped.set(row[0], row);
+
+    const width = columns.length;
+    const perBatch = Math.max(1, Math.floor(SynapsePersistence.MAX_BOUND_PARAMS / width));
+    const tuple = `(${Array(width).fill('?').join(',')})`;
+    const head = `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES `;
+
+    const all = Array.from(deduped.values());
+    for (let off = 0; off < all.length; off += perBatch) {
+      const slice = all.slice(off, off + perBatch);
+      await this.run(head + Array(slice.length).fill(tuple).join(','), slice.flat());
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public async saveNodes(nodes: any[], pulseId: string): Promise<void> {
     if (this.readOnly) return;
-    const db = await this.ensureVaultOpen();
+    await this.ensureVaultOpen();
     const owned = !this.inPulse;
+    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata'];
     try {
       if (owned) await this.run("BEGIN TRANSACTION");
-      const stmt = db.prepare(`INSERT OR REPLACE INTO nodes (id, pulseId, fingerprint, canonicalKind, canonicalRank, semantic_kind, name, file, lineStart, lineEnd, parentId, rootId, namespaceId, unitId, structureId, layer_path, depth, risk, gravity, complexity, isEntryPoint, visibility, dna, signature, kinetic, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      for (const n of nodes) {
+      const rows = nodes.map(n => {
         const m = n.properties || {};
         const name = m.name || n.name || 'unknown';
         const filePath = m.filePath || n.filePath || '';
@@ -278,16 +323,15 @@ export class SynapsePersistence {
         const canonicalKind = m.canonicalKind || n.label || 'STRUCTURE';
         const canonicalRank = m.canonicalRank || n.canonicalRank || 0;
 
-        await new Promise<void>((r, j) => stmt.run(
+        return [
           n.id.toLowerCase(), pulseId, m.fingerprint || null, canonicalKind, canonicalRank, semanticKind, name, filePath.toLowerCase(), m.range?.start.line || 0, m.range?.end.line || 0,
           m.parentId?.toLowerCase() || null, m.rootId?.toLowerCase() || null, m.namespaceId?.toLowerCase() || null, m.unitId?.toLowerCase() || null, m.structureId?.toLowerCase() || null,
           m.layer_path || null, m.depth || 0, m.risk || 0, n.gravity || m.gravity || 0, n.complexity || m.complexity || 1,
           m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(m.dna || {}), JSON.stringify(m.signature || {}), JSON.stringify(m.kinetic || {}),
-          JSON.stringify({ ...m, id: n.id, name, range: m.range }),
-          (e: Error | null) => e ? j(e) : r()
-        ));
-      }
-      stmt.finalize();
+          JSON.stringify({ ...m, id: n.id, name, range: m.range })
+        ];
+      });
+      await this.insertBatched('nodes', columns, rows);
       if (owned) await this.run("COMMIT");
     } catch (err) {
       if (owned) { try { await this.run('ROLLBACK'); } catch {} }
@@ -298,22 +342,21 @@ export class SynapsePersistence {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public async saveEdges(edges: any[], pulseId: string): Promise<void> {
     if (this.readOnly) return;
-    const db = await this.ensureVaultOpen();
+    await this.ensureVaultOpen();
     const owned = !this.inPulse;
+    const columns = ['id', 'pulseId', 'sourceId', 'targetId', 'category', 'type', 'weight', 'confidence', 'lineNumber', 'properties'];
     try {
       if (owned) await this.run("BEGIN TRANSACTION");
-      const stmt = db.prepare(`INSERT OR REPLACE INTO edges (id, pulseId, sourceId, targetId, category, type, weight, confidence, lineNumber, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      for (const e of edges) {
+      const rows = edges.map(e => {
         // Graph edges (ConducksEdge) carry their data on `.properties`, not `.metadata`; weight lives
         // on `.confidence`. Reading `.metadata`/`.weight` (old code) silently dropped EVERY edge's
         // properties + lineNumber and forced weight=1.0. Read the real fields.
         const props = e.properties || e.metadata || {};
-        await new Promise<void>((r, j) => stmt.run(
-          e.id, pulseId, e.sourceId?.toLowerCase(), e.targetId?.toLowerCase(), e.type === 'IMPORTS' ? 'dependency' : 'structural', e.type, e.weight || e.confidence || 1.0, e.confidence || 1.0, props?.line || 0, JSON.stringify(props),
-          (err: Error | null) => err ? j(err) : r()
-        ));
-      }
-      stmt.finalize();
+        return [
+          e.id, pulseId, e.sourceId?.toLowerCase(), e.targetId?.toLowerCase(), e.type === 'IMPORTS' ? 'dependency' : 'structural', e.type, e.weight || e.confidence || 1.0, e.confidence || 1.0, props?.line || 0, JSON.stringify(props)
+        ];
+      });
+      await this.insertBatched('edges', columns, rows);
       if (owned) await this.run("COMMIT");
     } catch (err) {
       if (owned) { try { await this.run('ROLLBACK'); } catch {} }

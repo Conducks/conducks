@@ -23,20 +23,42 @@ export class AnalyzeCommand implements ConducksCommand {
     const targetPath = args.find(a => !a.startsWith('-')) || process.cwd();
 
     // A pulse over the wrong root (a typo'd `~/Documents`) costs hours and writes a vault into a
-    // folder that is not a project. Ask first; `--yes` skips the question for scripts.
-    if (!args.includes('--yes') && !(await confirmScope(targetPath, registry))) {
+    // folder that is not a project. `--yes` skips the QUESTION, not the CHECK — it used to skip
+    // both, which meant every non-interactive caller (a script, CI, an agent, this project's own
+    // benchmark) ran with no guard at all. That is how two benchmark projects with no project
+    // marker of their own silently analyzed `/private/tmp` instead. The assessment is still
+    // printed, so an automated run leaves a record of what it was warned about.
+    const autoYes = args.includes('--yes');
+    if (!(await confirmScope(targetPath, registry, autoYes))) {
       console.error("\n[Conducks] Aborted — nothing was analyzed.\n");
       process.exit(1);
     }
 
     try {
       // Delegate to the unified Analysis domain with scoped root
-      await (registry.analyze as any).full({ 
+      await (registry.analyze as any).full({
         root: targetPath,
-        staged: isStaged, 
+        staged: isStaged,
         verbose: isVerbose,
         force: isForce
       });
+
+      // Reclaim the vault now the pulse has published. A pulse purges and re-inserts every unit it
+      // touched, and DuckDB keeps the old row versions forever — so the file grows on every analyze
+      // whether or not the code changed. Doing it here rather than as a maintenance command is the
+      // point: a chore nobody runs is a vault nobody reclaims. The check is one query and the
+      // rewrite only runs when it will pay, so a clean vault costs ~10 ms.
+      try {
+        const reclaimed = await registry.infrastructure.reclaimVault();
+        if (reclaimed) {
+          const mb = (n: number) => (n / 1048576).toFixed(1);
+          console.log(`🛡️  [Vault] Reclaimed ${mb(reclaimed.before)} MB → ${mb(reclaimed.after)} MB`);
+        }
+      } catch (err: any) {
+        // Never fail a good pulse over housekeeping. The graph is already committed; a vault that is
+        // merely too big still answers every question correctly.
+        console.error(`⚠️  [Vault] Compaction skipped: ${err.message}`);
+      }
     } catch (err: any) {
       if (err.message?.includes("LOCKED")) {
         console.error("\n❌ [Conducks] Structural Synapse is LOCKED.");
@@ -45,25 +67,10 @@ export class AnalyzeCommand implements ConducksCommand {
         process.exit(1);
       }
       throw err;
-    }
-
-    // Reclaim the vault now the pulse has published. A pulse purges and re-inserts every unit it
-    // touched, and DuckDB keeps the old row versions forever — so the file grows on every analyze
-    // whether or not the code changed. Doing it here rather than as a maintenance command is the
-    // point: a chore nobody runs is a vault nobody reclaims. The check is one query and the rewrite
-    // only runs when it will pay, so a clean vault costs ~10 ms.
-    try {
-      const reclaimed = await registry.infrastructure.reclaimVault();
-      if (reclaimed) {
-        const mb = (n: number) => (n / 1048576).toFixed(1);
-        console.log(`🛡️  [Vault] Reclaimed ${mb(reclaimed.before)} MB → ${mb(reclaimed.after)} MB`);
-      }
-    } catch (err: any) {
-      // Never fail a good pulse over housekeeping. The graph is already committed; a vault that is
-      // merely too big still answers every question correctly.
-      console.error(`⚠️  [Vault] Compaction skipped: ${err.message}`);
     } finally {
-      // Ensure the DuckDB connection is ALWAYS closed
+      // The close belongs in a `finally` around the PULSE, not after it. It used to sit past the
+      // rethrow above, so a failed analyze — the exact case that leaves a transaction open and a
+      // write-ahead log on disk — was the one case that never closed the vault.
       await closePersistence(registry);
     }
   }
@@ -75,12 +82,20 @@ export class AnalyzeCommand implements ConducksCommand {
  * With no TTY — a script, an agent, CI — an unanswerable question is a NO: silence must never start
  * an hours-long write.
  */
-async function confirmScope(targetPath: string, registry: Registry): Promise<boolean> {
+async function confirmScope(targetPath: string, registry: Registry, autoYes = false): Promise<boolean> {
   const scope = registry.infrastructure.assessScope(targetPath);
   if (scope.level === "ok") return true;
 
   console.error("\n\x1b[33m⚠️  [Conducks] This does not look like one project root.\x1b[0m");
   console.error(registry.infrastructure.explainScope(scope));
+
+  // `--yes` IS the answer to the question, so it proceeds — but only after the reasons have been
+  // printed. A silent bypass is what let an unattended run write a vault into a system temp folder
+  // with nothing in the output to say it had been warned.
+  if (autoYes) {
+    console.error("\n[Conducks] Proceeding anyway — `--yes` was passed.\n");
+    return true;
+  }
 
   if (!process.stdin.isTTY) {
     console.error("\nNo terminal to confirm on — pass `--yes` if this really is the intended root.\n");

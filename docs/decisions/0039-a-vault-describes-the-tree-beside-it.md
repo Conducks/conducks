@@ -1,6 +1,6 @@
 # 0039 — a vault describes the tree beside it, and a service is a service everywhere
 Status: Accepted
-- Enforced by: NOTHING YET — see Consequences. The worktree half is current behaviour and untested; the conducks.json half is not built, since `discoverRoot()` still answers the boundary question independently.
+- Enforced by: tests/unit/core/root-discovery.test.ts (root discovery refuses a directory the scope guard already calls impossible, so one stray vault cannot claim the tree above it, and a real project is still found by its vault alone) — PARTLY. The worktree half is current behaviour and untested, and `discoverRoot()` still answers the boundary question independently of `conducks.json`; see Consequences.
 - Date: 2026-07-28
 
 ## Context
@@ -54,12 +54,22 @@ The vault must stop discovering its own boundary. `discoverRoot()` walks up to t
 `.conducks`, `package.json`, `.git` and others — which is a second answer to the question
 `conducks.json` already answers. Where both exist, the declaration wins.
 
-**This record is not enforced by anything yet, and that is stated rather than left for the board to
-imply.** The worktree half describes what conducks already does, so it is true today and nothing
-would notice if it stopped being true — a test that pulses two worktrees of one repo and asserts two
-vaults is what would pin it. The `conducks.json` half is not built at all: `discoverRoot()` still
-walks up to the nearest marker and answers the boundary question on its own, so the declaration does
-not yet win where both exist. `todo21#P0` carries both.
+**This record is only partly enforced, and that is stated rather than left for the board to imply.**
+The worktree half describes what conducks already does, so it is true today and nothing would notice
+if it stopped being true — a test that pulses two worktrees of one repo and asserts two vaults is
+what would pin it. The `conducks.json` half is not built at all: `discoverRoot()` still walks up to
+the nearest marker and answers the boundary question on its own, so the declaration does not yet win
+where both exist. `todo21#P0` carries both.
+
+The cost of leaving it unbuilt stopped being hypothetical on 2026-07-29. `discoverRoot()` treated a
+`.conducks` directory as proof of a project root, so one vault left in `/private/tmp` three days
+earlier made every marker-less folder beneath it resolve there — two benchmark projects analyzed
+2,323 unrelated files instead of their own source, and the resulting out-of-memory failure was
+recorded against projects that were never being analyzed. The immediate hole is closed: root
+discovery now refuses any directory the scope guard already calls impossible, reusing that predicate
+rather than keeping a second list, which is this record's rule applied to the one place it was being
+broken. That is a narrowing, not the decision — the declaration still does not win.
+
 
 `Open:` one vault per service, or one vault whose rows carry a service column. The column is the
 better shape — cross-service edges stay resolvable and there is one lock rather than N — but it is

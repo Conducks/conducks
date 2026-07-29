@@ -659,19 +659,39 @@
   does run: each chunk goes through `spawnSync`, which blocks until that process exits, so the dev
   path pays N process boots one after another. Measure a `tsx` run before assuming it helps there.
 
-## `analyze` OOMs on ordinary projects — one transaction pins the whole pulse
-- Gotcha: `conducks analyze` produces an EMPTY vault and exits non-zero on projects of a few hundred
-  files. Measured 2026-07-29 on copies of three real projects: `assistant` (554 source files) and
-  `reference-project` (2948) both fail, `mentorseed` (660) succeeds — so it is not a simple count.
-  The vault is created and `SELECT count(*) FROM nodes` returns 0.
-- Why: `beginPulse()` wraps the ENTIRE analyze in one transaction that only commits in `save()`, so
-  DuckDB holds every uncommitted row pinned and cannot spill. It exhausts its default budget — 80% of
-  RAM, 19.1 GiB on a 24 GB machine — during the DISCOVERY flush, before wave 1. `SET memory_limit`
-  does NOT help: at 2 GB it fails identically with "failed to pin block (1.8 GiB/1.8 GiB used)".
-  Pinned pages are the problem, not the ceiling.
-- Applies: the error message points at the wrong thing, which is why this survived. The OOM is logged
-  once for the discovery pass; every wave after it reports `TransactionContext Error: Current
-  transaction is aborted`, and that is what the CLI prints as fatal. Debugging starts on transactions
-  and never reaches memory. The single transaction is DELIBERATE — it is what makes an interrupted
-  analyze roll back rather than leave a partial graph — so this is a tradeoff to decide, not a bug to
-  patch. `todo22#P5`.
+## A write inside the pulse MUST batch — DuckDB charges per statement, not per row
+- Gotcha: one statement per row costs ~885 KB of DuckDB memory per row while a transaction is open,
+  against ~0.8 KB when each statement self-commits. Measured on a 26-column table, 20,000 rows:
+  17,281 MB in one open transaction, 15 MB self-committing, 169 MB batched 500 per statement inside
+  the SAME transaction. DuckDB allocates transaction-local storage per STATEMENT and coalesces none
+  of it before the COMMIT.
+- Why: this is what made `analyze` die at 19.1 GiB (80% of a 24 GB machine) partway through wave 3.
+  `beginPulse()` sets `inPulse`, `saveNodes`/`saveEdges` read `owned = !this.inPulse` and stop
+  committing, and the atomic-pulse change (`34ba398`, 2026-07-19) therefore moved every install from
+  0.8 KB to 885 KB per row without anything measuring it. Fixed by `insertBatched()` (ADR 0041).
+- Applies: cap a batch by PARAMETER count, not rows — 26 columns x 2000 rows throws `RangeError:
+  Maximum call stack size exceeded` in the node driver's argument spread before DuckDB sees it. And
+  deduplicate on id first: `INSERT OR REPLACE` row-by-row lets a later row win, but two rows with one
+  id in a single multi-row statement try to update the same row twice and fail. Any NEW write path
+  added inside the pulse inherits the trap; only `saveNodes`/`saveEdges` are pinned by a test.
+- Applies: `SET memory_limit` does NOT help and was reverted — at 2 GB it fails identically with
+  "failed to pin block (1.8 GiB/1.8 GiB used)", and it would break projects that currently work.
+
+## A stray `.conducks` silently makes every folder above it resolve to the wrong root
+- Gotcha: `discoverRoot()` walks up and returns the first directory holding `.conducks`, checked
+  BEFORE any real project marker. One vault left in a system temp directory therefore captures every
+  marker-less folder beneath it, and the failure spreads and never heals. Measured 2026-07-29: two
+  benchmark projects with no `package.json` of their own both anchored at `/private/tmp` and analyzed
+  2,323 unrelated files instead of their own 554. The third had a `package.json` and worked, which is
+  the ONLY reason it read as "2 of 3 projects fail" rather than as a boundary bug.
+- Why: root discovery and the scope guard each had their own notion of what a project is. The guard
+  already knew `/private/tmp` is never a project; discovery never asked it. `discoverRoot()` now
+  skips anything `isNeverAProjectRoot()` rejects, reusing that predicate rather than copying the list
+  (ADR 0039).
+- Applies: read the FIRST lines of an analyze log before trusting anything downstream —
+  `Anchoring structural synapse at: <path>` is the root that matters, and it can differ from the
+  `Targeted Pulse:` path printed right after it. A benchmark that does not assert on the anchor line
+  can measure a completely different tree and report a plausible number.
+- Applies: `--yes` used to skip the scope guard entirely rather than just the prompt, so no automated
+  caller had a guard at all. It now always assesses and always prints reasons. A bypass that leaves
+  no trace is indistinguishable from a guard that does not exist.

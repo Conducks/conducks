@@ -46,6 +46,14 @@ would merge them into one graph. That is what catches a parking folder nobody th
 With no TTY — a script, an agent, CI — any level above `ok` is a refusal: a question nobody can
 answer is a NO, never a yes by default. `--yes` is the single bypass.
 
+**`--yes` answers the question; it does not switch the guard off.** As shipped it did both — the
+assessment was inside the `if (!--yes)`, so every non-interactive caller ran with no guard at all
+and no record of what it had skipped. Measured 2026-07-29: this project's own benchmark passed
+`--yes`, and two folders that `assessRoot()` would have raised `ask` on for having no project marker
+were analyzed against the wrong root entirely, silently. The assessment now always runs and always
+prints its reasons; `--yes` decides what happens after they are printed. A bypass that leaves no
+trace is indistinguishable from a guard that does not exist.
+
 The test is "does this look like a project", not "is this big". A 40,000-file monorepo with a `.git`
 at its root is precisely what conducks is for; `~/Documents` with 40,000 files is not.
 

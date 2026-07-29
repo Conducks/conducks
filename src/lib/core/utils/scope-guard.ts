@@ -63,6 +63,21 @@ const CRITICAL_BASENAMES = new Set([
   ".terraform", "bower_components", "__pycache__", ".gradle", ".idea", ".vscode",
 ]);
 
+/**
+ * True for a directory that is never a project root, wherever it turns up.
+ *
+ * Root DISCOVERY needs the same answer this guard already computes, and computing it twice is how
+ * the two drifted: `discoverRoot()` treats a `.conducks` directory as proof of a project root, so a
+ * single stray vault left in `/private/tmp` silently recruited every folder beneath it. Measured —
+ * two benchmark projects with no `package.json` of their own both anchored at `/private/tmp` and
+ * analyzed 2,323 unrelated files instead of their own source. One notion of "not a project", two
+ * consumers, which is the rule ADR 0039 states.
+ */
+export function isNeverAProjectRoot(dir: string): boolean {
+  const resolved = path.resolve(dir);
+  return criticalRoots().includes(resolved) || CRITICAL_BASENAMES.has(path.basename(resolved));
+}
+
 export type ScopeLevel = "ok" | "ask" | "ask-twice";
 
 export interface ScopeAssessment {

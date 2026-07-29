@@ -1,32 +1,47 @@
-# Handover — 2026-07-28
+# Handover — 2026-07-29
 Status: current
 
 ## Where it stands
-- **The layer contract is enforced for the first time.** `conducks guard` had detected 3 illegal
-  pairs for months and nothing ran it. The edges are routed through `registry`, and CI runs guard
-  and `docs-lint` after `analyze`. Test files sit outside the contract on purpose.
-- **The vault reclaims itself** (ADR 0037). DuckDB never returns deleted row versions; this repo's
-  vault held 8.76 MB of rows in 235 MB. `analyze` now rewrites and swaps when `bloatRatio()` says it
-  pays: **235.3 MB → 12.8 MB** in 100 ms, and the next pulse correctly declines.
-- **The graph loads only when something walks it** (ADR 0038). Per session: docs-only 92 MB, filter
-  query 109 MB, `conducks_status` 104 MB — against 435 MB for everything before. Forgetting is loud
-  by design: a deferred graph reads as an EMPTY one, and opt-in cost 3 silently-wrong tools.
-- **`conducks_status` can report a stale index again.** `load()` never restored the metadata TABLE,
-  so `lastAnalyzedCommit` was undefined and staleness computed against `"none"` — always false, in
-  every read-only process. `statusFromVault()` reads the table; in-memory `status()` is still wrong.
-- **The remaining memory is not a data-structure problem.** After a load heap is 53 MB; after two
-  forced GCs, 21 MB, with RSS unmoved at 199 MB. The graph retains 21 MB, the rest is V8 arena. The
-  typed-array rewrite was dropped on that measurement rather than argued about.
-- Gates: **583 tests** · typecheck 0 · `guard` clean · `docs-lint` clean (50 governed docs) · one
-  hygiene warning, which is correct (`todo07` is wholly deferred).
+- **The atomic pulse was costing 885 KB of DuckDB memory per row** (ADR 0041). `beginPulse()` made
+  `saveNodes`/`saveEdges` stop self-committing, and DuckDB charges per STATEMENT — measured 17,281 MB
+  for 20,000 rows against 15 MB self-committing. That is why `analyze` died at 19.1 GiB. Batching
+  inside the same transaction fixes it at **169 MB**, with rollback-on-kill untouched: there was no
+  tradeoff to decide, which only became visible after measuring.
+- **Root discovery could anchor a vault outside the project** (ADR 0039, now partly enforced). A
+  `.conducks` left in `/private/tmp` on 2026-07-26 captured every marker-less folder beneath it — two
+  benchmark projects analyzed **2,323 unrelated files** instead of their own 554. Discovery now
+  refuses any directory the scope guard already rejects, reusing that predicate rather than a copy.
+- **`--yes` switched the scope guard off, not just the prompt** (ADR 0021). Every non-interactive
+  caller — CI, agents, this project's own benchmark — ran unguarded and left no trace of it. The
+  assessment now always runs and always prints its reasons.
+- **A failed analyze never closed the vault.** `closePersistence` sat past a rethrow, so the one case
+  that leaves an open transaction and a WAL on disk was the one case that skipped the close.
+- **Three diagnoses of the OOM were written down before anything was measured, and all three were
+  wrong** — wrong mechanism (pinned rows), wrong place (discovery flush, not wave 3), wrong suspect
+  (the duplicated `metadata` column, measured at 28 MB total). CONDUCKS-31 had been written days
+  earlier and was not followed. `todo22#P5` is corrected.
+- Gates: **636 tests pass** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
+  **6 integration failures are PRE-EXISTING** — verified against a clean worktree at HEAD, identical
+  set. `docs-watcher` debounce is flaky, 1 in 3.
+
+## Do not cite
+`results-baseline.txt` measures nothing. Two of three subjects were the wrong tree, `nodes=0` read a
+vault path that never existed, `peak_cpu=0%` sampled the subshell, and mentorseed varied 139 s to
+193 s between identical runs. The O(N squared) import fix on this branch is real code with **no
+measured number** attached.
 
 ## Next, in order
-1. **`todo21#P1`** — line-level updates. A one-line edit costs **~1.0 s** over a 369 ms unchanged
-   pulse, measured; that is the number to beat. It also stops the vault churn at source, so it
-   closes ADR 0037's last task and unblocks `#P3`. `todo21#P0` is 4/6 and no longer blocking.
-2. **`todo21#P6`** — readers served from a snapshot (ADR 0040, decided today). Reuses `compact()`'s
-   write-fsync-rename path, and it is a precondition for a live engine rather than a follow-on: a
-   per-save micro-pulse against an exclusive lock would fail readers continuously.
-3. **`todo22#P2`/`#P3`** — two rule engines share the name "sentinel", and ~58 findings fire
-   untriaged. Cheap, independent, nothing gates it.
-4. **PUBLISH — still yours to run** (`todo16`, deferred to you 2026-07-26). Everything it gates is green.
+1. **`todo22#P5`, last task** — the orchestrator runs every remaining wave after a flush that cannot
+   succeed, so the CLI prints `Current transaction is aborted` and the real cause stays hidden. Cheap,
+   and it is why this took two days to find.
+2. **Re-baseline** on projects that carry their own marker, 3+ runs, fixed harness. Only then can the
+   import fix be judged.
+3. **`todo21#P1`** — line-level updates. A one-line edit costs ~807 ms; that is the number to beat.
+   Closes ADR 0037's last task and unblocks `#P3`.
+4. **`todo21#P6`** — readers served from a snapshot (ADR 0040).
+5. **`todo22#P2`/`#P3`** — two rule engines share the name "sentinel", ~58 findings fire untriaged.
+6. **PUBLISH — still yours to run** (`todo16`, deferred to you 2026-07-26).
+
+## Watch for
+Any NEW write path added inside the pulse inherits the 885 KB-per-row trap. Only `saveNodes` and
+`saveEdges` are pinned by a test.

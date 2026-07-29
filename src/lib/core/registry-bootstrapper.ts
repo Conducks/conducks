@@ -4,6 +4,7 @@ import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { logger } from "@/lib/core/utils/logger.js";
+import { isNeverAProjectRoot } from "@/lib/core/utils/scope-guard.js";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,7 +65,11 @@ export class RegistryBootstrapper {
       while (current !== path.parse(current).root) {
         const isForbidden = forbiddenArtifacts.includes(path.basename(current));
 
-        if (isForbidden) {
+        // A system, home-level or tooling directory is never a project root, whatever it contains.
+        // Checked BEFORE the markers below, because the `.conducks` rule would otherwise let one
+        // stray vault in `/private/tmp` claim every tree under it — measured, and it silently
+        // analyzed 2,323 unrelated files. The predicate is the scope guard's, not a second copy.
+        if (isForbidden || isNeverAProjectRoot(current)) {
           const parent = path.dirname(current);
           if (parent === current) break;
           current = parent;
