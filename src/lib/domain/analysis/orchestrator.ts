@@ -98,20 +98,19 @@ export class AnalyzeOrchestrator implements ConducksComponent {
 
     let totalNodes = 0;
     let totalEdges = 0;
-    let pulseIncomplete = false;
 
     // Flush Discovery Pass to clear RAM for Induction
     if (this.persistence) {
       logger.info(`🛡️ [Conducks] [Pass 1.5] Flushing structural hierarchy to vault...`);
-      try {
-        const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
-        totalNodes += nodeCount;
-        totalEdges += edgeCount;
-      } catch (flushErr) {
-        console.error(`[Conducks Orchestrator] Chunk flush failed for discovery pass:`, flushErr);
-        // B3 fix: mark pulse incomplete so caller knows node/edge counts are stale
-        pulseIncomplete = true;
-      }
+      // A flush failure inside the pulse is NOT recoverable, so it is not swallowed. The whole
+      // analyze is one transaction; the moment a statement in it fails, DuckDB aborts the
+      // transaction and every later statement fails with "Current transaction is aborted". Carrying
+      // on produced exactly one useful line — the real error — followed by a wave of misleading
+      // ones, and the CLI then printed the LAST of them as fatal. That is why an out-of-memory
+      // failure was debugged as a transaction problem for two days.
+      const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
+      totalNodes += nodeCount;
+      totalEdges += edgeCount;
     }
 
     // === Pass 2 & 3: Conducks Streaming Induction & Binding 🛡️ ===
@@ -119,9 +118,6 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     
     const CHUNK_SIZE = 500;
     const totalBatches = Math.ceil(normalizedFiles.length / CHUNK_SIZE);
-    // B8 fix: track consecutive flush failures for circuit breaker
-    let consecutiveFlushFailures = 0;
-    const MAX_CONSECUTIVE_FLUSH_FAILURES = 3;
 
     for (let i = 0; i < normalizedFiles.length; i += CHUNK_SIZE) {
       const chunk = normalizedFiles.slice(i, i + CHUNK_SIZE);
@@ -149,23 +145,13 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       // Flush Chunk to Vault & Clear RAM
       if (this.persistence) {
         logger.info(`🛡️ [Conducks] [Wave ${batchNum}] Flushing structural delta to vault...`);
-        try {
-          const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
-          totalNodes += nodeCount;
-          totalEdges += edgeCount;
-          // B8 fix: reset failure streak on success
-          consecutiveFlushFailures = 0;
-        } catch (flushErr) {
-          consecutiveFlushFailures++;
-          console.error(`[Conducks Orchestrator] Chunk flush failed for wave ${batchNum} (consecutive: ${consecutiveFlushFailures}):`, flushErr);
-          // B3 fix: mark pulse incomplete on any flush failure
-          pulseIncomplete = true;
-          // B8 fix: circuit breaker — abort after 3 consecutive failures
-          if (consecutiveFlushFailures >= MAX_CONSECUTIVE_FLUSH_FAILURES) {
-            logger.warn(`🛡️ [Conducks] Aborting analysis wave: ${consecutiveFlushFailures} consecutive flush failures.`);
-            break;
-          }
-        }
+        // Same reasoning as the discovery flush above: the transaction is already aborted, so the
+        // remaining waves cannot succeed and the errors they produce hide the one that matters.
+        // `flushAndClear` also only clears AFTER a successful write, so continuing kept re-flushing
+        // an ever-growing graph — waves 3, 4 and 5 of a failed run each reported ~6,600 nodes.
+        const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
+        totalNodes += nodeCount;
+        totalEdges += edgeCount;
 
         // DF1: Write per-symbol kinetic columns from spectrum kinetic blobs
         for (const res of inductionResults) {
@@ -199,21 +185,20 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       // Seed the hash gate for every file this pulse analyzed (todo17 Phase 1). Without this the
       // watcher has nothing to compare against after a fresh `analyze`, so the first save of every
       // file re-parses it — the gate would only start paying off on the second edit.
-      // `pulseIncomplete` suppresses it: recording hashes for a pulse that did not finish would mark
-      // files as analyzed that never were, and the gate would then skip them forever.
-      if (!pulseIncomplete) {
-        for (const file of normalizedFiles) {
-          await this.persistence.setFileHash(file.path, FileHashGate.hash(file.source), Buffer.byteLength(file.source));
-        }
+      // Reaching here means every flush succeeded — a failed one now throws and the pulse rolls
+      // back — so there is no longer a committed-but-incomplete state for the hash gate to guard
+      // against. The `incomplete` flag this used to carry was always false once that became true,
+      // and a flag that cannot be set is worse than none: it reads as a check that ran.
+      for (const file of normalizedFiles) {
+        await this.persistence.setFileHash(file.path, FileHashGate.hash(file.source), Buffer.byteLength(file.source));
       }
 
       await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
-      
+
       // Conducks Pulse Hardening: Ensure pulse record knows total count.
-      // B3 fix: surface pulseIncomplete so callers can detect stale counts.
       await this.persistence.run(
         "INSERT OR REPLACE INTO pulses (id, timestamp, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?)",
-        [pulseId, Date.now(), totalNodes, totalEdges, JSON.stringify({ totalUnits: normalizedFiles.length, incomplete: pulseIncomplete })]
+        [pulseId, Date.now(), totalNodes, totalEdges, JSON.stringify({ totalUnits: normalizedFiles.length })]
       );
     }
 

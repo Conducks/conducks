@@ -695,3 +695,17 @@
 - Applies: `--yes` used to skip the scope guard entirely rather than just the prompt, so no automated
   caller had a guard at all. It now always assesses and always prints reasons. A bypass that leaves
   no trace is indistinguishable from a guard that does not exist.
+
+## A pulse costs ~1 GB regardless of source size — and three obvious causes have been ruled out
+- Gotcha: a full `analyze --force` on this repo (287 files, 1.4 MB of source, 6,794 nodes) peaks at
+  **1216 MB RSS and 204% CPU**. An unchanged pulse, where the hash gate skips parsing, peaks at
+  **223 MB and 68%**. So ~1 GB belongs to induction, and the machine gets hot because of it.
+- Why: not for any of the reasons that look obvious. Total source is 1.4 MB, so holding every file's
+  text in `allUnits` is a rounding error. The graph is tens of MB. And halving the wave size five
+  times over (`CHUNK_SIZE` 500 to 100) bought only 1216 to 970 MB. All three MEASURED, all three
+  dead — do not re-propose them.
+- Applies: `CHUNK_SIZE` also CHANGES THE RESULT — 6,794 nodes at 500, 6,823 at 100 — because
+  cross-file resolution only sees what is inside the current wave. Treat wave size as a correctness
+  parameter, not a tuning knob, until that is explained.
+- Applies: sample the real node process, never `$!`. `scratchpad/bench/run.sh` watched the subshell,
+  so every `peak_cpu` it printed was 0% — an instrument reading zero looks like a measurement.
