@@ -48,6 +48,39 @@ const duckMemoryMB = async (p: SynapsePersistence): Promise<number> => {
   return Number(rows[0]?.b ?? 0) / 1048576;
 };
 
+describe('batchSizeFor — the two limits a batch has to satisfy', () => {
+  /**
+   * The DuckDB limit. Batching at 384 rows crashed the process with `INTERNAL Error: Unaligned
+   * fetch in validity and main column data for update` about one run in three, on a fresh vault as
+   * well as an old one. DuckDB processes in vectors of 2048 rows and a batch that does not divide
+   * one straddles it. This is asserted as a RULE because the crash is nondeterministic — a
+   * behavioural test would have passed two runs in three while broken, which is how it shipped.
+   */
+  it('never returns a batch that fails to divide DuckDB’s 2048-row vector', () => {
+    for (const width of [1, 2, 7, 10, 26, 40, 137, 5000, 20000]) {
+      const n = SynapsePersistence.batchSizeFor(width);
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(Number.isInteger(Math.log2(n))).toBe(true);       // a power of two
+      if (n < 2048) expect(2048 % n).toBe(0);
+    }
+  });
+
+  /**
+   * The JavaScript limit. The node driver spreads bound parameters through `apply`, so the cap is
+   * on PARAMETERS and not rows — 26 columns x 2000 rows overflows the call stack before DuckDB
+   * sees the statement. A row count safe for 10-column edges is not safe for 26-column nodes.
+   */
+  it('keeps every batch under the bound-parameter cap, whatever the table width', () => {
+    for (const width of [1, 10, 26, 137, 5000]) {
+      expect(SynapsePersistence.batchSizeFor(width) * width).toBeLessThanOrEqual(10000);
+    }
+  });
+
+  it('still returns a usable batch for an absurdly wide table', () => {
+    expect(SynapsePersistence.batchSizeFor(20000)).toBe(1);
+  });
+});
+
 describe('batched inserts — the atomic pulse must not cost 885 KB per row', () => {
   /**
    * The regression test proper. 5,000 nodes written row-by-row inside an open transaction cost

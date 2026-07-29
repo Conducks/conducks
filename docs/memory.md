@@ -709,3 +709,40 @@
   parameter, not a tuning knob, until that is explained.
 - Applies: sample the real node process, never `$!`. `scratchpad/bench/run.sh` watched the subshell,
   so every `peak_cpu` it printed was 0% — an instrument reading zero looks like a measurement.
+
+## A multi-row INSERT batch MUST be a power of two, or DuckDB crashes about one run in three
+- Gotcha: `INSERT OR REPLACE` with 384 rows per statement kills the process with `INTERNAL Error:
+  Unaligned fetch in validity and main column data for update` inside `MergeIntoGlobalState::Sink ->
+  PhysicalUpdate::Sink`. MEASURED: ~1 run in 3, on a FRESH vault as well as an aged one, so it is
+  neither vault corruption nor a timing artefact. At 256 the same analyze ran 20 times clean across
+  two projects.
+- Why: DuckDB processes in vectors of 2,048 rows. A batch that does not divide that vector straddles
+  one, and the multi-row update path fetches the validity (null) mask and the column data out of
+  step. `batchSizeFor()` rounds down to a power of two for this reason alone.
+- Applies: the crash is NONDETERMINISTIC, so a behavioural test passes two runs in three while
+  broken — which is how it reached a commit. Assert the RULE (`batchSizeFor` is public), never a
+  pulse that happened to succeed. Same for any new multi-row write anywhere in the vault.
+- Applies: delete-then-insert avoids the MERGE path and measured 22 MB against 212 MB for the same
+  20,000 rows — a 10x win — but broke the real pulse with `Duplicate key "id: ecosystem::path"`,
+  which no standalone probe could reproduce. Worth returning to; do not ship it without the repro.
+
+## Never query `duckdb_memory()` on the pulse connection while the transaction is open
+- Gotcha: `SELECT sum(memory_usage_bytes) FROM duckdb_memory()` issued mid-pulse kills the process
+  with an INTERNAL assertion inside `PipelineExecutor::TryFlushCachingOperators`. Reproduced on the
+  first attempt at adding a memory trace.
+- Why: the diagnostic query runs on the same connection as the open write transaction. Whatever the
+  cause, an assertion failure in the writer is not a price worth paying for a number.
+- Applies: `process.memoryUsage()` needs no query and answers the question that matters —
+  `rss - heapTotal - external` is the native footprint. `CONDUCKS_MEM_TRACE=1 conducks analyze`
+  prints it per wave (`orchestrator.traceMemory`), off by default.
+
+## The pulse's gigabyte is NOT the JavaScript heap
+- Gotcha: a full `analyze --force` peaks at ~1.1-1.2 GB RSS, and the same pulse SUCCEEDS under
+  `--max-old-space-size=400` while still peaking at 1043 MB. So no amount of JS-side restructuring
+  touches it — the memory is native.
+- Why: at the discovery flush the split reads rss=383 MB, heapUsed=101 MB, heapTotal=178 MB,
+  external=50 MB, native=~150 MB — and native grows from there. Candidates not yet separated:
+  tree-sitter trees, the 12 grammars loaded eagerly at bootstrap whatever the project's languages,
+  and DuckDB's own buffer manager.
+- Applies: do not propose a JS fix for this without re-reading these numbers. Four explanations have
+  now been measured and killed (pinned rows, wave size, source retention, JS heap). `todo22#P7`.

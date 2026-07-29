@@ -272,6 +272,32 @@ export class SynapsePersistence {
   private static readonly MAX_BOUND_PARAMS = 10000;
 
   /**
+   * How many rows one multi-row statement may carry, for a table of `width` columns.
+   *
+   * Two independent limits, and BOTH are load-bearing:
+   *
+   * The parameter cap is a JavaScript limit, not a database one — the node driver passes bound
+   * parameters through `Function.prototype.apply`, so 26 columns x 2000 rows throws
+   * `RangeError: Maximum call stack size exceeded` before DuckDB is reached.
+   *
+   * The power-of-two rounding is a DuckDB limit. It processes in vectors of 2048 rows, and a
+   * multi-row `INSERT OR REPLACE` at a batch that does not divide that vector crashed the process
+   * with `INTERNAL Error: Unaligned fetch in validity and main column data for update` inside
+   * `MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`. MEASURED at batch 384: roughly one run in
+   * three, on a FRESH vault as well as an old one, so neither vault corruption nor a timing
+   * artefact. At batch 256 the same analyze ran 20 times with no failure.
+   *
+   * This is exported for a test rather than left inline because the failure it prevents is
+   * NONDETERMINISTIC — a behavioural test would pass two runs in three while broken, which is
+   * exactly how this shipped in the first place. The rule can be asserted even though the crash
+   * cannot be reliably reproduced.
+   */
+  public static batchSizeFor(width: number): number {
+    const fit = Math.max(1, Math.floor(SynapsePersistence.MAX_BOUND_PARAMS / width));
+    return Math.max(1, 2 ** Math.floor(Math.log2(fit)));
+  }
+
+  /**
    * Insert rows in batches instead of one statement per row.
    *
    * DuckDB allocates transaction-local storage PER STATEMENT and coalesces none of it until the
@@ -294,7 +320,12 @@ export class SynapsePersistence {
     for (const row of rows) deduped.set(row[0], row);
 
     const width = columns.length;
-    const perBatch = Math.max(1, Math.floor(SynapsePersistence.MAX_BOUND_PARAMS / width));
+    // Rounded DOWN to a power of two. DuckDB processes in vectors of 2048 rows, and a multi-row
+    // `INSERT OR REPLACE` at a batch size that does not divide that vector crashed the process
+    // with `INTERNAL Error: Unaligned fetch in validity and main column data for update` — measured
+    // at batch 384, roughly one run in three, on a FRESH vault, so it is neither vault corruption
+    // nor a timing artefact. A batch that divides the vector never straddles one.
+    const perBatch = SynapsePersistence.batchSizeFor(width);
     const tuple = `(${Array(width).fill('?').join(',')})`;
     const head = `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES `;
 

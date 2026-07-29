@@ -1,6 +1,13 @@
 # Handover — 2026-07-29
 Status: current
 
+## Read this first
+The batching fix in `cb367a2` shipped a NONDETERMINISTIC crash — `INSERT OR REPLACE` at 384 rows per
+statement killed the process about one run in three, and the whole suite stayed green throughout.
+Fixed by rounding the batch down to a power of two (DuckDB's vector is 2,048 rows). The lesson is in
+`todo22#P8`: a behavioural test passes two runs in three while broken, so the RULE is asserted, not
+a pulse that happened to succeed.
+
 ## Where it stands
 - **The atomic pulse was costing 885 KB of DuckDB memory per row** (ADR 0041). `beginPulse()` made
   `saveNodes`/`saveEdges` stop self-committing, and DuckDB charges per STATEMENT — measured 17,281 MB
@@ -20,7 +27,11 @@ Status: current
   wrong** — wrong mechanism (pinned rows), wrong place (discovery flush, not wave 3), wrong suspect
   (the duplicated `metadata` column, measured at 28 MB total). CONDUCKS-31 had been written days
   earlier and was not followed. `todo22#P5` is corrected.
-- Gates: **636 tests pass** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
+- **A pulse's gigabyte is not the JavaScript heap.** The same analyze succeeds under
+  `--max-old-space-size=400` while still peaking at 1043 MB RSS, so no JS-side change touches it.
+  Four explanations have now been measured and killed. `CONDUCKS_MEM_TRACE=1 conducks analyze`
+  prints the split per wave; the remaining work needs a NATIVE profiler (`todo22#P7`).
+- Gates: **639 tests pass** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
   **6 integration failures are PRE-EXISTING** — verified against a clean worktree at HEAD, identical
   set. `docs-watcher` debounce is flaky, 1 in 3.
 

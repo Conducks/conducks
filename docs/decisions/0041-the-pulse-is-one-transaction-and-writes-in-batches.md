@@ -1,6 +1,6 @@
 # 0041 — the pulse is one transaction, and that is only affordable in batches
 Status: Accepted
-- Enforced by: tests/unit/core/persistence/batched-insert.test.ts (a pulse-sized write stays far under what one statement per row costs, last-wins survives the deduplication batching needs, a write larger than one batch splits and loses nothing, and an aborted pulse still leaves no rows)
+- Enforced by: tests/unit/core/persistence/batched-insert.test.ts (a pulse-sized write stays far under what one statement per row costs, last-wins survives the deduplication batching needs, a write larger than one batch splits and loses nothing, an aborted pulse still leaves no rows, and every batch size both divides DuckDB's 2048-row vector and stays under the bound-parameter cap)
 - Date: 2026-07-29
 
 ## Context
@@ -44,6 +44,25 @@ parameters through `Function.prototype.apply`, so 26 columns times 2,000 rows th
 `RangeError: Maximum call stack size exceeded` in JavaScript before DuckDB is reached. A row count
 safe for 10-column edges is not safe for 26-column nodes, so the cap has to be on the thing that
 actually overflows.
+
+**And the batch is then rounded DOWN to a power of two**, which is a second, independent limit that
+this decision originally shipped without and paid for. DuckDB processes in vectors of 2,048 rows,
+and a multi-row `INSERT OR REPLACE` at a batch that does not divide that vector killed the process
+with `INTERNAL Error: Unaligned fetch in validity and main column data for update`, inside
+`MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`. MEASURED at the original batch of 384: about
+one run in three, on a FRESH vault as well as an aged one, so neither vault corruption nor a timing
+artefact. At 256 the same analyze ran 20 times with no failure, on two different projects.
+
+The rule is asserted directly rather than through behaviour, because the crash is NONDETERMINISTIC:
+a test that runs a pulse twice would have passed while broken two times in three, which is exactly
+how this reached a commit. `batchSizeFor()` is public for that reason.
+
+**Not chosen: delete-then-insert instead of `INSERT OR REPLACE`.** It avoids the crashing MERGE path
+entirely and measured TEN TIMES better in isolation — 22 MB against 212 MB for 20,000 rows written
+twice, at identical wall time. It also broke the real pulse with
+`Duplicate key "id: ecosystem::path" violates primary key constraint`, which a standalone probe of
+the same shape (overlapping ids, varying NULLs, file-backed and in-memory) could not reproduce. A
+10x memory win is worth returning to, but not while the mechanism is unexplained. `todo22#P7`.
 
 **Rows are deduplicated on their id, last one winning.** `INSERT OR REPLACE` applied one row at a
 time lets a later row overwrite an earlier one; the same two rows inside a single multi-row
