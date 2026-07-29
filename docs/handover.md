@@ -56,7 +56,7 @@ three shipped red — verify the vault write path by running `analyze`, not by r
   26, and not the three stored twice). **Peak 1053 MB to 871 MB.** A/B verified identical: same
   nodes, edges, resolutions, virtual symbols and vault.
 - Gates: **652 tests pass, 0 failing** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
-  `docs-watcher` debounce is flaky, 1 in 3, and Governance is flaky under full-suite parallelism.
+  Two flaky tests, now tracked as `todo22#P13` rather than only mentioned here.
 
 ## Do not cite
 `results-baseline.txt` measures nothing. Two of three subjects were the wrong tree, `nodes=0` read a
