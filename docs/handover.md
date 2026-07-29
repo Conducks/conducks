@@ -49,6 +49,12 @@ three shipped red — verify the vault write path by running `analyze`, not by r
   `rename` and `explain` all read `graphEngine` without calling `ensureGraphLoaded()` (ADR 0038), so
   each threw on every invocation. Broken since that ADR landed, written off as pre-existing for days
   — including in this file. One line each.
+- **The mid-pulse reload no longer compresses data nothing reads.** `addNode` zlib-deflates every
+  node's non-skeleton properties, and `getAllNodes()` — what the ranker, linkers and virtual
+  induction all use — returns skeletons and never the compressed half. The analyze reload is now
+  shallow: ingest 102 MB to 1 MB, `external` 110 MB to 3 MB. Plus a narrowed SELECT (15 columns of
+  26, and not the three stored twice). **Peak 1053 MB to 871 MB.** A/B verified identical: same
+  nodes, edges, resolutions, virtual symbols and vault.
 - Gates: **652 tests pass, 0 failing** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
   `docs-watcher` debounce is flaky, 1 in 3, and Governance is flaky under full-suite parallelism.
 

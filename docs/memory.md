@@ -784,3 +784,24 @@
   registry init" recorded earlier is this load, not persistence or chronicle.
 - Applies: booting `analyze` lazily should return that 135 MB outright. NOT yet done or tested —
   the deferral guard throws on any graph access, so every pre-pulse path has to be checked first.
+
+## The graph compresses properties that `getAllNodes()` never returns
+- Gotcha: `addNode` zlib-deflates every node's non-skeleton properties into `compressedMeat` unless
+  `isShallow` is set, and `getNode()` inflates + re-parses them on EVERY call. But `getAllNodes()`
+  returns the raw skeleton and never the meat — so the ranker, the linkers and virtual induction,
+  which all use `getAllNodes()`, pay the compression and read none of it.
+- Why: MEASURED on the mid-pulse reload of 6,544 nodes — 102 MB to ingest and 110 MB of `external`
+  Buffers, both gone with `load(graph, { shallow: true })`. Peak RSS 1053 MB to 871 MB.
+- Applies: pass `shallow: true` for any load whose consumers read skeleton properties only. Do NOT
+  for the mirror's `hydrateNode`, which exists to read the meat.
+- Applies: `getNode()` is NOT a cheap map lookup when meat is present — it inflates. A resolver that
+  calls it per candidate in a loop pays that every time.
+
+## `bindRouteCircuits` cannot work after a reload — its fields are not in the skeleton
+- Gotcha: it reads `node.properties.isRoute` / `isRequest` / `url` / `method` / `path`, and NONE of
+  those are in the property list `addNode` keeps in the skeleton. After any `persistence.load()`
+  they are undefined, so cross-service HTTP binding finds nothing.
+- Why: found while checking whether a shallow reload would break it. It was already broken — it can
+  only have worked in the same process that parsed the routes, before any reload.
+- Applies: don't cite cross-service route binding as working on a loaded graph. Either promote those
+  fields into the skeleton or state that it is parse-time only. `todo22#P12`.

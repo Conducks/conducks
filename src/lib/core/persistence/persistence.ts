@@ -230,11 +230,31 @@ export class SynapsePersistence {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public async load(graph: any): Promise<void> {
+  /**
+   * Materialise the vault into an in-memory graph.
+   *
+   * `shallow` skips the per-node compression `addNode` otherwise performs — MEASURED at 102 MB to
+   * ingest 6,544 nodes, and it is pure waste for a caller that only reads skeleton properties,
+   * because `getAllNodes()` returns skeletons and never the compressed half. It also makes
+   * `getNode()` cheap: with meat present that call inflates zlib and re-parses JSON EVERY time.
+   *
+   * It is opt-in rather than the default because a shallow node genuinely loses its non-skeleton
+   * properties, and the mirror's `hydrateNode` depends on them.
+   */
+  public async load(graph: any, options: { shallow?: boolean } = {}): Promise<void> {
     const db = await this.ensureVaultOpen();
-    const nodes = await this.query("SELECT * FROM nodes");
+    // Only the columns this method actually reads. `SELECT *` fetched all 26 and the driver
+    // materialises every one as a JavaScript value — MEASURED at 190 MB to pull 6,544 node rows,
+    // roughly 29 KB per row for data that is a fraction of that. `dna`, `signature` and `kinetic`
+    // are deliberately absent: they are stored BOTH as their own columns and inside `metadata`, and
+    // the spread below already carries them, so selecting them again cost three extra JSON parses
+    // per node for values that were then overwritten with equal ones.
+    const nodes = await this.query(
+      `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
+              risk, unitId, parentId, namespaceId, layer_path, depth, metadata FROM nodes`);
     traceMemory(`load: ${nodes.length} node rows fetched`);
-    const edges = await this.query("SELECT * FROM edges");
+    const edges = await this.query(
+      `SELECT id, sourceId, targetId, type, weight, confidence, properties FROM edges`);
     traceMemory(`load: ${edges.length} edge rows fetched`);
 
     for (const row of nodes) {
@@ -242,6 +262,7 @@ export class SynapsePersistence {
         id: row.id,
         label: row.canonicalKind,
         name: row.name,
+        isShallow: options.shallow === true,
         properties: {
           ...JSON.parse(row.metadata),
           name: row.name,
@@ -256,10 +277,7 @@ export class SynapsePersistence {
           parentId: row.parentId,
           namespaceId: row.namespaceId,
           layer_path: row.layer_path,
-          depth: row.depth,
-          kinetic: JSON.parse(row.kinetic || '{}'),
-          dna: JSON.parse(row.dna || '{}'),
-          signature: JSON.parse(row.signature || '{}')
+          depth: row.depth
         }
       });
     }

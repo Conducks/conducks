@@ -199,7 +199,10 @@ export class AnalysisService implements ConducksComponent {
     // 4. Reload graph from vault so PageRank runs on the full node/edge set.
     // The orchestrator flushed and cleared the in-memory graph during analysis,
     // so we must reload before resonating or gravity will be 0 for everything.
-    await this.persistence.load(this.graph.getGraph());
+    // Shallow: everything downstream of here — the ranker, the linkers, virtual induction — reads
+    // skeleton properties only, and `getAllNodes()` never returns the compressed half anyway. It
+    // saves compressing every node on the way in and re-inflating it on every `getNode()`.
+    await this.persistence.load(this.graph.getGraph(), { shallow: true });
     traceMemory('after reloading the whole graph for PageRank');
 
     this.graph.resonate();
