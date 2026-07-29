@@ -761,20 +761,23 @@
   source (3 MB for all 447 files), the JavaScript heap (400 MB cap succeeds), and the twelve
   grammars (14 MB total). Do not re-propose any of them.
 
-## An id written TWICE in one pulse cannot be deleted and re-inserted — it must be UPDATEd
-- Gotcha: a pulse writes the containment skeleton twice (discovery flush, then a wave re-recording
-  the same ecosystem/directory nodes). Deleting such a row and re-inserting it inside the SAME
-  transaction fails with `Duplicate key "id: ecosystem::path" violates primary key constraint` —
-  DuckDB keeps the primary key of the row inserted earlier in that transaction. Confirmed by
-  instrumenting the failing statement: the id appears exactly ONCE in the batch and once in the
-  call, so it is not a dedup bug.
-- Why: `insertBatched` now tracks ids written during the open pulse and turns a repeat into an
-  `UPDATE` — the one write shape that has never failed here, and what `updateRanks` already used.
-- Applies: it only reproduces on an AGED vault. Fresh-copy runs passed 6/6 while the real repo
-  failed 100%. Test on the repo's own vault before believing a vault fix.
-- Applies: NO TEST CATCHES THIS. Removing the fix leaves the suite green — mutation-checked at one
-  row and at 900 rows across several batches. Three separate vault-write failures have now shipped
-  green. Verify the write path by running `analyze`, not by running jest.
+## Never delete-and-reinsert a primary key inside the pulse — UPDATE existing rows, INSERT new ones
+- Gotcha: delete+insert of the same key in one transaction hits a DuckDB index bug
+  (duckdb/duckdb#2241, #16520, #16604; edge cases remain in 1.4.4) — `Duplicate key ... violates
+  primary key constraint`. The victim key can be written ONCE: the minimal repro (captured from a
+  real failing pulse, replayed, delta-shrunk to 5 statements) needs a batch of OTHER committed rows
+  churned first, and it survives vault compaction. Every small probe of the pattern passes, so no
+  behavioural test can see this bug — `batched-insert.test.ts` asserts the statement STREAM instead:
+  zero DELETEs from the write path.
+- Why: `insertBatched` probes which ids exist (a read, seeing this pulse's earlier writes), then
+  `UPDATE ... FROM (VALUES ...)` per batch for those and plain INSERT for the rest.
+- Applies: TWO previous fixes here looked proven and were not. Batch alignment: 25 clean runs, then
+  4/4 crashes on other input. Repeat-write tracking: right for repeats, accidental for the rest —
+  its own statement log showed the victim still going delete-then-insert, passing on batch
+  composition. Verify a fix for a layout-sensitive bug by the absence of the PATTERN, never by runs.
+- Applies: `CONDUCKS_SQL_LOG=<file> conducks analyze` writes every SQL statement as JSONL. Capture
+  the log of a failing run and REPLAY it instead of reconstructing the pulse from a theory of it —
+  four hand-built fixtures failed to reproduce what the replay reproduced on the first attempt.
 
 ## The graph is loaded TWICE per analyze, and the first load is thrown away
 - Gotcha: the bootstrapper loads the whole graph at startup — MEASURED 88 MB to 223 MB, +135 MB —

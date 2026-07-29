@@ -11,11 +11,12 @@ import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
  * MERGE crash from multi-row `INSERT OR REPLACE`, a wrong "fix" that rounded the batch to a power
  * of two, and a duplicate-key violation when a pulse writes one id twice.
  *
- * READ THIS BEFORE TRUSTING THIS FILE: it does NOT reproduce any of the three. Removing the
- * repeat-write fix from `insertBatched` leaves every test here green — verified by mutation against
- * FOUR successively more realistic versions of the fixture. What it does cover is the shape those
- * failures live in, and the invariants they broke: last-write-wins for an id written twice in a
- * pulse, and rollback to exactly the previously published graph.
+ * READ THIS BEFORE TRUSTING THIS FILE: it does NOT reproduce any of the three — verified by
+ * mutation against four successively more realistic versions. What finally reproduced the failure
+ * was capturing a real pulse's statement log (`CONDUCKS_SQL_LOG`) and replaying it verbatim; the
+ * write path's rule is asserted on the statement stream in batched-insert.test.ts. This file covers
+ * the invariants the failures broke: last-write-wins for an id written twice in a pulse, and
+ * rollback to exactly the previously published graph.
  *
  * Variables added while trying to reproduce it, each ruled OUT as sufficient. Recorded so the next
  * attempt starts here instead of repeating them:

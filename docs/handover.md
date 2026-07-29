@@ -2,6 +2,14 @@
 Status: current
 
 ## Read this first
+The duplicate-key vault crash is root-caused and structurally fixed. It is a DuckDB bug
+(duckdb/duckdb#2241, #16520, #16604) hit by delete+insert of a primary key inside one transaction
+under churn. Found by capturing a failing pulse's SQL (`CONDUCKS_SQL_LOG`, now shipped), replaying
+it verbatim, and delta-shrinking 36 statements to 5 — after four hand-built fixtures failed.
+`insertBatched` now UPDATEs existing rows and INSERTs new ones, deleting nothing; the previous
+repeat-write fix was right for one trigger and accidental for the other. The rule is pinned on the
+statement stream (zero DELETEs), the only level a layout-sensitive bug can be tested at.
+
 The batching fix in `cb367a2` shipped a NONDETERMINISTIC crash, and the FIRST fix for it was also
 wrong. A multi-row `INSERT OR REPLACE` compiles to a MERGE and DuckDB dies inside it with
 `INTERNAL Error: Unaligned fetch in validity...`. Rounding the batch to a power of two to "align"

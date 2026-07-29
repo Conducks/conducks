@@ -1,6 +1,6 @@
 # 0041 — the pulse is one transaction, and that is only affordable in batches
 Status: Accepted
-- Enforced by: tests/unit/core/persistence/batched-insert.test.ts (a pulse-sized write stays far under what one statement per row costs, last-wins survives the deduplication batching needs, a write larger than one batch splits and loses nothing, an aborted pulse still leaves no rows, and every batch stays under the bound-parameter cap)
+- Enforced by: tests/unit/core/persistence/batched-insert.test.ts (a pulse-sized write stays far under what one statement per row costs; last-wins survives deduplication; a write larger than one batch splits and loses nothing; an aborted pulse leaves no rows; every batch stays under the bound-parameter cap; and the statement stream contains ZERO deletes — existing rows are UPDATEd, new rows INSERTed, which is the only level the DuckDB bug below can be tested at)
 - Date: 2026-07-29
 
 ## Context
@@ -45,31 +45,37 @@ parameters through `Function.prototype.apply`, so 26 columns times 2,000 rows th
 safe for 10-column edges is not safe for 26-column nodes, so the cap has to be on the thing that
 actually overflows.
 
-**And the write is DELETE-then-INSERT, not `INSERT OR REPLACE`.** A multi-row `INSERT OR REPLACE`
-compiles to a MERGE, and DuckDB crashes inside it with `INTERNAL Error: Unaligned fetch in validity
-and main column data for update`, in `MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`. Measured
-on this repo's own source: the MERGE build failed 2 runs in 3 on a fresh vault; delete-then-insert
-has not failed once across more than a dozen. It is also cheaper — 22 MB against 212 MB for 20,000
-rows written twice, at identical wall time, because the update path is where the transaction-local
-storage was going. Every DELETE runs before any INSERT: interleaving them per batch produced
-`Duplicate key violates primary key constraint`, and ordering the phases removes the interleaving
-rather than guessing at why. The extra row versions are what ADR 0037's compaction already reclaims.
+**And the write is UPDATE-or-INSERT, split by existence — never delete-and-reinsert.** Deleting and
+re-inserting the same primary key inside one transaction hits DuckDB's over-eager index checking
+(duckdb/duckdb#2241, #16520, #16604; edge cases remain after the partial fix in #15836, still
+present in 1.4.4) and dies with `Duplicate key ... violates primary key constraint`. The trigger is
+NOT the key's own history: captured and delta-shrunk, the minimal repro is BEGIN; delete+insert one
+batch of OTHER committed rows; then delete+insert a batch containing the victim — a key written only
+ONCE. Both halves are required, every single-row probe of the pattern passes, and the failure
+survives vault compaction. So each batch now probes which ids exist (a read, costing no
+transaction-local storage, seeing this pulse's own earlier writes), UPDATEs those via one
+`UPDATE ... FROM (VALUES ...)` statement per batch, and plainly INSERTs the rest. The pattern the
+bug needs no longer occurs in `insertBatched` at all, and that ABSENCE is what the test asserts —
+a green run proves nothing about a bug this layout-sensitive.
 
-**A repeat write of the same id inside one pulse is an UPDATE, not a delete-and-reinsert.** A pulse
-writes some ids twice: the discovery flush records the containment skeleton, and a wave re-records
-the same ecosystem and directory nodes while ingesting its units. Deleting such a row and
-re-inserting it in the SAME transaction fails — DuckDB keeps the primary key of a row inserted
-earlier in that transaction, and the insert dies with
-`Duplicate key "id: ecosystem::path" violates primary key constraint`. Confirmed by instrumenting
-the failing statement: the id appears exactly once in the batch and once in the call, so it is not a
-deduplication bug. The second write therefore uses `UPDATE`, which is the one write shape that has
-never failed here — `updateRanks` and `updateKineticColumns` have always used it. The rewrite set is
-small by construction, since it is the skeleton and not the symbols.
+`INSERT OR REPLACE` stays excluded: multi-row it compiles to a MERGE, and DuckDB crashes inside
+`MergeIntoGlobalState::Sink` with `INTERNAL Error: Unaligned fetch in validity and main column data
+for update`, about one run in three at some batch shapes.
 
-**This third failure is not covered by a test, and that is stated rather than implied.** Removing
-the fix leaves the suite green — mutation-checked at one row and again at 900 rows spanning several
-batches. It is verified only by running a real analyze against the vault that reproduced it: 4 clean
-runs against a prior failure rate of 100%. `todo22#P10` carries the gap.
+**How this was finally pinned down, because the method is the lesson.** Four hand-built fixtures of
+increasing realism failed to reproduce the crash — each encoded a THEORY of the pulse, and the
+theory was the unreliable part. What worked: `CONDUCKS_SQL_LOG` records every write statement of a
+real failing run as JSONL; replaying that log verbatim against a copy of the failed vault reproduced
+it deterministically on the first attempt; greedy delta-debugging shrank 36 statements to 5.
+
+**Not chosen, and RECORDED BECAUSE IT WAS PARTLY ACCIDENTAL: delete-then-insert with repeat writes
+tracked and turned into UPDATEs.** The previous decision here. It was right about repeat writes —
+the discovery flush and a wave both record the containment skeleton, and re-inserting a key this
+transaction already inserted does fail — and its 5 clean runs on the failing vault were still luck:
+the statement log of that build shows the victim key STILL going delete-then-insert, surviving only
+because converting repeats to updates shifted the batch composition the bug is sensitive to. It also
+measured well (22 MB against 212 MB for 20,000 rows written twice), which is a reminder that a fix
+can be fast, tested, measured, and still wrong about why it works.
 
 **Not chosen, and RECORDED BECAUSE IT WAS WRONG: rounding the batch to a power of two.** The first
 fix for the crash assumed the batch had to divide DuckDB's 2,048-row vector, since the error says
@@ -113,6 +119,15 @@ A pulse large enough will still exhaust memory — it just takes roughly 100 tim
 there. No project has been measured at that size, and this record does not claim a ceiling it has
 not tested.
 
-The crash this record now avoids was believed fixed once already, by the alignment theory above,
-on the strength of 25 consecutive passing runs. Treat any future "it stopped happening" about a
-nondeterministic failure as unproven until there is a deterministic repro to fix.
+The crash this record avoids was believed fixed TWICE — by batch alignment on the strength of 25
+consecutive passes, and by the repeat-write UPDATE on the strength of 5 — and both beliefs failed
+further scrutiny. What settled it was a deterministic replay of a captured statement log, shrunk
+mechanically. Treat any future "it stopped happening" about a nondeterministic failure as unproven
+until the statement log reproduces it and the fix makes the PATTERN absent rather than the symptom
+quiet. `CONDUCKS_SQL_LOG=<file> conducks analyze` captures the log.
+
+One delete-then-insert cycle per key remains structurally possible outside `insertBatched`:
+`purgeUnits` deletes a unit's rows and the wave re-inserts them. That is a SINGLE cycle with no
+churn between the delete and the insert of the same key — the shape every probe passes, and the
+shape the pre-batching code ran for weeks. Stated so nobody mistakes "the pattern is gone" for a
+claim wider than what `insertBatched` controls.

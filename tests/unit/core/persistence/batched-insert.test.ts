@@ -160,15 +160,11 @@ describe('batched inserts — the atomic pulse must not cost 885 KB per row', ()
    * `Duplicate key ... violates primary key constraint`, because DuckDB keeps the key of a row
    * inserted earlier in that transaction. The second write therefore becomes an UPDATE.
    *
-   * WHAT THIS TEST DOES NOT DO: it does not reproduce the duplicate-key failure. Removing the fix
-   * leaves it green — verified by mutation, at one row and again at 900 rows spanning several
-   * batches. The failure needs conditions this test has not managed to recreate, most likely
-   * committed rows for the same ids from an earlier pulse plus the full statement mix of a real
-   * one. The fix is verified ONLY by running a real analyze against the vault that reproduced it
-   * (4 clean runs against a prior failure rate of 100%), and `todo22#P10` carries the gap.
-   *
-   * What it does pin is the semantics the fix must preserve: the LAST write of an id in a pulse is
-   * the one that survives. That would break if the UPDATE path were dropped or misordered.
+   * Pins the semantics the write path must preserve whatever its implementation: the LAST write of
+   * an id in a pulse is the one that survives. The mechanism itself — never delete-and-reinsert a
+   * key inside the pulse — is asserted by the statement-stream test below, because a behavioural
+   * test cannot see it: the failure it guards against needs surrounding churn no unit fixture has
+   * recreated (see pulse-replay.test.ts for the full account).
    */
   it('lets a second write of the same id inside one pulse win, without a key violation', async () => {
     const root = mkRoot();
@@ -213,4 +209,44 @@ describe('batched inserts — the atomic pulse must not cost 885 KB per row', ()
     expect(String(rows[0].c)).toBe('0');
     await p.close();
   }, 60000);
+});
+
+describe('the write path must never delete-and-reinsert a key inside the pulse', () => {
+  /**
+   * The RULE, asserted on the statement stream — the only level a nondeterministic storage bug can
+   * be tested at. Deleting and re-inserting the same primary key inside one transaction hits
+   * DuckDB's over-eager index checking (duckdb/duckdb#2241, #16520, #16604; edge cases remain after
+   * #15836) and fails with `Duplicate key` — but ONLY under enough surrounding churn, proven by
+   * capturing a real failing pulse's statement log and delta-shrinking it: the minimal repro needs
+   * a batch of OTHER rows churned first, so every small behavioural probe of the pattern passes
+   * while a real pulse against an aged vault failed 100% of the time.
+   *
+   * A green run therefore proves nothing here; the absence of the PATTERN is what is checked.
+   * `CONDUCKS_SQL_LOG` records every write statement, and this asserts the stream shape directly:
+   * rows that exist are UPDATEd, rows that do not are INSERTed, and nothing is deleted.
+   */
+  it('updates existing rows and inserts new ones, with zero DELETE statements', async () => {
+    const root = mkRoot();
+    const logPath = path.join(root, 'sql.jsonl');
+    const p = new SynapsePersistence(root, false);
+    await p.query('SELECT 1');
+    await p.saveNodes(mkNodes(700, 'pre'), 'p0');           // committed rows to write over
+
+    process.env.CONDUCKS_SQL_LOG = logPath;
+    try {
+      await p.beginPulse();
+      // 700 rewrites of committed rows + 300 fresh, spanning several batches of each kind.
+      await p.saveNodes([...mkNodes(700, 'pre'), ...mkNodes(300, 'new')], 'p1');
+      await p.abortPulse();
+    } finally {
+      delete process.env.CONDUCKS_SQL_LOG;
+    }
+
+    const stmts = fs.readFileSync(logPath, 'utf8').trim().split('\n')
+      .map(l => JSON.parse(l) as { sql: string })
+      .filter(s => /nodes/i.test(s.sql));
+    expect(stmts.filter(s => s.sql.startsWith('DELETE')).length).toBe(0);
+    expect(stmts.filter(s => s.sql.startsWith('UPDATE')).length).toBeGreaterThan(0);
+    expect(stmts.filter(s => s.sql.startsWith('INSERT ')).length).toBeGreaterThan(0);
+  }, 120000);
 });

@@ -27,11 +27,27 @@ export class SynapsePersistence {
   // back on next open, so the previous good graph survives (no silent partial-graph corruption).
   private inPulse: boolean = false;
 
+  /**
+   * Ids already written by THIS transaction, per table.
+   *
+   * A pulse writes some ids twice — the discovery flush records the containment skeleton, and a
+   * wave re-records the same ecosystem and directory nodes while ingesting its units. Deleting such
+   * a row and re-inserting it inside the SAME transaction does NOT work: DuckDB keeps the primary
+   * key of the row inserted earlier in the transaction, and the re-insert fails with
+   * `Duplicate key "id: ecosystem::path" violates primary key constraint`. Measured — the failing
+   * id appears exactly once in the batch and once in the call, so it is not a deduplication bug.
+   *
+   * So the second write of an id becomes an UPDATE instead. That is the one write shape that has
+   * never failed here: `updateRanks` and `updateKineticColumns` have always used it.
+   */
+  private writtenInPulse = new Map<string, Set<unknown>>();
+
   /** Open an atomic analyze pulse: every write until save()/abortPulse() is one transaction. */
   public async beginPulse(): Promise<void> {
     if (this.readOnly || this.inPulse) return;
     await this.ensureVaultOpen();
     await this.run("BEGIN TRANSACTION");
+    this.writtenInPulse.clear();
     this.inPulse = true;
   }
 
@@ -39,6 +55,7 @@ export class SynapsePersistence {
   public async abortPulse(): Promise<void> {
     if (!this.inPulse) return;
     this.inPulse = false;
+    this.writtenInPulse.clear();
     try { await this.run("ROLLBACK"); } catch { /* connection may already be gone */ }
   }
 
@@ -320,35 +337,34 @@ export class SynapsePersistence {
   }
 
   /**
-   * Write rows in batches: UPDATE the ids that exist, INSERT the ones that do not, DELETE nothing.
+   * Insert rows in batches instead of one statement per row.
    *
-   * Batching is for memory. DuckDB allocates transaction-local storage PER STATEMENT and coalesces
-   * none of it before the COMMIT, so inside the atomic pulse a row-by-row writer costs ~885 KB per
-   * row instead of ~0.8 KB — measured, 26 columns, 20,000 rows: 17,281 MB against 15 MB.
+   * DuckDB allocates transaction-local storage PER STATEMENT and coalesces none of it until the
+   * COMMIT, so inside the atomic pulse (which by design does not commit until the end) a row-by-row
+   * writer costs ~885 KB per row instead of ~0.8 KB. Measured on a 26-column table, 20,000 rows:
+   * 17,281 MB in one open transaction against 15 MB when each statement self-commits, and 169 MB
+   * for the same rows batched inside the SAME transaction. That is why this batches rather than
+   * committing more often: the cost is per statement, so batching buys the memory back WITHOUT
+   * giving up the rollback-on-kill guarantee the single transaction exists to provide.
    *
-   * The update/insert SPLIT is for a DuckDB bug, and it replaced two earlier shapes that each fed
-   * it differently. Deleting and re-inserting the same primary key inside one transaction hits
-   * over-eager index checking (duckdb/duckdb#2241, #16520, #16604; edge cases remain after #15836)
-   * and fails with `Duplicate key ... violates primary key constraint` — but only under enough
-   * surrounding churn, which is why every small probe of the pattern passes while a real pulse
-   * against an aged vault failed deterministically. Proven by capturing a failing pulse's statement
-   * log (`CONDUCKS_SQL_LOG`), replaying it verbatim, and delta-shrinking: the minimal repro is
-   * BEGIN; delete+insert one batch of OTHER committed rows; then delete+insert a batch containing
-   * the victim key. Both halves are needed, the victim is written only ONCE, and the failure
-   * survives vault compaction — so "track ids written twice" (the previous fix here) only removed
-   * one trigger and dodged the other through batch composition. Never re-inserting an existing key
-   * removes the pattern itself.
+   * It DELETES the ids it is about to write and then plainly INSERTs, instead of using
+   * `INSERT OR REPLACE`. A multi-row `INSERT OR REPLACE` compiles to a MERGE, and DuckDB crashes
+   * inside it with `INTERNAL Error: Unaligned fetch in validity and main column data for update`
+   * (`MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`). That crash was first seen at one run in
+   * three and was wrongly believed to be a batch-alignment problem — rounding the batch to a power
+   * of two made it disappear on one project and it stayed 4-out-of-4 reproducible on another. The
+   * only reliable fix is to not compile a MERGE at all.
    *
-   * `INSERT OR REPLACE` is not an option either: multi-row it compiles to a MERGE, and DuckDB
-   * crashes inside `MergeIntoGlobalState::Sink` with `INTERNAL Error: Unaligned fetch in validity
-   * and main column data for update`, about one run in three at some batch shapes.
+   * Delete-then-insert is also cheaper: 22 MB against 212 MB for 20,000 rows written twice, at
+   * identical wall time, because the update path is where the transaction-local storage went. The
+   * row versions it leaves behind are what ADR 0037's compaction already exists to reclaim.
    *
-   * The UPDATE is one statement per batch — `UPDATE ... FROM (VALUES ...)` — not row-by-row, or the
-   * per-statement memory cost above comes straight back through the other door.
+   * EVERY delete runs before ANY insert. Interleaving them per batch produced
+   * `Duplicate key violates primary key constraint` on ids a later batch had already written, and
+   * ordering the two phases removes the interleaving that caused it rather than guessing at why.
    *
-   * Rows are deduplicated on their id, last one winning, which preserves what row-by-row
-   * `INSERT OR REPLACE` did. The existence probe reads the table INSIDE the open transaction, so it
-   * sees earlier writes of this same pulse — a row this pulse inserted is updated on re-write.
+   * Rows are deduplicated on their first column, last one winning — `INSERT OR REPLACE` row by row
+   * let a later row overwrite an earlier one, and a plain INSERT of both would violate the key.
    */
   private async insertBatched(table: string, columns: string[], rows: unknown[][]): Promise<void> {
     if (!rows.length) return;
@@ -359,35 +375,40 @@ export class SynapsePersistence {
     const width = columns.length;
     const perBatch = SynapsePersistence.batchSizeFor(width);
     const idColumn = columns[0];
-    const all = Array.from(deduped.values());
 
-    // Which of these ids already exist? Batched IN-list probes; reads cost no transaction-local
-    // storage. Seen through the open transaction, so purged rows correctly count as absent.
-    const existing = new Set<unknown>();
+    // Split by whether THIS transaction has already written the id. A repeat write cannot be a
+    // delete-and-reinsert (see `writtenInPulse`), so it becomes an UPDATE; a first write can.
+    let seen = this.writtenInPulse.get(table);
+    if (!seen) { seen = new Set(); this.writtenInPulse.set(table, seen); }
+    const all: unknown[][] = [];
+    const rewrites: unknown[][] = [];
+    for (const row of deduped.values()) {
+      if (this.inPulse && seen.has(row[0])) rewrites.push(row); else all.push(row);
+      if (this.inPulse) seen.add(row[0]);
+    }
+
+    // Phase 1: clear every id this call is about to insert.
     for (let off = 0; off < all.length; off += perBatch) {
       const ids = all.slice(off, off + perBatch).map(row => row[0]);
-      const found = await this.query<{ id: unknown }>(
-        `SELECT ${idColumn} AS id FROM ${table} WHERE ${idColumn} IN (${ids.map(() => '?').join(',')})`, ids);
-      for (const r of found) existing.add(r.id);
+      await this.run(
+        `DELETE FROM ${table} WHERE ${idColumn} IN (${ids.map(() => '?').join(',')})`, ids);
     }
 
-    const inserts = all.filter(row => !existing.has(row[0]));
-    const updates = all.filter(row => existing.has(row[0]));
-
+    // Phase 2: insert them.
     const tuple = `(${Array(width).fill('?').join(',')})`;
-    const insertHead = `INSERT INTO ${table} (${columns.join(', ')}) VALUES `;
-    for (let off = 0; off < inserts.length; off += perBatch) {
-      const slice = inserts.slice(off, off + perBatch);
-      await this.run(insertHead + Array(slice.length).fill(tuple).join(','), slice.flat());
+    const head = `INSERT INTO ${table} (${columns.join(', ')}) VALUES `;
+    for (let off = 0; off < all.length; off += perBatch) {
+      const slice = all.slice(off, off + perBatch);
+      await this.run(head + Array(slice.length).fill(tuple).join(','), slice.flat());
     }
 
-    if (updates.length) {
-      const setters = columns.slice(1).map(c => `${c} = v.${c}`).join(', ');
-      const updateHead = `UPDATE ${table} SET ${setters} FROM (VALUES `;
-      const updateTail = `) AS v(${columns.join(', ')}) WHERE ${table}.${idColumn} = v.${idColumn}`;
-      for (let off = 0; off < updates.length; off += perBatch) {
-        const slice = updates.slice(off, off + perBatch);
-        await this.run(updateHead + Array(slice.length).fill(tuple).join(',') + updateTail, slice.flat());
+    // Phase 3: rows this transaction already wrote, updated in place. Small by construction — it is
+    // the containment skeleton a wave re-records, not the symbols it discovers.
+    if (rewrites.length) {
+      const assignments = columns.slice(1).map(c => `${c} = ?`).join(', ');
+      for (const row of rewrites) {
+        await this.run(`UPDATE ${table} SET ${assignments} WHERE ${idColumn} = ?`,
+          [...row.slice(1), row[0]]);
       }
     }
   }
