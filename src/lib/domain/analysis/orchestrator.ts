@@ -161,18 +161,27 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         totalEdges += edgeCount;
         traceMemory(`wave ${batchNum}/${totalBatches}`);
 
-        // DF1: Write per-symbol kinetic columns from spectrum kinetic blobs
+        // DF1: Write per-symbol kinetic columns from spectrum kinetic blobs.
+        //
+        // Collected and written in ONE call, not one statement per symbol. Inside the pulse
+        // transaction DuckDB charges per statement, so the per-symbol loop this replaced grew from
+        // 1,243 ms in wave 1 to 1,665 ms by wave 8 on a 4,000-file project while the rows per wave
+        // stayed flat — and from 11 s to 97 s on a 9,310-unit one. Same trap ADR 0041 batched the
+        // node and edge writes to escape; this call site was missed.
+        //
+        // NOT wrapped in a catch. It runs inside the pulse transaction, so the first failure aborts
+        // it and every later statement reports `Current transaction is aborted` — exactly the
+        // circuit-breaker mistake removed from the flush above. A silent catch here hid a real
+        // constraint violation behind a transaction error for two debugging rounds.
+        const kineticRows: Array<{ nodeId: string; blame_age_days?: number; churn_count_90d?: number; entropy_score?: number; last_author?: string }> = [];
         for (const res of inductionResults) {
           if (!res.success || !res.spectrum) continue;
           for (const n of (res.spectrum.nodes || [])) {
             const kinetic = n.metadata?.kinetic;
             const nodeId = n.metadata?.id;
             if (!nodeId || !kinetic) continue;
-            // NOT swallowed. This runs inside the pulse transaction, so the first failure here
-            // aborts it and every later statement reports `Current transaction is aborted` —
-            // exactly the circuit-breaker mistake removed from the flush above. A silent catch here
-            // hid a real constraint violation behind a transaction error for two debugging rounds.
-            await this.persistence!.updateKineticColumns(nodeId, {
+            kineticRows.push({
+              nodeId,
               blame_age_days: kinetic.tenureDays ?? undefined,
               churn_count_90d: kinetic.resonance ?? undefined,
               entropy_score: kinetic.entropy ?? undefined,
@@ -180,6 +189,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
             });
           }
         }
+        await this.persistence!.updateKineticBatch(kineticRows);
 
         // Recover Heap
         if (global.gc) {

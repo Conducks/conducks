@@ -66,6 +66,17 @@ three shipped red — verify the vault write path by running `analyze`, not by r
 - Gates: **652 tests pass, 0 failing** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
   Two flaky tests, now tracked as `todo22#P13` rather than only mentioned here.
 
+## The growing flush is found and fixed
+`analyze` wrote kinetic columns one UPDATE per symbol inside the pulse transaction. Measured: the
+stage grew 1,243 ms to 1,665 ms across 9 waves on a 4,000-file project (11 s to 97 s on a
+9,310-unit one) while rows per wave stayed flat. `updateKineticBatch()` makes it a flat 117 ms, with
+the graph and all four kinetic columns hashing identically across 2,430 rows.
+
+Two things worth carrying: the first suspect (`insertBatched`'s existence probe) was WRONG — it does
+grow with table size but insert sat flat beside it — and the fix was found only by splitting the
+flush stage and timing its parts. Also, a perf fixture needs REAL git history: neither the synthetic
+project nor mentorseed has a `.git`, so the stage that dominates a real pulse cost nothing there.
+
 ## Measured, and it settles an open claim
 The O(N squared) import fix buys NOTHING end to end — 20.9s against 20.8s at 290 files, 40.0s
 against 40.6s at 660, three cold runs each with only `processors/import.ts` differing. The quadratic

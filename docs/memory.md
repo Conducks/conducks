@@ -828,3 +828,18 @@
   `CONDUCKS_MEM_TRACE=1` for the stage split.
 - Applies: INTERLEAVE A/B arms. Measuring with-fix first and without-fix second showed a 4.1s
   regression that vanished when the fixed build was re-measured afterwards. Run order drifts.
+
+## Any per-row write inside the pulse is the 885 KB/statement trap — batch it
+- Gotcha: `analyze` wrote kinetic columns with one UPDATE per symbol. MEASURED on a 4,000-file
+  project across 9 waves: 1,243 ms in wave 1 growing to 1,665 ms by wave 8, while rows per wave
+  stayed flat — cost rising as the transaction accumulates. On a 9,310-unit project the same stage
+  went 11 s to 97 s. Batched via `updateKineticBatch()`: a FLAT 117-119 ms.
+- Why: ADR 0041 batched `saveNodes`/`saveEdges` for exactly this reason and this call site was
+  missed. The rule is not "batch the big writes" — it is that ANY per-row statement inside the open
+  pulse pays per-statement transaction-local storage, and the cost GROWS through the pulse.
+- Applies: the flush stage looked like the vault write and was not. `flushAndClear` measured FLAT at
+  ~1150 ms per wave throughout. Split a stage before attributing it — the first suspect here was
+  `insertBatched`'s existence probe, which does grow with table size (30 to 109 ms) and is still not
+  the cost, because insert sat flat at 466 ms beside it.
+- Applies: a perf fixture needs REAL git history. Neither the synthetic project nor mentorseed has a
+  `.git`, so kinetic values were absent and the loop that dominated a real pulse cost nothing.

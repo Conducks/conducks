@@ -250,3 +250,70 @@ describe('the write path must never delete-and-reinsert a key inside the pulse',
     expect(stmts.filter(s => s.sql.startsWith('INSERT ')).length).toBeGreaterThan(0);
   }, 120000);
 });
+
+describe('kinetic columns — batched, because the pulse charges per statement', () => {
+  /**
+   * `analyze` wrote kinetic columns one UPDATE per symbol, inside the open pulse transaction. That
+   * is the same per-statement cost ADR 0041 batched the node and edge writes to escape, in a call
+   * site that was missed. MEASURED on a 4,000-file project across 9 waves: the per-symbol loop took
+   * 1,243 ms in wave 1 and 1,665 ms by wave 8 while rows per wave stayed flat — cost rising as the
+   * transaction accumulates. On a 9,310-unit project the same stage went from 11 s to 97 s. Batched,
+   * it is 117 ms and does not grow.
+   *
+   * Asserted on the statement STREAM, like the delete rule above: a timing test would be flaky and a
+   * correctness test cannot see the difference. What matters is that N symbols cost O(N/batch)
+   * statements, not N.
+   */
+  it('writes many symbols in a handful of statements, not one per symbol', async () => {
+    const root = mkRoot();
+    const logPath = path.join(root, 'kinetic.jsonl');
+    const p = new SynapsePersistence(root, false);
+    await p.query('SELECT 1');
+    await p.saveNodes(mkNodes(3000, 'k'), 'p1');
+
+    const rows = Array.from({ length: 3000 }, (_, i) => ({
+      nodeId: `k${i}`, blame_age_days: i % 90, churn_count_90d: i % 7,
+      entropy_score: (i % 100) / 100, last_author: `dev${i % 5}`,
+    }));
+
+    process.env.CONDUCKS_SQL_LOG = logPath;
+    try {
+      await p.beginPulse();
+      await p.updateKineticBatch(rows);
+      await p.abortPulse();
+    } finally {
+      delete process.env.CONDUCKS_SQL_LOG;
+    }
+
+    const updates = fs.readFileSync(logPath, 'utf8').trim().split('\n')
+      .map(l => JSON.parse(l) as { sql: string })
+      .filter(s => s.sql.startsWith('UPDATE nodes'));
+    // 3,000 rows at 5 columns is ~2,000 per batch — a couple of statements, nowhere near 3,000.
+    expect(updates.length).toBeGreaterThan(0);
+    expect(updates.length).toBeLessThan(20);
+    await p.close();
+  }, 120000);
+
+  /**
+   * The batch writes all four columns per row, where the per-symbol version built a partial SET
+   * clause from whichever values were present. COALESCE is what keeps that equivalent: a row with
+   * no value for a column must leave the stored value alone, not null it out.
+   */
+  it('leaves a column untouched when the incoming row has no value for it', async () => {
+    const root = mkRoot();
+    const p = new SynapsePersistence(root, false);
+    await p.query('SELECT 1');
+    await p.saveNodes(mkNodes(1, 'z'), 'p1');
+
+    await p.updateKineticBatch([{ nodeId: 'z0', blame_age_days: 42, last_author: 'ada' }]);
+    // Second write carries only entropy — the first write's values must survive it.
+    await p.updateKineticBatch([{ nodeId: 'z0', entropy_score: 0.5 }]);
+
+    const [row] = await p.query<{ b: number; e: number; a: string }>(
+      `SELECT blame_age_days AS b, entropy_score AS e, last_author AS a FROM nodes WHERE id = 'z0'`);
+    expect(Number(row.b)).toBe(42);
+    expect(row.a).toBe('ada');
+    expect(Number(row.e)).toBeCloseTo(0.5, 5);
+    await p.close();
+  }, 60000);
+});

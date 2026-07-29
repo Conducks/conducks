@@ -111,10 +111,17 @@ worth having is untouched. The regression test asserts DuckDB's own accounting t
 `duckdb_memory()` rather than a proxy, and it was mutation-checked: forcing one row per statement
 takes the same test from 1.4 s and under 500 MB to 28.5 s and 3,707 MB.
 
-Any write path added later inherits the same trap. A new row-by-row writer inside the pulse will
-cost 885 KB per row again, and nothing outside `saveNodes`/`saveEdges` is currently pinned against
-it. The rule is that a write inside the pulse batches; the test only covers the two methods that
-exist today.
+Any write path added later inherits the same trap, and one already had. `analyze` wrote kinetic
+columns with one UPDATE per symbol — measured at 1,243 ms in wave 1 growing to 1,665 ms by wave 8 of
+a 4,000-file project, and 11 s to 97 s on a 9,310-unit one, while rows per wave stayed flat.
+`updateKineticBatch()` made it a flat 117 ms. That was found only because the flush stage was split
+and timed; from the outside it looked like the vault write, which measured FLAT at ~1150 ms per wave
+throughout.
+
+So the rule is broader than it first read here: it is not "batch the big writes", it is that ANY
+per-row statement inside the open pulse pays per-statement transaction-local storage and the cost
+GROWS through the pulse. Both batched writers are pinned on their statement streams; a third
+per-row writer added tomorrow is not.
 
 Batching is not free of judgement. 8.6 KB per row is still an order of magnitude above the 0.8 KB a
 self-committing writer pays, because transaction-local storage genuinely holds the uncommitted rows.

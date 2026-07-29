@@ -733,6 +733,60 @@ export class SynapsePersistence {
     return await this.ensureVaultOpen();
   }
 
+  /**
+   * Write kinetic columns for MANY symbols in one statement per batch.
+   *
+   * The per-symbol `updateKineticColumns` below runs one UPDATE per row, and `analyze` called it
+   * once for every symbol in every wave — inside the open pulse transaction, where DuckDB allocates
+   * transaction-local storage PER STATEMENT and coalesces none of it before the COMMIT. That is the
+   * same trap ADR 0041 batched the node and edge writes to escape; this call site was simply missed.
+   *
+   * MEASURED on a 4,000-file project, 9 waves: the per-symbol loop cost 1,243 ms in wave 1 and grew
+   * to 1,665 ms by wave 8 while the rows written per wave stayed flat — the cost per statement rises
+   * as the transaction accumulates. On a 9,310-unit project the same stage grew from 11 s to 97 s.
+   * Batching makes it one statement per 2,500 rows instead of one per row.
+   *
+   * All four columns are written for every row, with COALESCE preserving whatever is already stored
+   * when a symbol has no value for one of them. The per-row version built a partial SET clause
+   * instead; doing that in a batch would need a different statement per column combination, and
+   * COALESCE keeps one statement while leaving untouched columns untouched.
+   */
+  public async updateKineticBatch(rows: Array<{
+    nodeId: string;
+    blame_age_days?: number;
+    churn_count_90d?: number;
+    entropy_score?: number;
+    last_author?: string;
+  }>): Promise<void> {
+    if (this.readOnly || !rows.length) return;
+
+    const deduped = new Map<string, typeof rows[number]>();
+    for (const r of rows) deduped.set(r.nodeId.toLowerCase(), r);
+    const all = Array.from(deduped.entries());
+
+    const WIDTH = 5;
+    const perBatch = SynapsePersistence.batchSizeFor(WIDTH);
+    const tuple = `(${Array(WIDTH).fill('?').join(',')})`;
+    const head = `UPDATE nodes SET
+        blame_age_days = COALESCE(v.blame_age_days, nodes.blame_age_days),
+        churn_count_90d = COALESCE(v.churn_count_90d, nodes.churn_count_90d),
+        entropy_score = COALESCE(v.entropy_score, nodes.entropy_score),
+        last_author = COALESCE(v.last_author, nodes.last_author)
+      FROM (VALUES `;
+    const tail = `) AS v(id, blame_age_days, churn_count_90d, entropy_score, last_author)
+      WHERE nodes.id = v.id`;
+
+    for (let off = 0; off < all.length; off += perBatch) {
+      const slice = all.slice(off, off + perBatch);
+      const params: unknown[] = [];
+      for (const [id, d] of slice) {
+        params.push(id, d.blame_age_days ?? null, d.churn_count_90d ?? null,
+          d.entropy_score ?? null, d.last_author ?? null);
+      }
+      await this.run(head + Array(slice.length).fill(tuple).join(',') + tail, params);
+    }
+  }
+
   public async updateKineticColumns(nodeId: string, data: {
     blame_age_days?: number;
     churn_count_90d?: number;
