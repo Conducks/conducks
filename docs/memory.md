@@ -700,8 +700,10 @@
 - Gotcha: a full `analyze --force` on this repo (287 files, 1.4 MB of source, 6,794 nodes) peaks at
   **1216 MB RSS**. An unchanged pulse, where the hash gate skips parsing, peaks at
   **223 MB and 68%**. So ~1 GB belongs to induction, and the machine gets hot because of it.
-- Why: not for any of the reasons that look obvious. Total source is 1.4 MB, so holding every file's
-  text in `allUnits` is a rounding error. The graph is tens of MB. And halving the wave size five
+- Why: not for any of the reasons that look obvious. Total source is 1.4 MB on THIS repo, so holding
+  every file's text in `allUnits` is a rounding error HERE — but that generalises badly: a 9,310-unit
+  project measured **+318 MB** for the same step (188 MB to 506 MB), so `allUnits` is real on a large
+  codebase and the "rounding error" finding is scoped to small ones. The graph is tens of MB. And halving the wave size five
   times over (`CHUNK_SIZE` 500 to 100) bought only 1216 to 970 MB. All three MEASURED, all three
   dead — do not re-propose them.
 - Applies: `CHUNK_SIZE` also CHANGES THE RESULT — 6,794 nodes at 500, 6,823 at 100 — because

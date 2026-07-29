@@ -19,11 +19,20 @@ import { logger } from "@/lib/core/utils/logger.js";
  * the pulse connection while the transaction is open kills the process with an INTERNAL assertion
  * inside `PipelineExecutor` — reproduced on the first attempt at writing this.
  */
+/** Wall clock since the first trace, so a stage's DURATION is readable and not just its memory. */
+let firstTraceAt: number | null = null;
+
 export function traceMemory(label: string): void {
   if (!process.env.CONDUCKS_MEM_TRACE) return;
   const mb = (n: number) => Math.round(n / 1048576);
   const m = process.memoryUsage();
   const native = mb(m.rss) - mb(m.heapTotal) - mb(m.external);
-  logger.info(`🛡️ [MemTrace] ${label} — rss=${mb(m.rss)}MB heapUsed=${mb(m.heapUsed)}MB ` +
+  // Elapsed matters as much as the memory: "which stage grows faster than the file count" cannot be
+  // answered from RSS alone, and the alternative — timestamping log lines from outside — loses the
+  // stage labels that make the answer readable.
+  const now = Date.now();
+  firstTraceAt ??= now;
+  const elapsed = ((now - firstTraceAt) / 1000).toFixed(1);
+  logger.info(`🛡️ [MemTrace] t=${elapsed}s ${label} — rss=${mb(m.rss)}MB heapUsed=${mb(m.heapUsed)}MB ` +
     `heapTotal=${mb(m.heapTotal)}MB external=${mb(m.external)}MB native=${native}MB`);
 }
