@@ -154,6 +154,48 @@ describe('batched inserts — the atomic pulse must not cost 885 KB per row', ()
   }, 120000);
 
   /**
+   * A pulse writes some ids TWICE — the discovery flush records the containment skeleton, and a
+   * wave re-records the same ecosystem and directory nodes while ingesting its units. Deleting such
+   * a row and re-inserting it inside the same transaction fails with
+   * `Duplicate key ... violates primary key constraint`, because DuckDB keeps the key of a row
+   * inserted earlier in that transaction. The second write therefore becomes an UPDATE.
+   *
+   * WHAT THIS TEST DOES NOT DO: it does not reproduce the duplicate-key failure. Removing the fix
+   * leaves it green — verified by mutation, at one row and again at 900 rows spanning several
+   * batches. The failure needs conditions this test has not managed to recreate, most likely
+   * committed rows for the same ids from an earlier pulse plus the full statement mix of a real
+   * one. The fix is verified ONLY by running a real analyze against the vault that reproduced it
+   * (4 clean runs against a prior failure rate of 100%), and `todo22#P10` carries the gap.
+   *
+   * What it does pin is the semantics the fix must preserve: the LAST write of an id in a pulse is
+   * the one that survives. That would break if the UPDATE path were dropped or misordered.
+   */
+  it('lets a second write of the same id inside one pulse win, without a key violation', async () => {
+    const root = mkRoot();
+    const p = new SynapsePersistence(root, false);
+    await p.query('SELECT 1');
+
+    await p.beginPulse();
+    // A discovery flush: several batches' worth, with the skeleton node among them.
+    await p.saveNodes(
+      [{ id: 'ecosystem::path', label: 'ECOSYSTEM', properties: { name: 'first', filePath: '/r' } },
+       ...mkNodes(900, 'skel')], 'p1');
+    // Then a wave that re-records the skeleton alongside its own symbols — the real shape, and the
+    // reason this needs to span batches: a single-row repeat does NOT reproduce it.
+    await p.saveNodes(
+      [...mkNodes(900, 'sym'),
+       { id: 'ecosystem::path', label: 'ECOSYSTEM', properties: { name: 'second', filePath: '/r' } },
+       ...mkNodes(900, 'skel')], 'p1');
+
+    const rows = await p.query<{ c: number; name: string }>(
+      `SELECT count(*) AS c, any_value(name) AS name FROM nodes WHERE id = 'ecosystem::path'`);
+    expect(String(rows[0].c)).toBe('1');
+    expect(rows[0].name).toBe('second');
+    await p.abortPulse();
+    await p.close();
+  }, 60000);
+
+  /**
    * The guarantee the single transaction exists for. Batching happens INSIDE the pulse, so an
    * analyze that dies before `save()` must still leave nothing behind — otherwise the fix traded
    * the OOM for a partial graph, which is the worse bug.

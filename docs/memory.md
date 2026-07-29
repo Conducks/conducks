@@ -760,3 +760,27 @@
 - Applies: five explanations have now been measured and KILLED — pinned rows, wave size, holding the
   source (3 MB for all 447 files), the JavaScript heap (400 MB cap succeeds), and the twelve
   grammars (14 MB total). Do not re-propose any of them.
+
+## An id written TWICE in one pulse cannot be deleted and re-inserted — it must be UPDATEd
+- Gotcha: a pulse writes the containment skeleton twice (discovery flush, then a wave re-recording
+  the same ecosystem/directory nodes). Deleting such a row and re-inserting it inside the SAME
+  transaction fails with `Duplicate key "id: ecosystem::path" violates primary key constraint` —
+  DuckDB keeps the primary key of the row inserted earlier in that transaction. Confirmed by
+  instrumenting the failing statement: the id appears exactly ONCE in the batch and once in the
+  call, so it is not a dedup bug.
+- Why: `insertBatched` now tracks ids written during the open pulse and turns a repeat into an
+  `UPDATE` — the one write shape that has never failed here, and what `updateRanks` already used.
+- Applies: it only reproduces on an AGED vault. Fresh-copy runs passed 6/6 while the real repo
+  failed 100%. Test on the repo's own vault before believing a vault fix.
+- Applies: NO TEST CATCHES THIS. Removing the fix leaves the suite green — mutation-checked at one
+  row and at 900 rows across several batches. Three separate vault-write failures have now shipped
+  green. Verify the write path by running `analyze`, not by running jest.
+
+## The graph is loaded TWICE per analyze, and the first load is thrown away
+- Gotcha: the bootstrapper loads the whole graph at startup — MEASURED 88 MB to 223 MB, +135 MB —
+  and `AnalysisDomain.analyze` then calls `this.graph.getGraph().clear()` before using any of it.
+  The pulse later reloads from the vault anyway (+230 MB). Nothing reads the first load.
+- Why: ADR 0038 made the load lazy for read-only paths; `analyze` still boots eager. The "+135 MB
+  registry init" recorded earlier is this load, not persistence or chronicle.
+- Applies: booting `analyze` lazily should return that 135 MB outright. NOT yet done or tested —
+  the deferral guard throws on any graph access, so every pre-pulse path has to be checked first.

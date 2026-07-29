@@ -55,6 +55,22 @@ storage was going. Every DELETE runs before any INSERT: interleaving them per ba
 `Duplicate key violates primary key constraint`, and ordering the phases removes the interleaving
 rather than guessing at why. The extra row versions are what ADR 0037's compaction already reclaims.
 
+**A repeat write of the same id inside one pulse is an UPDATE, not a delete-and-reinsert.** A pulse
+writes some ids twice: the discovery flush records the containment skeleton, and a wave re-records
+the same ecosystem and directory nodes while ingesting its units. Deleting such a row and
+re-inserting it in the SAME transaction fails — DuckDB keeps the primary key of a row inserted
+earlier in that transaction, and the insert dies with
+`Duplicate key "id: ecosystem::path" violates primary key constraint`. Confirmed by instrumenting
+the failing statement: the id appears exactly once in the batch and once in the call, so it is not a
+deduplication bug. The second write therefore uses `UPDATE`, which is the one write shape that has
+never failed here — `updateRanks` and `updateKineticColumns` have always used it. The rewrite set is
+small by construction, since it is the skeleton and not the symbols.
+
+**This third failure is not covered by a test, and that is stated rather than implied.** Removing
+the fix leaves the suite green — mutation-checked at one row and again at 900 rows spanning several
+batches. It is verified only by running a real analyze against the vault that reproduced it: 4 clean
+runs against a prior failure rate of 100%. `todo22#P10` carries the gap.
+
 **Not chosen, and RECORDED BECAUSE IT WAS WRONG: rounding the batch to a power of two.** The first
 fix for the crash assumed the batch had to divide DuckDB's 2,048-row vector, since the error says
 "unaligned". Twenty consecutive clean analyzes on one project and five on another looked like

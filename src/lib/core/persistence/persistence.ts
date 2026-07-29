@@ -4,6 +4,7 @@ import { chronicle } from "../git/chronicle-interface.js";
 import { logger } from "../../core/utils/logger.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import duckdb from "duckdb";
+import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import type { ConducksComponent } from "../../../contracts/types.js";
 
 /**
@@ -26,11 +27,27 @@ export class SynapsePersistence {
   // back on next open, so the previous good graph survives (no silent partial-graph corruption).
   private inPulse: boolean = false;
 
+  /**
+   * Ids already written by THIS transaction, per table.
+   *
+   * A pulse writes some ids twice — the discovery flush records the containment skeleton, and a
+   * wave re-records the same ecosystem and directory nodes while ingesting its units. Deleting such
+   * a row and re-inserting it inside the SAME transaction does NOT work: DuckDB keeps the primary
+   * key of the row inserted earlier in the transaction, and the re-insert fails with
+   * `Duplicate key "id: ecosystem::path" violates primary key constraint`. Measured — the failing
+   * id appears exactly once in the batch and once in the call, so it is not a deduplication bug.
+   *
+   * So the second write of an id becomes an UPDATE instead. That is the one write shape that has
+   * never failed here: `updateRanks` and `updateKineticColumns` have always used it.
+   */
+  private writtenInPulse = new Map<string, Set<unknown>>();
+
   /** Open an atomic analyze pulse: every write until save()/abortPulse() is one transaction. */
   public async beginPulse(): Promise<void> {
     if (this.readOnly || this.inPulse) return;
     await this.ensureVaultOpen();
     await this.run("BEGIN TRANSACTION");
+    this.writtenInPulse.clear();
     this.inPulse = true;
   }
 
@@ -38,6 +55,7 @@ export class SynapsePersistence {
   public async abortPulse(): Promise<void> {
     if (!this.inPulse) return;
     this.inPulse = false;
+    this.writtenInPulse.clear();
     try { await this.run("ROLLBACK"); } catch { /* connection may already be gone */ }
   }
 
@@ -215,7 +233,9 @@ export class SynapsePersistence {
   public async load(graph: any): Promise<void> {
     const db = await this.ensureVaultOpen();
     const nodes = await this.query("SELECT * FROM nodes");
+    traceMemory(`load: ${nodes.length} node rows fetched`);
     const edges = await this.query("SELECT * FROM edges");
+    traceMemory(`load: ${edges.length} edge rows fetched`);
 
     for (const row of nodes) {
       graph.addNode({
@@ -244,6 +264,7 @@ export class SynapsePersistence {
       });
     }
 
+    traceMemory('load: nodes ingested into graph');
     for (const row of edges) {
       // A ConducksEdge carries its data on `.properties` — there is no `.metadata` field. Loading
       // into `.metadata` (old code) left EVERY vault-loaded edge with `properties === undefined`,
@@ -336,9 +357,19 @@ export class SynapsePersistence {
     const width = columns.length;
     const perBatch = SynapsePersistence.batchSizeFor(width);
     const idColumn = columns[0];
-    const all = Array.from(deduped.values());
 
-    // Phase 1: clear every id this call is about to write.
+    // Split by whether THIS transaction has already written the id. A repeat write cannot be a
+    // delete-and-reinsert (see `writtenInPulse`), so it becomes an UPDATE; a first write can.
+    let seen = this.writtenInPulse.get(table);
+    if (!seen) { seen = new Set(); this.writtenInPulse.set(table, seen); }
+    const all: unknown[][] = [];
+    const rewrites: unknown[][] = [];
+    for (const row of deduped.values()) {
+      if (this.inPulse && seen.has(row[0])) rewrites.push(row); else all.push(row);
+      if (this.inPulse) seen.add(row[0]);
+    }
+
+    // Phase 1: clear every id this call is about to insert.
     for (let off = 0; off < all.length; off += perBatch) {
       const ids = all.slice(off, off + perBatch).map(row => row[0]);
       await this.run(
@@ -351,6 +382,16 @@ export class SynapsePersistence {
     for (let off = 0; off < all.length; off += perBatch) {
       const slice = all.slice(off, off + perBatch);
       await this.run(head + Array(slice.length).fill(tuple).join(','), slice.flat());
+    }
+
+    // Phase 3: rows this transaction already wrote, updated in place. Small by construction — it is
+    // the containment skeleton a wave re-records, not the symbols it discovers.
+    if (rewrites.length) {
+      const assignments = columns.slice(1).map(c => `${c} = ?`).join(', ');
+      for (const row of rewrites) {
+        await this.run(`UPDATE ${table} SET ${assignments} WHERE ${idColumn} = ?`,
+          [...row.slice(1), row[0]]);
+      }
     }
   }
 

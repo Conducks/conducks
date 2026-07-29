@@ -9,8 +9,12 @@ with DuckDB's 2,048-row vector gave 25 consecutive clean runs and looked proven 
 of 4 on a different input. The real fix is DELETE-then-INSERT, which never compiles a MERGE, uses
 22 MB against 212 MB, and produces an identical graph.
 
-Two lessons, both paid for: consecutive passes are NOT a repro for a nondeterministic failure, and a
-theory that explains the error MESSAGE is not a theory that explains the error.
+It then failed a THIRD way — an id written twice in one pulse cannot be deleted and re-inserted in
+the same transaction — fixed by making a repeat write an UPDATE. See `todo22#P10`.
+
+Three lessons, all paid for: consecutive passes are NOT a repro for a nondeterministic failure; a
+theory that explains the error MESSAGE is not a theory that explains the error; and NONE of these
+three shipped red — verify the vault write path by running `analyze`, not by running jest.
 
 ## Where it stands
 - **The atomic pulse was costing 885 KB of DuckDB memory per row** (ADR 0041). `beginPulse()` made

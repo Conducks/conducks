@@ -168,16 +168,16 @@ export class AnalyzeOrchestrator implements ConducksComponent {
             const kinetic = n.metadata?.kinetic;
             const nodeId = n.metadata?.id;
             if (!nodeId || !kinetic) continue;
-            try {
-              await this.persistence!.updateKineticColumns(nodeId, {
-                blame_age_days: kinetic.tenureDays ?? undefined,
-                churn_count_90d: kinetic.resonance ?? undefined,
-                entropy_score: kinetic.entropy ?? undefined,
-                last_author: kinetic.primaryAuthor || undefined,
-              });
-            } catch {
-              // Non-fatal — kinetic column update failure does not block the pulse
-            }
+            // NOT swallowed. This runs inside the pulse transaction, so the first failure here
+            // aborts it and every later statement reports `Current transaction is aborted` —
+            // exactly the circuit-breaker mistake removed from the flush above. A silent catch here
+            // hid a real constraint violation behind a transaction error for two debugging rounds.
+            await this.persistence!.updateKineticColumns(nodeId, {
+              blame_age_days: kinetic.tenureDays ?? undefined,
+              churn_count_90d: kinetic.resonance ?? undefined,
+              entropy_score: kinetic.entropy ?? undefined,
+              last_author: kinetic.primaryAuthor || undefined,
+            });
           }
         }
 
