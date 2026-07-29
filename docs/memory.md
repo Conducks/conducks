@@ -698,7 +698,7 @@
 
 ## A pulse costs ~1 GB regardless of source size — and three obvious causes have been ruled out
 - Gotcha: a full `analyze --force` on this repo (287 files, 1.4 MB of source, 6,794 nodes) peaks at
-  **1216 MB RSS and 204% CPU**. An unchanged pulse, where the hash gate skips parsing, peaks at
+  **1216 MB RSS**. An unchanged pulse, where the hash gate skips parsing, peaks at
   **223 MB and 68%**. So ~1 GB belongs to induction, and the machine gets hot because of it.
 - Why: not for any of the reasons that look obvious. Total source is 1.4 MB, so holding every file's
   text in `allUnits` is a rounding error. The graph is tens of MB. And halving the wave size five
@@ -707,8 +707,12 @@
 - Applies: `CHUNK_SIZE` also CHANGES THE RESULT — 6,794 nodes at 500, 6,823 at 100 — because
   cross-file resolution only sees what is inside the current wave. Treat wave size as a correctness
   parameter, not a tuning knob, until that is explained.
-- Applies: sample the real node process, never `$!`. `scratchpad/bench/run.sh` watched the subshell,
-  so every `peak_cpu` it printed was 0% — an instrument reading zero looks like a measurement.
+- Applies: measure with `npm run benchmark` (`tools/measure-pulse.mjs`), which reads peak RSS from
+  the KERNEL via `/usr/bin/time`. Two earlier harnesses were wrong in opposite directions: one
+  sampled `$!`, the subshell, and printed `peak_cpu=0%` on every run; its replacement sampled
+  `ps -o %cpu` and reported ~200%, which was a decaying-average artifact. The kernel figure is
+  user+sys over wall = **1.0 cores** — analyze is genuinely single-threaded, matching the finding
+  that the worker pool never spawns. Sampling can both miss a peak and invent one.
 
 ## A multi-row `INSERT OR REPLACE` crashes DuckDB — write DELETE-then-INSERT instead
 - Gotcha: a batched `INSERT OR REPLACE` compiles to a MERGE and kills the process with `INTERNAL

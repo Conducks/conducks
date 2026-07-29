@@ -241,6 +241,21 @@
 - Purpose: Thirteen language front-ends (C, C++, C#, Go, Java, JavaScript, PHP, Python, Ruby, Rust, Swift, TypeScript, TSX), each capturing the constructs that carry that language's structure rather than a shared lowest common denominator — Go goroutines and channels as spawner-to-spawned edges, Rust lifetimes and trait impls as IMPLEMENTS and CONSTRAINS, Swift property wrappers and protocol conformance, PHP namespace aliases and `insteadof` trait conflicts, Ruby metaprogramming and Rails DSL (`attr_accessor`, `define_method`, `belongs_to`), C# LINQ and delegates.
 - Intent: A graph that only understands functions and imports says the same thing about every codebase. What a Rails app IS lives in its DSL, and what a Go service IS lives in its concurrency, so a per-language capture is the difference between a call graph and a description.
 
+## Performance Measurement — `npm run benchmark`
+
+- Purpose: `tools/measure-pulse.mjs` spawns a real `conducks analyze` and reports wall time, cores
+  used, peak RSS and the resulting graph size, over N runs from a cold vault. Peak memory comes from
+  the KERNEL (`/usr/bin/time -l` on macOS, `-v` on GNU), never from sampling. It warns when wall
+  time varies more than 15% across runs, and it fails loudly rather than printing a number it could
+  not parse.
+- Intent: three earlier attempts at this were each wrong in a way that looked like data. One
+  sampled the wrong process and printed `peak_cpu=0%` every run. Its replacement sampled
+  `ps -o %cpu` and reported "204% CPU" for a workload the kernel measures at 1.0 cores — sampling
+  can both miss a peak and invent one. And `npm run benchmark` itself was broken for months under
+  `node --loader ts-node/esm`, measuring in-process where it could never see process start, grammar
+  loading, or peak memory. An instrument that reports confidently while measuring nothing is the
+  failure this replaces.
+
 ## Diagnostics — env-gated, off by default
 
 - Purpose: `CONDUCKS_MEM_TRACE=1 conducks analyze` prints RSS, heap, external and native memory at

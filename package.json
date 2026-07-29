@@ -35,7 +35,7 @@
 		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
 		"test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
 		"test:int": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
-		"benchmark": "node --loader ts-node/esm tests/benchmark/run.ts",
+		"benchmark": "node tools/measure-pulse.mjs",
 		"test:persistence": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects persistence",
 		"bootstrap": "node scripts/bootstrap.mjs",
 		"hooks": "git config core.hooksPath scripts/hooks && echo \"hooks installed: pre-commit runs conducks docs-lint\""
