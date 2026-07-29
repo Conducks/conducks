@@ -28,6 +28,11 @@ export class RenameCommand implements ConducksCommand {
       console.log(`\x1b[33m⚠️  DRY RUN mode (pass --confirm to apply changes)\x1b[0m`);
     }
 
+    // Materialise the deferred graph before touching it (ADR 0038). This command reads
+    // `graphEngine` on the very next line, and the guard throws there rather than letting a
+    // deferred graph read as an empty one — so the load has to be asked for, not assumed.
+    await registry.infrastructure.ensureGraphLoaded();
+
     // Structural Sync via Registry Bridge
     await registry.infrastructure.persistence.load(registry.infrastructure.graphEngine.getGraph());
     

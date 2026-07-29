@@ -33,6 +33,13 @@ export class StatusCommand implements ConducksCommand {
         return;
       }
 
+      // Every mode below WALKS the graph — blueprint audits it, health resonates it and ranks its
+      // nodes — so the deferred load (ADR 0038) has to be materialised first. Without this the
+      // command threw `The structural graph is not materialised` on every invocation, which is the
+      // guard doing its job: it is designed to fail loudly at the call site rather than let a
+      // deferred graph read as an empty one and report zero nodes.
+      await registry.infrastructure.ensureGraphLoaded();
+
       // 2.6 Mode: Blueprint (Structural Integrity)
       if (args.includes('--blueprint') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'blueprint')) {
         console.log(`🛡️  [Conducks Blueprint] Mapping structural integrity...`);

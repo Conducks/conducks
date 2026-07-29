@@ -41,9 +41,16 @@ three shipped red — verify the vault write path by running `analyze`, not by r
   +101. Native climbs 49 MB to 742 MB and NO stage gives any back, so the peak is the sum of all of
   them. Five explanations have been measured and killed — pinned rows, wave size, holding the source
   (3 MB for all 447 files), the JS heap (a 400 MB cap succeeds), and the twelve grammars (14 MB).
-- Gates: **645 tests pass** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
-  **6 integration failures are PRE-EXISTING** — verified against a clean worktree at HEAD, identical
-  set. `docs-watcher` debounce is flaky, 1 in 3.
+- **`analyze` no longer loads the graph at boot to throw it away** — 88 MB to 223 MB of RSS spent on
+  a graph `graph.clear()` discarded immediately. "analyze entry" now reads 83 MB against 226 MB. The
+  PEAK only moves 1073 to 1053 MB, because the boot load was already collected by the time the peak
+  arrives; the win is across the first half of the run, not off the top.
+- **The six "pre-existing" integration failures were one bug.** `status`, `status --blueprint`,
+  `rename` and `explain` all read `graphEngine` without calling `ensureGraphLoaded()` (ADR 0038), so
+  each threw on every invocation. Broken since that ADR landed, written off as pre-existing for days
+  — including in this file. One line each.
+- Gates: **652 tests pass, 0 failing** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
+  `docs-watcher` debounce is flaky, 1 in 3, and Governance is flaky under full-suite parallelism.
 
 ## Do not cite
 `results-baseline.txt` measures nothing. Two of three subjects were the wrong tree, `nodes=0` read a

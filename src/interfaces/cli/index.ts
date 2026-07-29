@@ -151,8 +151,18 @@ export async function main() {
 
   if (command) {
     try {
-      // Lazy load heavy dependencies (WASM, grammars) only upon execution
-      if (!needsNoRegistry) await registry.initialize(isReadCommand, targetPath, isReadCommand);
+      // Lazy load heavy dependencies (WASM, grammars) only upon execution.
+      //
+      // `analyze` defers the graph too, even though it is a write command. It is the one writer
+      // that cannot use a preloaded graph: `AnalysisDomain.analyze` calls `graph.clear()` before
+      // touching it, so the whole load is discarded, and the pulse reloads from the vault later
+      // anyway. MEASURED: the bootstrap load costs 88 MB to 223 MB of RSS — 135 MB spent on a graph
+      // nothing reads. It is safe because the analysis domain holds the graph instance directly
+      // rather than through `registry.infrastructure.graphEngine`, so the deferral guard (ADR 0038)
+      // never fires on this path, and `analyze` is already in STALENESS_BYPASS so nothing loads the
+      // graph to print a staleness banner either.
+      const deferGraph = isReadCommand || commandId === 'analyze';
+      if (!needsNoRegistry) await registry.initialize(isReadCommand, targetPath, deferGraph);
 
       if (!isStalenessBypass) {
         await persistence.load(registry.query.graph.getGraph());

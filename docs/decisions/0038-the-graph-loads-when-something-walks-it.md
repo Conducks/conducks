@@ -1,6 +1,6 @@
 # 0038 — the graph loads when something walks it, and forgetting is loud
 Status: Accepted
-- Enforced by: tests/unit/core/lazy-graph.test.ts (a deferral runs once for N callers, takes the current connection, and is cleared by a later eager load); tests/unit/domain/governance/status-from-vault.test.ts (the vault path reports real counts against an empty graph)
+- Enforced by: tests/unit/integration (cli, evolution, metrics — the four commands that walk the graph now materialise it, and the suite goes red if one stops); tests/unit/core/lazy-graph.test.ts (a deferral runs once for N callers, takes the current connection, and is cleared by a later eager load); tests/unit/domain/governance/status-from-vault.test.ts (the vault path reports real counts against an empty graph)
 - Date: 2026-07-28
 
 ## Context
@@ -38,6 +38,20 @@ construction, so they read the empty graph without ever passing the accessor. `c
 stayed silently wrong with the guard in place. That is why the default is safe rather than fast.
 
 ## Consequences
+
+**The opt-in was missed by four CLI commands and the suite stayed red for days.** `status`,
+`status --blueprint`, `rename` and `explain` all read `registry.infrastructure.graphEngine` without
+calling `ensureGraphLoaded()` first, so every one of them threw
+`The structural graph is not materialised`. Six integration tests failed continuously and were
+repeatedly written off as "pre-existing" — including by this project's own handover notes — because
+nothing tied them back to this decision. They were one bug, and the fix is one line in each command.
+
+That is the cost side of "forgetting is loud". The guard worked exactly as designed: it failed at
+the call site instead of quietly reporting zero nodes, which is what the three silently-wrong MCP
+tools did before it existed. But a loud failure still has to be ACTED on, and four commands shipped
+broken because a red suite became background noise. A failing test that is tolerated is a check that
+evaluates to nothing — CONDUCKS-13 at the level of the gate itself.
+
 
 Measured per session shape on this repo, against 435 MB for every session before: docs only 92 MB,
 filter or template query 109 MB, `conducks_status` 104 MB, and a graph-walking tool ~220 MB.
