@@ -812,3 +812,17 @@
   only have worked in the same process that parsed the routes, before any reload.
 - Applies: don't cite cross-service route binding as working on a loaded graph. Either promote those
   fields into the skeleton or state that it is parse-time only. `todo22#P12`.
+
+## An O(N squared) is not automatically a bottleneck — measure its SHARE, not its shape
+- Gotcha: import resolution rebuilt `new Set(allPaths.map(canonicalize))` per import specifier —
+  a genuine quadratic, isolated at **45 ms / 228 ms / 4350 ms** for 300 / 700 / 3000 paths against
+  **0 / 1 / 2 ms** after caching. Fixing it changed end-to-end analyze by NOTHING: 20.9s against
+  20.8s at 290 files, 40.0s against 40.6s at 660. Because 228 ms inside a 40,000 ms pulse is 0.6%.
+- Why: the claim made when it landed — "worth more than the parallelism it was investigating" —
+  reasoned from the SHAPE of the complexity, not its share of runtime. Parse and vault write
+  dominate a pulse; the resolver never did.
+- Applies: keep the fix (correct, cheap, tested) but do not cite it as a speedup. Before optimising
+  anything here, measure what fraction it actually occupies — `npm run benchmark` for end-to-end,
+  `CONDUCKS_MEM_TRACE=1` for the stage split.
+- Applies: INTERLEAVE A/B arms. Measuring with-fix first and without-fix second showed a 4.1s
+  regression that vanished when the fixed build was re-measured afterwards. Run order drifts.

@@ -66,6 +66,16 @@ three shipped red — verify the vault write path by running `analyze`, not by r
 - Gates: **652 tests pass, 0 failing** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
   Two flaky tests, now tracked as `todo22#P13` rather than only mentioned here.
 
+## Measured, and it settles an open claim
+The O(N squared) import fix buys NOTHING end to end — 20.9s against 20.8s at 290 files, 40.0s
+against 40.6s at 660, three cold runs each with only `processors/import.ts` differing. The quadratic
+is real (45 / 228 / 4350 ms at 300 / 700 / 3000 paths, against 0 / 1 / 2 ms) but never a meaningful
+share: 228 ms inside a 40,000 ms pulse. The fix stays because it is correct and free; the claim made
+for it when it landed is withdrawn. Parse and vault write are where the time is.
+
+`npm run benchmark` does this now — it was broken under ts-node for months, and CPU is 1.0 cores,
+not the 204% a sampling harness reported.
+
 ## Do not cite
 `results-baseline.txt` measures nothing. Two of three subjects were the wrong tree, `nodes=0` read a
 vault path that never existed, `peak_cpu=0%` sampled the subshell, and mentorseed varied 139 s to
