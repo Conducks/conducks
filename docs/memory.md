@@ -841,5 +841,9 @@
   ~1150 ms per wave throughout. Split a stage before attributing it — the first suspect here was
   `insertBatched`'s existence probe, which does grow with table size (30 to 109 ms) and is still not
   the cost, because insert sat flat at 466 ms beside it.
-- Applies: a perf fixture needs REAL git history. Neither the synthetic project nor mentorseed has a
-  `.git`, so kinetic values were absent and the loop that dominated a real pulse cost nothing.
+- Applies: a perf fixture needs REAL git history, and COPYING a project can silently remove it. The
+  real mentorseed has 325 commits; the scratch copy every earlier benchmark used had no `.git`, so
+  kinetic values were absent and the stage that dominates a real pulse cost nothing there. With git
+  restored the same project takes **73 s against 40 s** — a third of the pulse was invisible in every
+  mentorseed number quoted before this. Verify `git rev-list --count HEAD` in the fixture, not the
+  original.
