@@ -241,6 +241,20 @@
 - Purpose: Thirteen language front-ends (C, C++, C#, Go, Java, JavaScript, PHP, Python, Ruby, Rust, Swift, TypeScript, TSX), each capturing the constructs that carry that language's structure rather than a shared lowest common denominator — Go goroutines and channels as spawner-to-spawned edges, Rust lifetimes and trait impls as IMPLEMENTS and CONSTRAINS, Swift property wrappers and protocol conformance, PHP namespace aliases and `insteadof` trait conflicts, Ruby metaprogramming and Rails DSL (`attr_accessor`, `define_method`, `belongs_to`), C# LINQ and delegates.
 - Intent: A graph that only understands functions and imports says the same thing about every codebase. What a Rails app IS lives in its DSL, and what a Go service IS lives in its concurrency, so a per-language capture is the difference between a call graph and a description.
 
+## Diagnostics — env-gated, off by default
+
+- Purpose: `CONDUCKS_MEM_TRACE=1 conducks analyze` prints RSS, heap, external and native memory at
+  each stage of a pulse. `CONDUCKS_SQL_LOG=<file> conducks analyze` appends every write statement as
+  one JSONL row, and `tools/replay-sql-log.mjs <log> <vault.db> [--shrink]` replays that log against
+  a copy of the vault and delta-shrinks it to a minimal failing set.
+- Intent: both exist because reasoning about this pulse repeatedly produced confident wrong answers.
+  Five explanations of where its memory goes were written down before anything measured them and all
+  five were wrong; four hand-built fixtures failed to reproduce a vault crash that the captured
+  statement log reproduced on the first attempt. They are instruments for questions where reading
+  the code is not enough — memory that is native rather than JavaScript, and storage behaviour that
+  depends on surrounding churn. Off unless asked for, because a pulse should not pay for a
+  diagnostic.
+
 ## Tunables
 
 | knob | default | file:line | effect |

@@ -66,7 +66,10 @@ for update`, about one run in three at some batch shapes.
 increasing realism failed to reproduce the crash — each encoded a THEORY of the pulse, and the
 theory was the unreliable part. What worked: `CONDUCKS_SQL_LOG` records every write statement of a
 real failing run as JSONL; replaying that log verbatim against a copy of the failed vault reproduced
-it deterministically on the first attempt; greedy delta-debugging shrank 36 statements to 5.
+it deterministically on the first attempt; greedy delta-debugging shrank 36 statements to 5. Both
+halves ship: the log is written by `run()` under `CONDUCKS_SQL_LOG`, and the replay-and-shrink
+harness is `tools/replay-sql-log.mjs`. Its shrinker takes a STRICT oracle — same statement, same
+error text — because a loose "did anything fail" oracle shrank into a different bug twice.
 
 **Not chosen, and RECORDED BECAUSE IT WAS PARTLY ACCIDENTAL: delete-then-insert with repeat writes
 tracked and turned into UPDATEs.** The previous decision here. It was right about repeat writes —
