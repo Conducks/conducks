@@ -100,6 +100,9 @@ import zlib from "zlib";
 /**
  * High-performance graph storage optimized for intelligence analysis.
  */
+/** Shared empty result, so a miss allocates nothing. */
+const EMPTY_ID_SET: ReadonlySet<NodeId> = new Set<NodeId>();
+
 export class ConducksAdjacencyList {
   private nodes: Map<NodeId, ConducksNode> = new Map();
   private outEdges: Map<NodeId, Set<ConducksEdge>> = new Map(); // Forward: source -> edges
@@ -108,13 +111,58 @@ export class ConducksAdjacencyList {
   private metadata: Map<string, string> = new Map();             // Global project metadata (Phase 5.3)
   private compressedMeat: Map<NodeId, Buffer> = new Map();       // VMC: Memory Zip for non-skeleton properties
 
+  /**
+   * Two more indexes over the same nodes, because three separate resolvers were each answering
+   * "which nodes have this name / live in this file" by scanning EVERY node.
+   *
+   * `nameIndex` is keyed by the exact spelling, which is what `findNodesByName` wants and is
+   * useless to a caller that already lowercased. Rather than change that method's semantics, the
+   * lowercase view is its own map. Each costs O(N) in ids that already exist and turns an O(N)
+   * scan per lookup into O(1) — for callers that run one lookup per import or per file, that is
+   * the difference between O(M x N) and O(M + N).
+   *
+   * Every index here is maintained in exactly three places — `addNode`, `removeNodes`, `clear` —
+   * and an index that misses one of them silently returns wrong answers rather than failing.
+   */
+  private lowerNameIndex: Map<string, Set<NodeId>> = new Map();
+  private filePathIndex: Map<string, Set<NodeId>> = new Map();
+
   public clear(): void {
     this.nodes.clear();
     this.outEdges.clear();
     this.inEdges.clear();
     this.nameIndex.clear();
+    this.lowerNameIndex.clear();
+    this.filePathIndex.clear();
     this.metadata.clear();
     this.compressedMeat.clear();
+  }
+
+  /**
+   * Drop one node's entries from every index.
+   *
+   * One place, because the indexes are keyed by values that can CHANGE — a rename changes the name
+   * key, a moved file changes the path key — so both removal paths (overwrite in `addNode`, purge
+   * in `clearFile`) must undo exactly what `addNode` recorded, using the node as it was.
+   */
+  private unindex(id: NodeId, node: ConducksNode): void {
+    const name = node.properties.name;
+    if (name) {
+      this.nameIndex.get(name)?.delete(id);
+      this.lowerNameIndex.get(String(name).toLowerCase())?.delete(id);
+    }
+    const filePath = node.properties.filePath;
+    if (filePath) this.filePathIndex.get(String(filePath).toLowerCase())?.delete(id);
+  }
+
+  /** Node ids whose lowercased name matches. O(1) — the caller does its own filtering. */
+  public getNodeIdsByLowerName(lowerName: string): ReadonlySet<NodeId> {
+    return this.lowerNameIndex.get(lowerName) ?? EMPTY_ID_SET;
+  }
+
+  /** Node ids declared in a given file path, matched case-insensitively. O(1). */
+  public getNodeIdsByFilePath(filePath: string): ReadonlySet<NodeId> {
+    return this.filePathIndex.get(filePath.toLowerCase()) ?? EMPTY_ID_SET;
   }
 
   /**
@@ -179,6 +227,14 @@ export class ConducksAdjacencyList {
       }
     }
 
+    // An id can be re-added with a DIFFERENT name or file — a symbol renamed, or a file moved. The
+    // indexes are keyed by those values, so the old entries have to go before the new ones land, or
+    // the id stays reachable under a name it no longer has. That is not merely stale: `clearFile`
+    // reads this index to decide what to purge, so a leftover entry makes a pulse delete nodes that
+    // belong to a different file, and the node count silently shifts.
+    const previous = this.nodes.get(id);
+    if (previous) this.unindex(id, previous);
+
     this.nodes.set(id, skeletonNode);
 
     // 3. Update Fast Search Index
@@ -186,6 +242,22 @@ export class ConducksAdjacencyList {
     if (name) {
       if (!this.nameIndex.has(name)) this.nameIndex.set(name, new Set());
       this.nameIndex.get(name)!.add(id);
+
+      const lower = name.toLowerCase();
+      let lowerSet = this.lowerNameIndex.get(lower);
+      if (!lowerSet) { lowerSet = new Set(); this.lowerNameIndex.set(lower, lowerSet); }
+      lowerSet.add(id);
+    }
+
+    // Keyed LOWERCASE, because `clearFile` matches paths case-insensitively and it is the write
+    // path that must not miss anything — an entry left behind after a purge hands out ids for nodes
+    // that no longer exist. Readers that need exact-case semantics filter after the lookup.
+    const filePath = node.properties.filePath || '';
+    if (filePath) {
+      const key = filePath.toLowerCase();
+      let pathSet = this.filePathIndex.get(key);
+      if (!pathSet) { pathSet = new Set(); this.filePathIndex.set(key, pathSet); }
+      pathSet.add(id);
     }
   }
 
@@ -261,12 +333,10 @@ export class ConducksAdjacencyList {
     // 1. Identify "Physical Units" in this file path. 
     // We skip 'NAMESPACE' (Phase 7.2) nodes as they are stable Virtual Containers 
     // that should persist even if specific files within them are being re-indexed.
-    const nodesInFile = Array.from(this.nodes.values()).filter(n => {
-      const path = n?.properties?.filePath;
-      if (!path) return false; // Virtual node (no physical file origin)
-      return path.toLowerCase() === targetPath;
-    });
-    const nodeIds = new Set(nodesInFile.map(n => n.id));
+    // Was a scan and a copy of EVERY node, and this runs once per file being re-indexed — so a
+    // pulse over F files cost O(F x N) before any parsing happened. The index answers it directly,
+    // and it is keyed lowercase precisely so this comparison stays the one it always was.
+    const nodeIds = new Set(this.getNodeIdsByFilePath(targetPath));
 
     for (const id of nodeIds) {
       // 1. Clean up references in other nodes' sets
@@ -298,12 +368,10 @@ export class ConducksAdjacencyList {
       this.outEdges.delete(id);
       this.inEdges.delete(id);
 
-      // 3. Remove from Name Index
+      // 3. Remove from every index. A removal that forgets one leaves an id pointing at a node
+      // that no longer exists, and the resolver then binds an edge to nothing.
       const node = this.nodes.get(id);
-      if (node && node.properties.name) {
-        const ids = this.nameIndex.get(node.properties.name);
-        if (ids) ids.delete(id);
-      }
+      if (node) this.unindex(id, node);
 
       // 4. Remove Node
       this.nodes.delete(id);
@@ -345,10 +413,14 @@ export class ConducksAdjacencyList {
    */
   public getNeighborsByFilePath(filePath: string, direction: 'upstream' | 'downstream'): Array<{ targetPath: string, edge: ConducksEdge }> {
     const fileEdges: Array<{ targetPath: string, edge: ConducksEdge }> = [];
-    const nodesInFile = Array.from(this.nodes.values()).filter(n => n.properties.filePath === filePath);
-
-    for (const node of nodesInFile) {
-      const neighbors = this.getNeighbors(node.id, direction);
+    // Was `Array.from(this.nodes.values()).filter(...)` — a full scan AND a full copy of every node
+    // in the graph, on every call. `cochange-engine` calls this twice per candidate pair, so the
+    // cost was O(pairs x N) in time and O(N) in garbage per call. The index answers it directly.
+    for (const nodeId of this.getNodeIdsByFilePath(filePath)) {
+      // The index is case-insensitive; this method always compared paths exactly, so the exact
+      // check is kept rather than quietly widening what counts as "in this file".
+      if (this.nodes.get(nodeId)?.properties.filePath !== filePath) continue;
+      const neighbors = this.getNeighbors(nodeId, direction);
       for (const edge of neighbors) {
         const targetId = direction === 'downstream' ? edge.targetId : edge.sourceId;
         const targetNode = this.nodes.get(targetId);

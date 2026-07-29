@@ -81,12 +81,25 @@ export class GlobalSymbolLinker {
    * Attempts to link symbols by name if path resolution fails.
    */
   private fuzzyLink(node: any, name: string, graph: ConducksAdjacencyList): void {
-    // Simplified: Find any node with the same name that is a BEHAVIOR or STRUCTURE.
+    // Find any node with the same name that is a BEHAVIOR or STRUCTURE.
     // Never match across language families (a TS symbol cannot import a Rust/Go/Python one).
-    const candidates = Array.from(graph.getNodesMap().values()).filter((n: any) =>
-      n.properties?.name === name && (n.label === 'BEHAVIOR' || n.label === 'STRUCTURE') &&
-      sameFamily(node.id, n.id)
-    );
+    //
+    // Was `Array.from(graph.getNodesMap().values()).filter(...)`, which both scanned and COPIED
+    // every node in the graph on each call — and this is the tier-3 fallback, so it ran once per
+    // symbol that the first two tiers could not resolve. O(unresolved x nodes) in time and O(nodes)
+    // of garbage per call. The name index answers it in one lookup.
+    //
+    // The index is keyed lowercase while this compares the exact spelling, so the case check stays:
+    // narrowing by lowercase first is strictly cheaper and cannot miss a match.
+    const candidates: any[] = [];
+    for (const id of graph.getNodeIdsByLowerName(name.toLowerCase())) {
+      const n: any = graph.getNode(id);
+      if (!n) continue;
+      if (n.properties?.name !== name) continue;
+      if (n.label !== 'BEHAVIOR' && n.label !== 'STRUCTURE') continue;
+      if (!sameFamily(node.id, n.id)) continue;
+      candidates.push(n);
+    }
 
     if (candidates.length === 1) {
       const target = candidates[0] as any;

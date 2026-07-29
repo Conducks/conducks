@@ -177,9 +177,12 @@ export class ImportResolver {
     const lowerName = symbolName.toLowerCase();
     const candidates: string[] = [];
 
-    for (const node of this.graph.getNodesMap().values()) {
-      const nodeName = node.properties?.name?.toLowerCase();
-      if (!nodeName) continue;
+    // This used to walk EVERY node in the graph to find the ones whose name matched, and it runs
+    // once per unresolved import — O(imports x nodes). The graph already indexes nodes by name, so
+    // the same answer is one map lookup plus a walk of the handful of nodes that share the name.
+    for (const nodeId of this.graph.getNodeIdsByLowerName(lowerName)) {
+      const node = this.graph.getNode(nodeId);
+      if (!node) continue;
 
       // Only consider exported symbols
       if (!node.properties?.isExport) continue;
@@ -187,10 +190,7 @@ export class ImportResolver {
       // Never bind across language families (a TS symbol cannot import a Rust/Go/Python one)
       if (!sameFamily(sourceFileId, node.id)) continue;
 
-      // Exact name match across all exported nodes
-      if (nodeName === lowerName) {
-        candidates.push(node.id);
-      }
+      candidates.push(node.id);
     }
 
     if (candidates.length === 1) {

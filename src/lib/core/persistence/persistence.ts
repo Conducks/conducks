@@ -303,15 +303,29 @@ export class SynapsePersistence {
    * DuckDB allocates transaction-local storage PER STATEMENT and coalesces none of it until the
    * COMMIT, so inside the atomic pulse (which by design does not commit until the end) a row-by-row
    * writer costs ~885 KB per row instead of ~0.8 KB. Measured on a 26-column table, 20,000 rows:
-   * 17,281 MB in one open transaction against 15 MB when each statement self-commits — and 169 MB
-   * for the same rows batched 500 at a time inside the SAME transaction. That is why this batches
-   * rather than committing more often: the cost is per statement, so batching buys the memory back
-   * WITHOUT giving up the rollback-on-kill guarantee that the single transaction exists to provide.
+   * 17,281 MB in one open transaction against 15 MB when each statement self-commits, and 169 MB
+   * for the same rows batched inside the SAME transaction. That is why this batches rather than
+   * committing more often: the cost is per statement, so batching buys the memory back WITHOUT
+   * giving up the rollback-on-kill guarantee the single transaction exists to provide.
    *
-   * Rows are deduplicated on their first column, last one winning. `INSERT OR REPLACE` applied one
-   * row at a time lets a later row overwrite an earlier one; the same two rows inside a single
-   * multi-row statement would instead try to update one row twice and fail. Deduplicating here
-   * preserves the row-by-row semantics exactly.
+   * It DELETES the ids it is about to write and then plainly INSERTs, instead of using
+   * `INSERT OR REPLACE`. A multi-row `INSERT OR REPLACE` compiles to a MERGE, and DuckDB crashes
+   * inside it with `INTERNAL Error: Unaligned fetch in validity and main column data for update`
+   * (`MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`). That crash was first seen at one run in
+   * three and was wrongly believed to be a batch-alignment problem — rounding the batch to a power
+   * of two made it disappear on one project and it stayed 4-out-of-4 reproducible on another. The
+   * only reliable fix is to not compile a MERGE at all.
+   *
+   * Delete-then-insert is also cheaper: 22 MB against 212 MB for 20,000 rows written twice, at
+   * identical wall time, because the update path is where the transaction-local storage went. The
+   * row versions it leaves behind are what ADR 0037's compaction already exists to reclaim.
+   *
+   * EVERY delete runs before ANY insert. Interleaving them per batch produced
+   * `Duplicate key violates primary key constraint` on ids a later batch had already written, and
+   * ordering the two phases removes the interleaving that caused it rather than guessing at why.
+   *
+   * Rows are deduplicated on their first column, last one winning — `INSERT OR REPLACE` row by row
+   * let a later row overwrite an earlier one, and a plain INSERT of both would violate the key.
    */
   private async insertBatched(table: string, columns: string[], rows: unknown[][]): Promise<void> {
     if (!rows.length) return;
@@ -320,16 +334,20 @@ export class SynapsePersistence {
     for (const row of rows) deduped.set(row[0], row);
 
     const width = columns.length;
-    // Rounded DOWN to a power of two. DuckDB processes in vectors of 2048 rows, and a multi-row
-    // `INSERT OR REPLACE` at a batch size that does not divide that vector crashed the process
-    // with `INTERNAL Error: Unaligned fetch in validity and main column data for update` — measured
-    // at batch 384, roughly one run in three, on a FRESH vault, so it is neither vault corruption
-    // nor a timing artefact. A batch that divides the vector never straddles one.
     const perBatch = SynapsePersistence.batchSizeFor(width);
-    const tuple = `(${Array(width).fill('?').join(',')})`;
-    const head = `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES `;
-
+    const idColumn = columns[0];
     const all = Array.from(deduped.values());
+
+    // Phase 1: clear every id this call is about to write.
+    for (let off = 0; off < all.length; off += perBatch) {
+      const ids = all.slice(off, off + perBatch).map(row => row[0]);
+      await this.run(
+        `DELETE FROM ${table} WHERE ${idColumn} IN (${ids.map(() => '?').join(',')})`, ids);
+    }
+
+    // Phase 2: insert them.
+    const tuple = `(${Array(width).fill('?').join(',')})`;
+    const head = `INSERT INTO ${table} (${columns.join(', ')}) VALUES `;
     for (let off = 0; off < all.length; off += perBatch) {
       const slice = all.slice(off, off + perBatch);
       await this.run(head + Array(slice.length).fill(tuple).join(','), slice.flat());

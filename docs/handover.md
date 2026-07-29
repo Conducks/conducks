@@ -2,11 +2,15 @@
 Status: current
 
 ## Read this first
-The batching fix in `cb367a2` shipped a NONDETERMINISTIC crash — `INSERT OR REPLACE` at 384 rows per
-statement killed the process about one run in three, and the whole suite stayed green throughout.
-Fixed by rounding the batch down to a power of two (DuckDB's vector is 2,048 rows). The lesson is in
-`todo22#P8`: a behavioural test passes two runs in three while broken, so the RULE is asserted, not
-a pulse that happened to succeed.
+The batching fix in `cb367a2` shipped a NONDETERMINISTIC crash, and the FIRST fix for it was also
+wrong. A multi-row `INSERT OR REPLACE` compiles to a MERGE and DuckDB dies inside it with
+`INTERNAL Error: Unaligned fetch in validity...`. Rounding the batch to a power of two to "align"
+with DuckDB's 2,048-row vector gave 25 consecutive clean runs and looked proven — then crashed 4 out
+of 4 on a different input. The real fix is DELETE-then-INSERT, which never compiles a MERGE, uses
+22 MB against 212 MB, and produces an identical graph.
+
+Two lessons, both paid for: consecutive passes are NOT a repro for a nondeterministic failure, and a
+theory that explains the error MESSAGE is not a theory that explains the error.
 
 ## Where it stands
 - **The atomic pulse was costing 885 KB of DuckDB memory per row** (ADR 0041). `beginPulse()` made
@@ -33,7 +37,7 @@ a pulse that happened to succeed.
   +101. Native climbs 49 MB to 742 MB and NO stage gives any back, so the peak is the sum of all of
   them. Five explanations have been measured and killed — pinned rows, wave size, holding the source
   (3 MB for all 447 files), the JS heap (a 400 MB cap succeeds), and the twelve grammars (14 MB).
-- Gates: **639 tests pass** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
+- Gates: **645 tests pass** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
   **6 integration failures are PRE-EXISTING** — verified against a clean worktree at HEAD, identical
   set. `docs-watcher` debounce is flaky, 1 in 3.
 

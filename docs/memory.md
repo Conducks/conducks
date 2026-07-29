@@ -710,21 +710,20 @@
 - Applies: sample the real node process, never `$!`. `scratchpad/bench/run.sh` watched the subshell,
   so every `peak_cpu` it printed was 0% — an instrument reading zero looks like a measurement.
 
-## A multi-row INSERT batch MUST be a power of two, or DuckDB crashes about one run in three
-- Gotcha: `INSERT OR REPLACE` with 384 rows per statement kills the process with `INTERNAL Error:
-  Unaligned fetch in validity and main column data for update` inside `MergeIntoGlobalState::Sink ->
-  PhysicalUpdate::Sink`. MEASURED: ~1 run in 3, on a FRESH vault as well as an aged one, so it is
-  neither vault corruption nor a timing artefact. At 256 the same analyze ran 20 times clean across
-  two projects.
-- Why: DuckDB processes in vectors of 2,048 rows. A batch that does not divide that vector straddles
-  one, and the multi-row update path fetches the validity (null) mask and the column data out of
-  step. `batchSizeFor()` rounds down to a power of two for this reason alone.
-- Applies: the crash is NONDETERMINISTIC, so a behavioural test passes two runs in three while
-  broken — which is how it reached a commit. Assert the RULE (`batchSizeFor` is public), never a
-  pulse that happened to succeed. Same for any new multi-row write anywhere in the vault.
-- Applies: delete-then-insert avoids the MERGE path and measured 22 MB against 212 MB for the same
-  20,000 rows — a 10x win — but broke the real pulse with `Duplicate key "id: ecosystem::path"`,
-  which no standalone probe could reproduce. Worth returning to; do not ship it without the repro.
+## A multi-row `INSERT OR REPLACE` crashes DuckDB — write DELETE-then-INSERT instead
+- Gotcha: a batched `INSERT OR REPLACE` compiles to a MERGE and kills the process with `INTERNAL
+  Error: Unaligned fetch in validity and main column data for update` in
+  `MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`. MEASURED on this repo's own source: 2 runs
+  in 3 on a fresh vault. Delete-then-insert has not failed once in more than a dozen runs, produces
+  an identical graph (6512 nodes / 17270 edges both ways), and uses 22 MB against 212 MB for 20,000
+  rows written twice.
+- Why: the update half of the upsert is both the crash site and where the transaction-local storage
+  went. Not compiling a MERGE removes both problems. Run EVERY delete before ANY insert — per-batch
+  interleaving produced `Duplicate key violates primary key constraint`.
+- Applies: THE FIRST FIX FOR THIS WAS WRONG AND LOOKED PROVEN. Rounding the batch to a power of two
+  (to "align" with DuckDB's 2,048-row vector) gave 20 consecutive clean runs on one project and 5 on
+  another — then crashed 4 out of 4 on a third input. A nondeterministic failure needs a
+  deterministic repro before any fix is believed; consecutive passes are not one.
 
 ## Never query `duckdb_memory()` on the pulse connection while the transaction is open
 - Gotcha: `SELECT sum(memory_usage_bytes) FROM duckdb_memory()` issued mid-pulse kills the process

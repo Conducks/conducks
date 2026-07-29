@@ -1,6 +1,6 @@
 # 0041 — the pulse is one transaction, and that is only affordable in batches
 Status: Accepted
-- Enforced by: tests/unit/core/persistence/batched-insert.test.ts (a pulse-sized write stays far under what one statement per row costs, last-wins survives the deduplication batching needs, a write larger than one batch splits and loses nothing, an aborted pulse still leaves no rows, and every batch size both divides DuckDB's 2048-row vector and stays under the bound-parameter cap)
+- Enforced by: tests/unit/core/persistence/batched-insert.test.ts (a pulse-sized write stays far under what one statement per row costs, last-wins survives the deduplication batching needs, a write larger than one batch splits and loses nothing, an aborted pulse still leaves no rows, and every batch stays under the bound-parameter cap)
 - Date: 2026-07-29
 
 ## Context
@@ -34,8 +34,8 @@ total, irrelevant). CONDUCKS-31 exists because of exactly this, and it was writt
 
 ## Decision
 
-**The pulse stays one transaction, and writes go in batches.** `insertBatched()` builds one
-multi-row `INSERT OR REPLACE` per batch instead of one statement per row. Because the cost is per
+**The pulse stays one transaction, and writes go in batches.** `insertBatched()` writes many rows
+per statement instead of one statement per row. Because the cost is per
 statement, this buys the memory back without touching the guarantee: 169 MB against 17,281 MB for
 the same rows, still one transaction, still rolling the whole pulse back when it is killed.
 
@@ -45,28 +45,25 @@ parameters through `Function.prototype.apply`, so 26 columns times 2,000 rows th
 safe for 10-column edges is not safe for 26-column nodes, so the cap has to be on the thing that
 actually overflows.
 
-**And the batch is then rounded DOWN to a power of two**, which is a second, independent limit that
-this decision originally shipped without and paid for. DuckDB processes in vectors of 2,048 rows,
-and a multi-row `INSERT OR REPLACE` at a batch that does not divide that vector killed the process
-with `INTERNAL Error: Unaligned fetch in validity and main column data for update`, inside
-`MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`. MEASURED at the original batch of 384: about
-one run in three, on a FRESH vault as well as an aged one, so neither vault corruption nor a timing
-artefact. At 256 the same analyze ran 20 times with no failure, on two different projects.
+**And the write is DELETE-then-INSERT, not `INSERT OR REPLACE`.** A multi-row `INSERT OR REPLACE`
+compiles to a MERGE, and DuckDB crashes inside it with `INTERNAL Error: Unaligned fetch in validity
+and main column data for update`, in `MergeIntoGlobalState::Sink -> PhysicalUpdate::Sink`. Measured
+on this repo's own source: the MERGE build failed 2 runs in 3 on a fresh vault; delete-then-insert
+has not failed once across more than a dozen. It is also cheaper — 22 MB against 212 MB for 20,000
+rows written twice, at identical wall time, because the update path is where the transaction-local
+storage was going. Every DELETE runs before any INSERT: interleaving them per batch produced
+`Duplicate key violates primary key constraint`, and ordering the phases removes the interleaving
+rather than guessing at why. The extra row versions are what ADR 0037's compaction already reclaims.
 
-The rule is asserted directly rather than through behaviour, because the crash is NONDETERMINISTIC:
-a test that runs a pulse twice would have passed while broken two times in three, which is exactly
-how this reached a commit. `batchSizeFor()` is public for that reason.
-
-**Not chosen: delete-then-insert instead of `INSERT OR REPLACE`.** It avoids the crashing MERGE path
-entirely and measured TEN TIMES better in isolation — 22 MB against 212 MB for 20,000 rows written
-twice, at identical wall time. It also broke the real pulse with
-`Duplicate key "id: ecosystem::path" violates primary key constraint`, which a standalone probe of
-the same shape (overlapping ids, varying NULLs, file-backed and in-memory) could not reproduce. A
-10x memory win is worth returning to, but not while the mechanism is unexplained. `todo22#P7`.
+**Not chosen, and RECORDED BECAUSE IT WAS WRONG: rounding the batch to a power of two.** The first
+fix for the crash assumed the batch had to divide DuckDB's 2,048-row vector, since the error says
+"unaligned". Twenty consecutive clean analyzes on one project and five on another looked like
+proof. It was not: on a third input the same build crashed 4 times out of 4. The alignment theory
+explained the error message, not the error. The batch is still rounded to a power of two because the
+code that does it is harmless, but it is NOT what fixes the crash and must not be trusted as such.
 
 **Rows are deduplicated on their id, last one winning.** `INSERT OR REPLACE` applied one row at a
-time lets a later row overwrite an earlier one; the same two rows inside a single multi-row
-statement would try to update one row twice and fail. Deduplicating first preserves the old
+time let a later row overwrite an earlier one; a plain INSERT of both would violate the primary key. Deduplicating first preserves the old
 semantics exactly rather than approximately.
 
 **Not chosen: committing per wave.** It fixes the memory and gives up the reason the transaction
@@ -100,7 +97,6 @@ A pulse large enough will still exhaust memory — it just takes roughly 100 tim
 there. No project has been measured at that size, and this record does not claim a ceiling it has
 not tested.
 
-`Open:` whether the orchestrator should stop the pulse on the first flush failure instead of
-running every remaining wave against an aborted transaction. It is why the OOM was reported as
-`TransactionContext Error: Current transaction is aborted` and why the real cause stayed hidden for
-so long. `todo22#P5` carries it.
+The crash this record now avoids was believed fixed once already, by the alignment theory above,
+on the strength of 25 consecutive passing runs. Treat any future "it stopped happening" about a
+nondeterministic failure as unproven until there is a deterministic repro to fix.

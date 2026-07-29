@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList } from "./adjacency-list.js";
+import { ConducksAdjacencyList, type ConducksNode, type ConducksEdge } from "./adjacency-list.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { Logger } from "../utils/logger.js";
@@ -97,17 +97,32 @@ export class ConducksGraph {
    * Conducks — Pulse Binding (Variable Handover)
    */
   private bindPulseCircuits(): void {
-    const allNodes = Array.from(this.graph.getAllNodes());
-
-    for (const node of allNodes) {
+    for (const node of this.graph.getAllNodes()) {
       const outgoing = this.graph.getNeighbors(node.id, 'downstream');
-      const assignments = outgoing.filter(e => e.properties?.reason === 'assignment');
-      const calls = outgoing.filter(e => e.type === 'CALLS' && !e.properties?.isResonance);
+
+      // The producer lookup used to be `assignments.find(...)` run once per call ARGUMENT, and it
+      // re-split every assignment's target id on every one of those scans — O(calls x args x
+      // assignments) with a string split per comparison, for a node with many outgoing edges.
+      // Indexing the assignments once per node makes each argument an O(1) lookup, and each id is
+      // split exactly once.
+      let producersByName: Map<string, ConducksEdge> | null = null;
+      const calls: ConducksEdge[] = [];
+      for (const e of outgoing) {
+        if (e.properties?.reason === 'assignment') {
+          const produced = e.targetId.split('::').pop();
+          if (produced) {
+            if (!producersByName) producersByName = new Map();
+            if (!producersByName.has(produced)) producersByName.set(produced, e);
+          }
+        }
+        if (e.type === 'CALLS' && !e.properties?.isResonance) calls.push(e);
+      }
+      if (!producersByName || calls.length === 0) continue;
 
       for (const call of calls) {
         const args = (call.properties?.arguments as string[]) || [];
         for (const arg of args) {
-          const producer = assignments.find(a => a.targetId.split('::').pop() === arg);
+          const producer = producersByName.get(arg);
           if (producer) {
             this.graph.addEdge({
               id: `PULSE::${producer.targetId}->${call.id}`,
@@ -127,38 +142,76 @@ export class ConducksGraph {
    * Conducks — Route Binding (Microservice Bridge)
    */
   private bindRouteCircuits(): void {
-    const allNodes = Array.from(this.graph.getAllNodes());
-    const routes = allNodes.filter(n => n.properties.isRoute);
-    const requests = allNodes.filter(n => n.properties.isRequest);
+    // Was a full cross product: every request against every route, compiling a fresh RegExp inside
+    // the inner comparison — O(requests x routes) regex COMPILATIONS, which is far more expensive
+    // than the match itself. Three changes, none of which alter which pairs match:
+    //   1. routes are bucketed by HTTP method, so a GET request never looks at a POST route;
+    //   2. each route's pattern is compiled ONCE, not once per request;
+    //   3. a route with no parameters is a string comparison, never a regex.
+    // Worst case is still O(requests x routes-of-that-method), which is inherent to pattern
+    // matching, but the compilations drop to O(routes) and exact hits to O(1).
+    const routesByMethod = new Map<string, Array<{ node: ConducksNode; pattern: RegExp | null; path: string }>>();
+    const requests: ConducksNode[] = [];
+
+    // One pass, rather than materialising every node and filtering it twice.
+    for (const node of this.graph.getAllNodes()) {
+      if (node.properties.isRequest) requests.push(node);
+      if (!node.properties.isRoute) continue;
+
+      const method = String(node.properties.method ?? '');
+      const routePath = ConducksGraph.normalizeUrl(node.properties.path as string);
+      let bucket = routesByMethod.get(method);
+      if (!bucket) { bucket = []; routesByMethod.set(method, bucket); }
+      bucket.push({ node, pattern: ConducksGraph.routePattern(routePath), path: routePath });
+    }
 
     for (const req of requests) {
       const reqUrl = req.properties.url;
-      const reqMethod = req.properties.method;
+      const reqMethod = String(req.properties.method ?? '');
+      const normReq = ConducksGraph.normalizeUrl(reqUrl as string);
 
-      for (const route of routes) {
-        const routePath = route.properties.path;
-        const routeMethod = route.properties.method;
-
-        if (reqMethod === routeMethod && this.isUrlMatch(reqUrl, routePath)) {
-          this.graph.addEdge({
-            id: `RESONANCE::${req.id}->${route.id}`,
-            sourceId: req.id,
-            targetId: route.id,
-            type: 'CALLS' as any,
-            confidence: 0.9,
-            properties: { isResonance: true, url: reqUrl }
-          });
-        }
+      // Every route of this method is still considered, because the original bound a request to
+      // EVERY route it matched, not just the first. Short-circuiting on the first exact hit was
+      // tried and rejected: it silently dropped edges when two routes share a path, which is a
+      // behaviour change wearing a performance costume.
+      //
+      // What the precomputation buys is the pattern: a literal route matches only its own text, so
+      // it is compared as a string, and a parameterised route uses a regex compiled ONCE for the
+      // route instead of once per request-route pair.
+      for (const { node: route, pattern, path: routeNorm } of routesByMethod.get(reqMethod) ?? []) {
+        const matches = pattern === null ? routeNorm === normReq : pattern.test(normReq);
+        if (matches) this.bindResonance(req, route, reqUrl as string);
       }
     }
   }
 
-  private isUrlMatch(reqUrl: string, routePath: string): boolean {
-    const normReq = reqUrl?.replace(/\/$/, "") || "";
-    const normRoute = routePath?.replace(/\/$/, "") || "";
-    if (normReq === normRoute) return true;
+  private bindResonance(req: ConducksNode, route: ConducksNode, reqUrl: string): void {
+    this.graph.addEdge({
+      id: `RESONANCE::${req.id}->${route.id}`,
+      sourceId: req.id,
+      targetId: route.id,
+      type: 'CALLS' as any,
+      confidence: 0.9,
+      properties: { isResonance: true, url: reqUrl }
+    });
+  }
+
+  /** Trailing slash carries no meaning in a route, so both sides are compared without one. */
+  private static normalizeUrl(url: string | undefined): string {
+    return url?.replace(/\/$/, "") || "";
+  }
+
+  /**
+   * Compile a route path into the pattern that matches request URLs against it.
+   *
+   * Returns null for a literal path with no parameters — the caller answers those from a map, so
+   * the regex is never built. Compiling this once per ROUTE rather than once per request-route
+   * PAIR is the whole point: pattern compilation dominated the cost of route binding.
+   */
+  private static routePattern(normRoute: string): RegExp | null {
+    if (!/[{:]/.test(normRoute)) return null;
     const regexPattern = normRoute.replace(/\{[^}]+\}/g, "[^/]+").replace(/:[^\/]+/g, "[^/]+");
-    return new RegExp(`^${regexPattern}$`).test(normReq);
+    return new RegExp(`^${regexPattern}$`);
   }
 
   /**
