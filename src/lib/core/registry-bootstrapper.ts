@@ -4,6 +4,7 @@ import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { logger } from "@/lib/core/utils/logger.js";
+import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import { isNeverAProjectRoot } from "@/lib/core/utils/scope-guard.js";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import path from "node:path";
@@ -154,6 +155,7 @@ export class RegistryBootstrapper {
       updateIgnoreManager: (i: IgnoreManager) => void;
     }
   ): Promise<void> {
+    traceMemory('bootstrapper entry (modules loaded)');
     const { readOnly, root, lazy } = options;
     // A previous root's deferred load must never survive into this one.
     this.pendingLoad = null;
@@ -176,6 +178,7 @@ export class RegistryBootstrapper {
       await grammars.loadLanguage('c');
       this.isGrammarInitialized = true;
       process.stderr.write(`🛡️ [Conducks Bootstrapper] Native Grammar Engine Ready.\n`);
+      traceMemory('after 12 grammars loaded');
     }
 
     const baseRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();

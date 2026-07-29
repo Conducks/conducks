@@ -27,10 +27,12 @@ a pulse that happened to succeed.
   wrong** — wrong mechanism (pinned rows), wrong place (discovery flush, not wave 3), wrong suspect
   (the duplicated `metadata` column, measured at 28 MB total). CONDUCKS-31 had been written days
   earlier and was not followed. `todo22#P5` is corrected.
-- **A pulse's gigabyte is not the JavaScript heap.** The same analyze succeeds under
-  `--max-old-space-size=400` while still peaking at 1043 MB RSS, so no JS-side change touches it.
-  Four explanations have now been measured and killed. `CONDUCKS_MEM_TRACE=1 conducks analyze`
-  prints the split per wave; the remaining work needs a NATIVE profiler (`todo22#P7`).
+- **The pulse's gigabyte has no single cause, and now it is measured end to end.**
+  `CONDUCKS_MEM_TRACE=1 conducks analyze` prints every stage. On 447 units, peak 1076 MB: registry
+  init +135, parse +152, vault write +177, **reloading the whole graph for PageRank +230**, linkers
+  +101. Native climbs 49 MB to 742 MB and NO stage gives any back, so the peak is the sum of all of
+  them. Five explanations have been measured and killed — pinned rows, wave size, holding the source
+  (3 MB for all 447 files), the JS heap (a 400 MB cap succeeds), and the twelve grammars (14 MB).
 - Gates: **639 tests pass** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
   **6 integration failures are PRE-EXISTING** — verified against a clean worktree at HEAD, identical
   set. `docs-watcher` debounce is flaky, 1 in 3.

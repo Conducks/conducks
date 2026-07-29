@@ -746,3 +746,18 @@
   and DuckDB's own buffer manager.
 - Applies: do not propose a JS fix for this without re-reading these numbers. Four explanations have
   now been measured and killed (pinned rows, wave size, source retention, JS heap). `todo22#P7`.
+
+## The pulse's gigabyte has NO single cause — it is five stages that each add 100-230 MB
+- Gotcha: peak 1076 MB on 447 units. MEASURED with `CONDUCKS_MEM_TRACE=1`: modules 77 MB, +11
+  grammars, **+135 registry init**, +33 ignore filter, **+3 reading all 447 files**, +50 skeleton,
+  +58 discovery flush, **+152 parse**, **+177 vault write**, **+230 reloading the graph for
+  PageRank**, +101 linkers. Nothing dominates, so no single fix helps much.
+- Why: native memory never comes back down — 49 MB to 742 MB across the pulse, with no stage
+  releasing any. The peak is the SUM of every stage, not the largest one. `heapUsed` does fall back
+  after each wave; `native` does not.
+- Applies: the largest single step is `persistence.load()` pulling the WHOLE graph back for
+  PageRank — 230 MB — which directly undoes the flush-and-clear the waves just did. PageRank needs
+  every edge, but not as JS objects.
+- Applies: five explanations have now been measured and KILLED — pinned rows, wave size, holding the
+  source (3 MB for all 447 files), the JavaScript heap (400 MB cap succeeds), and the twelve
+  grammars (14 MB total). Do not re-propose any of them.

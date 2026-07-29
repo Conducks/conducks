@@ -5,6 +5,7 @@ import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
 import { Logger } from "@/lib/core/utils/logger.js";
 import path from "node:path";
+import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
@@ -66,8 +67,10 @@ export class AnalysisService implements ConducksComponent {
     }
 
     // 1. Digital Reflection via Chronicle Interface (Discovery)
+    traceMemory('analyze entry');
     const voyager = chronicle;
     let files = await voyager.discoverFiles(options.staged);
+    traceMemory(`after discoverFiles (${files.length} paths)`);
 
     // [Conducks State-Sync] Change Detection & Incremental Targeting 🏺
     // We filter the discovery set to only include "Dirty Units" (changed since last synapse)
@@ -84,6 +87,7 @@ export class AnalysisService implements ConducksComponent {
         }
     }
 
+    traceMemory(`after ignore filter (${filteredFiles.length} kept)`);
     let dirtyFiles = filteredFiles;
     if (!options.staged && lastSyncTime > 0) {
       const statsPromises = filteredFiles.map(async f => {
@@ -134,6 +138,7 @@ export class AnalysisService implements ConducksComponent {
       }
     }
 
+    traceMemory('after vault reconcile');
     if (dirtyFiles.length === 0 && !options.force) {
       logger.warn("No changes detected. Structural Synapse is already at 100% resonance.");
       return { success: true, files: 0 };
@@ -151,11 +156,14 @@ export class AnalysisService implements ConducksComponent {
     // The bootstrapper pre-loads the full graph, which would cause a redundant full-flush.
     this.graph.getGraph().clear();
 
+    traceMemory(`after file discovery, before reading ${dirtyFiles.length} files`);
+
     // 2. Reflecting structural stream
     const allUnits = [];
     for await (const batch of voyager.streamBatches(dirtyFiles, 500, options.staged)) {
       allUnits.push(...batch);
     }
+    traceMemory('after reading files into memory');
 
     // [Conducks Atomic Pulse] purge + flush + rank + save are ONE transaction. An interrupted
     // analyze never reaches the final COMMIT, so duckdb rolls the whole pulse back on next open —
@@ -192,8 +200,10 @@ export class AnalysisService implements ConducksComponent {
     // The orchestrator flushed and cleared the in-memory graph during analysis,
     // so we must reload before resonating or gravity will be 0 for everything.
     await this.persistence.load(this.graph.getGraph());
+    traceMemory('after reloading the whole graph for PageRank');
 
     this.graph.resonate();
+    traceMemory('after PageRank');
 
     // 4.1 Commit computed gravity values back to the vault (targeted UPDATE, safe on shallow nodes).
     const gravityValues = Array.from(this.graph.getGraph().getAllNodes()).map(n => ({
@@ -236,6 +246,7 @@ export class AnalysisService implements ConducksComponent {
 
     // 4.6 Taxonomy reconcile (ADR 0013): cut DATA, edge-gate ATOM. Runs last so every reference
     // edge (intra/service/federated/virtual) is present when deciding which atoms are load-bearing.
+    traceMemory('after linkers and virtual induction');
     await this.persistence.pruneTaxonomy();
 
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.

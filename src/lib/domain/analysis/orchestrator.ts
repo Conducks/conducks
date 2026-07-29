@@ -14,6 +14,7 @@ import path from "node:path";
 
 import { ConducksComponent } from "@/contracts/types.js";
 import { logger } from "@/lib/core/utils/logger.js";
+import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import { Worker } from "node:worker_threads";
 import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -60,35 +61,6 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     this.persistence = persistence;
   }
 
-  /**
-   * Print where a pulse's memory actually is, when `CONDUCKS_MEM_TRACE` is set.
-   *
-   * A full 287-file pulse peaks at 1216 MB while the source it reads is 1.4 MB, and three separate
-   * explanations of that were written down before anything was measured and all three were wrong.
-   * The one thing established is that it is NOT the JavaScript heap: the same pulse succeeds under
-   * `--max-old-space-size=400` and still peaks above a gigabyte. So the split that matters is
-   * V8 against DuckDB against everything else native, and that cannot be read from outside the
-   * process — `ps` reports one RSS number for all three.
-   *
-   * Off unless asked for, because a pulse should not pay for a diagnostic. It lives here rather
-   * than in a script so the numbers come from inside the run being explained, which is the whole
-   * reason the earlier guesses were unfalsifiable.
-   *
-   * It deliberately does NOT ask DuckDB for its own accounting. `SELECT ... FROM duckdb_memory()`
-   * on the pulse connection while the transaction is open kills the process with an INTERNAL
-   * assertion failure inside `PipelineExecutor` — reproduced on the first attempt at writing this.
-   * `rss` minus `heapUsed` minus `external` is the number that matters anyway, and it needs no
-   * query at all.
-   */
-  private async traceMemory(label: string): Promise<void> {
-    if (!process.env.CONDUCKS_MEM_TRACE) return;
-    const mb = (n: number) => Math.round(n / 1048576);
-    const m = process.memoryUsage();
-    const unaccounted = mb(m.rss) - mb(m.heapTotal) - mb(m.external);
-    logger.info(`🛡️ [MemTrace] ${label} — rss=${mb(m.rss)}MB heapUsed=${mb(m.heapUsed)}MB ` +
-      `heapTotal=${mb(m.heapTotal)}MB external=${mb(m.external)}MB native=${unaccounted}MB`);
-  }
-
    /**
    * Orchestrates a high-fidelity structural analysis on the provided files.
    * Universal Two-Pass Resolution Architecture (Discovery -> Induction)
@@ -97,6 +69,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     files: Array<{ path: string, source: string }>, 
     options: { workspaceRoot?: string, projectRoots?: string[] } = {}
   ): Promise<{ pulseId: string, nodeCount: number, edgeCount: number }> {
+    traceMemory(`orchestrator entry (${files.length} units)`);
     this.context.reset();
     const context = this.context;
     const pulseId = `pulse_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -119,6 +92,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
     // Phase 0 + Pass 1: L0-L3 containment skeleton (ecosystem/repository/directory/unit) and the
     // taxonomy legend — must exist before a single file is parsed (see graph-skeleton-builder.ts).
     const projectMap = this.skeletonBuilder.build(this.graph, normalizedFiles, workspaceRoot, projectRoots);
+    traceMemory('after skeleton build');
 
     // Adaptive Memory Pressure Calculation
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -140,7 +114,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
       totalNodes += nodeCount;
       totalEdges += edgeCount;
-      await this.traceMemory('after discovery flush');
+      traceMemory('after discovery flush');
     }
 
     // === Pass 2 & 3: Conducks Streaming Induction & Binding 🛡️ ===
@@ -154,12 +128,14 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       const batchNum = Math.floor(i / CHUNK_SIZE) + 1;
       
       logger.info(`🛡️ [Conducks] Wave ${batchNum}/${totalBatches}: Inducing ${chunk.length} units...`);
+      traceMemory(`wave ${batchNum} before parse`);
       const inductionResults = await this.workerPool.run(
         chunk,
         false,
         allPaths,
         context.exportState().registry
       );
+      traceMemory(`wave ${batchNum} after parse`);
 
       for (const res of inductionResults) {
         this.reflectionPipeline.apply(res, {
@@ -171,6 +147,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
           useShallowMode,
         });
       }
+      traceMemory(`wave ${batchNum} after reflect`);
 
       // Flush Chunk to Vault & Clear RAM
       if (this.persistence) {
@@ -182,7 +159,7 @@ export class AnalyzeOrchestrator implements ConducksComponent {
         const { nodeCount, edgeCount } = await this.graph.flushAndClear(this.persistence, pulseId);
         totalNodes += nodeCount;
         totalEdges += edgeCount;
-        await this.traceMemory(`wave ${batchNum}/${totalBatches}`);
+        traceMemory(`wave ${batchNum}/${totalBatches}`);
 
         // DF1: Write per-symbol kinetic columns from spectrum kinetic blobs
         for (const res of inductionResults) {
