@@ -14,6 +14,24 @@ export class AuditService {
    * Performs a high-performance longitudinal audit over the last N pulses.
    */
   public async audit(windowSize: number = 5): Promise<AuditResult> {
+    // Same root cause as DriftEngine: `nodes.id` is a PRIMARY KEY, so `LAG(gravity) OVER
+    // (PARTITION BY n.id ...)` sees exactly one row per partition, LAG is always NULL, and
+    // `WHERE prev_gravity IS NOT NULL` drops every row. The query below can never return a hotspot
+    // however much a codebase decays. Reporting STABLE from it is reporting success from a check
+    // that ran on nothing, so the honest answer is the INSUFFICIENT_DATA this type already declares
+    // and `audit.ts:30` already has a branch for — a branch that was unreachable until now.
+    const [probe] = await this.persistence.query<{ rows: number; ids: number }>(
+      'SELECT count(*) AS rows, count(DISTINCT id) AS ids FROM nodes');
+    if (Number(probe?.rows ?? 0) <= Number(probe?.ids ?? 0)) {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        message: 'Historical audit cannot be computed: the vault stores one row per symbol '
+          + '(current state only) and never records earlier gravity or complexity. This is a '
+          + 'missing feature, not a clean bill of health — see todo22.',
+        hotspots: [],
+      } as AuditResult;
+    }
+
     const startTime = Date.now();
 
     // 1. Unified Windowed Structural Trend Query

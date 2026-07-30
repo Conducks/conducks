@@ -25,12 +25,38 @@ export class DriftEngine {
 
     if (pulses.length < 2 && !prevPulseId) {
       return {
-        status: 'STABLE',
+        status: 'INSUFFICIENT_DATA',
         message: 'Insufficient historical data for drift analysis (Need at least 2 pulses).',
         deltas: [],
         moves: []
       };
     }
+
+    // `nodes.id` is a PRIMARY KEY, so the table holds exactly one row per symbol — the CURRENT
+    // state. Nothing anywhere records what a symbol's gravity or complexity was in an earlier
+    // pulse. Both queries below are written as if `nodes` were a history table and are therefore
+    // structurally unsatisfiable: `JOIN nodes p ON c.id = p.id AND c.pulseId != p.pulseId` cannot
+    // match, because a row cannot be a different pulse's version of itself.
+    //
+    // The old code ran them anyway, got zero rows, and reported
+    // `STABLE — Structural resonance stable across 0 symbols`. That reads as "checked everything,
+    // nothing drifted" when nothing was checked at all — CONDUCKS-13, a check that evaluates to
+    // nothing and reports success. Say what is true instead: the data does not exist.
+    const [historyProbe] = await this.persistence.query<{ rows: number; ids: number }>(
+      'SELECT count(*) AS rows, count(DISTINCT id) AS ids FROM nodes');
+    const keepsHistory = Number(historyProbe?.rows ?? 0) > Number(historyProbe?.ids ?? 0);
+    if (!keepsHistory) {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        message: 'Drift cannot be computed: the vault stores one row per symbol (current state '
+          + 'only) and never records a symbol\'s earlier gravity or complexity. This is a missing '
+          + 'feature, not a clean result — see todo22.',
+        deltas: [],
+        moves: [],
+        summary: { total_symbols: 0, decay_count: 0, improvement_count: 0, move_count: 0 },
+      } as DriftResult;
+    }
+
 
     const currentPulseId = pulses[0].id;
     const targetPrevPulseId = prevPulseId || pulses[1].id;
@@ -114,7 +140,7 @@ export class DriftEngine {
 }
 
 export interface DriftResult {
-  status: 'STABLE' | 'DECAYING' | 'IMPROVING';
+  status: 'STABLE' | 'DECAYING' | 'IMPROVING' | 'INSUFFICIENT_DATA';
   message: string;
   deltas: Array<{
     id: string;

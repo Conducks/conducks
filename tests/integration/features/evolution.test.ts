@@ -65,21 +65,24 @@ export function subtract(a: number, b: number): number { return add(a, -b); }
     runCli(['analyze', '--yes'], { cwd: repo });
 
     const { combined } = runCli(['drift'], { cwd: repo });
+    // The count is still 0 — the schema genuinely records no per-symbol history — but the command
+    // must no longer present that as a clean result. It used to print
+    // `STABLE — Structural resonance stable across 0 symbols`, which reads as "checked everything,
+    // nothing drifted" when nothing was checked. It now says the data does not exist.
+    expect(combined).toContain('Drift cannot be computed');
+    expect(combined).not.toContain('resonance stable');
     const totalSymbolsLine = combined.match(/Total Symbols:\s*(\d+)/);
-    expect(totalSymbolsLine).not.toBeNull();
-    // This SHOULD be > 0 for a real structural change — it is 0 because of the schema bug
-    // documented above. Asserting the current (broken) value so a schema fix breaks this test
-    // loudly, which is the point: this suite is meant to catch the fix, not hide the bug.
     expect(Number(totalSymbolsLine![1])).toBe(0);
   });
 
-  it('BUG: audit --history finds zero decay hotspots even after genuine decay across pulses', () => {
-    // AuditService.audit() returns status:'STABLE' (never the 'INSUFFICIENT_DATA' its own type
-    // declares) when the LAG query yields no rows, so the CLI's dedicated insufficient-data branch
-    // (src/interfaces/cli/commands/audit.ts:30) is itself dead code — it falls through to the
-    // "no consistent decay" message instead. Same root cause, different observable string.
+  it('audit --history says the history is missing rather than reporting a clean bill of health', () => {
+    // `AuditService` used to return status 'STABLE' when its LAG query yielded no rows, so the CLI's
+    // dedicated insufficient-data branch (src/interfaces/cli/commands/audit.ts:30) was unreachable
+    // and users saw "no consistent structural decay" — a clean bill of health from a check that
+    // examined nothing. It now returns the INSUFFICIENT_DATA its own type always declared.
     const { combined } = runCli(['audit', '--history=5'], { cwd: repo });
-    expect(combined).toContain('No consistent structural decay patterns found');
+    expect(combined).toContain('Historical audit cannot be computed');
+    expect(combined).not.toContain('No consistent structural decay patterns found');
   });
 
   it('rename (GVR) dry-run reports the real file that would change, without writing it', () => {
