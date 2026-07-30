@@ -141,6 +141,15 @@ export function main(): string {
     expect(await count('nodes WHERE parentId IS NULL')).toBe(1);
   });
 
+  it('links a record to the code it governs, and lets docs carry no structural weight', async () => {
+    // ADR 0058. The fixture has no docs/ tree, so the count here is zero — what this pins is the
+    // INVARIANT that matters either way: a doc must never gain gravity, because a module's rank would
+    // then depend on how much documentation sits beside it.
+    const [{ c }] = await vault.query<{ c: number }>(
+      "SELECT COALESCE(max(gravity), 0)::DOUBLE AS c FROM nodes WHERE file LIKE '%.md'");
+    expect(Number(c)).toBe(0);
+  });
+
   it('prices its guesses — confidence spans more than one value', async () => {
     const [row] = await vault.query<{ c: number }>(
       'SELECT count(DISTINCT confidence)::INT AS c FROM edges');

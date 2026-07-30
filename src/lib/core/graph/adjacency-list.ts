@@ -9,7 +9,7 @@ export type NodeId = string;
 // PULSES_TO used to be written as `'PULSES_TO' as any` because it was missing here. A cast is how
 // an edge type stays invisible to every exhaustive switch over EdgeType, and it is part of why
 // nothing noticed the vault held none of them.
-export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY' | 'PULSES_TO';
+export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY' | 'PULSES_TO' | 'GOVERNS';
 
 /**
  * Structural containment edges — they express "X is defined inside Y", NOT "X depends on Y".
@@ -25,7 +25,10 @@ export const STRUCTURAL_EDGE_TYPES: EdgeType[] = ['MEMBER_OF', 'CONTAINS', 'HAS_
  * compiler erases (ADR 0016). Cycle and hub findings ignore these; dead-code still counts a type
  * reference as usage, which is a different question.
  */
-export const NON_RUNTIME_EDGE_TYPES: EdgeType[] = [...STRUCTURAL_EDGE_TYPES, 'TYPE_REFERENCE'];
+// GOVERNS is a DOC -> CODE link (ADR 0058). It is non-runtime by definition: a record pinning a file
+// is not a call, and letting it carry structural weight would make a module's rank a function of how
+// much documentation sits beside it.
+export const NON_RUNTIME_EDGE_TYPES: EdgeType[] = [...STRUCTURAL_EDGE_TYPES, 'TYPE_REFERENCE', 'GOVERNS'];
 
 /**
  * Edges ARCH-3 does not traverse. ARCH-3 means a MODULE IMPORT cycle (ADR 0017), so on top of the

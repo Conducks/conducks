@@ -52,6 +52,7 @@ export class IntraLinker {
     FROM_IMAGE: false,      // infrastructure, not a source symbol
     VIRTUAL_LINK: false,    // synthesised by induction — resolving it would be circular
     PULSES_TO: false,       // both ends are resolved at bind time by ADR 0051
+    GOVERNS: false,         // derived from a doc's own text against real paths (ADR 0058)
   };
 
   private static readonly RESOLVABLE_TYPES = new Set<string>(

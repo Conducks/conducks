@@ -167,7 +167,7 @@ export function buildBoard(root: string): DocsBoard {
   }
   linkPhases(board);
   linkDecisions(board);
-  for (const x of crossCheckDecisions(board.decisions)) mergeLint(board, x.file, "decision", x.errs);
+  for (const x of crossCheckDecisions(board.decisions, root)) mergeLint(board, x.file, "decision", x.errs);
   hygiene(board);
   board.reviews = driftedReviews(root);
   return board;
@@ -431,7 +431,21 @@ function linkDecisions(board: DocsBoard): void {
  * changed it — the failure the `decisions/README.md` index used to paper over.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function crossCheckDecisions(decisions: any[]): Array<{ file: string; errs: string[] }> {
+/**
+ * Every repo-relative code path named inside an `- Enforced by:` value (ADR 0058).
+ *
+ * The field is specified as "a repo-relative path" and in practice carries prose around it: eight
+ * values name more than one path, and several read like
+ * "sentinel rule `layer_boundaries` (src/lib/domain/governance/sentinel-rules.ts)". So this pulls
+ * every `tests/…` or `src/…` occurrence out of the value rather than treating the whole value as a
+ * path. That is a regex over prose and is worth naming as such — it is not clean parsing.
+ */
+export function enforcedByPaths(value: string): string[] {
+  if (!value) return [];
+  return Array.from(String(value).matchAll(/\b((?:tests|src)\/[A-Za-z0-9_./-]+\.[A-Za-z]+)/g)).map(m => m[1]);
+}
+
+export function crossCheckDecisions(decisions: any[], treeRoot: string = process.cwd()): Array<{ file: string; errs: string[] }> {
   const byId = new Map(decisions.filter(d => d.id).map(d => [d.id, d]));
   const out: Array<{ file: string; errs: string[] }> = [];
   for (const d of decisions) {
@@ -452,6 +466,15 @@ export function crossCheckDecisions(decisions: any[]): Array<{ file: string; err
       if (target?.openPhases?.length && !(d.inherits ?? []).includes(ref))
         errs.push(`supersedes ADR ${ref}, which still has unbuilt work (${target.openPhases.join(", ")}) — say what carried over with \`- Inherits: ${ref} (…)\` or abandon it explicitly`);
     }
+    // An `- Enforced by:` naming a file that does not exist is a claim of enforcement with nothing
+    // behind it — the same shape as a rule that matches zero nodes, or a verdict from a comparison
+    // that never ran. One of this repository's 46 was already wrong and nothing caught it (ADR 0058).
+    for (const rel of enforcedByPaths(d.enforcedBy ?? '')) {
+      if (!existsSync(path.join(treeRoot, rel))) {
+        errs.push(`\`- Enforced by:\` names \`${rel}\`, which does not exist — a record cannot be proved by a file that is not there`);
+      }
+    }
+
     if (errs.length) out.push({ file: d.file, errs });
   }
   return out;

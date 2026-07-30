@@ -3,8 +3,10 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
+import { buildBoard, enforcedByPaths } from "@/lib/domain/analysis/docs-board.js";
 import { Logger } from "@/lib/core/utils/logger.js";
 import path from "node:path";
+import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
@@ -253,6 +255,9 @@ export class AnalysisService {
     // 4.5 [Conducks Virtual Induction] 🏺
     await this.induceVirtualLibraries(this.graph.getGraph(), pulseId);
 
+    // Doc -> code links, derived from the grammar the docs already use (ADR 0058).
+    await this.deriveDocGovernance(pulseId, targetRoot);
+
     // The binders' edges are persisted HERE, once every resolver has run: IntraLinker has rebound
     // bare call targets and induction has materialised the external ones, so an endpoint that can
     // resolve has resolved. Anything still unresolved is dropped rather than written — ADR 0051:
@@ -317,6 +322,60 @@ export class AnalysisService {
    * Scans for dangling external references and induces virtual nodes to group them 
    * by library/namespace. This transforms "Orphans" into "Ecosystem Members".
    */
+  /**
+   * GOVERNS edges: a doc file -> the code file it names (ADR 0058).
+   *
+   * The links are already written and already parsed — `- Enforced by:` on an ADR names a
+   * repo-relative path, and a `MODULE.md` sits beside the module it documents. Nothing about how a
+   * doc is WRITTEN changes; this reads what the grammar already defines and stores the reference so
+   * `impact` can answer "which decision pins this file".
+   *
+   * The docs LAYER is untouched: `docs-lint` and `docs-status` still boot no engine (ADR 0033). This
+   * runs inside the pulse, which is the only direction ADRs 0023 and 0033 actually constrain.
+   *
+   * A path that does not resolve produces NO edge (ADR 0051). `docs-lint` reports it instead, which
+   * is where a broken claim belongs.
+   */
+  private async deriveDocGovernance(pulseId: string, workspaceRoot: string): Promise<void> {
+    const graph = this.graph.getGraph();
+    const edges: any[] = [];
+    const seen = new Set<string>();
+
+    const link = (docFile: string, targetFile: string, reason: string) => {
+      const docId = `${canonicalize(docFile)}::unit`;
+      const tgtId = `${canonicalize(targetFile)}::unit`;
+      // Both ends must exist as nodes. A doc outside the analysed set, or a path naming a file the
+      // pulse never saw, produces nothing rather than a dangling edge.
+      if (!graph.hasNode(docId) || !graph.hasNode(tgtId)) return;
+      const id = `GOVERNS::${docId}->${tgtId}`;
+      if (seen.has(id)) return;
+      seen.add(id);
+      edges.push({ id, sourceId: docId, targetId: tgtId, type: 'GOVERNS', confidence: 1.0, properties: { reason } });
+    };
+
+    try {
+      const board = buildBoard(workspaceRoot);
+      for (const d of (board.decisions ?? []) as any[]) {
+        if (!d.enforcedBy || !d.file) continue;
+        for (const rel of enforcedByPaths(String(d.enforcedBy))) {
+          // `d.file` is relative to the DOCS directory (`decisions/0044-….md`), while the
+          // `Enforced by` path is relative to the REPO (`tests/unit/…`). Resolving both against the
+          // repo root silently produced zero edges, because `<root>/decisions/…` does not exist.
+          link(path.resolve(workspaceRoot, 'docs', d.file), path.resolve(workspaceRoot, rel), 'enforced-by');
+        }
+      }
+    } catch (err: any) {
+      // The docs tree is optional; a project without one is not an error.
+      logger.warn(`🛡️ [Conducks] Doc governance skipped: ${err.message}`);
+      return;
+    }
+
+    if (edges.length > 0) {
+      await this.persistence.saveEdges(edges, pulseId);
+      logger.info(`🛡️ [Conducks] ${edges.length} doc->code governance edge(s) — which record pins which file.`);
+    }
+  }
+
   private async induceVirtualLibraries(graph: ConducksGraph | any, pulseId: string): Promise<void> {
     const allEdges = graph.getAllEdges();
     // Induction runs AFTER the last wave flush, so anything added here exists only in memory and
