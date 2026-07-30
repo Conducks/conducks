@@ -178,6 +178,19 @@ export class SynapsePersistence {
       metadata JSON
     );`;
 
+    // One row per symbol PER PULSE — the history `nodes` cannot hold, because `nodes.id` is a
+    // PRIMARY KEY and therefore stores only the current state. `drift` and `audit --history` were
+    // written against `nodes` as if it were this table, which is why both were structurally
+    // incapable of returning a result (todo22#P14).
+    const historySql = `CREATE TABLE IF NOT EXISTS node_history (
+      pulseId VARCHAR,
+      nodeId VARCHAR,
+      gravity REAL,
+      complexity INTEGER,
+      fingerprint VARCHAR,
+      PRIMARY KEY (pulseId, nodeId)
+    );`;
+
     const metaSql = `CREATE TABLE IF NOT EXISTS metadata (
       key VARCHAR PRIMARY KEY,
       value TEXT
@@ -196,6 +209,7 @@ export class SynapsePersistence {
     );`;
 
     await run(nodesSql);
+    await run(historySql);
     await run(edgesSql);
     await run(pulsesSql);
     await run(metaSql);
@@ -875,6 +889,36 @@ export class SynapsePersistence {
     if (setClauses.length === 0) return;
     params.push(nodeId.toLowerCase());
     await this.run(`UPDATE nodes SET ${setClauses.join(', ')} WHERE id = ?`, params);
+  }
+
+  /**
+   * Record what every symbol looked like at the end of this pulse.
+   *
+   * `nodes` keeps one row per id — the current state — so nothing in the vault could answer "what
+   * was this symbol's gravity last pulse". `drift` and `audit --history` were both written as if
+   * `nodes` held history and were structurally incapable of returning a row (todo22#P14). This is
+   * the table they needed.
+   *
+   * `INSERT INTO ... SELECT` is one server-side statement with no bound parameters, so it costs one
+   * statement of transaction-local storage regardless of project size and cannot hit the multi-row
+   * write bugs of ADR 0041.
+   *
+   * Retention is bounded because this grows per pulse — roughly 4,836 rows on a 974-unit project,
+   * so an unbounded table would outgrow the graph it describes. `KEEP_PULSES` back is enough for
+   * `audit --history`, whose own window defaults to 5.
+   */
+  private static readonly KEEP_PULSES = 20;
+
+  public async snapshotHistory(pulseId: string): Promise<void> {
+    if (this.readOnly) return;
+    await this.run(
+      `INSERT INTO node_history (pulseId, nodeId, gravity, complexity, fingerprint)
+       SELECT ?, id, gravity, complexity, fingerprint FROM nodes`, [pulseId]);
+    // Drop snapshots older than the retention window. Done here rather than as a chore because a
+    // maintenance command nobody runs is a table nobody prunes (the reasoning of ADR 0037).
+    await this.run(
+      `DELETE FROM node_history WHERE pulseId NOT IN (
+         SELECT id FROM pulses ORDER BY timestamp DESC LIMIT ${SynapsePersistence.KEEP_PULSES})`);
   }
 
   /**

@@ -252,6 +252,11 @@ export class AnalysisService implements ConducksComponent {
     traceMemory('after linkers and virtual induction');
     await this.persistence.pruneTaxonomy();
 
+    // Snapshot AFTER gravity is committed and the taxonomy is settled, so the history records what
+    // the pulse actually published rather than an intermediate state. This is what makes `drift`
+    // and `audit --history` answerable at all (todo22#P14).
+    await this.persistence.snapshotHistory(pulseId);
+
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
     await this.persistence.save(this.graph.getGraph(), {
       metadataOnly: true,

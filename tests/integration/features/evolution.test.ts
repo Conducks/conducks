@@ -53,7 +53,7 @@ export function add(a: number, b: number): number {
     expect(combined).toContain('Insufficient historical data');
   });
 
-  it('BUG: drift still reports zero symbols after a real, distinct second pulse with genuine structural change', () => {
+  it('drift compares two real pulses and names the symbol that decayed', () => {
     writeFile(repo, 'src/calc.ts', `
 export function add(a: number, b: number): number {
   if (a < 0) { if (b < 0) { return -(a + b); } else { return b - a; } }
@@ -65,23 +65,31 @@ export function subtract(a: number, b: number): number { return add(a, -b); }
     runCli(['analyze', '--yes'], { cwd: repo });
 
     const { combined } = runCli(['drift'], { cwd: repo });
-    // The count is still 0 — the schema genuinely records no per-symbol history — but the command
-    // must no longer present that as a clean result. It used to print
-    // `STABLE — Structural resonance stable across 0 symbols`, which reads as "checked everything,
-    // nothing drifted" when nothing was checked. It now says the data does not exist.
-    expect(combined).toContain('Drift cannot be computed');
-    expect(combined).not.toContain('resonance stable');
+    // Symbols are actually COMPARED now — `node_history` records one row per symbol per pulse, so
+    // the join has something to match. This used to be 0 for every project forever, because both
+    // queries read `nodes`, which holds exactly one row per id.
     const totalSymbolsLine = combined.match(/Total Symbols:\s*(\d+)/);
-    expect(Number(totalSymbolsLine![1])).toBe(0);
+    expect(totalSymbolsLine).not.toBeNull();
+    expect(Number(totalSymbolsLine![1])).toBeGreaterThan(0);
+    // `add` gained nested branching between the two pulses, so it must be the one reported as
+    // decaying — a count alone would pass on any noise. The count is colour-wrapped in the CLI
+    // output, so the escape sequence has to be skipped; `Total Symbols` above is not.
+    const decaying = combined.match(/Decaying:\s*(?:\u001b\[[0-9;]*m)?(\d+)/);
+    expect(decaying).not.toBeNull();
+    expect(Number(decaying![1])).toBeGreaterThan(0);
+    expect(combined).toContain('add');
+    // And the wording must agree with the finding: it used to print "resonance stable" beside a
+    // list of decay hotspots.
+    expect(combined).toContain('Structural decay in');
+    expect(combined).not.toContain('resonance stable');
   });
 
-  it('audit --history says the history is missing rather than reporting a clean bill of health', () => {
-    // `AuditService` used to return status 'STABLE' when its LAG query yielded no rows, so the CLI's
-    // dedicated insufficient-data branch (src/interfaces/cli/commands/audit.ts:30) was unreachable
-    // and users saw "no consistent structural decay" — a clean bill of health from a check that
-    // examined nothing. It now returns the INSUFFICIENT_DATA its own type always declared.
+  it('audit --history finds the decaying symbol across pulses', () => {
+    // The LAG window used to partition `nodes` by id, and `nodes.id` is a PRIMARY KEY — one row per
+    // partition, so LAG was always NULL and every row was dropped. It reads `node_history` now.
     const { combined } = runCli(['audit', '--history=5'], { cwd: repo });
-    expect(combined).toContain('Historical audit cannot be computed');
+    expect(combined).toContain('Longitudinal Hotspots');
+    expect(combined).toContain('add');
     expect(combined).not.toContain('No consistent structural decay patterns found');
   });
 

@@ -32,56 +32,32 @@ export class DriftEngine {
       };
     }
 
-    // `nodes.id` is a PRIMARY KEY, so the table holds exactly one row per symbol — the CURRENT
-    // state. Nothing anywhere records what a symbol's gravity or complexity was in an earlier
-    // pulse. Both queries below are written as if `nodes` were a history table and are therefore
-    // structurally unsatisfiable: `JOIN nodes p ON c.id = p.id AND c.pulseId != p.pulseId` cannot
-    // match, because a row cannot be a different pulse's version of itself.
-    //
-    // The old code ran them anyway, got zero rows, and reported
-    // `STABLE — Structural resonance stable across 0 symbols`. That reads as "checked everything,
-    // nothing drifted" when nothing was checked at all — CONDUCKS-13, a check that evaluates to
-    // nothing and reports success. Say what is true instead: the data does not exist.
-    const [historyProbe] = await this.persistence.query<{ rows: number; ids: number }>(
-      'SELECT count(*) AS rows, count(DISTINCT id) AS ids FROM nodes');
-    const keepsHistory = Number(historyProbe?.rows ?? 0) > Number(historyProbe?.ids ?? 0);
-    if (!keepsHistory) {
-      return {
-        status: 'INSUFFICIENT_DATA',
-        message: 'Drift cannot be computed: the vault stores one row per symbol (current state '
-          + 'only) and never records a symbol\'s earlier gravity or complexity. This is a missing '
-          + 'feature, not a clean result — see todo22.',
-        deltas: [],
-        moves: [],
-        summary: { total_symbols: 0, decay_count: 0, improvement_count: 0, move_count: 0 },
-      } as DriftResult;
-    }
-
-
     const currentPulseId = pulses[0].id;
     const targetPrevPulseId = prevPulseId || pulses[1].id;
 
     // 2. Query Deltas (Exact Matches via ID)
     const exactDriftQuery = `
       SELECT
-        c.id, c.name, c.file, c.fingerprint as current_fingerprint,
+        c.nodeId as id, n.name, n.file, c.fingerprint as current_fingerprint,
         p.fingerprint as prev_fingerprint,
         c.gravity as current_gravity, p.gravity as prev_gravity,
         c.complexity as current_complexity, p.complexity as prev_complexity
-      FROM nodes c
-      JOIN nodes p ON c.id = p.id AND c.pulseId != p.pulseId
+      FROM node_history c
+      JOIN node_history p ON c.nodeId = p.nodeId
+      JOIN nodes n ON n.id = c.nodeId
       WHERE c.pulseId = ? AND p.pulseId = ?
     `;
 
     // 3. Query Structural "Moves" (Same DNA, Different ID)
     const moveQuery = `
       SELECT
-        c.id as current_id, p.id as prev_id, c.name, c.file,
+        c.nodeId as current_id, p.nodeId as prev_id, n.name, n.file,
         c.fingerprint, c.gravity as current_gravity, p.gravity as prev_gravity
-      FROM nodes c
-      JOIN nodes p ON c.fingerprint = p.fingerprint AND c.id != p.id
+      FROM node_history c
+      JOIN node_history p ON c.fingerprint = p.fingerprint AND c.nodeId != p.nodeId
+      JOIN nodes n ON n.id = c.nodeId
       WHERE c.pulseId = ? AND p.pulseId = ?
-      AND c.id NOT IN (SELECT id FROM nodes WHERE pulseId = ?)
+      AND c.nodeId NOT IN (SELECT nodeId FROM node_history WHERE pulseId = ?)
     `;
 
     // Sequential queries — lazy persistence closes connection between calls
@@ -124,9 +100,17 @@ export class DriftEngine {
     
     return {
       status: deltas.some(d => d.velocity > 0.05) ? 'DECAYING' : 'STABLE',
-      message: moves.length > 0 
-        ? `Architectural drift stable. Detected ${moves.length} structural renames.` 
-        : `Structural resonance stable across ${exactRows.length} symbols.`,
+      // The message must agree with the status. It used to say "stable" unconditionally, so a
+      // DECAYING result printed "Structural resonance stable across N symbols" beside a list of
+      // decay hotspots — reassuring text over a warning, which is the same failure as reporting
+      // STABLE from a check that ran on nothing.
+      message: (() => {
+        const decaying = deltas.filter(d => d.velocity > 0.05).length;
+        const renames = moves.length > 0 ? ` ${moves.length} structural rename(s) detected.` : '';
+        return decaying > 0
+          ? `Structural decay in ${decaying} of ${exactRows.length} symbols compared.${renames}`
+          : `Structural resonance stable across ${exactRows.length} symbols.${renames}`;
+      })(),
       deltas,
       moves,
       summary: {

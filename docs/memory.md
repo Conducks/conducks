@@ -863,3 +863,16 @@
 - Applies: `updateRanks` and `updateKineticBatch` use the SAME multi-row UPDATE shape on `nodes` and
   work on every subject measured. Whether `nodes` is safe or merely has not hit the breaking state is
   UNKNOWN — do not read their passing as proof the shape is sound.
+
+## `nodes` is CURRENT STATE only — history lives in `node_history`
+- Gotcha: `nodes.id` is a PRIMARY KEY, so exactly one row exists per symbol. Any query shaped like
+  `JOIN nodes p ON c.id = p.id AND c.pulseId != p.pulseId`, or `LAG(...) OVER (PARTITION BY n.id)`,
+  is structurally unsatisfiable — it cannot return a row however much a codebase changes. `drift` and
+  `audit --history` were both written that way and reported "stable" / "no decay found" on every run
+  of every project for as long as they existed.
+- Why: `node_history` (pulseId, nodeId, gravity, complexity, fingerprint) now records one row per
+  symbol per pulse, written by a single server-side `INSERT INTO ... SELECT` after gravity is
+  committed, pruned to the last 20 pulses. Both features read it and work.
+- Applies: any new longitudinal question — decay, churn, velocity, "what changed since" — reads
+  `node_history`, never `nodes`. Verify a longitudinal feature on a TWO-PULSE fixture with a real
+  change between them; a single-pulse fixture cannot distinguish "works" from "returns nothing".
