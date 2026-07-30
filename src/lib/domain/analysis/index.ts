@@ -315,7 +315,10 @@ export class AnalysisService implements ConducksComponent {
       if (parts.length >= 2) {
         namespace = parts[0];
         symbol = parts[1];
-        if (externalPrefixes.includes(namespace)) isCandidate = true;
+        // `node:fs`, `node:child_process` … carry the runtime in the namespace, so an exact-list
+        // check never matched and 214 edges into node builtins stayed dangling while every other
+        // external reference was induced.
+        if (externalPrefixes.includes(namespace) || namespace.startsWith('node:')) isCandidate = true;
       } else {
         // Special Case: Naked symbols that are not absolute paths
         if (!targetId.startsWith('/') && !targetId.startsWith('c:\\')) {

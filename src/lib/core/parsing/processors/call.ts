@@ -14,6 +14,13 @@ export class CallProcessor {
    */
   public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: AnalyzeContext): void {
     if (!target) return;
+    // A call whose RECEIVER is a literal or an expression is not a reference to any symbol, and the
+    // edge it produced could never resolve. Two shapes accounted for 169 dangling edges here:
+    // a regex literal (`/\/architecture\//.test`, 77 of them) and a chained call
+    // (`id.split('::').pop`, `path.join(x, y).toLowerCase`, 92). The meaningful edge in the second
+    // case is the INNER call, which is captured separately — dropping the outer chain loses no
+    // reference, it removes a target that was never a symbol.
+    if (!CallProcessor.isSymbolReference(target)) return;
 
     let targetId = target.toLowerCase();
     const langId = spectrum.metadata.language || 'typescript';
@@ -70,6 +77,25 @@ export class CallProcessor {
     });
   }
 
+
+  /**
+   * Whether a captured call target names a symbol at all.
+   *
+   * Deliberately a denylist of shapes that CANNOT be a symbol rather than an allowlist of valid
+   * identifiers: identifier rules differ across the twelve grammars, and a narrow allowlist would
+   * silently drop legitimate targets in whichever language it did not anticipate.
+   */
+  public static isSymbolReference(target: string): boolean {
+    const t = target.trim();
+    if (!t) return false;
+    // A call on the result of another call: the inner call is captured on its own.
+    if (t.includes('(') || t.includes(')')) return false;
+    // Literal receivers: regex, string, template. `/x/.test(...)` calls nothing declared anywhere.
+    if (/^[/"'`]/.test(t)) return false;
+    // A numeric receiver is the same case.
+    if (/^\d/.test(t)) return false;
+    return true;
+  }
 
   /**
    * Identifies if a name-to-name call is a constructor call.

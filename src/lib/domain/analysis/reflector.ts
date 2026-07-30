@@ -463,7 +463,15 @@ export class ConducksReflector implements ConducksComponent {
                   const aliasName = (aliasCap && aliasCap.node) ? aliasCap.node.text : bindingName;
 
                   if (context) {
-                    context.registerLocalBinding(aliasName, specifier);
+                    // Register the RESOLVED path, not the raw specifier. `CallProcessor` builds a
+                    // target id as `${binding}::${name}`, so storing the specifier produced ids
+                    // like `@/registry/index.js::registry.audit.advise` — 817 dangling edges here,
+                    // the single largest group, because an alias is not a path any node is keyed
+                    // by. Relative specifiers were already fine; aliases and bare packages were
+                    // not. Falls back to the specifier when resolution finds nothing, which keeps
+                    // the previous behaviour for genuinely external modules.
+                    const resolvedSpecifier = this.imports.resolve(specifier, file.path, allPaths, provider, context);
+                    context.registerLocalBinding(aliasName, resolvedSpecifier || specifier);
                   }
 
                   // Per-binding IMPORTS relationship for function-level dead code detection

@@ -122,6 +122,36 @@ export class ImportProcessor {
       }
     }
 
+    // 3b. Alias specifiers (`@/x`, `~/x`).
+    //
+    // These are neither relative nor a bare package, so they fell straight past the branch above
+    // into the basename fallback — which correctly refuses on `index.js` (24 files share it here),
+    // leaving 817 dangling edges with ids like `@/registry/index.js::registry.audit.advise`. The
+    // alias is resolved by SUFFIX rather than by reading tsconfig: the alias root is a project
+    // convention (`@/* -> src/*` here) and matching the tail of a real path finds it without this
+    // processor needing to know the mapping. Ambiguity refuses, same rule as everywhere else.
+    if (/^[@~]\//.test(specifier)) {
+      const tail = specifier.replace(/^[@~]\//, '');
+      const bases = [tail];
+      if (tail.endsWith('.js')) bases.push(tail.slice(0, -3));
+      const exts = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js'];
+      const wanted = new Set<string>();
+      for (const b of bases) for (const ext of exts) wanted.add(canonicalize(b + ext));
+
+      let hit: string | undefined;
+      for (const p of allPaths) {
+        const canon = canonicalize(p);
+        for (const w of wanted) {
+          if (canon === w || canon.endsWith('/' + w)) {
+            if (hit && hit !== p) return undefined;
+            hit = p;
+            break;
+          }
+        }
+      }
+      if (hit) return hit;
+    }
+
     // 4. Fuzzy Module Fallback (For languages with less strict relative paths)
     //
     // UNIQUE MATCH ONLY. This used to return the first candidate in `allPaths` order, which is
