@@ -993,3 +993,16 @@
 - Applies: when a comment explains WHY an option is set, check the callee actually reads it. Removed
   with both comments; the real mechanism is that anything created after the last wave flush needs
   its own explicit persist call.
+
+## An integration test that reads a CLI surface can pass while the vault is empty
+- Gotcha: the first version of `virtual-induction.test.ts` asserted on `conducks audit` and
+  `conducks query` output. It passed against a build with the persist call REMOVED — the CLI
+  surfaces are not sensitive to whether the rows exist, so the test measured nothing. Rewritten to
+  open the vault and count rows, it goes red on the unfixed build with `0 virtual nodes` and
+  `4 dangling edges`.
+- Why: this is the same blindness that let the bug survive for as long as it did. A feature whose
+  output nothing reads back can be deleted without any surface changing.
+- Applies: for anything that WRITES, assert against the store, not against a command's stdout. And
+  `helpers.ensureBuild()` only builds when `build/` is missing — it will happily run an integration
+  test against a stale build, which is how the same test appeared to pass before the fix was
+  compiled. `grep` the fix in `build/` before trusting an integration run.

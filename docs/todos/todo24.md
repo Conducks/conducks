@@ -1,6 +1,6 @@
 # todo24 — the fallback register: no degraded answer looks like a confident one
 Status: doing
-- Acceptance: every fallback in the register either refuses, or labels its guess in a way a query can filter on.
+- Acceptance: every fallback in the register either refuses or labels its guess, and nothing a pulse computes is left in memory.
 
 ## Context
 
@@ -27,8 +27,16 @@ about drift, so Phase 1 goes first even though it is small.
 
 ## Phase 1 — find out whether node_history is actually being written
 - Builds: 0044
-- [ ] This vault holds 70 pulses and 0 rows in `node_history`, which is why `drift` had nothing to compare. Two explanations fit what is on disk: the table was added after those pulses were written, or `snapshotHistory` is failing silently. Nobody has checked. Fixed when a pulse run against a clean vault is followed by `SELECT pulseId, count(*) FROM node_history GROUP BY 1` returning a row for that pulse, and the same query on this repo's vault is recorded in the finding either way
-- [ ] If it is being written correctly, `drift` on a two-pulse vault must reach a real verdict rather than `INSUFFICIENT_DATA`. Fixed when `conducks analyze` twice in a row is followed by `conducks drift` reporting a non-zero symbols-compared count
+- [x] ANSWERED, and it is not a bug: `snapshotHistory` works. Two pulses on a clean two-file fixture give `SELECT pulseId, count(*) FROM node_history GROUP BY 1` → 18 rows for each of the two pulses. This repo's own vault has 70 pulses and 0 rows because it was last written on 29 Jul, before the table existed — the first explanation, not the silent-failure one
+- [x] The comparison the engine runs returns real rows on that fixture: the exact-delta join across the two pulses yields 18 comparable symbols. `drift` on this repo will keep reporting INSUFFICIENT_DATA until it is re-analyzed, which is now the correct answer rather than a false green
+- [ ] FOUND WHILE CHECKING, unrelated to the above: `conducks drift <path>` takes the path as `prevPulseId`. `DriftCommand` reads `args.find(a => !a.startsWith('--'))` and the dispatcher independently uses the same positional as the target root, so the path is consumed twice — the run reported "check that node_history holds rows for pulse /private/tmp/.../hx". Fixed when `conducks drift <path>` analyses that path against its own previous pulse
+
+## Phase 4 — virtual induction reaches the vault
+- Builds: 0042
+- [x] `induceVirtualLibraries` logged "Resonated with 2,691 virtual ecosystem symbols" and persisted none, because it runs after the last wave flush and the pulse's final `save()` writes no node rows. Same failure and same remedy as cross-service binding (todo22#P15): the induced nodes are collected and written with an explicit `saveNodes` inside the pulse transaction
+- [x] The cost it was leaving behind is measured, not asserted: 6,808 of 13,418 edges in this repo's vault — 51% — pointed at a target with no node, and the targets were `global::process`, `path.resolve`, `db.all`. On a fixture exercising all three reference kinds, dangling edges go 4 → 0 and virtual nodes 0 → 2
+- [x] Enforced by `tests/integration/features/virtual-induction.test.ts`, which queries the vault directly. Its FIRST version asserted against `audit` and `query` output and passed against a build with the persist call removed — the CLI surfaces are not sensitive to whether the rows exist, which is the same blindness that let the bug live. Confirmed red against the unfixed build: 0 virtual nodes, 4 dangling
+- [ ] `bindPulseCircuits` has the identical shape and is still open: it builds `PULSES_TO` edges after the flush, never adds them to `lastResonanceEdges`, and the vault holds 0 of them. Fixed when a fixture with a variable handover produces a persisted `PULSES_TO` edge, asserted by reading the vault rather than a CLI surface
 
 ## Phase 2 — the remaining twelve guessers each refuse or label
 - Depends: todo24#P1

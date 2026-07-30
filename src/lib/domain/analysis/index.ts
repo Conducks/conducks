@@ -254,7 +254,7 @@ export class AnalysisService implements ConducksComponent {
     this.graph.getGraph().setMetadata('targetPulseId', pulseId);
 
     // 4.5 [Conducks Virtual Induction] 🏺
-    await this.induceVirtualLibraries(this.graph.getGraph());
+    await this.induceVirtualLibraries(this.graph.getGraph(), pulseId);
 
     // 4.6 Taxonomy reconcile (ADR 0013): cut DATA, edge-gate ATOM. Runs last so every reference
     // edge (intra/service/federated/virtual) is present when deciding which atoms are load-bearing.
@@ -286,8 +286,14 @@ export class AnalysisService implements ConducksComponent {
    * Scans for dangling external references and induces virtual nodes to group them 
    * by library/namespace. This transforms "Orphans" into "Ecosystem Members".
    */
-  private async induceVirtualLibraries(graph: ConducksGraph | any): Promise<void> {
+  private async induceVirtualLibraries(graph: ConducksGraph | any, pulseId: string): Promise<void> {
     const allEdges = graph.getAllEdges();
+    // Induction runs AFTER the last wave flush, so anything added here exists only in memory and
+    // the pulse's final save() writes no node rows. The log said "Resonated with 2,691 virtual
+    // ecosystem symbols" while `SELECT count(*) FROM nodes WHERE id LIKE 'lib::%'` returned 0 on
+    // every vault. Collected and written explicitly, the same way cross-service edges are
+    // (todo22#P15) — same failure, same shape, same remedy.
+    const induced: any[] = [];
     const externalPrefixes = ['global', 'npm', 'std', 'pip', 'gem', 'mvn', 'go', 'crates'];
     
     let inducedCount = 0;
@@ -322,7 +328,7 @@ export class AnalysisService implements ConducksComponent {
         
         // 1. Induce Library Node (e.g. lib::unresolved or lib::npm)
         if (!graph.hasNode(libId)) {
-          graph.addNode({
+          const libNode = {
             id: libId,
             label: 'LIBRARY',
             properties: { 
@@ -332,11 +338,13 @@ export class AnalysisService implements ConducksComponent {
               canonicalRank: 1, // Ecosystem Layer
               isShallow: true
             }
-          });
+          };
+          graph.addNode(libNode);
+          induced.push({ ...libNode, name: namespace });
         }
 
         // 2. Induce Symbol Node
-        graph.addNode({
+        const symbolNode = {
           id: targetId,
           label: 'LIBRARY_SYMBOL',
           properties: {
@@ -347,7 +355,9 @@ export class AnalysisService implements ConducksComponent {
             parentId: libId,
             isShallow: true
           }
-        });
+        };
+        graph.addNode(symbolNode);
+        induced.push({ ...symbolNode, name: symbol });
 
         // 3. Bind to Library (Conducks Rule: Columnar Hierarchy Only) 🏺
         // We no longer persist MEMBER_OF edges; containment is in node.properties.parentId
@@ -355,8 +365,11 @@ export class AnalysisService implements ConducksComponent {
       }
     }
 
-    if (inducedCount > 0) {
-      logger.info(`🛡️ [Conducks Induction] Resonated with ${inducedCount} virtual ecosystem symbols.`);
+    // The log line only claims what the vault received. Reporting the in-memory count was how this
+    // reported success for every pulse it silently discarded.
+    if (induced.length > 0) {
+      await this.persistence.saveNodes(induced, pulseId);
+      logger.info(`🛡️ [Conducks Induction] Persisted ${induced.length} virtual ecosystem nodes for ${inducedCount} external reference(s).`);
     }
   }
 }
