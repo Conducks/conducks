@@ -77,4 +77,7 @@ blind spot.
 whose extension has no provider with no result and no log — deliberate, but it means "not analysed"
 and "analysed, empty" are already conflated one layer earlier, before any of the rules above apply.
 Whether that should be reported per pulse or is genuinely uninteresting has not been measured; nobody
-knows how many files it drops on a polyglot repository. Carried by todo25#P3.
+knows how many files it drops on a polyglot repository. Carried by todo25#P3 — ANSWERED there on
+2026-07-30: the skip is now reported rather than silent. It surfaced immediately once rule 3 landed,
+because a fixture with `package.json` and `go.mod` aborted the pulse — manifests are handled by
+EssenceLens, not by a grammar, so they were legitimately absent and the strict count called it loss.

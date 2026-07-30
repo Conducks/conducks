@@ -97,7 +97,22 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
     try {
       const ext = path.extname(unit.path);
       const provider = ext === '.h' ? (isCppHeader(unit.path) ? cppProvider : cProvider) : providers.get(ext);
-      if (!provider) continue;
+      if (!provider) {
+        // REPORTED, not skipped in silence (ADR 0049, its open question answered).
+        //
+        // This used to `continue`, so a file with no language provider produced no result at all —
+        // and the caller could not tell "we chose not to parse this" from "this vanished". That is
+        // the same conflation the rest of ADR 0049 closes one layer up, and it surfaced the moment
+        // the orchestrator started counting: a fixture with `package.json` and `go.mod` aborted the
+        // pulse, because manifests are handled by EssenceLens rather than by a grammar and were
+        // therefore legitimately absent.
+        //
+        // Answering the open question with the measurement it asked for: on a polyglot fixture the
+        // skipped set is manifests and other non-code files, which is uninteresting per file and
+        // load-bearing in aggregate — the count has to reconcile, so the skip has to be visible.
+        results.push({ path: unit.path, success: false, skipped: true, reason: `no language provider for ${ext || 'this file'}` });
+        continue;
+      }
 
       // Phase 1: Omni-Repo Native Grammar Induction 🛡️ 🔨
       const langId = provider.langId;

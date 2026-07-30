@@ -1,21 +1,22 @@
 # Memory — conducks
 
-## Inheritance is recorded ONLY for Java and Swift — TS/TSX/Go still emit ZERO heritage edges
-- Gotcha: `EXTENDS`/`IMPLEMENTS` are in the `EdgeType` union (`adjacency-list.ts:9`),
-  `evolution/dead-code.ts:29` counts them as usage, and ADR 0010 lists them among "genuine coupling"
-  — yet for TS/TSX/Go no such edge has ever existed. `reflector.ts:438` gates heritage on
-  `cName === 'heritage' && node`, and their heritage patterns
-  (`(class_heritage (implements_clause (_) @heritage))`, `typescript/queries.ts:30-32`) are
-  STANDALONE — no co-captured `@name`, so no node exists for the match and `heritage.process()`
-  (`processors/heritage.ts:17`, the only producer of these edge types) never runs. The captures
-  themselves hit; the reflector drops them.
-- Why: heritage was written as its own pattern rather than as part of the class pattern. The FIX IS
-  PROVEN: Java and Swift's queries (2026-07-25) co-capture the subject in the same pattern
-  (`superclass: (superclass (type_identifier) @heritage)` alongside `@name @isStruct`) and their
-  suites now assert real EXTENDS/IMPLEMENTS edges.
-- Applies: `typescript/queries.ts:30-32`, tsx, javascript, go heritage patterns. Port the Java/Swift
-  co-capture shape (this is todo11's whole job). Until then, anything reasoning about TS/Go
-  inheritance is reasoning about nothing — and STALE_IMPORT stays blocked on it.
+## Heritage for TS/TSX/Go WAS broken and is not any more — this entry was stale for weeks
+- Gotcha: this file used to say "Inheritance is recorded ONLY for Java and Swift — TS/TSX/Go still
+  emit ZERO heritage edges". That was true when written and stopped being true after the queries
+  were ported. MEASURED 2026-07-30 on a purpose-built fixture: Go struct embedding gives
+  `Dog EXTENDS animal`, TSX gives `Widget EXTENDS base` and `Widget IMPLEMENTS greeter`, TS gives
+  both — every one resolved to a file-qualified target, not a bare name. This repository's own vault
+  holds 84 IMPLEMENTS and 19 EXTENDS, all from `.ts`.
+- Why it matters more than the correction itself: a five-dimension architecture audit reported
+  "TypeScript, TSX and Go record zero inheritance edges" as a MAJOR finding, and cited
+  `docs/memory.md:1-11` as its evidence. It read the claim instead of counting the rows. A stale
+  memory entry does not merely fail to help — it actively manufactures false findings in anything
+  that trusts it, and it is quoted with more confidence than a measurement because it reads as
+  settled knowledge.
+- Applies: an entry here that asserts a CAPABILITY is absent needs re-measuring before it is cited,
+  and should carry the date it was last checked. Pinned now by
+  `tests/integration/features/heritage-languages.test.ts`, so the claim cannot go stale silently
+  again: if heritage regresses in any of the three, that test fails rather than this file lying.
 
 ## STALE_IMPORT under-reports BY DESIGN — do not "fix" its recall without the subset proof
 - Gotcha: `findStaleImports` (`evolution/dead-code.ts`, shipped 2026-07-25) reports a binding only on
