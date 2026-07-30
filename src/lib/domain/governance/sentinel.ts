@@ -19,7 +19,13 @@ export interface SentinelRule {
   id: string;
   type: 'require_heritage' | 'require_export' | 'require_caller' | 'framework_check' | 'require_file' | 'max_fans';
   matchPath?: string; // Glob pattern for files to check
-  matchLabel?: string; // e.g. 'function' or 'class'
+  matchLabel?: string; // canonical kind, e.g. 'STRUCTURE' or 'BEHAVIOR'
+  // Narrows within a canonical kind, using the node's `semantic_kind` — 'struct' (a class),
+  // 'interface', 'enum'. STRUCTURE alone cannot express "a class but not an interface", and that
+  // gap made this repo's own require_heritage rule report 97 violations of which 55 were interfaces
+  // and type aliases being asked to implement a component contract they have no business
+  // implementing. A gate that cries wolf 97 times is ignored as completely as one that never fires.
+  matchSemanticKind?: string;
   target?: string;    // e.g. 'BaseService' or 'handler'
   max?: number;       // For max_fans rule
 }
@@ -79,10 +85,24 @@ export class ConducksSentinel implements ConducksComponent {
       }
 
       // 2. Node-Specific Rule Handling
+      //
+      // A rule that matches NO node passes silently — it is indistinguishable from a rule whose
+      // subjects are all compliant. That has now happened twice in this file: once with a
+      // `matchLabel` naming a language token instead of a canonical kind, and once with a
+      // `matchSemanticKind` naming the vault's column instead of the in-memory field. The guard
+      // below makes it impossible for a third variant to hide.
+      let matched = 0;
       for (const node of allNodes) {
         // Conducks: Regex path matching for structural scoping
         if (rule.matchPath && !new RegExp(rule.matchPath).test(node.id)) continue;
         if (rule.matchLabel && node.label !== rule.matchLabel) continue;
+        // `properties.kind` — the vault column is `semantic_kind`, the in-memory field is `kind`
+        // (persistence.ts maps it on load). Reading the column name here matched zero nodes and the
+        // rule reported clean, which is precisely the failure the matchLabel guard above exists to
+        // prevent; the zero-match guard below now catches this class for every rule, not just for
+        // an invalid label.
+        if (rule.matchSemanticKind && node.properties.kind !== rule.matchSemanticKind) continue;
+        matched++;
 
         const violation = await this.checkRule(node, rule, graph);
         if (violation) {
@@ -93,6 +113,15 @@ export class ConducksSentinel implements ConducksComponent {
             message: violation
           });
         }
+      }
+
+      if (matched === 0) {
+        report.success = false;
+        report.violations.push({
+          nodeId: 'global',
+          ruleId: rule.id,
+          message: `matched 0 nodes, so it can only ever report clean. Check matchPath ("${rule.matchPath ?? '*'}"), matchLabel ("${rule.matchLabel ?? '*'}") and matchSemanticKind ("${rule.matchSemanticKind ?? '*'}") against the graph — a rule with no subjects is not a passing rule.`,
+        });
       }
     }
 
@@ -125,8 +154,22 @@ export class ConducksSentinel implements ConducksComponent {
         const heritageEdges = graph.getNeighbors(node.id, 'downstream').filter(e => 
           e.type === 'EXTENDS' || e.type === 'IMPLEMENTS' || e.type === 'TYPE_REFERENCE'
         );
-        const hasTarget = heritageEdges.some(e => 
-          e.targetId.endsWith(`::${rule.target}`) || e.properties.rawTarget === rule.target
+        // Case-INSENSITIVE, because node ids are case-folded on insert (APFS) while a rule names
+        // the target as it is written in source. `endsWith('::ConducksComponent')` could never
+        // match `...::conduckscomponent`, so every class failed this rule including the 28 that do
+        // implement it — the violation message even printed `found [conduckscomponent]` beside
+        // `Expected [ConducksComponent]` and nobody read it, because it was one line in 97.
+        // Compare the SYMBOL, not the id. Two things defeated the old `endsWith('::Target')`:
+        // node ids are case-folded on insert while a rule names the target as written in source,
+        // and an unresolved heritage target has no `::` prefix at all — it is the bare name. So
+        // every class failed this rule, including the 28 that do implement the interface, and the
+        // violation line printed `found [conduckscomponent]` beside `Expected [ConducksComponent]`
+        // while nobody read it, because it was one line in 97.
+        const wanted = String(rule.target ?? '').toLowerCase();
+        const symbolOf = (id: string) => String(id).toLowerCase().split('::').pop() ?? '';
+        const hasTarget = heritageEdges.some(e =>
+          symbolOf(e.targetId) === wanted ||
+          String(e.properties.rawTarget ?? '').toLowerCase() === wanted
         );
         
         if (!hasTarget) {

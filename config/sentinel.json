@@ -4,13 +4,15 @@
     "type": "require_heritage",
     "matchPath": "src/lib/domain/",
     "matchLabel": "STRUCTURE",
-    "target": "ConducksComponent"
+    "target": "ConducksComponent",
+    "matchSemanticKind": "struct"
   },
   {
     "id": "domain-visibility-rule",
     "type": "require_export",
     "matchPath": "src/lib/domain/",
-    "matchLabel": "STRUCTURE"
+    "matchLabel": "STRUCTURE",
+    "matchSemanticKind": "struct"
   },
   {
     "id": "hub-overload-prevention",
