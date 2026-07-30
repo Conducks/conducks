@@ -71,8 +71,14 @@ Induction runs last and cannot tell them apart, so anything that reaches it unre
 whether it deserves one or not. `RESOLVABLE_TYPES` is the list that decides which edges get a chance
 to be the third case, and it was written once and never revisited when new edge types were added.
 
-`Open:` whether any OTHER edge type is missing from `RESOLVABLE_TYPES` for the same reason.
-`DEFINES`, `ALIASES` and `PULSES_TO` are not in it. `PULSES_TO` no longer needs it after ADR 0051
-resolves both ends at bind time, but `DEFINES` and `ALIASES` have not been checked, and the failure
-is silent by construction — a bare target that gets induced looks exactly like a legitimate external
-reference. Carried by todo25#P7.
+**The allowlist itself was the deeper defect, and it is gone.** `RESOLVABLE_TYPES` was an array, so a
+newly added edge type defaulted to unresolvable and failed silently — which is how heritage spent
+months inventing a duplicate. It is now a `Record<EdgeType, boolean>` classifying every member, so
+the COMPILER refuses to build until a new type is decided about. Verified by adding a fake edge type:
+the build fails naming the missing key. The judgement still belongs to a person; it can no longer be
+skipped by accident, which was the only part going wrong.
+
+`Open:` `DEFINES` and `ALIASES` appear in the codebase as edge types but are not members of the
+`EdgeType` union, so the record above cannot classify them and the compiler cannot see them either.
+Whether they should join the union — and then be classified — or whether they are strings that were
+never meant to be edge types is unanswered. Carried by todo25#P7.

@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList } from './adjacency-list.js';
+import { ConducksAdjacencyList, type EdgeType } from './adjacency-list.js';
 import { logger } from '@/lib/core/utils/logger.js';
 import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js';
 
@@ -19,16 +19,44 @@ import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js'
  */
 export class IntraLinker {
 
-  // EXTENDS and IMPLEMENTS belong here for the same reason the other four do: `implements Foo` names
-  // a symbol the file IMPORTED, which is exactly what this linker resolves. Leaving them out meant a
-  // heritage target stayed bare forever, and virtual induction then materialised a phantom node for
-  // it — so the graph held BOTH `contracts/types.ts::conduckscomponent` (real, gravity 0.022) and a
-  // bare `conduckscomponent` (invented, gravity 0), and any query keyed on one silently missed the
-  // edges pointing at the other. A genuinely external parent (`extends Error`) still falls through
-  // to induction, which is where an external symbol belongs (ADR 0053).
-  private static readonly RESOLVABLE_TYPES = new Set([
-    'CALLS', 'CONSTRUCTS', 'TYPE_REFERENCE', 'ACCESSES', 'EXTENDS', 'IMPLEMENTS'
-  ]);
+  /**
+   * Which edge types get a chance to be RESOLVED, keyed exhaustively by `EdgeType` (ADR 0053).
+   *
+   * This was an allowlist array, and an allowlist here fails in the worst available direction: a new
+   * edge type defaults to unresolvable, its target stays bare through every pulse, virtual induction
+   * manufactures a phantom node for it, and nothing complains — because a bare target that got
+   * induced is indistinguishable from a legitimate external reference. That is exactly how heritage
+   * spent months creating a duplicate `ConducksComponent` beside the real one.
+   *
+   * As a `Record<EdgeType, boolean>` the COMPILER refuses to build until a newly added edge type is
+   * classified. The decision still has to be made by a person; it just can no longer be skipped by
+   * accident, which is the only part that was going wrong.
+   *
+   * true  = names a symbol that may live in another file, so the resolver should try.
+   * false = the target is a CONSTRUCTED id (containment, manifests, virtual links), so there is
+   *         nothing to look up and trying would be noise.
+   */
+  private static readonly RESOLVABLE: Record<EdgeType, boolean> = {
+    CALLS: true,
+    CONSTRUCTS: true,
+    TYPE_REFERENCE: true,
+    ACCESSES: true,
+    EXTENDS: true,          // added by ADR 0053 — 72 of 73 heritage targets resolve locally
+    IMPLEMENTS: true,       // same
+    IMPORTS: false,         // resolved earlier, by ImportProcessor against the file's own specifiers
+    MEMBER_OF: false,       // containment; the parent id is constructed, not referenced
+    CONTAINS: false,        // containment
+    HAS_METHOD: false,      // containment
+    HAS_PROPERTY: false,    // containment
+    DEPENDS_ON: false,      // a package manifest entry; the target is external by definition
+    FROM_IMAGE: false,      // infrastructure, not a source symbol
+    VIRTUAL_LINK: false,    // synthesised by induction — resolving it would be circular
+    PULSES_TO: false,       // both ends are resolved at bind time by ADR 0051
+  };
+
+  private static readonly RESOLVABLE_TYPES = new Set<string>(
+    (Object.keys(IntraLinker.RESOLVABLE) as EdgeType[]).filter(t => IntraLinker.RESOLVABLE[t])
+  );
 
   private resolver = new TypeScriptResolver();
 
