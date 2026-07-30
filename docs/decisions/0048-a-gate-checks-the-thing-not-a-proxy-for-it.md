@@ -83,4 +83,6 @@ by naming the vault's column instead of the in-memory field, and it looked like 
 `rank_violations=458` as "pre-existing, tracked" and passes. That is defensible for a finding nobody
 has triaged and indefensible as a permanent state — a number carried as acceptable for long enough
 becomes invisible. Deciding it means triaging the 458 first, which is its own job. Carried by
-todo25#P6.
+todo25#P6 — ANSWERED there on 2026-07-30: all 458 were one false-positive pair (UNIT → ECOSYSTEM,
+i.e. a file importing an npm package), caused by reading a containment ladder as a dependency one.
+The rule was corrected rather than ratcheted, and `guard` no longer carries a findings line at all.

@@ -274,6 +274,15 @@ export class GovernanceService implements ConducksComponent {
             const tgtRank = tgt.properties.canonicalRank ?? -1;
             if (srcRank < 0 || tgtRank < 0) continue;
             if (srcRank >= SYMBOL_LEVEL && tgtRank >= SYMBOL_LEVEL) continue; // normal symbol dependency
+            // An external package is not a rank inversion — it is what a dependency IS. ECOSYSTEM is
+            // rank 0 because the ranks are a CONTAINMENT ladder (ecosystem contains repository
+            // contains directory contains unit), and this rule reads them as a DEPENDENCY ladder.
+            // Conflating the two orderings made every `import path from 'node:path'` a violation:
+            // all 458 findings `conducks guard` has carried as "pre-existing, tracked" were this one
+            // pair, UNIT -> ECOSYSTEM, and not one of them was real. A number carried as acceptable
+            // for long enough stops being read, which is why it was worth triaging rather than
+            // ratcheting (todo25#P6, ADR 0048).
+            if (tgt.properties.canonicalKind === 'ECOSYSTEM') continue;
             // Violation: higher-ranked (more abstract) depending on lower-ranked (more concrete)
             // i.e. src rank > tgt rank means src is more abstract and should not depend on something more concrete
             if (srcRank > tgtRank && (rule.threshold === undefined || Math.abs(srcRank - tgtRank) >= rule.threshold)) {
