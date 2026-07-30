@@ -847,3 +847,16 @@
   restored the same project takes **73 s against 40 s** — a third of the pulse was invisible in every
   mentorseed number quoted before this. Verify `git rev-list --count HEAD` in the fixture, not the
   original.
+
+## A batched UPDATE is safe on `nodes` and FAILS on `edges` — mechanism unknown
+- Gotcha: `UPDATE edges SET targetId = v.targetId FROM (VALUES ...)` fails a pulse with
+  `PRIMARY KEY or UNIQUE constraint violation: duplicate key "semantic::...::type_reference"` — a PK
+  violation on an id the statement does not write. The identical helper on `nodes` (`updateRanks`,
+  `updateKineticBatch`) is safe. Reproducible: revert only the edge call and the pulse runs clean.
+- Why: NOT established. Probably the DuckDB index bug of ADR 0041 (duckdb/duckdb#2241, #16520,
+  #16604) from a third direction — `edges` has just taken a large insert in the same transaction —
+  but that is a guess and it is labelled as one. `updateEdgeTargets` stays per-row with a comment.
+- Applies: do not "fix" the remaining per-row loop in `updateEdgeTargets` without capturing the
+  failure first — `CONDUCKS_SQL_LOG=<f> conducks analyze` then
+  `tools/replay-sql-log.mjs <f> <vault.db> --shrink`. It is 1,566 statements and 364 ms; that is not
+  worth a fourth wrong theory about this bug.

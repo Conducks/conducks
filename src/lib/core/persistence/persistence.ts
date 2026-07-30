@@ -573,6 +573,23 @@ export class SynapsePersistence {
    * Records the hash of a file that was just analyzed. Silent no-op on a read-only connection — a
    * missing hash only costs a redundant parse next time, so it must never fail the caller.
    */
+  /**
+   * Seed the hash gate for MANY files in one statement per batch.
+   *
+   * `analyze` called the per-file version once per unit — MEASURED at 974 statements and 720 ms on a
+   * 974-unit project, the slowest per statement of the three per-row writers found by todo22#P8.
+   * Reuses `insertBatched`, so it inherits the update-or-insert split that avoids the DuckDB
+   * delete-and-reinsert bug (ADR 0041) rather than re-deriving it here.
+   */
+  public async setFileHashBatch(
+    entries: Array<{ file: string; hash: string; sizeBytes: number }>
+  ): Promise<void> {
+    if (this.readOnly || !entries.length) return;
+    const now = Date.now();
+    await this.insertBatched('file_hashes', ['file', 'hash', 'sizeBytes', 'updatedAt'],
+      entries.map(e => [e.file.toLowerCase(), e.hash, e.sizeBytes, now]));
+  }
+
   public async setFileHash(file: string, hash: string, sizeBytes: number): Promise<void> {
     if (this.readOnly) return;
     await this.run(
@@ -619,11 +636,13 @@ export class SynapsePersistence {
       const exec = (sql: string) => new Promise<void>((r, j) => db.exec(sql, (e: duckdb.DuckDbError | null) => e ? j(e) : r()));
       const owned = !this.inPulse;
       if (owned) await exec("BEGIN TRANSACTION");
-      const stmt = db.prepare(`UPDATE nodes SET gravity = ?, isEntryPoint = ? WHERE id = ?`);
-      for (const entry of changed) {
-        await new Promise<void>((r, j) => stmt.run(entry.gravity, entry.isEntryPoint ?? false, entry.id.toLowerCase(), (e: Error | null) => e ? j(e) : r()));
-      }
-      stmt.finalize();
+      // Batched, not one statement per node. Inside the pulse DuckDB charges per statement, and
+      // MEASURED on a 974-unit project this loop was 2,416 statements and 369 ms — the same trap
+      // ADR 0041 batched the node and edge writes to escape, and the third call site found by
+      // sweeping for it (todo22#P8).
+      await this.updateFromValues('nodes', 'id',
+        ['gravity', 'isEntryPoint'],
+        changed.map(e => [e.id.toLowerCase(), e.gravity, e.isEntryPoint ?? false]));
       if (owned) await exec("COMMIT");
     } catch (fail) {
       if (!this.inPulse) { try { await this.run('ROLLBACK'); } catch {} }
@@ -643,6 +662,15 @@ export class SynapsePersistence {
       const exec = (sql: string) => new Promise<void>((r, j) => db.exec(sql, (e: duckdb.DuckDbError | null) => e ? j(e) : r()));
       const owned = !this.inPulse;
       if (owned) await exec("BEGIN TRANSACTION");
+      // PER-ROW ON PURPOSE, and the only survivor of the todo22#P8 sweep. Batching this into
+      // `updateFromValues` — the same helper `updateRanks` above uses safely on `nodes` — fails the
+      // pulse with `PRIMARY KEY or UNIQUE constraint violation: duplicate key "semantic::...
+      // ::type_reference"` on an edge id the statement never writes. Reproducible; reverting this
+      // one call and leaving the other two batched runs clean. Almost certainly the same DuckDB
+      // index bug ADR 0041 documents (duckdb/duckdb#2241, #16520, #16604) reached from a third
+      // direction, since `edges` has just taken a large insert in this transaction — but the
+      // mechanism is NOT established, and 1,566 statements at 364 ms is not worth guessing at.
+      // Capture the statement log and shrink it before trying again: todo22#P8.
       const stmt = db.prepare(`UPDATE edges SET targetId = ? WHERE id = ?`);
       for (const entry of rebinds) {
         await new Promise<void>((r, j) => stmt.run(entry.newTargetId.toLowerCase(), entry.id, (e: Error | null) => e ? j(e) : r()));
@@ -731,6 +759,40 @@ export class SynapsePersistence {
 
   public async getRawConnection(): Promise<duckdb.Database> {
     return await this.ensureVaultOpen();
+  }
+
+  /**
+   * `UPDATE <table> SET <cols> FROM (VALUES ...)` — one statement per batch, not per row.
+   *
+   * Every per-row write inside the pulse pays per-statement transaction-local storage, and the cost
+   * GROWS through the transaction: ADR 0041 measured 885 KB per row against 0.8 KB self-committing.
+   * Three call sites were found by sweeping for the pattern rather than waiting for the next
+   * symptom — `updateRanks` (2,416 statements, 369 ms), `updateEdgeTargets` (1,566, 364 ms) and the
+   * file-hash gate (974, 720 ms), all on a single 974-unit project.
+   *
+   * `rows` are `[key, ...values]` matching `[keyColumn, ...columns]`. Deduplicated on the key, last
+   * one winning, because two updates to one row inside a single statement is not defined behaviour.
+   */
+  private async updateFromValues(
+    table: string, keyColumn: string, columns: string[], rows: unknown[][]
+  ): Promise<void> {
+    if (this.readOnly || !rows.length) return;
+
+    const deduped = new Map<unknown, unknown[]>();
+    for (const row of rows) deduped.set(row[0], row);
+    const all = Array.from(deduped.values());
+
+    const width = columns.length + 1;
+    const perBatch = SynapsePersistence.batchSizeFor(width);
+    const tuple = `(${Array(width).fill('?').join(',')})`;
+    const setters = columns.map(c => `${c} = v.${c}`).join(', ');
+    const head = `UPDATE ${table} SET ${setters} FROM (VALUES `;
+    const tail = `) AS v(${keyColumn}, ${columns.join(', ')}) WHERE ${table}.${keyColumn} = v.${keyColumn}`;
+
+    for (let off = 0; off < all.length; off += perBatch) {
+      const slice = all.slice(off, off + perBatch);
+      await this.run(head + Array(slice.length).fill(tuple).join(',') + tail, slice.flat());
+    }
   }
 
   /**

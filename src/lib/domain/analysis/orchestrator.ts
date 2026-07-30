@@ -207,9 +207,11 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       // back — so there is no longer a committed-but-incomplete state for the hash gate to guard
       // against. The `incomplete` flag this used to carry was always false once that became true,
       // and a flag that cannot be set is worse than none: it reads as a check that ran.
-      for (const file of normalizedFiles) {
-        await this.persistence.setFileHash(file.path, FileHashGate.hash(file.source), Buffer.byteLength(file.source));
-      }
+      await this.persistence.setFileHashBatch(normalizedFiles.map(file => ({
+        file: file.path,
+        hash: FileHashGate.hash(file.source),
+        sizeBytes: Buffer.byteLength(file.source),
+      })));
 
       await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
 
