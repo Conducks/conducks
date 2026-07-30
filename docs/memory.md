@@ -922,3 +922,28 @@
   text is the bare verb.
 - Applies: any language where the verb can appear as a method on an object — check the capture's
   TEXT against a real framework snippet before trusting the predicate.
+
+## A backtick inside a query or SQL comment terminates the template literal
+- Gotcha: query files and the schema DDL are TypeScript template literals, so a comment written with
+  markdown-style backticks — `metadata`, `@app.get('/x')` — closes the string and produces a wall of
+  TS1005/TS1443 errors pointing at lines that look fine. Hit THREE times in one session, in
+  `persistence.ts`, `tsx/queries.ts` and `python/queries.ts`.
+- Applies: inside any template literal, write comments in plain words with no backticks. `tsc` catches
+  it, but the error names the syntax fallout rather than the cause, so it costs a rebuild each time.
+
+## Verify the BUILT output, not just that the tests passed
+- Gotcha: commit `9f0d855` claimed a narrowed `SELECT` and shipped only half of it. An earlier
+  scripted edit failed its `assert`, a later edit fixed a different line, and the suite was green
+  either way because no test covers which columns the reload fetches. The A/B then measured "7 MB,
+  noise" — a true measurement of a change that was not there.
+- Why: a green suite proves the tests still pass, not that the change exists. The claim was only
+  caught two commits later, while debugging something else.
+- Applies: after a scripted or multi-step edit, grep the change in `build/` before claiming it — the
+  build is what ran. `grep -n "<the new SQL>" build/src/...` costs seconds.
+
+## A scripted edit that asserts and then proceeds is not an edit that applied
+- Gotcha: a `python - <<'PY'` heredoc whose `assert` fails prints a traceback and returns non-zero,
+  but a following `git commit` in the same chain still runs. Twice this session a documentation
+  update was silently dropped from a commit that claimed it, and once a source edit was.
+- Applies: either check the exit status before committing, or re-read the file and confirm the text
+  is there. Anchors rot fastest when the surrounding prose was reworded earlier in the same session.
