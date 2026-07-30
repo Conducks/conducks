@@ -92,9 +92,29 @@
   .st.r { border-color: var(--live); background: var(--live-soft); color: var(--live); }
   .src { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-3); }
 
+  /* Diagrams are hand-built from CSS boxes on purpose: this file is read straight from the repo as
+     often as it is served, and a diagram that needs a script to render shows up as raw text there. */
   .diagram { background: var(--panel); border: 1px solid var(--line); border-radius: 3px;
-             padding: 1.2rem; overflow-x: auto; }
-  .diagram .mermaid { display: flex; justify-content: center; min-width: 0; }
+             padding: 1.4rem 1.2rem; overflow-x: auto; }
+  .flow { display: flex; flex-direction: column; align-items: center; min-width: 540px; }
+  .row { display: flex; gap: 0.55rem; flex-wrap: wrap; justify-content: center; align-items: stretch; }
+  .nb { border: 1px solid var(--line); border-radius: 3px; background: var(--panel-2);
+        padding: 0.45rem 0.7rem; font-family: var(--mono); font-size: 0.76rem; color: var(--ink);
+        text-align: center; line-height: 1.35; min-width: 7.5rem; }
+  .nb small { display: block; font-size: 0.68rem; color: var(--ink-3); margin-top: 0.1rem; }
+  .nb.live { border-color: var(--live); background: var(--live-soft); color: var(--live); }
+  .nb.partial { border-color: var(--partial); background: var(--partial-soft); color: var(--partial); }
+  .nb.dead { border-color: var(--dead); background: var(--dead-soft); color: var(--dead); }
+  .nb.store { border-color: var(--ink-3); background: var(--panel); border-width: 2px;
+              border-radius: 14px / 6px; min-width: 12rem; }
+  .arw { color: var(--ink-3); font-size: 0.95rem; line-height: 1; padding: 0.3rem 0; }
+  .arw.dash { opacity: 0.6; }
+  .rowlab { font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--ink-3); padding: 0.55rem 0 0.3rem; }
+  .side { display: flex; align-items: center; gap: 0.45rem; padding: 0.25rem 0; }
+  .side .tie { color: var(--ink-3); font-family: var(--mono); font-size: 0.72rem; }
+  .lost { display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--mono);
+          font-size: 0.68rem; color: var(--dead); font-weight: 600; }
 
   .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
   table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
@@ -172,66 +192,58 @@
     <p>Four entry points, three answer layers, one store. Red means it runs and its output never lands.</p>
   </div>
   <div class="diagram">
-<pre class="mermaid">
-graph TB
-  subgraph ENTRY["entry points"]
-    CLI["conducks CLI<br/>38 commands"]
-    MCP["MCP server<br/>14 tools"]
-    WATCH["watch / micro-pulse"]
-    WEB["mirror server<br/>:3333"]
-  end
+<div class="flow">
+  <div class="rowlab">entry points</div>
+  <div class="row">
+    <div class="nb">conducks CLI<small>38 commands</small></div>
+    <div class="nb">MCP server<small>14 tools</small></div>
+    <div class="nb">watch<small>micro-pulse per save</small></div>
+    <div class="nb">mirror server<small>port 3333</small></div>
+  </div>
 
-  subgraph WRITE["write path — analyze"]
-    DISC["discover<br/>git ls-files → fs walk"]
-    GATE["hash gate<br/>content sha"]
-    SKEL["skeleton L0-L3"]
-    PARSE["parse waves<br/>500 units · 13 grammars"]
-    REFL["reflector<br/>captures → spectrum"]
-    GNOSIS["reflectGnosis<br/>regex fallback"]
-    FLUSH["flush + clear<br/>per wave"]
-  end
+  <div class="arw">↓</div>
+  <div class="rowlab">write path — analyze</div>
+  <div class="row">
+    <div class="nb live">discover<small>git ls-files → fs walk</small></div>
+    <div class="nb live">hash gate<small>content sha</small></div>
+    <div class="nb live">skeleton<small>L0–L3 containment</small></div>
+    <div class="nb partial">parse waves<small>500 units · 13 grammars · 1 core</small></div>
+    <div class="nb live">flush + clear<small>per wave</small></div>
+  </div>
+  <div class="side">
+    <span class="tie">└ grammar missing ⇢</span>
+    <div class="nb dead">reflectGnosis<small>regex · py/ts/js only</small></div>
+  </div>
 
-  subgraph BIND["resonate — after last flush"]
-    RELOAD["reload<br/>columns only"]
-    NEURAL["bindNeuralCircuits"]
-    ROUTE["bindRouteCircuits"]
-    PULSE["bindPulseCircuits"]
-    RANK["PageRank<br/>30 iterations"]
-    LINK["IntraLinker · Http · Federated"]
-    VIRT["induceVirtualLibraries"]
-  end
+  <div class="arw">↓</div>
+  <div class="row"><div class="nb store">DuckDB vault<small>nodes · edges · pulses · node_history · metadata · file_hashes</small></div></div>
+  <div class="arw">↓</div>
 
-  VAULT[("DuckDB vault<br/>6 tables")]
+  <div class="rowlab">resonate — runs after the last flush</div>
+  <div class="row"><div class="nb live">reload<small>columns only, no blob</small></div></div>
+  <div class="arw">↓</div>
+  <div class="row">
+    <div class="nb live">bindRouteCircuits<small>→ saveEdges</small></div>
+    <div class="nb live">PageRank<small>→ updateRanks</small></div>
+    <div class="nb live">IntraLinker<small>→ updateEdgeTargets</small></div>
+    <div class="nb dead">bindNeuralCircuits<small>no persist call</small></div>
+    <div class="nb dead">bindPulseCircuits<small>no persist call</small></div>
+    <div class="nb dead">induceVirtualLibraries<small>no persist call</small></div>
+  </div>
+  <div class="row" style="margin-top:0.5rem">
+    <div class="nb" style="border:none;background:none">↩ back to vault</div>
+    <div class="nb" style="border:none;background:none"><span class="lost">✕ discarded at save()</span></div>
+  </div>
 
-  subgraph READ["read layers"]
-    DOCS["docs layer<br/>no engine"]
-    SQL["SQL layer<br/>no graph"]
-    GRAPH["graph layer<br/>needs full load"]
-  end
-
-  CLI --> DISC
-  WATCH --> REFL
-  DISC --> GATE --> SKEL --> PARSE --> REFL --> FLUSH
-  PARSE -.grammar missing.-> GNOSIS -.-> FLUSH
-  FLUSH --> VAULT
-  VAULT --> RELOAD --> NEURAL & ROUTE & PULSE & RANK
-  RELOAD --> LINK --> VIRT
-  ROUTE -->|explicit saveEdges| VAULT
-  RANK -->|updateRanks| VAULT
-  LINK -->|updateEdgeTargets| VAULT
-  NEURAL -.->|lost| X1(("✕"))
-  PULSE -.->|lost| X2(("✕"))
-  VIRT -.->|lost| X3(("✕"))
-  VAULT --> SQL --> CLI
-  VAULT --> GRAPH --> CLI & MCP
-  DOCS --> CLI & MCP
-  VAULT --> WEB
-
-  classDef dead fill:#F6E3DD,stroke:#A8503A,color:#161B1F
-  classDef lost fill:#A8503A,stroke:#A8503A,color:#fff
-  class NEURAL,PULSE,VIRT,GNOSIS dead
-  class X1,X2,X3 lost
-</pre>
+  <div class="arw">↓</div>
+  <div class="rowlab">read layers</div>
+  <div class="row">
+    <div class="nb live">docs layer<small>no engine, no vault</small></div>
+    <div class="nb live">SQL layer<small>vault, no graph</small></div>
+    <div class="nb partial">graph layer<small>needs the full load</small></div>
+    <div class="nb partial">web mirror<small>full refetch per pulse</small></div>
+  </div>
+</div>
   </div>
   <div class="callout">
     <strong>Three binders write to memory after the last flush.</strong> <code>resonate()</code> runs
@@ -257,35 +269,50 @@ graph TB
     <p>Where a symbol comes from and every branch that can swallow it.</p>
   </div>
   <div class="diagram">
-<pre class="mermaid">
-graph LR
-  SRC["source file"] --> EXT{"extension has<br/>a provider?"}
-  EXT -->|no| DROP(("dropped<br/>silently"))
-  EXT -->|yes| GRAM{"grammar<br/>loads?"}
-  GRAM -->|no| RGX["regex fallback<br/>py/ts/js only"]
-  GRAM -->|yes| Q["tree-sitter query<br/>per language"]
-  RGX --> SPEC
-  Q --> P1["CallProcessor"] & P2["HeritageProcessor"] & P3["BindingProcessor"] & P4["FlowProcessor"] & P5["ImportProcessor"]
-  P1 --> SPEC["spectrum<br/>nodes + relationships"]
-  P2 --> SPEC
-  P3 --> SPEC
-  P4 --> SPEC
-  P5 --> RES{"import<br/>resolves?"}
-  RES -->|exact| SPEC
-  RES -->|basename guess| SPEC
-  RES -->|no| NOEDGE(("no edge"))
-  SPEC --> ING["ingestSpectrum"]
-  ING --> LOCAL{"target is a<br/>known symbol?"}
-  LOCAL -->|yes| EDGE["edge to node"]
-  LOCAL -->|no| DANG["edge to bare name"]
-  EDGE --> V[("vault")]
-  DANG --> V
+<div class="flow">
+  <div class="row"><div class="nb">source file</div></div>
+  <div class="arw">↓</div>
+  <div class="row"><div class="nb">extension has a provider?</div></div>
+  <div class="side">
+    <span class="tie">└ no ⇢</span>
+    <div class="nb dead">dropped<small>no result, no error, no log</small></div>
+  </div>
+  <div class="arw">↓ yes</div>
 
-  classDef bad fill:#A8503A,stroke:#A8503A,color:#fff
-  classDef guess fill:#F5EAD1,stroke:#8A6716,color:#161B1F
-  class DROP,NOEDGE bad
-  class RGX,DANG guess
-</pre>
+  <div class="row"><div class="nb">grammar loads?</div></div>
+  <div class="side">
+    <span class="tie">└ no ⇢</span>
+    <div class="nb partial">regex fallback<small>guesses structure</small></div>
+  </div>
+  <div class="arw">↓ yes</div>
+
+  <div class="row"><div class="nb live">tree-sitter query<small>per language</small></div></div>
+  <div class="arw">↓ captures</div>
+  <div class="row">
+    <div class="nb">CallProcessor<small>CALLS · CONSTRUCTS</small></div>
+    <div class="nb">HeritageProcessor<small>EXTENDS · IMPLEMENTS</small></div>
+    <div class="nb">BindingProcessor<small>ALIASES</small></div>
+    <div class="nb">FlowProcessor<small>ACCESSES · routes</small></div>
+    <div class="nb">ImportProcessor<small>IMPORTS</small></div>
+  </div>
+  <div class="side">
+    <span class="tie">└ import unresolved ⇢</span>
+    <div class="nb partial">basename match<small>first in path order</small></div>
+    <span class="tie">or ⇢</span>
+    <div class="nb dead">no edge</div>
+  </div>
+
+  <div class="arw">↓</div>
+  <div class="row"><div class="nb live">spectrum<small>nodes + relationships</small></div></div>
+  <div class="arw">↓ ingestSpectrum</div>
+  <div class="row"><div class="nb">target is a known symbol?</div></div>
+  <div class="row" style="margin-top:0.45rem">
+    <div class="nb live">yes → edge to node<small>6,610 in this vault</small></div>
+    <div class="nb dead">no → edge to bare name<small>6,808 in this vault</small></div>
+  </div>
+  <div class="arw">↓ both are written</div>
+  <div class="row"><div class="nb store">vault</div></div>
+</div>
   </div>
   <div class="callout">
     <strong>Half the edges end at <code>DANG</code>.</strong> 6,808 of 13,418 edges in this repo's
