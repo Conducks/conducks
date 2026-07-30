@@ -900,3 +900,25 @@
 - Why: `ConducksGraph.lastResonanceEdges` now collects them and the pulse calls `saveEdges`.
 - Applies: any new binder added to `resonate()` inherits this. Assert the edge is in the VAULT
   after a pulse, not that the binder ran.
+
+## Route detection is CENTRAL — a grammar points, the reflector decides
+- Gotcha: all ten grammars already captured `@kinesis_route_path`, but the reflector branched on a
+  separate `@kinesis_route` tag that only TypeScript and TSX carried. That redundant second tag is
+  the entire reason route detection was dead in eight languages. The reflector now triggers on the
+  PATH capture and normalises the verb centrally — `GetMapping` to GET, `HandleFunc` to GET.
+- Why: the query cannot be shared (node types differ per grammar: `call` vs `call_expression`,
+  `string` vs `string_literal` vs `interpreted_string_literal`, decorators vs annotations), but the
+  SEMANTICS are identical everywhere and belong in one place. Adding a language means adding a
+  pattern, never a branch.
+- Applies: verified with one fixture covering Go `http.HandleFunc`, Java `@GetMapping`, Flask
+  `@app.get` and Ruby `get` — six routes, correct verbs, no per-language logic.
+- Applies: the REQUEST half is still TypeScript-only (`@kinesis_request_url` exists nowhere else).
+  Routes working in a language does not mean cross-service binding works there.
+
+## A verb captured as dotted text will not match `^get$`
+- Gotcha: Python's route pattern matched `@infra_method` against `^(get|post|...)$`, but Flask's
+  `@app.get('/x')` gives the capture the text `app.get`, so it never matched — the pattern only
+  worked for a bare `@get('/x')`, which nobody writes. Capture the ATTRIBUTE node instead, whose
+  text is the bare verb.
+- Applies: any language where the verb can appear as a method on an object — check the capture's
+  TEXT against a real framework snippet before trusting the predicate.

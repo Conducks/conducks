@@ -28,6 +28,20 @@ import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js
 /** A tree-sitter `(string)` capture keeps its delimiters; route and URL comparisons must not. */
 const stripQuotes = (v: string): string => v.replace(/^['"`]|['"`]$/g, '');
 
+/**
+ * Turn whatever a grammar calls the HTTP verb into the verb.
+ *
+ * Each language names its own route construct — Spring's `@GetMapping`, Go's `HandleFunc`, Flask's
+ * `@app.route`, Rails' `resources` — but the VERB those imply is not language-specific, so the
+ * mapping belongs here rather than in ten query files. Anything unrecognised stays as-is and is
+ * uppercased, which keeps an unknown framework matching itself rather than silently becoming GET.
+ */
+const normalizeHttpMethod = (raw: string | undefined): string => {
+  const v = (raw ?? 'GET').replace(/Mapping$|Attribute$/, '').toUpperCase();
+  if (v === 'REQUEST' || v === 'ROUTE' || v === 'HANDLEFUNC' || v === 'HANDLE') return 'GET';
+  return v;
+};
+
 export class ConducksReflector implements ConducksComponent {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
@@ -547,11 +561,14 @@ export class ConducksReflector implements ConducksComponent {
           const scopeName = getScopeAt(currentMatchRow);
           this.flow.processAssignment(cText, val, scopeName, spectrum);
         }
-        else if (cName === 'kinesis_route') {
-          // A `(string)` capture includes its quotes, so `'/users/profile'` arrives with them and
-          // would never equal a request URL captured the same way. Strip once, here and below.
-          const pathReg = stripQuotes(captureMap['kinesis_route_path'] ?? '/');
-          const method = captureMap['route_method'] ?? 'GET';
+        // Triggered by the PATH capture, which all ten grammars already emit, rather than by a
+        // separate @kinesis_route tag that only TypeScript and TSX carried. The grammar's job is to
+        // point at a route path and its verb; turning that into a node is this layer's job, and
+        // demanding a second redundant tag is what left eight languages silently dead (todo22#P15).
+        // @route_method is the TS/TSX capture name, @infra_method the one every other grammar uses.
+        else if (cName === 'kinesis_route_path') {
+          const pathReg = stripQuotes(cText);
+          const method = normalizeHttpMethod(captureMap['route_method'] ?? captureMap['infra_method']);
           const scopeName = getScopeAt(currentMatchRow);
           this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework());
 
@@ -562,9 +579,9 @@ export class ConducksReflector implements ConducksComponent {
             targetNode.metadata.isEntryPoint = true;
           }
         }
-        else if (cName === 'kinesis_request') {
-          const url = stripQuotes(captureMap['kinesis_request_url'] ?? '/');
-          const method = captureMap['req_method'] ?? 'GET';
+        else if (cName === 'kinesis_request_url') {
+          const url = stripQuotes(cText);
+          const method = normalizeHttpMethod(captureMap['req_method'] ?? captureMap['kinesis_method']);
           const scopeName = getScopeAt(currentMatchRow);
           // The RECEIVER is what tells `processRequest` this is genuinely a network call. Omitting
           // it left the gate with no evidence for a relative URL, so every `fetch('/path')` was

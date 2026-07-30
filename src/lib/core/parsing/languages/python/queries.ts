@@ -43,6 +43,16 @@ export const PYTHON_QUERIES = `
   (type (binary_operator left: (attribute) @pulse_type_target right: (identifier) @pulse_type_target))
   (type (binary_operator left: (identifier) @pulse_type_target right: (attribute) @pulse_type_target))
 
+  ;; Flask/FastAPI @app.get('/path') — the verb is the ATTRIBUTE, so it is captured directly rather
+  ;; than regex-matched against the dotted text app.get. The pattern below only matched a bare
+  ;; @get('/path'), which is not how either framework is written, so Python routes were never
+  ;; captured (todo22#P15). Probed against the real grammar before being added.
+  (decorator
+    (call
+      function: (attribute attribute: (identifier) @infra_method
+        (#match? @infra_method "^(get|post|put|delete|patch|route)$"))
+      arguments: (argument_list . (string) @kinesis_route_path))) @isInfra
+
   ;; --- Infrastructure (L4: Entry Points & Metadata) ---
   (decorator
     [(call
