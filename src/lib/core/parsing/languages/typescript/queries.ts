@@ -115,6 +115,16 @@ export const TYPESCRIPT_QUERIES = `
   ;; --- Pulse Flow (Assignments) ---
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
 
+  ;; --- Pulse Flow (declarations) ---
+  ;; A const declaration with a call value is how a handover is almost always written in
+  ;; TS/JS, and only assignment_expression (a REassignment) was captured — so
+  ;; bindPulseCircuits had nothing to bind on idiomatic code and the vault held zero
+  ;; PULSES_TO edges on every project. Scoped to a call value on purpose: a literal
+  ;; initialiser is not a handover and would be noise.
+  (variable_declarator
+    name: (identifier) @pulse_assignment_name
+    value: (call_expression) @pulse_assignment_value)
+
   ;; --- Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps) ---
   ;; The value identifier is a USE of that symbol, not a call. Feeds the reference-as-value path.
   (pair value: (identifier) @ref_value)

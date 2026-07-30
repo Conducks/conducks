@@ -1006,3 +1006,13 @@
   `helpers.ensureBuild()` only builds when `build/` is missing — it will happily run an integration
   test against a stale build, which is how the same test appeared to pass before the fix was
   compiled. `grep` the fix in `build/` before trusting an integration run.
+
+## Backticks inside a tree-sitter query template literal — the fourth time
+- Gotcha: `languages/*/queries.ts` hold the SCM query in a template literal, so a backtick anywhere
+  in a comment INSIDE it terminates the string. `tsc` reports `';' expected` on the following line,
+  which points at the pattern rather than at the comment that broke it.
+- Why: it has now happened in `persistence.ts`, `tsx/queries.ts`, `python/queries.ts` and
+  `typescript/queries.ts`. Three of the four were prose comments quoting a code fragment — exactly
+  what a careful comment tends to contain.
+- Applies: write those comments with no backticks at all. If a code fragment must be quoted, name it
+  in words ("a const declaration with a call value") rather than in backticks.

@@ -136,14 +136,21 @@ export class ConducksGraph {
         for (const arg of args) {
           const producer = producersByName.get(arg);
           if (producer) {
-            this.graph.addEdge({
+            // Collected, not just added. `bindPulseCircuits` runs after the last wave flush like
+            // every other binder, so an edge that is only added to the in-memory graph is dropped
+            // when the pulse commits — the vault held 0 PULSES_TO rows on every project. The
+            // caller persists `lastResonanceEdges`; this is the same remedy bindResonance already
+            // uses, and the name is now a misnomer for "edges the binders built".
+            const edge: ConducksEdge = {
               id: `PULSE::${producer.targetId}->${call.id}`,
               sourceId: producer.targetId,
               targetId: call.targetId,
-              type: 'PULSES_TO' as any,
+              type: 'PULSES_TO',
               confidence: 0.7,
               properties: { reason: 'handover', variable: arg }
-            });
+            };
+            this.graph.addEdge(edge);
+            this.lastResonanceEdges.push(edge);
           }
         }
       }

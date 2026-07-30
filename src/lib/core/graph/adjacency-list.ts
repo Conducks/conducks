@@ -6,7 +6,10 @@
  */
 
 export type NodeId = string;
-export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY';
+// PULSES_TO used to be written as `'PULSES_TO' as any` because it was missing here. A cast is how
+// an edge type stays invisible to every exhaustive switch over EdgeType, and it is part of why
+// nothing noticed the vault held none of them.
+export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY' | 'PULSES_TO';
 
 /**
  * Structural containment edges — they express "X is defined inside Y", NOT "X depends on Y".
