@@ -33,7 +33,12 @@ export class MetricsService implements ConducksComponent {
     const node = g.getNode(symbolId);
     if (!node || !node.properties.filePath) return { entropy: 0, risk: 0, authorCount: 0 };
 
-    const distribution = (await chronicle.getAuthorDistribution(node.properties.filePath)) || {};
+    const distribution = await chronicle.getAuthorDistribution(node.properties.filePath);
+    // A null distribution is "git could not be read", not "one careful owner". Reporting risk 0
+    // for it made the least-known file look like the safest one on the board.
+    if (distribution === null) {
+      return { entropy: 0, risk: 0, authorCount: 0, unavailable: true };
+    }
     const authors = Object.keys(distribution);
     const entropy = calculateShannonEntropy(distribution);
     const risk = normalizeEntropyRisk(entropy, authors.length || 1);

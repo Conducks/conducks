@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
@@ -13,7 +14,13 @@ export class DriftCommand implements ConducksCommand {
   public usage = "conducks drift [prevPulseId]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
-    const prevPulseId = args.find(a => !a.startsWith('--'));
+    // The dispatcher ALSO reads the first positional as the target root, so `conducks drift <path>`
+    // used to pass the path in here as a pulse id — the run then reported "check that node_history
+    // holds rows for pulse /private/tmp/...". A pulse id is `pulse_<ms>_<suffix>`; anything that
+    // is a directory on disk is the caller retargeting the project, not naming a pulse.
+    const positional = args.find(a => !a.startsWith('--'));
+    const looksLikeAPath = !!positional && (positional.includes('/') || fs.existsSync(positional));
+    const prevPulseId = looksLikeAPath ? undefined : positional;
 
     try {
       console.log(`\n\x1b[1m--- 🕵️‍♂️ Conducks Architectural Drift Analysis ---\x1b[0m`);

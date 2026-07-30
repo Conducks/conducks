@@ -182,11 +182,13 @@ export class Conducks implements ConducksComponent {
     return this.advisor.analyze(this.graph.getGraph(), cochangeFindings);
   }
 
-  public async calculateEntropy(symbolId: string): Promise<{ entropy: number, risk: number }> {
+  public async calculateEntropy(symbolId: string): Promise<{ entropy: number, risk: number, unavailable?: boolean }> {
     const graph = this.graph.getGraph();
     const node = graph.getNode(symbolId);
     if (!node || !node.properties.filePath) return { entropy: 0, risk: 0 };
     const distribution = await chronicle.getAuthorDistribution(node.properties.filePath);
+    // Null is "git could not be read". Scoring it 0 risk put the least-known file at the safe end.
+    if (distribution === null) return { entropy: 0, risk: 0, unavailable: true };
     const entropy = calculateShannonEntropy(distribution);
     const risk = normalizeEntropyRisk(entropy, Object.keys(distribution).length);
     return { entropy, risk };

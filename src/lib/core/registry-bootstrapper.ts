@@ -93,9 +93,14 @@ export class RegistryBootstrapper {
       }
     }
     
-    // If we've reached the system root without finding a marker, 
-    // fallback to the explicitly requested startPath or process.cwd()
-    return startPath ? path.resolve(startPath) : process.cwd();
+    // Reached the system root without finding a marker. The fallback stands — refusing here would
+    // break a scratch directory, a fresh checkout before its manifest exists, and every test
+    // fixture — but it is now SAID OUT LOUD. Silently anchoring to cwd is the shape that once let
+    // a stray vault in `/private/tmp` claim 2,323 unrelated files: the analyze looked normal
+    // throughout, because nothing on the way in ever named the directory it had chosen.
+    const chosen = startPath ? path.resolve(startPath) : process.cwd();
+    logger.warn(`🛡️ [Conducks] No project marker found above ${chosen} — no .conducks, .git, package.json, tsconfig.json, go.mod, Cargo.toml, pyproject.toml, requirements.txt or composer.json. Anchoring HERE by fallback. If that is not your project root, pass the path explicitly.`);
+    return chosen;
   }
 
   /**

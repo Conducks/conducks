@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import path from 'node:path';
+import { logger } from '@/lib/core/utils/logger.js';
 
 /**
  * Non-code files the FS fallback still ingests. No language provider declares these — they carry
@@ -190,10 +191,20 @@ export class ChronicleInterface {
   public async *streamBatches(filePaths: string[], batchSize: number = 20, fromIndex: boolean = false): AsyncGenerator<Array<{ path: string, source: string }>> {
     for (let i = 0; i < filePaths.length; i += batchSize) {
       const chunk = filePaths.slice(i, i + batchSize);
-      const batch = await Promise.all(chunk.map(async (f) => {
+      const read = await Promise.all(chunk.map(async (f) => {
         const source = await this.readSingleFile(f, fromIndex);
         return { path: f, source };
       }));
+      // An unreadable file is DROPPED rather than passed on as empty source. It used to arrive at
+      // the parser as a valid empty file: hashed, recorded in the gate, and given a unit node with
+      // no symbols — so a permissions error looked exactly like a blank file, and the hash gate
+      // then skipped it on every later run.
+      const batch = read.filter((r): r is { path: string; source: string } => r.source !== null);
+      const dropped = read.length - batch.length;
+      if (dropped > 0) {
+        const names = read.filter(r => r.source === null).map(r => r.path);
+        logger.warn(`🛡️ [Conducks] Skipped ${dropped} unreadable file(s): ${names.join(', ')}`);
+      }
       yield batch;
     }
   }
@@ -212,14 +223,18 @@ export class ChronicleInterface {
   /**
    * Reads the "Essence" (content) of a single file. (Primitive)
    */
-  private async readSingleFile(filePath: string, fromIndex: boolean): Promise<string> {
+  // NULL when the file could not be read; '' only when the file is genuinely empty. Returning ''
+  // for both meant an unreadable file entered the parse path as valid empty source, was hashed,
+  // and produced a unit node with no symbols — indistinguishable from a real empty file, and
+  // recorded in the gate as successfully analysed.
+  private async readSingleFile(filePath: string, fromIndex: boolean): Promise<string | null> {
     if (!fromIndex) {
       const fs = await import('node:fs/promises');
-      return fs.readFile(filePath, 'utf-8').catch(() => '');
+      return fs.readFile(filePath, 'utf-8').catch(() => null);
     }
 
     if (!this.isInsideProject(filePath)) {
-      return '';
+      return null;
     }
 
     try {
@@ -236,15 +251,18 @@ export class ChronicleInterface {
       const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] });
       return output as string;
     } catch {
-      return '';
+      return null;
     }
   }
 
   /**
    * Reads the "Essence" (content) of a file from the Git index or workspace.
    */
+  // Keeps returning '' for an unreadable file, deliberately: this is the single-file reader used
+  // by callers that want content or nothing, and they have always treated '' that way. The PULSE
+  // path is the one that must not confuse the two, and it uses streamBatches, which now drops them.
   public async readFile(filePath: string, fromIndex: boolean = false): Promise<string> {
-    return this.readSingleFile(filePath, fromIndex);
+    return (await this.readSingleFile(filePath, fromIndex)) ?? '';
   }
 
   /**
@@ -306,9 +324,12 @@ export class ChronicleInterface {
    * Conducks — Authorship Distribution
    * Calculates the commit count per unique author for Shannon Entropy analysis.
    */
-  public async getAuthorDistribution(filePath: string): Promise<Record<string, number>> {
+  // NULL when git could not be read; an EMPTY MAP when it was read and the file has no authors.
+  // Both used to be `{}`, and the two produce identical entropy (0) and identical risk (0) — so an
+  // unreadable file scored as a perfectly-owned one, which is the safest-looking answer available.
+  public async getAuthorDistribution(filePath: string): Promise<Record<string, number> | null> {
     if (!this.isInsideProject(filePath)) {
-      return {};
+      return null;
     }
 
     try {
@@ -331,7 +352,7 @@ export class ChronicleInterface {
       }
       return distribution;
     } catch (err) {
-      return {};
+      return null;
     }
   }
 

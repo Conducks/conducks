@@ -57,8 +57,9 @@ describe('ChronicleInterface Unit Tests 📜', () => {
 
       const dist = await chronicle.getAuthorDistribution('src/utils.ts');
 
-      expect(dist['alice@dev.com']).toBe(2);
-      expect(dist['bob@dev.com']).toBe(1);
+      expect(dist).not.toBeNull();
+      expect(dist!['alice@dev.com']).toBe(2);
+      expect(dist!['bob@dev.com']).toBe(1);
     });
 
     it('should parse porcelain blame data into symbol metadata', async () => {
@@ -95,5 +96,37 @@ describe('ChronicleInterface Unit Tests 📜', () => {
       expect(chronicle.getCommitsBehind('oldhash')).toBe(5);
       expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('rev-list oldhash..HEAD'), expect.anything());
     });
+  });
+});
+
+describe('git failure is distinguishable from a genuine zero', () => {
+  // Own setup: the block above scopes `mockExec` to its describe. Paths must sit INSIDE the mock
+  // project, or `isInsideProject` short-circuits and these would pass without git ever failing.
+  const projectDir = '/mock/project';
+  const inProject = path.join(projectDir, 'src/utils.ts');
+  let exec: jest.Mock;
+  let git: ChronicleInterface;
+
+  beforeEach(() => {
+    exec = jest.fn(() => { throw new Error('not a git repository'); });
+    git = new ChronicleInterface(projectDir, exec as any);
+  });
+
+  it('returns null commits-behind when git cannot be read, not 0', () => {
+    // 0 is also the value for "you are current", and 0 is what silences the staleness banner — so
+    // returning it here made the one case that needs reporting look like the healthy case.
+    expect(git.getCommitsBehind('abc123')).toBeNull();
+  });
+
+  it('returns null author distribution when git cannot be read, not an empty map', async () => {
+    // An empty map and a failure both produce entropy 0 and risk 0, so an unreadable file scored
+    // as a perfectly-owned one — the safest-looking answer available.
+    await expect(git.getAuthorDistribution(inProject)).resolves.toBeNull();
+  });
+
+  it('flags commit resonance as unavailable rather than reporting no history', async () => {
+    const res = await git.getCommitResonance(inProject);
+    expect(res.unavailable).toBe(true);
+    expect(res.count).toBe(0);
   });
 });
