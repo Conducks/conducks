@@ -18,6 +18,19 @@ the store, not the diff.
 Also: `guard` reported a green pass on this vault for weeks while comparing zero symbols, and that
 result was cited as a passing gate several times. It now says NOT ASSESSED.
 
+The vault was rebuilt from scratch on 30 Jul, so its numbers are current rather than accumulated:
+5,277 nodes, 14,768 edges, and **53 dangling edges against 6,808 at the start of the day**. The old
+file is parked outside the repo rather than deleted. Four causes were fixed and measured — alias
+specifiers stored raw (817), `node:` builtins and npm packages excluded by an exact-match prefix list
+(574), regex-literal and chained-call receivers captured as symbols (169). `drift` now compares 5,233
+symbols where it used to compare none.
+
+Next, and NOT started: `conducks audit` reports 97 violations of one sentinel rule and essentially
+all of them are false — `matchLabel: STRUCTURE` matches 55 interfaces and 42 structs under
+`src/lib/domain/`, and demands each implement `ConducksComponent`. A gate that cries wolf 97 times is
+ignored exactly as thoroughly as one that reports a false green, which is the same failure this
+session has been closing from the other side.
+
 ## Earlier — the vault crash
 The duplicate-key vault crash is root-caused and structurally fixed. It is a DuckDB bug
 (duckdb/duckdb#2241, #16520, #16604) hit by delete+insert of a primary key inside one transaction

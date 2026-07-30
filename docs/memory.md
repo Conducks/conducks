@@ -1016,3 +1016,33 @@
   what a careful comment tends to contain.
 - Applies: write those comments with no backticks at all. If a code fragment must be quoted, name it
   in words ("a const declaration with a call value") rather than in backticks.
+
+## Virtual induction was manufacturing the nodes that made its own edges resolve
+- Gotcha: `induceVirtualLibraries` creates a node for any edge target the graph does not contain. It
+  was doing that for expression fragments — `dumpdb().catch`, `path.join(x, y).toLowerCase`,
+  `/\/architecture\//.test` — because `CallProcessor` was capturing them as call targets. Of 3,093
+  such edges, 2,953 RESOLVED, every one to a `library_symbol` node induction had itself created for
+  that same fragment. Every paren-containing node id in the vault was one of these: 1,313 of them.
+- Why: the dangling-edge count could never have shown it, because the junk resolved. A metric read
+  healthy exactly where the system was inventing its own evidence — the same shape as a test that
+  asserts on a surface the bug does not touch.
+- Applies: when a component's job is to CREATE the thing that makes a check pass, that check cannot
+  also be its measure of success. Count the inputs it was given, not the gaps it closed. — todo24#P5
+
+## `pulseId` on a node means FIRST seen, not last — so a sweep by pulseId deletes live rows
+- Gotcha: the obvious fix for stale rows is "delete anything whose pulseId is not the newest". It is
+  wrong. Two pulses into a freshly built vault there are already two ids: 3,624 nodes re-stamped by
+  the wave flush, and 1,653 induced nodes still carrying the pulse that first created them.
+  Induction skips a target the reloaded graph already holds, so it never re-stamps those rows.
+- Applies: before sweeping by a column, check what the column means on every row, not on the rows
+  the sweep was designed around. A sweep here needs "not seen this run" to be distinguishable from
+  "not re-written this run", which is a change to what pulseId means and belongs in an ADR.
+
+## An exact-match list of external prefixes cannot classify real module specifiers
+- Gotcha: `externalPrefixes = ['global','npm','std','pip','gem','mvn','go','crates']` was checked
+  against the namespace of an edge target. Real specifiers carry the PACKAGE there:
+  `@jest/globals::jest.fn`, `minimatch::minimatch`, `node:fs::readdirsync`. The list matched almost
+  nothing, so 574 edges into node builtins and npm packages stayed dangling.
+- Applies: local ids are absolute paths, so the property that actually separates them is whether the
+  namespace LOOKS LIKE A PATH. Reach for the invariant, not for an enumeration of the cases you
+  happen to have seen — the enumeration is what goes stale.

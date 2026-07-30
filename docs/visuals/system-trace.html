@@ -542,27 +542,28 @@
   </div>
   <div class="scroll">
     <table>
-      <thead><tr><th>edge type</th><th>count</th><th>dangling</th><th>confidence</th><th>reading</th></tr></thead>
+      <thead><tr><th>edge type</th><th>count</th><th>was</th><th>reading</th></tr></thead>
       <tbody>
-        <tr><td><code>CALLS</code></td><td class="n">6,760</td><td class="n">5,559</td><td class="n">0.85</td><td>82% point at nothing</td></tr>
-        <tr><td><code>MEMBER_OF</code></td><td class="n">2,432</td><td class="n">4</td><td class="n">1.00</td><td>containment, sound</td></tr>
-        <tr><td><code>IMPORTS</code></td><td class="n">1,522</td><td class="n">28</td><td class="n">0.90–1.00</td><td>the resolver works</td></tr>
-        <tr><td><code>TYPE_REFERENCE</code></td><td class="n">911</td><td class="n">650</td><td class="n">0.85</td><td>mostly external types</td></tr>
-        <tr><td><code>ACCESSES</code></td><td class="n">638</td><td class="n">9</td><td class="n">0.80–1.00</td><td>sound</td></tr>
-        <tr><td><code>CONSTRUCTS</code></td><td class="n">602</td><td class="n">458</td><td class="n">0.85</td><td>76% dangling</td></tr>
-        <tr><td><code>DEPENDS_ON</code></td><td class="n">450</td><td class="n">0</td><td class="n">1.00</td><td>from manifests</td></tr>
-        <tr><td><code>IMPLEMENTS</code> / <code>EXTENDS</code></td><td class="n">84 / 19</td><td class="n">83 / 17</td><td class="n">1.00</td><td>nearly all point at external types</td></tr>
-        <tr><td><code>PULSES_TO</code>, resonance, fuzzy</td><td class="n">0</td><td class="n">—</td><td class="n">—</td><td>absent entirely</td></tr>
+        <tr><td><code>CALLS</code></td><td class="n">5,344</td><td class="n">6,760</td><td>lower on purpose — 3,093 were literal or expression receivers that named no symbol</td></tr>
+        <tr><td><code>MEMBER_OF</code></td><td class="n">3,548</td><td class="n">2,432</td><td>containment</td></tr>
+        <tr><td><code>ACCESSES</code></td><td class="n">1,833</td><td class="n">638</td><td>const declarations are captured now, not only re-assignments</td></tr>
+        <tr><td><code>IMPORTS</code></td><td class="n">1,568</td><td class="n">1,522</td><td>aliases resolve</td></tr>
+        <tr><td><code>TYPE_REFERENCE</code></td><td class="n">922</td><td class="n">911</td><td>TS, TSX and Go only</td></tr>
+        <tr><td><code>CONSTRUCTS</code></td><td class="n">624</td><td class="n">602</td><td>11% land on a non-type — measured, deferred</td></tr>
+        <tr><td><code>DEPENDS_ON</code></td><td class="n">458</td><td class="n">450</td><td>from manifests</td></tr>
+        <tr><td><code>PULSES_TO</code></td><td class="n">352</td><td class="n">0</td><td>was built and discarded on every pulse</td></tr>
+        <tr><td><code>IMPLEMENTS</code> / <code>EXTENDS</code></td><td class="n">84 / 19</td><td class="n">84 / 19</td><td>still low — C++, C# and PHP capture no heritage at all</td></tr>
+        <tr><td><code>DEFINES</code></td><td class="n">14</td><td class="n">0</td><td>route definitions</td></tr>
       </tbody>
     </table>
   </div>
   <div class="cards" style="margin-top:0.4rem">
-    <div class="card"><h3>2,465 nodes · 13,418 edges</h3><p>but the latest pulse record claims <strong>6,864 / 17,897</strong> — the counters sum per wave while <code>nodes.id</code> is a primary key, so re-flushed rows are counted repeatedly.</p></div>
-    <div class="card"><h3>3 pulse ids coexist</h3><p>2,435 rows from the current pulse, 28 from one older, 2 from another. Old rows are never swept.</p></div>
+    <div class="card"><h3>53 dangling edges</h3><p>from <strong>6,808</strong>. Four causes, each measured: aliases stored raw (817), <code>node:</code> and npm namespaces excluded by an exact-match list (574), literal and chained receivers captured as symbols (169).</p></div>
+    <div class="card"><h3>pulseId means FIRST seen</h3><p>so the obvious sweep for stale rows would delete every valid external symbol. Two pulses into a clean vault: 3,624 re-stamped, 1,653 induced rows still carrying the pulse that created them.</p></div>
     <div class="card"><h3><code>layer_path</code></h3><p>holds <code>../../../../../../users/…/persistence.ts/run</code> — a lowercased machine-specific path, not a layer. 332 rows null.</p></div>
     <div class="card"><h3>1 <code>class</code> node</h3><p>against 163 <code>struct</code> and 621 <code>method</code>, in a TypeScript codebase. Classes are landing as <code>struct</code>.</p></div>
   </div>
-  <p class="note"><span class="st">queried</span> <span class="src">30 Jul 2026 · vault written 29 Jul</span></p>
+  <p class="note"><span class="st">queried</span> <span class="src">30 Jul 2026, against a vault rebuilt from scratch that same day — every row from one pulse, no accumulated history</span></p>
 </section>
 
 <section>
