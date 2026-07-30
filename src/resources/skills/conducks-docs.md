@@ -31,6 +31,7 @@ Inside a governed doc `###` still opens nothing — §5.1.)
 | write a todo | §6.7 shape · **§6.8 what a task says** · §6.9 unanswered questions · §6.10 sizing |
 | write an ADR | §6.6 — including where an open question goes |
 | write features, architecture, a MODULE.md, conventions or memory | §6.1–§6.5 |
+| draw a diagram, or anything someone will LOOK at | §6.13 — and stamp every claim with how it was checked |
 | close a todo or accept an ADR | §6.10 "On close" · §8 promote-on-close |
 | run or read the tooling | §7 |
 
@@ -66,7 +67,7 @@ Write it the turn you decide it: a choice → ADR, a trap → `memory.md`, work 
 
 | | living — overwrite in place | record — frozen |
 |---|---|---|
-| | `features` `architecture` `modules/` `conventions` `memory` `handover` | `decisions/` `todos/` |
+| | `features` `architecture` `modules/` `visuals/` `conventions` `memory` `handover` | `decisions/` `todos/` |
 
 A record's only permitted mutation is a **stamp**: a status line, or a pointer to where truth moved.
 Changing its reasoning or outcome is forbidden.
@@ -104,6 +105,7 @@ docs/
 ├── conventions.md    binding rules, IDed, with reasons          living
 ├── memory.md         traps the code cannot show                 living
 ├── modules/          one note per module                        living
+├── visuals/          rendered pictures — ONLY when asked for    living
 ├── decisions/        one ADR per numbered file                  record
 ├── todos/            todoNN.md + completed/                     record
 ├── handover.md       snapshot for the next session              living, dated
@@ -124,6 +126,7 @@ docs/                    ROOT — what no single service owns
 ├── conventions.md       rules the whole codebase follows      ROOT ONLY
 ├── memory.md            traps that span services              ROOT ONLY
 ├── handover.md                                                ROOT ONLY
+├── visuals/             rendered pictures, ONLY when asked      ROOT ONLY
 ├── decisions/           ADRs for seams
 ├── todos/               epics for codependent work only
 └── <soft>/              product/ business/ design/ — ROOT ONLY, never inside a service
@@ -143,6 +146,7 @@ app/docs/                SERVICE — same for admin, database, packages/*
 | `features.md` | index only, no facts | the facts | root links down; a fact is in exactly one |
 | `architecture.md` | the service graph | that service's module graph | same shape, one altitude apart |
 | `modules/` | — | yes | root has no modules; it owns no code |
+| `visuals/` | yes | **never** | — |
 | `decisions/` | seam ADRs | that service's ADRs | numbered per tree; cross-tree refs are `app:0014` (§4) |
 | `todos/` | codependent epics only | that service's work | epic points down, slice points up |
 | `conventions.md` | yes | **never** | — |
@@ -166,6 +170,7 @@ to arrive. An empty `docs/` gives the next reader nothing to find and nowhere to
 |---|---|
 | `features.md`, `architecture.md`, `handover.md` (root only) | `modules/<path>/MODULE.md` — one per module that earns a note |
 | `decisions/`, `todos/` (folders) | `conventions.md`, `memory.md` (root only) — once there is a rule or a trap |
+| — | `visuals/` (root only) — **only when someone asks for a picture**, never to fill the set (§6.13) |
 
 `conducks bootstrap-docs [name]` writes the root set; `--service` writes the service set. A file with
 one placeholder entry is correct; a file that does not exist is not. Never create `progress.md`,
@@ -325,8 +330,10 @@ only as a `Status:`, a `- Key: value`, or a `- [ ]`. **There is no fourth way.**
 ### §5.4 What docs-lint fails on
 
 **Only six types are linted:** `todos` · `decisions` · `features` · `conventions` · `memory` ·
-`handover`. `architecture.md`, `MODULE.md` and the soft folders are parsed but NOT grammar-checked —
-a broken heading there fails nothing, so the structures above are conventions you keep, not gates.
+`handover`. `architecture.md`, `MODULE.md`, `visuals/` and the soft folders are parsed but NOT
+grammar-checked — a broken heading there fails nothing, so the structures above are conventions you
+keep, not gates. Nothing catches a `visuals/` file going stale but a reader, which is why §6.13 makes
+it carry its own provenance.
 
 **`docs-lint` FAILS the gate on:** a missing `# Title` · a missing `Status:` on a todo, decision or
 handover · a `Status:` outside its file's vocabulary · a wrapped value · a todo with no `## Phase N`
@@ -687,32 +694,6 @@ correctly, still says what to check, and leaves the fix to whoever is holding th
 measured and neither shrinks the file" is one — and it stops the next person re-running the same
 eliminations.
 
-**A claim about WHERE a cost is must carry its number, or say it has none.** This is the sharp edge
-of the rule above, because it does not feel like a hunch when you write it. A design session produces
-real understanding, and "this is the real win, the other half is nearly free" reads as knowledge
-rather than as a guess — so it goes in unmarked, and whoever picks the todo up optimises the half it
-named. Both halves of that sentence were wrong in this project's own todo: the "real win" was 3-7% of
-the cost and the "nearly free" half was the single biggest phase.
-
-Mark it or measure it. Either form is honest:
-
-```markdown
-❌ Diff the symbol set instead of re-inserting. This is the real win;
-   the parse half is nearly free
-
-✅ UNMEASURED: the DB write looks like the cost, and the parse half looks
-   cheap. Split the pulse into parse / extract / write and time each
-   before optimising any of them — nothing here is measured yet
-
-✅ The DB write is 31-75 ms of a 807 ms edit, and `orchestrator.analyze`
-   is 423 ms of it. Attack the parse half
-```
-
-**A prediction is not evidence, and "obviously" is not a measurement.** If the work needed to check
-is smaller than the work being planned, do the check first — it is cheaper to measure a bottleneck
-than to remove the wrong one. When it genuinely cannot be checked yet, the claim belongs in Phase 0
-as a question, not in a build phase as a premise.
-
 **A task an agent cannot verify is not done, it is claimed.** Every task should name what a reader
 runs to check it. If nothing can be run, say so and say why, rather than leaving the reader to assume
 a test exists.
@@ -874,6 +855,73 @@ What shipped and when comes from dated ADRs and closed todos: `conducks docs-sta
 `conducks_docs` with `recent: <n>`. An existing `progress.md` is derived — unread, unlinted — and
 belongs in `legacy/`.
 
+### §6.13 `visuals/` — rendered pictures, root only, only when asked
+
+**Created ONLY when someone asks for one.** Unlike every other file here, this folder is never
+bootstrapped and never "completed" to fill a set. Nobody maintains a picture they did not want, and
+an unwanted one rots into a confident lie.
+
+**Root only, and one per subject.** A visual usually spans the whole system, and one per service
+costs more upkeep than it returns.
+
+**Any subject, any format.** A visual may depict the runtime data flow, a state machine, a brand
+system, a product surface, a pricing shape. It may be `.html`, `.svg`, `.md` with a diagram —
+whatever renders. This is the one folder the standard does not constrain by content or file type,
+because what makes it a visual is that it is *looked at*, not that it is about code.
+
+**What `architecture.md` will not hold.** `architecture.md` is anatomy — the parts and which arrows
+between them are legal, and §6.2 says nothing else. A detailed runtime trace is physiology: what
+happens on one path, in order, what each step hands the next, and what each fallback decides when the
+first answer is unavailable. That last one falls through every slot in §2 — not a trap (it is
+designed, not a surprise), not a rule (nobody follows it, the code does), not one module's business
+(it spans them), and **not queryable**, because no static graph can say what a catch block decides.
+
+#### Every visual carries provenance, per claim
+
+This is the whole rule, and it exists because a picture *looks* authoritative whether or not anyone
+checked it. Head the file with what it depicts, what it was built from, and when. Then mark each
+class of claim:
+
+| stamp | the claim is | how it was checked |
+|---|---|---|
+| `queried` | structure — who calls whom, the module graph, dead code | `conducks trace` / `impact` / `audit`. **Name the command in the visual.** |
+| `traced` | behaviour — ordering, what a fallback decides, a threshold | a `file:line` anchor, a test, or a measurement. **conducks cannot help here** |
+| `measured` | a number — a ratio, a count, a timing | the run that produced it, with its date |
+| `authored` | not a claim about code — brand, product, a concept | nothing to verify. Saying so is what stops a reader treating it as fact |
+| `UNVERIFIED` | a code claim with none of the above | **say it in the visual, visibly** |
+
+**An inferred claim that looks identical to a traced one is the failure this folder must not
+produce.** If you read a comment rather than the implementation, that is `UNVERIFIED` until you read
+the implementation. Marking it costs a line; not marking it costs the next reader a wrong belief they
+have no way to detect.
+
+**`conducks trace` verifies wiring, never logic** — it answers "does A call B", not "does A clear the
+counter before B increments it". Do not let a `queried` stamp stand in for a `traced` one; they check
+different things and only one of them can be automated.
+
+**When conducks cannot run, say so in the visual.** A missing `.conducks/` graph, an unbuilt synapse
+DB, a repo it was never pointed at — all normal. Write *"conducks unavailable in this repo; structural
+claims are read, not queried"* rather than leaving a `queried` stamp nobody could have earned.
+
+#### Keeping it honest as the code moves
+
+```markdown
+Depends on: 0046, 0052, 0053, todo14#P5
+```
+
+**A visual names the records it rests on.** A rule saying "recheck every visual whenever an ADR
+changes" is not one anybody keeps; a declared dependency is greppable, so when 0052 moves, one search
+says which visuals to re-check. Same one-fact-one-place logic as the rest of the standard.
+
+**Living, not a record** (§2): overwrite in place, and re-stamp the date.
+
+**NEVER the source of truth.** Precedence is code → `architecture.md` → the visual. It is traced at a
+moment and starts rotting immediately. `docs-lint` does not grammar-check it (§5.4), the same as
+`architecture.md` and `MODULE.md`, so nothing catches it going stale but a reader.
+
+**Do not put here:** the module graph (`architecture.md`), tool output (`.conducks/`, §8), or anything
+a reader must be able to trust — a visual supports understanding, it never settles an argument.
+
 ---
 
 ## §7 Reading and enforcing
@@ -928,3 +976,4 @@ list to re-read when a change feels ambiguous, and each points back at the secti
 | **Code outranks the doc** | Except a doc explicitly marked a **spec**, which decides what the code should do. `docs/product/*.md` are specs; everything else describes. A doc neither marked a spec nor matching the code is wrong — fix it in the change that revealed it. Code comments count as docs. |
 | **`archive/` and `legacy/` are the last stop** | Nothing live links into them. Promote anything still true before moving; the move is one-way. |
 | **One fact, one place** | Derive what can be derived. Where a claim is kept anyway, let lint compare it against the truth and treat the gap as the finding. |
+

@@ -1,0 +1,541 @@
+<title>conducks — what actually flows through a pulse</title>
+
+<style>
+  :root {
+    --ground: #F5F7F8;
+    --panel: #FFFFFF;
+    --panel-2: #EEF1F3;
+    --line: #D6DCE0;
+    --line-soft: #E4E9EC;
+    --ink: #161B1F;
+    --ink-2: #4A555C;
+    --ink-3: #77848B;
+    --live: #16786F;
+    --live-soft: #DBEDEB;
+    --dead: #A8503A;
+    --dead-soft: #F6E3DD;
+    --partial: #8A6716;
+    --partial-soft: #F5EAD1;
+    --unver: #7A3E8F;
+    --unver-soft: #EFE0F4;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #101418; --panel: #171D22; --panel-2: #1D242A;
+      --line: #2A343B; --line-soft: #222B31;
+      --ink: #E4EAEE; --ink-2: #A3B0B8; --ink-3: #78868E;
+      --live: #4FB3A8; --live-soft: #16302F;
+      --dead: #D07D63; --dead-soft: #33211B;
+      --partial: #C9A24E; --partial-soft: #2E2718;
+      --unver: #B98BCB; --unver-soft: #2A1F30;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101418; --panel: #171D22; --panel-2: #1D242A;
+    --line: #2A343B; --line-soft: #222B31;
+    --ink: #E4EAEE; --ink-2: #A3B0B8; --ink-3: #78868E;
+    --live: #4FB3A8; --live-soft: #16302F;
+    --dead: #D07D63; --dead-soft: #33211B;
+    --partial: #C9A24E; --partial-soft: #2E2718;
+    --unver: #B98BCB; --unver-soft: #2A1F30;
+  }
+  :root[data-theme="light"] {
+    --ground: #F5F7F8; --panel: #FFFFFF; --panel-2: #EEF1F3;
+    --line: #D6DCE0; --line-soft: #E4E9EC;
+    --ink: #161B1F; --ink-2: #4A555C; --ink-3: #77848B;
+    --live: #16786F; --live-soft: #DBEDEB;
+    --dead: #A8503A; --dead-soft: #F6E3DD;
+    --partial: #8A6716; --partial-soft: #F5EAD1;
+    --unver: #7A3E8F; --unver-soft: #EFE0F4;
+  }
+
+  body {
+    background: var(--ground); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+  h1, h2, h3 { text-wrap: balance; letter-spacing: -0.02em; margin: 0; }
+  h1 { font-size: clamp(1.9rem, 4vw, 2.7rem); font-weight: 620; line-height: 1.1; }
+  h2 { font-size: 1.35rem; font-weight: 600; }
+  h3 { font-size: 1rem; font-weight: 600; }
+  p { margin: 0; max-width: 68ch; color: var(--ink-2); }
+  a { color: var(--live); }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  header { display: flex; flex-direction: column; gap: 0.9rem; margin-bottom: 1.6rem; }
+  .lede { font-size: 1.05rem; color: var(--ink-2); max-width: 62ch; }
+
+  section { margin-top: 3.4rem; display: flex; flex-direction: column; gap: 1.1rem; }
+  .section-head { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  /* provenance block */
+  .prov {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 3px;
+    padding: 1.1rem 1.2rem; display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  .prov dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1.1rem; margin: 0; }
+  .prov dt {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-3); padding-top: 0.18rem;
+  }
+  .prov dd { margin: 0; font-size: 0.88rem; color: var(--ink-2); }
+  .warn {
+    border-left: 2px solid var(--unver); background: var(--unver-soft);
+    padding: 0.65rem 0.9rem; border-radius: 3px; font-size: 0.86rem; color: var(--ink-2);
+  }
+  .warn strong { color: var(--ink); }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 1.2rem; padding: 0.9rem 1.1rem;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+  .key { display: flex; align-items: center; gap: 0.5rem; font-size: 0.83rem; color: var(--ink-2); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .dot.live { background: var(--live); }
+  .dot.partial { background: var(--partial); }
+  .dot.dead { background: var(--dead); }
+
+  /* pipeline */
+  .pipe { display: flex; flex-direction: column; }
+  .stage {
+    display: grid; grid-template-columns: 4.2rem 1fr; gap: 0 1rem;
+    border-left: 2px solid var(--line); padding: 0 0 1.5rem 1.4rem; margin-left: 1.2rem;
+    position: relative;
+  }
+  .stage:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .stage::before {
+    content: ""; position: absolute; left: -6px; top: 0.45rem;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--live); box-shadow: 0 0 0 3px var(--ground);
+  }
+  .stage[data-state="partial"]::before { background: var(--partial); }
+  .stage[data-state="dead"]::before { background: var(--dead); }
+  .t { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-3);
+       font-variant-numeric: tabular-nums; padding-top: 0.15rem; }
+  .body { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+  .stage-title { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage-title h3 { font-family: var(--mono); font-size: 0.94rem; font-weight: 600; }
+  .note { font-size: 0.88rem; color: var(--ink-2); max-width: 64ch; }
+  .io { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-3); }
+  .io b { color: var(--live); font-weight: 500; }
+
+  .chip {
+    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 0.14rem 0.42rem; border-radius: 2px;
+    background: var(--live-soft); color: var(--live); white-space: nowrap;
+  }
+  .chip.partial { background: var(--partial-soft); color: var(--partial); }
+  .chip.dead { background: var(--dead-soft); color: var(--dead); }
+
+  /* provenance stamp — attached to a claim, never to a stage */
+  .st {
+    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.05em;
+    text-transform: uppercase; padding: 0.1rem 0.36rem; border-radius: 2px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .st.unver { border-color: var(--unver); background: var(--unver-soft); color: var(--unver); font-weight: 600; }
+  .src { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-3); }
+
+  .spur {
+    margin-top: 0.5rem; padding: 0.7rem 0.9rem; border-radius: 3px;
+    background: var(--dead-soft); border-left: 2px solid var(--dead);
+    font-size: 0.85rem; color: var(--ink-2); max-width: 64ch;
+  }
+  .spur.partial { background: var(--partial-soft); border-left-color: var(--partial); }
+  .spur.unver { background: var(--unver-soft); border-left-color: var(--unver); }
+  .spur strong { color: var(--ink); font-weight: 600; }
+
+  /* tables */
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.87rem; }
+  th, td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+       color: var(--ink-3); background: var(--panel-2); font-weight: 500; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--panel-2);
+         padding: 0.08em 0.32em; border-radius: 2px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.9rem; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px;
+          padding: 0.95rem 1.05rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  .card h3 { font-family: var(--mono); font-size: 0.85rem; }
+  .card p { font-size: 0.85rem; }
+  .card .metric { font-family: var(--mono); font-size: 1.5rem; font-variant-numeric: tabular-nums;
+                  color: var(--dead); line-height: 1; }
+  .card .metric.ok { color: var(--live); }
+
+  .foot { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+          font-size: 0.82rem; color: var(--ink-3); max-width: 68ch; }
+  @media (max-width: 600px) {
+    .stage { grid-template-columns: 1fr; margin-left: 0.6rem; }
+    .t { padding-top: 0; }
+    .prov dl { grid-template-columns: 1fr; gap: 0.15rem; }
+    .prov dt { padding-top: 0.5rem; }
+  }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">conducks · docs/visuals · runtime trace</div>
+  <h1>What actually flows through a pulse</h1>
+  <p class="lede">
+    The write path from <code>conducks analyze</code> to a committed vault, in order, with what each
+    stage hands the next and what each fallback decides. Three stages produce output that never
+    reaches the database.
+  </p>
+</header>
+
+<div class="prov">
+  <dl>
+    <dt>Depicts</dt>
+    <dd>the <code>analyze</code> runtime path and the read layers that sit on the result — physiology, not the module graph (that is <code>docs/architecture.md</code>)</dd>
+    <dt>Built from</dt>
+    <dd>source read at <code>b36bd56</code>, plus direct SQL against two vaults: this repository and a 974-unit TypeScript project with 325 commits</dd>
+    <dt>Traced</dt>
+    <dd>30 Jul 2026</dd>
+    <dt>Depends on</dt>
+    <dd>0037, 0038, 0040, 0041, 0042, 0043, todo22#P8, todo22#P15, todo23#P1</dd>
+    <dt>conducks</dt>
+    <dd>the vault is present here, so structural counts below are queried SQL. No claim on this page rests on <code>conducks trace</code> — it answers "does A call B", never "does A run before B"</dd>
+  </dl>
+
+  <div class="warn">
+    <strong>Not the source of truth.</strong> Precedence is code → <code>architecture.md</code> → this
+    file. It was traced at a moment and starts rotting immediately. <code>docs-lint</code> does not
+    check it. Every claim below carries how it was checked; anything stamped
+    <span class="st unver">unverified</span> is a code claim nobody has confirmed against the
+    implementation.
+  </div>
+</div>
+
+<div class="legend">
+  <span class="key"><span class="dot live"></span> reaches the vault</span>
+  <span class="key"><span class="dot partial"></span> works, but narrower than it looks</span>
+  <span class="key"><span class="dot dead"></span> runs, produces nothing that persists</span>
+  <span class="key"><span class="st">queried</span> SQL against a vault</span>
+  <span class="key"><span class="st">traced</span> read in source, anchor given</span>
+  <span class="key"><span class="st">measured</span> a run, with its date</span>
+  <span class="key"><span class="st unver">unverified</span> read a comment, not the code</span>
+</div>
+
+<section>
+  <div class="section-head">
+    <h2>The write path — <code>conducks analyze</code></h2>
+    <p>One transaction from <code>beginPulse()</code> to <code>save()</code>. A killed run rolls back whole.</p>
+  </div>
+
+  <div class="pipe">
+
+    <div class="stage" data-state="live">
+      <div class="t">1</div>
+      <div class="body">
+        <div class="stage-title"><h3>discoverFiles</h3><span class="chip">live</span></div>
+        <div class="io">git ls-files → paths → ignore filter → units</div>
+        <p class="note">Falls back to a filesystem walk when git discovery fails. <code>.conducksignore</code>
+        plus built-in excludes remove <code>node_modules</code>, <code>target</code>, <code>dist</code>.
+        <span class="st">traced</span> <span class="src">project-monitor.ts:283-288 · chronicle-interface.ts:138</span></p>
+        <p class="note">On a 9,310-unit subject: 12,538 paths discovered, 9,310 survive the filter.
+        <span class="st">measured</span> <span class="src">pulse run, 29 Jul 2026 — not re-run for this file</span></p>
+      </div>
+    </div>
+
+    <div class="stage" data-state="live">
+      <div class="t">2</div>
+      <div class="body">
+        <div class="stage-title"><h3>hash gate</h3><span class="chip">live</span></div>
+        <div class="io">content hash per file → unchanged files skipped</div>
+        <p class="note">A content hash, not a timestamp — so a touched-but-identical file costs nothing.
+        <span class="st">traced</span> <span class="src">file-hash-gate.ts:30</span></p>
+        <div class="spur unver">
+          <strong>Claim removed as unverified.</strong> An earlier draft said a second
+          <code>analyze</code> "finishes in under a second". That was never timed. What IS timed is the
+          first pulse at 75.4 s on the 974-unit subject; the warm-run number has no measurement behind
+          it and is not stated here.
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" data-state="live">
+      <div class="t">3</div>
+      <div class="body">
+        <div class="stage-title"><h3>skeleton + discovery flush</h3><span class="chip">live</span></div>
+        <div class="io">ecosystem → repository → directory → unit, written before any parse</div>
+        <p class="note">The containment skeleton exists in the vault before a single file is parsed, so
+        every later node has a parent to attach to.
+        <span class="st">traced</span> <span class="src">orchestrator.ts:94-118</span></p>
+      </div>
+    </div>
+
+    <div class="stage" data-state="partial">
+      <div class="t">4</div>
+      <div class="body">
+        <div class="stage-title"><h3>parse waves</h3><span class="chip partial">single-threaded</span></div>
+        <div class="io">500 units per wave → tree-sitter → spectrum → graph → flush → clear</div>
+        <p class="note">Wave size is a constant, not adaptive.
+        <span class="st">traced</span> <span class="src">orchestrator.ts:123</span></p>
+        <div class="spur partial">
+          <strong>The worker pool never spawns.</strong> <code>isTs</code> is
+          <code>__filename.endsWith('.ts')</code>, which is false under compiled JS, so no installed
+          copy can resolve a worker script.
+          <span class="st">traced</span> <span class="src">orchestrator.ts:24 · worker-pool.ts:16 · graph-engine.ts:44</span><br>
+          Kernel timing on a full pulse: 15.96 s user + 5.41 s sys over 21.41 s wall ≈ <strong>1.0 cores</strong>.
+          <span class="st">measured</span> <span class="src">/usr/bin/time -l, 30 Jul 2026</span>
+        </div>
+        <div class="spur partial">
+          <strong>Regex fallback</strong> (<code>reflectGnosis</code>) runs when a grammar or query is
+          missing. It captures a file node and little else, and it <em>degrades rather than refuses</em>
+          — the pulse continues with a thin node instead of failing, which is why a missing grammar
+          shows up as sparse edges rather than an error.
+          <span class="st">traced</span> <span class="src">reflector.ts:137, 156, 162</span>
+        </div>
+        <div class="spur unver">
+          <strong>"82% of pulse time" withdrawn.</strong> It came from reading stage deltas in a memory
+          trace, which ADR 0043 is entirely about not trusting. Parsing is the dominant stage; the
+          percentage is not measured and is not asserted here.
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" data-state="live">
+      <div class="t">5</div>
+      <div class="body">
+        <div class="stage-title"><h3>reload</h3><span class="chip">live</span></div>
+        <div class="io">vault → memory, columns only, no <code>metadata</code> blob</div>
+        <p class="note">The waves flush and clear to stay light; this loads it all back so the binders
+        can walk it. Narrowing it was worth 7 MB of an 838 MB peak — noise, and kept on clarity grounds
+        alone.
+        <span class="st">measured</span> <span class="src">two-run A/B, ADR 0043 · todo23#P1</span></p>
+      </div>
+    </div>
+
+    <div class="stage" data-state="dead">
+      <div class="t">6</div>
+      <div class="body">
+        <div class="stage-title"><h3>resonate() — the binders</h3><span class="chip dead">2 of 4 land nothing</span></div>
+        <div class="io">bindNeuralCircuits · bindRouteCircuits · bindPulseCircuits · PageRank</div>
+        <div class="spur">
+          <strong>bindPulseCircuits produces zero rows.</strong> It emits <code>PULSES_TO</code> edges
+          for variable handover between a producer and a call argument.
+          <code>SELECT count(*) FROM edges WHERE type='PULSES_TO'</code> returns <strong>0</strong> on
+          both vaults.
+          <span class="st">queried</span> <span class="src">30 Jul 2026, both vaults</span>
+          <span class="st">traced</span> <span class="src">graph-engine.ts:103, 110</span>
+        </div>
+        <div class="spur">
+          <strong>Everything the binders add is created after the last flush.</strong> The pulse ends
+          with <code>save({ metadataOnly: true })</code>, which writes the pulse record and no rows.
+          Cross-service edges are the one exception — they are persisted explicitly.
+          <span class="st">traced</span> <span class="src">analysis/index.ts:211, 271 · persistence.ts:547 · graph-engine.ts:92</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" data-state="partial">
+      <div class="t">7</div>
+      <div class="body">
+        <div class="stage-title"><h3>linkers</h3><span class="chip partial">tier 3 never fires</span></div>
+        <div class="io">IntraLinker → HttpServiceLinker → FederatedLinker</div>
+        <p class="note">IntraLinker resolves bare names in three passes: same file, then imported files,
+        then the method segment of <code>receiver.method</code>.
+        <span class="st">traced</span> <span class="src">core/graph/linker.ts:77-83</span></p>
+        <div class="spur partial">
+          <strong>The fuzzy tier is unreachable in practice.</strong> ImportResolver tier 3 and
+          <code>fuzzyLink</code> both write confidence 0.5.
+          <code>SELECT count(*) FROM edges WHERE confidence &lt; 0.6</code> returns <strong>0</strong>
+          on both vaults — the first two tiers resolve everything, or nothing reaches the third.
+          <span class="st">queried</span> <span class="src">30 Jul 2026, both vaults</span><br>
+          This fallback <em>guesses</em> rather than refuses: a name match with no import evidence still
+          writes an edge. That it has never fired is the only reason it has never written a wrong one.
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" data-state="dead">
+      <div class="t">8</div>
+      <div class="body">
+        <div class="stage-title"><h3>virtual library induction</h3><span class="chip dead">not persisted</span></div>
+        <div class="io">dangling edge targets → <code>lib::npm</code>, <code>lib::unresolved</code> …</div>
+        <div class="spur">
+          <strong>The log says it worked. The vault disagrees.</strong> A pulse prints
+          <em>"Resonated with 2,691 virtual ecosystem symbols"</em>, and
+          <code>SELECT count(*) FROM nodes WHERE id LIKE 'lib::%'</code> returns <strong>0</strong> on
+          both vaults. Same cause as the binders: induced after the final flush.
+          <span class="st">queried</span> <span class="src">30 Jul 2026, both vaults</span>
+          <span class="st">traced</span> <span class="src">analysis/index.ts:257, 293</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" data-state="live">
+      <div class="t">9</div>
+      <div class="body">
+        <div class="stage-title"><h3>ranks · risk · taxonomy · history</h3><span class="chip">live</span></div>
+        <div class="io">updateRanks · updateRisks · pruneTaxonomy · snapshotHistory</div>
+        <p class="note">All batched SQL. <code>node_history</code> holds one row per symbol per pulse,
+        20 pulses retained — it is what makes <code>drift</code> and <code>audit --history</code>
+        answerable at all, since <code>nodes.id</code> is a primary key and carries current state only.
+        <span class="st">traced</span> <span class="src">persistence.ts snapshotHistory</span></p>
+        <p class="note">5,116 rows on the 974-unit subject.
+        <span class="st">queried</span> <span class="src">30 Jul 2026</span> — and <strong>0</strong> in
+        this repository's own vault, which was written on 29 Jul before the feature existed. A count is
+        only ever true of the vault it came from.</p>
+      </div>
+    </div>
+
+    <div class="stage" data-state="live">
+      <div class="t">10</div>
+      <div class="body">
+        <div class="stage-title"><h3>commit + reclaim</h3><span class="chip">live</span></div>
+        <div class="io">COMMIT → bloat check → rewrite only if it pays</div>
+        <p class="note">DuckDB never reclaims deleted rows in place, so the file grows monotonically
+        without an explicit rewrite. Compaction rewrites it when the ratio justifies it — 235 MB to
+        12.8 MB on this repo's first run.
+        <span class="st">measured</span> <span class="src">ADR 0037</span></p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>What the graph actually contains</h2>
+    <p>This repository's own vault, counted today. The absent types are as informative as the present
+    ones — there is no <code>DEFINES</code> row and no <code>PULSES_TO</code> row at all.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Edge type</th><th>Count</th><th>Produced by</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td><code>CALLS</code></td><td class="n">6,760</td><td>call processor</td><td>the spine of impact and trace</td></tr>
+        <tr><td><code>MEMBER_OF</code></td><td class="n">2,432</td><td>skeleton</td><td>containment</td></tr>
+        <tr><td><code>IMPORTS</code></td><td class="n">1,522</td><td>import processor</td><td>module edges</td></tr>
+        <tr><td><code>TYPE_REFERENCE</code></td><td class="n">911</td><td>type captures</td><td>TS, TSX and Go only</td></tr>
+        <tr><td><code>ACCESSES</code></td><td class="n">638</td><td>flow processor</td><td>assignments and reads</td></tr>
+        <tr><td><code>CONSTRUCTS</code></td><td class="n">602</td><td>call processor</td><td><code>new X()</code></td></tr>
+        <tr><td><code>DEPENDS_ON</code></td><td class="n">450</td><td>package manifests</td><td>external ecosystem</td></tr>
+        <tr><td><code>IMPLEMENTS</code> / <code>EXTENDS</code></td><td class="n">84 / 19</td><td>heritage processor</td><td>TypeScript heritage clauses</td></tr>
+        <tr><td><code>PULSES_TO</code></td><td class="n">0</td><td>bindPulseCircuits</td><td>never persisted</td></tr>
+        <tr><td>resonance <code>CALLS</code></td><td class="n">0</td><td>bindRouteCircuits</td><td>no route/request pair in this subject</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note"><span class="st">queried</span> <span class="src">2,465 nodes · 13,418 edges · vault of 29 Jul 2026, counted 30 Jul</span></p>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>The read paths</h2>
+    <p>Three layers, deliberately separated by how much they must load. The docs layer takes no database
+    connection at all, which is why it keeps working while a pulse holds the write lock.</p>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3>docs layer</h3>
+      <p><code>docs-status</code> · <code>docs-lint</code> · <code>bootstrap-docs</code> · <code>help</code> · <code>monitor</code></p>
+      <p>Reads authored markdown and the filesystem. No engine, no vault, no lock contention.
+      <span class="st">traced</span> <span class="src">ADR 0033</span></p>
+    </div>
+    <div class="card">
+      <h3>SQL layer</h3>
+      <p><code>status</code> counts · staleness · <code>prune</code> · taxonomy</p>
+      <p>Answers from the vault without materialising the graph, so a read-only session pays nothing
+      for a graph it never walks.
+      <span class="st">traced</span> <span class="src">ADR 0038</span></p>
+    </div>
+    <div class="card">
+      <h3>graph layer</h3>
+      <p><code>impact</code> · <code>trace</code> · <code>explain</code> · <code>rename</code> · <code>audit</code> · <code>flows</code></p>
+      <p>Must call <code>ensureGraphLoaded()</code> first. Four commands did not, and threw on every
+      invocation until it was fixed.
+      <span class="st">traced</span> <span class="src">todo22</span></p>
+    </div>
+    <div class="card">
+      <h3>MCP surface</h3>
+      <p>14 tools, same three layers underneath</p>
+      <p><code>conducks_docs</code> and <code>conducks_status</code> stay answerable during a write; the
+      graph-walking tools do not.
+      <span class="st">queried</span> <span class="src">14 registrations in interfaces/tools/tools/, counted 30 Jul</span></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Built, not landing</h2>
+    <p>Each of these executes on every pulse and leaves nothing behind. Counted, not inferred.</p>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <div class="metric">0</div>
+      <h3>virtual library nodes</h3>
+      <p>Log reports 2,691 induced. Vault holds none. Found while tracing for this file.
+      <span class="st">queried</span></p>
+    </div>
+    <div class="card">
+      <div class="metric">0</div>
+      <h3><code>PULSES_TO</code> edges</h3>
+      <p>Variable-handover binding. Runs every pulse, persists nothing.
+      <span class="st">queried</span></p>
+    </div>
+    <div class="card">
+      <div class="metric">0</div>
+      <h3>fuzzy-tier resolutions</h3>
+      <p>Two independent fallbacks write confidence 0.5. Neither has produced a row on either vault.
+      <span class="st">queried</span></p>
+    </div>
+    <div class="card">
+      <div class="metric">1.0</div>
+      <h3>cores used</h3>
+      <p>The parallel worker pool cannot spawn in a compiled build. Every install parses on one core.
+      <span class="st">traced</span> <span class="st">measured</span></p>
+    </div>
+    <div class="card">
+      <div class="metric ok">5,116</div>
+      <h3><code>node_history</code> rows</h3>
+      <p>On the 974-unit subject. <code>drift</code> and <code>audit --history</code> went from
+      structurally impossible to working.
+      <span class="st">queried</span></p>
+    </div>
+    <div class="card">
+      <div class="metric ok">5 / 10</div>
+      <h3>languages detecting routes</h3>
+      <p>The client half — <code>@kinesis_request_url</code> — is TypeScript and TSX only, so
+      cross-service binding is half-built everywhere else.
+      <span class="st">traced</span> <span class="src">todo23#P3</span></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>The pattern</h2>
+  </div>
+  <p>
+    Three separate features build correct results in memory and lose them at the same point: the
+    pulse's final <code>save()</code> writes the pulse record and no rows, so anything added after the
+    last wave flush is discarded. Cross-service binding was fixed by persisting its edges explicitly.
+    Virtual induction and pulse circuits have the same shape and are still open.
+  </p>
+  <p>
+    None of this was visible from the test suite. 660 tests pass, and passed while all three produced
+    nothing — because the tests assert that a stage <em>ran</em>, not that its output reached the
+    database. That is the gap worth closing before anything else on the list.
+  </p>
+</section>
+
+<p class="foot">
+  Traced 30 Jul 2026. Counts come from direct SQL against the vaults named beside them, never from
+  logs — several logs disagree with their own database, which is how the virtual-induction gap was
+  found. Re-check this file when 0037, 0038, 0040, 0041, 0042, 0043 or todo23 moves.
+</p>
+
+</div>
