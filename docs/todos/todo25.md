@@ -52,6 +52,7 @@ must follow Phase 4 because it triages what that gate reports.
 - [ ] `helpers.ensureBuild()` only builds when `build/` is missing, never when it is stale — an integration test will happily prove a fix that was never compiled. This was hit twice in one session. Fixed when a source file newer than the build triggers a rebuild
 - [ ] `lib/domain/kinetic` (4 files) and `lib/domain/visual` (2 files) have no unit tests; `interfaces/web` has none of either. Kinetic first: it owns `impact` and `trace`, the two answers users act on
 - [ ] `jest.config.js` declares a `persistence` project whose `testMatch` finds no files. Point it at real tests or remove it
+- [ ] `tests/database/ts/structural.test.ts:17` opens THIS repository's real vault read-write (`new SynapsePersistence(process.cwd())`), so all four of its cases fail with a DuckDB lock error whenever a `conducks mcp` server is connected — which is whenever the tool is actually being used. Found by running the suite while the audit's own agents held an MCP session. Fixed when the suite passes with a live MCP server attached: open read-only, or build a fixture vault, but do not make a green suite depend on nobody using the tool
 
 ## Phase 6 — triage the 458
 - Depends: todo25#P4
