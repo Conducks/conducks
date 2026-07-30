@@ -315,10 +315,14 @@ export class AnalysisService implements ConducksComponent {
       if (parts.length >= 2) {
         namespace = parts[0];
         symbol = parts[1];
-        // `node:fs`, `node:child_process` … carry the runtime in the namespace, so an exact-list
-        // check never matched and 214 edges into node builtins stayed dangling while every other
-        // external reference was induced.
-        if (externalPrefixes.includes(namespace) || namespace.startsWith('node:')) isCandidate = true;
+        // The exact-match list could never work, because a real specifier carries the PACKAGE as
+        // its namespace: `@jest/globals::jest.fn`, `minimatch::minimatch`, `node:fs::readdirsync`.
+        // Local ids are absolute paths, so the rule that actually separates them is whether the
+        // namespace looks like a path. Anything else is a module this project does not contain.
+        // The named prefixes stay because `global::` and friends are synthesised, not paths.
+        const namespaceIsLocalPath = namespace.startsWith('/') || namespace.startsWith('c:\\')
+          || namespace.startsWith('.') || namespace.includes('.ts') || namespace.includes('.js');
+        if (externalPrefixes.includes(namespace) || !namespaceIsLocalPath) isCandidate = true;
       } else {
         // Special Case: Naked symbols that are not absolute paths
         if (!targetId.startsWith('/') && !targetId.startsWith('c:\\')) {
