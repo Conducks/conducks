@@ -773,6 +773,32 @@ export class SynapsePersistence {
    * would have removed every still-valid external symbol — measured, 1,653 of them on a two-pulse
    * vault. That is the counterexample the ADR is built on; do not re-introduce the skip.
    */
+  /**
+   * Delete edges that were written as a GUESS and never resolved (ADR 0055).
+   *
+   * Run at the very end of a pulse, after IntraLinker has rebound what it can and induction has
+   * materialised the genuinely external targets. What is left pointing at nothing, carrying the
+   * give-up confidence ADR 0046 assigns, is a call on a local value: `line.trim`, `args.includes`,
+   * `results.filter`. Those name no symbol this project contains and none it depends on, so there is
+   * nothing for the target to ever become.
+   *
+   * The confidence floor is the whole safety of this. An edge at 0.85 or 1.0 that still dangles is a
+   * real reference the resolver could not place — a bug to investigate, not a row to delete — and it
+   * survives. Only the band that already says "this was a guess" is swept.
+   */
+  public async sweepUnresolvedGuesses(minConfidence: number = 0.6): Promise<number> {
+    if (this.readOnly) return 0;
+    await this.ensureVaultOpen();
+    const [before] = await this.query<{ c: number }>(
+      `SELECT count(*)::INT AS c FROM edges e
+       LEFT JOIN nodes n ON e.targetId = n.id
+       WHERE n.id IS NULL AND e.confidence < ?`, [minConfidence]);
+    await this.run(
+      `DELETE FROM edges WHERE confidence < ?
+         AND targetId NOT IN (SELECT id FROM nodes)`, [minConfidence]);
+    return Number(before?.c ?? 0);
+  }
+
   public async sweepRowsNotInPulse(pulseId: string): Promise<{ nodes: number; edges: number }> {
     if (this.readOnly) return { nodes: 0, edges: 0 };
     await this.ensureVaultOpen();

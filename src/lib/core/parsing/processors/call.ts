@@ -88,14 +88,30 @@ export class CallProcessor {
   public static isSymbolReference(target: string): boolean {
     const t = target.trim();
     if (!t) return false;
-    // A call on the result of another call: the inner call is captured on its own.
-    if (t.includes('(') || t.includes(')')) return false;
-    // Literal receivers: regex, string, template. `/x/.test(...)` calls nothing declared anywhere.
-    if (/^[/"'`]/.test(t)) return false;
-    // A numeric receiver is the same case.
-    if (/^\d/.test(t)) return false;
-    return true;
+    // Optional chaining is punctuation on an otherwise ordinary path.
+    const path = t.replace(/\?\./g, '.');
+    // A call target must look like an IDENTIFIER PATH — `foo`, `foo.bar`, `this.baz`. Anything else
+    // is an expression, and an expression is not a symbol any graph can hold.
+    //
+    // The previous version denied only parens, which let far worse through: the receiver text of a
+    // method call on a LITERAL was captured verbatim, so the vault held nodes whose id was a
+    // fifteen-line array literal complete with newlines and comments — `['analyze','clean'].includes`,
+    // `[...board.decisions].sort`, and 1,480 more. Induction then materialised every one as a
+    // "library symbol", because induction cannot tell an external reference from a thing that was
+    // never a reference at all (ADR 0053).
+    //
+    // An allowlist of shape is correct here where a denylist of characters was not: there is one
+    // form a symbol reference takes, and unbounded forms it does not.
+    //
+    // The form is polyglot, which a first version got wrong by writing it for TypeScript alone and
+    // breaking two real cases the suite caught: C# `System.Nullable<int>` carries generic arguments,
+    // and Rust `std::fmt::Result` uses `::` where TS uses `.`. Both are genuine symbol paths. So
+    // generics are stripped and both separators are accepted — while brackets, quotes, whitespace
+    // and newlines stay rejected, which is what actually distinguishes a name from an expression.
+    const withoutGenerics = path.replace(/<[^<>]*>/g, '');
+    return /^[A-Za-z_$][A-Za-z0-9_$]*([.:]{1,2}[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(withoutGenerics);
   }
+
 
   /**
    * Identifies if a name-to-name call is a constructor call.

@@ -1,5 +1,6 @@
 # 0053 — a heritage target is resolved like any other reference, not induced and not refused
 Status: Accepted
+- Amended by: 0055
 - Enforced by: tests/integration/features/heritage-languages.test.ts (a heritage target resolves to a file-qualified symbol rather than a bare name)
 - Resolves: 0052
 - Date: 2026-07-30
@@ -68,7 +69,9 @@ The general lesson generalises past heritage and is the reason this record exist
 one-line fix: a dangling reference has THREE possible causes, and induction treats all of them as the
 third. It may be external (induce), meaningless (refuse), or simply not yet resolved (resolve).
 Induction runs last and cannot tell them apart, so anything that reaches it unresolved gets a node
-whether it deserves one or not. `RESOLVABLE_TYPES` is the list that decides which edges get a chance
+whether it deserves one or not. ADR 0055 amends this: it turned out some things reaching induction
+were never references AT ALL — array literals and calls on local values — so the second cause needed
+its own rule rather than being covered by the third. `RESOLVABLE_TYPES` is the list that decides which edges get a chance
 to be the third case, and it was written once and never revisited when new edge types were added.
 
 **The allowlist itself was the deeper defect, and it is gone.** `RESOLVABLE_TYPES` was an array, so a

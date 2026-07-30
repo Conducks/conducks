@@ -280,6 +280,13 @@ export class AnalysisService {
     // pulse, so every live row has just been re-written with this pulseId — including the virtual
     // nodes induction re-stamps above. The watcher's incremental path must never call this; it
     // writes a handful of files and would delete the rest of the graph.
+    // Guessed edges that never landed go before the stale-row sweep, so the row counts the sweep
+    // reports are of live data rather than of rows about to be removed anyway (ADR 0055).
+    const guesses = await this.persistence.sweepUnresolvedGuesses();
+    if (guesses > 0) {
+      logger.info(`🛡️ [Conducks] Dropped ${guesses} unresolved guess edge(s) — calls on local values that name no symbol.`);
+    }
+
     const swept = await this.persistence.sweepRowsNotInPulse(pulseId);
     if (swept.nodes > 0 || swept.edges > 0) {
       logger.info(`🛡️ [Conducks] Swept ${swept.nodes} node(s) and ${swept.edges} edge(s) left by earlier pulses.`);
@@ -322,6 +329,27 @@ export class AnalysisService {
     
     let inducedCount = 0;
     let restampedCount = 0;
+
+    // The names this project actually depends on, taken from the ECOSYSTEM nodes the manifest
+    // parser produced: `path`, `fs`, `chalk`, `@jest/globals`, `duckdb`, and so on.
+    //
+    // This is the discriminator induction never had. A dotted target is only external when its
+    // RECEIVER is one of these — `path.resolve` is, `results.forEach` is not. Without it, induction
+    // materialised a "library symbol" for every unresolved method call on a local variable, because
+    // it cannot tell an external reference from an unresolved local one and defaults to the former
+    // (ADR 0053). 1,480 of 1,692 induced nodes on this repository were that mistake.
+    const externalModules = new Set<string>();
+    for (const n of graph.getAllNodes()) {
+      if (n.properties?.canonicalKind === 'ECOSYSTEM') {
+        const nm = String(n.properties?.name ?? '').toLowerCase();
+        if (nm) externalModules.add(nm);
+      }
+    }
+    const receiverIsExternal = (dotted: string): boolean => {
+      const head = dotted.split('.')[0];
+      // `node:fs` and `@scope/pkg` arrive with their prefix intact.
+      return externalModules.has(head) || externalModules.has(head.replace(/^node:/, ''));
+    };
     const projectRoot = chronicle.getProjectDir().toLowerCase();
 
     for (const edge of allEdges) {
@@ -354,9 +382,11 @@ export class AnalysisService {
           || namespace.startsWith('.') || namespace.includes('.ts') || namespace.includes('.js');
         if (externalPrefixes.includes(namespace) || !namespaceIsLocalPath) isCandidate = true;
       } else {
-        // Special Case: Naked symbols that are not absolute paths
+        // A bare, unnamespaced target. It is external only when it reads as a member access on a
+        // module this project depends on. Anything else is a local symbol the resolver could not
+        // place, and inventing a node for it is how the vault filled with `results.foreach`.
         if (!targetId.startsWith('/') && !targetId.startsWith('c:\\')) {
-          isCandidate = true;
+          isCandidate = targetId.includes('.') ? receiverIsExternal(targetId) : false;
         }
       }
 
