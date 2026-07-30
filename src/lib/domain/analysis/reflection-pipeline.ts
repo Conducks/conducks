@@ -112,6 +112,11 @@ export class ReflectionPipeline {
               id: boundaryId, label: 'ECOSYSTEM', isShallow: true,
               properties: {
                 name: pkg, filePath: '', canonicalKind: 'ECOSYSTEM', canonicalRank: 0,
+                // Hangs off the ecosystem root rather than floating (ADR 0057). This is the THIRD
+                // path that creates an external node — the manifest parser and virtual induction
+                // are the others — and it is the one that actually produces them here, which is why
+                // parenting the other two moved the orphan count from 51 to 32 and no further.
+                parentId: 'ecosystem::global',
                 origin, package: origin === 'dependency' ? pkg : null, isBoundary: true,
               } as any,
             });

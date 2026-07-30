@@ -403,6 +403,8 @@ export class AnalysisService {
               filePath: `external://${namespace}`, 
               canonicalKind: 'STRUCTURE', 
               canonicalRank: 1, // Ecosystem Layer
+              // A library namespace hangs off the ecosystem root rather than floating (ADR 0057).
+              parentId: 'ecosystem::global',
               isShallow: true
             }
           };

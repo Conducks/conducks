@@ -78,6 +78,10 @@ export class EssenceLens {
           filePath: filePath,
           isExport: true,
           metadata: {
+            // Parented to the ecosystem root, so the containment tree has ONE top (ADR 0057).
+            // These carried no parent at all, leaving 32 external packages floating: unreachable by
+            // any walk, and absent from any answer to "what is under X".
+            parentId: 'ecosystem::global',
             ecosystem: 'npm',
             version: version as string,
             isExternal: true
@@ -122,6 +126,7 @@ export class EssenceLens {
           filePath: filePath,
           isExport: true,
           metadata: {
+            parentId: 'ecosystem::global',   // same as npm above (ADR 0057)
             ecosystem: 'pip',
             version,
             isExternal: true

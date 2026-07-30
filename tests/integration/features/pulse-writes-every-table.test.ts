@@ -134,6 +134,13 @@ export function main(): string {
     expect(Number(row.c)).toBe(0);
   });
 
+  it('has exactly one root — the containment tree is a tree, not a forest', async () => {
+    // ADR 0057. 51 nodes had no parent: external packages and library namespaces, created by three
+    // different paths, none of which attached them to anything. A walk from any external symbol ran
+    // out of parents before reaching a root.
+    expect(await count('nodes WHERE parentId IS NULL')).toBe(1);
+  });
+
   it('prices its guesses — confidence spans more than one value', async () => {
     const [row] = await vault.query<{ c: number }>(
       'SELECT count(DISTINCT confidence)::INT AS c FROM edges');
