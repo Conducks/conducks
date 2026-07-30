@@ -153,7 +153,16 @@ export class SynapsePersistence {
       dna JSON,
       signature JSON,
       kinetic JSON,
-      metadata JSON
+      metadata JSON,
+      -- Cross-service HTTP binding (todo22#P15). These lived only inside the metadata blob, and
+      -- addNode keeps a fixed skeleton that never included them, so after ANY reload the fields
+      -- were undefined and bindRouteCircuits matched nothing. Real columns because they are real
+      -- data the vault should own, not a JSON side-channel.
+      is_route BOOLEAN,
+      is_request BOOLEAN,
+      http_method VARCHAR,
+      http_path VARCHAR,
+      http_url VARCHAR
     );`;
 
     const edgesSql = `CREATE TABLE IF NOT EXISTS edges (
@@ -210,6 +219,11 @@ export class SynapsePersistence {
 
     await run(nodesSql);
     await run(historySql);
+    // Existing vaults predate the HTTP columns; ADD COLUMN IF NOT EXISTS is a no-op on new ones.
+    for (const col of ['is_route BOOLEAN', 'is_request BOOLEAN', 'http_method VARCHAR',
+                       'http_path VARCHAR', 'http_url VARCHAR']) {
+      await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS ${col}`);
+    }
     await run(edgesSql);
     await run(pulsesSql);
     await run(metaSql);
@@ -246,9 +260,19 @@ export class SynapsePersistence {
     // are deliberately absent: they are stored BOTH as their own columns and inside `metadata`, and
     // the spread below already carries them, so selecting them again cost three extra JSON parses
     // per node for values that were then overwritten with equal ones.
-    const nodes = await this.query(
-      `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
-              risk, unitId, parentId, namespaceId, layer_path, depth, metadata FROM nodes`);
+    // A shallow load fetches REAL COLUMNS ONLY and never the `metadata` blob. `addNode` keeps a
+    // fixed skeleton and discards the rest, and all but four of those fields are real columns; the
+    // four that are not (`parentname`, `rank`, `kineticEnergy`, `isExport`) have no reader on the
+    // analyze path. The full load keeps the blob because `explain`, `rename`, `diff` and the
+    // mirror's `hydrateNode` do read it.
+    const nodes = await this.query(options.shallow
+      ? `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
+                risk, unitId, parentId, namespaceId, layer_path, depth,
+                fingerprint, rootId, structureId, isEntryPoint, lineStart, lineEnd,
+                is_route, is_request, http_method, http_path, http_url FROM nodes`
+      : `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
+                risk, unitId, parentId, namespaceId, layer_path, depth, metadata,
+                is_route, is_request, http_method, http_path, http_url FROM nodes`);
     traceMemory(`load: ${nodes.length} node rows fetched`);
     const edges = await this.query(
       `SELECT id, sourceId, targetId, type, weight, confidence, properties FROM edges`);
@@ -284,7 +308,14 @@ export class SynapsePersistence {
           parentId: row.parentId,
           namespaceId: row.namespaceId,
           layer_path: row.layer_path,
-          depth: row.depth
+          depth: row.depth,
+          // Restored from real columns so cross-service binding survives a reload. `?? undefined`
+          // rather than the raw null, because `bindRouteCircuits` tests truthiness.
+          isRoute: row.is_route ?? undefined,
+          isRequest: row.is_request ?? undefined,
+          method: row.http_method ?? undefined,
+          path: row.http_path ?? undefined,
+          url: row.http_url ?? undefined
         }
       });
     }
@@ -421,7 +452,7 @@ export class SynapsePersistence {
     if (this.readOnly) return;
     await this.ensureVaultOpen();
     const owned = !this.inPulse;
-    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata'];
+    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url'];
     try {
       if (owned) await this.run("BEGIN TRANSACTION");
       const rows = nodes.map(n => {
@@ -439,7 +470,8 @@ export class SynapsePersistence {
           m.parentId?.toLowerCase() || null, m.rootId?.toLowerCase() || null, m.namespaceId?.toLowerCase() || null, m.unitId?.toLowerCase() || null, m.structureId?.toLowerCase() || null,
           m.layer_path || null, m.depth || 0, m.risk || 0, n.gravity || m.gravity || 0, n.complexity || m.complexity || 1,
           m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(m.dna || {}), JSON.stringify(m.signature || {}), JSON.stringify(m.kinetic || {}),
-          JSON.stringify({ ...m, id: n.id, name, range: m.range })
+          JSON.stringify({ ...m, id: n.id, name, range: m.range }),
+          m.isRoute ?? null, m.isRequest ?? null, m.method ?? null, m.path ?? null, m.url ?? null
         ];
       });
       await this.insertBatched('nodes', columns, rows);

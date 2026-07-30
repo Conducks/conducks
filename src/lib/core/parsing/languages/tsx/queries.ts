@@ -66,6 +66,24 @@ export const TSX_QUERIES = `
   (type_predicate type: (type_identifier) @pulse_type_target)
   (union_type (type_identifier) @pulse_type_target)
 
+  ;; --- Cross-service HTTP (todo22#P15) ---
+  ;; processRoute/processRequest in the reflector branch on @kinesis_route and @kinesis_request.
+  ;; NO grammar defined either capture, so both were dead code in every language and
+  ;; bindRouteCircuits never had a node to match. Probed against the real grammar before
+  ;; being added, per memory.md.
+  ;; Express/Koa style: app.get('/path', handler)
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (property_identifier) @route_method
+        (#match? @route_method "^(get|post|put|patch|delete|all)$"))
+    arguments: (arguments . (string) @kinesis_route_path)) @kinesis_route
+
+  ;; fetch('/url') — the request side of the same pair.
+  (call_expression
+    function: (identifier) @req_fn (#match? @req_fn "^(fetch)$")
+    arguments: (arguments . (string) @kinesis_request_url)) @kinesis_request
+
   ;; --- Infrastructure (L3-L4: Entry Points) ---
   ;; Decorators: @Controller('/path'), @Get('/path')
   (decorator

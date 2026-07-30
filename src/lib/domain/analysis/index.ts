@@ -208,6 +208,15 @@ export class AnalysisService implements ConducksComponent {
     this.graph.resonate();
     traceMemory('after PageRank');
 
+    // `resonate()` runs after the last wave flush, and `save({ metadataOnly: true })` below writes
+    // no rows — so cross-service CALLS edges were built in memory and dropped on every pulse. This
+    // is the final gap in todo22#P15: the binder worked, the vault never heard about it.
+    const resonanceEdges = this.graph.lastResonanceEdges;
+    if (resonanceEdges.length > 0) {
+      logger.info(`🛡️ [Resonance] Persisting ${resonanceEdges.length} cross-service edge(s).`);
+      await this.persistence.saveEdges(resonanceEdges, pulseId);
+    }
+
     // 4.1 Commit computed gravity values back to the vault (targeted UPDATE, safe on shallow nodes).
     const gravityValues = Array.from(this.graph.getGraph().getAllNodes()).map(n => ({
       id: n.id,

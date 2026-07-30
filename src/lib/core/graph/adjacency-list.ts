@@ -206,7 +206,15 @@ export class ConducksAdjacencyList {
         complexity: node.properties.complexity,
         dna: node.properties.dna,
         kinetic: node.properties.kinetic,
-        signature: node.properties.signature
+        signature: node.properties.signature,
+        // Cross-service HTTP binding reads these, and the skeleton is what survives a load — so
+        // omitting them made `bindRouteCircuits` match nothing on any graph that came from the
+        // vault rather than straight from a parse (todo22#P15).
+        isRoute: node.properties.isRoute,
+        isRequest: node.properties.isRequest,
+        method: node.properties.method,
+        path: node.properties.path,
+        url: node.properties.url
       }
     };
 

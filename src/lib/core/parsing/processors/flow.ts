@@ -61,7 +61,12 @@ export class FlowProcessor {
   ]);
 
   private readonly WHITELISTED_OBJECTS = new Set([
-    'requests', 'http', 'client', 'session', 'browser', 'page', 'httpx', 'aiohttp'
+    'requests', 'http', 'client', 'session', 'browser', 'page', 'httpx', 'aiohttp',
+    // `fetch` is unambiguous on its own: unlike `client.get(...)` there is no non-network meaning,
+    // so it qualifies without the absolute-URL evidence the other receivers need. Without it a
+    // relative `fetch('/users')` — the common shape in a browser or Next.js app — was rejected and
+    // produced no request node, leaving cross-service binding nothing to match (todo22#P15).
+    'fetch', 'axios', 'got', 'superagent', 'ky'
   ]);
 
   /**

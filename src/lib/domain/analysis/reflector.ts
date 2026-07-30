@@ -25,6 +25,9 @@ import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js
  * Orchestrates the induction wave and ensures the synapse resonance
  * is broadcast to the Mirror visual interface.
  */
+/** A tree-sitter `(string)` capture keeps its delimiters; route and URL comparisons must not. */
+const stripQuotes = (v: string): string => v.replace(/^['"`]|['"`]$/g, '');
+
 export class ConducksReflector implements ConducksComponent {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
@@ -545,7 +548,9 @@ export class ConducksReflector implements ConducksComponent {
           this.flow.processAssignment(cText, val, scopeName, spectrum);
         }
         else if (cName === 'kinesis_route') {
-          const pathReg = captureMap['kinesis_route_path'] ?? '/';
+          // A `(string)` capture includes its quotes, so `'/users/profile'` arrives with them and
+          // would never equal a request URL captured the same way. Strip once, here and below.
+          const pathReg = stripQuotes(captureMap['kinesis_route_path'] ?? '/');
           const method = captureMap['route_method'] ?? 'GET';
           const scopeName = getScopeAt(currentMatchRow);
           this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework());
@@ -558,10 +563,14 @@ export class ConducksReflector implements ConducksComponent {
           }
         }
         else if (cName === 'kinesis_request') {
-          const url = captureMap['kinesis_request_url'] ?? '/';
+          const url = stripQuotes(captureMap['kinesis_request_url'] ?? '/');
           const method = captureMap['req_method'] ?? 'GET';
           const scopeName = getScopeAt(currentMatchRow);
-          this.flow.processRequest(url, method, scopeName, spectrum);
+          // The RECEIVER is what tells `processRequest` this is genuinely a network call. Omitting
+          // it left the gate with no evidence for a relative URL, so every `fetch('/path')` was
+          // rejected as noise. `@req_fn` / `@kinesis_object` carry it depending on call shape.
+          const receiver = captureMap['req_fn'] ?? captureMap['kinesis_object'] ?? null;
+          this.flow.processRequest(url, method, scopeName, spectrum, receiver);
         }
         else if (cName === 'pulse_type_target') {
           const scope = getScopeAt(currentMatchRow);
@@ -599,7 +608,14 @@ export class ConducksReflector implements ConducksComponent {
       });
     }
 
-    spectrum.nodes = Array.from(nodeCache.values());
+    // `nodeCache` holds the symbols discovered by the query walk, and this line REPLACES the array
+    // rather than merging into it. Anything pushed to `spectrum.nodes` earlier in the walk is
+    // therefore discarded — which is what happened to every route and request node
+    // `FlowProcessor.processRoute`/`processRequest` created, in every language, for as long as they
+    // have existed. `bindRouteCircuits` then had nothing to match, and cross-service HTTP binding
+    // reported success while finding nothing (todo22#P15). Keep the virtual nodes.
+    const virtualNodes = spectrum.nodes.filter(n => !nodeCache.has(String(n.name).toLowerCase()));
+    spectrum.nodes = [...Array.from(nodeCache.values()), ...virtualNodes];
 
     // Conducks: Hierarchical Unification (L2-L7 Parentage)
     // [Conducks Rule] MEMBER_OF edges are no longer persisted as structural scaffolding.

@@ -85,8 +85,19 @@ export class ConducksGraph {
    * 
    * Triggers the full structural intelligence pipeline.
    */
+  /**
+   * Edges created by the binders during the LAST `resonate()`.
+   *
+   * `resonate()` runs after the final wave flush, so anything it adds exists only in memory —
+   * `save({ metadataOnly: true })` writes the pulse record and nothing else. Cross-service CALLS
+   * edges were therefore built correctly and then dropped on every pulse. The caller persists
+   * these (todo22#P15).
+   */
+  public lastResonanceEdges: ConducksEdge[] = [];
+
   public resonate(): void {
     this.logger.info(`[Conducks Synapse] Pushing Structural Resonance Flow...`);
+    this.lastResonanceEdges = [];
     this.bindNeuralCircuits();
     this.bindRouteCircuits();
     this.bindPulseCircuits();
@@ -186,14 +197,16 @@ export class ConducksGraph {
   }
 
   private bindResonance(req: ConducksNode, route: ConducksNode, reqUrl: string): void {
-    this.graph.addEdge({
+    const edge: ConducksEdge = {
       id: `RESONANCE::${req.id}->${route.id}`,
       sourceId: req.id,
       targetId: route.id,
       type: 'CALLS' as any,
       confidence: 0.9,
       properties: { isResonance: true, url: reqUrl }
-    });
+    };
+    this.graph.addEdge(edge);
+    this.lastResonanceEdges.push(edge);
   }
 
   /** Trailing slash carries no meaning in a route, so both sides are compared without one. */

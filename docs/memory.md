@@ -876,3 +876,27 @@
 - Applies: any new longitudinal question — decay, churn, velocity, "what changed since" — reads
   `node_history`, never `nodes`. Verify a longitudinal feature on a TWO-PULSE fixture with a real
   change between them; a single-pulse fixture cannot distinguish "works" from "returns nothing".
+
+## `reflector.ts` REPLACES spectrum.nodes — a virtual node pushed earlier is discarded
+- Gotcha: the query walk ends with `spectrum.nodes = Array.from(nodeCache.values())`. Anything a
+  processor pushed into `spectrum.nodes` before that line is gone. Every route and request node
+  `FlowProcessor` created was lost this way, in every language, for as long as the code existed.
+- Why: `nodeCache` holds symbols found by the walk; the assignment was written as if that were the
+  only source of nodes. It now merges virtual nodes that are not already in the cache.
+- Applies: a processor that invents a node (routes, requests, virtual libraries) must survive that
+  line. Verify a new virtual node reaches the VAULT, not just the spectrum — three of the four
+  cross-service breaks were invisible at the spectrum level.
+
+## A `(string)` tree-sitter capture includes its quotes
+- Gotcha: `@kinesis_route_path` on `app.get('/users')` captures `'/users'` WITH the quotes, so it
+  never equals a URL captured the same way from `fetch('/users')`. Strip before comparing.
+- Applies: any capture over a `(string)` node — paths, URLs, decorator arguments.
+
+## `resonate()` runs AFTER the final flush — its edges are not persisted for free
+- Gotcha: `bindNeuralCircuits`, `bindRouteCircuits` and `bindPulseCircuits` all add edges to the
+  in-memory graph inside `resonate()`, which the pulse calls after the last wave flush. The pulse
+  then ends with `save({ metadataOnly: true })`, which writes the pulse record and NO rows. Every
+  edge those binders create is dropped unless something explicitly saves it.
+- Why: `ConducksGraph.lastResonanceEdges` now collects them and the pulse calls `saveEdges`.
+- Applies: any new binder added to `resonate()` inherits this. Assert the edge is in the VAULT
+  after a pulse, not that the binder ran.
