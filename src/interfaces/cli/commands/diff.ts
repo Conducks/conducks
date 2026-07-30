@@ -95,16 +95,18 @@ export class DiffCommand implements ConducksCommand {
   }
 
   private async executeChronoscopicDiff(baseId: string, headId: string | null, registry: Registry): Promise<void> {
-    const { ConducksAdjacencyList } = await import("@/lib/core/graph/adjacency-list.js");
-    const { ConducksDiffEngine } = await import("@/lib/core/graph/diff-engine.js");
-    const { SynapsePersistence } = await import("@/lib/core/persistence/persistence.js");
-
-    const baseGraph = new ConducksAdjacencyList();
-    const headGraph = new ConducksAdjacencyList();
+    // Everything below comes from COMPOSITION. These were three dynamic imports straight into
+    // `core`, which is not a legal edge for `cli` — and being dynamic, they were invisible to the
+    // graph-based layer rule, so `guard` reported the contract clean while they violated it
+    // (ADR 0048).
+    const baseGraph = registry.infrastructure.createGraph();
+    const headGraph = registry.infrastructure.createGraph();
 
     const db = registry.infrastructure.persistence;
-    if (!(db instanceof SynapsePersistence)) {
-      console.error("Chronoscopic diff requires DuckDB persistence.");
+    // A capability check rather than an `instanceof` against a core class: the question is whether
+    // this vault can answer a parameterised query, not which class implements it.
+    if (typeof (db as any)?.query !== 'function') {
+      console.error("Chronoscopic diff requires a queryable vault.");
       process.exit(1);
     }
 
@@ -129,8 +131,7 @@ export class DiffCommand implements ConducksCommand {
       await registry.infrastructure.persistence.load(headGraph);
     }
 
-    const diffEngine = new ConducksDiffEngine();
-    const result = diffEngine.diff(baseGraph, headGraph);
+    const result = registry.query.diff.diff(baseGraph, headGraph);
 
     console.log(`\n\x1b[1mSummary:\x1b[0m ${result.summary}`);
 

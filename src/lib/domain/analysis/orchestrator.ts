@@ -137,6 +137,20 @@ export class AnalyzeOrchestrator implements ConducksComponent {
       );
       traceMemory(`wave ${batchNum} after parse`);
 
+      // Count what came back (ADR 0049). The worker pool now fails loudly on a crashed subprocess,
+      // and this is the second line of defence: the pool knows what it spawned, the orchestrator
+      // knows what it asked for, and the failure being guarded against is the pool's own
+      // accounting. A checker living inside the thing it checks shares its blind spot.
+      if (inductionResults.length !== chunk.length) {
+        const returned = new Set(inductionResults.map((r: any) => r.path));
+        const missing = chunk.filter(f => !returned.has(f.path)).map(f => f.path);
+        throw new Error(
+          `🛡️ [Conducks] Wave ${batchNum} sent ${chunk.length} unit(s) and received ${inductionResults.length}. ` +
+          `${missing.length} file(s) were never accounted for, starting with ${missing.slice(0, 5).join(', ')}. ` +
+          `A short wave is silent data loss, so the pulse aborts rather than committing a partial graph.`
+        );
+      }
+
       for (const res of inductionResults) {
         this.reflectionPipeline.apply(res, {
           graph: this.graph,

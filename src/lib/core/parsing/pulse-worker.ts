@@ -150,8 +150,11 @@ if (process.env.CONDUCKS_WORKER_MODE === 'spawn') {
       fs.writeFileSync(data.tempOutputFile, JSON.stringify(payload));
     }
     process.exit(0);
-    } catch (e: any) {
-      console.error(`🛡️ [Conducks Synapse] Persistence Failure during flush:`, e.message);
+  } catch (e: any) {
+    console.error(`🛡️ [Conducks Synapse] Worker failure:`, e.message);
+    // Exiting non-zero is now enough on its own — the parent inspects status (ADR 0049). Before
+    // that, this path exited without writing tempOutputFile, and the parent read a MISSING file as
+    // an empty result: a crash and a chunk with no symbols were indistinguishable.
     process.exit(1);
   }
 } else if (process.env.CONDUCKS_FORK_MODE === '1') {

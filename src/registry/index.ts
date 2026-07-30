@@ -35,6 +35,7 @@ import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/man
 import { MirrorEngine } from "@/lib/domain/visual/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
+import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
 import { PYTHON_SUITE } from "@/lib/core/parsing/languages/python/index.js";
 import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/languages/typescript/index.js";
 import { TSXProvider } from "@/lib/core/parsing/languages/tsx/index.js";
@@ -326,6 +327,11 @@ export const registry = {
     get logger() { return logger; },
     createLogger: (scope?: string) => new Logger(scope),
     createPersistence: (dbPath: string, readOnly?: boolean) => new SynapsePersistence(dbPath, readOnly),
+    // An empty graph, for callers that need to reconstitute one (the chronoscopic diff loads two
+    // historical pulses side by side). Exposed here because `cli -> core` is not a legal edge, and
+    // the diff command was reaching around the contract with a dynamic import to get it — invisible
+    // to the graph-based gate, which is precisely what ADR 0048 is about.
+    createGraph: () => new ConducksAdjacencyList(),
     // `doctor` reports which parse path is live; `analyze` reports what it is about to walk.
     // Both are questions about the engine, asked before any engine work happens.
     isNativeGrammarAvailable: () => grammars.isNativeAvailable(),

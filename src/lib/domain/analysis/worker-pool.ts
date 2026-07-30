@@ -76,27 +76,58 @@ export class WorkerPool {
 
             fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
 
-            spawnSync('node', [
+            // The outcome is INSPECTED (ADR 0049). This return value used to be discarded, and a
+            // missing output file resolved to `[]` — so a segfault in a native parser, an OOM kill
+            // and a chunk of genuinely symbol-free files were the same result. A chunk is
+            // files.length / coreCount, so one crash silently dropped hundreds of files from the
+            // pulse and every count downstream was quietly short.
+            const proc = spawnSync('node', [
               '--no-warnings',
               '--import', tsxLoader!,
               workerScript,
               tempInput
             ], {
               env: { ...process.env, CONDUCKS_WORKER_MODE: 'spawn' },
-              stdio: 'inherit'
+              stdio: 'inherit',
+              // Generous on purpose, and a guess until something real trips it — a value too low
+              // fails legitimate large files, and one too high is indistinguishable from none.
+              timeout: 10 * 60 * 1000,
             });
+
+            const cleanup = () => {
+              try { fs.unlinkSync(tempInput); } catch { /* best effort */ }
+              try { fs.unlinkSync(tempOutput); } catch { /* best effort */ }
+            };
+
+            if (proc.error || proc.signal || (proc.status !== null && proc.status !== 0)) {
+              cleanup();
+              const how = proc.signal === 'SIGTERM' && !proc.error
+                ? 'timed out after 10m'
+                : proc.signal ? `was killed by ${proc.signal}`
+                : proc.error ? `failed to start: ${proc.error.message}`
+                : `exited with status ${proc.status}`;
+              throw new Error(
+                `[WorkerPool] Parse worker ${how}. ${chunk.length} file(s) in this chunk were NOT analysed, ` +
+                `starting with ${chunk.slice(0, 3).map((u: any) => u.path).join(', ')}. ` +
+                `This is a failure, not an empty result — the pulse is aborted rather than silently short.`
+              );
+            }
 
             if (fs.existsSync(tempOutput)) {
               try {
                 const results = JSON.parse(fs.readFileSync(tempOutput, 'utf8'));
-                fs.unlinkSync(tempInput);
-                fs.unlinkSync(tempOutput);
+                cleanup();
                 resolve(results);
-              } catch (e) {
-                resolve([]);
+              } catch (e: any) {
+                cleanup();
+                throw new Error(`[WorkerPool] Worker output was unreadable (${e.message}). ${chunk.length} file(s) unaccounted for.`);
               }
             } else {
-              resolve([]);
+              cleanup();
+              throw new Error(
+                `[WorkerPool] Worker exited cleanly but wrote no output file. ${chunk.length} file(s) unaccounted for. ` +
+                `An absent result is not an empty one.`
+              );
             }
           });
         };
