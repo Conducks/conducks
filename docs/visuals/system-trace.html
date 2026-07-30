@@ -373,17 +373,18 @@
         <tr><td>file unreadable</td><td>returns <code>''</code></td><td><span class="st g">guesses</span></td><td>an unreadable file is indistinguishable from an empty one and is parsed as such</td><td class="src">chronicle:216</td></tr>
         <tr><td>git blame fails</td><td><code>{count:0, authors:0}</code></td><td><span class="st g">guesses</span></td><td>a symbol with real history looks never-committed; entropy scores it 0 risk</td><td class="src">chronicle:273</td></tr>
         <tr><td>no project marker found</td><td>uses <code>cwd</code></td><td><span class="st g">guesses</span></td><td>the shape that once anchored an analyze at <code>/private/tmp</code></td><td class="src">bootstrapper:96</td></tr>
-        <tr><td>no ignore manager</td><td>filters nothing</td><td><span class="st g">guesses</span></td><td>"no ignore config" is treated as "nothing is ignored"</td><td class="src">analysis/index:81</td></tr>
+        <tr><td>no ignore manager</td><td>filters nothing</td><td><span class="st g">guesses</span></td><td>"no ignore manager" is treated as "nothing is ignored". The registry always supplies one; <code>conducks-core.ts:58</code> builds an orchestrator without it, and whether that path runs is unconfirmed</td><td class="src">analysis/index:81 · conducks-core:58</td></tr>
         <tr><td>import unresolved</td><td>matches by basename</td><td><span class="st g">guesses</span></td><td>picks the first same-named file in path order — wrong directory, no warning</td><td class="src">import.ts:125</td></tr>
         <tr><td>call target unknown</td><td>emits the bare name</td><td><span class="st g">guesses</span></td><td>the dangling half of the edge table</td><td class="src">call.ts:48</td></tr>
         <tr><td>capitalised bare name</td><td>calls it a constructor</td><td><span class="st g">guesses</span></td><td><code>CONSTRUCTS</code> vs <code>CALLS</code> decided by capitalisation</td><td class="src">call.ts:68</td></tr>
         <tr><td>heritage clause untyped</td><td>guesses from the name</td><td><span class="st g">guesses</span></td><td><code>I</code>-prefix ⇒ IMPLEMENTS, else EXTENDS</td><td class="src">heritage.ts:46</td></tr>
         <tr><td><code>.h</code> file</td><td>sniffs 2 KB for C++ tokens</td><td><span class="st g">guesses</span></td><td>a C++ header without those tokens routes to the much thinner C query set</td><td class="src">pulse-worker:50</td></tr>
-        <tr><td>coverage has no entry</td><td>reports 0%</td><td><span class="st g">guesses</span></td><td>"not measured" is rendered as "measured, zero covered"</td><td class="src">coverage-bind:60</td></tr>
-        <tr><td>ambiguous symbol</td><td>picks highest gravity</td><td><span class="st g">guesses</span></td><td>no ambiguity signalled; gravity has 102 distinct values across 2,465 nodes, so ties are common</td><td class="src">synapse.ts:39</td></tr>
+        <tr><td>ambiguous symbol</td><td>picks highest gravity</td><td><span class="st g">guesses</span></td><td>no ambiguity signalled; gravity has 102 distinct values across 2,465 nodes, so ties are common and <code>reduce</code> silently keeps the first</td><td class="src">synapse.ts:39</td></tr>
+        <tr><td>coverage has no entry</td><td><code>pct: 0</code> but <code>bound: false</code></td><td><span class="st r">refuses</span></td><td><strong>re-checked and cleared.</strong> The raw record reads 0%, but the flag rides with it and all three consumers filter on <code>r.bound</code> before reporting, so an unmeasured function is never counted as covered-zero</td><td class="src">coverage-bind:83 · coverage.ts:49 · coverage-view.ts:89 · synapse.ts:891</td></tr>
         <tr><td>drift SQL throws</td><td>reports <code>STABLE</code></td><td><span class="st g">guesses</span></td><td>a failed query and genuine stability produce the same verdict</td><td class="src">drift-engine:66</td></tr>
         <tr><td>no baseline pulse</td><td><code>guard</code> passes</td><td><span class="st g">guesses</span></td><td>a gate that never ran reports "✅ risk 0.000 within limits"</td><td class="src">guard.ts:29</td></tr>
-        <tr><td>watcher diff fails</td><td>marks every line changed</td><td><span class="st g">guesses</span></td><td>costs recompute, not correctness</td><td class="src">watcher:180</td></tr>
+        <tr><td>watcher diff fails</td><td>marks every line changed</td><td><span class="st g">guesses</span></td><td>costs recompute, not correctness — and it is the one guess that <em>announces itself</em>, logging "Git diff unavailable" to stderr</td><td class="src">watcher:180</td></tr>
+        <tr><td>drift status vs message</td><td>message fixed, status not</td><td><span class="st g">guesses</span></td><td>a comment at <code>drift-engine:104</code> names this exact failure — "the same failure as reporting STABLE from a check that ran on nothing" — and the fix went to the message half only. The status still reads <code>STABLE</code></td><td class="src">drift-engine:101</td></tr>
         <tr><td>unknown extension</td><td>skips the file entirely</td><td><span class="st r">refuses</span></td><td>but <strong>silently</strong> — no result, no error record, no log line</td><td class="src">pulse-worker:99</td></tr>
         <tr><td>worker subprocess dies</td><td>returns <code>[]</code></td><td><span class="st r">refuses</span></td><td>silently — the whole chunk's files vanish unnamed</td><td class="src">worker-pool:89</td></tr>
         <tr><td>vault locked by a writer</td><td>throws, explains</td><td><span class="st r">refuses</span></td><td>clean — rewrites the error to name the cause</td><td class="src">persistence:111</td></tr>
@@ -394,7 +395,25 @@
       </tbody>
     </table>
   </div>
-  <p class="note"><span class="st">traced</span> — 15 guessing fallbacks, 7 refusing. Every anchor was reported by the lane that owned the file.</p>
+  <p class="note"><span class="st">traced</span> — every row above was re-opened and read line by line after the lanes reported it. One claim did not survive that check and is corrected in place rather than removed: coverage binding carries <code>bound: false</code> and every consumer honours it. Fourteen guessers stand.</p>
+
+  <div class="callout">
+    <strong>Confidence cannot tell a guess from a fact.</strong> The register above is not visible in
+    the data, because every guessing path writes the same confidence its resolved sibling does.
+    <code>call.ts:58</code> stamps <strong>0.85</strong> on a <code>CALLS</code> edge whether the
+    target was resolved to a real file or fell through to a bare name.
+    <code>heritage.ts:38</code> stamps <strong>1.0</strong> whether the query supplied the clause or
+    an <code>I</code>-prefix regex guessed it — a guessed <code>EXTENDS</code> is recorded as
+    certain.
+    <span class="st">traced</span>
+    <br><br>
+    That closes a question this file raised earlier. <code>WHERE confidence &lt; 0.6</code> returns
+    <strong>0</strong> rows while <strong>half</strong> the edge table dangles — not because the
+    guessing never happens, but because guessing was never priced. The confidence column records
+    which <em>rule</em> produced the edge, not how much the edge should be trusted, so no query can
+    separate the two and nothing downstream can weigh them.
+    <span class="st">queried</span> <span class="src">min confidence in this vault: 0.80</span>
+  </div>
 </section>
 
 <section>
