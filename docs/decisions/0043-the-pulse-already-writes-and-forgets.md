@@ -65,10 +65,14 @@ constrained. An earlier attempt at 2 GB, before the writes were batched, failed 
 ## Consequences
 
 todo23 shrinks. Phase 0's question — what an interrupted analyze may leave behind — is **void**:
-committing per wave buys no memory, so there is nothing to trade the rollback guarantee for. Phases 1
-and 2 are worth doing for correctness and clarity and are worth about 30 MB between them, which is
-the honest reason to do them, and Phase 4's prediction of "roughly 500 MB after the read half is
-removed" is withdrawn.
+committing per wave buys no memory, so there is nothing to trade the rollback guarantee for. Phase 4's
+prediction of "roughly 500 MB after the read half is removed" is withdrawn.
+
+This record's own "~30 MB from narrowing the reload" was ALSO wrong, and it was wrong the same way
+everything before it was: derived from a stage delta rather than from an experiment. Phase 1 shipped
+and a two-run A/B of the whole pulse gives 831 MB narrow against 838 MB full — 7 MB, noise. Shrinking
+one stage does not lower a peak another stage sets, which is the very thing this record says RSS is.
+The lesson survives its own author: a stage delta is not a lever until it has been pulled.
 
 The measured peak on that subject is now **881 MB**, down from 1,019 MB, entirely from batching the
 per-row writes (todo22#P8) — the one intervention that did move the number. That is the pattern worth

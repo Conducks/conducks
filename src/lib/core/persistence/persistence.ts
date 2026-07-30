@@ -247,7 +247,17 @@ export class SynapsePersistence {
         name: row.name,
         isShallow: options.shallow === true,
         properties: {
-          ...JSON.parse(row.metadata),
+          // A shallow row carries no blob, so the skeleton fields that used to be pulled out of it
+          // come from their real columns instead. The four that exist ONLY inside `metadata` —
+          // `parentname`, `rank`, `kineticEnergy`, `isExport` — have no reader on this path, which
+          // is what makes dropping the blob safe rather than merely cheaper.
+          ...(options.shallow ? {
+            fingerprint: row.fingerprint,
+            rootId: row.rootId ?? undefined,
+            structureId: row.structureId,
+            isEntryPoint: row.isEntryPoint,
+            range: { start: { line: row.lineStart }, end: { line: row.lineEnd } },
+          } : JSON.parse(row.metadata)),
           name: row.name,
           filePath: row.file,
           kind: row.semantic_kind,
