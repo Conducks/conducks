@@ -16,7 +16,6 @@ import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs";
 
-import { ConducksComponent } from "../../../contracts/types.js";
 import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js";
 
 /**
@@ -42,7 +41,7 @@ const normalizeHttpMethod = (raw: string | undefined): string => {
   return v;
 };
 
-export class ConducksReflector implements ConducksComponent {
+export class ConducksReflector {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
   public description = 'Analyzes source code units and reflects their structure into a Synapse graph.';

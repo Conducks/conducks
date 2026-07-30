@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { ManifestEngine, type TreeKind } from "./manifest-engine.js";
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Manifest Service
@@ -9,10 +8,7 @@ import { ConducksComponent } from "@/contracts/types.js";
  * Owns all filesystem I/O for manifest operations.
  * Delegates computation to ManifestEngine (pure, no I/O).
  */
-export class ManifestService implements ConducksComponent {
-  public readonly id = 'manifest-service';
-  public readonly type = 'analyzer';
-  public readonly description = 'Implements high-fidelity documentation governance and strategic learning recovery.';
+export class ManifestService {
   constructor(private readonly engine: ManifestEngine = new ManifestEngine()) {}
 
   /**

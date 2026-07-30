@@ -1,5 +1,4 @@
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
-import { ConducksComponent } from "@/contracts/types.js";
 
 interface StructuralSignature {
   density: number;
@@ -13,10 +12,7 @@ interface StructuralSignature {
  * 
  * Logic for comparing two structural foundation repositories.
  */
-export class ResonanceAnalyzer implements ConducksComponent {
-  public readonly id = 'resonance-analyzer';
-  public readonly type = 'analyzer';
-  public readonly description = 'Calculates structural resonance and similarity between codebases.';
+export class ResonanceAnalyzer {
   /**
    * Compares the 'current' graph with an 'other' graph.
    */

@@ -3,16 +3,12 @@ import { GVREngine, RefactorResult } from "./gvr-engine.js";
 import { ConducksWatcher } from "./watcher.js";
 import { DriftEngine, DriftResult } from "./drift-engine.js";
 import { AuditService, AuditResult } from "./audit-service.js";
-import { ConducksComponent } from "@/contracts/types.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 
 /**
  * Conducks — Structural Evolution Service 🧬
  */
-export class EvolutionService implements ConducksComponent {
-  public readonly id = 'evolution-service';
-  public readonly type = 'analyzer';
-  public readonly description = 'Tracks structural velocity and chronoscopic structural drift pulses.';
+export class EvolutionService {
   private _watcher: ConducksWatcher | null = null;
   public readonly drift: DriftEngine;
   public readonly auditService: AuditService;

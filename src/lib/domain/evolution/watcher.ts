@@ -40,15 +40,11 @@ interface WatcherOptions {
   onPulse?: (pulse: { event: string; filePath: string }) => void;
 }
 
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Synapse Structural Monitor (Watcher)
  */
-export class ConducksWatcher implements ConducksComponent {
-  public readonly id = 'structural-watcher';
-  public readonly type = 'analyzer';
-  public readonly description = 'Monitors the file system for structural changes and performs real-time incremental pulses.';
+export class ConducksWatcher {
   private watcher: FSWatcher | null = null;
   private linker = new GlobalSymbolLinker();
   private impactAnalyzer = new BlastRadiusAnalyzer();

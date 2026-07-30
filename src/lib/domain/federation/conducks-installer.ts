@@ -3,7 +3,6 @@ import path from "node:path";
 import os from "node:os";
 
 import { fileURLToPath } from "node:url";
-import { ConducksComponent } from "@/contracts/types.js";
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../resources/skills");
 
@@ -60,10 +59,7 @@ export interface SyncReport {
  * working is worse than no copy — it is guidance from an older version that reads as current
  * (CONDUCKS-15).
  */
-export class ConducksInstaller implements ConducksComponent {
-  public readonly id = 'conducks-installer';
-  public readonly type = 'analyzer';
-  public readonly description = 'Syncs the conducks-usage skills (SKILL.md) into ~/.claude/skills (global) and/or <project>/.claude/skills (local).';
+export class ConducksInstaller {
   private readonly dirs: Record<SkillScope, string>;
 
   constructor(

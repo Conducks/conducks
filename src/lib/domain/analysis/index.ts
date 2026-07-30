@@ -10,7 +10,6 @@ import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
 import { HttpServiceLinker } from "@/lib/core/graph/http-service-linker.js";
-import { ConducksComponent } from "@/contracts/types.js";
 
 import { QueryService } from "./query-service.js";
 
@@ -22,10 +21,7 @@ const logger = new Logger("AnalysisDomain");
  * High-level product logic for structural analysis, discovery, 
  * and neural context regeneration.
  */
-export class AnalysisService implements ConducksComponent {
-  public readonly id = 'analysis-service';
-  public readonly type = 'analyzer';
-  public readonly description = 'Orchestrates structural reflection and synapse discovery.';
+export class AnalysisService {
   public readonly query: QueryService;
 
   constructor(

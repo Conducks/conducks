@@ -31,11 +31,7 @@ const __dirname = path.dirname(__filename);
 /**
  * Project Conducks — Application Core
  */
-export class Conducks implements ConducksComponent {
-  public readonly id = "conducks-core";
-  public readonly type = "analyzer";
-  public readonly version = "2.0.0";
-  public readonly description = "The central structural intelligence engine of Conducks.";
+export class Conducks {
 
   public graph = new ConducksGraph();
   public search = new ConducksSearch(this.graph.getGraph());

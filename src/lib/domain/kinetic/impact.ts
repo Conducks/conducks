@@ -6,7 +6,12 @@ import { ConducksComponent } from "@/contracts/types.js";
  * Conducks — Blast Radius Analyzer
  */
 export class BlastRadiusAnalyzer extends BaseAnalyzer implements ConducksComponent {
+  // The ONLY domain class that still carries this contract, because it is the only one actually
+  // registered and looked up by id — `conducks-core.ts` does `registerComponent(...)` and later
+  // `getComponent("blast-radius-analyzer")`. Everything else that used to implement it declared an
+  // id and a type that nothing read (ADR 0052).
   public readonly id = 'blast-radius-analyzer';
+  public readonly type = 'analyzer' as const;
   public readonly description = 'Calculates the recursive structural impact and risk score of changes.';
 
   /**

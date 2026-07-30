@@ -1,12 +1,8 @@
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Pulse Pipeline
  */
-export class ConducksPipeline implements ConducksComponent {
-  public readonly id = 'pulse-pipeline';
-  public readonly type = 'analyzer';
-  public readonly description = 'Orchestrates the topological sorting and processing of the Structural Pulse.';
+export class ConducksPipeline {
   /**
    * Sorts the files in the context by dependency level.
    * Based on Kahn's Algorithm for Topological Sorting.

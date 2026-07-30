@@ -1,15 +1,11 @@
 import { ConducksAdjacencyList, NodeId, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
-import { ConducksComponent } from '@/contracts/types.js';
 
 /**
  * Structural Priority Queue (Min-Heap)
  * 
  * Optimized for Dijkstra traversals in large structural graphs.
  */
-export class PriorityQueue<T extends { weight: number }> implements ConducksComponent {
-  public readonly id = 'priority-queue';
-  public readonly type = 'resolver';
-  public readonly description = 'Optimized Min-Heap for structural graph traversals.';
+export class PriorityQueue<T extends { weight: number }> {
   private heap: T[] = [];
 
   public push(item: T): void {
@@ -65,9 +61,7 @@ export class PriorityQueue<T extends { weight: number }> implements ConducksComp
  * Provides shared traversal utilities for any component that needs to
  * query the Conducks knowledge graph.
  */
-export abstract class BaseAnalyzer implements ConducksComponent {
-  public abstract readonly id: string;
-  public readonly type = 'analyzer';
+export abstract class BaseAnalyzer {
 
   /**
    * Performs a breadth-first search on the graph from a starting point.
@@ -130,9 +124,7 @@ export abstract class BaseAnalyzer implements ConducksComponent {
 /**
  * Conducks — Trace Analyzer
  */
-export class TraceAnalyzer extends BaseAnalyzer implements ConducksComponent {
-  public readonly id = 'trace-analyzer';
-  public readonly description = 'Provides high-fidelity execution tracing and risk-weighted pathfinding.';
+export class TraceAnalyzer extends BaseAnalyzer {
 
   constructor(private readonly graph?: ConducksAdjacencyList) {
     super();

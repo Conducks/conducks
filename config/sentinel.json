@@ -1,13 +1,5 @@
 [
   {
-    "id": "require-conducks-component",
-    "type": "require_heritage",
-    "matchPath": "src/lib/domain/",
-    "matchLabel": "STRUCTURE",
-    "target": "ConducksComponent",
-    "matchSemanticKind": "struct"
-  },
-  {
     "id": "domain-visibility-rule",
     "type": "require_export",
     "matchPath": "src/lib/domain/",

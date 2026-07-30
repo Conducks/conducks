@@ -5,7 +5,6 @@ import { ResonanceAnalyzer } from "./resonance.js";
 import { TestAligner } from "./test-aligner.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Metrics Domain Service
@@ -13,10 +12,7 @@ import { ConducksComponent } from "@/contracts/types.js";
  * Centralized logic for structural risk assessment, 
  * author distribution analysis, and structural similarity.
  */
-export class MetricsService implements ConducksComponent {
-  public readonly id = 'metrics-service';
-  public readonly type = 'analyzer';
-  public readonly description = 'Orchestrates structural risk assessment and kinetic metrics.';
+export class MetricsService {
 
   constructor(
     private graph: ConducksGraph,

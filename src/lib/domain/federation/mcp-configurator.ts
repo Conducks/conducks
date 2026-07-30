@@ -3,15 +3,11 @@ import { writeFileSync, renameSync, copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — MCP Configurator
  */
-export class MCPConfigurator implements ConducksComponent {
-  public readonly id = 'mcp-configurator';
-  public readonly type = 'analyzer';
-  public readonly description = 'Automates the anchoring of the Model Context Protocol in AI desktop environments.';
+export class MCPConfigurator {
   private readonly claudeConfigPath: string;
 
   constructor(

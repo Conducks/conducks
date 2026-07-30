@@ -30,9 +30,7 @@ const workerPath = path.resolve(__dirname, `../../core/parsing/pulse-worker.${is
  * The central orchestration engine for structural analysis.
  * Manages the batch-parallel topological pulse and structural resonance.
  */
-export class AnalyzeOrchestrator implements ConducksComponent {
-  public readonly id = "analyze-orchestrator";
-  public readonly type = "analyzer";
+export class AnalyzeOrchestrator {
 
   public context = new AnalyzeContext();
   private skeletonBuilder = new GraphSkeletonBuilder();

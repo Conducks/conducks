@@ -5,7 +5,6 @@ import { RegressionGuard } from "./guard.js";
 import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
-import { ConducksComponent } from "@/contracts/types.js";
 import path from "node:path";
 import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type SentinelRule } from "./sentinel-rules.js";
 
@@ -14,10 +13,7 @@ import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type Sentinel
  * 
  * Logic for architectural auditing, advisory, and context generation.
  */
-export class GovernanceService implements ConducksComponent {
-  public readonly id = 'governance-service';
-  public readonly type = 'analyzer';
-  public readonly description = 'Orchestrates architectural auditing and structural advice.';
+export class GovernanceService {
   private guard: RegressionGuard | null = null;
   private persistence: SynapsePersistence | null = null;
 

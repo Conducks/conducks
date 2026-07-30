@@ -1,5 +1,4 @@
 import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Mirror Engine
@@ -7,10 +6,7 @@ import { ConducksComponent } from "@/contracts/types.js";
  * Domain service responsible for translating the technical structural graph
  * into a high-fidelity visual wave for the Mirror interface.
  */
-export class MirrorEngine implements ConducksComponent {
-  public readonly id = 'mirror-engine';
-  public readonly type = 'analyzer';
-  public readonly description = 'Translates the structural graph into high-fidelity visual waves and clusters.';
+export class MirrorEngine {
   constructor(private graph: ConducksAdjacencyList) {}
 
   /**

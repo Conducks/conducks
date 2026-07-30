@@ -1,14 +1,10 @@
 import { ConducksSearch } from "./search-engine.js";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Intelligence Service
  */
-export class IntelligenceService implements ConducksComponent {
-  public readonly id = 'intelligence-service';
-  public readonly type = 'analyzer';
-  public readonly description = 'Encapsulates global structural search and cross-project federated linking.';
+export class IntelligenceService {
   constructor(
     public readonly search: ConducksSearch,
     public readonly federation: FederatedLinker

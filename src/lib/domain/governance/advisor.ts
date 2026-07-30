@@ -1,14 +1,10 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, IMPORT_CYCLE_IGNORED_EDGE_TYPES } from '@/lib/core/graph/adjacency-list.js';
 import type { Advice } from '@/types/domain.js';
-import { ConducksComponent } from '@/contracts/types.js';
 
 /**
  * Conducks — Conducks Architecture Advisor
  */
-export class ConducksAdvisor implements ConducksComponent {
-  public readonly id = 'architecture-advisor';
-  public readonly type = 'analyzer';
-  public readonly description = 'Provides structural intuition and deep-dive architectural analysis of the Synapse.';
+export class ConducksAdvisor {
   /**
    * Performs a comprehensive architectural audit.
    */

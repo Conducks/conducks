@@ -2,17 +2,13 @@ import { TraceAnalyzer } from "./trace.js";
 import { BlastRadiusAnalyzer } from "./impact.js";
 import { ConducksFlowEngine } from "./flow-engine.js";
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * Conducks — Kinetic Domain Service
  * 
  * Unifies the 'Pulse' (movement) logic of the structural graph.
  */
-export class KineticService implements ConducksComponent {
-  public readonly id = 'kinetic-service';
-  public readonly type = 'analyzer';
-  public readonly description = 'Unifies execution tracing, blast radius, and data flow lineage.';
+export class KineticService {
   private traceAnalyzer: TraceAnalyzer;
   private impactAnalyzer: BlastRadiusAnalyzer;
   private flowEngine: ConducksFlowEngine;

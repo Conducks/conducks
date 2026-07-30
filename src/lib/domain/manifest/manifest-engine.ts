@@ -1,5 +1,4 @@
 import path from "node:path";
-import { ConducksComponent } from "@/contracts/types.js";
 
 /**
  * A file to be written during bootstrap.
@@ -40,10 +39,7 @@ export interface ManifestRecord {
  * Pure computation only — no filesystem I/O.
  * Callers are responsible for writing the returned data to disk.
  */
-export class ManifestEngine implements ConducksComponent {
-  public readonly id = 'manifest-engine';
-  public readonly type = 'analyzer';
-  public readonly description = 'Implements high-fidelity documentation governance and strategic learning recovery.';
+export class ManifestEngine {
   /**
    * The conducks-docs grammar file set (see the conducks-docs skill and docs-grammar.ts — the SAME
    * grammar `docs-lint` validates). Every scaffolded file MUST pass docs-lint. Flat docs/ — never
