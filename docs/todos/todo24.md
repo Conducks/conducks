@@ -1,5 +1,5 @@
 # todo24 — the fallback register: no degraded answer looks like a confident one
-Status: doing
+Status: done
 - Acceptance: every fallback in the register either refuses or labels its guess, and nothing a pulse computes is left in memory.
 
 ## Context

@@ -1,5 +1,6 @@
 # 0058 — the graph knows about docs; the docs layer still needs no graph
 Status: Accepted
+- Enforced by: tests/unit/domain/analysis/enforced-by-paths.test.ts (the extractor takes every path a value names and no fragment); tests/integration/features/pulse-writes-every-table.test.ts (a doc node never gains gravity)
 - Builds: 0023, 0033
 - Date: 2026-07-31
 
