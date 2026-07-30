@@ -19,8 +19,15 @@ import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js'
  */
 export class IntraLinker {
 
+  // EXTENDS and IMPLEMENTS belong here for the same reason the other four do: `implements Foo` names
+  // a symbol the file IMPORTED, which is exactly what this linker resolves. Leaving them out meant a
+  // heritage target stayed bare forever, and virtual induction then materialised a phantom node for
+  // it — so the graph held BOTH `contracts/types.ts::conduckscomponent` (real, gravity 0.022) and a
+  // bare `conduckscomponent` (invented, gravity 0), and any query keyed on one silently missed the
+  // edges pointing at the other. A genuinely external parent (`extends Error`) still falls through
+  // to induction, which is where an external symbol belongs (ADR 0053).
   private static readonly RESOLVABLE_TYPES = new Set([
-    'CALLS', 'CONSTRUCTS', 'TYPE_REFERENCE', 'ACCESSES'
+    'CALLS', 'CONSTRUCTS', 'TYPE_REFERENCE', 'ACCESSES', 'EXTENDS', 'IMPLEMENTS'
   ]);
 
   private resolver = new TypeScriptResolver();

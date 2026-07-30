@@ -80,6 +80,15 @@ func (d Dog) Speak() string { return "woof" }
     expect(rows.some(r => r.name === 'Dog')).toBe(true);
   });
 
+  it('does not invent a second node for a target that already exists', async () => {
+    // ADR 0053. Heritage was missing from IntraLinker.RESOLVABLE_TYPES, so a heritage target stayed
+    // bare and virtual induction then manufactured a node for it — splitting the graph, with the
+    // edges pointing at the invention and none at the real interface.
+    const rows = await vault.query<{ c: number }>(
+      `SELECT count(*)::INT AS c FROM nodes WHERE lower(name) = 'shape'`);
+    expect(Number(rows[0].c)).toBe(1);
+  });
+
   it('resolves the target to a real symbol, not a bare name', async () => {
     // A bare target would still count as "an edge exists" while pointing at nothing — the failure
     // mode that made half this vault's edges dangle before todo24.

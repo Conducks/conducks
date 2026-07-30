@@ -1,5 +1,6 @@
 # 0052 — a contract is carried only where something consumes it
 Status: Accepted
+- Resolved by: 0053
 - Enforced by: tests/unit/domain/governance/sentinel-scope.test.ts (the sentinel still reports a class that genuinely fails a heritage rule, so removing the domain-wide rule did not disable heritage checking)
 - Date: 2026-07-30
 
@@ -84,4 +85,6 @@ gravity 0.0223, and a bare `conduckscomponent` with gravity 0 created by an unre
 target. Every marker edge that pointed at the bare node was invisible to any query keyed on the real
 one, which means the 31 above may undercount. Whether unresolved heritage targets should be induced
 like call targets are, or refused like ADR 0051 refuses unresolved handovers, is unanswered. Carried
-by todo25#P7.
+by todo25#P7 — ANSWERED by ADR 0053, and the question's two options were both wrong: the target was
+neither external nor unresolvable, it was simply never RESOLVED, because heritage was missing from
+`IntraLinker.RESOLVABLE_TYPES`. 72 of 73 now resolve and the duplicate node is gone.
