@@ -63,14 +63,20 @@ export class DriftEngine {
     // Sequential queries — lazy persistence closes connection between calls
     let exactRows: any[] = [];
     let moveRows: any[] = [];
+    // A failed query and a genuinely quiet codebase both leave these arrays empty, and until this
+    // flag existed the caller could not tell them apart: `deltas.some(...)` is false on an empty
+    // array, so a thrown query reported STABLE — a green verdict from a comparison that never ran.
+    let queryFailed = false;
     try {
       exactRows = await this.persistence.query(exactDriftQuery, [currentPulseId, targetPrevPulseId]);
     } catch (err: any) {
+      queryFailed = true;
       logger.error(`[DriftEngine] Exact drift query failed: ${err.message}`);
     }
     try {
       moveRows = await this.persistence.query(moveQuery, [currentPulseId, targetPrevPulseId, targetPrevPulseId]);
     } catch (err: any) {
+      queryFailed = true;
       logger.error(`[DriftEngine] Move query failed: ${err.message}`);
     }
 
@@ -98,13 +104,25 @@ export class DriftEngine {
       gravity: row.current_gravity
     }));
     
+    // STABLE has to be EARNED. Two states used to collapse into it and both read as good news:
+    // a query that threw, and a pair of pulses with nothing comparable between them (this repo's
+    // own vault: 70 pulses, 0 rows in node_history, verdict "stable across 0 symbols"). The
+    // comment below already named the failure — "the same failure as reporting STABLE from a check
+    // that ran on nothing" — and only the message half was fixed. This is the status half.
+    const status: DriftResult['status'] =
+      queryFailed ? 'UNAVAILABLE'
+      : (exactRows.length === 0 && moves.length === 0) ? 'INSUFFICIENT_DATA'
+      : deltas.some(d => d.velocity > 0.05) ? 'DECAYING'
+      : 'STABLE';
+
     return {
-      status: deltas.some(d => d.velocity > 0.05) ? 'DECAYING' : 'STABLE',
+      status,
       // The message must agree with the status. It used to say "stable" unconditionally, so a
       // DECAYING result printed "Structural resonance stable across N symbols" beside a list of
-      // decay hotspots — reassuring text over a warning, which is the same failure as reporting
-      // STABLE from a check that ran on nothing.
+      // decay hotspots — reassuring text over a warning.
       message: (() => {
+        if (status === 'UNAVAILABLE') return 'Drift could not be assessed: the comparison query failed. This is NOT a stable result.';
+        if (status === 'INSUFFICIENT_DATA') return `No symbols were comparable between these two pulses, so no drift verdict was reached. Check that node_history holds rows for pulse ${targetPrevPulseId}.`;
         const decaying = deltas.filter(d => d.velocity > 0.05).length;
         const renames = moves.length > 0 ? ` ${moves.length} structural rename(s) detected.` : '';
         return decaying > 0
@@ -124,7 +142,9 @@ export class DriftEngine {
 }
 
 export interface DriftResult {
-  status: 'STABLE' | 'DECAYING' | 'IMPROVING' | 'INSUFFICIENT_DATA';
+  // INSUFFICIENT_DATA = the comparison ran and had nothing to compare.
+  // UNAVAILABLE       = the comparison could not run at all. Neither is a pass.
+  status: 'STABLE' | 'DECAYING' | 'IMPROVING' | 'INSUFFICIENT_DATA' | 'UNAVAILABLE';
   message: string;
   deltas: Array<{
     id: string;

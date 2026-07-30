@@ -947,3 +947,49 @@
   update was silently dropped from a commit that claimed it, and once a source edit was.
 - Applies: either check the exit status before committing, or re-read the file and confirm the text
   is there. Anchors rot fastest when the surrounding prose was reworded earlier in the same session.
+
+## An empty result set is the shape of good news AND of a check that never ran
+- Gotcha: `deltas.some(d => d.velocity > 0.05)` is false on an empty array, so a thrown SQL query,
+  a pair of pulses with nothing in common, and a genuinely quiet codebase all produced `STABLE`.
+  `conducks drift` printed "✅ Structural resonance stable across 0 symbols" beside "Total Symbols:
+  0" on this repo's own vault — 70 pulses, 0 rows in `node_history` — and `guard` consumed that
+  result and printed "✅ Stability acceptable: Global risk (0.000)".
+- Why: the count that would have exposed it was already on screen. A verdict derived from a
+  collection has to be derived from whether the collection was POPULATED, not from what is in it.
+  Note the near-miss: `deltas` is filtered to symbols that moved, so a healthy codebase legitimately
+  has none — keying the status off `deltas.length` would have swapped one wrong verdict for another.
+  The row count of the comparison is the discriminator.
+- Applies: any verdict computed with `.some()`, `.every()`, `.filter().length` or a reduce over
+  rows that came from a query. `.every()` is the worst of them — it returns TRUE on empty. ADR 0044.
+
+## A fallback that guesses must not record its guess at the same confidence as a fact
+- Gotcha: `CallProcessor` stamped `confidence: 0.85` on a CALLS edge whether the target resolved to
+  a real file or fell through to a bare name; `HeritageProcessor` stamped `1.0` whether the query
+  captured the clause or an `/^I[A-Z]/` regex guessed it. So `WHERE confidence < 0.6` returned 0
+  rows on a vault where 6,808 of 13,418 edges point at nothing.
+- Why: that zero was read for weeks as "the fuzzy tier never fires". It actually meant guessing was
+  never priced — the column recorded which RULE emitted the edge, not how far to trust it, and no
+  query could separate a resolved edge from a guessed one.
+- Applies: when a confidence, score or weight is a literal at the push site, check whether every
+  branch reaching that push deserves the same number. A constant per edge TYPE is the smell. ADR 0046.
+
+## A two-sided invariant fails on the side nobody asserts
+- Gotcha: `bindNeuralCircuits` wrote `edge.targetId = localId` instead of calling
+  `rebindEdgeTarget`, so the edge pointed at the new target while `inEdges` still filed it under the
+  old one. `impact` walks upstream, so "who calls this" lost exactly the edges the binder repaired.
+- Why: the forward direction stayed correct, and the forward direction is what a test naturally
+  checks. An assertion on `edge.targetId` passes against the broken version — it proves nothing.
+  Both cases in the enforcing test were confirmed RED against a restored bare assignment before the
+  test was accepted.
+- Applies: when a structure keeps a derived index, the test asserts the DERIVED side. `IntraLinker`
+  did the same operation correctly all along — one codebase, one operation, two call sites, one
+  safe. ADR 0045.
+
+## A dead parameter reads as a working switch and sends the next reader to the wrong fix
+- Gotcha: `persistence.save()` accepted `metadataOnly` and never read it. Two call-site comments
+  described it as the switch that suppresses row writes, so the obvious fix for a binder whose
+  output vanished was to flip it — which would have changed nothing. `save()` has never written
+  node or edge rows in any mode.
+- Applies: when a comment explains WHY an option is set, check the callee actually reads it. Removed
+  with both comments; the real mechanism is that anything created after the last wave flush needs
+  its own explicit persist call.

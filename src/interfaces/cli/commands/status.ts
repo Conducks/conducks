@@ -25,8 +25,13 @@ export class StatusCommand implements ConducksCommand {
       if (isPulse && fileArg) {
         console.log(`🛡️  [Conducks Pulse] Resonating structural unit: ${chalk.cyan(fileArg)}`);
         const result = await (registry.analyze as any).resonate(fileArg);
-        if (result.success) {
+        if (result.success && result.persisted) {
           console.log(chalk.green(`Success: ${fileArg} resurrected into the synapse (${result.nodes} nodes).`));
+        } else if (result.success) {
+          // `status` is not on the CLI's write allowlist (cli/index.ts), so its vault handle is
+          // read-only and the micro-pulse skips its own write. Saying "resurrected into the
+          // synapse" here claimed a write that the layer below had already declined to make.
+          console.log(chalk.yellow(`Parsed ${fileArg} (${result.nodes} nodes) — NOT written: 'status' holds a read-only vault handle. Run 'conducks analyze' to persist.`));
         } else {
           console.error(chalk.red(`Failed to pulse ${fileArg}: ${result.error}`));
         }

@@ -69,7 +69,10 @@ export class GuardCommand implements ConducksCommand {
         console.error('\n❌ Architectural regression detected. Blocked.');
         process.exit(1);
       } else {
-        console.log('\n✅ ' + status.message);
+        // Not blocking is not the same as passing. `shouldBlock` returns block:false both for a
+        // clean comparison and for one it could not make (ADR 0044), and prefixing a green tick to
+        // "NOT ASSESSED" reproduced the exact failure that ADR fixes, one layer up.
+        console.log('\n' + (status.message.includes('NOT ASSESSED') ? status.message : '✅ ' + status.message));
         if (status.risk > 0) {
           console.log(`- Minor decay detected: ${status.risk.toFixed(3)} (Acceptable)`);
         }

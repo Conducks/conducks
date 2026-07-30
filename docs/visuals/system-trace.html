@@ -90,6 +90,7 @@
   .st.unver { border-color: var(--unver); background: var(--unver-soft); color: var(--unver); font-weight: 600; }
   .st.g { border-color: var(--dead); background: var(--dead-soft); color: var(--dead); font-weight: 600; }
   .st.r { border-color: var(--live); background: var(--live-soft); color: var(--live); }
+  .st.fx { border-color: var(--live); background: var(--live); color: #fff; font-weight: 600; }
   .src { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-3); }
 
   /* Diagrams are hand-built from CSS boxes on purpose: this file is read straight from the repo as
@@ -254,12 +255,12 @@
     <span class="st">traced</span> <span class="src">analysis/index.ts:208-274 · persistence.ts:547</span>
   </div>
   <div class="callout">
-    <strong>Correction — <code>metadataOnly</code> is a dead parameter.</strong> The pulse calls
-    <code>save({ metadataOnly: true })</code> and two source comments describe it as the switch that
-    suppresses row writes. <code>save()</code> accepts the field and never reads it
-    (<code>persistence.ts:547-579</code>). The effect is as described; the mechanism is not. Flipping
-    the flag would change nothing.
-    <span class="st">traced</span>
+    <strong><code>metadataOnly</code> was a dead parameter — now removed.</strong> The pulse called
+    <code>save({ metadataOnly: true })</code> and two source comments described it as the switch that
+    suppresses row writes. <code>save()</code> accepted the field and never read it. The effect was
+    as described; the mechanism was not, so the obvious fix — flipping the flag — would have changed
+    nothing. Parameter and both comments are gone.
+    <span class="st fx">fixed</span>
   </div>
 </section>
 
@@ -363,7 +364,9 @@
   <div class="section-head">
     <h2>4 · The fallback register</h2>
     <p>The reason this trace exists. A fallback that <strong>refuses</strong> is safe. One that
-    <strong>guesses</strong> writes a value you cannot distinguish from a real one.</p>
+    <strong>guesses</strong> writes a value you cannot distinguish from a real one.
+    <strong>Four are now fixed</strong> — each behind a test confirmed red against the old code.
+    Ten guessers remain, tracked in <code>todo24</code>.</p>
   </div>
   <div class="scroll">
     <table>
@@ -375,14 +378,14 @@
         <tr><td>no project marker found</td><td>uses <code>cwd</code></td><td><span class="st g">guesses</span></td><td>the shape that once anchored an analyze at <code>/private/tmp</code></td><td class="src">bootstrapper:96</td></tr>
         <tr><td>no ignore manager</td><td>filters nothing</td><td><span class="st g">guesses</span></td><td>"no ignore manager" is treated as "nothing is ignored". The registry always supplies one; <code>conducks-core.ts:58</code> builds an orchestrator without it, and whether that path runs is unconfirmed</td><td class="src">analysis/index:81 · conducks-core:58</td></tr>
         <tr><td>import unresolved</td><td>matches by basename</td><td><span class="st g">guesses</span></td><td>picks the first same-named file in path order — wrong directory, no warning</td><td class="src">import.ts:125</td></tr>
-        <tr><td>call target unknown</td><td>emits the bare name</td><td><span class="st g">guesses</span></td><td>the dangling half of the edge table</td><td class="src">call.ts:48</td></tr>
+        <tr><td>call target unknown</td><td>emits the bare name at <strong>0.4</strong></td><td><span class="st fx">fixed</span></td><td>still emitted — dropping it would delete half this graph — but no longer recorded at the resolved edge's 0.85, so a query can finally separate the two</td><td class="src">ADR 0046</td></tr>
         <tr><td>capitalised bare name</td><td>calls it a constructor</td><td><span class="st g">guesses</span></td><td><code>CONSTRUCTS</code> vs <code>CALLS</code> decided by capitalisation</td><td class="src">call.ts:68</td></tr>
-        <tr><td>heritage clause untyped</td><td>guesses from the name</td><td><span class="st g">guesses</span></td><td><code>I</code>-prefix ⇒ IMPLEMENTS, else EXTENDS</td><td class="src">heritage.ts:46</td></tr>
+        <tr><td>heritage clause untyped</td><td>guesses from the name at <strong>0.6</strong></td><td><span class="st fx">fixed</span></td><td><code>I</code>-prefix ⇒ IMPLEMENTS, else EXTENDS — unchanged, but a guessed relation is no longer stored at 1.0 alongside one the query captured</td><td class="src">ADR 0046</td></tr>
         <tr><td><code>.h</code> file</td><td>sniffs 2 KB for C++ tokens</td><td><span class="st g">guesses</span></td><td>a C++ header without those tokens routes to the much thinner C query set</td><td class="src">pulse-worker:50</td></tr>
         <tr><td>ambiguous symbol</td><td>picks highest gravity</td><td><span class="st g">guesses</span></td><td>no ambiguity signalled; gravity has 102 distinct values across 2,465 nodes, so ties are common and <code>reduce</code> silently keeps the first</td><td class="src">synapse.ts:39</td></tr>
         <tr><td>coverage has no entry</td><td><code>pct: 0</code> but <code>bound: false</code></td><td><span class="st r">refuses</span></td><td><strong>re-checked and cleared.</strong> The raw record reads 0%, but the flag rides with it and all three consumers filter on <code>r.bound</code> before reporting, so an unmeasured function is never counted as covered-zero</td><td class="src">coverage-bind:83 · coverage.ts:49 · coverage-view.ts:89 · synapse.ts:891</td></tr>
-        <tr><td>drift SQL throws</td><td>reports <code>STABLE</code></td><td><span class="st g">guesses</span></td><td>a failed query and genuine stability produce the same verdict</td><td class="src">drift-engine:66</td></tr>
-        <tr><td>no baseline pulse</td><td><code>guard</code> passes</td><td><span class="st g">guesses</span></td><td>a gate that never ran reports "✅ risk 0.000 within limits"</td><td class="src">guard.ts:29</td></tr>
+        <tr><td>drift SQL throws</td><td>reports <code>UNAVAILABLE</code></td><td><span class="st fx">fixed</span></td><td>was <code>STABLE</code> — a failed query and genuine stability gave the same verdict. Now three distinct states, and STABLE requires symbols actually compared</td><td class="src">ADR 0044</td></tr>
+        <tr><td>no baseline pulse</td><td><code>guard</code> says NOT ASSESSED</td><td><span class="st fx">fixed</span></td><td>was "✅ risk 0.000 within limits" from a gate that never ran. Still exits zero — a first pulse has no baseline and blocking it would be worse — but no longer claims a pass</td><td class="src">ADR 0044</td></tr>
         <tr><td>watcher diff fails</td><td>marks every line changed</td><td><span class="st g">guesses</span></td><td>costs recompute, not correctness — and it is the one guess that <em>announces itself</em>, logging "Git diff unavailable" to stderr</td><td class="src">watcher:180</td></tr>
         <tr><td>drift status vs message</td><td>message fixed, status not</td><td><span class="st g">guesses</span></td><td>a comment at <code>drift-engine:104</code> names this exact failure — "the same failure as reporting STABLE from a check that ran on nothing" — and the fix went to the message half only. The status still reads <code>STABLE</code></td><td class="src">drift-engine:101</td></tr>
         <tr><td>unknown extension</td><td>skips the file entirely</td><td><span class="st r">refuses</span></td><td>but <strong>silently</strong> — no result, no error record, no log line</td><td class="src">pulse-worker:99</td></tr>
@@ -427,15 +430,17 @@
       <p><code>index.ts:121</code> opens the vault read-only for every command except <code>analyze</code>
       and <code>clean</code>. <code>micro-pulse.ts:68</code> guards its write on
       <code>!readOnly</code> — and the success line sits <em>outside</em> the guard.</p>
-      <p><code>🛡️ [Micro-Pulse] logger.ts resurrected (19 nodes).</code></p>
-      <p>Nothing was written. <span class="st">ran</span></p>
+      <p>Was: <code>🛡️ [Micro-Pulse] logger.ts resurrected (19 nodes).</code> — nothing written.</p>
+      <p>Now the success line sits inside the write branch, and the read-only path reports
+      "parsed … but NOT written". <span class="st fx">fixed</span> <span class="st">ran</span></p>
     </div>
     <div class="card">
       <h3>drift</h3>
       <p>70 pulses in the vault, <strong>0 rows</strong> in <code>node_history</code>.</p>
-      <p><code>✅ Structural resonance stable across 0 symbols.<br/>- Total Symbols: 0</code></p>
-      <p>The count and the verdict are printed by the same code. <code>guard</code> consumes this
-      result, so the commit gate rests on it. <span class="st">ran</span></p>
+      <p>Was: <code>✅ Structural resonance stable across 0 symbols.</code> beside
+      <code>Total Symbols: 0</code>.</p>
+      <p>Now <code>INSUFFICIENT_DATA</code>, and <code>guard</code> reports NOT ASSESSED instead of a
+      pass. <span class="st fx">fixed</span> <span class="st">ran</span> <span class="src">ADR 0044</span></p>
     </div>
   </div>
 </section>
@@ -518,7 +523,9 @@
     <code>edge.targetId</code> directly, leaving <code>inEdges</code> filed under the old target. After
     binding, <code>impact</code> asks "who calls this" and misses exactly the edges that were just
     repaired. <code>IntraLinker</code> does the same operation correctly at
-    <code>linker-intra.ts:141</code>. <span class="st">traced</span>
+    <code>linker-intra.ts:141</code>. Now routed through <code>rebindEdgeTarget</code>; both
+    assertions in the enforcing test were confirmed red against the bare assignment first.
+    <span class="st fx">fixed</span> <span class="src">ADR 0045</span>
   </div>
 </section>
 

@@ -208,9 +208,9 @@ export class AnalysisService implements ConducksComponent {
     this.graph.resonate();
     traceMemory('after PageRank');
 
-    // `resonate()` runs after the last wave flush, and `save({ metadataOnly: true })` below writes
-    // no rows — so cross-service CALLS edges were built in memory and dropped on every pulse. This
-    // is the final gap in todo22#P15: the binder worked, the vault never heard about it.
+    // `resonate()` runs after the last wave flush, and `save()` below writes no node or edge rows
+    // — so cross-service CALLS edges were built in memory and dropped on every pulse. This is the
+    // final gap in todo22#P15: the binder worked, the vault never heard about it.
     const resonanceEdges = this.graph.lastResonanceEdges;
     if (resonanceEdges.length > 0) {
       logger.info(`🛡️ [Resonance] Persisting ${resonanceEdges.length} cross-service edge(s).`);
@@ -267,11 +267,7 @@ export class AnalysisService implements ConducksComponent {
     await this.persistence.snapshotHistory(pulseId);
 
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
-    await this.persistence.save(this.graph.getGraph(), {
-      metadataOnly: true,
-      nodeCount,
-      edgeCount
-    });
+    await this.persistence.save(this.graph.getGraph(), { nodeCount, edgeCount });
 
     } catch (pulseErr) {
       // Any failure before the commit rolls the entire pulse back — no partial graph is left behind.

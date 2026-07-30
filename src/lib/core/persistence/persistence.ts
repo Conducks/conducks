@@ -544,7 +544,11 @@ export class SynapsePersistence {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public async save(graph: any, options: { metadataOnly?: boolean, nodeCount?: number, edgeCount?: number } = {}): Promise<void> {
+  // NOTE: this used to accept a `metadataOnly` flag that the body never read. Two call-site
+  // comments described it as the switch that suppressed row writes, so the obvious fix for a
+  // binder whose output vanished was to flip it — which would have changed nothing. save() writes
+  // metadata and the pulse row and commits; it has never written node or edge rows in any mode.
+  public async save(graph: any, options: { nodeCount?: number, edgeCount?: number } = {}): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     const pulseId = graph.getMetadata('targetPulseId') || `pulse_${Date.now()}`;

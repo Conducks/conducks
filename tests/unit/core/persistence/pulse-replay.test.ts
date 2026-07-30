@@ -95,7 +95,7 @@ const runPulse = async (p: SynapsePersistence, generation: string) => {
   // then gravity for every node. Mixing updates into the same transaction as the inserts is part
   // of the shape, not decoration.
   await p.updateRanks(many(1200, 'sym').map((n, i) => ({ id: n.id, gravity: i / 1200, isEntryPoint: i === 0 })));
-  await p.save(commitStub, { metadataOnly: true, nodeCount: 1801, edgeCount: 1800 });
+  await p.save(commitStub, { nodeCount: 1801, edgeCount: 1800 });
 };
 
 describe('vault write path — replayed in the shape a real pulse produces', () => {

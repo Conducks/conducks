@@ -34,7 +34,7 @@ export class MicroPulseService {
   /**
    * Resonates a single file unit into the Structural Synapse.
    */
-  public async resonate(filePath: string): Promise<{ success: boolean; error?: string; nodes?: number }> {
+  public async resonate(filePath: string): Promise<{ success: boolean; persisted?: boolean; error?: string; nodes?: number }> {
     try {
       const root = chronicle.getProjectDir();
       const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(root, filePath);
@@ -65,10 +65,17 @@ export class MicroPulseService {
       );
 
       // 5. Conducks Purge & Resurrection 🛡️
-      if (!(this.persistence as any).readOnly) {
+      //
+      // The success line used to sit OUTSIDE this branch, so a read-only handle — which is every
+      // CLI invocation except `analyze` and `clean` (cli/index.ts) — printed "resurrected (N
+      // nodes)" and returned success:true having written nothing. `conducks status --mode pulse`
+      // reported 19 nodes into a vault it had not touched. Whether the write happened is now the
+      // thing that decides what is reported.
+      const readOnly = !!(this.persistence as any).readOnly;
+      if (!readOnly) {
         const unitId = `${absolutePath.toLowerCase()}::unit`;
         await this.persistence.purgeUnits([unitId]);
-        
+
         // Flush spectrum nodes to vault directly
         const nodes = spectrum.nodes.map((n: any) => ({
           id: n.metadata?.id || `${absolutePath}::${n.name}`,
@@ -77,13 +84,15 @@ export class MicroPulseService {
           properties: { ...n.metadata, ...n }
         }));
         await this.persistence.saveNodes(nodes, `micro_${Date.now()}`);
+        logger.success(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} resurrected (${spectrum.nodes.length} nodes).`);
+      } else {
+        logger.warn(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} parsed (${spectrum.nodes.length} nodes) but NOT written — the vault is open read-only.`);
       }
 
-      logger.success(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} resurrected (${spectrum.nodes.length} nodes).`);
-      
-      return { 
-        success: true, 
-        nodes: spectrum.nodes.length 
+      return {
+        success: true,
+        persisted: !readOnly,
+        nodes: spectrum.nodes.length
       };
     } catch (err: any) {
       logger.error(`🛡️ [Micro-Pulse] Failed to resonate ${filePath}: ${err.message}`);

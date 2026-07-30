@@ -29,12 +29,27 @@ export class RegressionGuard {
     const drift: DriftResult = await this.driftEngine.compare();
 
     if (drift.status === 'STABLE') {
-      return { 
-        block: false, 
-        risk: 0, 
-        message: 'Structural resonance is stable. No regression detected.', 
+      return {
+        block: false,
+        risk: 0,
+        message: 'Structural resonance is stable. No regression detected.',
         hotspots: [],
         factors: []
+      };
+    }
+
+    // A gate that could not run must not read as a gate that passed. Only STABLE above short-
+    // circuited, so INSUFFICIENT_DATA and UNAVAILABLE fell through to `deltas = []`, `avgRisk = 0`
+    // and printed "✅ Stability acceptable: Global risk (0.000) within limits" — a confident pass
+    // from a comparison that never happened. It still does not block, because a first pulse and a
+    // missing baseline are normal and blocking them would be worse; it says so instead of lying.
+    if (drift.status === 'INSUFFICIENT_DATA' || drift.status === 'UNAVAILABLE') {
+      return {
+        block: false,
+        risk: 0,
+        message: `⚠️  NOT ASSESSED: ${drift.message} No regression check ran, so this is not a pass.`,
+        hotspots: [],
+        factors: ['The structural comparison did not run — treat this gate as absent, not green.']
       };
     }
 

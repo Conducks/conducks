@@ -17,6 +17,10 @@ export class CallProcessor {
 
     let targetId = target.toLowerCase();
     const langId = spectrum.metadata.language || 'typescript';
+    // Starts true so the discovery pass (not resolution mode) is unchanged — those targets are
+    // qualified later during ingestion and by IntraLinker, and marking them low here would
+    // downgrade edges that do get resolved. Only the explicit give-up branch below sets it false.
+    let resolved = true;
 
     // Conducks.6: Deterministic Symbol Resolution (The Great Binding)
     if (context && context.isResolutionMode()) {
@@ -48,6 +52,7 @@ export class CallProcessor {
       // 3. Fallback to Local/Naked Symbol (Will be qualified in graph ingestion)
       else {
         targetId = lowTarget;
+        resolved = false;
       }
     }
 
@@ -55,8 +60,13 @@ export class CallProcessor {
       sourceName: (source || 'unit').toLowerCase(),
       targetName: targetId,
       type: type,
-      confidence: 0.85,
-      metadata: { arguments: args, original: target }
+      // A guess must not be recorded at the same confidence as a fact. Both branches above used to
+      // stamp 0.85, so an edge whose target was resolved to a real file and an edge that fell
+      // through to a bare name were indistinguishable in the vault — which is why
+      // `WHERE confidence < 0.6` returned zero rows on a graph where half the edges dangle. The
+      // column now says how far to trust the edge, not merely which rule emitted it.
+      confidence: resolved ? 0.85 : 0.4,
+      metadata: { arguments: args, original: target, resolved }
     });
   }
 

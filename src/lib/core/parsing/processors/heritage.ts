@@ -29,13 +29,19 @@ export class HeritageProcessor {
     if (!heritage || !source) return;
 
     // Clause-driven when the query knew it; name heuristic only as fallback.
+    const inferred = explicitType === undefined;
     const relType = explicitType ?? (this.isInterfacePattern(heritage) ? 'IMPLEMENTS' : 'EXTENDS');
 
     spectrum.relationships.push({
       sourceName: source || 'UNIT',
       targetName: heritage,
       type: relType,
-      confidence: 1.0
+      // Both branches used to record 1.0, so an EXTENDS the query captured from the clause and an
+      // EXTENDS guessed from an `I`-prefix regex were both stored as certain. The guessed one is
+      // the type of relation, not the existence of it, so it stays a real edge — at a confidence
+      // that says the DIRECTION was inferred.
+      confidence: inferred ? 0.6 : 1.0,
+      metadata: { inferredRelation: inferred }
     });
   }
 

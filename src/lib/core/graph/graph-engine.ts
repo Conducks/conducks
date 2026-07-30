@@ -88,10 +88,11 @@ export class ConducksGraph {
   /**
    * Edges created by the binders during the LAST `resonate()`.
    *
-   * `resonate()` runs after the final wave flush, so anything it adds exists only in memory —
-   * `save({ metadataOnly: true })` writes the pulse record and nothing else. Cross-service CALLS
-   * edges were therefore built correctly and then dropped on every pulse. The caller persists
-   * these (todo22#P15).
+   * `resonate()` runs after the final wave flush, so anything it adds exists only in memory.
+   * `save()` writes the pulse record and metadata — it has NO branch that writes node or edge
+   * rows, in any mode. Cross-service CALLS edges were therefore built correctly and then dropped
+   * on every pulse. The caller persists these explicitly (todo22#P15); anything else a binder
+   * creates after the last flush needs its own save call or it is lost the same way.
    */
   public lastResonanceEdges: ConducksEdge[] = [];
 
@@ -319,7 +320,13 @@ export class ConducksGraph {
         if (!edge.targetId.includes('::') && edge.properties?.rawTarget) {
           const localId = `${node.properties.filePath}::${edge.properties.rawTarget.toLowerCase()}`;
           if (this.graph.getNode(localId)) {
-            edge.targetId = localId;
+            // MUST go through rebindEdgeTarget, not a bare assignment. `inEdges` is a separate
+            // backward index keyed by target, and moving the target without updating it leaves the
+            // edge filed under the id it no longer points at — so `getNeighbors(newTarget,
+            // 'upstream')` misses it while the old target still returns it. That index is what
+            // `impact` walks, which meant "who calls this" lost exactly the edges this binder had
+            // just repaired. IntraLinker has always done it correctly (linker-intra.ts).
+            this.graph.rebindEdgeTarget(edge, localId);
           }
         }
       }
