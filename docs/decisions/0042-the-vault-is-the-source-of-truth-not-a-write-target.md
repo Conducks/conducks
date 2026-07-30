@@ -1,6 +1,14 @@
 # 0042 — the vault is the source of truth; memory holds a working set, not the graph
 Status: Accepted
+- Amended by: 0043
 - Date: 2026-07-30
+
+0043 disproved this record's DIAGNOSIS by experiment while keeping its decision. The transaction
+holds nothing releasable (committing per wave changes peak RSS by 0.03%), DuckDB's cache is not the
+cause (`memory_limit` from 256 MB to 19.1 GiB changes nothing), and the reload now costs +55 MB
+rather than the +235 MB measured here — batching the per-row writes absorbed it. The stage table
+below is what the trace said; it is not what the levers say. Read 0043 for the sizing before acting
+on any number in this record.
 
 ## Context
 

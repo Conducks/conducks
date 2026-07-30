@@ -4,28 +4,32 @@ Status: todo
 
 ## Context
 
-A 974-unit project peaks at 994 MB and the source is 9 MB of it. The read half — `persistence.load()`
-pulling 9,861 nodes and 28,737 edges back after every wave already flushed them — is +293 MB, and the
-consumers it serves read a fraction of what it fetches. ADR 0042 has the per-consumer audit and the
-measured stage table.
+**Read ADR 0043 before any number here.** This todo was written against 0042's diagnosis, which was
+disproved by experiment the same day: the transaction holds nothing releasable, DuckDB's cache is not
+the cause, and the reload is worth ~30 MB rather than the 293 MB 0042 implied. Phase 0 is void as a
+result, and the per-task sizing notes are corrected in place.
 
-Two things this todo does NOT do. It does not touch the write half: the ~200 MB of uncommitted rows
-buys rollback-on-kill, and whether any of that is spendable is Phase 0's question. And it does not
-promise a small pulse — boot and parsing are ~217 MB and legitimate, so a fully converted pulse still
-costs roughly 500 MB here.
+What survives is the DESIGN argument, and it is worth doing on its own terms. Consumers receive a
+materialised graph and pick fields out of it, which is how `bindRouteCircuits` came to read five
+fields that do not exist after a reload. A consumer that states the projection it needs cannot drift
+that way. ADR 0042 has the per-consumer audit.
+
+The peak is 881 MB today, down from 1,019 MB, and every megabyte of that came from batching per-row
+writes (todo22#P8) rather than from anything in this todo. Expect clarity from this work, not memory.
 
 Order matters more than usual. Phase 1 is worth doing alone and de-risks the rest; Phases 3 and 4 may
 turn out unnecessary once Phases 1 and 2 land, and that is a real outcome rather than a shortfall.
 
 ## Phase 0 — decide what an interrupted analyze may leave behind
 - Builds: 0042
-- [ ] The pulse holds ~200 MB of uncommitted rows because the whole analyze is one transaction, which is what makes a killed run leave the previous graph intact instead of a half-written one. Per-wave commits, a savepoint per wave, and writing to a sibling vault and swapping all release that memory and cost different amounts of that guarantee. NO THRESHOLD IS SET for how much is spendable, and no measurement sets it — the question is what an interrupted `analyze` is allowed to leave behind, which is a product call. Write the phase that implements the chosen option once the answer exists; do not write candidate phases now
-- [ ] UNMEASURED: whether a savepoint per wave actually releases transaction-local storage in DuckDB, or merely marks a rollback point while holding the same rows. That decides whether the middle option exists at all. Verify with `CONDUCKS_MEM_TRACE=1` across a multi-wave pulse under a savepoint-per-wave build before the option is offered as real
+- [-] Whether to trade the rollback guarantee for the transaction's memory — VOID, there is nothing to trade. MEASURED (ADR 0043): a build committing at the end of every wave peaks at 918,405,120 bytes against 918,716,416 for the single transaction, a 0.03% difference. The ~200 MB this question was built on was an attribution from stage deltas, not a holding. The atomic pulse costs nothing recoverable, so it stays and no product call is needed
+- [-] Whether a savepoint per wave releases transaction-local storage — VOID for the same reason: the commit-per-wave measurement already bounds what any weaker form could return at ~0
 
 ## Phase 1 — the reload fetches only what its consumers read
 - Builds: 0042
 - [ ] `persistence.load()` selects 15 columns including a `metadata` JSON blob averaging 1382 bytes, and the analyze reload is already `shallow: true` — so the blob is fetched and JSON-parsed to extract a handful of skeleton fields and the rest is dropped. Fetching 9,861 node rows costs +235 MB RSS, about 24 KB per row. Establish which skeleton fields exist as real columns (`fingerprint`, `rootId`, `structureId`, `isEntryPoint`, `lineStart`/`lineEnd`) and which live only inside `metadata` (`parentname`, `rank`, `kineticEnergy`, `isExport`), because that decides whether the blob can be dropped or must be promoted to columns first
 - [ ] Fixed when `CONDUCKS_MEM_TRACE=1 conducks analyze` shows the `load: N node rows fetched` stage under 50 MB, and the vault content is byte-identical to the previous build on the same source — compare with a path-normalised hash of `nodes` and `edges`, since ids embed the project path and a naive diff reports every row as changed
+- [ ] SIZING CORRECTED (ADR 0043): this is worth about **30 MB**, not the 293 MB ADR 0042 implied. The node fetch measured +235 MB before the per-row writes were batched and +55 MB after; cutting the query to `SELECT id, canonicalKind` reaches +25 MB. Do it for correctness and for the projection discipline, not for the memory — anyone expecting 293 MB back will not find it
 
 ## Phase 2 — PageRank reads an edge list, not a graph
 - Depends: todo23#P1
@@ -44,4 +48,4 @@ turn out unnecessary once Phases 1 and 2 land, and that is a real outcome rather
 - Depends: todo23#P3
 - Builds: 0042
 - [ ] Once Phases 1 to 3 land, either `persistence.load()` has no caller inside the pulse, or exactly one remains with a written reason. Fixed when `grep -n "persistence.load" src/lib/domain/analysis/index.ts` returns nothing, or returns one line whose comment names the consumer and why SQL lost for it
-- [ ] Re-measure the whole pulse. ADR 0042 predicts roughly 500 MB on a 974-unit subject after the read half is removed and the write half kept. If the number lands far from that, the stage table in ADR 0042 was wrong somewhere and the gap is the finding — record it rather than adjusting the expectation quietly
+- [ ] Re-measure the whole pulse. ADR 0042's prediction of roughly 500 MB is WITHDRAWN by 0043 — the peak is 881 MB today, down from 1,019 MB entirely through batching the per-row writes, and the read half is worth ~30 MB of what remains. Expect roughly 850 MB after Phases 1-3, and if it lands far from that, record the gap rather than adjusting the expectation quietly
