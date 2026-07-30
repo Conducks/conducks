@@ -44,17 +44,18 @@
 - Applies: don't quote "impact risk = HIGH" — no user has ever seen it. Either surface `risk` or drop
   it; and note its bands are score-based, so they are not comparable to the composite 0-10 risk.
 
-## Coverage over-binds by basename — fixed in one matcher, still live in the other
-- Gotcha: there are TWO independent `matchFile` implementations. `analysis/coverage-bind.ts:57-63` was
-  fixed by todo08 (suffix match now requires a path-segment boundary and a suffix spanning a "/", so
-  64 phantom-FULL index.ts rows became 2). `cli/commands/coverage-view.ts:68-72` still carries the old
-  fallback — `k.endsWith("/" + lf.split("/").pop())` — so one covered `index.ts` binds its lines to
-  every same-named file in the graph.
-- Why: the fix landed in the domain helper; the CLI view has its own inline copy that nothing points
-  at the shared code.
-- Applies: `conducks coverage` (bound path, trustworthy) vs `conducks coverage-view` (still
-  over-matching). Distinct-path functions are real either way; in coverage-view the fill % may be
-  borrowed from a same-named file.
+## Coverage binding was duplicated in two files — the claim that one was BROKEN was stale
+- Gotcha: this entry used to say `cli/commands/coverage-view.ts` still carried the old bare-basename
+  fallback while `analysis/coverage-bind.ts` had been fixed. CHECKED 2026-07-31: both carried the
+  FIXED matcher, character for character. The claim had been true and was repaired without this note
+  being updated — the second stale memory entry found in two days, after the TS/Go heritage one.
+- Why it still mattered: the real defect was DUPLICATION. Two copies of one matcher is the condition
+  under which the next fix reaches only one of them, which is exactly what had happened. The copy is
+  gone; `coverage-view` now calls the shared functions through composition, because a direct
+  `cli -> domain` import is illegal and the boundary gate refused it (ADR 0005).
+- Applies: an entry asserting something is BROKEN needs re-checking before it is cited, the same as
+  one asserting a capability is absent. Prefer recording the structural risk — "two implementations
+  of one rule" — over the symptom, because the symptom gets fixed and the risk does not.
 
 ## A cycle/hub finding is only as good as the edge types it counts
 - Gotcha: three separate false-positive hunts (ADR 0010, 0016, 0017) had one root cause — the graph

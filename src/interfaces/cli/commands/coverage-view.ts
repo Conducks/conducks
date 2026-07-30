@@ -51,41 +51,16 @@ export class CoverageViewCommand implements ConducksCommand {
         if (!isWatch) console.error(chalk.red(`Cannot read coverage file ${covPath}: ${(e as Error).message}`));
         return false;
       }
-      const ranByFile = new Map<string, Set<number>>();
-      for (const [file, d] of Object.entries<any>(cov)) {
-        const lines = new Set<number>();
-        const sm = d.statementMap || {}, s = d.s || {};
-        for (const id of Object.keys(sm)) {
-          if ((s[id] || 0) > 0) {
-            const st = sm[id];
-            const end = (st.end && st.end.line) || st.start.line;
-            for (let ln = st.start.line; ln <= end; ln++) lines.add(ln);
-          }
-        }
-        ranByFile.set(file.toLowerCase(), lines);
-      }
-      const covKeys = [...ranByFile.keys()];
-      // Same matcher as coverage-bind (todo08). Suffix match only on a path-segment boundary AND
-      // only when the suffix carries a directory. The old bare-basename fallback lit EVERY
-      // same-named file FULL from one covered file — 12 index.ts all reading 100%.
-      const suffixMatch = (long: string, short: string): boolean =>
-        long === short ||
-        (short.includes("/") && long.endsWith(short) && long[long.length - short.length - 1] === "/");
-      const matchFile = (f: string): string | undefined => {
-        const lf = f.toLowerCase();
-        return covKeys.find(k => suffixMatch(k, lf) || suffixMatch(lf, k));
-      };
-      const results: Array<{ name: string; file: string; start: number; end: number; pct: number; bound: boolean }> = [];
-      for (const n of nodes) {
-        const key = matchFile(n.file);
-        const span = n.lineEnd - n.lineStart + 1;
-        let hit = 0;
-        if (key) {
-          const ran = ranByFile.get(key)!;
-          for (let ln = n.lineStart; ln <= n.lineEnd; ln++) if (ran.has(ln)) hit++;
-        }
-        results.push({ name: n.name, file: n.file, start: n.lineStart, end: n.lineEnd, pct: Math.round((hit / span) * 100), bound: !!key });
-      }
+      // ONE implementation, shared with `conducks coverage` (ADR 0004, todo25#P8).
+      //
+      // This file used to carry its own copy of the istanbul parse, the suffix matcher and the
+      // binding loop. Both copies are currently correct — `memory.md` claimed this one still had the
+      // old bare-basename fallback that lit every same-named file FULL, and that claim was stale —
+      // but two implementations of one rule is the condition under which the next fix reaches only
+      // one of them, which is exactly what happened last time.
+      const parsed = registry.coverage.parse(covPath);
+      const results = registry.coverage.bindNodes(nodes as any, parsed);
+
       const bound = results.filter(r => r.bound);
       const byFile = new Map<string, typeof bound>();
       for (const r of bound) {

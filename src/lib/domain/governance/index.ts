@@ -125,14 +125,32 @@ export class GovernanceService {
     }
 
     // 2. Orphaned Edge Detection (Refactoring Alerts)
+    let internalOrphans = 0;
+    let externalOrphans = 0;
+
     const allEdges = this.graph.getAllEdges();
     const orphanedEdges = allEdges.filter(e => {
       if (e.type === 'MEMBER_OF') return false; 
       return !this.graph.hasNode(e.targetId);
     });
 
-    let internalOrphans = 0;
-    let externalOrphans = 0;
+    // An edge has TWO ends and this check only ever read one. 199 `PULSES_TO` edges pointed FROM a
+    // variable name — not a node id — and `audit` reported nothing, because a missing SOURCE was
+    // invisible to it (ADR 0051 fixed those edges; the blind spot outlived them). A dangling source
+    // is the same defect as a dangling target and is reported the same way.
+    const sourcelessEdges = allEdges.filter(e => {
+      if (e.type === 'MEMBER_OF') return false;
+      return !this.graph.hasNode(e.sourceId);
+    });
+    for (const e of sourcelessEdges) {
+      internalOrphans++;
+      violations.push({
+        id: e.sourceId,
+        source: e.sourceId,
+        type: 'REFACTOR',
+        message: `REFACTOR-2: Edge from a node that does not exist: [${e.sourceId}] -> [${e.targetId}] (${e.type})`
+      });
+    }
 
     for (const orphan of orphanedEdges) {
       const sourceNode = this.graph.getNode(orphan.sourceId);

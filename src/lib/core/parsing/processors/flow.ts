@@ -28,6 +28,17 @@ export class FlowProcessor {
    * Processes an HTTP route definition (e.g. FastAPI @app.get('/path')).
    */
   public processRoute(path: string, method: string, scope: string, spectrum: PrismSpectrum, framework?: string | null): void {
+    // A route path is a URL path, not arbitrary text (ADR 0055 applied to this processor).
+    //
+    // The capture matched the first string argument of a call, so `db.all("SELECT id FROM nodes …")`
+    // in a diagnostic script produced a node whose id was the SQL statement. Four of them reached
+    // the vault. The rule that separates the two is the same one that separates a symbol from an
+    // expression: a route is a short, single-line path, and it starts with `/` or a parameter.
+    const looksLikeRoute = /^[/:{]/.test(path)
+      && path.length <= 200
+      && !/[\s'"`;]/.test(path.replace(/\{[^}]*\}/g, ''));
+    if (!looksLikeRoute) return;
+
     const routeId = `ROUTE::${path}::${method.toUpperCase()}`;
     const kind = framework ? `${framework}_route` : 'route';
 

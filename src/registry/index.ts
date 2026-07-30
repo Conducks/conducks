@@ -273,6 +273,12 @@ export const registry = {
       );
       return bindCoverage(nodes, parseIstanbul(covPath));
     },
+    // The two halves, for a caller that queries its node set ONCE and re-binds a changing coverage
+    // file against it — `coverage-view --watch`. It carried its own copy of both for that reason;
+    // routing them through composition keeps one implementation without giving `cli` a domain
+    // import, which the boundary gate refuses (ADR 0005, ADR 0048).
+    parse: (covPath: string) => parseIstanbul(covPath),
+    bindNodes: (nodes: CovNode[], parsed: ReturnType<typeof parseIstanbul>) => bindCoverage(nodes, parsed),
     defaultBaselinePath: (projectRoot?: string) => defaultBaselinePath(projectRoot),
     saveBaseline: (results: CoverageResult[], baselinePath?: string) => saveBaseline(results, baselinePath),
     loadBaseline: (baselinePath?: string) => loadBaseline(baselinePath),

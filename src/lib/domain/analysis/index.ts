@@ -6,6 +6,7 @@ import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
 import { buildBoard, enforcedByPaths } from "@/lib/domain/analysis/docs-board.js";
 import { Logger } from "@/lib/core/utils/logger.js";
 import path from "node:path";
+import fsSync from "node:fs";
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import fs from "node:fs/promises";
@@ -322,6 +323,18 @@ export class AnalysisService {
    * Scans for dangling external references and induces virtual nodes to group them 
    * by library/namespace. This transforms "Orphans" into "Ecosystem Members".
    */
+  /** Every `MODULE.md` under `docs/modules`, as a path relative to that directory. */
+  private static walkModuleDocs(dir: string, base: string, out: string[]): string[] {
+    let entries: fsSync.Dirent[];
+    try { entries = fsSync.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) AnalysisService.walkModuleDocs(full, path.join(base, e.name), out);
+      else if (e.name === 'MODULE.md') out.push(path.join(base, e.name));
+    }
+    return out;
+  }
+
   /**
    * GOVERNS edges: a doc file -> the code file it names (ADR 0058).
    *
@@ -362,6 +375,32 @@ export class AnalysisService {
           // `Enforced by` path is relative to the REPO (`tests/unit/…`). Resolving both against the
           // repo root silently produced zero edges, because `<root>/decisions/…` does not exist.
           link(path.resolve(workspaceRoot, 'docs', d.file), path.resolve(workspaceRoot, rel), 'enforced-by');
+        }
+      }
+      // MODULE.md -> the module it documents. The mapping already existed in `docs-board.ts:346`
+      // in the other direction (`src/lib/core/parsing` -> `docs/modules/core/parsing/MODULE.md`);
+      // this reverses it. The doc governs the module's own index file, because a directory is not a
+      // node and the index is what a reader opens first.
+      for (const rel of AnalysisService.walkModuleDocs(path.join(workspaceRoot, 'docs', 'modules'), '', [])) {
+        const modulePath = path.dirname(rel);            // e.g. core/parsing, or domain/analysis/reflector
+        const docFile = path.join(workspaceRoot, 'docs', 'modules', rel);
+        // A module note names one of THREE shapes, and assuming only the first linked 6 of 21:
+        //   a directory with an index      core/kinetic          -> src/lib/domain/kinetic/index.ts
+        //   a single file                  analysis/reflector    -> src/lib/domain/analysis/reflector.ts
+        //   a directory with neither       core/graph            -> the DIRECTORY node itself
+        for (const base of [path.join('src', 'lib', modulePath), path.join('src', modulePath)]) {
+          const abs = path.join(workspaceRoot, base);
+          link(docFile, path.join(abs, 'index.ts'), 'module-doc');
+          link(docFile, `${abs}.ts`, 'module-doc');
+          // The directory node is keyed differently from a unit — it has no `::unit` suffix.
+          const dirId = `directory::${canonicalize(abs)}`;
+          if (graph.hasNode(`${canonicalize(docFile)}::unit`) && graph.hasNode(dirId)) {
+            const id = `GOVERNS::${canonicalize(docFile)}::unit->${dirId}`;
+            if (!seen.has(id)) {
+              seen.add(id);
+              edges.push({ id, sourceId: `${canonicalize(docFile)}::unit`, targetId: dirId, type: 'GOVERNS', confidence: 1.0, properties: { reason: 'module-doc' } });
+            }
+          }
         }
       }
     } catch (err: any) {
