@@ -42,6 +42,20 @@ function resolveSymbolId(symbol: string): string | null {
   return best.id as string;
 }
 
+/**
+ * DuckDB functions that reach outside the vault (ADR 0047).
+ *
+ * A denylist is the wrong shape in general — this one is used because DuckDB's surface is large and
+ * an allowlist of permitted SYNTAX would reject legitimate analytical SQL. It is paired with the
+ * SELECT-prefix check rather than replacing it, and each entry is a function that performs I/O:
+ * file reads, directory listings, network fetches, or attaching another database.
+ */
+const FORBIDDEN_SQL_FUNCTIONS = [
+  'read_text', 'read_blob', 'read_csv', 'read_csv_auto', 'read_json', 'read_json_auto',
+  'read_parquet', 'read_ndjson', 'read_ndjson_auto', 'parquet_scan', 'iceberg_scan',
+  'glob', 'sniff_csv', 'attach', 'copy_from', 'install', 'load',
+];
+
 export const synapseTools: Record<string, Tool> = {
 
   conducks_query: {
@@ -616,9 +630,23 @@ AFTER THIS: Use conducks_explain for deeper analysis of returned symbols.`,
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ sql, path: customPath }: any) => {
-      // MCP4: Only allow SELECT statements
+      // MCP4 + ADR 0047. The prefix check below is NECESSARY and was never SUFFICIENT: DuckDB's core
+      // table functions read files and make network requests from inside a perfectly ordinary
+      // SELECT, and this tool is driven by an LLM agent, which is steerable by content it reads.
+      // Verified against this project's own vault before the guard was added:
+      //
+      //     SELECT * FROM read_text('/etc/hosts')     -> returned the file
+      //
+      // So the guard tests the CAPABILITY, not the shape of the string, and does it with an
+      // allowlist: anything that is not a plain read of the vault's own tables is refused by name.
       if (!sql || !sql.trim().toUpperCase().startsWith('SELECT')) {
         return mcpErr('FORBIDDEN_QUERY', 'Only SELECT statements are allowed.', 'Rewrite your query as a SELECT statement.', false);
+      }
+      const forbidden = FORBIDDEN_SQL_FUNCTIONS.find(fn => new RegExp(`\\b${fn}\\s*\\(`, 'i').test(sql));
+      if (forbidden) {
+        return mcpErr('FORBIDDEN_QUERY',
+          `The function ${forbidden}() reads outside the vault and is not permitted.`,
+          'Query the vault tables directly: nodes, edges, pulses, node_history, metadata, file_hashes.', false);
       }
 
       try {

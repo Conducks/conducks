@@ -125,11 +125,23 @@ export class MirrorServer {
   /**
    * Resonate: Start the server with adaptive port discovery.
    */
-  public start(port: number = 3333): Promise<number> {
+  /**
+   * `host` defaults to loopback (ADR 0047).
+   *
+   * `app.listen(port)` with no host binds EVERY interface, and these routes — /api/synapse,
+   * /api/node/:id, /api/governance, /api/docs — are unauthenticated. The CORS allowlist restricts
+   * browser JavaScript and does nothing to `curl`, so on a shared network or a cloud dev box any
+   * other host could read the full structural and governance dataset of the analysed codebase.
+   * Exposing it is now a deliberate act rather than the default nobody chose.
+   */
+  public start(port: number = 3333, host: string = '127.0.0.1'): Promise<number> {
+    if (host !== '127.0.0.1' && host !== 'localhost') {
+      logger.warn(`⚠️  [Conducks Gateway] Binding ${host} — these API routes have NO authentication. Anyone who can reach this port can read your codebase's full structure.`);
+    }
     return new Promise((resolve) => {
       const tryPort = (p: number) => {
-        this.server = this.app.listen(p, () => {
-          logger.info(`💎 [Conducks Gateway] Structural Resonance Active at http://localhost:${p}`);
+        this.server = this.app.listen(p, host, () => {
+          logger.info(`💎 [Conducks Gateway] Structural Resonance Active at http://${host}:${p}`);
           resolve(p);
         }).on('error', (err: any) => {
           if (err.code === 'EADDRINUSE') {

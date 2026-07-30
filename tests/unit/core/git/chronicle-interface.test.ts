@@ -27,7 +27,7 @@ describe('ChronicleInterface Unit Tests 📜', () => {
 
       expect(files).toContain(path.resolve(mockProjectDir, 'src/main.ts'));
       expect(files).toContain(path.resolve(mockProjectDir, 'docs/README.md'));
-      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('git ls-files'), expect.anything());
+      expect(mockExec).toHaveBeenCalledWith('git', expect.arrayContaining(['ls-files']), expect.anything());
     });
 
     it('should filter out node_modules and .git paths', async () => {
@@ -42,14 +42,16 @@ describe('ChronicleInterface Unit Tests 📜', () => {
 
   describe('Git Intelligence (Conducks)', () => {
     it('should extract commit resonance (count and authors)', async () => {
-      mockExec.mockReturnValueOnce('42\n'); // Count
-      mockExec.mockReturnValueOnce('7\n');  // Authors
+      mockExec.mockReturnValueOnce('42\n'); // rev-list --count
+      // The unique-author count is derived here now: the shell pipe (`| sort -u | wc -l`) is gone
+      // with the shell, so the mock returns the raw `git log --format=%ae` lines instead of a total.
+      mockExec.mockReturnValueOnce('a@x.com\nb@x.com\na@x.com\n');
 
       const res = await chronicle.getCommitResonance('src/main.ts');
 
       expect(res.count).toBe(42);
-      expect(res.authors).toBe(7);
-      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('rev-list --count'), expect.anything());
+      expect(res.authors).toBe(2); // two DISTINCT addresses in the mocked log
+      expect(mockExec).toHaveBeenCalledWith('git', expect.arrayContaining(['rev-list', '--count']), expect.anything());
     });
 
     it('should calculate author distribution for entropy analysis', async () => {
@@ -94,7 +96,7 @@ describe('ChronicleInterface Unit Tests 📜', () => {
     it('should calculate commits behind a base hash', () => {
       mockExec.mockReturnValue('5\n');
       expect(chronicle.getCommitsBehind('oldhash')).toBe(5);
-      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('rev-list oldhash..HEAD'), expect.anything());
+      expect(mockExec).toHaveBeenCalledWith('git', expect.arrayContaining(['rev-list', 'oldhash..HEAD']), expect.anything());
     });
   });
 });

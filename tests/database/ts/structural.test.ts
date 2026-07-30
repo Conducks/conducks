@@ -14,7 +14,13 @@ describe('Synapse Structural Layer Audit', () => {
   let latestPulseId: string;
 
   beforeAll(async () => {
-    persistence = new SynapsePersistence(path.resolve(process.cwd())); // Allow DB creation on fresh runners
+    // READ-ONLY, deliberately (todo25#P5). This suite opens the repository's own live vault, and
+    // opening it read-write took DuckDB's single-writer lock — so all four cases failed whenever a
+    // `conducks mcp` server was attached, which is whenever the tool is actually in use. A suite
+    // that goes red because somebody is using the product is a defect in the suite. The old comment
+    // said read-write allowed "DB creation on fresh runners"; a fresh runner has no graph to audit,
+    // so the honest behaviour there is to skip, which the vault check below now does.
+    persistence = new SynapsePersistence(path.resolve(process.cwd()), true);
     db = await persistence.getRawConnection();
 
     if (!db) {

@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { logger } from '@/lib/core/utils/logger.js';
 
@@ -114,9 +114,33 @@ export class ChronicleInterface {
 
   constructor(
     projectDir: string = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd(),
-    private readonly exec: typeof execSync = execSync
+    private readonly execFile: typeof execFileSync = execFileSync
   ) {
     this.projectDir = path.resolve(projectDir);
+  }
+
+  /**
+   * The ONLY way this class runs git (ADR 0047, CONDUCKS-35).
+   *
+   * Arguments are passed as an ARRAY, so no value can reach a shell. Every command here used to be
+   * a template string run through `execSync`, which is `/bin/sh -c` — and the interpolated value
+   * was a repo-relative path from `git ls-files`, i.e. attacker-controlled in any cloned
+   * repository. Git allows a filename containing a quote and `$()`, so analysing a hostile repo
+   * executed whatever that filename said.
+   *
+   * The timeout is here rather than at each call site for the same reason (ADR 0049): nine call
+   * sites had none, so a corrupted or network-mounted `.git` hung the caller forever. 30s is
+   * generous for a local git operation and the first real timeout report is the measurement that
+   * corrects it.
+   */
+  private git(args: string[], opts: { quiet?: boolean } = {}): string {
+    return this.execFile('git', args, {
+      cwd: this.projectDir,
+      encoding: 'utf-8',
+      timeout: 30_000,
+      maxBuffer: 64 * 1024 * 1024,
+      ...(opts.quiet ? { stdio: ['pipe', 'pipe', 'ignore'] as const } : {}),
+    }) as unknown as string;
   }
 
   public setProjectDir(dir: string): void {
@@ -136,14 +160,17 @@ export class ChronicleInterface {
 
     // 1. Attempt Git Discovery
     try {
-      let commands = ['git ls-files --cached --recurse-submodules', 'git ls-files --others --exclude-standard'];
+      let commands: string[][] = [
+        ['ls-files', '--cached', '--recurse-submodules'],
+        ['ls-files', '--others', '--exclude-standard'],
+      ];
       if (stagedOnly) {
-        commands = ['git diff --cached --name-only'];
+        commands = [['diff', '--cached', '--name-only']];
       }
 
       for (const cmd of commands) {
         try {
-          const output = this.exec(cmd, { cwd: this.projectDir, encoding: 'utf-8' });
+          const output = this.git(cmd);
           (output as string).split('\n')
             .filter(f => f.trim().length > 0)
             .map(f => path.resolve(this.projectDir, f))
@@ -247,9 +274,7 @@ export class ChronicleInterface {
         relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
       }
 
-      const command = `git show :0:${relativePath}`;
-      const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] });
-      return output as string;
+      return this.git(['show', `:0:${relativePath}`], { quiet: true });
     } catch {
       return null;
     }
@@ -270,8 +295,7 @@ export class ChronicleInterface {
    */
   public async getProgenitors(): Promise<string[]> {
     try {
-      const command = 'git submodule status';
-      const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8' });
+      const output = this.git(['submodule', 'status']);
       return (output as string).split('\n')
         .filter(l => l.trim().length > 0)
         .map(l => {
@@ -303,14 +327,14 @@ export class ChronicleInterface {
       }
 
       // 1. Commit Count (Frequency)
-      const countCmd = `git rev-list --count HEAD -- "${relativePath}"`;
-      const countOutput = this.exec(countCmd, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
+      const countOutput = this.git(['rev-list', '--count', 'HEAD', '--', relativePath], { quiet: true });
       const count = parseInt(countOutput.trim(), 10) || 0;
 
       // 2. Unique Authors (Density)
-      const authorsCmd = `git log --format="%ae" -- "${relativePath}" | sort -u | wc -l`;
-      const authorsOutput = this.exec(authorsCmd, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
-      const authors = parseInt(authorsOutput.trim(), 10) || 0;
+      // The unique-author count was `git log ... | sort -u | wc -l`, which needs a shell. Counting
+      // distinct lines here removes the pipe, and with it the only reason this call needed one.
+      const authorLines = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true });
+      const authors = new Set(authorLines.split('\n').map(a => a.trim()).filter(Boolean)).size;
 
       return { count, authors };
     } catch {
@@ -342,8 +366,7 @@ export class ChronicleInterface {
         relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
       }
 
-      const command = `git log --format="%ae" -- "${relativePath}"`;
-      const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
+      const output = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true });
       const authors = output.split('\n').filter(a => a.trim().length > 0);
 
       const distribution: Record<string, number> = {};
@@ -375,8 +398,7 @@ export class ChronicleInterface {
       if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
         relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
       }
-      const command = `git blame --porcelain -- "${relativePath}"`;
-      const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
+      const output = this.git(['blame', '--porcelain', '--', relativePath], { quiet: true });
       const lines = output.split('\n');
 
       let currentAuthor = '';
@@ -419,7 +441,7 @@ export class ChronicleInterface {
    */
   public getHeadHash(): string | null {
     try {
-      const output = this.exec('git rev-parse HEAD', { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
+      const output = this.git(['rev-parse', 'HEAD'], { quiet: true });
       return output.trim();
     } catch {
       return null;
@@ -432,8 +454,7 @@ export class ChronicleInterface {
    */
   public getCommitsBehind(baseHash: string): number | null {
     try {
-      const command = `git rev-list ${baseHash}..HEAD --count`;
-      const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
+      const output = this.git(['rev-list', `${baseHash}..HEAD`, '--count'], { quiet: true });
       const parsed = parseInt(output.trim(), 10);
       // NaN means git answered with something this cannot read, which is not "zero commits".
       return Number.isNaN(parsed) ? null : parsed;
