@@ -5,6 +5,8 @@
  * it described live behaviour nothing else covered. Kept as it was, apart from its location.
  */
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { synapseTools } from '@/interfaces/tools/tools/synapse.js';
+import { kineticTools } from '@/interfaces/tools/tools/kinetic.js';
 import { ConducksMCPServer } from '@/interfaces/tools/server.js';
 
 // Mock the MCP SDK Server
@@ -39,15 +41,23 @@ describe('ConducksMCPServer Unit Tests 💎', () => {
     server = new ConducksMCPServer();
   });
 
-  it('should initialize and bootstrap successfully', async () => {
+  // Both cases here used to end in `expect(server).toBeDefined()` after `new ConducksMCPServer()`
+  // had already assigned it — assertions that cannot fail once the constructor returns. The second
+  // was named "should provide resource definitions" and checked nothing of the sort, which is worse
+  // than no test: it reads as coverage on the board and in review (todo25#P5, CONDUCKS-34).
+  it('registers the full tool surface on bootstrap', async () => {
     await server.bootstrap();
-    // Verify it doesn't throw and initializes internal components
-    expect(server).toBeDefined();
+    const names = Object.keys(synapseTools).concat(Object.keys(kineticTools));
+    // 14 tools ship; the count is asserted so that silently losing one fails here.
+    expect(names.length).toBe(14);
+    expect(names).toEqual(expect.arrayContaining(['conducks_query', 'conducks_impact', 'conducks_docs']));
   });
 
-  it('should provide resource definitions', async () => {
+  it('gives every registered tool a description and an input schema', async () => {
     await server.bootstrap();
-    // Verification via manual registry status mocking below
-    expect(server).toBeDefined();
+    for (const [name, tool] of Object.entries({ ...synapseTools, ...kineticTools })) {
+      expect(`${name}: ${(tool as any).description ?? ''}`.length).toBeGreaterThan(name.length + 20);
+      expect((tool as any).inputSchema?.type).toBe('object');
+    }
   });
 });

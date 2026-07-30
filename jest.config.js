@@ -50,23 +50,11 @@ export default {
 			],
 			setupFilesAfterEnv: [],
 		},
-		{
-			displayName: 'persistence',
-			preset: 'ts-jest/presets/default-esm',
-			testEnvironment: 'node',
-			moduleNameMapper,
-			transform: {
-				'^.+\\.tsx?$': [
-					'ts-jest',
-					{
-						useESM: true,
-					},
-				],
-			},
-			testMatch: ['**/tests/persistence/**/*.test.ts'],
-			modulePathIgnorePatterns: ['<rootDir>/build/'],
-			extensionsToTreatAsEsm: [],
-		},
+		// REMOVED: a 'persistence' project whose testMatch pointed at tests/persistence/**, a directory
+		// that does not exist — so it contributed zero tests while appearing in the config as a whole
+		// suite. The unit project's testPathIgnorePatterns still excludes that path, so recreating the
+		// directory would silently run nothing; delete the ignore too if it ever comes back.
+		// todo25#P5.
 	],
 	verbose: true,
 };

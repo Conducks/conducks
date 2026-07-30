@@ -17,8 +17,32 @@ import os from 'node:os';
 
 export const cliPath = path.resolve('build/src/interfaces/cli/index.js');
 
+/**
+ * Builds when `build/` is MISSING **or STALE** (todo25#P5).
+ *
+ * It used to check only for absence, so an integration test would happily run against a build
+ * compiled before the fix it was written to prove. That happened twice in one session: a test
+ * appeared to pass, and the code under it had never been compiled. A test proving nothing is worse
+ * than no test, because it reports as coverage (CONDUCKS-34).
+ *
+ * Staleness is newest-source-mtime vs the built CLI. It costs one directory walk per suite and
+ * removes an entire class of false green.
+ */
 export function ensureBuild(): void {
   if (!fs.existsSync(cliPath)) {
+    execFileSync('npm', ['run', 'build'], { stdio: 'ignore' });
+    return;
+  }
+  const builtAt = fs.statSync(cliPath).mtimeMs;
+  const newestSource = (dir: string): number => {
+    let newest = 0;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      newest = Math.max(newest, entry.isDirectory() ? newestSource(full) : fs.statSync(full).mtimeMs);
+    }
+    return newest;
+  };
+  if (newestSource(path.resolve('src')) > builtAt) {
     execFileSync('npm', ['run', 'build'], { stdio: 'ignore' });
   }
 }
