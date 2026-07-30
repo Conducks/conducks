@@ -1,7 +1,24 @@
-# Handover — 2026-07-29
+# Handover — 2026-07-30
 Status: current
 
 ## Read this first
+A nine-lane trace of the whole system (`docs/visuals/system-trace.html`) catalogued every fallback
+and labelled each REFUSES or GUESSES. Fourteen guessed. Six are now fixed behind ADRs 0044, 0045 and
+0046, and the three features that computed correct results and persisted none of them — cross-service
+edges, virtual induction, pulse circuits — all land. `todo24` carries the remaining eight.
+
+Two lessons from that work are worth more than the fixes. First, an enforcing test must be confirmed
+RED against the old code: the first version of `virtual-induction.test.ts` asserted on CLI output and
+passed against a build with the persist call removed, because no surface was sensitive to whether the
+rows existed — the same blindness that let the bug live. Second, `PULSES_TO` had a second cause
+hiding behind the first: once the edges persisted, the query that feeds them still never matched
+`const x = f()`. A fix that takes a count from nothing to nothing looks identical to no fix, so count
+the store, not the diff.
+
+Also: `guard` reported a green pass on this vault for weeks while comparing zero symbols, and that
+result was cited as a passing gate several times. It now says NOT ASSESSED.
+
+## Earlier — the vault crash
 The duplicate-key vault crash is root-caused and structurally fixed. It is a DuckDB bug
 (duckdb/duckdb#2241, #16520, #16604) hit by delete+insert of a primary key inside one transaction
 under churn. Found by capturing a failing pulse's SQL (`CONDUCKS_SQL_LOG`, now shipped), replaying

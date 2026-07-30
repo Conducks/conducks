@@ -269,9 +269,9 @@ export class ChronicleInterface {
    * Conducks — Commit Resonance
    * Extracts commit frequency and author count for a specific structural unit.
    */
-  public async getCommitResonance(filePath: string): Promise<{ count: number, authors: number }> {
+  public async getCommitResonance(filePath: string): Promise<{ count: number, authors: number, unavailable?: boolean }> {
     if (!this.isInsideProject(filePath)) {
-      return { count: 0, authors: 0 };
+      return { count: 0, authors: 0, unavailable: true };
     }
 
     try {
@@ -296,7 +296,10 @@ export class ChronicleInterface {
 
       return { count, authors };
     } catch {
-      return { count: 0, authors: 0 };
+      // `unavailable` separates a git failure from a symbol that genuinely has no commits. Both
+      // used to return a bare {0,0}, so entropy scored an unreadable file identically to a
+      // brand-new one — a real risk signal and its absence, reported the same way.
+      return { count: 0, authors: 0, unavailable: true };
     }
   }
   /**
@@ -406,13 +409,18 @@ export class ChronicleInterface {
    * Conducks — Sync Staleness Sensor
    * Returns the number of commits between a base hash and current HEAD.
    */
-  public getCommitsBehind(baseHash: string): number {
+  public getCommitsBehind(baseHash: string): number | null {
     try {
       const command = `git rev-list ${baseHash}..HEAD --count`;
       const output = this.exec(command, { cwd: this.projectDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }) as string;
-      return parseInt(output.trim(), 10) || 0;
+      const parsed = parseInt(output.trim(), 10);
+      // NaN means git answered with something this cannot read, which is not "zero commits".
+      return Number.isNaN(parsed) ? null : parsed;
     } catch {
-      return 0;
+      // NULL, not 0. Returning 0 made "git is unreadable" indistinguishable from "you are current",
+      // and 0 is the value that silences the staleness banner — so the one case where a user most
+      // needs telling produced the reassuring output. Callers decide what to say about null.
+      return null;
     }
   }
 

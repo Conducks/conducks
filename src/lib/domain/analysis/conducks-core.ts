@@ -318,7 +318,7 @@ export class Conducks implements ConducksComponent {
   /**
    * Conducks — Active Staleness Verification
    */
-  public checkStaleness(): { stale: boolean, commitsBehind: number } {
+  public checkStaleness(): { stale: boolean, commitsBehind: number, countUnavailable?: boolean } {
     const graph = this.graph.getGraph();
     const lastCommit = chronicle.getLastPulsedCommit(graph);
     if (!lastCommit) return { stale: false, commitsBehind: 0 };
@@ -327,8 +327,11 @@ export class Conducks implements ConducksComponent {
     if (!currentHead) return { stale: false, commitsBehind: 0 };
     if (currentHead === lastCommit) return { stale: false, commitsBehind: 0 };
 
+    // `null` from getCommitsBehind means git could not answer, which is NOT zero commits behind.
+    // The index is still stale — HEAD differs from the last pulsed commit, which is how we got
+    // here — so the staleness flag stands and only the count is unknown.
     const diff = chronicle.getCommitsBehind(lastCommit);
-    return { stale: true, commitsBehind: diff };
+    return { stale: true, commitsBehind: diff ?? 0, countUnavailable: diff === null };
   }
 
   public audit(): any {

@@ -332,6 +332,12 @@ export class ConducksAdjacencyList {
     // 2. Update edge property
     edge.targetId = newTargetId;
 
+    // A rebind IS a resolution: the target is now known, so an edge that was written as a guess
+    // (ADR 0046 records unresolved call targets at 0.4) is no longer one and must stop reporting
+    // itself as low confidence. Only the guessed band is raised — an edge at 0.6 or above was
+    // never a give-up and keeps whatever its processor decided.
+    if (edge.confidence < 0.6) edge.confidence = 0.85;
+
     // 3. Add to new target's in-set
     if (!this.inEdges.has(newTargetId)) this.inEdges.set(newTargetId, new Set());
     this.inEdges.get(newTargetId)!.add(edge);

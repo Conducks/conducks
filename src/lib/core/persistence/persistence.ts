@@ -731,7 +731,11 @@ export class SynapsePersistence {
       // direction, since `edges` has just taken a large insert in this transaction — but the
       // mechanism is NOT established, and 1,566 statements at 364 ms is not worth guessing at.
       // Capture the statement log and shrink it before trying again: todo22#P8.
-      const stmt = db.prepare(`UPDATE edges SET targetId = ? WHERE id = ?`);
+      // Confidence is raised with the target, for the reason in `rebindEdgeTarget`: a resolved
+      // edge is no longer a guess. Without this, ADR 0046's 0.4 stuck to edges the linker had
+      // since resolved, so the column understated them — a new inaccuracy introduced by the fix
+      // for the old one.
+      const stmt = db.prepare(`UPDATE edges SET targetId = ?, confidence = CASE WHEN confidence < 0.6 THEN 0.85 ELSE confidence END WHERE id = ?`);
       for (const entry of rebinds) {
         await new Promise<void>((r, j) => stmt.run(entry.newTargetId.toLowerCase(), entry.id, (e: Error | null) => e ? j(e) : r()));
       }

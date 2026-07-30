@@ -168,8 +168,14 @@ export async function main() {
         await persistence.load(registry.query.graph.getGraph());
         const status = registry.audit.status();
         if (status.staleness.stale) {
-          const commits = (status.staleness as any).commitsBehind || 0;
-          console.log(`\x1b[33m⚠️  [Conducks] Index is ${commits} commits behind HEAD. Run 'conducks analyze' to refresh structural resonance.\x1b[0m\n`);
+          // "0 commits behind" was printed both when git said zero and when git could not be read
+          // at all — and an unreadable git is exactly when a user needs telling. `getCommitsBehind`
+          // now returns null for that case and the banner says so rather than inventing a count.
+          const st = status.staleness as any;
+          const behind = st.countUnavailable
+            ? 'an unknown number of commits (git could not be read)'
+            : `${st.commitsBehind ?? 0} commits`;
+          console.log(`\x1b[33m⚠️  [Conducks] Index is ${behind} behind HEAD. Run 'conducks analyze' to refresh structural resonance.\x1b[0m\n`);
         }
       }
 

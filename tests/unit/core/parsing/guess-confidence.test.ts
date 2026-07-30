@@ -68,3 +68,30 @@ describe('a heritage edge is priced by whether the clause was captured or inferr
     expect(rel.metadata.inferredRelation).toBe(true);
   });
 });
+
+describe('a rebind clears the guess it was written with', () => {
+  it('raises a low-confidence edge when its target becomes known', async () => {
+    const { ConducksAdjacencyList } = await import('@/lib/core/graph/adjacency-list.js');
+    const g = new ConducksAdjacencyList();
+    g.addNode({ id: 'a.ts::caller', name: 'caller', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);
+    g.addNode({ id: 'a.ts::helper', name: 'helper', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);
+    const edge = { id: 'e1', sourceId: 'a.ts::caller', targetId: 'helper', type: 'CALLS', confidence: 0.4, properties: {} } as any;
+    g.addEdge(edge);
+
+    g.rebindEdgeTarget(edge, 'a.ts::helper');
+    expect(edge.confidence).toBe(0.85);
+  });
+
+  it('does not touch an edge that was never a guess', async () => {
+    const { ConducksAdjacencyList } = await import('@/lib/core/graph/adjacency-list.js');
+    const g = new ConducksAdjacencyList();
+    g.addNode({ id: 'a.ts::x', name: 'x', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);
+    g.addNode({ id: 'a.ts::y', name: 'y', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);
+    // 0.6 is the inferred-heritage band: a real judgement, not a give-up, so a rebind leaves it.
+    const edge = { id: 'e2', sourceId: 'a.ts::x', targetId: 'y', type: 'EXTENDS', confidence: 0.6, properties: {} } as any;
+    g.addEdge(edge);
+
+    g.rebindEdgeTarget(edge, 'a.ts::y');
+    expect(edge.confidence).toBe(0.6);
+  });
+});
