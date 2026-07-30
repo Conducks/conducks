@@ -265,7 +265,12 @@ export class ConducksGraph {
     for (const metaNode of spectrum.nodes) {
       const m = metaNode.metadata || {};
       const nodeId = m.id ? m.id.toLowerCase() : `${filePath}::${metaNode.name.toLowerCase()}`;
-      const parentId = m.parentId ? m.parentId.toLowerCase() : (unitId || null);
+      // A file node's parent is its DIRECTORY, which the skeleton pass already established and
+      // flushed. `unitId` here IS this node's own id, so the old fallback made every unit its own
+      // parent — 334 self-loops, and every parent-walk on them ran to its hop limit and gave up.
+      // Leaving it null lets the skeleton's value stand, because the UPDATE coalesces this column.
+      const computedParent = m.parentId ? m.parentId.toLowerCase() : (unitId || null);
+      const parentId = computedParent === nodeId ? null : computedParent;
       
       this.graph.addNode({
         id: nodeId,

@@ -117,6 +117,23 @@ export function main(): string {
     expect(dangling).toBe(0);
   });
 
+  it('never makes a node its own parent', async () => {
+    // ADR 0056. `ingestSpectrum` computed a parent as `m.parentId ?? unitId`, and for the FILE node
+    // `unitId` IS its own id — 334 self-loops on this project, one per file. Every parent-walk on
+    // them ran to its hop limit and fell back, which read as a clustering problem rather than broken
+    // containment.
+    expect(await count('nodes WHERE parentId = id')).toBe(0);
+  });
+
+  it('keeps the two representations of containment in agreement', async () => {
+    // Containment is stored twice — a MEMBER_OF edge and a parentId column. They disagreed on 334
+    // nodes, and where they disagreed the edge was right.
+    const [row] = await vault.query<{ c: number }>(
+      `SELECT count(*)::INT AS c FROM edges e JOIN nodes n ON e.sourceId = n.id
+       WHERE e.type = 'MEMBER_OF' AND e.targetId <> n.parentId`);
+    expect(Number(row.c)).toBe(0);
+  });
+
   it('prices its guesses — confidence spans more than one value', async () => {
     const [row] = await vault.query<{ c: number }>(
       'SELECT count(DISTINCT confidence)::INT AS c FROM edges');

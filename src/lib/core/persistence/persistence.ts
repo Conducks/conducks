@@ -437,7 +437,17 @@ export class SynapsePersistence {
     }
 
     if (updates.length) {
-      const setters = columns.slice(1).map(c => `${c} = v.${c}`).join(', ');
+      // `parentId` is COALESCED, not assigned — the same rule as `updateFromValues` and for the same
+      // reason, which is why it has to be in BOTH: this is the path `saveNodes` takes, and patching
+      // only the other helper left 384 orphans while looking like a fix.
+      //
+      // Containment is established by the SKELETON pass, which runs once and flushes before any
+      // wave. A wave then re-writes the same node rows with no opinion about the parent, and the
+      // graph is CLEARED between waves, so at that moment the row being updated is the only place
+      // the value still exists. Assigning would erase it.
+      const setters = columns.slice(1)
+        .map(c => c === 'parentId' ? `${c} = COALESCE(v.${c}, ${table}.${c})` : `${c} = v.${c}`)
+        .join(', ');
       const updateHead = `UPDATE ${table} SET ${setters} FROM (VALUES `;
       const updateTail = `) AS v(${columns.join(', ')}) WHERE ${table}.${idColumn} = v.${idColumn}`;
       for (let off = 0; off < updates.length; off += perBatch) {
@@ -1040,7 +1050,18 @@ export class SynapsePersistence {
     const width = columns.length + 1;
     const perBatch = SynapsePersistence.batchSizeFor(width);
     const tuple = `(${Array(width).fill('?').join(',')})`;
-    const setters = columns.map(c => `${c} = v.${c}`).join(', ');
+    // `parentId` is COALESCED rather than assigned. Containment is established by the SKELETON pass,
+    // which runs once and flushes before any wave; a wave then re-writes the same node rows and had
+    // no opinion about the parent, so a plain assignment erased it. The graph is cleared between
+    // waves (ADR 0041), so the writer cannot recover the value from memory either — the only place
+    // it still exists at that moment is the row being updated.
+    //
+    // Narrowed to this one column deliberately: "an update should never erase what it does not know"
+    // is a tempting general rule and a wrong one, because it would also make a genuine clear
+    // impossible. Containment is the case where the writer is known to be uninformed.
+    const setters = columns
+      .map(c => c === 'parentId' ? `${c} = COALESCE(v.${c}, ${table}.${c})` : `${c} = v.${c}`)
+      .join(', ');
     const head = `UPDATE ${table} SET ${setters} FROM (VALUES `;
     const tail = `) AS v(${keyColumn}, ${columns.join(', ')}) WHERE ${table}.${keyColumn} = v.${keyColumn}`;
 

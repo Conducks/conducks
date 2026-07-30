@@ -246,6 +246,11 @@ export class ConducksAdjacencyList {
     const previous = this.nodes.get(id);
     if (previous) this.unindex(id, previous);
 
+    // A node is never its own parent. Enforced at the source now (graph-engine's ingest) and
+    // preserved across waves by COALESCE on the parentId column — an earlier guard here tried to
+    // recover the value from `previous`, which fails because the graph is CLEARED between waves, so
+    // it turned 334 self-loops into 384 orphans instead.
+
     this.nodes.set(id, skeletonNode);
 
     // 3. Update Fast Search Index
