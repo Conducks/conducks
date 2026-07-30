@@ -211,11 +211,12 @@ export class AnalysisService implements ConducksComponent {
     // `resonate()` runs after the last wave flush, and `save()` below writes no node or edge rows
     // — so cross-service CALLS edges were built in memory and dropped on every pulse. This is the
     // final gap in todo22#P15: the binder worked, the vault never heard about it.
-    const resonanceEdges = this.graph.lastResonanceEdges;
-    if (resonanceEdges.length > 0) {
-      logger.info(`🛡️ [Resonance] Persisting ${resonanceEdges.length} cross-service edge(s).`);
-      await this.persistence.saveEdges(resonanceEdges, pulseId);
-    }
+    // MOVED to after linking and induction — see below. Persisting here captured endpoints as they
+    // stood mid-pipeline: `bindPulseCircuits` runs inside `resonate()`, while `IntraLinker` (which
+    // resolves bare call targets) and virtual induction (which materialises external ones) both run
+    // AFTER it. A handover edge written at this point kept a target id that was about to be
+    // resolved, leaving 41 edges pointing from a name that no longer existed anywhere.
+
 
     // 4.1 Commit computed gravity values back to the vault (targeted UPDATE, safe on shallow nodes).
     const gravityValues = Array.from(this.graph.getGraph().getAllNodes()).map(n => ({
@@ -256,10 +257,37 @@ export class AnalysisService implements ConducksComponent {
     // 4.5 [Conducks Virtual Induction] 🏺
     await this.induceVirtualLibraries(this.graph.getGraph(), pulseId);
 
+    // The binders' edges are persisted HERE, once every resolver has run: IntraLinker has rebound
+    // bare call targets and induction has materialised the external ones, so an endpoint that can
+    // resolve has resolved. Anything still unresolved is dropped rather than written — ADR 0051:
+    // both ends of an edge are node ids, or the edge is not written.
+    const builtEdges = this.graph.lastResonanceEdges;
+    if (builtEdges.length > 0) {
+      const g = this.graph.getGraph();
+      const writable = builtEdges.filter(e => g.hasNode(e.sourceId) && g.hasNode(e.targetId));
+      const dropped = builtEdges.length - writable.length;
+      if (writable.length > 0) {
+        await this.persistence.saveEdges(writable, pulseId);
+      }
+      logger.info(
+        `🛡️ [Resonance] Persisted ${writable.length} binder edge(s)` +
+        (dropped > 0 ? `, dropped ${dropped} whose endpoints never resolved` : '') + '.'
+      );
+    }
+
     // 4.6 Taxonomy reconcile (ADR 0013): cut DATA, edge-gate ATOM. Runs last so every reference
     // edge (intra/service/federated/virtual) is present when deciding which atoms are load-bearing.
     traceMemory('after linkers and virtual induction');
     await this.persistence.pruneTaxonomy();
+
+    // Sweep what this pulse did not touch (ADR 0050). Safe HERE and nowhere else: this is the full
+    // pulse, so every live row has just been re-written with this pulseId — including the virtual
+    // nodes induction re-stamps above. The watcher's incremental path must never call this; it
+    // writes a handful of files and would delete the rest of the graph.
+    const swept = await this.persistence.sweepRowsNotInPulse(pulseId);
+    if (swept.nodes > 0 || swept.edges > 0) {
+      logger.info(`🛡️ [Conducks] Swept ${swept.nodes} node(s) and ${swept.edges} edge(s) left by earlier pulses.`);
+    }
 
     // Snapshot AFTER gravity is committed and the taxonomy is settled, so the history records what
     // the pulse actually published rather than an intermediate state. This is what makes `drift`
@@ -297,12 +325,18 @@ export class AnalysisService implements ConducksComponent {
     const externalPrefixes = ['global', 'npm', 'std', 'pip', 'gem', 'mvn', 'go', 'crates'];
     
     let inducedCount = 0;
+    let restampedCount = 0;
     const projectRoot = chronicle.getProjectDir().toLowerCase();
 
     for (const edge of allEdges) {
       const targetId = edge.targetId.toLowerCase();
       
-      // If the target already exists, skip it.
+      // A target the graph already holds needs no NODE created — but if it is a virtual node this
+      // pulse still depends on, it must be RE-STAMPED, or its row keeps the pulseId of whenever it
+      // was first induced. That is what made `nodes.pulseId` mean "first seen" for exactly this
+      // subset, and it is why a sweep keyed on pulseId would have deleted every still-valid external
+      // symbol. Re-collecting it costs one UPDATE and makes the column mean "last seen" for every
+      // row without adding a column (ADR 0050).
       if (graph.hasNode(targetId)) continue;
 
       // Identify External Ecosystem patterns: "namespace::symbol" or "naked_symbol"
@@ -374,9 +408,30 @@ export class AnalysisService implements ConducksComponent {
 
     // The log line only claims what the vault received. Reporting the in-memory count was how this
     // reported success for every pulse it silently discarded.
+    // Re-stamp every virtual node the graph still holds (ADR 0050).
+    //
+    // Collected by PROPERTY, not by walking edges: a `lib::<namespace>` node is never an edge
+    // TARGET — containment is carried on `parentId`, not by a MEMBER_OF edge — so a traversal-based
+    // sweep of "things this pulse referenced" never reaches it. The first version of this did exactly
+    // that and the sweep then deleted both library nodes on the second pulse, which the whole-pulse
+    // test caught. Anything not re-stamped keeps an older pulseId and is swept as stale.
+    const alreadyCollected = new Set(induced.map(n => n.id));
+    for (const n of graph.getAllNodes()) {
+      if (alreadyCollected.has(n.id)) continue;
+      if (!String(n.properties?.filePath ?? '').startsWith('external://')) continue;
+      induced.push({ id: n.id, name: n.properties.name, label: n.label, properties: n.properties });
+      restampedCount++;
+    }
+
     if (induced.length > 0) {
       await this.persistence.saveNodes(induced, pulseId);
-      logger.info(`🛡️ [Conducks Induction] Persisted ${induced.length} virtual ecosystem nodes for ${inducedCount} external reference(s).`);
+      // Counted, not derived by subtraction: `induced` holds a library node AND a symbol node for
+      // some candidates, so the difference would not be the re-stamp count.
+      logger.info(
+        `🛡️ [Conducks Induction] ${inducedCount} new external reference(s)` +
+        (restampedCount > 0 ? `, ${restampedCount} re-stamped` : '') +
+        ` — ${induced.length} row(s) written.`
+      );
     }
   }
 }

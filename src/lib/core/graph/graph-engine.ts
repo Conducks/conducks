@@ -119,6 +119,9 @@ export class ConducksGraph {
       // split exactly once.
       let producersByName: Map<string, ConducksEdge> | null = null;
       const calls: ConducksEdge[] = [];
+      // Calls indexed by the SOURCE TEXT of their target, so an assignment's right-hand side can be
+      // matched back to the call that produced it (ADR 0051).
+      const callsByOriginal = new Map<string, ConducksEdge>();
       for (const e of outgoing) {
         if (e.properties?.reason === 'assignment') {
           const produced = e.targetId.split('::').pop();
@@ -127,7 +130,11 @@ export class ConducksGraph {
             if (!producersByName.has(produced)) producersByName.set(produced, e);
           }
         }
-        if (e.type === 'CALLS' && !e.properties?.isResonance) calls.push(e);
+        if (e.type === 'CALLS' && !e.properties?.isResonance) {
+          calls.push(e);
+          const original = String(e.properties?.original ?? '').toLowerCase();
+          if (original && !callsByOriginal.has(original)) callsByOriginal.set(original, e);
+        }
       }
       if (!producersByName || calls.length === 0) continue;
 
@@ -136,14 +143,26 @@ export class ConducksGraph {
         for (const arg of args) {
           const producer = producersByName.get(arg);
           if (producer) {
+            // The SOURCE is the producing CALL's target — the function whose output was handed on —
+            // not the variable that carried it (ADR 0051). `producer.targetId` is the variable name,
+            // which is not a node id, so 199 of these edges used to point FROM something the graph
+            // did not contain. `audit` never saw it because its orphan check reads targets only.
+            //
+            // The assignment edge records its right-hand side in `value`; matching that against the
+            // calls in this same scope recovers the producing call. When it cannot be recovered the
+            // edge is NOT written: a handover whose producer is unknown is a guess, and an edge from
+            // a non-existent node is worse than a missing edge (ADR 0046, CONDUCKS-32).
+            const rhs = String(producer.properties?.value ?? '').toLowerCase().replace(/\(.*$/, '').trim();
+            const producingCall = rhs ? callsByOriginal.get(rhs) : undefined;
+            if (!producingCall) continue;
             // Collected, not just added. `bindPulseCircuits` runs after the last wave flush like
             // every other binder, so an edge that is only added to the in-memory graph is dropped
             // when the pulse commits — the vault held 0 PULSES_TO rows on every project. The
             // caller persists `lastResonanceEdges`; this is the same remedy bindResonance already
             // uses, and the name is now a misnomer for "edges the binders built".
             const edge: ConducksEdge = {
-              id: `PULSE::${producer.targetId}->${call.id}`,
-              sourceId: producer.targetId,
+              id: `PULSE::${producingCall.targetId}->${call.id}`,
+              sourceId: producingCall.targetId,
               targetId: call.targetId,
               type: 'PULSES_TO',
               confidence: 0.7,

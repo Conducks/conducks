@@ -760,6 +760,35 @@ export class SynapsePersistence {
    * lost. Executes via run() inside the active pulse transaction (inPulse), so it commits atomically
    * with save() and rolls back with abortPulse() on any failure — never leaves a half-pruned graph.
    */
+  /**
+   * Delete every row this pulse did not touch (ADR 0050).
+   *
+   * ONLY safe after a FULL pulse. An incremental one — the watcher, a micro-pulse — writes a handful
+   * of files, so sweeping there would delete the entire rest of the graph. The caller is responsible
+   * for that distinction and this method cannot check it, which is why the name says what it does
+   * rather than sounding like maintenance.
+   *
+   * The sweep keys on `pulseId`, which is correct ONLY because induction now re-stamps the virtual
+   * nodes it skips. Before that, those rows kept the pulse that first created them, so this delete
+   * would have removed every still-valid external symbol — measured, 1,653 of them on a two-pulse
+   * vault. That is the counterexample the ADR is built on; do not re-introduce the skip.
+   */
+  public async sweepRowsNotInPulse(pulseId: string): Promise<{ nodes: number; edges: number }> {
+    if (this.readOnly) return { nodes: 0, edges: 0 };
+    await this.ensureVaultOpen();
+
+    const [before] = await this.query<{ n: number; e: number }>(
+      `SELECT (SELECT count(*) FROM nodes WHERE pulseId <> ?)::INT AS n,
+              (SELECT count(*) FROM edges WHERE pulseId <> ?)::INT AS e`, [pulseId, pulseId]);
+
+    // Edges first: an edge outliving its endpoints is the dangling state this project spent a day
+    // measuring, so the order is not incidental.
+    await this.run(`DELETE FROM edges WHERE pulseId <> ?`, [pulseId]);
+    await this.run(`DELETE FROM nodes WHERE pulseId <> ?`, [pulseId]);
+
+    return { nodes: Number(before?.n ?? 0), edges: Number(before?.e ?? 0) };
+  }
+
   public async pruneTaxonomy(): Promise<void> {
     if (this.readOnly) return;
     await this.ensureVaultOpen();

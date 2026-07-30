@@ -90,6 +90,33 @@ export function main(): string {
     expect(dangling).toBe(0);
   });
 
+  it('leaves no row from an earlier pulse behind', async () => {
+    // ADR 0050. Two pulses ran in setup; after the second, every row must carry it. `pulseId` means
+    // LAST seen, which is only true because induction re-stamps the virtual nodes it would otherwise
+    // skip — without that, this sweep deletes every still-valid external symbol.
+    const [{ c }] = await vault.query<{ c: number }>(
+      'SELECT count(DISTINCT pulseId)::INT AS c FROM nodes');
+    expect(Number(c)).toBe(1);
+  });
+
+  it('keeps the induced library nodes across a second pulse', async () => {
+    // The regression this test caught while ADR 0050 was being built: a `lib::<namespace>` node is
+    // never an edge TARGET, so a re-stamp driven by edge traversal never reaches it and the sweep
+    // deleted both on pulse two.
+    const [{ c }] = await vault.query<{ c: number }>(
+      "SELECT count(*)::INT AS c FROM nodes WHERE id LIKE 'lib::%'");
+    expect(Number(c)).toBeGreaterThan(0);
+  });
+
+  it('gives every handover edge two real endpoints', async () => {
+    // ADR 0051. The source used to be the VARIABLE NAME, which is not a node id, so 199 of these
+    // pointed from something the graph did not contain — invisible to `audit`, whose orphan check
+    // reads targets only.
+    const dangling = await count(
+      `edges e LEFT JOIN nodes n ON e.sourceId = n.id WHERE e.type = 'PULSES_TO' AND n.id IS NULL`);
+    expect(dangling).toBe(0);
+  });
+
   it('prices its guesses — confidence spans more than one value', async () => {
     const [row] = await vault.query<{ c: number }>(
       'SELECT count(DISTINCT confidence)::INT AS c FROM edges');
