@@ -32,7 +32,6 @@ import {
   type CoverageSnapshot,
 } from "@/lib/domain/analysis/coverage-baseline.js";
 import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/manifest/index.js";
-import { MirrorEngine } from "@/lib/domain/visual/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
@@ -125,7 +124,6 @@ const resonance = new ResonanceAnalyzer();
 const aligner = new TestAligner();
 const diffEngine = new ConducksDiffEngine();
 const manifestEngine = new ManifestEngine();
-let mirrorEngine = new MirrorEngine(graph.getGraph());
 
 // 4. Domain Facade Consolidation (Service Layer)
 let orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
@@ -341,7 +339,9 @@ export const registry = {
     explainScope: (scope: ReturnType<typeof assessRoot>) => explainScope(scope),
   },
   mirror: {
-    getVisualWave: (layers?: number[], clusters?: string[], spread?: number) => (mirrorEngine as any).getVisualWave(layers, clusters, spread),
+    // `getVisualWave` used to be exposed here from MirrorEngine, which walked the in-memory graph.
+    // The wave is answered from SQL now (ADR 0054) and nothing called this facade member, so it is
+    // gone with the engine rather than left as a second way to ask the same question.
     // Gateway is wired against the composition-owned graph + persistence singletons.
     createGateway: (projectRoot: string) => new GatewayService(graph, persistence, projectRoot)
   },

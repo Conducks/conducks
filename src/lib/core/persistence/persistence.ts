@@ -789,6 +789,142 @@ export class SynapsePersistence {
     return { nodes: Number(before?.n ?? 0), edges: Number(before?.e ?? 0) };
   }
 
+  /**
+   * The visual wave, answered from SQL (ADR 0042).
+   *
+   * The mirror used to render from the IN-MEMORY graph, which meant `conducks mirror` had to
+   * materialise every node and edge just to draw a few hundred of them — the exact inversion ADR
+   * 0042 argues against, on the one surface where it is least justified, because a dashboard shows a
+   * SUMMARY by construction. It also meant the dashboard served an empty wave whenever the graph had
+   * not been loaded, which is what `mirror` actually did: it sits in STALENESS_BYPASS, so nothing
+   * populated memory and the browser got 0 nodes against a vault holding thousands.
+   *
+   * A `getCompactWave` was called for this through an `as any` and never existed — the cast made a
+   * missing method compile, and the caller's catch turned the runtime failure into an empty result.
+   * This is that method, written.
+   *
+   * TRUNCATION IS REPORTED, never silent: a wave capped at `limit` says so and says by how much, so
+   * a reader can tell "this is the whole graph" from "this is the top slice of it".
+   */
+  public async getVisualWave(
+    layers?: number[],
+    spread: number = 1200,
+    limit: number = 1500
+  ): Promise<{ nodes: any[]; links: any[]; clusters: any[]; truncated: boolean; totalNodes: number }> {
+    await this.ensureVaultOpen();
+
+    // Containment tiers by default (ecosystem -> unit). Symbol-level ranks are excluded because a
+    // force graph of every function is unreadable, not because they are uninteresting.
+    const ranks = (layers && layers.length) ? layers : [0, 1, 2, 3, 4, 5, 6];
+    const rankList = ranks.map(() => '?').join(',');
+
+    const [{ total }] = await this.query<{ total: number }>(
+      `SELECT count(*)::INT AS total FROM nodes WHERE canonicalRank IN (${rankList})`, ranks);
+
+    // Heaviest first, so a truncated wave is the most connected slice rather than an arbitrary one.
+    const rows = await this.query<any>(
+      `SELECT id, name, canonicalKind, canonicalRank, parentId, file, gravity, complexity, risk
+       FROM nodes WHERE canonicalRank IN (${rankList})
+       ORDER BY gravity DESC NULLS LAST LIMIT ${Math.max(1, limit)}`, ranks);
+
+    const ids = rows.map(r => r.id);
+    if (ids.length === 0) return { nodes: [], links: [], clusters: [], truncated: false, totalNodes: 0 };
+
+    // Only edges whose BOTH endpoints survived the slice — a link to an invisible node is a line to
+    // nowhere, which is worse on a canvas than an absent line.
+    const inList = ids.map(() => '?').join(',');
+    const edges = await this.query<any>(
+      `SELECT sourceId, targetId, type, confidence FROM edges
+       WHERE sourceId IN (${inList}) AND targetId IN (${inList}) AND sourceId <> targetId`,
+      [...ids, ...ids]);
+
+    // Clustering follows ADR 0028's rule, which `mirror.engine.detectCluster()` defines: walk up
+    // `parentId` until a DIRECTORY, REPOSITORY or NAMESPACE is reached, and fall back to the global
+    // ecosystem. Grouping by the IMMEDIATE parent instead is a different rule with a different
+    // answer — it produced 404 clusters here against the containers a reader actually recognises —
+    // so the rule is ported rather than replaced, even though the code that runs it moved.
+    //
+    // The parent chain needs the whole tree, but only three columns of it: id, parentId and kind.
+    // That is a projection, not the graph, which is the distinction ADR 0042 draws.
+    const parents = await this.query<{ id: string; parentId: string | null; canonicalKind: string }>(
+      `SELECT id, parentId, canonicalKind FROM nodes`);
+    const byId = new Map(parents.map(n => [n.id, n]));
+    const CONTAINERS = new Set(['DIRECTORY', 'REPOSITORY', 'NAMESPACE']);
+    const clusterOf = (startId: string): string => {
+      let cur: string | null = startId;
+      for (let hops = 0; hops < 20 && cur; hops++) {   // same 20-hop bound as detectCluster
+        const n = byId.get(cur);
+        if (!n) break;
+        if (CONTAINERS.has(String(n.canonicalKind))) return cur;
+        cur = n.parentId;
+      }
+      return 'ecosystem::global';
+    };
+
+    const clusterById = new Map<string, string>();
+    const clusterCounts = new Map<string, number>();
+    for (const r of rows) {
+      const c = clusterOf(r.id);
+      clusterById.set(r.id, c);
+      clusterCounts.set(c, (clusterCounts.get(c) || 0) + 1);
+    }
+    const clusterIds = Array.from(clusterCounts.keys());
+    const centres = new Map<string, { x: number; y: number }>();
+    clusterIds.forEach((cid, i) => {
+      const angle = (i / Math.max(1, clusterIds.length)) * Math.PI * 2;
+      centres.set(cid, { x: Math.cos(angle) * spread, y: Math.sin(angle) * spread });
+    });
+
+    const degree = new Map<string, number>();
+    for (const e of edges) {
+      degree.set(e.sourceId, (degree.get(e.sourceId) || 0) + 1);
+      degree.set(e.targetId, (degree.get(e.targetId) || 0) + 1);
+    }
+
+    const nodes = rows.map((r, i) => {
+      const clusterId = clusterById.get(r.id) || 'ecosystem::global';
+      const centre = centres.get(clusterId) || { x: 0, y: 0 };
+      const deg = degree.get(r.id) || 0;
+      const angle = (i / Math.max(1, rows.length)) * Math.PI * 2;
+      return {
+        id: r.id,
+        name: r.name || String(r.id).split('::').pop(),
+        parentId: r.parentId,
+        group: r.canonicalKind,
+        level: Number(r.canonicalRank ?? 0),
+        clusterId,
+        clusterX: centre.x,
+        clusterY: centre.y,
+        degree: deg,
+        mass: 1 + deg / 10,
+        gravity: Number(r.gravity ?? 0),
+        complexity: Number(r.complexity ?? 0),
+        risk: Number(r.risk ?? 0),
+        filePath: r.file,
+        x: centre.x + Math.cos(angle) * 120,
+        y: centre.y + Math.sin(angle) * 120,
+      };
+    });
+
+    const links = edges.map((e, i) => ({
+      id: `${e.sourceId}->${e.targetId}::${e.type}::${i}`,
+      source: e.sourceId,
+      target: e.targetId,
+      type: e.type,
+      category: (e.type === 'MEMBER_OF' || e.type === 'CONTAINS') ? 'LINEAGE' : 'KINESIS',
+      weight: 1,
+      confidence: Number(e.confidence ?? 1),
+    }));
+
+    const clusters = clusterIds.map(id => ({
+      id,
+      count: clusterCounts.get(id) || 0,
+      ...(centres.get(id) || { x: 0, y: 0 }),
+    }));
+
+    return { nodes, links, clusters, truncated: Number(total) > nodes.length, totalNodes: Number(total) };
+  }
+
   public async pruneTaxonomy(): Promise<void> {
     if (this.readOnly) return;
     await this.ensureVaultOpen();

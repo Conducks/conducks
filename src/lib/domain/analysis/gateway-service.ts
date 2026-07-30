@@ -1,6 +1,5 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
-import { MirrorEngine } from "@/lib/domain/visual/mirror.engine.js";
 import { Logger } from "@/lib/core/utils/logger.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,14 +13,12 @@ const logger = new Logger("GatewayService");
  */
 export class GatewayService {
   private watcher: fs.FSWatcher | null = null;
-  private mirrorEngine: MirrorEngine;
 
   constructor(
     private graph: ConducksGraph,
     private persistence: SynapsePersistence,
     private projectRoot: string
   ) {
-    this.mirrorEngine = new MirrorEngine(this.graph.getGraph());
   }
 
   /**
@@ -68,21 +65,30 @@ export class GatewayService {
   /**
    * Generates a high-fidelity visual wave for the dashboard.
    */
-  public async getWave(layers?: number[], clusters?: string[], spread?: number, compact: boolean = false) {
-    if (compact) {
-      // Bypass heavy in-memory engine and return a compact DB-driven wave
-      try {
-        return await (this.persistence as any).getCompactWave(layers, clusters, spread);
-      } catch (err) {
-        logger.error('Failed to build compact wave', err);
-        return { nodes: [], edges: [] };
-      } finally {
-        // 🛡️ Lock Release
-        await this.persistence.close();
+  /**
+   * The wave is answered from SQL, not from the in-memory graph (ADR 0042, ADR 0054).
+   *
+   * The old default called `MirrorEngine.getVisualWave`, which walks a materialised graph — so
+   * `conducks mirror` had to load every node and edge to draw a few hundred. It also meant the
+   * dashboard served an EMPTY wave whenever nothing had loaded the graph, which is what `mirror`
+   * did: it is in STALENESS_BYPASS, so the browser got 0 nodes against a vault holding thousands.
+   *
+   * The `compact` branch that was supposed to be the SQL path called `getCompactWave` through an
+   * `as any`. No such method existed. The cast made it compile, and the catch below turned the
+   * runtime failure into `{nodes: [], edges: []}` — so the "fast path" was a silent empty result.
+   */
+  public async getWave(layers?: number[], _clusters?: string[], spread?: number, _compact: boolean = false) {
+    try {
+      const wave = await this.persistence.getVisualWave(layers, spread ?? 1200);
+      if (wave.truncated) {
+        logger.info(`🛡️ [Mirror] Showing ${wave.nodes.length} of ${wave.totalNodes} nodes — the heaviest slice, not the whole graph.`);
       }
+      return wave;
+    } catch (err) {
+      logger.error('Failed to build the visual wave', err);
+      // Still an empty result, but no longer a SILENT one — the log above names the cause.
+      return { nodes: [], links: [], clusters: [], truncated: false, totalNodes: 0 };
     }
-
-    return this.mirrorEngine.getVisualWave(layers, clusters, spread);
   }
 
   /**
