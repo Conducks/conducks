@@ -31,6 +31,24 @@ all of them are false — `matchLabel: STRUCTURE` matches 55 interfaces and 42 s
 ignored exactly as thoroughly as one that reports a false green, which is the same failure this
 session has been closing from the other side.
 
+## The architecture audit — 30 Jul 2026
+
+Five dimensions, nine agents, 49 findings. ADRs 0047, 0048 and 0049 hold the decisions; todo25
+carries the work. Two findings are exploitable and were verified by hand, not just reported:
+`conducks_graph_query` returns the contents of `/etc/hosts` for a statement that passes its
+SELECT-only check, and `ChronicleInterface` interpolates repo-controlled filenames into shell strings
+run by `execSync`. Do those before anything else in todo25.
+
+The verdict on the architecture itself was GOOD and should not be lost in the list: one composition
+root, dependency direction genuinely held, and zero static import violations across 198 files —
+measured independently rather than taken from the audit. The weaknesses are all at the edges.
+
+Also worth carrying: the audit ran the shared engine's DEFAULT dimension menu rather than the
+architecture dimensions passed to it, so it is broader than intended (security, robustness, release)
+and thinner on name-pattern and docs-truth. One dimension returned junk outright. The boundary gap
+was filled by a hand-written scanner instead, which is what found the four dynamic-import violations
+the graph-based gate cannot see.
+
 ## Earlier — the vault crash
 The duplicate-key vault crash is root-caused and structurally fixed. It is a DuckDB bug
 (duckdb/duckdb#2241, #16520, #16604) hit by delete+insert of a primary key inside one transaction
