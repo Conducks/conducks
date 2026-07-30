@@ -848,15 +848,18 @@
   mentorseed number quoted before this. Verify `git rev-list --count HEAD` in the fixture, not the
   original.
 
-## A batched UPDATE is safe on `nodes` and FAILS on `edges` — mechanism unknown
+## A multi-row UPDATE on `edges` ALWAYS fails — one row per statement is the only form
 - Gotcha: `UPDATE edges SET targetId = v.targetId FROM (VALUES ...)` fails a pulse with
   `PRIMARY KEY or UNIQUE constraint violation: duplicate key "semantic::...::type_reference"` — a PK
   violation on an id the statement does not write. The identical helper on `nodes` (`updateRanks`,
   `updateKineticBatch`) is safe. Reproducible: revert only the edge call and the pulse runs clean.
-- Why: NOT established. Probably the DuckDB index bug of ADR 0041 (duckdb/duckdb#2241, #16520,
-  #16604) from a third direction — `edges` has just taken a large insert in the same transaction —
-  but that is a guess and it is labelled as one. `updateEdgeTargets` stays per-row with a comment.
-- Applies: do not "fix" the remaining per-row loop in `updateEdgeTargets` without capturing the
-  failure first — `CONDUCKS_SQL_LOG=<f> conducks analyze` then
-  `tools/replay-sql-log.mjs <f> <vault.db> --shrink`. It is 1,566 statements and 364 ms; that is not
-  worth a fourth wrong theory about this bug.
+- Why: not a size threshold, which was the obvious guess and is wrong. Splitting the failing UPDATE
+  against a deterministic replay: **1566, 512, 128, 32 and 8 rows per statement FAIL; 1 row PASSES**.
+  Any multi-row form breaks. Per-row is the only shape that works, not a stopgap.
+- Applies: NOT reproducible in isolation. Four standalone models pass — committed rows updated in a
+  transaction, rows inserted then updated in the same transaction at 1,566 and 23,000, and the whole
+  delete-insert-update sequence a pulse performs. Only the captured statement log reproduces it,
+  exactly like the ADR 0041 bug.
+- Applies: `updateRanks` and `updateKineticBatch` use the SAME multi-row UPDATE shape on `nodes` and
+  work on every subject measured. Whether `nodes` is safe or merely has not hit the breaking state is
+  UNKNOWN — do not read their passing as proof the shape is sound.
