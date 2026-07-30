@@ -123,21 +123,28 @@ export class ImportProcessor {
     }
 
     // 4. Fuzzy Module Fallback (For languages with less strict relative paths)
+    //
+    // UNIQUE MATCH ONLY. This used to return the first candidate in `allPaths` order, which is
+    // arbitrary: in this repository alone 15 basenames are ambiguous, and `index.ts` occurs 24
+    // times, `queries.ts` 13, `resolver.ts` 11. Resolving an unresolved `index` import that way is
+    // right about one time in twenty-four, and the edge it writes is indistinguishable from a
+    // correctly resolved one. Refusing costs an edge; guessing costs a WRONG edge, and a wrong
+    // edge is what `impact` and `trace` then walk.
     const baseName = path.basename(specifier);
-    // Exact basename first — the overwhelmingly common case, and now a map hit rather than a scan.
     const exact = ImportProcessor.basenameIndexFor(allPaths).get(baseName);
-    if (exact && exact.length) return exact[0];
-    // The original matched on startsWith, so a prefix match must still resolve. Only reached when
-    // the exact bucket misses, which is rare, and the ORDER is preserved: the previous loop returned
-    // the first path in `allPaths` whose basename started with the specifier's, so this walks
-    // `allPaths` in the same order rather than the index's insertion order.
+    if (exact && exact.length === 1) return exact[0];
+    if (exact && exact.length > 1) return undefined;
+    // Prefix match, same rule. The original returned the first path whose basename started with the
+    // specifier's; it now collects and only answers when the answer is unambiguous. Short-circuits
+    // on the second hit rather than scanning the rest.
+    let prefixHit: string | undefined;
     for (const p of allPaths) {
       if (path.basename(p).startsWith(baseName)) {
-        return p;
+        if (prefixHit) return undefined;
+        prefixHit = p;
       }
     }
-
-    return undefined;
+    return prefixHit;
   }
 
   /**
