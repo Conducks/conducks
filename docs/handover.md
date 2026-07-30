@@ -66,6 +66,17 @@ three shipped red — verify the vault write path by running `analyze`, not by r
 - Gates: **652 tests pass, 0 failing** · typecheck 0 · `guard` clean · `docs-lint` clean (51 governed docs).
   Two flaky tests, now tracked as `todo22#P13` rather than only mentioned here.
 
+## The architecture call is recorded, not yet built
+ADR 0042: the vault is the source of truth, memory holds a working set. Measured on a 974-unit
+project peaking at 994 MB — the source is 9 MB of it, the JS heap never exceeds 148 MB, and ~293 MB
+is fetching rows BACK after the waves already flushed them. PageRank reads ids and edges; it is
+handed 9,861 node rows with a 1.4 KB JSON blob each. todo23 carries the work, Phase 1 first.
+
+Two things stated in the record so they are not rediscovered as disappointments: the write half's
+~200 MB is deliberately KEPT (it buys rollback-on-kill, and what an interrupted analyze may leave
+behind is a product call in todo23#P0), and a fully converted pulse still costs ~500 MB here because
+boot and parsing are ~217 MB and legitimate.
+
 ## The growing flush is found and fixed
 `analyze` wrote kinetic columns one UPDATE per symbol inside the pulse transaction. Measured: the
 stage grew 1,243 ms to 1,665 ms across 9 waves on a 4,000-file project (11 s to 97 s on a
