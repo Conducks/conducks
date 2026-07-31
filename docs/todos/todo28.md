@@ -1,5 +1,5 @@
 # todo28 — the MCP surface: two dead modes, one unusable tool, and half a graph of noise
-Status: todo
+Status: doing
 - Acceptance: every mode an MCP tool advertises does what its description says, no tool can return a response the transport must reject, and a context request spends its token budget on symbols rather than local variables.
 
 ## Context
@@ -17,14 +17,14 @@ Four tools are genuinely strong and want no work here — `docs` (the whole boar
 vault), `graph_query`, `prune`, `impact`, plus `status --mode map`.
 
 ## Phase 1 — modes that do not do what they say
-- [ ] `conducks_status --mode manifest` returns the `health` payload BYTE FOR BYTE. Verified by comparing the two responses for equality: identical. The enum accepts `manifest`, the description promises "an LLM-optimized technical summary of the codebase", and the handler branches only on `map` and `pulse` — so `manifest` falls through to the health return. Same class as `AuditResult.status` declaring `INSUFFICIENT_DATA` and never returning it (todo22#P3): a declared capability that is absent, failing toward a plausible answer
-- [ ] Decide: implement it, or remove it from the enum and the description. A mode that silently answers a different question is worse than a missing one, because the caller cannot tell
-- [ ] Fixed when either `manifest` returns something `health` does not, or the enum no longer offers it — and a test asserts the two responses differ
+- [x] `conducks_status --mode manifest` returns the `health` payload BYTE FOR BYTE. Verified by comparing the two responses for equality: identical. The enum accepts `manifest`, the description promises "an LLM-optimized technical summary of the codebase", and the handler branches only on `map` and `pulse` — so `manifest` falls through to the health return. Same class as `AuditResult.status` declaring `INSUFFICIENT_DATA` and never returning it (todo22#P3): a declared capability that is absent, failing toward a plausible answer
+- [x] Decided: implement it — see ADR 0063. It composes `registry.audit.audit()` (violations), `hotspots`/`entry_points` templates and `status.stats`/`staleness` into one onboarding digest, the same capabilities `conducks_audit`/`conducks_status --mode map`/`health` already expose in this file, rather than removing a capability a real composition could satisfy
+- [x] Fixed: `manifest` now returns hotspots/entryPoints/a violations summary that `health` carries none of — verified via `JSON.stringify` inequality plus field-level assertions in tests/unit/interfaces/tools/mcp-surface.test.ts (8/8 passing, 6/8 red against the unfixed handler)
 
 ## Phase 2 — a tool that cannot be called over MCP
-- [ ] `conducks_coverage` returned **213,106 characters / 680 functions** and the transport rejected it outright. It has no `limit` parameter, unlike `query`, `prune` and `flows`, and no token budget, unlike `context`. On any project larger than this one it is strictly unusable
-- [ ] It reported `meta.truncated: false` on that response. The field is not merely unhelpful, it is false — the answer WAS cut off, by the transport rather than by the tool. Every other tool sets this honestly
-- [ ] Fixed when a coverage call on this repository returns under 25,000 characters by default, and `meta.truncated` is true whenever the full set was not returned. Verify against the 680-function baseline
+- [x] `conducks_coverage` returned **213,106 characters / 680 functions** and the transport rejected it outright. It has no `limit` parameter, unlike `query`, `prune` and `flows`, and no token budget, unlike `context`. On any project larger than this one it is strictly unusable. Reproduced 2026-07-31 via a fresh stdio JSON-RPC call against build/ (`node build/src/interfaces/cli/index.js mcp`), matching the number in this task exactly
+- [x] It reported `meta.truncated: false` on that response. The field is not merely unhelpful, it is false — the answer WAS cut off, by the transport rather than by the tool. Every other tool sets this honestly. Fixed: `meta.truncated` is now `shown.length < bound.length`
+- [x] Fixed: added `limit` (default 75, max 500). Measured against the 680-function baseline by slicing the real 680-row response at N=30..100 through the tool's own `JSON.stringify(res, null, 2)` formatter — 75 -> 23,279 chars, 80 -> 24,832 chars (too close to the 25,000 ceiling), so 75 was chosen for margin. `summary` still counts the full 680/1/369 baseline; only `functions` is capped
 
 ## Phase 3 — trace does not return a trace
 - [ ] `conducks_trace --mode execution` on `AnalysisService.analyze` returned 10 "steps" including `global::promise`, `global::process` and `fs.stat`, with `synapsepersistence.beginpulse` LAST — it runs first. The result is an unordered neighbour set presented as execution order

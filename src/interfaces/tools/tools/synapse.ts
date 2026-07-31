@@ -233,10 +233,11 @@ Modes:
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ mode, file, path: customPath }: any) => {
       try {
-        // `pulse` re-parses a file and needs a graph to write into. The other two modes report
-        // counts and staleness, which are `count(*)` and two rows of `metadata` — so they must not
-        // pay the ~165 MB graph load to answer "is my index stale".
-        await ensureAnchor(customPath, true, mode === "pulse");
+        // `pulse` re-parses a file and needs a graph to write into. `manifest` runs the same cycle
+        // detection `conducks_audit` uses (registry.audit.audit() walks the in-memory graph), so it
+        // needs the graph loaded too. `health` and `map` report counts, staleness and SQL-templated
+        // hotspots — none of that touches the in-memory graph, so they must not pay the ~165 MB load.
+        await ensureAnchor(customPath, true, mode === "pulse" || mode === "manifest");
         const status = mode === "pulse" ? registry.audit.status() : await registry.audit.statusFromVault();
 
         if (mode === "map") {
@@ -245,6 +246,25 @@ Modes:
             { stats: status.stats, staleness: status.staleness, hotspots },
             { nodeCount: status.stats?.nodeCount, truncated: false }
           );
+        }
+
+        // `manifest` was previously not branched on at all and fell through to the `health` return
+        // below — the enum and the description promised "an LLM-optimized technical summary of the
+        // codebase" while the handler silently answered "is my index stale" instead (todo28#P1).
+        // This composes the onboarding digest from capabilities that already exist elsewhere in this
+        // file (`map`'s hotspots template, `conducks_audit`'s scan) rather than duplicating them.
+        if (mode === "manifest") {
+          const hotspots = await registry.analyze.query.execute('hotspots', [5]);
+          const entryPoints = await registry.analyze.query.execute('entry_points', [5]);
+          const audit = registry.audit.audit();
+          return mcpOk({
+            stats: status.stats,
+            staleness: status.staleness,
+            hotspots,
+            entryPoints,
+            violations: { total: audit.violations.length, sample: audit.violations.slice(0, 5) },
+            discoveriesSummary: `Identified ${audit.stats.ecosystem_dangling} external library symbols (Information only).`,
+          }, { nodeCount: status.stats?.nodeCount, truncated: false });
         }
 
         if (mode === "pulse") {
@@ -901,25 +921,36 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
 branch coverage. A dark function (0%) with no callers is dead/forgotten code; one that was
 covered and is now dark has broken.
 
-WHEN TO USE: See which functions a test run exercised, and spot lost/untested capabilities.`,
+WHEN TO USE: See which functions a test run exercised, and spot lost/untested capabilities.
+Response is capped by \`limit\` (default 75) — the \`summary\` counts (total/full/dark) are always
+computed over the FULL bound set, only the \`functions\` list is capped. Raise \`limit\` for more rows;
+\`meta.truncated\` is honest about whether every bound function was returned.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     inputSchema: {
       type: "object",
       properties: {
         coverage: { type: "string", description: "Path to an istanbul coverage-final.json." },
+        // MCP1: numeric bounds. 75 measured at ~23.3 KB on this repo's own 680-function baseline
+        // (213 KB unbounded) — comfortably under the ~25 KB an MCP response can carry.
+        limit: { type: "number", default: 75, minimum: 1, maximum: 500, description: "Max functions to return in the `functions` list." },
         path: { type: "string", description: "Optional: the project root." }
       },
       required: ["coverage"]
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ coverage, path: customPath }: any) => {
+    handler: async ({ coverage, limit, path: customPath }: any) => {
       try {
         await ensureAnchor(customPath, true);
         const results = await registry.coverage.bind(coverage);
         const bound = results.filter((r: any) => r.bound);
         const full = bound.filter((r: any) => r.pct >= 99).length;
         const dark = bound.filter((r: any) => r.pct === 0).length;
-        return mcpOk({ functions: bound, summary: { total: bound.length, full, dark } }, { nodeCount: bound.length });
+        const cap = Math.min(500, Math.max(1, limit ?? 75));
+        const shown = bound.slice(0, cap);
+        return mcpOk(
+          { functions: shown, summary: { total: bound.length, full, dark } },
+          { nodeCount: shown.length, truncated: shown.length < bound.length }
+        );
       } catch (err: any) {
         return mcpErr('COVERAGE_FAILED', err.message, 'Run conducks analyze first, and pass a valid coverage-final.json.', true);
       } finally {
