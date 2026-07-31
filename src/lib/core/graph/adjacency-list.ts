@@ -168,6 +168,48 @@ import zlib from "zlib";
 const EMPTY_ID_SET: ReadonlySet<NodeId> = new Set<NodeId>();
 
 export class ConducksAdjacencyList {
+  /**
+   * Set while a lazy load is DEFERRED: reading this graph is a bug until it is materialised.
+   *
+   * The registry already guards `infrastructure.graphEngine`, but that getter only sees callers who
+   * go through it. `search`, `kinetic` and `governance` are handed `graph.getGraph()` at
+   * CONSTRUCTION (`registry/index.ts:118,132,138`) and hold the object directly, so the getter never
+   * runs for them — a deferred graph reads as an EMPTY one and every answer is a silent zero. That
+   * is CONDUCKS-13, and it is why `needsGraph` had to be opt-OUT rather than opt-in (todo21#P5).
+   *
+   * The guard therefore lives on the OBJECT rather than on the accessor. Every holder shares this
+   * one instance, whenever they captured it, so one flag covers all of them and no constructor
+   * signature has to change.
+   *
+   * A WRITE clears it (see `addNode`), because a graph someone is filling is not deferred — that is
+   * how `analyze` legitimately reads a graph it built from source rather than from the vault.
+   * Only a read of a graph that is empty AND unfilled can silently answer "nothing".
+   */
+  private deferred: boolean = false;
+
+  /** Mark the graph unreadable until `load()` materialises it. */
+  public markDeferred(): void { this.deferred = true; }
+
+  /** Called by the loader once rows are in: the graph now answers for real. */
+  public markMaterialised(): void { this.deferred = false; }
+
+  public get isDeferred(): boolean { return this.deferred; }
+
+  /**
+   * Fail loudly at the read that would otherwise return a confident nothing.
+   *
+   * The message names the caller's options rather than just the fault, because both are legitimate:
+   * walk the graph after awaiting the load, or answer from SQL — which is the reason the load is
+   * deferred in the first place.
+   */
+  private assertMaterialised(op: string): void {
+    if (!this.deferred) return;
+    throw new Error(
+      `🛡️ [Graph] \`${op}\` read a graph that is not materialised, so it would have answered ` +
+      `"nothing" rather than failing. Await \`registry.infrastructure.ensureGraphLoaded()\` before ` +
+      `walking the graph, or answer from SQL — which is why the load is deferred (todo21#P5).`);
+  }
+
   private nodes: Map<NodeId, ConducksNode> = new Map();
   private outEdges: Map<NodeId, Set<ConducksEdge>> = new Map(); // Forward: source -> edges
   private inEdges: Map<NodeId, Set<ConducksEdge>> = new Map();  // Backward: target -> edges
@@ -236,6 +278,15 @@ export class ConducksAdjacencyList {
    * v1.7.0 (VMC): If isShallow is false, we compress the 'Meat' to preserve memory.
    */
   public addNode(node: ConducksNode): void {
+    // A graph someone is FILLING is not a deferred one, whoever is filling it.
+    //
+    // `analyze` defers the load on purpose (it is in `STALENESS_BYPASS`) and then builds the graph
+    // from source rather than from the vault — so it legitimately reads a graph nothing loaded.
+    // Guarding on the deferral alone conflated that with the real failure and broke 53 tests, which
+    // is the useful half of that mistake: the flag has to mean "empty AND nobody is filling it",
+    // not "the vault load was skipped".
+    this.deferred = false;
+
     const id = node.id.toLowerCase();
     node.id = id;
 
@@ -486,6 +537,7 @@ export class ConducksAdjacencyList {
    * Fetches neighbors in a specific direction.
    */
   public getNeighbors(nodeId: NodeId, direction: 'upstream' | 'downstream' = 'downstream', type?: EdgeType): ConducksEdge[] {
+    this.assertMaterialised("getNeighbors");
     const normalizedId = nodeId.toLowerCase();
     const edgeSet = direction === 'downstream' ? this.outEdges.get(normalizedId) : this.inEdges.get(normalizedId);
     return edgeSet ? Array.from(edgeSet) : [];
@@ -537,6 +589,7 @@ export class ConducksAdjacencyList {
    * v1.7.0 (VMC): Hydrates the node with 'Meat' (properties) from the compressed store.
    */
   public getNode(nodeId: NodeId): ConducksNode | undefined {
+    this.assertMaterialised("getNode");
     const id = nodeId.toLowerCase();
     const skeleton = this.nodes.get(id);
     if (!skeleton) return undefined;
@@ -566,14 +619,17 @@ export class ConducksAdjacencyList {
    * Checks if a node exists (Case-Insensitive).
    */
   public hasNode(nodeId: NodeId): boolean {
+    this.assertMaterialised("hasNode");
     return this.nodes.has(nodeId.toLowerCase());
   }
 
   public getAllNodes(): IterableIterator<ConducksNode> {
+    this.assertMaterialised("getAllNodes");
     return this.nodes.values();
   }
 
   public getNodesMap(): Map<NodeId, ConducksNode> {
+    this.assertMaterialised("getNodesMap");
     return this.nodes;
   }
 
@@ -599,6 +655,7 @@ export class ConducksAdjacencyList {
    * Fetches the complete set of edges from the Synapse Graph.
    */
   public getAllEdges(): ConducksEdge[] {
+    this.assertMaterialised("getAllEdges");
     const edges: ConducksEdge[] = [];
     for (const edgeSet of this.outEdges.values()) {
       edges.push(...Array.from(edgeSet));

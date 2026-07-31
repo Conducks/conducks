@@ -258,8 +258,13 @@ export class RegistryBootstrapper {
       // does — which is what the flag always promised: it was destructured here and never read, so
       // every read-only process paid a full load to answer questions that touched no node.
       if (lazy) {
+        // Mark the GRAPH, not just the registry accessor. Services capture `graph.getGraph()` at
+        // construction and hold it directly, so the accessor guard never runs for them and a
+        // deferred graph reads as an empty one (todo21#P5).
+        graph.getGraph().markDeferred();
         this.pendingLoad = async (current) => {
           await current.load(graph.getGraph());
+          graph.getGraph().markMaterialised();
           await federation.hydrate(graph.getGraph());
         };
         return;
@@ -279,8 +284,10 @@ export class RegistryBootstrapper {
     }
     
     if (lazy) {
+      graph.getGraph().markDeferred();
       this.pendingLoad = async (current) => {
         await current.load(graph.getGraph());
+        graph.getGraph().markMaterialised();
         await federation.hydrate(graph.getGraph());
       };
       return;
