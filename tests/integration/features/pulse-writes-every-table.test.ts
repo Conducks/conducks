@@ -136,6 +136,20 @@ export function main(): string {
     expect(await count('nodes WHERE unitId = id')).toBe(0);
   });
 
+  it('gives every file-backed unit a layer_path', async () => {
+    // todo26. 172 units had none — 141 `.md`, plus `.mjs`/`.cjs`/`.json`/dotfiles — because the
+    // reflector is the only writer that set it and it never runs for a file with no language
+    // provider. Triage reclassified this as "probably an exemption rule, a changelog should not get
+    // a language-derived path"; reading the field settled it the other way. `layer_path` is
+    // `path.relative(projectRoot, file)` lowercased — a PATH, with no language content at all.
+    //
+    // Scoped to units that HAVE a file: the taxonomy legend carries a node named UNIT that
+    // describes the kind rather than being one, and it has no path because it has no file.
+    expect(await count(
+      "nodes WHERE canonicalKind = 'UNIT' AND file IS NOT NULL AND file <> '' " +
+      "AND (layer_path IS NULL OR layer_path = '')")).toBe(0);
+  });
+
   it('keeps the two representations of containment in agreement', async () => {
     // Containment is stored twice — a MEMBER_OF edge and a parentId column. They disagreed on 334
     // nodes, and where they disagreed the edge was right.

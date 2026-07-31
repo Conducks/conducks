@@ -7,6 +7,18 @@ import { logger } from "@/lib/core/utils/logger.js";
  * Analyzes the delta between two structural pulses to detect architectural decay.
  * PageRank velocity, complexity bloat, and coupling entropy.
  */
+/**
+ * The velocity above which a symbol counts as DECAYING.
+ *
+ * There were two thresholds and one word. The human message counted `velocity > 0.05`; the
+ * machine-readable `summary.decay_count` counted `velocity > 0`, which is any movement at all in
+ * the decaying direction, including noise. On this repository they printed 3 and 153 on the same
+ * screen, both labelled "decay", with nothing saying which was meant (todo26).
+ *
+ * One definition now serves both. A reader comparing the sentence to the summary sees one number.
+ */
+export const DECAY_VELOCITY_THRESHOLD = 0.05;
+
 export class DriftEngine {
   constructor(private readonly persistence: SynapsePersistence) {}
 
@@ -124,7 +136,7 @@ export class DriftEngine {
     const status: DriftResult['status'] =
       queryFailed ? 'UNAVAILABLE'
       : (exactRows.length === 0 && moves.length === 0) ? 'INSUFFICIENT_DATA'
-      : deltas.some(d => d.velocity > 0.05) ? 'DECAYING'
+      : deltas.some(d => d.velocity > DECAY_VELOCITY_THRESHOLD) ? 'DECAYING'
       : 'STABLE';
 
     return {
@@ -135,7 +147,7 @@ export class DriftEngine {
       message: (() => {
         if (status === 'UNAVAILABLE') return 'Drift could not be assessed: the comparison query failed. This is NOT a stable result.';
         if (status === 'INSUFFICIENT_DATA') return `No symbols were comparable between these two pulses, so no drift verdict was reached. Check that node_history holds rows for pulse ${targetPrevPulseId}.`;
-        const decaying = deltas.filter(d => d.velocity > 0.05).length;
+        const decaying = deltas.filter(d => d.velocity > DECAY_VELOCITY_THRESHOLD).length;
         const renames = moves.length > 0 ? ` ${moves.length} structural rename(s) detected.` : '';
         const gapCount = deltas.filter(d => d.identityGap).length;
         // Named explicitly rather than folded into "stable" — a gap row was not checked for a
@@ -151,7 +163,7 @@ export class DriftEngine {
       moves,
       summary: {
         total_symbols: exactRows.length,
-        decay_count: deltas.filter(d => d.velocity > 0).length,
+        decay_count: deltas.filter(d => d.velocity > DECAY_VELOCITY_THRESHOLD).length,
         improvement_count: deltas.filter(d => d.velocity < 0).length,
         move_count: moves.length,
         identity_gap_count: deltas.filter(d => d.identityGap).length

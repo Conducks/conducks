@@ -207,6 +207,16 @@ export class GraphSkeletonBuilder {
           canonicalKind: 'UNIT',
           canonicalRank: 3,
           parentId,
+          // Set HERE, for every unit, not only for the ones a language provider claims (todo26).
+          // 172 units — 141 `.md`, plus `.mjs`/`.cjs`/`.json`/dotfiles — had none, because the
+          // reflector is the only other writer and it never runs for a file with no provider.
+          //
+          // This was reclassified during triage as "probably an exemption rule, since a changelog
+          // should not get a language-derived path". That was wrong, and reading the field settled
+          // it: `layer_path` is `path.relative(projectRoot, file)` lowercased — a PATH, with no
+          // language content whatsoever. A markdown file has one for exactly the same reason a
+          // TypeScript file does.
+          layer_path: getProjectRelativePath(file.path, workspaceRoot).toLowerCase(),
           rootId: `repository::${rootName}`
         }
       });
