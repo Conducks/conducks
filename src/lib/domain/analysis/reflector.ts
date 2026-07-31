@@ -258,6 +258,18 @@ export class ConducksReflector {
                  && atOrBefore(s.endRow, s.endCol, self.endRow, self.endCol)) {
           return false;   // s is contained by the declaration being resolved
         }
+        // A scope encloses this declaration only if it actually CONTAINS it. The row test above is
+        // not enough when two declarations share a line: `struct User {} fn main() {}` puts both on
+        // row 0, each passes the other's row check, and the guard above only rejects a scope the
+        // declaration contains — never one it merely sits beside. Both `user.main` and `main.user`
+        // were created, each naming the other as parent, and neither `user` nor `main` survived as
+        // a standalone node because both were consumed as children. That is all four of the
+        // dangling `parentId` values on this repository (todo25), and the reproduction is one line
+        // of Rust or C.
+        if (self && !(atOrBefore(s.startRow, s.startCol, self.startRow, self.startCol)
+                   && atOrBefore(self.endRow, self.endCol, s.endRow, s.endCol))) {
+          return false;
+        }
         return true;
       });
 
