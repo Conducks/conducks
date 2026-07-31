@@ -1,3 +1,4 @@
+import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
 import fs from "node:fs";
 import path from "node:path";
 import { chronicle } from "../git/chronicle-interface.js";
@@ -894,33 +895,23 @@ export class SynapsePersistence {
        WHERE sourceId IN (${inList}) AND targetId IN (${inList}) AND sourceId <> targetId`,
       [...ids, ...ids]);
 
-    // Clustering follows ADR 0028's rule, which `mirror.engine.detectCluster()` defines: walk up
-    // `parentId` until a DIRECTORY, REPOSITORY or NAMESPACE is reached, and fall back to the global
-    // ecosystem. Grouping by the IMMEDIATE parent instead is a different rule with a different
-    // answer — it produced 404 clusters here against the containers a reader actually recognises —
-    // so the rule is ported rather than replaced, even though the code that runs it moved.
+    // Clustering follows ADR 0028's rule, which now lives in ONE place — `cluster-rule.ts` — and is
+    // shared with `mirror.engine.detectCluster()`. It was ported here rather than replaced when
+    // ADR 0054 moved this work off the materialised graph, and the second copy was accepted as debt
+    // at the time (todo25#P9). ADR 0079 closes it: the rule was never the problem, so it is kept and
+    // the duplicate removed. Grouping by the IMMEDIATE parent is a different rule with a different
+    // answer — 404 clusters here against the 128 containers a reader actually recognises.
     //
     // The parent chain needs the whole tree, but only three columns of it: id, parentId and kind.
     // That is a projection, not the graph, which is the distinction ADR 0042 draws.
     const parents = await this.query<{ id: string; parentId: string | null; canonicalKind: string }>(
       `SELECT id, parentId, canonicalKind FROM nodes`);
     const byId = new Map(parents.map(n => [n.id, n]));
-    const CONTAINERS = new Set(['DIRECTORY', 'REPOSITORY', 'NAMESPACE']);
-    const clusterOf = (startId: string): string => {
-      let cur: string | null = startId;
-      for (let hops = 0; hops < 20 && cur; hops++) {   // same 20-hop bound as detectCluster
-        const n = byId.get(cur);
-        if (!n) break;
-        if (CONTAINERS.has(String(n.canonicalKind))) return cur;
-        cur = n.parentId;
-      }
-      return 'ecosystem::global';
-    };
 
     const clusterById = new Map<string, string>();
     const clusterCounts = new Map<string, number>();
     for (const r of rows) {
-      const c = clusterOf(r.id);
+      const c = clusterOf(r.id, id => byId.get(id));
       clusterById.set(r.id, c);
       clusterCounts.set(c, (clusterCounts.get(c) || 0) + 1);
     }

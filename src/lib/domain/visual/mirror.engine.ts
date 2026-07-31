@@ -1,3 +1,4 @@
+import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
 
 /**
@@ -221,21 +222,11 @@ export class MirrorEngine {
     };
   }
 
+  /** ADR 0028's rule, which now lives in `cluster-rule.ts` so the SQL wave path shares it. */
   private detectCluster(node: any, nodeMap: Map<string, any>): string {
-    let currentSearchId = node.id;
-    let depthLimit = 20; 
-    while (depthLimit-- > 0) {
-      const n = nodeMap.get(currentSearchId);
-      if (!n || !n.properties) break;
-      const kind = n.properties.canonicalKind;
-      if (kind === 'DIRECTORY' || kind === 'REPOSITORY' || kind === 'NAMESPACE') {
-        return currentSearchId;
-      }
-      const structuralParentId = n.properties.parentId;
-      if (structuralParentId && structuralParentId !== currentSearchId) {
-        currentSearchId = structuralParentId;
-      } else { break; }
-    }
-    return 'ecosystem::global';
+    return clusterOf(node.id, id => {
+      const n = nodeMap.get(id);
+      return n?.properties ? { parentId: n.properties.parentId, canonicalKind: n.properties.canonicalKind } : undefined;
+    });
   }
 }
