@@ -195,12 +195,22 @@ export class AnalysisService {
       }
     }
 
-    // 4. Reload graph from vault so PageRank runs on the full node/edge set.
-    // The orchestrator flushed and cleared the in-memory graph during analysis,
-    // so we must reload before resonating or gravity will be 0 for everything.
-    // Shallow: everything downstream of here — the ranker, the linkers, virtual induction — reads
-    // skeleton properties only, and `getAllNodes()` never returns the compressed half anyway. It
-    // saves compressing every node on the way in and re-inflating it on every `getNode()`.
+    // 4. Reload the graph from the vault. The orchestrator flushed and CLEARED the in-memory graph
+    // between waves (ADR 0041), so every consumer below here that needs a whole-project view has to
+    // have it rebuilt: `resonate()` (the binders and PageRank), `IntraLinker`, virtual induction and
+    // doc governance. FOUR consumers, not one — this comment used to name PageRank alone, which is
+    // how todo23#P2 came to be scoped to the ranker and sized against a reload only the ranker
+    // needed.
+    //
+    // It stays, and ADR 0060 is why: measured twice on `mentorseed` (974 files, 9,910 nodes), the
+    // whole read half — this load, PageRank, the linkers and induction — is roughly 33 MB of a
+    // 686 MB peak, under 5%. The +293 MB this was once thought to cost is not there. The peak is set
+    // by the wave flushes on the write side. Anyone proposing to remove this has to beat 5%.
+    //
+    // Shallow: everything downstream reads skeleton properties only, and `getAllNodes()` never
+    // returns the compressed half anyway. It saves compressing every node on the way in and
+    // re-inflating it on every `getNode()` — kept on that merit rather than for memory (todo23#P1
+    // measured it at 7 MB, which is noise).
     await this.persistence.load(this.graph.getGraph(), { shallow: true });
     traceMemory('after reloading the whole graph for PageRank');
 
