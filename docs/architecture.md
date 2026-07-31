@@ -60,7 +60,14 @@ flowchart TD
 5. `registry` is the only composition point; it imports domain + core + contracts.
 6. Interfaces never import each other, with two encoded exceptions: `cli → web` (the `mirror` command launches the web server — a launcher edge, not logic coupling) and `web → domain`/`core` directly.
 7. The structural graph is not materialised by `registry.initialize()`. A path that walks it calls `ensureGraphLoaded()` first; a path that can answer from the vault does that instead (CONDUCKS-30, ADR 0038).
-- Enforced by: .github/workflows/main.yml (the `Enforce Layer Contract` step, `conducks guard` on the graph `analyze` just wrote)
+- Enforced by: tests/architecture/boundaries.test.ts (reads both import forms and fails on any upward import), and .github/workflows/main.yml (the `Enforce Layer Contract` step, `conducks guard` on the graph `analyze` just wrote)
+
+`tests/architecture/boundaries.test.ts` is the gate that runs on every suite. It walks the source
+tree and fails on a runtime import that crosses a layer upward, reading BOTH import forms — a
+statement and a dynamic `import()` — because a rule that reads only one is a rule the next bypass
+walks straight through. `import type` is exempt: the compiler erases it (ADR 0016). It carries one
+named exception, `pulse-worker.ts -> reflector`, which is stated in the test rather than left as a
+silent hole.
 
 `conducks guard` evaluates the `layer_boundaries` sentinel rule on this repo's real graph and
 hard-blocks any upward edge — imports and calls alike. CI is the only place it runs: the pre-commit

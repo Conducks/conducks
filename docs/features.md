@@ -60,6 +60,10 @@
 - Purpose: Full inventory of indexed symbols ordered by structural gravity, for reading a codebase top-down instead of searching for something you already know the name of.
 - Intent: Supports triage — a human or agent who wants "show me the heaviest things here" rather than "find X".
 
+## Workspace Listing — `conducks list`
+- Purpose: Show the anchored workspace and any federated projects linked into it.
+- Intent: The anchor is implicit in every other command and invisible until something answers from the wrong project. One command that states which vault is being read turns that from a debugging session into a glance.
+
 ## Entry Point Detection — `conducks entry`
 - Purpose: Show where execution actually begins — routes, CLI handlers, mains — ranked by gravity, across frameworks.
 - Intent: Orients a reader who has never seen the repo toward real starting points instead of making them guess from file names.

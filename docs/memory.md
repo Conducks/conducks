@@ -1048,3 +1048,13 @@
 - Applies: local ids are absolute paths, so the property that actually separates them is whether the
   namespace LOOKS LIKE A PATH. Reach for the invariant, not for an enumeration of the cases you
   happen to have seen — the enumeration is what goes stale.
+
+## `results-baseline.txt` measures nothing — do not cite it
+- Gotcha: the file looks like a benchmark baseline and every number in it is void. Two of three subjects were the wrong tree, `nodes=0` read a vault path that never existed, `peak_cpu=0%` sampled the subshell rather than the work, and `mentorseed` varied between 139 s and 193 s across identical runs
+- Why: it was produced once by a harness that has since been fixed, and nothing in the file says so. A stale number with a plausible filename outranks a correct number nobody wrote down, which is how it kept being quoted
+- Applies: repository root; any performance claim about `analyze`. Current measured figures live in ADR 0060 (memory) and ADR 0061 (parse time), both with the run that produced them
+
+## Three pre-grammar todos live in `legacy/`, and one of them lied about being done
+- Gotcha: `todo2`, `todo3` and `todo4` predate the line grammar — no `# Title`, no `Status:`, no `- Acceptance:`, no `## Phase N`, with state written as `**STATUS: 100% COMPLETED**` and emoji, which the parser never reads. They sat in `todos/completed/` holding 94 unticked checkboxes. `completed/` is not scanned, so nothing had ever evaluated them
+- Why: todo4 declared "Reshape Fully Reflected ✅" and four of its six acceptance claims are false against the live vault — 670 file-backed nodes carry no fingerprint. A claim in an unscanned folder is a claim nobody can check, which is the same failure as a gate that reports success without running. The surviving work is todo26; the files moved to `legacy/` because they cannot be linted and will not be rewritten
+- Applies: `docs/legacy/`, and any todo about to be closed — if it still has open tasks it stays in `todos/` with `Status: doing` (conducks-docs §6.10)
