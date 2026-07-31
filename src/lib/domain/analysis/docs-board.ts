@@ -503,7 +503,29 @@ function linkPhases(board: DocsBoard): void {
 
 /**
  * Roll each ADR's build state up from the phases that declare `- Builds:` it. `unlinked` is a
- * distinct answer from `built`: nobody claimed the work, so silence must not read as done.
+ * distinct answer from the finished ones: nobody claimed the work, so silence must not read as done.
+ *
+ * `claimed` vs `proven` is the whole point of the split (ADR 0076, todo22#P4).
+ *
+ * The old value was `built`, and it OVERCLAIMED. It is derived from the linked phases alone, so an
+ * ADR with five consequences and one phase covering one of them read `built` the moment that phase
+ * finished. The check can answer "did anyone claim this decision and finish what they claimed"; it
+ * has never been able to answer "is all of it claimed", because `## Consequences` is prose and no
+ * regex maps a paragraph to a phase.
+ *
+ * Two ways to close that gap were considered and BOTH rejected (see the ADR): making each
+ * consequence its own `-` bullet produces a count with no mapping, and a bullet starting with a
+ * capital word parses as a FIELD, which is a live hazard rather than a cosmetic one. Having the ADR
+ * name the phases that carry it duplicates `- Builds:` in reverse, and a two-ended stamp is the
+ * failure `crossCheckDecisions` already exists to catch.
+ *
+ * So the honest move is to stop using a word that claims more than the derivation supports, and to
+ * promote the one field that IS evidence of coverage:
+ *
+ *   `claimed`  every linked phase is done — the work someone claimed is finished
+ *   `proven`   the same, AND `- Enforced by:` names a file that exists, so a test holds it
+ *
+ * Neither says every consequence is covered. `proven` says something checked it.
  */
 function linkDecisions(board: DocsBoard): void {
   for (const d of board.decisions) {
@@ -512,7 +534,10 @@ function linkDecisions(board: DocsBoard): void {
       for (const p of t.phases)
         if ((p.builds as string[]).includes(d.id)) d.builtBy.push(p);
     const open = d.builtBy.filter((p: { state: string }) => p.state !== "done");
-    d.buildState = !d.builtBy.length ? "unlinked" : !open.length ? "built" : d.builtBy.some((p: { done: number }) => p.done) ? "partial" : "unbuilt";
+    const finished = d.builtBy.length > 0 && open.length === 0;
+    d.buildState = !d.builtBy.length ? "unlinked"
+      : finished ? (d.enforcedBy ? "proven" : "claimed")
+      : d.builtBy.some((p: { done: number }) => p.done) ? "partial" : "unbuilt";
     d.openPhases = open.map((p: { addr: string }) => p.addr);
   }
   // A `- Builds:` pointing at no ADR is a broken address, same as a dangling relation stamp.

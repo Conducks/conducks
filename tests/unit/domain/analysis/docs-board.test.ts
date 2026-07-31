@@ -40,10 +40,12 @@ describe('docs-board — links between docs', () => {
   it('rolls an ADR build state up from the phases that declare `- Builds:` it', () => {
     const b = buildBoard(root);
     const byId = Object.fromEntries(b.decisions.map(d => [d.id, d]));
-    expect(byId['0001'].buildState).toBe('built');
+    // `claimed`, not `built`: every linked phase is done, which is not the same fact as every
+    // consequence being covered — 0001 names no `- Enforced by:`, so nothing checked it (ADR 0076).
+    expect(byId['0001'].buildState).toBe('claimed');
     expect(byId['0002'].buildState).toBe('partial');
     expect(byId['0002'].openPhases).toEqual(['todo01#P2']);
-    // Unlinked is a distinct answer from built — silence must not read as done.
+    // Unlinked is a distinct answer from finished — silence must not read as done.
     expect(byId['0004'].buildState).toBe('unlinked');
     expect(b.unlinked).toContain('0004');
     // …but an `- Enforced by:` artifact counts as a link, so it is not reported as unproven.
@@ -53,6 +55,7 @@ describe('docs-board — links between docs', () => {
     // warning that can never be cleared trains the reader to skip the whole line.
     expect(b.unlinked).not.toContain('0006');
   });
+
 
   it('derives blocked from an unmet `- Depends:` and names the blocker', () => {
     const b = buildBoard(root);
@@ -415,5 +418,47 @@ describe('prose references resolve, or the gate fails', () => {
   it('does NOT resolve a bare four-digit number — too ambiguous to check', () => {
     w('decisions/0016-bare.md', adr2('0016', 'writes a bare number', 'Superseded in spirit by 8888, and the cap is 1500.'));
     expect(errsOf('decisions/0016-bare.md')).toBe('');
+  });
+});
+
+/**
+ * `claimed` vs `proven` — the distinction the old `built` collapsed (todo22#P4, ADR 0076).
+ *
+ * `built` was derived from the linked phases alone, so an ADR with five consequences and one phase
+ * covering one of them read `built` the moment that phase finished. Both ADRs here have every linked
+ * phase done; only one has anything that CHECKED the result.
+ *
+ * Its own tree on purpose: adding a phase to the shared fixture above changed the phase list two
+ * unrelated tests assert on, which is a fixture teaching the wrong lesson about test isolation.
+ */
+describe('a finished claim is not a proven one', () => {
+  let root: string;
+  const adr3 = (id: string, extra = '') =>
+    `# ${id} — t\nStatus: Accepted\n${extra}- Date: 2026-07-31\n\n## Context\nc\n## Decision\nd\n## Consequences\nq\n`;
+
+  beforeAll(() => {
+    root = mkdtempSync(path.join(tmpdir(), 'conducks-proven-'));
+    mkdirSync(path.join(root, 'docs', 'decisions'), { recursive: true });
+    mkdirSync(path.join(root, 'docs', 'todos'), { recursive: true });
+    const w = (p: string, s: string) => writeFileSync(path.join(root, 'docs', p), s);
+    w('decisions/0001-claimed.md', adr3('0001'));
+    w('decisions/0002-proven.md', adr3('0002', '- Enforced by: tests/x.test.ts (the rule holds)\n'));
+    w('todos/todo01.md',
+      '# todo01 — w\nStatus: doing\n- Acceptance: green\n\n' +
+      '## Phase 1 — done, nothing checks it\n- Builds: 0001\n- [x] a\n\n' +
+      '## Phase 2 — done, a test holds it\n- Builds: 0002\n- [x] b\n');
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('reports `claimed` when every phase is done but nothing enforces the decision', () => {
+    const byId = Object.fromEntries(buildBoard(root).decisions.map(d => [d.id, d]));
+    expect(byId['0001'].enforcedBy).toBeFalsy();
+    expect(byId['0001'].buildState).toBe('claimed');
+  });
+
+  it('reports `proven` only when `- Enforced by:` names something', () => {
+    const byId = Object.fromEntries(buildBoard(root).decisions.map(d => [d.id, d]));
+    expect(byId['0002'].enforcedBy).toBeTruthy();
+    expect(byId['0002'].buildState).toBe('proven');
   });
 });

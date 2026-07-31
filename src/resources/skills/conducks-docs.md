@@ -347,8 +347,13 @@ resolves, because the order it claims is not one this tree can keep · **`conven
 `memory.md` or `handover.md` inside a service tree** — they are root-only, and split across services
 an agent reading one tree cannot know it is missing the rest · **any `README.md` INSIDE a docs tree**,
 outside `completed/` `legacy/` `archive/` `agent-runs/` — your repository's own root `README.md` is
-untouched and always fine, because the walk starts at `docs/` and never climbs above it. It cannot
-see `## Phase 2b` — that is a silent gap in `docs-status`.
+untouched and always fine, because the walk starts at `docs/` and never climbs above it · **a
+`todoNN#PN` or `ADR NNNN` written in PROSE that resolves to nothing** — a reader follows a
+paragraph reference exactly like a field, and the number is checked wherever it is written, not only
+in `- Builds:` and `- Depends:`. A phase in a `completed/` todo still resolves; it is a closed
+record, not a missing one. It cannot see `## Phase 2b` — that is a silent gap in `docs-status` — and
+it cannot resolve a BARE four-digit number written without the `ADR` prefix, because `0.05`, `1,500`
+and a byte count are the same shape as an id and the rule would fail the gate on measurements.
 
 ### §5.5 What it warns on
 
