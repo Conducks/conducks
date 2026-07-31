@@ -1,7 +1,14 @@
 # 0039 — a vault describes the tree beside it, and a service is a service everywhere
 Status: Accepted
+- Amended by: 0069
 - Enforced by: tests/unit/core/root-discovery.test.ts (root discovery refuses a directory the scope guard already calls impossible, so one stray vault cannot claim the tree above it, and a real project is still found by its vault alone) — PARTLY. The worktree half is current behaviour and untested, and `discoverRoot()` still answers the boundary question independently of `conducks.json`; see Consequences.
 - Date: 2026-07-28
+
+0069 built the half this record specified and left unbuilt. Its own `Enforced by:` line already
+said so — "`discoverRoot()` still answers the boundary question independently of `conducks.json`" —
+and the cost was measured on a real monorepo: one repository ended up with several partial vaults,
+and 163 cross-service imports resolved to phantom symbols because the other service was not in the
+vault to resolve against.
 
 ## Context
 

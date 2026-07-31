@@ -150,6 +150,17 @@ export class ImportProcessor {
         }
       }
       if (hit) return hit;
+
+      // An alias that does not resolve here is not a bare word to keep guessing at. Its root is a
+      // project convention (`@/* -> src/*`, or a workspace alias like `@/core -> ../packages/core`)
+      // and when the suffix match above finds nothing, the target is either genuinely outside
+      // `allPaths` (a sibling package/service this analysis was never pointed at) or a typo — never
+      // a coincidence to resolve by basename. Falling through to the fuzzy fallback below matched
+      // `@/core/registry/Registry`'s tail segment "Registry" against an unrelated in-scope file
+      // (`Registry.test.ts`) whose basename happened to start with the same word, and every importer
+      // of that alias then bound to it — 106 edges into one wrong file (ADR 0070). Refuse instead:
+      // ADR 0055's rule — a node is a symbol, not a guess — applies here exactly as it does there.
+      return undefined;
     }
 
     // 4. Fuzzy Module Fallback (For languages with less strict relative paths)

@@ -97,6 +97,27 @@ export class AnalysisService {
       });
       dirtyFiles = (await Promise.all(statsPromises)).filter(f => f !== null) as string[];
 
+      // A file the vault has NEVER SEEN is dirty however old it is (ADR 0069).
+      //
+      // mtime-vs-last-pulse alone assumes the vault already covers everything discovery returns.
+      // That held while each project had its own vault and its own pulse timeline. It stops holding
+      // the moment one workspace vault is shared across services: analyzing `database` stamps a
+      // pulse at NOW, and `app`'s files — untouched since May, never analyzed into this vault — are
+      // then all older than it and read as clean. Measured on mentorseed: the app scope reported
+      // "already at 100% resonance" against a vault holding 40 nodes, none of them app's.
+      //
+      // `file_hashes` is the honest record of what was actually analyzed, and the pulse already
+      // seeds it. Absence from it means never seen, which is exactly what mtime cannot express.
+      const seen = new Set([...(await this.persistence.getAllFileHashes()).keys()].map(f => f.toLowerCase()));
+      if (seen.size > 0) {
+        const unseen = filteredFiles.filter(f => !seen.has(f.toLowerCase()));
+        if (unseen.length > 0) {
+          const already = new Set(dirtyFiles);
+          dirtyFiles = [...dirtyFiles, ...unseen.filter(f => !already.has(f))];
+          logger.info(`🛡️ [Conducks] ${unseen.length} unit(s) the vault has never seen — analyzing regardless of mtime.`);
+        }
+      }
+
       if (dirtyFiles.length > 0) {
           logger.info(`🛡️ [Sovereiorn Discovery] Found ${dirtyFiles.length} dirty units since last pulse.`);
           dirtyFiles.slice(0, 5).forEach(f => logger.info(`  - ${path.basename(f)}`));
@@ -303,7 +324,9 @@ export class AnalysisService {
       logger.info(`🛡️ [Conducks] Dropped ${guesses} unresolved guess edge(s) — calls on local values that name no symbol.`);
     }
 
-    const swept = await this.persistence.sweepRowsNotInPulse(pulseId);
+    // A scoped run sweeps only its own subtree — otherwise it deletes every other service in the
+    // workspace (ADR 0069).
+    const swept = await this.persistence.sweepRowsNotInPulse(pulseId, targetRoot !== projectRoot ? targetRoot : undefined);
     if (swept.nodes > 0 || swept.edges > 0) {
       logger.info(`🛡️ [Conducks] Swept ${swept.nodes} node(s) and ${swept.edges} edge(s) left by earlier pulses.`);
     }

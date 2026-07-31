@@ -809,18 +809,38 @@ export class SynapsePersistence {
     return Number(before?.c ?? 0);
   }
 
-  public async sweepRowsNotInPulse(pulseId: string): Promise<{ nodes: number; edges: number }> {
+  public async sweepRowsNotInPulse(pulseId: string, scope?: string): Promise<{ nodes: number; edges: number }> {
     if (this.readOnly) return { nodes: 0, edges: 0 };
     await this.ensureVaultOpen();
 
+    // `scope` bounds the sweep to one subtree, and a SCOPED analyze must always pass it (ADR 0069).
+    //
+    // Without it this deletes every row not written by the current pulse — correct for a whole
+    // project, catastrophic for one service of a workspace. Measured on mentorseed the moment its
+    // five services began sharing one vault: analyzing `app` wrote 3,022 app nodes and deleted all
+    // 29 of `database`'s, because they carried an earlier pulseId. The vault ended up describing
+    // whichever service was analyzed last, which is a worse failure than the split vaults this
+    // change set out to fix, and it is silent.
+    //
+    // Nodes are matched on `file`; edges on either endpoint's file, so an edge is swept only when
+    // the node it belongs to is in scope.
+    const inScopeNode = scope ? ` AND lower(file) LIKE ?` : '';
+    const scopeArg = scope ? [`${scope.toLowerCase()}%`] : [];
+    const inScopeEdge = scope
+      ? ` AND (sourceId IN (SELECT id FROM nodes WHERE lower(file) LIKE ?)
+              OR targetId IN (SELECT id FROM nodes WHERE lower(file) LIKE ?))`
+      : '';
+    const scopeArgEdge = scope ? [`${scope.toLowerCase()}%`, `${scope.toLowerCase()}%`] : [];
+
     const [before] = await this.query<{ n: number; e: number }>(
-      `SELECT (SELECT count(*) FROM nodes WHERE pulseId <> ?)::INT AS n,
-              (SELECT count(*) FROM edges WHERE pulseId <> ?)::INT AS e`, [pulseId, pulseId]);
+      `SELECT (SELECT count(*) FROM nodes WHERE pulseId <> ?${inScopeNode})::INT AS n,
+              (SELECT count(*) FROM edges WHERE pulseId <> ?${inScopeEdge})::INT AS e`,
+      [pulseId, ...scopeArg, pulseId, ...scopeArgEdge]);
 
     // Edges first: an edge outliving its endpoints is the dangling state this project spent a day
     // measuring, so the order is not incidental.
-    await this.run(`DELETE FROM edges WHERE pulseId <> ?`, [pulseId]);
-    await this.run(`DELETE FROM nodes WHERE pulseId <> ?`, [pulseId]);
+    await this.run(`DELETE FROM edges WHERE pulseId <> ?${inScopeEdge}`, [pulseId, ...scopeArgEdge]);
+    await this.run(`DELETE FROM nodes WHERE pulseId <> ?${inScopeNode}`, [pulseId, ...scopeArg]);
 
     return { nodes: Number(before?.n ?? 0), edges: Number(before?.e ?? 0) };
   }

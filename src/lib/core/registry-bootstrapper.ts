@@ -49,11 +49,49 @@ export class RegistryBootstrapper {
   }
 
   /**
-   * Autonomously resolves the nearest project root.
+   * The nearest ANCESTOR (or self) declaring a workspace with a `conducks.json`, or null.
+   *
+   * Nearest wins on purpose: a vendored dependency that is itself a monorepo should be able to
+   * declare its own workspace and have paths beneath it answer from that, rather than being
+   * absorbed by the outer one. That case is untested — ADR 0069 records it as open.
+   *
+   * The same scope guard the marker walk uses applies here, so a stray `conducks.json` under
+   * `/private/tmp` or a home directory cannot claim the tree above it.
+   */
+  private findDeclaredWorkspace(from: string): string | null {
+    let current = from;
+    while (current && current !== path.parse(current).root) {
+      if (!isNeverAProjectRoot(current) && fsSync.existsSync(path.join(current, 'conducks.json'))) {
+        return current;
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+    return null;
+  }
+
+  /**
+   * Resolves the root conducks anchors to: a declared workspace if there is one, otherwise the
+   * nearest inferred project marker.
    */
   public discoverRoot(startPath: string): string {
     const searchPaths = [startPath];
     const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
+
+    // PASS 1 — a DECLARED workspace, searched all the way up before anything is inferred (ADR 0069).
+    //
+    // This has to be its own walk, not a reordered check inside the one below. The marker walk
+    // returns at the FIRST directory carrying any marker, so a service with its own package.json
+    // would still win before the workspace above it was ever looked at — which is precisely the bug:
+    // `mentorseed/app` anchored at `app`, while `mentorseed/database`, having no marker of its own,
+    // walked up and planted a SECOND vault at the repository root holding 40 nodes. Same repo, two
+    // vaults, neither seeing the monorepo.
+    //
+    // Searching for the declaration separately, and first, is what makes one workspace one vault
+    // regardless of which service you happen to point at.
+    const declared = this.findDeclaredWorkspace(startPath ? path.resolve(startPath) : process.cwd());
+    if (declared) return declared;
 
     for (const start of searchPaths) {
       let current = start ? path.resolve(start) : process.cwd();

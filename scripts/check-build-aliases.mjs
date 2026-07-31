@@ -38,7 +38,16 @@ export function findUnresolvedAliasImports(buildDir) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const buildDir = path.resolve(process.cwd(), "build");
+  // Scoped to build/src — the code that actually RUNS. The failure this gate exists to catch was
+  // `Cannot find package '@/registry' imported from build/src/interfaces/cli/index.js`, i.e. the
+  // shipped CLI, and jest ignores build/ entirely (`modulePathIgnorePatterns`), so build/tests is
+  // never executed from there.
+  //
+  // It also removes a false positive that blocked a legitimate build: a test that embeds FIXTURE
+  // SOURCE in a template literal — `source: \`import { x } from '@/core/y'\`` — reads to a regex
+  // exactly like a real unrewritten import, because a regex cannot tell code from a string
+  // containing code. Narrowing the directory is the honest fix; trying to parse JS here is not.
+  const buildDir = path.resolve(process.cwd(), "build", "src");
   const offenders = findUnresolvedAliasImports(buildDir);
 
   if (offenders.length > 0) {

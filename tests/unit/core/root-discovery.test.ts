@@ -49,6 +49,59 @@ describe('isNeverAProjectRoot — one notion of "not a project"', () => {
   });
 });
 
+describe('discoverRoot — a DECLARED workspace outranks an inferred marker (ADR 0069)', () => {
+
+  /**
+   * Measured on `mentorseed`, which declares five services in a root `conducks.json`. Analyzing
+   * `app` anchored at `app` because it carries its own package.json; analyzing `database` — a
+   * declared service with NO package.json — walked past the workspace and planted a second vault at
+   * the repository root holding 40 nodes. One repository, several partial vaults, and the smallest
+   * one sitting where a reader would most trust it.
+   */
+  it('anchors at the declared workspace, not at a nearer package marker', () => {
+    const ws = mkRoot();
+    fs.writeFileSync(path.join(ws, 'conducks.json'), JSON.stringify({ services: ['app'] }));
+    const service = path.join(ws, 'app');
+    fs.mkdirSync(service, { recursive: true });
+    // The nearer, inferred marker — this is what used to win.
+    fs.writeFileSync(path.join(service, 'package.json'), '{}');
+
+    expect(new RegistryBootstrapper().discoverRoot(service)).toBe(ws);
+  });
+
+  it('anchors at the declared workspace for a service that has NO marker of its own', () => {
+    // `database` in mentorseed: a real declared service with no package.json. This is the case that
+    // produced the 40-node root vault.
+    const ws = mkRoot();
+    fs.writeFileSync(path.join(ws, 'conducks.json'), JSON.stringify({ services: ['database'] }));
+    const service = path.join(ws, 'database');
+    fs.mkdirSync(service, { recursive: true });
+
+    expect(new RegistryBootstrapper().discoverRoot(service)).toBe(ws);
+  });
+
+  it('outranks a stray vault, so a split tree heals instead of staying split', () => {
+    // The declaration must beat `.conducks` too — otherwise a tree that already grew per-service
+    // vaults keeps answering from them forever.
+    const ws = mkRoot();
+    fs.writeFileSync(path.join(ws, 'conducks.json'), JSON.stringify({ services: ['app'] }));
+    const service = path.join(ws, 'app');
+    fs.mkdirSync(path.join(service, '.conducks'), { recursive: true });
+
+    expect(new RegistryBootstrapper().discoverRoot(service)).toBe(ws);
+  });
+
+  it('leaves a project with NO declaration exactly as it was — this change is additive', () => {
+    // Every project conducks has ever run against, including its own, is this case.
+    const repo = mkRoot();
+    fs.writeFileSync(path.join(repo, 'package.json'), '{}');
+    const nested = path.join(repo, 'src', 'deep');
+    fs.mkdirSync(nested, { recursive: true });
+
+    expect(new RegistryBootstrapper().discoverRoot(nested)).toBe(repo);
+  });
+});
+
 describe('discoverRoot — a stray vault must not recruit the tree above it', () => {
   /**
    * The exact shape of the measured failure, reproduced with a name the guard rejects everywhere
