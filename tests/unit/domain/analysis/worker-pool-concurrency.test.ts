@@ -27,18 +27,26 @@ const mockState: {
 // Real ESM (this project runs jest with --experimental-vm-modules) does not let `jest.mock`
 // intercept a Node builtin the way it does a userland module — `jest.unstable_mockModule` plus a
 // dynamic import of the module under test is the mechanism Jest documents for this case.
-jest.unstable_mockModule('node:child_process', () => ({
-  spawn: jest.fn((_cmd: string, args: string[]) => {
-    mockState.timestamps.push(Date.now());
-    const proc = new EventEmitter() as EventEmitter & { kill: jest.Mock };
-    (proc as any).kill = jest.fn();
-    mockState.liveProcs.push(proc);
-    const tempInput = args[args.length - 1] as string;
-    const inputData = JSON.parse(fs.readFileSync(tempInput, 'utf8'));
-    mockState.handler(proc, tempInput, inputData.tempOutputFile);
-    return proc;
-  }),
-}));
+jest.unstable_mockModule('node:child_process', async () => {
+  // A dynamic `import()` here would re-enter Jest's ESM mock registry and recurse into this same
+  // factory. `createRequire` goes through Node's CJS loader instead, which the mock hook does not
+  // intercept, so this reaches the real module.
+  const { createRequire } = await import('node:module');
+  const actual = createRequire(import.meta.url)('node:child_process');
+  return {
+    ...actual,
+    spawn: jest.fn((_cmd: string, args: string[]) => {
+      mockState.timestamps.push(Date.now());
+      const proc = new EventEmitter() as EventEmitter & { kill: jest.Mock };
+      (proc as any).kill = jest.fn();
+      mockState.liveProcs.push(proc);
+      const tempInput = args[args.length - 1] as string;
+      const inputData = JSON.parse(fs.readFileSync(tempInput, 'utf8'));
+      mockState.handler(proc, tempInput, inputData.tempOutputFile);
+      return proc;
+    }),
+  };
+});
 
 const { WorkerPool } = await import('@/lib/domain/analysis/worker-pool.js');
 
