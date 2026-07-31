@@ -473,8 +473,13 @@ Returns neighboring nodes ranked by relevance. Supports optional token budget to
 WHEN TO USE: Gathering focused context around a specific symbol for an AI agent prompt.
 AFTER THIS: Use conducks_explain to deep-dive a high-relevance node.
 
-Ranking: score = confidence × (1/(depth+1)) × (1/(rank+1))
-Budget: nodes are scored and added highest-first until budget is exhausted or diminishing returns threshold hit.`,
+Ranking: score = confidence × (1/(depth+1)) × (1/(canonicalRank+1)) — canonicalRank is the taxonomy
+depth (STRUCTURE 7, BEHAVIOR 8, ATOM 11), so a local variable is worth less than the function or class
+that holds it at the same graph depth and confidence.
+Budget: nodes are scored and added highest-first until budget is exhausted or diminishing returns threshold hit.
+ATOMs (local variables, fields) are excluded by default — pass include_atoms:true to get them back.
+Each item carries "line" (jump target, when the node has one) and "short_id" (repo-relative, alongside
+the full "id" — always feed "id" back into trace/impact/explain/context, short_id is display-only).`,
     // MCP2: tool annotations
     annotations: {
       readOnlyHint: true,
@@ -488,12 +493,13 @@ Budget: nodes are scored and added highest-first until budget is exhausted or di
         // MCP1: numeric bounds
         radius: { type: "number", default: 2, minimum: 1, maximum: 10, description: "BFS depth radius." },
         max_tokens: { type: "number", minimum: 100, maximum: 100000, description: "Optional: max estimated token budget. If omitted, uses default 8000." },
-        path: { type: "string", description: "Optional: The absolute project root." }
+        path: { type: "string", description: "Optional: The absolute project root." },
+        include_atoms: { type: "boolean", default: false, description: "Include ATOM nodes (local variables, fields) in the result. Off by default — they are rarely useful context and usually crowd out the symbols that are." }
       },
       required: ["symbol"]
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ symbol, radius, max_tokens, path: customPath }: any) => {
+    handler: async ({ symbol, radius, max_tokens, path: customPath, include_atoms }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;
@@ -520,6 +526,13 @@ Budget: nodes are scored and added highest-first until budget is exhausted or di
         // MCP9: smart token ceiling
         const MAX_TOKENS_DEFAULT = 8000;
         const budget = max_tokens ?? MAX_TOKENS_DEFAULT;
+        const includeAtoms = include_atoms === true;
+
+        // todo28#P4: repo-relative id, for display only — `id` (below) is still the full id and is
+        // what must be fed back into trace/impact/explain/context.
+        const projectRoot = String((registry.infrastructure as any).chronicle.getProjectDir() ?? '').toLowerCase().replace(/\/$/, '');
+        const shortenId = (fullId: string): string =>
+          projectRoot && fullId.startsWith(projectRoot + '/') ? fullId.slice(projectRoot.length + 1) : fullId;
 
         // BFS: collect all nodes within radius, tracking depth and best edge weight
         type NodeEntry = { nodeId: string; depth: number; edgeWeight: number };
@@ -558,15 +571,24 @@ Budget: nodes are scored and added highest-first until budget is exhausted or di
         for (const entry of visited.values()) {
           const node = graph.getNode(entry.nodeId);
           if (!node) continue;
-          // MCP9: rankWeight = 1/(rank+1); lower rank number => higher weight
-          const rankWeight = 1 / ((node.properties?.rank ?? 4) + 1);
+          // todo28#P4: exclude ATOMs (locals/fields) by default — 51% of the graph is ATOM and they
+          // were crowding out the symbols a caller actually wants. include_atoms:true opts back in.
+          if (!includeAtoms && node.properties?.canonicalKind === 'ATOM') continue;
+          // todo28#P4: this used to read node.properties.rank — the live PageRank importance value,
+          // not the taxonomy rank the "lower rank number => higher weight" comment describes. Every
+          // node has some small PageRank float, so that term barely separated ATOM from BEHAVIOR from
+          // STRUCTURE at all, and could even score a leaf variable above the function holding it.
+          // canonicalRank (STRUCTURE 7, BEHAVIOR 8, ATOM 11 …) is the field the formula was meant to use.
+          const rankWeight = 1 / ((node.properties?.canonicalRank ?? 4) + 1);
           const relevance_score = (entry.edgeWeight ?? 0.5) * (1 / (entry.depth + 1)) * rankWeight;
           const item = {
             id: node.id,
+            short_id: shortenId(node.id),
             name: node.properties.name,
             kind: node.properties.canonicalKind,
             rank: node.properties.canonicalRank,
             file: node.properties.filePath,
+            line: node.properties?.range?.start?.line ?? null,
             depth: entry.depth,
             relevance_score: parseFloat(relevance_score.toFixed(4))
           };
@@ -579,13 +601,22 @@ Budget: nodes are scored and added highest-first until budget is exhausted or di
 
         // MCP9: smart budget application — never cut mid-item, stop on diminishing returns
         const topScore = scored.length > 0 ? scored[0].relevance_score : 0;
-        const items: Array<{ id: string; name: string; kind: string; rank: number; file: string; depth: number; relevance_score: number }> = [];
+        const items: Array<{ id: string; short_id: string; name: string; kind: string; rank: number; file: string; line: number | null; depth: number; relevance_score: number }> = [];
         let tokensUsed = 0;
         let truncated = false;
 
         for (const s of scored) {
-          // Diminishing returns: skip if score is less than 10% of top score
-          if (s.relevance_score < topScore * 0.1) {
+          // Diminishing returns: skip if score is less than 10% of top score.
+          //
+          // NOT applied when the caller passed `include_atoms` — that flag exists to say "I know
+          // these rank low, give them to me anyway", and this cutoff silently overrode it. With
+          // `rankWeight = 1/(canonicalRank+1)` an ATOM scores 1/12 against a STRUCTURE's 1/8, which
+          // puts it under 10% of the top score in any real neighbourhood, so `include_atoms: true`
+          // admitted ATOMs to scoring (235 candidates -> 273) and then dropped every one of them:
+          // identical output at a 20k budget and at the 100k maximum. A flag that cannot change
+          // what comes back is the same absent-capability this tool file just fixed in `manifest`
+          // (ADR 0063). The budget check below still bounds the response.
+          if (!includeAtoms && s.relevance_score < topScore * 0.1) {
             truncated = items.length < scored.length;
             break;
           }
@@ -595,10 +626,12 @@ Budget: nodes are scored and added highest-first until budget is exhausted or di
           }
           items.push({
             id: s.node.id,
+            short_id: shortenId(s.node.id),
             name: s.node.properties.name,
             kind: s.node.properties.canonicalKind,
             rank: s.node.properties.canonicalRank,
             file: s.node.properties.filePath,
+            line: s.node.properties?.range?.start?.line ?? null,
             depth: s.depth,
             relevance_score: parseFloat(s.relevance_score.toFixed(4))
           });
