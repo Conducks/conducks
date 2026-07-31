@@ -15,6 +15,12 @@ export class GrammarRegistry {
   private languages: Map<string, any> = new Map();
   private isolatedParsers: Map<string, Parser> = new Map();
   private unavailableLanguages: Set<string> = new Set();
+  // Compiled tree-sitter queries, keyed on the `lang` object identity and then on the query
+  // source string. `lang` is the same object for a given langId for the life of the process
+  // (loadLanguage sets it once and guards re-entry), and `queryScm` is a readonly per-provider
+  // constant, so this caches "once per language per process" without any caller changes. See
+  // ADR 0065.
+  private queryCache: Map<any, Map<string, any>> = new Map();
   private require = createRequire(import.meta.url);
   private nativeParser: any | undefined;
   private nativeLoadFailed = false;
@@ -200,28 +206,47 @@ export class GrammarRegistry {
 
   /**
    * Creates a structural query for a given language.
+   *
+   * Compiled queries are cached per (lang, source) pair — see `queryCache` above — because the
+   * only caller compiles the same per-language constant once per FILE. Uncached, a 299-file
+   * TypeScript pulse ran `new NativeParser.Query()` 299 times against identical arguments.
    */
   public createQuery(lang: any, source: string): any {
+    const bySource = this.queryCache.get(lang);
+    const cached = bySource?.get(source);
+    if (cached) return cached;
+
     const nativeLang = (lang as any).language || lang;
     const NativeParser = this.loadNative();
     if (!NativeParser) return undefined;
     // 🛡️ [Conducks Resilience Bridge] v4.0
     // Parser.Query crashes with 'reading 166' on grammar ABI mismatches.
     // Bypass the JS wrapper and use the native binding directly.
+    let query: any;
     try {
-      return new NativeParser.Query(nativeLang, source);
+      query = new NativeParser.Query(nativeLang, source);
     } catch (err) {
       try {
         const tsPath = path.dirname(this.require.resolve('tree-sitter/package.json'));
         const binding = this.require('node-gyp-build')(tsPath);
         if (binding && binding.Query) {
-          return new binding.Query(nativeLang, source);
+          query = new binding.Query(nativeLang, source);
+        } else {
+          throw err;
         }
       } catch (bypassErr) {
         this.log(`[Conducks Registry] Query bypass failed:`, bypassErr);
+        throw err;
       }
-      throw err;
     }
+
+    let cache = this.queryCache.get(lang);
+    if (!cache) {
+      cache = new Map();
+      this.queryCache.set(lang, cache);
+    }
+    cache.set(source, query);
+    return query;
   }
 
 
