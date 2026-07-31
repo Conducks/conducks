@@ -338,3 +338,82 @@ describe('closing a todo that still holds deferred work', () => {
     expect(warnsOf('todos/todo02.md')).not.toMatch(/buries them/);
   });
 });
+
+/**
+ * A reference written in PROSE is followed exactly like a field, and until now nothing resolved one.
+ *
+ * ADR 0069 wrote "Carried by todo29#P3" before todo29 existed, and the gate passed. ADR 0060
+ * pointed at `todo23#P5` after that phase had moved. Twice in two days, caught by a human both
+ * times — which is the definition of a rule the tooling should own (todo29#P4, todo22#P4).
+ */
+describe('prose references resolve, or the gate fails', () => {
+  let root: string;
+  const w = (rel: string, body: string) => {
+    const full = path.join(root, 'docs', rel);
+    mkdirSync(path.dirname(full), { recursive: true });
+    writeFileSync(full, body);
+  };
+  const adr2 = (id: string, title: string, prose: string) =>
+    `# ${id} — ${title}\nStatus: Accepted\n- Date: 2026-07-31\n\n## Context\nc\n## Decision\nd\n## Consequences\n${prose}\n`;
+
+  const errsOf = (file: string) =>
+    buildBoard(root).lint.filter(x => x.file === file).flatMap(x => x.errs).join('\n');
+
+  beforeAll(() => {
+    root = mkdtempSync(path.join(tmpdir(), 'conducks-prose-'));
+    w('todos/todo01.md',
+      '# todo01 — real work\nStatus: doing\n- Acceptance: green\n\n' +
+      '## Phase 1 — p\n- [x] a\n\n## Phase 2 — q\n- [ ] b\n');
+    // A CLOSED todo is still a legitimate address. `walkDocs` skips `completed/` because a closed
+    // record is not linted, and resolving against open todos alone would fail every correct
+    // reference to finished work.
+    w('todos/completed/todo05.md',
+      '# todo05 — finished work\nStatus: done\n- Acceptance: green\n\n## Phase 3 — p\n- [x] a\n');
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('fails on a phase number nobody wrote — the ADR 0069 failure', () => {
+    w('decisions/0010-invented.md', adr2('0010', 'invents a number', 'Carried by todo01#P9.'));
+    expect(errsOf('decisions/0010-invented.md')).toMatch(/`todo01#P9`, which does not exist/);
+  });
+
+  it('fails on a phase whose todo does not exist at all', () => {
+    w('decisions/0011-notodo.md', adr2('0011', 'names a missing todo', 'Carried by todo77#P1.'));
+    expect(errsOf('decisions/0011-notodo.md')).toMatch(/`todo77#P1`, which does not exist/);
+  });
+
+  it('fails on an ADR number nobody wrote', () => {
+    w('decisions/0012-badadr.md', adr2('0012', 'cites a missing ADR', 'This follows ADR 8888.'));
+    expect(errsOf('decisions/0012-badadr.md')).toMatch(/`ADR 8888`, which does not exist/);
+  });
+
+  it('accepts a phase that exists, including one in a COMPLETED todo', () => {
+    w('decisions/0013-good.md', adr2('0013', 'points at real records', 'See todo01#P2, todo05#P3 and ADR 0010.'));
+    expect(errsOf('decisions/0013-good.md')).toBe('');
+  });
+
+  it('ignores a reference inside a fenced block — that is illustration, not an address', () => {
+    w('decisions/0014-fenced.md', adr2('0014', 'shows an example', 'Write it like this:\n\n```\nCarried by todo01#P9\n```\n'));
+    expect(errsOf('decisions/0014-fenced.md')).toBe('');
+  });
+
+  /**
+   * A qualified address belongs to `crossTreeLint`, which knows what the other trees hold. Read here
+   * as well, `app:todo42#P1` would also be tested as a same-tree `todo42#P1` and fail against THIS
+   * tree's numbering — the exact confusion conducks-docs §4 exists to prevent.
+   */
+  it('leaves a cross-tree address alone rather than resolving it against this tree', () => {
+    w('decisions/0015-crosstree.md', adr2('0015', 'addresses another tree', 'Carried by app:todo42#P1.'));
+    expect(errsOf('decisions/0015-crosstree.md')).not.toMatch(/todo42#P1`, which does not exist/);
+  });
+
+  /**
+   * The stated gap, pinned so it is a decision rather than a hole someone finds later. A bare
+   * four-digit number is not an address: `0.05`, `1,500` and a byte count all appear in these docs,
+   * and a rule that guessed which were ADR ids would fail the gate on measurements.
+   */
+  it('does NOT resolve a bare four-digit number — too ambiguous to check', () => {
+    w('decisions/0016-bare.md', adr2('0016', 'writes a bare number', 'Superseded in spirit by 8888, and the cap is 1500.'));
+    expect(errsOf('decisions/0016-bare.md')).toBe('');
+  });
+});

@@ -16,7 +16,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import {
-  GOVERNED, REL, type DocType, inferType, parseBody, shape, lint,
+  GOVERNED, REL, RE, type DocType, inferType, parseBody, shape, lint,
 } from "@/lib/domain/analysis/docs-grammar.js";
 import { resolveDocsTrees } from "@/lib/domain/analysis/service-docs.js";
 
@@ -148,6 +148,7 @@ function walkDocs(dir: string): string[] {
 export function buildBoard(root: string): DocsBoard {
   const docsDir = statSyncSafe(path.join(root, "docs")) ? path.join(root, "docs") : root;
   const board: DocsBoard = { todos: [], decisions: [], other: [], lint: [], warns: [], unlinked: [], crossRefs: [] };
+  const sources: Array<{ file: string; type: DocType; src: string }> = [];
   for (const fp of walkDocs(docsDir)) {
     const type = inferType(fp);
     const src = readFileSync(fp, "utf8");
@@ -156,6 +157,7 @@ export function buildBoard(root: string): DocsBoard {
     if (GOVERNED.includes(type)) {
       const errs = lint(type, body, src);
       if (errs.length) board.lint.push({ file: rel, type, errs });
+      sources.push({ file: rel, type, src });
     }
     // Read from the RAW source, not the parsed body: an epic addresses its slices in checkbox text
     // (`- [x] app:todo42`) and a slice points up at its epic in prose. Neither is a field.
@@ -168,6 +170,7 @@ export function buildBoard(root: string): DocsBoard {
   linkPhases(board);
   linkDecisions(board);
   for (const x of crossCheckDecisions(board.decisions, root)) mergeLint(board, x.file, "decision", x.errs);
+  proseRefLint(board, docsDir, sources);
   hygiene(board);
   board.reviews = driftedReviews(root);
   return board;
@@ -231,6 +234,101 @@ function walkReadmes(dir: string): string[] {
     }
   }
   return out;
+}
+
+/**
+ * Every UNQUALIFIED `todoNN#PN` and `ADR NNNN` written in prose, outside a fenced block.
+ *
+ * The fields are not the only place a doc points at another record. ADR 0069 wrote
+ * "Carried by todo29#P3" in a closing paragraph BEFORE todo29 existed — an invented number, which
+ * the standard forbids — and `docs-lint` passed, because it resolved `- Builds:` and `- Depends:`
+ * and nothing else. ADR 0060 pointed at `todo23#P5` after that phase had moved. Twice in two days,
+ * caught by a human both times (todo29#P4, todo22#P4).
+ *
+ * A prose reference is load-bearing in exactly the way a field is: a reader follows it, and one that
+ * resolves to nothing costs them the search plus the time spent trusting it (conducks-docs §1).
+ *
+ * TWO shapes only, and the omission is deliberate. `todoNN#PN` and `ADR NNNN` are unambiguous.
+ * A BARE four-digit number is not — `0.05`, `1,500`, a byte count and a year all appear in these
+ * docs, and a rule that guessed which ones were ADR ids would fail the gate on measurements. So a
+ * reference written as a bare `0069` is still unchecked, and that is a stated gap rather than a
+ * silent one.
+ */
+export function proseRefs(src: string): Array<{ kind: "phase" | "adr"; ref: string }> {
+  const out: Array<{ kind: "phase" | "adr"; ref: string }> = [];
+  let fenced = false;
+  for (const line of src.split(/\r?\n/)) {
+    if (RE.fence.test(line)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+    // Qualified addresses belong to `crossTreeLint`, which knows what the other trees hold. Strip
+    // them first or `app:todo42#P1` is also read here as a same-tree `todo42#P1` and fails against
+    // THIS tree's numbering — the exact confusion §4 exists to prevent.
+    const bare = line.replace(CROSS_REF, "");
+    for (const m of bare.matchAll(/\btodo\d+#P\d+\b/g)) out.push({ kind: "phase", ref: m[0] });
+    for (const m of bare.matchAll(/\bADR\s+(\d{4})\b/g)) out.push({ kind: "adr", ref: m[1] });
+  }
+  return out;
+}
+
+/**
+ * Phase addresses a prose reference may legitimately name, INCLUDING completed todos.
+ *
+ * `walkDocs` skips `completed/` because a closed record is not linted — but it is still a real
+ * address, and ADRs cite one constantly (`todo24#P6`, `todo28#P4`). Resolving against open todos
+ * alone would fail the gate on every correct reference to finished work, which is the opposite of
+ * the rule's purpose.
+ */
+function phaseAddrsIncludingCompleted(docsDir: string): Set<string> {
+  const out = new Set<string>();
+  const scan = (dir: string): void => {
+    let entries: string[];
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const e of entries) {
+      const fp = path.join(dir, e);
+      if (statSync(fp).isDirectory()) { scan(fp); continue; }
+      const todo = e.match(/^(todo\d+)\.md$/);
+      if (!todo) continue;
+      for (const m of readFileSync(fp, "utf8").matchAll(/^## Phase (\d+)\b/gm)) out.add(`${todo[1]}#P${m[1]}`);
+    }
+  };
+  scan(path.join(docsDir, "todos"));
+  return out;
+}
+
+/** ADR ids that exist on disk, read from filenames so an unparseable record still counts as present. */
+function adrIdsOnDisk(docsDir: string): Set<string> {
+  const out = new Set<string>();
+  const scan = (dir: string): void => {
+    let entries: string[];
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const e of entries) {
+      const fp = path.join(dir, e);
+      if (statSync(fp).isDirectory()) { scan(fp); continue; }
+      const m = e.match(/^(\d{4})-.*\.md$/);
+      if (m) out.add(m[1]);
+    }
+  };
+  scan(path.join(docsDir, "decisions"));
+  return out;
+}
+
+/** Fail the gate on a prose reference that resolves to nothing — see `proseRefs`. */
+function proseRefLint(board: DocsBoard, docsDir: string, sources: Array<{ file: string; type: DocType; src: string }>): void {
+  const phases = phaseAddrsIncludingCompleted(docsDir);
+  const adrs = adrIdsOnDisk(docsDir);
+  for (const { file, type, src } of sources) {
+    const errs: string[] = [];
+    const seen = new Set<string>();
+    for (const { kind, ref } of proseRefs(src)) {
+      if (seen.has(kind + ref)) continue;
+      seen.add(kind + ref);
+      if (kind === "phase" && !phases.has(ref))
+        errs.push(`prose names \`${ref}\`, which does not exist — never invent the number (conducks-docs §4); write "no todo carries this yet" instead`);
+      if (kind === "adr" && !adrs.has(ref))
+        errs.push(`prose names \`ADR ${ref}\`, which does not exist`);
+    }
+    if (errs.length) mergeLint(board, file, type, errs);
+  }
 }
 
 /** One built tree, labelled — what `crossTreeLint` needs to resolve addresses between trees. */

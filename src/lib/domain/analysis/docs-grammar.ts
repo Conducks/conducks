@@ -19,7 +19,7 @@ export type DocType =
 
 export const GOVERNED: DocType[] = ["todo", "decision", "features", "memory", "conventions", "handover"];
 
-const RE = {
+export const RE = {
   title: /^#\s+(.+?)\s*$/,
   status: /^Status:\s*(.+?)\s*$/,
   section: /^##\s+(.+?)\s*$/,
