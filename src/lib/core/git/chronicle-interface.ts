@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import fsSync from "node:fs";
 import path from 'node:path';
 import { logger } from '@/lib/core/utils/logger.js';
 
@@ -133,9 +134,41 @@ export class ChronicleInterface {
    * generous for a local git operation and the first real timeout report is the measurement that
    * corrects it.
    */
-  private git(args: string[], opts: { quiet?: boolean } = {}): string {
+  /**
+   * Every repository root at or under `this.projectDir`, nearest first.
+   *
+   * A NESTED repository is invisible to its parent: `git ls-files` in the outer repo does not list
+   * a directory that carries its own `.git`, and `--recurse-submodules` only descends into
+   * REGISTERED submodules, not a plain `git init` inside a subdirectory. Measured on a fixture —
+   * 3 units discovered where 5 exist, the inner service absent from the vault entirely, its code
+   * never read (todo29#P0). So each repository has to be asked separately.
+   *
+   * The walk is bounded and skips the directories the FS fallback already skips, so on the common
+   * case — one repository, no nesting — it costs one shallow readdir per directory and returns a
+   * single root.
+   */
+  private async repositoryRoots(maxDepth: number = 6): Promise<string[]> {
+    const fs = await import('node:fs/promises');
+    const roots: string[] = [];
+    const skip = new Set(['node_modules', 'venv', '__pycache__', 'dist', 'build', 'out', '.next']);
+
+    const walk = async (dir: string, depth: number): Promise<void> => {
+      let entries;
+      try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+      if (entries.some(e => e.name === '.git')) roots.push(dir);
+      if (depth >= maxDepth) return;
+      for (const e of entries) {
+        if (!e.isDirectory() || skip.has(e.name) || e.name.startsWith('.')) continue;
+        await walk(path.join(dir, e.name), depth + 1);
+      }
+    };
+    await walk(this.projectDir, 0);
+    return roots;
+  }
+
+  private git(args: string[], opts: { quiet?: boolean; cwd?: string } = {}): string {
     return this.execFile('git', args, {
-      cwd: this.projectDir,
+      cwd: opts.cwd ?? this.projectDir,
       encoding: 'utf-8',
       timeout: 30_000,
       maxBuffer: 64 * 1024 * 1024,
@@ -168,23 +201,47 @@ export class ChronicleInterface {
         commands = [['diff', '--cached', '--name-only']];
       }
 
-      for (const cmd of commands) {
-        try {
-          const output = this.git(cmd);
-          (output as string).split('\n')
-            .filter(f => f.trim().length > 0)
-            .map(f => path.resolve(this.projectDir, f))
-            .filter(f => !f.includes('/node_modules/') && !f.includes('/.git/'))
-            .filter(f => !BINARY_EXTENSIONS.has(path.extname(f).toLowerCase()))
-            .forEach(f => allFiles.add(f));
-        } catch { /* Silent fail for individual git commands */ }
+      // Ask EVERY repository under the anchor, not only the anchor's own (todo29#P0, ADR 0069).
+      // With no nesting this is the single root and the behaviour is byte-identical to before.
+      const roots = await this.repositoryRoots();
+      const targets = roots.length > 0 ? roots : [this.projectDir];
+
+      for (const root of targets) {
+        for (const cmd of commands) {
+          try {
+            const output = this.git(cmd, { cwd: root });
+            (output as string).split('\n')
+              .filter(f => f.trim().length > 0)
+              .map(f => path.resolve(root, f))
+              .filter(f => !f.includes('/node_modules/') && !f.includes('/.git/'))
+              .filter(f => !BINARY_EXTENSIONS.has(path.extname(f).toLowerCase()))
+              .forEach(f => allFiles.add(f));
+          } catch { /* Silent fail for individual git commands */ }
+        }
       }
 
-      if (allFiles.size > 0) return Array.from(allFiles);
+      // A file can sit in the workspace and inside NO repository — the `conducks.json` that
+      // DECLARES a workspace whose services each carry their own `.git` is exactly that file
+      // (ADR 0069's third topology). Before nested discovery, git failed outright there and the FS
+      // scan below caught everything; now git partially succeeds, and returning here silently drops
+      // every root-level file. Measured on the fixture: 5 units became 4, and the missing one was
+      // the declaration that defines the workspace.
+      //
+      // So: return early only when the anchor is ITSELF a repository, which is the single-repo case
+      // and the entire installed base. Otherwise fall through and merge the FS scan.
+      // Coverage is PARTIAL only when files came from nested repositories while the anchor is not
+      // itself one — then, and only then, a root-level file can be inside no repository at all.
+      // If no nested repository was found, whatever git returned is the whole answer and the FS
+      // scan would add nothing but cost.
+      const anchorIsRepo = fsSync.existsSync(path.join(this.projectDir, '.git'));
+      const partialCoverage = roots.length > 0 && !anchorIsRepo;
+      if (allFiles.size > 0 && !partialCoverage) return Array.from(allFiles);
     } catch { /* Full Git failure falls through to FS scan */ }
 
     // 2. Fallback: Recursive FS Scan (Conducks Universal Discovery)
-    console.error(`[Chronicle Interface] Git discovery failed. Falling back to universal FS scan for: ${this.projectDir}`);
+    if (allFiles.size === 0) {
+      console.error(`[Chronicle Interface] Git discovery failed. Falling back to universal FS scan for: ${this.projectDir}`);
+    }
     const fs = await import('node:fs/promises');
     const { extensions, filenames } = await getDiscoverySurface();
 
@@ -266,7 +323,7 @@ export class ChronicleInterface {
 
     try {
       const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.projectDir);
+      const projectRoot = path.resolve(this.gitRootFor(filePath));
 
       // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
       let relativePath = path.relative(projectRoot, fixedPath);
@@ -338,8 +395,10 @@ export class ChronicleInterface {
     if (!this.isInsideProject(filePath)) return null;
 
     try {
-      const relativePath = this.toRepoRelative(filePath);
-      const output = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true });
+      // The repository that OWNS this file, not the workspace anchor (ADR 0069).
+      const repo = this.gitRootFor(filePath);
+      const relativePath = this.toRepoRelative(filePath, repo);
+      const output = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true, cwd: repo });
       const lines = output.split('\n').map(a => a.trim()).filter(Boolean);
 
       const distribution: Record<string, number> = {};
@@ -355,9 +414,47 @@ export class ChronicleInterface {
    * The repo-relative path, case-agnostically (critical on macOS and Windows). This was written out
    * three times in this file, character for character, once per git-reading method.
    */
-  private toRepoRelative(filePath: string): string {
+  /** Cache: absolute directory -> the repository root that owns it, or null. */
+  private gitRootCache = new Map<string, string | null>();
+
+  /**
+   * The repository that actually owns a file — the nearest `.git` at or above it (ADR 0069).
+   *
+   * The workspace root and the git root are different questions, and conflating them is silent
+   * rather than loud. Measured on a nested fixture: a file with one commit reported
+   * `count=0 authors=0`, because git ran SUCCESSFULLY against the outer repository, which
+   * truthfully knows nothing about that path. ADR 0049 drew its line at a subprocess that FAILED;
+   * this is one that succeeded and answered about the wrong thing, so nothing surfaced.
+   *
+   * Cached per directory because it is asked once per file, and a repository has one answer for
+   * every file beneath it.
+   */
+  private gitRootFor(filePath: string): string {
+    let dir = path.dirname(path.resolve(filePath));
+    const seen: string[] = [];
+    while (dir && dir !== path.parse(dir).root) {
+      const cached = this.gitRootCache.get(dir);
+      if (cached !== undefined) {
+        const answer = cached ?? this.projectDir;
+        for (const d of seen) this.gitRootCache.set(d, cached);
+        return answer;
+      }
+      seen.push(dir);
+      if (fsSync.existsSync(path.join(dir, '.git'))) {
+        for (const d of seen) this.gitRootCache.set(d, dir);
+        return dir;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    for (const d of seen) this.gitRootCache.set(d, null);
+    return this.projectDir;
+  }
+
+  private toRepoRelative(filePath: string, root?: string): string {
     const fixedPath = path.resolve(filePath);
-    const projectRoot = path.resolve(this.projectDir);
+    const projectRoot = path.resolve(root ?? this.projectDir);
     if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
       return fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
     }
@@ -375,7 +472,7 @@ export class ChronicleInterface {
 
     try {
       const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.projectDir);
+      const projectRoot = path.resolve(this.gitRootFor(filePath));
 
       // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
       let relativePath = path.relative(projectRoot, fixedPath);
@@ -384,13 +481,13 @@ export class ChronicleInterface {
       }
 
       // 1. Commit Count (Frequency)
-      const countOutput = this.git(['rev-list', '--count', 'HEAD', '--', relativePath], { quiet: true });
+      const countOutput = this.git(['rev-list', '--count', 'HEAD', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
       const count = parseInt(countOutput.trim(), 10) || 0;
 
       // 2. Unique Authors (Density)
       // The unique-author count was `git log ... | sort -u | wc -l`, which needs a shell. Counting
       // distinct lines here removes the pipe, and with it the only reason this call needed one.
-      const authorLines = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true });
+      const authorLines = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
       const authors = new Set(authorLines.split('\n').map(a => a.trim()).filter(Boolean)).size;
 
       return { count, authors };
@@ -415,7 +512,7 @@ export class ChronicleInterface {
 
     try {
       const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.projectDir);
+      const projectRoot = path.resolve(this.gitRootFor(filePath));
 
       // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
       let relativePath = path.relative(projectRoot, fixedPath);
@@ -423,7 +520,7 @@ export class ChronicleInterface {
         relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
       }
 
-      const output = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true });
+      const output = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
       const authors = output.split('\n').filter(a => a.trim().length > 0);
 
       const distribution: Record<string, number> = {};
@@ -448,14 +545,14 @@ export class ChronicleInterface {
 
     try {
       const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.projectDir);
+      const projectRoot = path.resolve(this.gitRootFor(filePath));
 
       // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
       let relativePath = path.relative(projectRoot, fixedPath);
       if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
         relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
       }
-      const output = this.git(['blame', '--porcelain', '--', relativePath], { quiet: true });
+      const output = this.git(['blame', '--porcelain', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
       const lines = output.split('\n');
 
       let currentAuthor = '';
