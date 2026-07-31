@@ -24,7 +24,7 @@ import fs from 'node:fs';
  */
 
 async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = false) {
-  const { units, allPaths, discoveryMode, globalSymbols } = data;
+  const { units, allPaths, discoveryMode, globalSymbols, externalPackages } = data;
 
   // The reflector lives in the DOMAIN layer; this worker is in CORE. A static import would be a
   // core → domain edge (ADR 0005). This file is a process entry point, not a core primitive — it is
@@ -43,6 +43,10 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
       context.registerGlobalSymbol(id, sym as any);
     }
   }
+  // Without these the resolver's external-package check is dead inside the subprocess, and a bare
+  // specifier falls through to the basename fallback — which is how `next/headers` came to point at
+  // the project's own `headers.ts`.
+  for (const pkg of (externalPackages ?? []) as string[]) context.registerExternalPackage(pkg);
 
   const cppProvider = new CPPProvider();
   const cProvider = new CProvider();

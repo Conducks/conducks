@@ -11,6 +11,43 @@ import path from "node:path";
  */
 export class EssenceLens {
   /**
+   * The package NAMES a manifest declares, for import resolution — not for the graph.
+   *
+   * `refract()` already reads the same manifests, but it runs in step 3 of the pulse, AFTER the
+   * wave that resolves imports. So at the moment `ImportProcessor.resolve()` asks
+   * "is `next` an external package?", nothing had ever told it about any package, and the answer was
+   * always no. `context.registerExternalPackage()` had no production caller at all.
+   *
+   * The cost of that was not a missing edge but a WRONG one. With step 2 dead, a bare specifier fell
+   * through to the basename fallback, and on mentorseed `next/headers` matched the project's OWN
+   * `packages/core/security/server/headers.ts` and `vitest/config` matched its `config.ts` — six
+   * import edges pointing at project files that have nothing to do with those packages. ADR 0070
+   * made this argument for aliases; this is the same failure one specifier-shape over.
+   *
+   * Returns names only, because that is all resolution needs. Versions and node creation stay in
+   * `refract()`, which is the one place that builds ECOSYSTEM nodes.
+   */
+  public declaredDependencies(filePath: string, source: string): string[] {
+    const fileName = path.basename(filePath);
+    try {
+      if (fileName === 'package.json') {
+        const pkg = JSON.parse(source);
+        return Object.keys({
+          ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}), ...(pkg.peerDependencies || {}),
+        });
+      }
+      if (fileName === 'requirements.txt') {
+        return source.split(/\r?\n/)
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#'))
+          .map(l => l.split(/[<>=!~;[\s]/)[0].trim())
+          .filter(Boolean);
+      }
+    } catch { /* a malformed manifest declares nothing; `refract` reports the parse failure */ }
+    return [];
+  }
+
+  /**
    * Refracts a manifest file into a Spectrum of external dependencies.
    */
   public refract(filePath: string, source: string): PrismSpectrum {

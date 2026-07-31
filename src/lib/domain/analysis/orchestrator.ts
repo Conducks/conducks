@@ -4,6 +4,7 @@ import { WorkerPool } from "@/lib/domain/analysis/worker-pool.js";
 import { ReflectionPipeline } from "@/lib/domain/analysis/reflection-pipeline.js";
 import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
+import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
@@ -87,6 +88,22 @@ export class AnalyzeOrchestrator {
     const workspaceRoot: string = options.workspaceRoot || path.resolve(process.cwd());
     const projectRoots: string[] = cliProjectRoots.length > 0 ? cliProjectRoots.map((r: string) => path.resolve(r)) : [workspaceRoot];
 
+    // Every package this workspace DECLARES, read before anything is parsed.
+    //
+    // Manifests were read in step 3 of the pulse, after the wave that resolves imports, so
+    // `isExternalPackage()` was answering from an empty set at the only moment it is asked. Reading
+    // them here costs one JSON.parse per manifest and is what makes step 2 of the resolver exist at
+    // all. EVERY manifest in the tree counts, not the root one: on a monorepo `next` is declared in
+    // `app/package.json` and the workspace root declares nothing, so a per-service dependency was
+    // invisible to the service that uses it.
+    for (const f of normalizedFiles) {
+      const base = path.basename(f.path);
+      if (base !== 'package.json' && base !== 'requirements.txt') continue;
+      for (const dep of essenceLens.declaredDependencies(f.path, f.source)) {
+        context.registerExternalPackage(dep.toLowerCase());
+      }
+    }
+
     // Phase 0 + Pass 1: L0-L3 containment skeleton (ecosystem/repository/directory/unit) and the
     // taxonomy legend — must exist before a single file is parsed (see graph-skeleton-builder.ts).
     const projectMap = this.skeletonBuilder.build(this.graph, normalizedFiles, workspaceRoot, projectRoots);
@@ -131,7 +148,12 @@ export class AnalyzeOrchestrator {
         chunk,
         false,
         allPaths,
-        context.exportState().registry
+        context.exportState().registry,
+        // A worker builds its OWN context, so anything the main thread knows and does not send is
+        // knowledge the worker does not have. The declared packages have to travel the same way the
+        // global symbols do, or step 2 of the resolver stays dead inside every subprocess while
+        // looking alive on the main thread.
+        context.exportState().externalPackages
       );
       traceMemory(`wave ${batchNum} after parse`);
 

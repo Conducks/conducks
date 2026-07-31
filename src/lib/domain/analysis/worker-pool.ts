@@ -38,7 +38,9 @@ export class WorkerPool {
     files: Array<{ path: string, source: string }>,
     discoveryMode: boolean,
     allPaths: string[],
-    globalSymbols?: Record<string, any>
+    globalSymbols?: Record<string, any>,
+    /** Package names the workspace's manifests declare — see `essence-lens.declaredDependencies`. */
+    externalPackages?: string[]
   ): Promise<any[]> {
     const unitCount = files.length;
     if (unitCount === 0) return [];
@@ -88,7 +90,7 @@ export class WorkerPool {
           const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
           const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
 
-          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
+          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, externalPackages, isFork: true, tempOutputFile: tempOutput }));
 
           const nodeArgs = isTs
             ? ['--no-warnings', '--import', tsxLoader!, workerScript, tempInput]
@@ -197,6 +199,7 @@ export class WorkerPool {
             context.registerGlobalSymbol(id, sym);
           }
         }
+        for (const pkg of externalPackages ?? []) context.registerExternalPackage(pkg);
 
         const res = await reflector.reflect(file, provider, context, allPaths);
         results.push({ path: file.path, spectrum: res, state: context.exportState(), success: true });

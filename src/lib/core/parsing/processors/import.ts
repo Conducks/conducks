@@ -83,12 +83,28 @@ export class ImportProcessor {
     }
 
     // 2. External Package Check
-    if (!specifier.startsWith('.')) {
-      const pkgName = specifier.split('/')[0];
-      if (context?.isExternalPackage(pkgName)) {
-        return { name: pkgName, kind: 'external_dependency' };
-      }
-    }
+    //
+    // The package name is the FIRST TWO segments when the specifier is scoped, and the first one
+    // otherwise. `@playwright/test` is one package; `@playwright` is not a package at all, so
+    // splitting on the first `/` unconditionally meant a scoped package could never match, whatever
+    // the manifest said. Same for `@vercel/analytics/next`, where the third segment is a subpath.
+    //
+    // This branch answers at PACKAGE level and is deliberately narrow, because package level is
+    // coarser than what the graph already gets for free. Left to fall through, an unresolved
+    // external specifier is induced as `lib::<pkg>::<symbol>` — a node per imported SYMBOL, which is
+    // what makes "who uses `useState`" answerable at all. MEASURED on mentorseed (974 units) when
+    // this branch was first made to fire for every declared dependency: nodes 5,997 -> 3,182 and
+    // edges 19,014 -> 6,179, because every named external import collapsed into one package link.
+    // The dangling COUNT fell 194 -> 99 and looked like a win; the dangling RATE went 1.02% -> 1.60%
+    // and the graph had lost two thirds of itself. A count that improves while the rate worsens is
+    // the shape of a denominator being destroyed, and it is why this is measured rather than
+    // reasoned about.
+    //
+    // So a declared package is used to REFUSE the basename fallback in step 4, not to short-circuit
+    // here. `declaredExternal` carries that one bit forward.
+    const seg = specifier.split('/');
+    const pkgName = specifier.startsWith('@') && seg.length >= 2 ? `${seg[0]}/${seg[1]}` : seg[0];
+    const declaredExternal = !specifier.startsWith('.') && !!context?.isExternalPackage(pkgName);
 
     const dir = path.dirname(importerPath);
 
@@ -171,6 +187,17 @@ export class ImportProcessor {
     // right about one time in twenty-four, and the edge it writes is indistinguishable from a
     // correctly resolved one. Refusing costs an edge; guessing costs a WRONG edge, and a wrong
     // edge is what `impact` and `trace` then walk.
+    //
+    // A DECLARED dependency never reaches the fallback at all. `next/headers` has basename `headers`
+    // and mentorseed owns a `packages/core/security/server/headers.ts`, so the fallback matched them
+    // and wrote an IMPORTS edge from a Next.js import to the project's own file — `vitest/config`
+    // onto `config.ts` the same way. Six such edges, each one a WRONG edge rather than a missing
+    // one, which is the trade ADR 0070 already refused for aliases: the manifest says this specifier
+    // names a package, so a file that happens to share its last segment is a coincidence, never a
+    // resolution. Returning undefined hands it to induction, which mints `lib::<pkg>::<symbol>` and
+    // keeps the symbol-level answer.
+    if (declaredExternal) return undefined;
+
     const baseName = path.basename(specifier);
     const exact = ImportProcessor.basenameIndexFor(allPaths).get(baseName);
     if (exact && exact.length === 1) return exact[0];
