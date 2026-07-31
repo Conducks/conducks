@@ -4,8 +4,17 @@ import path from 'node:path';
 /**
  * Conducks — Sentinel Rule Language (YAML DSL)
  *
- * Defines user-configurable graph-level conditions for architectural governance.
- * Rules are loaded from `.conducks/sentinel.yml` in the project root.
+ * Defines a small, HARDCODED set of graph-wide structural conditions for architectural
+ * governance (cycles, rank inversions, layer boundaries — see `LAYER_FRAGMENTS` /
+ * `ALLOWED_DEPENDENCIES` below). Evaluated by `governance/index.ts`'s `auditWithRules()`,
+ * which `conducks guard` reads. Rules are loaded from `.conducks/sentinel.yml` in the project root.
+ *
+ * ADR 0073: this `SentinelRule` is unrelated to `sentinel.ts`'s `ProjectRule` (formerly also named
+ * `SentinelRule`) — that one is the DECLARATIVE, user-editable per-node policy set in
+ * `config/sentinel.json`, evaluated by `conducks audit`. Neither engine evaluates the other's
+ * rules. This type keeps its name in this change because it is consumed by `governance/index.ts`
+ * and `guard.ts`, both outside this change's file ownership — a rename here would need to land in
+ * the same turn as updating those call sites, or the collision would just move rather than close.
  */
 
 export type SentinelCondition =
