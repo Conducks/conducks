@@ -73,7 +73,10 @@ export class GuardCommand implements ConducksCommand {
         // clean comparison and for one it could not make (ADR 0044), and prefixing a green tick to
         // "NOT ASSESSED" reproduced the exact failure that ADR fixes, one layer up.
         const assessed = !status.message.includes('NOT ASSESSED');
-        console.log('\n' + (assessed ? '✅ ' + status.message : status.message));
+        // The domain already prefixes its own tick (`guard.ts:79` builds "✅ Stability acceptable:
+        // …"), so prefixing again printed "✅ ✅". Add one only when the message does not carry it.
+        const needsTick = assessed && !status.message.trimStart().startsWith('✅');
+        console.log('\n' + (needsTick ? '✅ ' + status.message : status.message));
         if (status.risk > 0) {
           console.log(`- Minor decay detected: ${status.risk.toFixed(3)} (Acceptable)`);
         }
