@@ -1,5 +1,6 @@
 # 0050 — a node row records when it was LAST seen, and a full pulse sweeps the rest
 Status: Accepted
+- Amended by: 0078
 - Enforced by: tests/integration/features/pulse-writes-every-table.test.ts (a two-pulse vault carries exactly one distinct `pulseId` in `nodes`, and its induced `lib::` nodes survive the second pulse)
 - Date: 2026-07-30
 

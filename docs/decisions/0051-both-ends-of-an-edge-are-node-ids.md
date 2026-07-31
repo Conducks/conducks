@@ -1,5 +1,6 @@
 # 0051 — both ends of an edge are node ids, or the edge is not written
 Status: Accepted
+- Amended by: 0078
 - Enforced by: tests/integration/features/pulse-writes-every-table.test.ts (no `PULSES_TO` edge has a source that is absent from `nodes`)
 - Date: 2026-07-30
 
