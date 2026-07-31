@@ -12,6 +12,43 @@ export const TYPESCRIPT_QUERIES = `
     (import_clause (named_imports (import_specifier name: (identifier) @name alias: (identifier)? @alias)))
     source: (string) @source) @isImport
 
+  ;; Barrel re-export, per specifier: "export { coreDb as db } from ./DatabaseManager".
+  ;;
+  ;; The whole-file @isImport pattern above (@source only) sees the statement but not which names
+  ;; it republishes, so reflection-pipeline.ts had no way to know a downstream "import { db } from
+  ;; '@/core/database/server'" should land on anything other than a symbol literally named "db"
+  ;; DEFINED in the target file — and a pure re-export defines no such symbol, only the ORIGINAL
+  ;; module does, often under a different name. Every one of those per-binding BIND:: edges dangled.
+  ;;
+  ;; @name is tagged onto the grammar's PUBLIC name — the "alias:" field when the specifier renames
+  ;; ("x as y"), otherwise the plain "name:" field — because @isBinding (a DEFINITION_CAPTURES member,
+  ;; see capture-tags.ts) makes the reflector's existing node-creation path (reflector.ts ~L322) mint
+  ;; a real node "<thisFile>::<publicName>". That is not a guess: the AST proves this file exports a
+  ;; binding by that name, same certainty as any other declaration — ADR 0070's refusal is about
+  ;; fabricating a TARGET from a coincidence, not about declining to record a fact this file's own
+  ;; syntax states outright. It is what makes the downstream BIND:: edge land on something real.
+  ;;
+  ;; The renamed pattern also tags the grammar's "name:" field (the ORIGINAL symbol, "coreDb") as
+  ;; @alias. reflector.ts already has an UNUSED branch for exactly this (cName === "alias" && node,
+  ;; ~L539) that calls BindingProcessor.processAlias and emits a durable ALIASES edge
+  ;; publicName -> originalName. IntraLinker (linker-intra.ts) already classifies ALIASES as
+  ;; RESOLVABLE (ADR 0053) and, scoped to files this one imports, rebinds the bare original name to
+  ;; its real cross-file definition in a later pass — the same mechanism CALLS/TYPE_REFERENCE use, no
+  ;; new resolution code needed. One hop per IntraLinker pass; chained barrels (a barrel re-exporting
+  ;; another barrel) resolve to the next hop's node, not all the way to the root definition. See ADR
+  ;; 0071 for what that leaves open ("export * from", multi-hop chains, cycles) and why this scope is
+  ;; the deliberate first step.
+  ;;
+  ;; !alias (renamed pattern requires it present, this one requires it absent) keeps the two
+  ;; patterns from double-matching the same specifier; a local re-export ("export { x }", no "from")
+  ;; has no "source:" field and is untouched, still handled by the existing @ref_value pattern below.
+  (export_statement
+    (export_clause (export_specifier name: (identifier) @alias alias: (identifier) @name))
+    source: (string) @source) @isBinding
+  (export_statement
+    (export_clause (export_specifier name: (identifier) @name !alias))
+    source: (string) @source) @isBinding
+
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
   (public_field_definition name: (property_identifier) @name) @isProperty
