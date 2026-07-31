@@ -1,3 +1,4 @@
+import { readWatcherLiveness, type WatcherLiveness } from "@/lib/domain/evolution/watcher-liveness.js";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -60,6 +61,14 @@ export interface ProjectReport {
     unlinkedDecisions: number;
   };
   drift: ModuleDrift[];
+  /**
+   * Whether anything is keeping this project's graph fresh.
+   *
+   * Staleness alone cannot distinguish "nobody watches this project" from "the watcher died" — both
+   * render as drift, and they mean opposite things (todo21#P3). One is a configuration choice; the
+   * other is an incident nobody was told about.
+   */
+  watcher: WatcherLiveness;
 }
 
 /** Extensions the monitor hashes. Matching the graph exactly is not required — it needs a stable, cheap set. */
@@ -87,6 +96,9 @@ export class ProjectMonitor {
       graph: { analyzed: false, changed: 0, added: 0, removed: 0, tracked: 0, stale: false },
       docs: { violations: 0, warnings: 0, unlinkedDecisions: 0 },
       drift: [],
+      // Read here, in `base`, so it survives every early return below: a project whose vault is
+      // unreadable is exactly one where "is anything watching it?" is worth knowing.
+      watcher: readWatcherLiveness(project.root),
     };
 
     if (!fs.existsSync(project.root)) {

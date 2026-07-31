@@ -64,7 +64,7 @@ rows in 235 MB is real and is a DISK problem (Phase 4).
 - Depends: todo21#P1
 - [ ] One engine; `watch` and `monitor` become surfaces over it
 - [ ] One module-hash implementation. ADR 0031 records two that must agree — collapse them
-- [ ] Liveness marker, so a DEAD watcher does not look identical to no watcher. They mean opposite things and both render as drift today
+- [x] BUILT — `watcher-liveness.ts`. A running watcher writes `.conducks/watcher.json` (pid, startedAt, heartbeatAt) and refreshes it every 20 s on an UNREFFED timer, so a diagnostic never holds the process open; a clean `stop()` removes it, which is what makes a deliberate shutdown read as `none` rather than `dead`. `monitor` now prints `watcher DEAD — pid N (process gone|heartbeat stale)` above the staleness line, because staleness is the SYMPTOM and this is the cause; `live` prints dim and `none` prints NOTHING, since most projects are not watched and a line on every one is the noise that gets a report ignored. Liveness needs BOTH signals and each is mutation-checked separately: the pid alone misses a process that is alive and wedged, the heartbeat alone cannot tell a clean exit from a hang. The 90 s staleness window is deliberately much longer than the 20 s refresh — a watcher blocked in a long micro-pulse is working, and calling it dead would turn a slow pulse into a false incident. A malformed or unreadable marker reads as `none`, following the monitor's existing rule that a project which cannot answer becomes a line rather than an exception
 - [ ] Every command answers correctly with NOTHING running. A daemon is an accelerator, never a requirement — CI has no daemon, and a gate that needs one cannot gate a pull request
 
 ## Phase 4 — the vault is 27x its own contents

@@ -106,6 +106,16 @@ export class MonitorCommand implements ConducksCommand {
 
       console.log(`${label} ${graph}  ${chalk.dim("·")}  ${docs}`);
       console.log(chalk.dim(`  ${r.root}`));
+
+      // A DEAD watcher is louder than a stale graph, because staleness is the SYMPTOM and this is
+      // the cause. Nothing is printed for `none`: most projects are not watched, and a line saying
+      // so on every one of them is the noise that gets a report ignored (todo21#P3).
+      if (r.watcher.state === 'dead') {
+        console.log(chalk.red(`  watcher DEAD — pid ${r.watcher.pid} (${r.watcher.reason}), last beat ${r.watcher.heartbeatAt}`));
+        console.log(chalk.dim(`  this is why the graph is behind. 'conducks watch' to restart it.`));
+      } else if (r.watcher.state === 'live') {
+        console.log(chalk.dim(`  watcher live — pid ${r.watcher.pid} since ${r.watcher.startedAt}`));
+      }
       if (r.graph.analyzed && r.graph.added > 0) {
         console.log(chalk.dim(`  ${r.graph.added} file(s) the graph has never analyzed — 'analyze' is incremental by mtime, so`));
         console.log(chalk.dim(`  a file untouched since the last pulse never enters a wave. 'conducks analyze --force' if it matters.`));

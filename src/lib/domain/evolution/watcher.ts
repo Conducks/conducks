@@ -1,3 +1,4 @@
+import { writeWatcherMarker, clearWatcherMarker, HEARTBEAT_INTERVAL_MS } from "@/lib/domain/evolution/watcher-liveness.js";
 import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
@@ -96,6 +97,9 @@ export class ConducksWatcher {
   /**
    * Starts the Synapse Monitor.
    */
+  /** Refreshes the liveness marker while this watcher runs. Null when stopped. */
+  private heartbeat: ReturnType<typeof setInterval> | null = null;
+
   public start(): void {
     if (this.watcher) return;
 
@@ -114,6 +118,19 @@ export class ConducksWatcher {
       .on("change", (filePath: string) => { console.error(`[Watcher Debug] change: ${filePath}`); this.handlePulseEvent("change", filePath); })
       .on("unlink", (filePath: string) => { console.error(`[Watcher Debug] unlink: ${filePath}`); this.handlePulseEvent("unlink", filePath); })
       .on("error", (err: unknown) => { console.error('[Watcher]', err); });
+
+    // Publish liveness so a DEAD watcher stops looking like no watcher (todo21#P3). Both render as
+    // drift in `monitor`, and they mean opposite things: nobody watching is a choice, a watcher that
+    // fell over is an incident.
+    const startedAt = new Date().toISOString();
+    writeWatcherMarker(this.rootDir, startedAt, new Date());
+    this.heartbeat = setInterval(
+      () => { try { writeWatcherMarker(this.rootDir, startedAt, new Date()); } catch { /* a diagnostic must not kill the watcher */ } },
+      HEARTBEAT_INTERVAL_MS,
+    );
+    // Never hold the event loop open for a heartbeat — the watcher's own handles decide the
+    // process lifetime, and an unreffed timer means `stop()` is the only thing that ends it.
+    this.heartbeat.unref?.();
   }
 
   /**
@@ -130,6 +147,9 @@ export class ConducksWatcher {
    * Stops the Monitor.
    */
   public async stop(): Promise<void> {
+    if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = null; }
+    // Removed on a CLEAN stop, so a deliberate shutdown reads as "none" rather than "dead".
+    clearWatcherMarker(this.rootDir);
     if (this.watcher) {
       await this.watcher.close();
       this.watcher = null;
