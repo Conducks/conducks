@@ -1,3 +1,4 @@
+import { EXTERNAL_ROOT } from "@/lib/core/graph/external-nodes.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { mapToCanonical } from "@/lib/core/parsing/taxonomy.js";
 import path from "node:path";
@@ -80,8 +81,10 @@ export class EssenceLens {
           metadata: {
             // Parented to the ecosystem root, so the containment tree has ONE top (ADR 0057).
             // These carried no parent at all, leaving 32 external packages floating: unreachable by
-            // any walk, and absent from any answer to "what is under X".
-            parentId: 'ecosystem::global',
+            // any walk, and absent from any answer to "what is under X". The constant lives in
+            // `external-nodes.ts` — this is a SpectrumNode, so it takes the parent rather than the
+            // whole property block (todo25#P12).
+            parentId: EXTERNAL_ROOT,
             ecosystem: 'npm',
             version: version as string,
             isExternal: true
@@ -126,7 +129,7 @@ export class EssenceLens {
           filePath: filePath,
           isExport: true,
           metadata: {
-            parentId: 'ecosystem::global',   // same as npm above (ADR 0057)
+            parentId: EXTERNAL_ROOT,   // same as npm above (ADR 0057)
             ecosystem: 'pip',
             version,
             isExternal: true

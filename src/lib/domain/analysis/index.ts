@@ -12,6 +12,7 @@ import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import fs from "node:fs/promises";
 import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
+import { externalNodeProps, libraryNamespaceId } from "@/lib/core/graph/external-nodes.js";
 import { HttpServiceLinker } from "@/lib/core/graph/http-service-linker.js";
 
 import { QueryService } from "./query-service.js";
@@ -522,20 +523,19 @@ export class AnalysisService {
       }
 
       if (isCandidate) {
-        const libId = `lib::${namespace}`;
+        const libId = libraryNamespaceId(namespace);
         
         // 1. Induce Library Node (e.g. lib::unresolved or lib::npm)
         if (!graph.hasNode(libId)) {
           const libNode = {
             id: libId,
             label: 'LIBRARY',
-            properties: { 
-              name: namespace, 
-              filePath: `external://${namespace}`, 
-              canonicalKind: 'STRUCTURE', 
-              canonicalRank: 1, // Ecosystem Layer
-              // A library namespace hangs off the ecosystem root rather than floating (ADR 0057).
-              parentId: 'ecosystem::global',
+            properties: {
+              // Shape and parent from `external-nodes.ts`, the one definition of an external node
+              // (todo25#P12). `filePath` is overridden below because a library namespace has a
+              // meaningful `external://` path where a package boundary does not.
+              ...externalNodeProps({ name: namespace, canonicalKind: 'STRUCTURE', canonicalRank: 1 }),
+              filePath: `external://${namespace}`,
               isShallow: true
             }
           };
@@ -548,11 +548,10 @@ export class AnalysisService {
           id: targetId,
           label: 'LIBRARY_SYMBOL',
           properties: {
-            name: symbol,
+            // A symbol hangs off its NAMESPACE, not the external root — the one case where the
+            // parent is not the default, which is why the factory takes it as a parameter.
+            ...externalNodeProps({ name: symbol, canonicalKind: 'BEHAVIOR', canonicalRank: 7, parentId: libId }),
             filePath: `external://${namespace}/${symbol}`,
-            canonicalKind: 'BEHAVIOR',
-            canonicalRank: 7, // Leaf Level
-            parentId: libId,
             isShallow: true
           }
         };

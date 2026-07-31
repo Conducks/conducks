@@ -4,7 +4,7 @@ import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import { ConducksComponent } from "@/contracts/types.js";
 import type { PrismSpectrum } from "@/types/prism-types.js";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -58,59 +58,85 @@ export class WorkerPool {
     }
 
     const workerCount = parseInt(process.env.CONDUCKS_WORKERS ?? String(Math.max(1, os.cpus().length - 1)), 10);
-    const skipWorker = workerCount <= 0 || (!isTs && tsxLoader === null);
+    // Only CONDUCKS_WORKERS<=0 opts out. The compiled binary used to be excluded here too
+    // (`!isTs && tsxLoader === null`), which meant every shipped install parsed single-threaded —
+    // todo21#P1. tsxLoader is only needed to run the .ts worker script under tsx; the compiled .js
+    // worker runs under plain `node`, so its absence is no longer a reason to skip.
+    const skipWorker = workerCount <= 0;
     if (!skipWorker) {
-      // NOTE: tsxLoader is null when running compiled JS; tsxLoader! below will throw if workerCount>0 in that mode.
       const coreCount = workerCount;
       const chunkSize = Math.ceil(unitCount / coreCount);
-      const results: Array<{ success: boolean; path: string; spectrum?: PrismSpectrum; state?: unknown }> = [];
-
+      const chunks: Array<{ path: string, source: string }[]> = [];
       for (let i = 0; i < unitCount; i += chunkSize) {
-        const chunk = files.slice(i, i + chunkSize);
+        chunks.push(files.slice(i, i + chunkSize));
+      }
 
-        const spawnWorker = async (chunk: string[]) => {
-          return new Promise<any[]>((resolve) => {
+      // Chunks run CONCURRENTLY, bounded by construction — there are at most `coreCount` of them,
+      // one per chunk, so no separate semaphore is needed on top of the chunking above. This
+      // replaces the previous `await spawnWorker(chunk)` sitting INSIDE the loop, which made the
+      // whole pool sequential: it paid the cost of splitting into N chunks and then ran them one at
+      // a time, buying zero parallelism (todo21#P1, ADR 0072).
+      //
+      // `spawn` (async, non-blocking) replaces `spawnSync` for the same reason. The outcome is still
+      // INSPECTED (ADR 0049): a dead worker throws loudly naming how many files it lost, rather than
+      // resolving to `[]`. On the first failure, every still-running sibling process is killed so a
+      // crash does not leave orphaned node processes racing a pulse that has already been aborted.
+      const liveProcs = new Set<ReturnType<typeof spawn>>();
 
-            const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
-            const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+      const spawnWorker = (chunk: Array<{ path: string, source: string }>): Promise<any[]> => {
+        return new Promise<any[]>((resolve, reject) => {
+          const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+          const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
 
-            fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
+          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, isFork: true, tempOutputFile: tempOutput }));
 
-            // The outcome is INSPECTED (ADR 0049). This return value used to be discarded, and a
-            // missing output file resolved to `[]` — so a segfault in a native parser, an OOM kill
-            // and a chunk of genuinely symbol-free files were the same result. A chunk is
-            // files.length / coreCount, so one crash silently dropped hundreds of files from the
-            // pulse and every count downstream was quietly short.
-            const proc = spawnSync('node', [
-              '--no-warnings',
-              '--import', tsxLoader!,
-              workerScript,
-              tempInput
-            ], {
-              env: { ...process.env, CONDUCKS_WORKER_MODE: 'spawn' },
-              stdio: 'inherit',
-              // Generous on purpose, and a guess until something real trips it — a value too low
-              // fails legitimate large files, and one too high is indistinguishable from none.
-              timeout: 10 * 60 * 1000,
-            });
+          const nodeArgs = isTs
+            ? ['--no-warnings', '--import', tsxLoader!, workerScript, tempInput]
+            : ['--no-warnings', workerScript, tempInput];
 
-            const cleanup = () => {
-              try { fs.unlinkSync(tempInput); } catch { /* best effort */ }
-              try { fs.unlinkSync(tempOutput); } catch { /* best effort */ }
-            };
+          const proc = spawn('node', nodeArgs, {
+            env: { ...process.env, CONDUCKS_WORKER_MODE: 'spawn' },
+            stdio: 'inherit',
+          });
+          liveProcs.add(proc);
 
-            if (proc.error || proc.signal || (proc.status !== null && proc.status !== 0)) {
-              cleanup();
-              const how = proc.signal === 'SIGTERM' && !proc.error
+          let spawnError: Error | null = null;
+          let timedOut = false;
+          // Generous on purpose, and a guess until something real trips it — a value too low fails
+          // legitimate large files, and one too high is indistinguishable from none.
+          const timer = setTimeout(() => {
+            timedOut = true;
+            proc.kill('SIGTERM');
+          }, 10 * 60 * 1000);
+
+          const cleanup = () => {
+            clearTimeout(timer);
+            liveProcs.delete(proc);
+            try { fs.unlinkSync(tempInput); } catch { /* best effort */ }
+            try { fs.unlinkSync(tempOutput); } catch { /* best effort */ }
+          };
+
+          const failChunk = (message: string) => {
+            cleanup();
+            for (const other of liveProcs) other.kill('SIGTERM');
+            reject(new Error(
+              `[WorkerPool] Parse worker ${message}. ${chunk.length} file(s) in this chunk were NOT analysed, ` +
+              `starting with ${chunk.slice(0, 3).map((u: any) => u.path).join(', ')}. ` +
+              `This is a failure, not an empty result — the pulse is aborted rather than silently short.`
+            ));
+          };
+
+          proc.on('error', (err) => { spawnError = err; });
+
+          proc.on('exit', (code, signal) => {
+            if (spawnError || signal || (code !== null && code !== 0)) {
+              const how = timedOut && signal === 'SIGTERM' && !spawnError
                 ? 'timed out after 10m'
-                : proc.signal ? `was killed by ${proc.signal}`
-                : proc.error ? `failed to start: ${proc.error.message}`
-                : `exited with status ${proc.status}`;
-              throw new Error(
-                `[WorkerPool] Parse worker ${how}. ${chunk.length} file(s) in this chunk were NOT analysed, ` +
-                `starting with ${chunk.slice(0, 3).map((u: any) => u.path).join(', ')}. ` +
-                `This is a failure, not an empty result — the pulse is aborted rather than silently short.`
-              );
+                : signal ? `was killed by ${signal}`
+                : spawnError ? `failed to start: ${(spawnError as Error).message}`
+                : `exited with status ${code}`;
+              failChunk(how);
+              return;
             }
 
             if (fs.existsSync(tempOutput)) {
@@ -120,22 +146,21 @@ export class WorkerPool {
                 resolve(results);
               } catch (e: any) {
                 cleanup();
-                throw new Error(`[WorkerPool] Worker output was unreadable (${e.message}). ${chunk.length} file(s) unaccounted for.`);
+                reject(new Error(`[WorkerPool] Worker output was unreadable (${e.message}). ${chunk.length} file(s) unaccounted for.`));
               }
             } else {
               cleanup();
-              throw new Error(
+              reject(new Error(
                 `[WorkerPool] Worker exited cleanly but wrote no output file. ${chunk.length} file(s) unaccounted for. ` +
                 `An absent result is not an empty one.`
-              );
+              ));
             }
           });
-        };
+        });
+      };
 
-        const resultChunk = await spawnWorker(chunk as any);
-        results.push(...resultChunk);
-      }
-      return results;
+      const resultChunks = await Promise.all(chunks.map(spawnWorker));
+      return resultChunks.flat();
     }
 
     // Main thread fallback for debug or small batches

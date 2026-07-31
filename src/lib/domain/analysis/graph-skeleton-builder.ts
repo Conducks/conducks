@@ -1,3 +1,4 @@
+import { EXTERNAL_ROOT } from "@/lib/core/graph/external-nodes.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
 import { logger } from "@/lib/core/utils/logger.js";
@@ -29,7 +30,9 @@ export class GraphSkeletonBuilder {
     projectRoots: string[]
   ): Map<string, string> {
     // 1. Create the Unified ecosystem Node (Rank 0)
-    const ecosystemId = "ecosystem::global";
+    // The root itself. Not an "external node" in the dependency sense, but the same literal, so it
+    // comes from the same place (todo25#P12).
+    const ecosystemId = EXTERNAL_ROOT;
     graph.getGraph().addNode({
       id: ecosystemId,
       label: "Ecosystem",
@@ -131,13 +134,13 @@ export class GraphSkeletonBuilder {
         name: 'Structural Legend',
         canonicalKind: 'ECOSYSTEM',
         canonicalRank: -1,
-        parentId: 'ecosystem::global'
+        parentId: EXTERNAL_ROOT
       }
     });
     graph.getGraph().addEdge({
       id: 'member::legend->global',
       sourceId: 'ecosystem::legend',
-      targetId: 'ecosystem::global',
+      targetId: EXTERNAL_ROOT,
       type: 'MEMBER_OF',
       confidence: 1.0,
       properties: {}

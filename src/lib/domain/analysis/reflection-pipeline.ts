@@ -5,6 +5,7 @@ import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { sameFamily } from "@/lib/core/graph/import-resolver.js";
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { ConducksComponent } from "@/contracts/types.js";
+import { ecosystemId, externalNodeProps } from "@/lib/core/graph/external-nodes.js";
 import path from "node:path";
 
 /**
@@ -106,17 +107,15 @@ export class ReflectionPipeline {
         const origin = rel.metadata.origin;
         if (origin && origin !== 'internal') {
           const pkg = (rel.metadata.package as string | null) || specifier.replace(/^node:/, '');
-          const boundaryId = `ecosystem::${pkg.toLowerCase()}`;
+          const boundaryId = ecosystemId(pkg);
           if (!graph.getGraph().getNode(boundaryId)) {
             graph.getGraph().addNode({
               id: boundaryId, label: 'ECOSYSTEM', isShallow: true,
               properties: {
-                name: pkg, filePath: '', canonicalKind: 'ECOSYSTEM', canonicalRank: 0,
-                // Hangs off the ecosystem root rather than floating (ADR 0057). This is the THIRD
-                // path that creates an external node — the manifest parser and virtual induction
-                // are the others — and it is the one that actually produces them here, which is why
-                // parenting the other two moved the orphan count from 51 to 32 and no further.
-                parentId: 'ecosystem::global',
+                // Shape and parent come from `external-nodes.ts` — the one place that defines
+                // what an external node is (todo25#P12). This was the THIRD of four sites setting
+                // `parentId: 'ecosystem::global'` by hand, which is why ADR 0057 was a hunt.
+                ...externalNodeProps({ name: pkg, canonicalKind: 'ECOSYSTEM', canonicalRank: 0 }),
                 origin, package: origin === 'dependency' ? pkg : null, isBoundary: true,
               } as any,
             });

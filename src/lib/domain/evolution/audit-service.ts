@@ -58,10 +58,15 @@ export class AuditService {
     const duration = Date.now() - startTime;
     logger.info(`[AuditService] Structural archeology completed in ${duration}ms (Window: ${windowSize}).`);
 
+    // ADR 0073: the same shape as ADR 0044's `DriftEngine.compare()` — a comparison that ran and
+    // had nothing to compare (no pulse pair yet, or the query threw and was caught above) is not
+    // the same fact as "compared and found no decay". Collapsing both into STABLE is exactly the
+    // "check that ran on nothing is not a pass" failure named there; `INSUFFICIENT_DATA` is the
+    // status this type already declared for it and never returned.
     if (rows.length === 0) {
       return {
-        status: 'STABLE',
-        message: 'Insufficient historical data or stable resonance. No consistent decay patterns found.',
+        status: 'INSUFFICIENT_DATA',
+        message: 'No historical data to compare — the archeological scan ran and had nothing to compare (needs at least two pulses with matching node_history rows).',
         hotspots: [],
         window_size: windowSize
       };

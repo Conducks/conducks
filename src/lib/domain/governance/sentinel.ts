@@ -10,12 +10,23 @@ import { CanonicalKind } from "@/lib/core/parsing/taxonomy.js";
 const VALID_MATCH_LABELS = new Set<string>(Object.values(CanonicalKind));
 
 /**
- * Conducks — Sentinel Policy Engine
- * 
- * A logic-based structural validator that enforces governance 
+ * Conducks — Project Rule Engine (config/sentinel.json)
+ *
+ * A logic-based structural validator that enforces governance
  * without requiring AI or expensive embeddings.
+ *
+ * ADR 0073: this file and `sentinel-rules.ts` are unrelated mechanisms that used to share the name
+ * `SentinelRule` for two different shapes. This one is `ConducksSentinel.validate()`, evaluated by
+ * `conducks audit` against the DECLARATIVE, user-editable per-node policies in `config/sentinel.json`
+ * (heritage, export, fan-out, file presence — `ProjectRule` below). `sentinel-rules.ts` is a
+ * different `SentinelRule` type, evaluated by `conducks guard` against a small, hardcoded set of
+ * graph-wide structural conditions (cycles, rank inversions, layer boundaries). Renamed here to
+ * `ProjectRule` — matching the "project rule(s)" wording `audit.ts` already prints — because this
+ * type was never imported outside this file and the rename was safe to make unilaterally; the
+ * other type keeps its name because unifying it touches files this change did not own. See ADR 0073
+ * for why the two mechanisms stay separate rather than merge.
  */
-export interface SentinelRule {
+export interface ProjectRule {
   id: string;
   type: 'require_heritage' | 'require_export' | 'require_caller' | 'framework_check' | 'require_file' | 'max_fans';
   matchPath?: string; // Glob pattern for files to check
@@ -47,7 +58,7 @@ export class ConducksSentinel {
   /**
    * Validates a graph against a set of structural policies.
    */
-  public async validate(graph: ConducksAdjacencyList, rules: SentinelRule[]): Promise<SentinelReport> {
+  public async validate(graph: ConducksAdjacencyList, rules: ProjectRule[]): Promise<SentinelReport> {
     const report: SentinelReport = {
       success: true,
       violations: []
@@ -142,7 +153,7 @@ export class ConducksSentinel {
     return coverage;
   }
 
-  private async checkRule(node: ConducksNode, rule: SentinelRule, graph: ConducksAdjacencyList): Promise<string | null> {
+  private async checkRule(node: ConducksNode, rule: ProjectRule, graph: ConducksAdjacencyList): Promise<string | null> {
     const p = node ? node.properties : null;
 
     switch (rule.type) {
