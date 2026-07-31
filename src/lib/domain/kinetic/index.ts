@@ -20,7 +20,8 @@ export class KineticService {
   }
 
   /**
-   * Traces the structural execution path downstream.
+   * Traces structural REACHABILITY downstream — ids ordered nearest-first by risk-weighted graph
+   * distance. Not an execution order: see `TraceAnalyzer.trace` (ADR 0066).
    */
   public trace(symbolId: NodeId, depth: number = 10) {
     return this.traceAnalyzer.trace(symbolId, depth);

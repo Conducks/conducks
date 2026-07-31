@@ -65,17 +65,33 @@ export abstract class BaseAnalyzer {
 
   /**
    * Performs a breadth-first search on the graph from a starting point.
+   *
+   * Todo28#P3: `dijkstra`'s pop order is already non-decreasing by weight (that is what makes a
+   * min-heap a min-heap), so this was *usually* already close to distance order — but the pop order
+   * is not a SORT, it is an artifact of push/pop interleaving, so nodes tied at the same weight (the
+   * common case: several direct calls from one function all sit at weight 1.0) came out in whatever
+   * order the heap happened to settle them, not in any order a caller could rely on. Measured on
+   * `AnalysisService.analyze`: `synapsepersistence.beginpulse`, a direct call, was returned LAST of
+   * 10 despite running first — because "first" has no graph meaning at that tier.
+   *
+   * The explicit sort below makes the one thing this traversal can honestly claim explicit and
+   * guaranteed: **ascending risk-weighted graph distance from `startId`, nearest first.** That is
+   * wiring — how far a node sits, not when it runs (ADR 0066; conducks-docs §6.13, "trace verifies
+   * wiring, never logic"). Nodes tied at the same distance are NOT further ordered by anything
+   * meaningful — `Array.prototype.sort` is stable (ES2019+), so ties keep dijkstra's pop order,
+   * which carries no temporal claim and must not be read as one.
    */
   protected bfs(
-    graph: any, 
-    startId: NodeId, 
+    graph: any,
+    startId: NodeId,
     direction: 'upstream' | 'downstream',
     maxDepth: number = 10
   ): Map<NodeId, { depth: number; path: ConducksEdge[] }> {
     const findings = this.dijkstra(graph, startId, direction, {}, maxDepth);
+    const ordered = Array.from(findings.entries()).sort((a, b) => a[1].weight - b[1].weight);
     const results = new Map<NodeId, { depth: number; path: ConducksEdge[] }>();
-    
-    for (const [id, data] of findings.entries()) {
+
+    for (const [id, data] of ordered) {
       results.set(id, { depth: Math.round(data.weight), path: data.path });
     }
     return results;
@@ -130,6 +146,11 @@ export class TraceAnalyzer extends BaseAnalyzer {
     super();
   }
 
+  /**
+   * Returns the ids reachable downstream from `symbolId`, ordered nearest-first by risk-weighted
+   * graph distance (see `bfs` above). This is a REACHABILITY order, not an execution order — a
+   * static graph has no notion of "runs before" between two direct calls at the same distance.
+   */
   public trace(symbolId: NodeId, depth: number = 10): NodeId[] {
     const g = this.graph || (null as any);
     if (!g) return [];

@@ -111,11 +111,17 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
     layer: "code",
     type: "tool",
     version: "2.1.0",
-    description: `Trace granular execution or data flow from a starting symbol.
+    description: `Trace structural reachability or the shortest wiring path from a starting symbol.
 Uses Risk-Weighted Dijkstra v1.7.0 for pathfinding.
 
-WHEN TO USE: Debugging execution cycles or understanding the call chain of a complex feature.
-AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.`,
+WHEN TO USE: Mapping what a symbol structurally reaches downstream, or the shortest call path between two symbols.
+AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.
+
+Modes:
+- reachability (default): downstream nodes reachable from the symbol, ordered nearest-first by risk-weighted graph distance. This is WIRING — who this symbol can reach — not execution order: a static graph has no way to know which of two direct calls runs first (conducks-docs §6.13). "execution" is accepted as a deprecated alias with identical behaviour, kept for callers on the old enum value.
+- path: the shortest structural path to a target symbol.
+
+Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be jumped to directly.`,
     // MCP2: tool annotations
     annotations: {
       readOnlyHint: true,
@@ -127,7 +133,8 @@ AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.`,
       properties: {
         symbol: { type: "string", description: "Starting symbol ID." },
         target: { type: "string", description: "Optional: Target symbol ID for pathfinding." },
-        mode: { type: "string", enum: ["execution", "path"], default: "execution" },
+        // "execution" kept for backward compatibility (deprecated alias of "reachability") — ADR 0066.
+        mode: { type: "string", enum: ["reachability", "execution", "path"], default: "reachability" },
         path: { type: "string", description: "Optional: The absolute project root." }
       },
       required: ["symbol"]
@@ -142,17 +149,35 @@ AFTER THIS: Use conducks_explain to see why a step in the trace is high-risk.`,
         await ensureAnchor(customPath, true);
         const resolvedId = resolveSymbolId(symbol);
         if (!resolvedId) return mcpErr('SYMBOL_NOT_FOUND', `No symbol matching "${symbol}"`, 'Use conducks_query to find valid symbol IDs', false);
+
+        // Bare ids average 127 chars and carry no line — a caller cannot jump to one without a
+        // second lookup (todo28#P4). Enrich every returned step with what `graph.getNode` already
+        // knows, in this tool only.
+        const graph = registry.infrastructure.graphEngine.getGraph();
+        const describe = (id: string) => {
+          const n: any = graph.getNode(id);
+          return {
+            id,
+            name: n?.properties?.name ?? id,
+            kind: n?.label ?? 'unknown',
+            file: n?.properties?.filePath ?? null,
+            line: n?.properties?.range?.start?.line ?? null,
+          };
+        };
+
         if (mode === "path" && target) {
           const resolvedTarget = resolveSymbolId(target);
           if (!resolvedTarget) return mcpErr('SYMBOL_NOT_FOUND', `No symbol matching "${target}"`, 'Use conducks_query to find valid symbol IDs', false);
           const pathResults = await registry.kinetic.findPath(resolvedId, resolvedTarget);
+          const steps = pathResults.map(describe);
           return mcpOk(
-            { steps: pathResults, indexStaleness: registry.audit.status().staleness.stale },
-            { nodeCount: pathResults.length, truncated: false }
+            { steps, indexStaleness: registry.audit.status().staleness.stale },
+            { nodeCount: steps.length, truncated: false }
           );
         }
+        // mode is "reachability", "execution" (deprecated alias) or unset — all reachability.
         const traceResults = await registry.kinetic.trace(resolvedId);
-        const steps = traceResults.slice(0, 10);
+        const steps = traceResults.slice(0, 10).map(describe);
         return mcpOk(
           { steps, indexStaleness: registry.audit.status().staleness.stale },
           { nodeCount: steps.length, truncated: traceResults.length > 10 }
