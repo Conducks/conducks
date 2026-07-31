@@ -808,15 +808,17 @@
 - Applies: `getNode()` is NOT a cheap map lookup when meat is present — it inflates. A resolver that
   calls it per candidate in a loop pays that every time.
 
-## `bindRouteCircuits` cannot work after a reload — its fields are not in the skeleton
-- Gotcha: it reads `node.properties.isRoute` / `isRequest` / `url` / `method` / `path`, and NONE of
-  those are in the property list `addNode` keeps in the skeleton. After any `persistence.load()`
-  they are undefined, so cross-service HTTP binding finds nothing.
-- Why: found while checking whether a shallow reload would break it. It was already broken — it can
-  only have worked in the same process that parsed the routes, before any reload.
-- Applies: don't cite cross-service route binding as working on a loaded graph. Either promote those
-  fields into the skeleton or state that it is parse-time only. `todo22#P12`.
-
+## A binder's fields survive a reload ONLY because someone made them columns
+- Gotcha: `bindRouteCircuits` reads `isRoute`, `isRequest`, `url`, `method` and `path`. None of those
+  were in the property list `addNode` keeps in the skeleton, so after any `persistence.load()` they
+  were undefined and cross-service HTTP binding found nothing. FIXED (todo22#P15): all five are real
+  DuckDB columns now (`persistence.ts:161-165`, migrated at :223) and are restored on every load,
+  including a shallow one. Verified today — 4 route nodes survive a reload in this vault.
+- Why it stays here: the FIX was to add columns, not to change the pattern. Any NEW field a binder
+  starts reading inherits the original bug silently, because an absent property and a false one are
+  the same thing to `if (node.properties.x)`. The request half is still TypeScript-only, so
+  `is_request` is 0 on this repo and the binder's other end is untested here (todo22#P15).
+- Applies: `graph-engine.ts` binders, `persistence.ts` column list — add to both or to neither
 ## An O(N squared) is not automatically a bottleneck — measure its SHARE, not its shape
 - Gotcha: import resolution rebuilt `new Set(allPaths.map(canonicalize))` per import specifier —
   a genuine quadratic, isolated at **45 ms / 228 ms / 4350 ms** for 300 / 700 / 3000 paths against

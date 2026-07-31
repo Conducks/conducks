@@ -106,4 +106,5 @@ the write half sets the peak in both.
 consistent with todo22's separate finding that parse adds ~152 MB of native memory that is never
 released. Whether these are the same allocation seen from two stages is unknown — both are stage
 deltas, and this record has just spent its length arguing that stage deltas over-attribute. It
-needs an A/B, not another trace. Carried by todo23#P5.
+needs an A/B, not another trace. Carried by todo22#P21 — todo23 closed on 2026-07-31 and that phase
+moved rather than being dropped, so this pointer follows it.
