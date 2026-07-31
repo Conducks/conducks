@@ -149,6 +149,6 @@ are the same shape at the level of the gates themselves.
 - [ ] The REQUEST side is still TypeScript-only. `@kinesis_request_url` exists in no other grammar, so nothing else can produce the client half of a pair — Python `requests.get(...)`, Go `http.Get(...)`, Java `RestTemplate` and so on each need a probed pattern. Route detection working in a language does NOT mean cross-service binding works there; it means half of it does
 
 ## Phase 21 — the native memory that never returns
-- Builds: 0060
+- Builds: 0060, 0043, 0042
 - [ ] FROM todo23#P5: native memory climbs 188 MB to 335 MB across the wave-1 vault flush and never returns, which is consistent with this todo's separate finding that parse adds ~152 MB of native memory that is never released. Whether these are the same allocation seen from two stages is UNKNOWN
 - [ ] Both are stage deltas, and ADR 0060 exists because stage deltas over-attribute — so this needs an A/B, not another trace. Fixed when a run with the vault write stubbed out is compared against a normal run on the same subject in the same directory and the difference in peak RSS is recorded. If the two findings are one allocation, say so; if they are two, size each

@@ -1,7 +1,12 @@
 # 0042 — the vault is the source of truth; memory holds a working set, not the graph
 Status: Accepted
-- Amended by: 0043
+- Amended by: 0043, 0060
 - Date: 2026-07-30
+
+0060 then withdrew what remained of the sizing. Measured twice on `mentorseed`, the reload this
+record is about costs 21-27 MB and the WHOLE read half is roughly 33 MB of a 686 MB peak — under 5%
+— so todo23's remaining phases were closed as void rather than deferred. The projection DISCIPLINE
+this record argues for survives and shipped; only its cost estimate is gone.
 
 0043 disproved this record's DIAGNOSIS by experiment while keeping its decision. The transaction
 holds nothing releasable (committing per wave changes peak RSS by 0.03%), DuckDB's cache is not the

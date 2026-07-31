@@ -647,8 +647,14 @@ export class ConducksReflector {
 
     // Conducks: Ingest Kinetic Git Signals (Only in Resolution Mode)
     if (!context.isDiscoveryMode()) {
-      const resonance = (await chronicle.getCommitResonance(file.path)) || { count: 0 };
-      const distribution = (await chronicle.getAuthorDistribution(file.path)) || {};
+      // ONE git invocation for both, not three. These two lines used to call
+      // `getCommitResonance` and `getAuthorDistribution` back to back, which spawned
+      // `rev-list --count` plus the SAME `git log --format=%ae` twice. A CPU profile of this
+      // function put 86% of its time in git subprocesses and under 1% in tree-sitter, so the spawn
+      // count is what parse speed is made of. Both public methods stay for their other callers.
+      const history = await chronicle.getFileHistory(file.path);
+      const resonance = history ? { count: history.count, authors: history.authors } : { count: 0 };
+      const distribution = history?.distribution ?? {};
       const blameData = (await chronicle.getBlameData(file.path)) || [];
       const entropyRaw = calculateShannonEntropy(distribution);
       const entropyRisk = normalizeEntropyRisk(entropyRaw, Object.keys(distribution).length);

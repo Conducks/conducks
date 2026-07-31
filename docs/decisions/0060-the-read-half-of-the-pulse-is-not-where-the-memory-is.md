@@ -1,7 +1,8 @@
 # 0060 — the read half of the pulse is not where the memory is
 Status: Accepted
 - Enforced by: tests/integration/features/pulse-writes-every-table.test.ts (the pulse still produces a complete graph after the reload it keeps)
-- Builds: 0042, 0043
+- Amends: 0042
+- Builds: 0043
 - Date: 2026-07-31
 
 ## Context
