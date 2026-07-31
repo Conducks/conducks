@@ -20,11 +20,13 @@
 	"files": [
 		"build",
 		"config",
+		"scripts/check-native-parser.mjs",
 		"LICENSE",
 		"README.md"
 	],
 	"scripts": {
-		"build": "rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/",
+		"build": "rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/check-build-aliases.mjs",
+		"postinstall": "node scripts/check-native-parser.mjs",
 		"start": "node ./build/src/interfaces/cli/index.js mirror",
 		"demo": "npm run build && npm run start",
 		"clean": "rm -rf build data .conducks",
