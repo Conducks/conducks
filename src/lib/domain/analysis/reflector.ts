@@ -122,7 +122,13 @@ export class ConducksReflector {
         displayName: path.basename(file.path),
         canonicalRank: fileMeta.rank,
         canonicalKind: 'UNIT',
-        unitId: fileId,
+        // A unit does not belong to another unit — it IS one. `unitId` answers "which file
+        // contains this node", and a file does not contain itself. persistence.ts:531 already
+        // documents this rule ("a unit's own row has unitId = NULL... it belongs to none") and
+        // purgeUnits relies on it. Setting this to `fileId` was the same shape of bug ADR 0056
+        // fixed for `parentId` — a self-loop from a generic fallback, not a deliberate choice
+        // (todo26 Phase 0).
+        unitId: null,
         namespaceId: namespaceId,
         rootId: `repository::${rootName}`,
         layer_path: relativePath,
@@ -639,6 +645,27 @@ export class ConducksReflector {
     // have existed. `bindRouteCircuits` then had nothing to match, and cross-service HTTP binding
     // reported success while finding nothing (todo22#P15). Keep the virtual nodes.
     const virtualNodes = spectrum.nodes.filter(n => !nodeCache.has(String(n.name).toLowerCase()));
+
+    // Virtual nodes (HTTP routes/requests, `FlowProcessor.processRoute`/`processRequest`) are
+    // pushed straight onto spectrum.nodes, bypassing the nodeCache path above where every OTHER
+    // definition gets its `fingerprint` and `layer_path` (~line 355). That is not cosmetic:
+    // `fingerprint` is drift-engine's join key (todo26) — a route with none is invisible to
+    // move/rename detection, and a route whose method or path changes reads as unchanged. A route
+    // IS a real declaration with a stable location, so it is hashed and placed the same way a
+    // symbol is, using what FlowProcessor already recorded (path/method/framework) as its DNA.
+    for (const vn of virtualNodes) {
+      const meta = (vn.metadata ?? (vn.metadata = {})) as Record<string, any>;
+      if (!meta.fingerprint) {
+        meta.fingerprint = crypto.createHash('sha256')
+          .update(`${file.path}|${vn.name}|${JSON.stringify(meta)}`)
+          .digest('hex');
+      }
+      if (!meta.layer_path) {
+        meta.layer_path = `${unitNode.metadata.layer_path}/${String(vn.name).toLowerCase()}`;
+      }
+      if (!meta.unitId) meta.unitId = fileId;
+    }
+
     spectrum.nodes = [...Array.from(nodeCache.values()), ...virtualNodes];
 
     // Conducks: Hierarchical Unification (L2-L7 Parentage)
@@ -878,12 +905,19 @@ export class ConducksReflector {
 
         if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isInfra ? 'Infra' : 'Class'}: ${name}`);
 
+        // Same fingerprint/layer_path the native path computes at ~line 355/383 — the regex
+        // fallback ran a real symbol through a different code path and silently dropped both
+        // (todo26 Phase 1). `dna` here is a best-effort DNA: Gnosis has no modifier captures, so
+        // only `isExported` (readable straight off the line) is known; the rest default false.
+        const gnosisDna = { isAsync: false, isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: 'void' };
+        const gnosisFingerprint = crypto.createHash('sha256').update(`${file.path}|${name}|${JSON.stringify(gnosisDna)}`).digest('hex');
+
         spectrum.nodes.push({
           name,
           kind: (isInfra ? 'INFRA' : 'STRUCTURE') as any,
           canonicalKind: activeMeta.kind,
           canonicalRank: activeMeta.rank,
-          metadata: { id, isStruct: !isInfra, isInfra, lineStart: i + 1, unitId: fileId },
+          metadata: { id, isStruct: !isInfra, isInfra, lineStart: i + 1, unitId: fileId, fingerprint: gnosisFingerprint, layer_path: `${relativePath}/${name.toLowerCase()}`, dna: gnosisDna },
           range: { start: { line: i, column: indent }, end: { line: i, column: indent + name.length } },
           filePath: file.path,
           isExport: line.includes('export')
@@ -900,12 +934,16 @@ export class ConducksReflector {
 
         if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isMethod ? 'Method' : 'Func'}: ${displayName} (Parent: ${currentClassId})`);
 
+        // See the class branch above — same gap, same fix.
+        const gnosisFuncDna = { isAsync: line.includes('async'), isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: 'void' };
+        const gnosisFuncFingerprint = crypto.createHash('sha256').update(`${file.path}|${displayName}|${JSON.stringify(gnosisFuncDna)}`).digest('hex');
+
         spectrum.nodes.push({
           name: displayName,
           kind: (isMethod ? 'BEHAVIOR' : 'FUNCTION') as any,
           canonicalKind: funcMeta.kind,
           canonicalRank: funcMeta.rank,
-          metadata: { id, lineStart: i + 1, parentId: isMethod ? currentClassId : undefined, unitId: fileId },
+          metadata: { id, lineStart: i + 1, parentId: isMethod ? currentClassId : undefined, unitId: fileId, fingerprint: gnosisFuncFingerprint, layer_path: `${relativePath}/${displayName.toLowerCase()}`, dna: gnosisFuncDna },
           range: { start: { line: i, column: indent }, end: { line: i, column: indent + name.length } },
           filePath: file.path,
           isExport: line.includes('export')

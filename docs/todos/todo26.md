@@ -1,5 +1,5 @@
 # todo26 — the structural DNA columns todo4 declared finished
-Status: todo
+Status: doing
 - Acceptance: `conducks drift` can see every node a pulse wrote — no node-history row is excluded from move detection or shift detection by a missing `fingerprint`, and the nodes that legitimately have none are excluded by a stated rule rather than by being absent.
 
 ## Context
@@ -59,17 +59,27 @@ The incremental parse gate is NOT affected — it keys on `FileHashGate.hash(fil
 `fingerprint`. That was checked rather than assumed.
 
 ## Phase 0 — decide which nodes are exempt, before fixing anything
-- [ ] `fingerprint` is documented as a hash of structural identity, and 500 UNIT nodes do not have one. Establish whether a UNIT is SUPPOSED to carry a fingerprint or whether only symbols are — the answer decides whether 500 is a bug or the design, and every count below depends on it
-- [ ] Same question for `unitId` on a UNIT node: a file's own `unitId` is either itself or null, and ADR 0056 already had to stop `parentId` being self-referential for exactly this shape. Decide which, and say so in the type
-- [ ] No threshold is set here and none is invented: this measurement sets the exempt list. Fixed when a written rule names each canonical kind that is exempt from each column, with the reason
+- Builds: 0064
+- [x] Decided: a UNIT is exempt from `fingerprint` — reflector.ts's unitNode has never included the field, in either code path, for any file (494/494 UNIT nodes in this vault, 100%, not a partial gap) — the hash's inputs (name + dna) describe a symbol's structural identity, and a file has neither; see ADR 0064
+- [x] Decided: `unitId` on a UNIT node's own row is `null`, matching persistence.ts:531's documented rule and purgeUnits' logic — reflector.ts's native unitNode set `unitId: fileId` (itself), the same self-loop shape ADR 0056 fixed for `parentId` on a different column, fixed in reflector.ts (see ADR 0064; graph-engine.ts still overrides this downstream — reported blocked, not owned)
+- [x] Rule written: UNIT/DIRECTORY/ECOSYSTEM/REPOSITORY/PACKAGE are exempt from `fingerprint` (no structural identity to hash); no canonicalKind is exempt from `unitId` or `layer_path` — the 159 UNIT rows missing both are files with no language provider, reported blocked below, not exempt
 
 ## Phase 1 — the columns that are genuinely missing
 - Depends: todo26#P0
-- [ ] Populate the columns for every kind Phase 0 rules non-exempt. The counts to beat are 670 missing fingerprints, 330 missing `unitId` and 334 missing `layer_path` among file-backed nodes, re-measured after Phase 0 narrows the population
-- [ ] Fixed when a query for a non-exempt node missing any of the three returns zero rows on this repository AND on `mentorseed`, and a test asserts it so the claim cannot rot the way todo4's did
+- Builds: 0064
+- [x] Re-measured against the live vault with taxonomy/ecosystem/external:// noise excluded (the 670/330/334 counts included those as false "file-backed" nodes): real gaps were 494 UNIT missing fingerprint (exempt, Phase 0), 4 route/request virtual BEHAVIOR + 1 Gnosis-fallback ATOM missing fingerprint (not exempt — fixed in reflector.ts), 159 UNIT missing unitId/layer_path (no language provider — blocked, see below)
+- [>] A query for a non-exempt node missing any of the three returning zero rows on this repo AND mentorseed — deferred: the 159 no-provider UNIT rows are produced by graph-skeleton-builder.ts and graph-engine.ts, neither owned by this change (edit nothing outside the OWNED FILES list per RULES.md §1); mentorseed was not measured at all, no access to that repo from this run
 
 ## Phase 2 — the claim cannot go unchecked again
 - Depends: todo26#P1
+- Builds: 0064
+- [x] `drift` must not treat an ABSENT fingerprint as an unchanged one — fixed in drift-engine.ts: each delta now carries `identityGap` (true when either side's fingerprint is null), the velocity filter no longer drops a gap row, and summary/message name the count instead of folding it into "stable" — proven red-then-green in tests/unit/domain/evolution/fingerprint-coverage.test.ts
 - [ ] todo4's real failure was not the missing columns; it was that a file declaring itself done sat in `completed/`, unscanned, for months with six unverified assertions in it. Add the vault assertion to the integration suite that already checks pulse output, so the acceptance is machine-checked rather than restated
 - [ ] Fixed when deliberately nulling one column on one node makes the suite go red
-- [ ] Separately, `drift` must not treat an ABSENT fingerprint as an unchanged one. Whatever Phase 0 rules exempt, a row that should have had a fingerprint and does not is a gap in the comparison, not a passing node — the same distinction ADR 0044 drew between STABLE and INSUFFICIENT_DATA. Fixed when a node-history row with a NULL fingerprint is reported rather than silently skipped
+
+## Phase 3 — what the review found after Phase 0 landed
+- Builds: 0064
+- [x] MY OWN COUNTS WERE WRONG and Phase 0's re-measurement corrected them. The "670 file-backed nodes missing fingerprint" in this todo's Context included 166 synthetic containers that carry a `file` value but are not source files — 125 `directory::`, 33 `ecosystem::`, 7 `taxonomy::`, 1 `repository::`. Excluding those: 499 real-path nodes, of which 494 are UNIT (exempt by ADR 0064) and **5 are genuinely broken symbols** — 4 BEHAVIOR + 1 ATOM. The claim "136 BEHAVIOR and 20 STRUCTURE" was those same synthetic and induced-external nodes counted as real
+- [x] The "drift is blind for 21% of history" figure is NUMERICALLY correct and MATERIALLY misleading, and the correction matters more than the number. Of 815 fingerprint-less history rows: 131 induced `external://` library symbols (no source, so no fingerprint is right), 169 synthetic containers, 494 UNIT files (exempt by design), and 5 real symbols. The genuine defect was 5 nodes, all now fixed. Verified by joining `node_history` to `nodes` and bucketing by origin
+- [ ] `decay_count` may have been inflated as a side effect. `drift-engine.ts:154` computes it as `deltas.filter(d => d.velocity > 0).length`, and Phase 1 added `|| d.identityGap` to the filter that builds `deltas` — so ~815 gap rows now survive into `deltas` and any with a non-zero gravity delta are counted as decaying. UNMEASURED: the before/after value was not captured, so this is a reasoned risk, not a demonstrated one. Fixed when `decay_count` is measured with and without gap rows and either excludes them or states why it should not
+- [ ] PRE-EXISTING, found while verifying: `drift` reports two different counts for one word in one screen — "Structural decay in 3 of 3845 symbols compared" uses `velocity > 0.05` (drift-engine.ts:138) while "Decaying: 153" uses `velocity > 0` (drift-engine.ts:154). Two thresholds, one label, no way for a reader to know which is meant. Fixed when one definition of decaying is used, or the two are named differently

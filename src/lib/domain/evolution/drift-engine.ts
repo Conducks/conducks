@@ -83,7 +83,15 @@ export class DriftEngine {
     const deltas = exactRows.map(row => {
       const gDelta = row.current_gravity - row.prev_gravity;
       const cDelta = row.current_complexity - row.prev_complexity;
-      const isShifted = row.current_fingerprint !== row.prev_fingerprint;
+      // A NULL fingerprint on either side means structural identity was never comparable for this
+      // row — the opposite of "nothing changed". Before this guard, `null !== null` is false in
+      // JS, so a symbol missing a fingerprint on both sides reported isShifted=false: the same
+      // ADR 0044 class of bug ("a check that ran on nothing is not a pass"), on drift's other join
+      // key. UNIT nodes are legitimately fingerprint-less by design (todo26 Phase 0) and will
+      // always land here — that is correct: a UNIT was never eligible for shift detection, and it
+      // must say so rather than claim it checked and found nothing wrong.
+      const identityGap = row.current_fingerprint == null || row.prev_fingerprint == null;
+      const isShifted = !identityGap && row.current_fingerprint !== row.prev_fingerprint;
 
       return {
         id: row.id,
@@ -92,9 +100,13 @@ export class DriftEngine {
         gravity_delta: gDelta,
         complexity_delta: cDelta,
         isModified: isShifted,
+        identityGap,
         velocity: (gDelta * 0.5) + (cDelta * 0.5)
       };
-    }).filter(d => Math.abs(d.velocity) > 0.001 || d.isModified);
+    // `d.identityGap` keeps a fingerprint-less row in the result instead of letting the velocity
+    // filter drop it — a near-zero gravity/complexity delta plus isModified=false used to make it
+    // vanish from `deltas` entirely, which is the "silently skipped" failure todo26 names.
+    }).filter(d => Math.abs(d.velocity) > 0.001 || d.isModified || d.identityGap);
 
     const moves = moveRows.map((row: any) => ({
       from: row.prev_id,
@@ -125,9 +137,15 @@ export class DriftEngine {
         if (status === 'INSUFFICIENT_DATA') return `No symbols were comparable between these two pulses, so no drift verdict was reached. Check that node_history holds rows for pulse ${targetPrevPulseId}.`;
         const decaying = deltas.filter(d => d.velocity > 0.05).length;
         const renames = moves.length > 0 ? ` ${moves.length} structural rename(s) detected.` : '';
+        const gapCount = deltas.filter(d => d.identityGap).length;
+        // Named explicitly rather than folded into "stable" — a gap row was not checked for a
+        // structural shift, it was skipped for lack of a fingerprint on one side (todo26).
+        const gapNote = gapCount > 0
+          ? ` ${gapCount} symbol(s) had no fingerprint on one side of the comparison — shift and move detection is blind for them, not confirmed stable.`
+          : '';
         return decaying > 0
-          ? `Structural decay in ${decaying} of ${exactRows.length} symbols compared.${renames}`
-          : `Structural resonance stable across ${exactRows.length} symbols.${renames}`;
+          ? `Structural decay in ${decaying} of ${exactRows.length} symbols compared.${renames}${gapNote}`
+          : `Structural resonance stable across ${exactRows.length} symbols.${renames}${gapNote}`;
       })(),
       deltas,
       moves,
@@ -135,7 +153,8 @@ export class DriftEngine {
         total_symbols: exactRows.length,
         decay_count: deltas.filter(d => d.velocity > 0).length,
         improvement_count: deltas.filter(d => d.velocity < 0).length,
-        move_count: moves.length
+        move_count: moves.length,
+        identity_gap_count: deltas.filter(d => d.identityGap).length
       }
     } as DriftResult;
   }
@@ -153,6 +172,10 @@ export interface DriftResult {
     gravity_delta: number;
     complexity_delta: number;
     isModified: boolean;
+    // true when either side of the comparison had no fingerprint — the row was not checked for a
+    // structural shift, it could not be. Never read `isModified === false` as "confirmed unchanged"
+    // without also checking this (todo26).
+    identityGap: boolean;
     velocity: number;
   }>;
   moves: Array<{
@@ -167,5 +190,6 @@ export interface DriftResult {
     decay_count: number;
     improvement_count: number;
     move_count: number;
+    identity_gap_count: number;
   };
 }
