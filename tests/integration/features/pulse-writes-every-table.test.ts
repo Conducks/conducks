@@ -125,6 +125,17 @@ export function main(): string {
     expect(await count('nodes WHERE parentId = id')).toBe(0);
   });
 
+  it('never makes a file its own unit', async () => {
+    // todo26. The SAME shape as the parent self-loop above, on the column ADR 0056 did not reach.
+    // `unitId` answers "which file contains this node", and a file does not contain itself —
+    // persistence.ts:531 documents that a unit's own row carries NULL, and purgeUnits is written
+    // against it. `ingestSpectrum` wrote `unitId: unitId || null`, which for the UNIT node IS its
+    // own id: 337 files recorded as their own unit. reflector.ts was fixed first and nothing
+    // changed in the vault, because the spread here overwrote it — which is why this assertion is
+    // on the PERSISTED result rather than on either writer.
+    expect(await count('nodes WHERE unitId = id')).toBe(0);
+  });
+
   it('keeps the two representations of containment in agreement', async () => {
     // Containment is stored twice — a MEMBER_OF edge and a parentId column. They disagreed on 334
     // nodes, and where they disagreed the edge was right.

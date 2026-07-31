@@ -287,7 +287,16 @@ export class ConducksGraph {
       // Leaving it null lets the skeleton's value stand, because the UPDATE coalesces this column.
       const computedParent = m.parentId ? m.parentId.toLowerCase() : (unitId || null);
       const parentId = computedParent === nodeId ? null : computedParent;
-      
+
+      // The SAME guard, on the column ADR 0056 did not reach. `unitId` answers "which file contains
+      // this node", and a file does not contain itself — persistence.ts:531 documents that a unit's
+      // own row carries `unitId = NULL`, and `purgeUnits` is written against it. This line was
+      // `unitId: unitId || null`, which for the UNIT node itself is its own id, so 337 files were
+      // recorded as their own unit. reflector.ts already emits `unitId: null` for the unit node
+      // (todo26 Phase 0); the spread below then overwrote it here, which is why fixing the
+      // reflector alone changed nothing in the vault.
+      const ownUnitId = unitId === nodeId ? null : (unitId || null);
+
       this.graph.addNode({
         id: nodeId,
         label: (metaNode as any).canonicalKind || 'UNIT',
@@ -302,7 +311,7 @@ export class ConducksGraph {
           canonicalKind: (metaNode as any).canonicalKind || 'UNIT',
           canonicalRank: (metaNode as any).canonicalRank || 2,
           parentId: parentId,
-          unitId: unitId || null,
+          unitId: ownUnitId,
           rootId: rootId || null
         } as any
       });
