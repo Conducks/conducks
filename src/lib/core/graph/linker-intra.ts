@@ -53,6 +53,10 @@ export class IntraLinker {
     VIRTUAL_LINK: false,    // synthesised by induction — resolving it would be circular
     PULSES_TO: false,       // both ends are resolved at bind time by ADR 0051
     GOVERNS: false,         // derived from a doc's own text against real paths (ADR 0058)
+    DEFINES: false,         // the target is a `ROUTE::<path>::<METHOD>` id minted by the same
+                            // spectrum that emits the edge — constructed, not referenced
+    ALIASES: true,          // the target is the ORIGINAL symbol the alias renames, and it routinely
+                            // lives in another file (`import { x as y }`, Go and Ruby wildcards)
   };
 
   private static readonly RESOLVABLE_TYPES = new Set<string>(

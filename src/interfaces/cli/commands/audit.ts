@@ -97,16 +97,25 @@ export class AuditCommand implements ConducksCommand {
     }));
     const report = await sentinel.validate(registry.query.graph.getGraph() as any, rules);
 
-    if (report.success && auditData.success) {
-      console.log("\n\x1b[32m✅ Conducks Governance confirmed. No structural regressions found.\x1b[0m");
-    } else if (!report.success) {
-      console.log("\x1b[31m❌ [Sentinel] Custom Governance Violations:\x1b[0m");
+    // Both halves report, ALWAYS, and the exit code comes last. The chain here used to be
+    // if/else-if, so a run where the rule set passed and the core checks did not took the third
+    // branch and exited 1 having printed no verdict at all — the findings above were on screen with
+    // nothing saying whether they were fatal, and the passing rule set was never mentioned. A
+    // command that exits non-zero in silence is asking the reader to guess which half failed.
+    if (!report.success) {
+      console.log("\n\x1b[31m❌ [Sentinel] Custom Governance Violations:\x1b[0m");
       report.violations.forEach((v: any) => console.log(`  - [${v.ruleId}] ${v.nodeId}: ${v.message}`));
-      process.exit(1);
-    } else if (!auditData.success) {
-      // Exit if core structural issues exist
-      process.exit(1);
+    } else {
+      console.log(`\n\x1b[32m✅ [Sentinel] ${rules.length} project rule(s) passed.\x1b[0m`);
     }
+
+    if (auditData.success) {
+      console.log("\x1b[32m✅ [Core] No structural regressions found.\x1b[0m");
+    } else {
+      console.log("\x1b[31m❌ [Core] Structural regressions found — see the findings above.\x1b[0m");
+    }
+
+    if (!report.success || !auditData.success) process.exit(1);
   }
 
   private async runFallbackAnalysis(registry: Registry): Promise<void> {

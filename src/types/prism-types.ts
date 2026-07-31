@@ -36,14 +36,16 @@ export interface SpectrumNode {
 /**
  * Conducks — Structural Prism Spectrum
  *
- * Superset relationship type union: includes both ALIASES and TYPE_REFERENCE.
+ * The relationship union is a SUBSET of `EdgeType` — every member here must exist there, because
+ * `GraphEngine` carries these straight into the graph. It was not a subset: `DEFINES` was emitted
+ * with an `as any` and reached the vault under a type `EdgeType` did not contain.
  */
 export interface PrismSpectrum {
   nodes: SpectrumNode[];
   relationships: Array<{
     sourceName: string;
     targetName: string;
-    type: 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'CONSTRUCTS' | 'ALIASES' | 'TYPE_REFERENCE';
+    type: 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'CONSTRUCTS' | 'ALIASES' | 'TYPE_REFERENCE' | 'DEFINES';
     confidence: number;
     metadata?: Record<string, any>;
   }>;

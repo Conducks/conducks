@@ -72,11 +72,16 @@ export class GuardCommand implements ConducksCommand {
         // Not blocking is not the same as passing. `shouldBlock` returns block:false both for a
         // clean comparison and for one it could not make (ADR 0044), and prefixing a green tick to
         // "NOT ASSESSED" reproduced the exact failure that ADR fixes, one layer up.
-        console.log('\n' + (status.message.includes('NOT ASSESSED') ? status.message : '✅ ' + status.message));
+        const assessed = !status.message.includes('NOT ASSESSED');
+        console.log('\n' + (assessed ? '✅ ' + status.message : status.message));
         if (status.risk > 0) {
           console.log(`- Minor decay detected: ${status.risk.toFixed(3)} (Acceptable)`);
         }
-        console.log('🛡️  Structural resonance is within safe limits.');
+        // Guarded for the same reason as the line above, which the comment there already gives — and
+        // this line was printing unconditionally three lines below it, so `guard` said "NOT ASSESSED
+        // ... this is not a pass" and then "structural resonance is within safe limits" in the same
+        // breath. A verdict nobody computed is not a limit anything is within.
+        if (assessed) console.log('🛡️  Structural resonance is within safe limits.');
         process.exit(0);
       }
     } finally {

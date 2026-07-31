@@ -1,5 +1,21 @@
-import { ConducksAdjacencyList, type ConducksNode, type ConducksEdge } from "./adjacency-list.js";
+import { ConducksAdjacencyList, type ConducksNode, type ConducksEdge, type EdgeType } from "./adjacency-list.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
+
+/**
+ * This file is where a parsed relationship BECOMES a graph edge, so it is where the two unions have
+ * to agree. They did not: `rel.type` was written into the edge with an `as any`, so a processor
+ * could invent a type and the vault would store it — `DEFINES` did exactly that, and four rows of it
+ * sat under a type `EdgeType` had never heard of, invisible to every classification keyed on the
+ * union.
+ *
+ * The cast is gone; this assertion is what keeps it gone. Adding a relationship type the graph does
+ * not classify is now a compile error here rather than a surprise in the vault.
+ */
+type _ParserTypesAreEdgeTypes =
+  PrismSpectrum['relationships'][number]['type'] extends EdgeType ? true
+  : ['relationship type is not an EdgeType — add it to EdgeType and classify it in EDGE_COUPLING'];
+const _assertParserTypesAreEdgeTypes: _ParserTypesAreEdgeTypes = true;
+void _assertParserTypesAreEdgeTypes;
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { Logger } from "../utils/logger.js";
 import { PrismRequest } from "@/lib/core/parsing/prism-core.js";
@@ -332,7 +348,7 @@ export class ConducksGraph {
         id: `SEMANTIC::${sourceId}->${targetId}::${rel.type.toLowerCase()}`,
         sourceId,
         targetId,
-        type: rel.type as any,
+        type: rel.type,
         confidence: rel.confidence || 1.0,
         properties: rel.metadata || {}
       });

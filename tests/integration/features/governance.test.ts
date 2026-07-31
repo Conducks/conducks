@@ -41,7 +41,11 @@ export class Thing {
 
     const { combined, status } = runCli(['audit'], { cwd: repo });
     expect(status).toBe(0);
-    expect(combined).toContain('Governance confirmed');
+    // Both halves report separately (ADR 0059). The single "Governance confirmed" line this used to
+    // assert was printed only when the rule set AND the core checks both passed, so a run where the
+    // rules passed and the core checks did not printed no verdict at all.
+    expect(combined).toContain('[Sentinel] 1 project rule(s) passed');
+    expect(combined).toContain('[Core] No structural regressions found');
   });
 
   // Assertion can fail: flip the fixture to violate the SAME rule and confirm audit turns red.

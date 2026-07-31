@@ -9,36 +9,94 @@ export type NodeId = string;
 // PULSES_TO used to be written as `'PULSES_TO' as any` because it was missing here. A cast is how
 // an edge type stays invisible to every exhaustive switch over EdgeType, and it is part of why
 // nothing noticed the vault held none of them.
-export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY' | 'PULSES_TO' | 'GOVERNS';
+// DEFINES and ALIASES were BOTH reaching the vault through `as any` — `DEFINES` cast at its emit
+// site, `ALIASES` through the blanket cast at the parser boundary. Four `DEFINES` rows were in the
+// vault under a type the union did not contain. Naming them here is what lets the classification
+// below be checked at all.
+export type EdgeType = 'CALLS' | 'IMPORTS' | 'EXTENDS' | 'IMPLEMENTS' | 'ACCESSES' | 'MEMBER_OF' | 'DEPENDS_ON' | 'FROM_IMAGE' | 'VIRTUAL_LINK' | 'CONSTRUCTS' | 'TYPE_REFERENCE' | 'CONTAINS' | 'HAS_METHOD' | 'HAS_PROPERTY' | 'PULSES_TO' | 'GOVERNS' | 'DEFINES' | 'ALIASES';
 
 /**
- * Structural containment edges — they express "X is defined inside Y", NOT "X depends on Y".
- * A TS interface owning its fields (HAS_PROPERTY), a class owning its methods (HAS_METHOD), a
- * member belonging to its file (MEMBER_OF), a file containing a symbol (CONTAINS) form trivial
- * loops (type → property → file → type) that are NOT circular dependencies. Cycle detection for
- * architectural auditing must ignore these, or every interface/singleton reads as a false cycle.
+ * Every edge type is runtime-visible at exactly one of these levels, and the levels NEST:
+ * containment ⊂ erased ⊂ local ⊂ module. Each classification below therefore takes the widest
+ * level it belongs to, and the three exported sets are derived rather than hand-listed.
+ *
+ * - `containment` — "X is defined inside Y", NOT "X depends on Y". A TS interface owning its fields
+ *   (HAS_PROPERTY), a class owning its methods (HAS_METHOD), a member belonging to its file
+ *   (MEMBER_OF), a file containing a symbol (CONTAINS) form trivial loops (type → property → file →
+ *   type) that are not circular dependencies. Ignoring these is what stops every interface and
+ *   singleton reading as a false cycle.
+ * - `erased` — not runtime coupling at all: type references the compiler erases (ADR 0016), and
+ *   doc→code links (ADR 0058). Cycle and hub findings ignore these; dead-code still counts a type
+ *   reference as usage, which is a different question.
+ * - `local` — real runtime coupling, but BELOW module level. A CALLS edge onto a parameter's method
+ *   resolves onto the owning class purely because the parameter is type-annotated, which closes
+ *   loops that do not exist between modules.
+ * - `module` — a module-level dependency. ARCH-3 traverses exactly these.
  */
-export const STRUCTURAL_EDGE_TYPES: EdgeType[] = ['MEMBER_OF', 'CONTAINS', 'HAS_METHOD', 'HAS_PROPERTY'];
+type EdgeCoupling = 'containment' | 'erased' | 'local' | 'module';
 
 /**
- * Edges that are not runtime coupling: containment (ADR 0010) plus type references, which the
- * compiler erases (ADR 0016). Cycle and hub findings ignore these; dead-code still counts a type
- * reference as usage, which is a different question.
+ * The classification, as an exhaustive `Record` rather than a set of array literals.
+ *
+ * An array cannot be exhaustive, and that is not a hypothetical: `PULSES_TO` was added to `EdgeType`
+ * and never added HERE, so ARCH-3 — which means a MODULE IMPORT cycle (ADR 0017) — traversed
+ * dataflow edges and reported node's own standard library as circular:
+ * `path.dirname -> path.join -> path.resolve`. Those three functions do not call each other. The
+ * edges are handovers between nested `path` calls in this project's own source, and a handover
+ * is not an import.
+ *
+ * With a `Record<EdgeType, …>` the compiler refuses a new member of the union until somebody has
+ * said what it couples. This is the same remedy ADR 0053 applied to `RESOLVABLE`.
  */
-// GOVERNS is a DOC -> CODE link (ADR 0058). It is non-runtime by definition: a record pinning a file
-// is not a call, and letting it carry structural weight would make a module's rank a function of how
-// much documentation sits beside it.
-export const NON_RUNTIME_EDGE_TYPES: EdgeType[] = [...STRUCTURAL_EDGE_TYPES, 'TYPE_REFERENCE', 'GOVERNS'];
+const EDGE_COUPLING: Record<EdgeType, EdgeCoupling> = {
+  // containment (ADR 0010)
+  MEMBER_OF: 'containment',
+  CONTAINS: 'containment',
+  HAS_METHOD: 'containment',
+  HAS_PROPERTY: 'containment',
+
+  // erased — present in the source, absent at runtime
+  TYPE_REFERENCE: 'erased',   // the compiler removes it (ADR 0016)
+  GOVERNS: 'erased',          // a doc pinning a file is not a call (ADR 0058); letting it carry
+                              // structural weight would make a module's rank a function of how much
+                              // documentation sits beside it
+  DEFINES: 'erased',          // a scope declaring an HTTP route. The route node is virtual — its
+                              // `filePath` is the literal string 'network' — so it is not code and
+                              // must not compete with code for gravity, on GOVERNS' reasoning
+
+  // local — runtime coupling below module level
+  CALLS: 'local',
+  CONSTRUCTS: 'local',
+  ACCESSES: 'local',
+  PULSES_TO: 'local',         // a value handover between two calls. Further from a module import
+                              // than CALLS is, which is why it belongs here and not in `module`
+  ALIASES: 'local',           // a local renaming of a symbol (`import { x as y }`, Go/Ruby wildcard
+                              // bindings). The IMPORTS edge already carries the module dependency,
+                              // so counting the alias again would double-count one import
+
+  // module — ARCH-3 traverses these
+  IMPORTS: 'module',
+  EXTENDS: 'module',
+  IMPLEMENTS: 'module',
+  DEPENDS_ON: 'module',
+  FROM_IMAGE: 'module',
+  VIRTUAL_LINK: 'module',
+};
+
+const atOrBelow = (...levels: EdgeCoupling[]): EdgeType[] =>
+  (Object.keys(EDGE_COUPLING) as EdgeType[]).filter(t => levels.includes(EDGE_COUPLING[t]));
+
+/** Containment edges — see `EDGE_COUPLING`. */
+export const STRUCTURAL_EDGE_TYPES: EdgeType[] = atOrBelow('containment');
+
+/** Edges that are not runtime coupling: containment plus erased. */
+export const NON_RUNTIME_EDGE_TYPES: EdgeType[] = atOrBelow('containment', 'erased');
 
 /**
- * Edges ARCH-3 does not traverse. ARCH-3 means a MODULE IMPORT cycle (ADR 0017), so on top of the
- * non-runtime edges it also drops call-level coupling: a CALLS edge onto a parameter's method is
- * resolved onto the owning class purely because the parameter is type-annotated, which closes loops
- * that do not exist between modules. Pair with `ignoreTypeOnly` to drop erased imports too.
+ * Edges ARCH-3 does not traverse: everything that is not module-level coupling. Pair with
+ * `ignoreTypeOnly` to drop erased imports too.
  */
-export const IMPORT_CYCLE_IGNORED_EDGE_TYPES: EdgeType[] = [
-  ...NON_RUNTIME_EDGE_TYPES, 'CALLS', 'CONSTRUCTS', 'ACCESSES'
-];
+export const IMPORT_CYCLE_IGNORED_EDGE_TYPES: EdgeType[] = atOrBelow('containment', 'erased', 'local');
 
 export interface ConducksNode<T = any> {
   id: NodeId;

@@ -57,7 +57,7 @@ export class FlowProcessor {
     spectrum.relationships.push({
       sourceName: (scope || 'unit').toLowerCase(),
       targetName: routeId,
-      type: 'DEFINES' as any,
+      type: 'DEFINES',
       confidence: 1.0,
       metadata: { isRouteEdge: true }
     });
