@@ -86,6 +86,28 @@ export async function main() {
   const commandId = args[0] || "help";
   const cmdArgs = args.slice(1);
 
+  // The CLI is QUIET by default; the MCP server is not (ADR 0080, todo02#P2).
+  //
+  // `conducks status` printed five boot lines before its report — grammar engine starting, grammar
+  // engine ready, log sink anchored, synapse anchored, resonance flow pushed — on every read-only
+  // command. None of it is the answer the caller asked for, and an agent parsing this has to know
+  // which lines to discard.
+  //
+  // Set HERE rather than in the logger's default, because the default has to stay loud: the MCP
+  // server shares this process's logger, stdout there is the JSON-RPC channel, and stderr is the
+  // only legal sink it has. So the CLI opts into silence and `conducks mcp` opts back out below.
+  //
+  // Quiet suppresses the TERMINAL only. Every suppressed line still lands in `.conducks/mcp.log`,
+  // so a failed pulse is still diagnosable — the point is to stop narrating startup, not to stop
+  // recording it. `--verbose` and `CONDUCKS_VERBOSE=1` restore the terminal half.
+  //
+  // Scoped to READ commands. `analyze`, `watch` and `clean` are long-running and their progress IS
+  // the output — silencing those would replace noise with a command that looks hung. And quiet never
+  // suppresses WARN/ERROR/SUCCESS at any level, so a failure is still reported.
+  const NARRATES = new Set(['analyze', 'watch', 'clean', 'record', 'mcp', 'setup', 'doctor', 'uninstall']);
+  const verbose = args.includes('--verbose') || process.env.CONDUCKS_VERBOSE === '1';
+  registry.infrastructure.logger.setQuiet(!verbose && !NARRATES.has(commandId));
+
   // Apostle v3: Intelligent Persistence Targeting
   let positionalArgs: string[] = [];
   for (let i = 0; i < cmdArgs.length; i++) {

@@ -205,7 +205,7 @@ export class RegistryBootstrapper {
     const { graph, persistence, ignoreManager, federation, updatePersistence, updateIgnoreManager } = context;
 
     if (!this.isGrammarInitialized) {
-      process.stderr.write(`🛡️ [Conducks Bootstrapper] Initializing Native Grammar Engine...\n`);
+      logger.boot(`🛡️ [Conducks Bootstrapper] Initializing Native Grammar Engine...`);
       await grammars.init();
       await grammars.loadLanguage('python');
       await grammars.loadLanguage('typescript');
@@ -220,7 +220,7 @@ export class RegistryBootstrapper {
       await grammars.loadLanguage('swift');
       await grammars.loadLanguage('c');
       this.isGrammarInitialized = true;
-      process.stderr.write(`🛡️ [Conducks Bootstrapper] Native Grammar Engine Ready.\n`);
+      logger.boot(`🛡️ [Conducks Bootstrapper] Native Grammar Engine Ready.`);
       traceMemory('after 12 grammars loaded');
     }
 
@@ -232,7 +232,7 @@ export class RegistryBootstrapper {
       logger.setLogFile(logPath);
     }
 
-    process.stderr.write(`🛡️ [Conducks Bootstrapper] Anchoring structural synapse at: ${effectiveRoot}\n`);
+    logger.boot(`🛡️ [Conducks Bootstrapper] Anchoring structural synapse at: ${effectiveRoot}`);
     const isCurrentlyConnected = persistence.isConnected();
     const rootChanged = chronicle.getProjectDir() !== effectiveRoot;
     const modeChanged = (persistence as any).readOnly !== readOnly;
@@ -268,7 +268,7 @@ export class RegistryBootstrapper {
       // FIX: Use the updated instance for the initial load
       try {
         await newPersistence.load(graph.getGraph());
-        process.stderr.write(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).\n`);
+        logger.boot(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
         await federation.hydrate(graph.getGraph());
       } catch (err: any) {
         console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
