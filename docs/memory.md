@@ -1,5 +1,15 @@
 # Memory — conducks
 
+## Content-addressed layers cost ~10% read time for 44% less disk
+
+Measured on two real adjacent commits, 8,781 slots, best of 3 warmed: scanning one layer is 23.7 ms
+flat against 25.0 ms addressed (+5.5%); 200 point lookups are 169.3 ms against 193.2 ms (+14%).
+The ~1 ms per lookup is DuckDB round-trip overhead, not the schema — only the delta is the shape's
+cost. Against 0.564x the disk, that trade is worth taking.
+
+Get the column split wrong and the deal disappears: simulating layers built 7 days apart, dedup
+holds at 48.4% with `kinetic` outside the content hash and collapses to **5.3%** with it inside.
+
 ## A content hash must not include volatile columns
 
 Content-addressing node rows dedups 48.4% of slots across two adjacent commits — but only when the
