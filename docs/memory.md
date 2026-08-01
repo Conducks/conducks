@@ -1,5 +1,24 @@
 # Memory — conducks
 
+## A content hash must not include volatile columns
+
+Content-addressing node rows dedups 48.4% of slots across two adjacent commits — but only when the
+volatile columns are OUTSIDE the hash. Measured per column across 4,370 ids present in both layers:
+`metadata` differs 92.9% of the time, `rootId` 92.6%, `layer_path` 88.9%, `gravity` 26.3%, while
+`fingerprint`, `file`, `dna`, `kinetic`, `signature` and nine others are identical on EVERY shared
+id.
+
+Hash the volatile four into the key and the key changes whenever they do: dedup falls from 48.4% to
+3.5% and content-addressing measures as a LOSS. That is what produced a day of contradictory
+numbers. Excluding just those four, 97.2% of shared ids have byte-identical stable content.
+
+## Two layers analyzed at different paths share nothing, and it means nothing
+
+A layer comparison must analyze both refs at the SAME directory, or every `id`, `file` and
+`parentId` embeds the layer root and the measured overlap collapses to noise (4.4%). Real layers are
+one repo at two commits. This artefact has now been produced twice by two different measurements,
+each time reading as a real result.
+
 ## Reading a git ref is cheap; reading it per file is not
 
 `git archive <ref>` reads this whole repo (551 files, 4.4 MB) in **53 ms**. `git cat-file --batch`

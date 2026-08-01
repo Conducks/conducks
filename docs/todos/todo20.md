@@ -14,18 +14,16 @@ the shape ADR 0035 gave it.
 
 Measured 2026-08-01. The gate this paragraph set has been met.
 
-## Phase 0b — the two-layer measurement is DISPUTED, and Phase 3 turns on it
+## Phase 0b — the two-layer measurement, settled
 - Builds: 0035
-- [ ] CONTRADICTION, unresolved, single-source. Phase 0 measured content-addressing at 1.07-1.21x for two layers and concluded it is REQUIRED. A later spike measured the opposite — flat layered storage 1.57x against content-addressed 2.14x at two layers, i.e. content-addressing **LOSES by 1.36x** and only wins past ~4 layers. The proposed explanation is specific and checkable: Phase 0 analyzed its two layers into SEPARATE VAULTS, and two `.db` files cannot share compression, whereas one table lets DuckDB's columnar dictionary/RLE dedup the shared ~90% for free — after which content-addressing only ADDS a 40-byte high-entropy SHA per node-slot, incompressible by construction, plus a second PK index. If that holds it matters, because ADR 0035's GC keeps the steady state at 2-3 layers (uncommitted/current/target), permanently on the losing side. NEITHER measurement has been reproduced by a second party. Fixed when one A/B settles it: two layers in ONE vault, flat against content-addressed, same subject, same run
-- [ ] Whichever way that lands, ADR 0035 needs a stamp. It mandates content-addressing on Phase 0's number; if the spike is right, the record is amended rather than quietly ignored — and if the spike is wrong, that belongs written down too, because it will be re-derived otherwise
+- [x] RESOLVED 2026-08-01 by a third A/B run here, and BOTH earlier measurements were wrong — for different reasons, each of which made content-addressing look worse or better than it is. Two real adjacent commits (HEAD, HEAD~5) exported with `git archive`, analyzed separately, then loaded into ONE vault two ways. **Content-addressing WINS: 1.94x against flat's 3.43x for two layers — 0.564x, i.e. 44% smaller.** 48.4% of slots dedupe (4,535 unique rows backing 8,781)
+- [x] THE HARNESS FAULTS, recorded because both are easy to repeat. FIRST: each layer was analyzed at a DIFFERENT absolute directory, so every `id` embedded the layer root and nothing could match — 4.4% shared, an artefact with no meaning. Real layers are one repo at two commits and share every path. SECOND, and the one that produced the dispute: the addressed row INCLUDED the volatile columns, so the content hash changed whenever they did and dedup fired **3.5% instead of 48.4%**. Hashing volatile data into a content key tests a strawman, not content-addressing
+- [x] THE DESIGN CONSTRAINT, now measured per column across 4,370 ids present in both layers, replacing Phase 0's coarser version. VOLATILE, and must live in the SLOT row: `metadata` 92.9%, `rootId` 92.6%, `layer_path` 88.9%, `gravity` 26.3%. IDENTICAL on every shared id: `fingerprint`, `canonicalKind`, `canonicalRank`, `semantic_kind`, `file`, `namespaceId`, `unitId`, `structureId`, `depth`, `isEntryPoint`, `visibility`, `dna`, `signature`, `kinetic`. Excluding just the four volatile columns, **97.2% of shared ids have byte-identical stable content** — higher than Phase 0's 91.8%, and that number is the whole case for the design
+- [ ] ADR 0035 still needs its stamp. Its mandate for content-addressing is UPHELD, but the number it rests on (1.07-1.21x, from two separate vaults) is not reproducible and the correct figure is 1.94x against a 3.43x flat baseline. Amend the record with the measured column split, since a future reader following 0035 without it will build the strawman shape and measure a loss
 
-The WIP that produced the dispute is preserved on branch `wip/todo20-layered-storage`
-(commit `81b1f3a`): 300 lines in `persistence.ts`, tsc clean, cold and multi-wave pulses clean,
-migration verified on a real 57 MB pre-layer vault. **No tests, suite never ran — do not merge
-as-is.** It builds plain layered storage (`layerId` + composite PK, `nodes`/`edges` as views) and
-deliberately drops `idx_nodes_id`, because under a composite PK an index on `id` alone stops being
-redundant and becomes exactly the secondary-index-on-a-written-column that todo22#P8 measured as
-fatal.
+**Phase 3 is unblocked and keeps ADR 0035's shape.** Build content-addressed, split the four
+volatile columns into the slot row, and do NOT put `metadata`, `rootId`, `layer_path` or `gravity`
+into the content hash.
 
 ## Phase 1 — the branch guard, useful on its own
 - Builds: 0035
