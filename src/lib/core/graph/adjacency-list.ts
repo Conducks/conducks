@@ -218,6 +218,30 @@ export class ConducksAdjacencyList {
   private compressedMeat: Map<NodeId, Buffer> = new Map();       // VMC: Memory Zip for non-skeleton properties
 
   /**
+   * `getNode` decompresses and re-`JSON.parse`s the same buffer on every call — MEASURED
+   * (todo22#P12) at 0 hits on `analyze --force` (the reload it worried about is shallow now, per
+   * Phase 12), but 21501 calls landing on only 3945 distinct ids during `prune` — a 5.45x re-decode
+   * rate costing 283 of 1480 ms wall time. That redundancy is what this caches, not the meat itself.
+   *
+   * Bounded rather than a plain memo: VMC's whole point (Phase 12) is keeping decompressed data OFF
+   * the heap, and a long-lived caller (the MCP server) can touch every node in the graph over its
+   * lifetime, at which point an unbounded cache re-inflates back to pre-VMC memory. A small LRU
+   * captures the same-node re-reads a single command makes without holding the whole graph decoded.
+   */
+  private static readonly MEAT_CACHE_CAPACITY = 2000;
+  private meatCache: Map<NodeId, Record<string, unknown>> = new Map();
+
+  /** Evict the least-recently-used entry once the cache is over capacity. */
+  private cacheMeat(id: NodeId, meat: Record<string, unknown>): void {
+    this.meatCache.delete(id);
+    this.meatCache.set(id, meat);
+    if (this.meatCache.size > ConducksAdjacencyList.MEAT_CACHE_CAPACITY) {
+      const oldest = this.meatCache.keys().next().value;
+      if (oldest !== undefined) this.meatCache.delete(oldest);
+    }
+  }
+
+  /**
    * Two more indexes over the same nodes, because three separate resolvers were each answering
    * "which nodes have this name / live in this file" by scanning EVERY node.
    *
@@ -242,6 +266,7 @@ export class ConducksAdjacencyList {
     this.filePathIndex.clear();
     this.metadata.clear();
     this.compressedMeat.clear();
+    this.meatCache.clear();
   }
 
   /**
@@ -334,6 +359,12 @@ export class ConducksAdjacencyList {
     };
 
     // 2. Memory Zip (VMC): Compress the 'Meat' (metadata) if present
+    //
+    // A cached decompression of the OLD meat must not survive this id being rewritten, whether the
+    // rewrite lands new meat (below) or goes shallow and leaves none — either way the cache would
+    // otherwise hand a later `getNode` data that no longer matches what `compressedMeat` holds for
+    // this id (todo22#P12).
+    this.meatCache.delete(id);
     if (!node.isShallow) {
       try {
         const meat = { ...node.properties };
@@ -348,6 +379,11 @@ export class ConducksAdjacencyList {
       } catch (err) {
         console.error(`[Conducks VMC] Compression failed for node ${id}:`, err);
       }
+    } else {
+      // Pre-existing gap the meat-cache test caught: re-adding an id as shallow left the OLD
+      // compressed buffer in place — nothing here ever cleared it — so `getNode` kept handing back
+      // meat from before this node went shallow. A shallow node has no meat by definition.
+      this.compressedMeat.delete(id);
     }
 
     // An id can be re-added with a DIFFERENT name or file — a symbol renamed, or a file moved. The
@@ -509,6 +545,11 @@ export class ConducksAdjacencyList {
 
       // 4. Remove Node
       this.nodes.delete(id);
+
+      // A purged id is unreachable through `getNode` regardless (it checks `this.nodes` first), so
+      // this is memory hygiene rather than a correctness fix — but it keeps the cache from holding
+      // decoded meat for a node that no longer exists.
+      this.meatCache.delete(id);
     }
   }
 
@@ -596,19 +637,30 @@ export class ConducksAdjacencyList {
 
     const compressed = this.compressedMeat.get(id);
     if (compressed) {
-      try {
-        const meat = JSON.parse(zlib.inflateSync(compressed).toString());
-        return {
-          ...skeleton,
-          isShallow: false,
-          properties: {
-            ...skeleton.properties,
-            ...meat
-          }
-        };
-      } catch (err) {
-        throw new Error(`Decompression failed for node ${id}: ${err}`);
+      // Decompress once per id and reuse from the LRU on repeat reads — MEASURED (todo22#P12) at a
+      // 5.45x re-decode rate for the same ids on `prune` (21501 calls landing on 3945 distinct
+      // nodes). `analyze --force` never reaches this branch at all (0 of 7306 `getNode` calls hit
+      // meat), because Phase 12 made the mid-pulse reload shallow — this cache is for `explain`,
+      // `diff`, `rename` and `prune`, which still load with meat and call `getNode` in loops.
+      let meat = this.meatCache.get(id);
+      if (!meat) {
+        let decoded: Record<string, unknown>;
+        try {
+          decoded = JSON.parse(zlib.inflateSync(compressed).toString());
+        } catch (err) {
+          throw new Error(`Decompression failed for node ${id}: ${err}`);
+        }
+        meat = decoded;
+        this.cacheMeat(id, meat);
       }
+      return {
+        ...skeleton,
+        isShallow: false,
+        properties: {
+          ...skeleton.properties,
+          ...meat
+        }
+      };
     }
 
     return skeleton;

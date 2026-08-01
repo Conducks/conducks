@@ -565,7 +565,14 @@ function linkDecisions(board: DocsBoard): void {
  */
 export function enforcedByPaths(value: string): string[] {
   if (!value) return [];
-  return Array.from(String(value).matchAll(/\b((?:tests|src)\/[A-Za-z0-9_./-]+\.[A-Za-z]+)/g)).map(m => m[1]);
+  // The path may carry SERVICE segments in front of `src/` or `tests/` — `app/src/...` on a
+  // monorepo — and the old regex, anchored on the bare `src/` prefix with a word boundary, happily
+  // started MID-PATH: `app/src/tests/unit/X.test.ts` matched as `src/tests/unit/X.test.ts`, which
+  // resolves to nothing. Measured on mentorseed: 18 of the 31 ADRs declaring `- Enforced by:` were
+  // silently dropped that way, and GOVERNS derivation read 0 where the docs held 31 records
+  // (todo29#P3). The lookbehind forbids starting right after a path character, and the optional
+  // leading segments carry the service prefix into the capture.
+  return Array.from(String(value).matchAll(/(?<![\w./-])((?:[A-Za-z0-9_.-]+\/)*(?:tests|src)\/[A-Za-z0-9_./-]+\.[A-Za-z]+)/g)).map(m => m[1]);
 }
 
 export function crossCheckDecisions(decisions: any[], treeRoot: string = process.cwd()): Array<{ file: string; errs: string[] }> {

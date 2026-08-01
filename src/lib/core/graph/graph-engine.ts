@@ -176,13 +176,48 @@ export class ConducksGraph {
             // when the pulse commits — the vault held 0 PULSES_TO rows on every project. The
             // caller persists `lastResonanceEdges`; this is the same remedy bindResonance already
             // uses, and the name is now a misnomer for "edges the binders built".
+            //
+            // A HANDOVER BELONGS TO THE SCOPE IT HAPPENS IN, and `node` IS that scope — it is the
+            // symbol whose outgoing edges this loop is reading, so the producing call and the
+            // consuming call are both inside it by construction.
+            //
+            // That fact used to reach the edge only by ACCIDENT. The id was built from `call.id`,
+            // and a CALLS edge's id is `SEMANTIC::<scope>-><target>::calls` (see `ingestSpectrum`),
+            // so the scope was in there — smuggled through another edge's id format, readable by
+            // nobody, and queryable by nothing. Meanwhile `properties` named the variable and never
+            // named the function. So the only ANSWERABLE form of the edge was "path.resolve feeds
+            // path.dirname", stated globally, when what actually happened was "inside THIS symbol,
+            // path.resolve feeds path.dirname". 124 of 238 of these edges on this repository have a
+            // library symbol at both ends, and every one of them was making a claim about node's
+            // `path` module rather than about the code being analysed (ADR 0059's open question).
+            //
+            // Two changes, and neither moves an endpoint:
+            //   1. `scope` is a PROPERTY, so the attribution is queryable without parsing an id;
+            //   2. the id is built from `node.id` and `call.targetId` DIRECTLY, rather than from
+            //      `call.id`. Same tuple (scope, producer, consumer), stated on purpose. It also
+            //      drops a latent lie: `bindNeuralCircuits` and `IntraLinker` rebind a call's
+            //      TARGET without rewriting its ID, so `call.id`'s target segment can name a symbol
+            //      `call.targetId` no longer points at.
+            //
+            // The ENDPOINTS are deliberately unchanged. ADR 0051 settled that a handover's source
+            // is the PRODUCING CALL's target — "produce's output feeds consume" says more than
+            // "this variable pulses to consume" — and running the edge from `node` to the consumer
+            // instead would undo it, discard the producer, and duplicate the CALLS edge that
+            // already joins those two. The scope is the third leg of a triple that an edge has only
+            // two ends for, so it travels as a property. ADR 0059's `local` coupling still holds:
+            // this is still below module level, still not an import, and now says so explicitly.
+            //
+            // RESIDENCY: `node.id` is safe to bake into an id only because the orchestrator reloads
+            // the WHOLE graph from the vault before calling `resonate()` (analysis/index.ts, ADR
+            // 0041's clear-per-wave is undone there). Nothing here depends on which wave a file
+            // landed in — the same trap todo22#P7 removed from `ingestSpectrum`'s Ghost Local strip.
             const edge: ConducksEdge = {
-              id: `PULSE::${producingCall.targetId}->${call.id}`,
+              id: `PULSE::${node.id}::${producingCall.targetId}->${call.targetId}`,
               sourceId: producingCall.targetId,
               targetId: call.targetId,
               type: 'PULSES_TO',
               confidence: 0.7,
-              properties: { reason: 'handover', variable: arg }
+              properties: { reason: 'handover', variable: arg, scope: node.id }
             };
             this.graph.addEdge(edge);
             this.lastResonanceEdges.push(edge);

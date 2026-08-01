@@ -45,3 +45,26 @@ describe('enforcedByPaths', () => {
     expect(enforcedByPaths('tests/unit/domain')).toEqual([]);
   });
 });
+
+/**
+ * The monorepo case (todo29#P3). The old regex anchored on the bare `src/`|`tests/` prefix, so
+ * `app/src/tests/unit/X.test.ts` matched STARTING MID-PATH as `src/tests/unit/X.test.ts` — a path
+ * that resolves to nothing. Measured on mentorseed: 18 of 31 ADRs declaring `- Enforced by:` were
+ * silently dropped, and GOVERNS derivation read 0 where the docs held 31 records.
+ */
+describe('service-prefixed paths keep their prefix', () => {
+  it('captures the whole monorepo path, not the truncated tail', () => {
+    expect(enforcedByPaths('app/src/tests/unit/AuthzChokePoint.test.ts (the gate holds)'))
+      .toEqual(['app/src/tests/unit/AuthzChokePoint.test.ts']);
+  });
+
+  it('captures a packages/-scoped path', () => {
+    expect(enforcedByPaths('packages/core/src/db/guard.test.ts'))
+      .toEqual(['packages/core/src/db/guard.test.ts']);
+  });
+
+  it('still captures a bare-rooted path exactly as before', () => {
+    expect(enforcedByPaths('tests/unit/core/graph/cluster-rule.test.ts'))
+      .toEqual(['tests/unit/core/graph/cluster-rule.test.ts']);
+  });
+});
