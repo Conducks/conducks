@@ -87,6 +87,21 @@ export class IntraLinker {
       // First-encountered (highest gravity after resonate) wins for ambiguous names.
       const fileMap = unitSymbols.get(unitId)!;
       if (!fileMap.has(name)) fileMap.set(name, node.id);
+
+      // The QUALIFIED member path, keyed alongside the bare name.
+      //
+      // A member's node id is `<file>::<owner>.<member>` and its `name` is only the LAST segment
+      // (`create`), while the call processor emits the target exactly as written in the source —
+      // `userrepository.create`. Keying by `name` alone therefore made the qualified form
+      // unlookupable: step 3b could never match it, and step 3c fell back to the bare method
+      // (`create`), which is generic enough to bind the wrong node or, more often, nothing.
+      // Measured on mentorseed: 10 `userrepository.*` edges dangled with the defining node present
+      // in the graph under exactly this id.
+      const sep = node.id.indexOf('::');
+      if (sep > 0) {
+        const qualified = node.id.slice(sep + 2);
+        if (qualified && qualified !== name && !fileMap.has(qualified)) fileMap.set(qualified, node.id);
+      }
     }
 
     // Strip ::unit to give the resolver raw absolute paths
@@ -119,6 +134,77 @@ export class IntraLinker {
       logger.debug(`🛡️ [IntraLinker] Edge ${sourceUnitId} imports ${targetUnit}`);
     }
 
+    // ── 2b. One hop further, through barrels ────────────────────────────────
+    //
+    // A binding is routinely imported from a BARREL that does not define it: mentorseed's
+    // `authService.ts` imports `userRepository` from `@/core/auth/server`, whose `index.ts`
+    // re-exports it from `../repositories/user.repository`. Scoped to depth 1 the defining unit is
+    // never in the candidate set — measured: 0 of the 10 `userrepository.*` targets are reachable at
+    // depth 1, all 10 at depth 2.
+    //
+    // Depth 2 only, and answered ONLY when exactly one unit at that depth defines the name (see
+    // `resolveSymbolUnique`). Depth 1 keeps first-match-wins because that is what it always did and
+    // the import list there is the file's own; depth 2 is one inference removed, so an ambiguous
+    // answer is refused rather than picked.
+    const unitImportsDepth2 = new Map<string, string[]>();
+    for (const [sourceUnitId, direct] of unitImports) {
+      const seen = new Set<string>(direct);
+      seen.add(sourceUnitId);
+      const second: string[] = [];
+      for (const mid of direct) {
+        for (const far of unitImports.get(mid) ?? []) {
+          if (seen.has(far)) continue;
+          seen.add(far);
+          second.push(far);
+        }
+      }
+      if (second.length > 0) unitImportsDepth2.set(sourceUnitId, second);
+    }
+
+    // ── 2c. External namespaces, and the symbols the graph attests under them ─
+    //
+    // An external import emits NO `IMPORTS` edge at all (measured on mentorseed: 0 of 3,095 carry an
+    // external origin), so the import scope above cannot see one. What the graph DOES hold is the
+    // resolved half of the same import: the call/construct processors write
+    // `@heroicons/react/24/outline::academiccapicon` because they consult the file's binding table,
+    // while the reference-as-value path writes the BARE name (`academiccapicon`) and dangles.
+    //
+    // Two facts, both read off edges rather than inferred:
+    //   - which external namespaces a unit demonstrably references (it already has a resolved edge
+    //     into one), and
+    //   - which `<namespace>::<symbol>` pairs exist anywhere in the workspace.
+    // A bare name is bound only where both hold and exactly one namespace answers. Built from EDGES,
+    // not from nodes, because virtual induction mints those nodes AFTER this linker runs — reading
+    // nodes would make the fix work on the second pulse and not the first.
+    const unitExternalNamespaces = new Map<string, Set<string>>();
+    const attestedExternal = new Map<string, Set<string>>();
+    // Memoised: a unit with 40 icon references would otherwise hydrate the same source node 40
+    // times, and `getNode` inflates compressed properties on every call.
+    const unitIdCache = new Map<string, string | null>();
+
+    for (const edge of graph.getAllEdges()) {
+      const sep = edge.targetId.indexOf('::');
+      if (sep <= 0) continue;
+      const namespace = edge.targetId.slice(0, sep);
+      const symbol = edge.targetId.slice(sep + 2);
+      if (!symbol || symbol.includes('::')) continue;
+      if (!IntraLinker.isExternalNamespace(namespace)) continue;
+
+      let symbols = attestedExternal.get(namespace);
+      if (!symbols) { symbols = new Set(); attestedExternal.set(namespace, symbols); }
+      symbols.add(symbol);
+
+      let srcUnit = unitIdCache.get(edge.sourceId);
+      if (srcUnit === undefined) {
+        srcUnit = this.unitIdOf(graph, edge.sourceId);
+        unitIdCache.set(edge.sourceId, srcUnit);
+      }
+      if (!srcUnit) continue;
+      let namespaces = unitExternalNamespaces.get(srcUnit);
+      if (!namespaces) { namespaces = new Set(); unitExternalNamespaces.set(srcUnit, namespaces); }
+      namespaces.add(namespace);
+    }
+
     // ── 3. Resolve unresolved edges ─────────────────────────────────────────
     const resolved: Array<{ id: string; newTargetId: string }> = [];
 
@@ -142,6 +228,35 @@ export class IntraLinker {
         }
         continue;
       }
+
+      // A `<barrelFile>::<binding>` IMPORTS target whose node does not exist — the residue ADR 0071
+      // left. That record mints a node for every name a barrel names OUTRIGHT
+      // (`export { a, b as c } from './x'`), and could not for `export * from './x'`, because the
+      // wildcard enumerates nothing at the re-exporting file.
+      //
+      // It is enumerable at the TARGET file, and by here the whole graph is loaded, so the objection
+      // that killed it at parse time (waves clear the graph between flushes) no longer applies. The
+      // barrel's own whole-file IMPORTS edges name every file it re-exports FROM — a wildcard emits
+      // one of those, which is exactly why the specifier survived even though the names did not.
+      // Search those files for a symbol with the binding's name and point the edge at the real
+      // definition, which is a better answer than a minted node at the barrel: no node is invented,
+      // and the importer lands on the file that actually defines the symbol.
+      if (edge.type === 'IMPORTS' && edge.targetId.includes('::') && !graph.hasNode(edge.targetId)) {
+        const sep = edge.targetId.lastIndexOf('::');
+        const binding = edge.targetId.slice(sep + 2);
+        const barrelUnit = `${edge.targetId.slice(0, sep)}::unit`;
+        if (binding && binding !== 'unit' && graph.hasNode(barrelUnit)) {
+          const viaBarrel =
+            this.resolveSymbol(binding, barrelUnit, unitImports, unitSymbols) ??
+            this.resolveSymbolUnique(binding, barrelUnit, unitImportsDepth2, unitSymbols);
+          if (viaBarrel && viaBarrel !== edge.targetId) {
+            graph.rebindEdgeTarget(edge, viaBarrel);
+            resolved.push({ id: edge.id, newTargetId: viaBarrel });
+          }
+        }
+        continue;
+      }
+
       // Skip already-resolved edges (fully qualified IDs always contain '::')
       if (edge.targetId.includes('::')) continue;
       if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type)) continue;
@@ -177,10 +292,39 @@ export class IntraLinker {
         }
       }
 
+      // 3d. One import hop further, through a barrel that re-exports the definition rather than
+      // owning it. Uniqueness-gated — see `unitImportsDepth2`.
+      if (!resolvedId) {
+        resolvedId = this.resolveSymbolUnique(bareName, sourceUnitId, unitImportsDepth2, unitSymbols);
+      }
+
+      // 3e. A named import of an EXTERNAL symbol. Bound only when this unit already references the
+      // namespace and the workspace attests the symbol under it — see `unitExternalNamespaces`.
+      if (!resolvedId) {
+        const namespaces = unitExternalNamespaces.get(sourceUnitId);
+        if (namespaces) {
+          let candidate: string | null = null;
+          let matches = 0;
+          for (const namespace of namespaces) {
+            if (!attestedExternal.get(namespace)?.has(bareName)) continue;
+            candidate = `${namespace}::${bareName}`;
+            matches++;
+          }
+          // Two packages exporting the same name is exactly the case where a guess would be wrong,
+          // and there is nothing left in the graph to break the tie. Refuse (ADR 0070).
+          if (matches === 1) resolvedId = candidate;
+        }
+      }
+
       if (resolvedId) {
         graph.rebindEdgeTarget(edge, resolvedId);
         resolved.push({ id: edge.id, newTargetId: resolvedId });
       }
+    }
+
+    // ── 4. Follow ALIASES chains past the first hop ──────────────────────────
+    for (const { id, newTargetId } of this.collapseAliasChains(graph)) {
+      resolved.push({ id, newTargetId });
     }
 
     if (resolved.length > 0) {
@@ -188,6 +332,75 @@ export class IntraLinker {
     }
 
     return resolved;
+  }
+
+  /**
+   * A namespace that names a MODULE this project does not contain, rather than a file inside it.
+   *
+   * The same test `induceVirtualLibraries` uses, for the same reason: a local id is an absolute
+   * path, so anything that does not look like one is a package. The synthesised prefixes are named
+   * explicitly because they are not paths either and must NOT be treated as importable packages —
+   * `directory::`, `ecosystem::` and `lib::` are constructed containment ids, and `global::` is
+   * induction's own bucket for things it could not place.
+   */
+  private static readonly CONSTRUCTED_NAMESPACES = new Set(['directory', 'ecosystem', 'lib', 'route', 'global', 'unresolved']);
+
+  private static isExternalNamespace(namespace: string): boolean {
+    if (!namespace || IntraLinker.CONSTRUCTED_NAMESPACES.has(namespace)) return false;
+    if (namespace.startsWith('/') || namespace.startsWith('.') || /^[a-z]:\\/.test(namespace)) return false;
+    if (namespace.includes('.ts') || namespace.includes('.js') || namespace.includes('.tsx') || namespace.includes('.jsx')) return false;
+    return true;
+  }
+
+  /** The unit a node id belongs to, whether it is the unit itself or a symbol inside it. */
+  private unitIdOf(graph: ConducksAdjacencyList, nodeId: string): string | null {
+    const node = graph.getNode(nodeId);
+    const unitId = (node?.properties?.unitId as string | undefined)?.toLowerCase();
+    if (unitId) return unitId;
+    return nodeId.endsWith('::unit') ? nodeId.toLowerCase() : null;
+  }
+
+  /**
+   * Walk an ALIASES chain to the definition it ultimately renames.
+   *
+   * `IntraLinker`'s main pass rebinds ONE hop, because `unitImports` only ever names files the
+   * CURRENT file imports (ADR 0071 states this and deliberately stops there). mentorseed has a real
+   * two-hop chain: `server.ts` re-exports `db` from `database/server/index.ts`, which re-exports it
+   * from `DatabaseManager.ts` under the name `coreDb`. After one hop `server.ts::db` points at the
+   * MIDDLE barrel's node — a real node, so nothing dangles, but the semantic link stops short of the
+   * definition.
+   *
+   * Termination is by construction, not by a depth cap: each step must land on a node not already
+   * `seen`, and `seen` only grows, so a chain of N distinct alias nodes takes at most N steps. A
+   * cycle (`a` aliases `b` aliases `a`, which a pair of barrels re-exporting each other produces)
+   * therefore stops at the repeat and keeps the last node it reached rather than looping or
+   * throwing — a partial answer, never a hang.
+   */
+  private collapseAliasChains(graph: ConducksAdjacencyList): Array<{ id: string; newTargetId: string }> {
+    const aliasTarget = new Map<string, string>();
+    const aliasEdges = graph.getAllEdges().filter(e => e.type === 'ALIASES');
+    for (const edge of aliasEdges) {
+      if (!aliasTarget.has(edge.sourceId)) aliasTarget.set(edge.sourceId, edge.targetId);
+    }
+
+    const collapsed: Array<{ id: string; newTargetId: string }> = [];
+    for (const edge of aliasEdges) {
+      const seen = new Set<string>([edge.sourceId]);
+      let terminal = edge.targetId;
+      while (!seen.has(terminal)) {
+        seen.add(terminal);
+        const next = aliasTarget.get(terminal);
+        // A bare next hop is one this pass could not resolve; stopping keeps the last REAL node
+        // rather than replacing it with a name that resolves to nothing.
+        if (!next || !graph.hasNode(next)) break;
+        terminal = next;
+      }
+      if (terminal !== edge.targetId) {
+        graph.rebindEdgeTarget(edge, terminal);
+        collapsed.push({ id: edge.id, newTargetId: terminal });
+      }
+    }
+    return collapsed;
   }
 
   private resolveSymbol(targetId: string, sourceUnitId: string, imports: Map<string, string[]>, symbols: Map<string, Map<string, string>>): string | null {
@@ -204,5 +417,26 @@ export class IntraLinker {
       }
     }
     return null;
+  }
+
+  /**
+   * Same lookup, but it REFUSES when more than one unit in the candidate set defines the name.
+   *
+   * Used for the depth-2 (through-a-barrel) set only. At depth 1 the candidate list is the file's
+   * own import statement and first-match-wins is the behaviour every existing edge was resolved
+   * under. At depth 2 the linker is inferring which of a barrel's own imports the binding came from,
+   * and two answers there means the graph does not know — so it says nothing rather than picking.
+   */
+  private resolveSymbolUnique(targetId: string, sourceUnitId: string, imports: Map<string, string[]>, symbols: Map<string, Map<string, string>>): string | null {
+    const lowerName = targetId.toLowerCase();
+    let found: string | null = null;
+
+    for (const unitId of imports.get(sourceUnitId) || []) {
+      const resolvedNodeId = symbols.get(unitId)?.get(lowerName);
+      if (!resolvedNodeId || resolvedNodeId === found) continue;
+      if (found) return null;
+      found = resolvedNodeId;
+    }
+    return found;
   }
 }
