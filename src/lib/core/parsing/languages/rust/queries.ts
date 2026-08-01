@@ -91,4 +91,18 @@ export const RUST_QUERIES = `
   
   ;; --- Debt Markers ---
   [(line_comment) (block_comment)] @comment
+
+  ;; --- Kinesis: the REQUEST half of a cross-service pair (todo22#P15) ---
+  ;;
+  ;; The RECEIVER is captured as well as the URL, because flow.ts uses it as the evidence that a
+  ;; call is a network call — without it, a config lookup and an HTTP GET are the same shape.
+
+  ;; client.get(url) — reqwest and friends
+  (call_expression
+    function: (field_expression
+      value: (identifier) @kinesis_object
+        (#match? @kinesis_object "^(client|http|reqwest|agent)$")
+      field: (field_identifier) @req_method
+        (#match? @req_method "^(get|post|put|patch|delete|head|request|send)$"))
+    arguments: (arguments . (string_literal) @kinesis_request_url)) @kinesis_request
 `;

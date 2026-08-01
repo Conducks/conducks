@@ -1,5 +1,21 @@
 # Memory — conducks
 
+## A tree-sitter query that compiles is not a query that matches
+
+Two patterns shipped-and-reverted in one sitting, both compiling cleanly and matching nothing:
+
+- PHP calls a double-quoted literal `encapsed_string`, NOT `string`.
+- A PHP `variable_name`'s text INCLUDES the leading `$`, so an anchored predicate that escapes it
+  (`^(\$client|...)$`) matches nothing. An unanchored `(client|http|guzzle)` works.
+
+This is the ADR 0071 failure — `@isBinding` and `RESOLVABLE.ALIASES` were built, wired, and produced
+zero edges for weeks because no query emitted the capture. Neither a compile nor a typecheck catches
+it.
+
+**Probe the AST before writing the pattern**, and assert on a REAL parse in the test. Dumping
+`node.children.map(c => c.type)` for the target expression takes a minute and is the only thing that
+tells you what the grammar actually calls its nodes.
+
 ## Two "sentinel rules" exist and they are unrelated mechanisms
 
 `sentinel-rules.ts` and `sentinel.ts` both talk about "rules", and they are different things read by

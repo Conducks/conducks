@@ -84,4 +84,18 @@ export const CSHARP_QUERIES = `
 
   ;; --- Debt Markers ---
   (comment) @comment
+
+  ;; --- Kinesis: the REQUEST half of a cross-service pair (todo22#P15) ---
+  ;;
+  ;; The RECEIVER is captured as well as the URL, because flow.ts uses it as the evidence that a
+  ;; call is a network call — without it, a config lookup and an HTTP GET are the same shape.
+
+  ;; httpClient.GetAsync(url) · client.PostAsync(url, ...)
+  (invocation_expression
+    (member_access_expression
+      (identifier) @kinesis_object
+        (#match? @kinesis_object "^(httpClient|client|http|_httpClient|_client|restClient)$")
+      (identifier) @req_method
+        (#match? @req_method "^(GetAsync|PostAsync|PutAsync|PatchAsync|DeleteAsync|SendAsync|GetStringAsync|GetFromJsonAsync|PostAsJsonAsync)$"))
+    (argument_list (argument (string_literal) @kinesis_request_url))) @kinesis_request
 `;

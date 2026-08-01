@@ -54,4 +54,17 @@ export const RUBY_QUERIES = `
 
   ;; --- Debt Markers ---
   (comment) @comment
+
+  ;; --- Kinesis: the REQUEST half of a cross-service pair (todo22#P15) ---
+  ;;
+  ;; The RECEIVER is captured as well as the URL, because flow.ts uses it as the evidence that a
+  ;; call is a network call — without it, a config lookup and an HTTP GET are the same shape.
+
+  ;; Net::HTTP.get(url) · RestClient.get(url) · client.post(url)
+  (call
+    receiver: [(scope_resolution) (constant) (identifier)] @kinesis_object
+      (#match? @kinesis_object "^(Net::HTTP|HTTP|RestClient|Faraday|client|http|conn)$")
+    method: (identifier) @req_method
+      (#match? @req_method "^(get|post|put|patch|delete|head|request|get_response)$")
+    arguments: (argument_list . (string) @kinesis_request_url)) @kinesis_request
 `;

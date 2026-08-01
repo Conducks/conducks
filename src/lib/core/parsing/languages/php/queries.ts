@@ -55,4 +55,23 @@ export const PHP_QUERIES = `
 
   ;; --- Debt Markers ---
   (comment) @comment
+
+  ;; --- Kinesis: the REQUEST half of a cross-service pair (todo22#P15) ---
+  ;;
+  ;; The RECEIVER is captured as well as the URL, because flow.ts uses it as the evidence that a
+  ;; call is a network call — without it, a config lookup and an HTTP GET are the same shape.
+
+  ;; $client->get(url) — Guzzle and friends
+  (member_call_expression
+    object: (variable_name) @kinesis_object
+      ;; No anchors and no escaped dollar. A PHP variable_name's text INCLUDES the leading $, and
+      ;; an anchored pattern escaping it (^(\$client|...)$) compiled without complaint and matched
+      ;; nothing — the ADR 0071 shape, found only because the fixture asserted on a real parse.
+      (#match? @kinesis_object "(client|http|guzzle)")
+    name: (name) @req_method
+      (#match? @req_method "^(get|post|put|patch|delete|head|request|send)$")
+    ;; PHP calls a double-quoted literal encapsed_string, not string — a pattern using string
+    ;; compiles cleanly and matches nothing, which is the ADR 0071 shape. Both forms are listed
+    ;; because a single-quoted URL is the other half of the same idiom.
+    arguments: (arguments (argument [(encapsed_string) (string)] @kinesis_request_url))) @kinesis_request
 `;
