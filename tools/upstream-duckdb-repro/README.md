@@ -1,59 +1,72 @@
-# DuckDB duplicate-key repro — NOT YET FILING-READY
+# DuckDB duplicate-key on a key deleted in the same transaction
 
-Status: **the reproduction does not fire.** Do not file upstream until it does — an issue without a
-runnable reproduction costs a maintainer more than it gives them.
+**Status: REPRODUCED, deterministically, from a captured real workload.** Filing-ready.
+`repro.mjs` (synthetic) still does NOT fire — see "What does not reproduce it" below, which is
+itself part of the report.
 
-## The bug, as observed in production
+## The bug
 
-DuckDB 1.4.4 (node binding). Inside one transaction, deleting and re-inserting rows raises
+DuckDB **1.4.4** (node binding, macOS arm64). Inside one transaction:
 
 ```
-Constraint Error: PRIMARY KEY or UNIQUE constraint violation: duplicate key "ecosystem::..."
+BEGIN
+  ... other work ...
+  DELETE FROM nodes WHERE id IN (?, ..., 'ecosystem::path', ...)   -- statement 15
+  ... other work ...
+  INSERT INTO nodes (...31 columns...) VALUES (...)                -- statement 42, ~7,936 params
+COMMIT
 ```
 
-on a key the statement stream writes exactly **once**. Related upstream issues:
-duckdb/duckdb#2241, #16520, #16604 (edge cases remain after #15836).
+fails with
 
-Two conditions were established while working around it:
+```
+Constraint Error: Duplicate key "id: ecosystem::path" violates primary key constraint.
+```
 
-- It needs **surrounding churn**. A batch containing the victim key fails only when another
-  delete+insert batch of unrelated rows precedes it in the same transaction.
-- On the real table, adding **any secondary index on a written column** makes a cold run fail 2 of 2
-  deterministically, where it is otherwise clean over 10+ runs.
+The key is **deleted at statement 15 and inserted exactly once at statement 42**, in the same
+transaction. No statement in the stream writes it twice. Verified directly against the captured log:
+the id appears once in the DELETE's parameters and once in the INSERT's.
 
-## What is here
+Related: duckdb/duckdb#2241, #16520, #16604 (edge cases appear to remain after #15836).
 
-| file | |
+## Reproducing
+
+`artifacts/pulse.jsonl` is the captured statement stream — 43 statements, ~3.6 MB, mostly bound
+parameters. Replay it against any vault with the same schema:
+
+```
+node ../replay-sql-log.mjs artifacts/pulse.jsonl <copy-of-vault>.db
+```
+
+Always replay against a **copy** — the vault is mutated.
+
+Deterministic: 2 runs of 2 on the real workload.
+
+## What does NOT reproduce it — and this is the useful half
+
+Four synthetic attempts, all clean, each removing a candidate factor:
+
+| attempt | result |
 |---|---|
-| `repro.mjs` | standalone attempt — self-contained, needs only `duckdb`. **Currently prints NOT REPRODUCED.** |
-| `../replay-sql-log.mjs` | the harness that root-caused it: replays a captured statement log and delta-shrinks it |
+| 40 cycles × 2,000 rows, delete+reinsert, one transaction | clean |
+| the same, plus a secondary index on a written column | clean |
+| 31-column table (matching the real one), 60 cycles, no checkpoints | clean |
+| 500 rows × 200 cycles, aged file | clean |
 
-## What has been tried and did NOT reproduce
+So the trigger is **not** batch size, column count, secondary indexes, or accumulated row versions
+on their own. Something about the real statement mix matters, and the captured log is the only
+thing that has it. That is why the artifact is committed rather than a tidy script.
 
-1. 40 cycles × 2,000 rows of delete+reinsert churn in one transaction.
-2. The same, plus `CREATE INDEX ... ON nodes(gravity)` — a secondary index on a written column.
+## Shrinking — read this before trusting a minimal set
 
-The second failing to fire is the useful result: the trigger is neither the index alone nor
-synthetic churn alone.
-
-## The likely route to a real artifact
-
-The original capture came from a real pulse against an **aged** vault — one carrying accumulated
-row versions from many prior pulses, which DuckDB never reclaims in place. Neither loop above ages a
-vault that way.
-
-```
-# 1. temporarily revert insertBatched() to delete-then-insert
-# 2. against a genuinely aged vault:
-CONDUCKS_SQL_LOG=/tmp/pulse.jsonl conducks analyze --force --yes
-# 3. shrink (always against a COPY — the vault is mutated):
-node tools/replay-sql-log.mjs /tmp/pulse.jsonl path/to/copy.db
-```
-
-That is how the original 36-statement capture was cut to 5.
+`--shrink` on this log produces a 2-statement set that is a **coincidence, not the mechanism**: it
+pairs an unrelated `DELETE FROM file_hashes` with the failing INSERT. The harness prints a warning
+about exactly this, and it is correct to. The real mechanism is statements 15 and 42 above, found by
+searching the log for the victim key rather than by trusting the shrinker.
 
 ## Why conducks no longer hits it
 
 `insertBatched()` splits by existence — UPDATE for ids that exist, INSERT for the rest, DELETE
-nothing — so no key is ever re-written and the pattern cannot arise. The layer tables added later
-use a plain insert for the same reason.
+nothing — so no key is ever deleted and re-inserted. The layer tables added later use a plain insert
+for the same reason. The capture above was produced by temporarily restoring the old shape behind an
+env flag, which has been removed again.
