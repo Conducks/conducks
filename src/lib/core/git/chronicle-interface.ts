@@ -104,6 +104,60 @@ async function getDiscoverySurface(): Promise<DiscoverySurface> {
   return discoverySurface;
 }
 
+/** The baseline a branch is compared against, and how it was found. See `resolveTarget`. */
+export interface ResolvedTarget {
+  /** The ref the target was resolved to, e.g. `refs/remotes/origin/main` or `develop`. */
+  ref: string;
+  /** The FORK POINT — the commit the comparison actually starts from, not the ref's tip. */
+  commit: string;
+  via: 'upstream' | 'merge-base';
+}
+
+/** A vault describing one branch while the checkout is on another. See `branchMismatch`. */
+export interface BranchMismatch {
+  vault: string;
+  checkout: string;
+}
+
+/**
+ * Whether a vault's branch and the checkout's branch disagree (ADR 0035, todo20#P1).
+ *
+ * **NULL ON EITHER SIDE IS NOT A MISMATCH.** Null means "no branch here", which is a legitimate
+ * state with three causes: a detached HEAD, a directory with no repository at all, and a vault
+ * written before the `branch` column existed. None of those is evidence that the graph describes
+ * the wrong tree, and refusing on them would break the two things ADR 0035 protects hardest —
+ * a project with no git must keep answering, and a detached HEAD still has a valid commit key.
+ *
+ * Kept as a free function, taking two strings and holding no git and no vault, because it is the
+ * single place the guard's meaning is decided and it has to be assertable directly.
+ */
+export function branchMismatch(vault: string | null | undefined, checkout: string | null | undefined): BranchMismatch | null {
+  if (!vault || !checkout) return null;
+  return vault === checkout ? null : { vault, checkout };
+}
+
+/**
+ * The refusal a read command prints. Names BOTH branches, because "your graph is stale" sends the
+ * reader to `analyze` without telling them what actually happened, and the branch they left is the
+ * fact that explains every wrong answer they just got.
+ *
+ * **`--force`, and that is not a stylistic choice.** MEASURED end to end: `analyze` is incremental
+ * by mtime, and a branch switch changes no mtime for any file identical on both branches — so plain
+ * `analyze` hits the `dirtyFiles.length === 0` early return in `domain/analysis/index.ts:163`,
+ * writes no pulse, and leaves the vault's branch on the OLD name. The refusal then fires again,
+ * forever. Naming the plain command here would send every reader into that loop. `--force` writes a
+ * pulse and clears it; verified on a two-branch fixture.
+ */
+export function branchRefusalMessage(m: BranchMismatch): string {
+  return [
+    `Refusing to answer: this graph was pulsed on branch '${m.vault}', but the checkout is on '${m.checkout}'.`,
+    `  Every symbol, edge and metric below would describe '${m.vault}', not the code on disk.`,
+    `  Run 'conducks analyze --force' to rebuild the graph for '${m.checkout}'.`,
+    `  (--force is required: a branch switch changes no file mtime, so a plain 'analyze' finds`,
+    `   nothing dirty, writes no pulse, and leaves this refusal in place.)`,
+  ].join('\n');
+}
+
 /**
  * Conducks — Chronicle Interface (Git-Direct)
  *
@@ -607,6 +661,145 @@ export class ChronicleInterface {
     } catch {
       return null;                 // detached HEAD, or not a repository at all
     }
+  }
+
+  /**
+   * The refusal owed to a caller holding a vault pulsed on `vaultBranch`, or null when there is
+   * nothing to refuse.
+   *
+   * A METHOD as well as the two free functions, because the CLI cannot import `core` — ADR 0005's
+   * layer contract allows `cli -> composition` only, and the CLI already receives this instance
+   * through the registry. Composing the check here is what lets the guard reach the CLI without
+   * opening a `cli -> core` edge that the boundary gate rightly fails.
+   */
+  public branchRefusal(vaultBranch: string | null | undefined): string | null {
+    const mismatch = branchMismatch(vaultBranch, this.getCurrentBranch());
+    return mismatch ? branchRefusalMessage(mismatch) : null;
+  }
+
+  /**
+   * Whether `projectDir` sits inside a git repository at all.
+   *
+   * ADR 0035: a project with no repository is not a broken mode. It has no commits, therefore no
+   * layers, no target and no branch — and every command it answers today must keep answering. This
+   * is the check that lets the git-shaped features say "not available here" instead of failing.
+   */
+  public isRepository(): boolean {
+    try {
+      return this.git(['rev-parse', '--is-inside-work-tree'], { quiet: true }).trim() === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The commit a branch should be compared AGAINST, resolved from git rather than assumed.
+   *
+   * Two mechanisms, in order, and nothing else (ADR 0035, todo20#P2):
+   *
+   *  1. The upstream tracking ref the user configured — `branch.<name>.merge` plus
+   *     `branch.<name>.remote`. This is the answer whenever it exists, because it is the one the
+   *     user stated.
+   *  2. Otherwise the nearest local branch this one forked from, found with `git merge-base`. The
+   *     nearest is the candidate whose merge-base has every other candidate's merge-base as an
+   *     ancestor — i.e. the fork point furthest down the history.
+   *
+   * **There is no third step, and `main` is never assumed.** When neither resolves, or when step 2
+   * is AMBIGUOUS — two branches sharing the winning fork point, which is exactly what `develop`
+   * sitting on the same commit as `main` looks like — this returns null and the caller refuses. A
+   * diff against the wrong baseline is the failure this project keeps shipping (CONDUCKS-13); a
+   * silently-wrong baseline is worse than no answer.
+   *
+   * The resolved `commit` is the FORK POINT, not the target ref's tip. Diffing against the tip
+   * attributes the target's own later commits to the branch under inspection.
+   */
+  public resolveTarget(branch?: string | null): ResolvedTarget | null {
+    const name = branch ?? this.getCurrentBranch();
+    if (!name) return null;             // detached HEAD or no repository: no branch, so no target
+
+    const upstream = this.upstreamRef(name);
+    if (upstream) {
+      const commit = this.mergeBase(name, upstream);
+      if (commit) return { ref: upstream, commit, via: 'upstream' };
+    }
+
+    return this.nearestForkPoint(name);
+  }
+
+  /** `branch.<name>.merge` + `branch.<name>.remote`, resolved to a ref that actually exists. */
+  private upstreamRef(branch: string): string | null {
+    const merge = this.config(`branch.${branch}.merge`);
+    if (!merge) return null;
+    const remote = this.config(`branch.${branch}.remote`);
+
+    // `.` means the upstream is a LOCAL branch, so `refs/heads/main` is already the ref. Any other
+    // remote makes it a remote-tracking ref, whose short name drops the `refs/heads/` prefix.
+    const candidate = !remote || remote === '.'
+      ? merge
+      : `refs/remotes/${remote}/${merge.replace(/^refs\/heads\//, '')}`;
+
+    return this.refExists(candidate) ? candidate : null;
+  }
+
+  /**
+   * The local branch this one most recently forked from.
+   *
+   * A candidate whose merge-base IS this branch's tip is skipped: that branch already CONTAINS this
+   * one, so it is a descendant, not the parent it forked from.
+   */
+  private nearestForkPoint(branch: string): ResolvedTarget | null {
+    const tip = this.revParse(branch);
+    const candidates: Array<{ ref: string; commit: string }> = [];
+
+    for (const ref of this.localBranches()) {
+      if (ref === branch) continue;
+      const base = this.mergeBase(branch, ref);
+      if (!base || base === tip) continue;
+      candidates.push({ ref, commit: base });
+    }
+    if (candidates.length === 0) return null;
+
+    const nearest = candidates.filter(c => candidates.every(o => this.isAncestor(o.commit, c.commit)));
+    // Zero means the fork points are not on one line of history and no candidate is nearest; more
+    // than one means several branches share the winning fork point. Both are ambiguous, and
+    // ambiguous is refused rather than broken by picking a name.
+    if (nearest.length !== 1) return null;
+
+    return { ref: nearest[0].ref, commit: nearest[0].commit, via: 'merge-base' };
+  }
+
+  private config(key: string): string | null {
+    try {
+      // `--get` exits 1 when the key is unset, which the catch turns into null.
+      return this.git(['config', '--get', key], { quiet: true }).trim() || null;
+    } catch { return null; }
+  }
+
+  private refExists(ref: string): boolean {
+    try { return this.git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { quiet: true }).trim().length > 0; }
+    catch { return false; }
+  }
+
+  private revParse(ref: string): string | null {
+    try { return this.git(['rev-parse', ref], { quiet: true }).trim() || null; }
+    catch { return null; }
+  }
+
+  private mergeBase(a: string, b: string): string | null {
+    try { return this.git(['merge-base', a, b], { quiet: true }).trim() || null; }
+    catch { return null; }          // unrelated histories have no merge base — a real answer, not an error
+  }
+
+  private isAncestor(ancestor: string, descendant: string): boolean {
+    try { this.git(['merge-base', '--is-ancestor', ancestor, descendant], { quiet: true }); return true; }
+    catch { return false; }         // exit 1 means "no", which execFileSync throws on
+  }
+
+  private localBranches(): string[] {
+    try {
+      return this.git(['for-each-ref', '--format=%(refname:short)', 'refs/heads'], { quiet: true })
+        .split('\n').map(l => l.trim()).filter(Boolean);
+    } catch { return []; }
   }
 
   /**

@@ -6,6 +6,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
 import { buildBoard } from "@/lib/domain/analysis/docs-board.js";
 import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/project-registry.js";
+import { branchMismatch } from "@/lib/core/git/chronicle-interface.js";
 
 /**
  * Conducks — Cross-Project Monitor
@@ -60,6 +61,22 @@ export interface ProjectReport {
     warnings: number;
     unlinkedDecisions: number;
   };
+  /**
+   * Branch identity — a freshness dimension the hashes cannot express (ADR 0035, todo20#P1).
+   *
+   * A vault pulsed on one branch while the checkout is on another is not stale in the file-hash
+   * sense. Every hash can match, `changed` can be 0, `graph.stale` can be false — and every answer
+   * the graph gives is still about a tree that is not on disk. So it is its OWN line, never folded
+   * into the staleness count.
+   */
+  branch: {
+    /** Branch of the latest pulse. Null: pulsed on a detached HEAD, or a vault older than the column. */
+    vault: string | null;
+    /** Branch the checkout is on now. Null: detached HEAD, or no repository at all. */
+    checkout: string | null;
+    /** Both sides are a real branch name and they differ. Null on either side is NOT a mismatch. */
+    mismatch: boolean;
+  };
   drift: ModuleDrift[];
   /**
    * Whether anything is keeping this project's graph fresh.
@@ -95,6 +112,9 @@ export class ProjectMonitor {
       root: project.root,
       graph: { analyzed: false, changed: 0, added: 0, removed: 0, tracked: 0, stale: false },
       docs: { violations: 0, warnings: 0, unlinkedDecisions: 0 },
+      // Read here for the same reason as `watcher`: it survives every early return, and a project
+      // with no repository legitimately answers null on both sides.
+      branch: { vault: null, checkout: this.checkoutBranch(project.root), mismatch: false },
       drift: [],
       // Read here, in `base`, so it survives every early return below: a project whose vault is
       // unreadable is exactly one where "is anything watching it?" is worth knowing.
@@ -124,6 +144,16 @@ export class ProjectMonitor {
       const onDisk = this.sourceFiles(project.root);
       base.graph.analyzed = true;
       base.graph.tracked = stored.size;
+
+      // The LATEST pulse: that is the branch the rows currently in the vault came from. An older
+      // pulse's branch describes rows that have since been swept.
+      try {
+        const rows = await persistence.query<{ branch: string | null }>(
+          'SELECT branch FROM pulses ORDER BY timestamp DESC LIMIT 1'
+        );
+        base.branch.vault = rows[0]?.branch ?? null;
+      } catch { /* a vault older than the `branch` column simply has no answer */ }
+      base.branch.mismatch = branchMismatch(base.branch.vault, base.branch.checkout) !== null;
 
       const changedPaths: string[] = [];
       const seen = new Set<string>();
@@ -289,6 +319,28 @@ export class ProjectMonitor {
 
     // Anything else is treated as a path, so an architecture note can be named directly.
     return fs.existsSync(path.join(root, intent)) ? intent : undefined;
+  }
+
+  /**
+   * The branch a registered project's checkout is on, or null when it has none.
+   *
+   * Spawned per project root rather than routed through the `chronicle` singleton, which anchors to
+   * ONE project directory for the whole process — the monitor is cross-project by definition and
+   * would otherwise read the same branch for every row. Same shape as `ChronicleInterface.
+   * getCurrentBranch`: `--quiet --short` exits non-zero and prints nothing on a detached HEAD, so
+   * null means "no branch here" and never an invented name.
+   */
+  private checkoutBranch(root: string): string | null {
+    try {
+      const out = execFileSync("git", ["symbolic-ref", "--quiet", "--short", "HEAD"], {
+        cwd: root, encoding: "utf8", timeout: 10_000,
+        // A non-git project is an expected case, not an error — do not print git's complaint.
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      return out.trim() || null;
+    } catch {
+      return null;                 // detached HEAD, no repository, or an unreadable root
+    }
   }
 
   /**

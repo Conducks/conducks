@@ -79,6 +79,44 @@ export const NEEDS_NO_REGISTRY = new Set([
 ]);
 
 /**
+ * The branch guard: the refusal a read command owes its caller when the vault describes another
+ * branch (ADR 0035, todo20#P1).
+ *
+ * Returns the message to print, or null when there is nothing to refuse. Reads the LATEST pulse's
+ * branch, because that is the branch the graph currently in the vault was built from — an older
+ * pulse's branch describes rows that have since been swept.
+ *
+ * Every failure mode here returns null rather than refusing. A vault with no `pulses` row, an
+ * unreadable vault, a directory with no git: none of those is evidence the graph describes the
+ * wrong tree, and a guard that refuses when it cannot tell is a guard that blocks the commands ADR
+ * 0035 promised would keep working without a repository.
+ *
+ * Exported so it can be asserted against a real vault and a real repository, rather than only
+ * through a spawned CLI.
+ *
+ * Both dependencies are taken STRUCTURALLY rather than imported. ADR 0005 allows `cli` to import
+ * `composition`, `contracts`, `web` and `mcp` — not `core` — and both of these objects already
+ * arrive through the registry, so naming their shape here keeps the guard in the CLI without
+ * opening a boundary the architecture gate would fail.
+ */
+export async function branchGuard(
+  persistence: { query<T = any>(sql: string, params?: unknown[]): Promise<T[]> },
+  chronicle: { branchRefusal(vaultBranch: string | null | undefined): string | null },
+): Promise<string | null> {
+  let rows: Array<{ branch: string | null }>;
+  try {
+    rows = await persistence.query<{ branch: string | null }>(
+      'SELECT branch FROM pulses ORDER BY timestamp DESC LIMIT 1'
+    );
+  } catch {
+    return null;                       // no vault, no pulses table, or a vault this cannot read
+  }
+  if (rows.length === 0) return null;  // never pulsed
+
+  return chronicle.branchRefusal(rows[0]?.branch);
+}
+
+/**
  * Conducks — Modular Conducks CLI v2.0.0
  */
 export async function main() {
@@ -187,6 +225,18 @@ export async function main() {
       if (!needsNoRegistry) await registry.initialize(isReadCommand, targetPath, deferGraph);
 
       if (!isStalenessBypass) {
+        // BEFORE the load, and it REFUSES rather than warns (ADR 0035). A warning above a full
+        // answer is read as noise and the answer below it is taken — and that answer describes a
+        // branch that is not on disk. Nothing about it is salvageable, so nothing is printed.
+        const refusal = await branchGuard(persistence as any, registry.infrastructure.chronicle);
+        if (refusal) {
+          console.error(`\x1b[31m${refusal}\x1b[0m`);
+          // `process.exitCode` + `return`, never `process.exit()`: the latter skips the `finally`
+          // below, leaving the vault handle open on the way out.
+          process.exitCode = 1;
+          return;
+        }
+
         await persistence.load(registry.query.graph.getGraph());
         const status = registry.audit.status();
         if (status.staleness.stale) {

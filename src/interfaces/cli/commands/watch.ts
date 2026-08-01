@@ -2,6 +2,46 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
+/** How often the watcher re-reads HEAD's branch. Cheap: one `symbolic-ref` against the local repo. */
+export const BRANCH_POLL_MS = 2_000;
+
+/**
+ * Watches for the branch moving under a running watcher, and calls back once per switch.
+ *
+ * A file watcher cannot see this. `git checkout` rewrites the working tree, so SOME saves fire —
+ * but only for files that actually differ between the two branches, and the watcher treats each as
+ * an ordinary edit and micro-pulses it into a graph still describing the branch that was left.
+ * Files identical on both branches never fire at all, so the graph ends up a blend of two trees
+ * with no event marking where one stopped (ADR 0035).
+ *
+ * Polling rather than watching `.git/HEAD`: `git checkout` replaces that file rather than editing
+ * it, which drops an inode-bound watch, and worktrees put HEAD somewhere else entirely. Reading the
+ * branch through git answers correctly for every layout.
+ *
+ * Returns the stop function. Exported so the invalidation can be asserted against a real repo
+ * without starting a full watcher.
+ */
+export function watchBranchSwitch(
+  readBranch: () => string | null,
+  onSwitch: (from: string | null, to: string | null) => void,
+  intervalMs: number = BRANCH_POLL_MS,
+): () => void {
+  let current = readBranch();
+  const timer = setInterval(() => {
+    const next = readBranch();
+    // Both sides must be a real branch name. A momentary null is a detached HEAD mid-rebase or a
+    // git call that failed, and treating that as a switch would invalidate the graph twice for one
+    // checkout — once into the null and once back out of it.
+    if (next === current || next === null || current === null) { current = next ?? current; return; }
+    const from = current;
+    current = next;
+    onSwitch(from, next);
+  }, intervalMs);
+  // Never hold the process open on its own account; the watcher's own lifetime decides that.
+  if (typeof timer.unref === 'function') timer.unref();
+  return () => clearInterval(timer);
+}
+
 /**
  * Conducks — Watch Command
  *
@@ -49,6 +89,27 @@ export class WatchCommand implements ConducksCommand {
     console.log("\x1b[34m- docs/ is watched too: grammar + link violations report on write.\x1b[0m");
     console.log("\x1b[33m- Note: Run 'conducks analyze' to persist new symbols to disk.\x1b[0m");
 
+    // A branch switch invalidates the graph, and a FILE watcher cannot see one (ADR 0035,
+    // todo20#P1). Auto-pulse is switched OFF at the switch rather than left running: every pulse
+    // after it would write symbols from the new branch into a graph describing the old one, mixing
+    // two trees in the vault with nothing recording where the boundary is. Stopping is recoverable;
+    // a blended vault is not.
+    const chronicle = registry.infrastructure.chronicle;
+    const stopBranchWatch = watchBranchSwitch(
+      () => chronicle.getCurrentBranch(),
+      (from, to) => {
+        console.log(`\n\x1b[31m[Conducks Watch] Branch switched: '${from}' → '${to}'.\x1b[0m`);
+        console.log(`\x1b[31m  The live graph describes '${from}' and is now invalid.\x1b[0m`);
+        if (isPulse) {
+          (watcher as any).enableAutoPulse(false);
+          console.log(`\x1b[33m  Auto-pulse stopped so nothing from '${to}' is written into it.\x1b[0m`);
+        }
+        // `--force`: the switch changed no mtime for any file identical on both branches, so a
+        // plain `analyze` finds nothing dirty and writes no pulse at all.
+        console.log(`\x1b[33m  Run 'conducks analyze --force' to rebuild for '${to}', then restart the watcher.\x1b[0m`);
+      },
+    );
+
     // FIX 5: Keep the process alive until a termination signal is received.
     // Use process.once() so each handler fires exactly once and is then
     // removed — prevents listener accumulation across multiple invocations.
@@ -56,6 +117,7 @@ export class WatchCommand implements ConducksCommand {
       const shutdown = async (signal: string) => {
         console.log(`\n\x1b[33m[Conducks Watch] Received ${signal}. Shutting down watcher...\x1b[0m`);
         try {
+          stopBranchWatch();
           await docsWatcher.stop();
           await watcher.stop();
         } catch (err: any) {

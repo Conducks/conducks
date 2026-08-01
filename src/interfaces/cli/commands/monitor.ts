@@ -77,8 +77,10 @@ export class MonitorCommand implements ConducksCommand {
 
     console.log(chalk.bold("\n--- 🛰️  Conducks Monitor ---\n"));
 
+    // A branch mismatch belongs in `--stale`. It is the case where every hash matches, so without
+    // it the one project answering from the wrong tree is the one `--stale` hides.
     const shown = onlyStale
-      ? reports.filter(r => r.unavailable || !r.graph.analyzed || r.graph.stale || r.docs.violations > 0)
+      ? reports.filter(r => r.unavailable || !r.graph.analyzed || r.graph.stale || r.branch.mismatch || r.docs.violations > 0)
       : reports;
 
     for (const r of shown) {
@@ -106,6 +108,21 @@ export class MonitorCommand implements ConducksCommand {
 
       console.log(`${label} ${graph}  ${chalk.dim("·")}  ${docs}`);
       console.log(chalk.dim(`  ${r.root}`));
+
+      // ITS OWN LINE, above the watcher and never folded into the graph column (ADR 0035,
+      // todo20#P1). The graph column can read "graph current" here and be perfectly correct about
+      // hashes while every answer from that vault is about a branch that is not checked out. Two
+      // different failures, so two different lines.
+      //
+      // REPORTED AND LEFT. Monitor does not pulse to fix it — ADR 0031 rejected letting an
+      // unattended process start a two-minute analysis, because that process gets killed, and a
+      // killed monitor reports nothing at all. That rejection is unchanged by branch identity.
+      if (r.branch.mismatch) {
+        console.log(chalk.red(`  branch MISMATCH — vault pulsed on '${r.branch.vault}', checkout is on '${r.branch.checkout}'`));
+        // `--force`: a branch switch changes no file mtime, so a plain `analyze` finds nothing
+        // dirty and writes no pulse, leaving this line here after the reader has acted on it.
+        console.log(chalk.dim(`  the hashes above are about the wrong tree. 'conducks analyze --force' in that project.`));
+      }
 
       // A DEAD watcher is louder than a stale graph, because staleness is the SYMPTOM and this is
       // the cause. Nothing is printed for `none`: most projects are not watched, and a line saying

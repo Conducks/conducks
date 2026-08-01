@@ -16,22 +16,22 @@ Measured 2026-08-01. The gate this paragraph set has been met.
 
 ## Phase 1 — the branch guard, useful on its own
 - Builds: 0035
-- [ ] `pulses` records the branch alongside the commit it already records
-- [ ] A read command whose vault was pulsed on a different branch REFUSES and names both branches, rather than answering from the wrong tree
-- [ ] `conducks watch` invalidates on branch switch, not only on file change — today it keeps micro-pulsing into a graph describing the branch you left
-- [ ] `conducks monitor` reports a branch mismatch as its own line, distinct from file staleness: every hash can match while every answer is still wrong. REPORT ONLY — it must not pulse to fix it (ADR 0031 rejected that, CONDUCKS-29)
-- [ ] Test: pulse on one branch, switch, assert the refusal fires and names both
-- [ ] Test: a registered project whose vault branch differs from its checkout appears in `monitor` with matching file hashes and a branch-mismatch line
+- [x] DONE in the contract freeze before the fan-out. `pulses.branch` added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` so old vaults stay readable, written from `chronicle.getCurrentBranch()`, which uses `symbolic-ref --quiet --short HEAD` and returns NULL on a detached HEAD rather than inventing a name
+- [x] BUILT — refuses with exit 1 and names both branches. Refusal, never a warning: a warning above a full answer gets read as noise while the answer below it, describing a branch not on disk, gets taken. The guard's MEANING lives in two free functions with no git and no vault (`branchMismatch`, `branchRefusalMessage`) so it is assertable directly, with the git and persistence dependencies passed structurally — which was forced by the architecture gate, since `cli` may not import `core` (ADR 0005)
+- [x] BUILT, and it POLLS rather than watches, for a reason worth keeping: a file watcher cannot see a checkout at all. Git only rewrites files that DIFFER, so identical files fire no event and differing files look like ordinary edits. Watching `.git/HEAD` fails too — checkout REPLACES that file, dropping an inode-bound watch, and worktrees keep it elsewhere. So it polls `symbolic-ref`. It stops the auto-pulse and reports; it does not rebuild, because stopping is recoverable and a vault blended from two trees is not
+- [x] BUILT, report-only per ADR 0031, and included in the `--stale` filter — which matters because a branch mismatch is exactly the case where every hash MATCHES, so without it `--stale` hides the one project answering from the wrong tree. Spawns git per project root rather than using the `chronicle` singleton, which anchors to one directory and would have reported the same branch for every row
+- [x] Asserted, and mutation-checked: `branchMismatch` always returning null kills 2, and dropping the vault branch name from the message kills 2
+- [x] Asserted. Treating a null checkout as a mismatch kills 3 across the no-git and monitor suites
 
 Ships independently and is not thrown away by the layer work. Today switching branch gives
 confidently wrong answers to every question with no warning.
 
 ## Phase 2 — resolve the target, never assume it
 - Builds: 0035
-- [ ] Resolve a branch's target from the upstream tracking ref (`branch.<name>.merge`), falling back to `git merge-base`
-- [ ] When neither resolves, say so and refuse — no defaulting to `main`
-- [ ] Test: a branch off a non-main parent resolves to that parent, and an unresolvable target refuses instead of guessing
-- [ ] A project with NO git answers every question it answers today: hash scan on access, one flat graph, no layers, no drift. ADR 0035 states this and no phase claimed it — it sat in todo21 under a phase building 0036, so 0035 reported a consequence nobody carried. Test: a directory with no `.git` pulses, queries and lints exactly as it does now
+- [x] BUILT — upstream tracking ref (`branch.<n>.merge` + `.remote`), then nearest local fork point
+- [x] BUILT — returns null on no candidates AND on an ambiguous winner (two branches sharing a fork point, which is exactly what `develop` sitting on `main`'s commit looks like). `main` is never returned as a default; mutation-checked both ways, killing 1 and 3
+- [x] Asserted. NOTE: `resolveTarget` has no consumer yet and that is a phase boundary rather than an oversight — its readers (`drift`, three-way merge) are Phase 3/4 and need commit-keyed layers first. Exported, tested, correct, and called by nothing
+- [x] ASSERTED at last — the consequence ADR 0035 stated and no phase ever claimed. A directory with no `.git` pulses, queries and lints exactly as before, and a null checkout branch is treated as UNKNOWN rather than as a mismatch, so the guard cannot refuse a project that simply has no git
 
 ## Phase 3 — commit-keyed layers
 - Builds: 0035

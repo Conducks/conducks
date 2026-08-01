@@ -96,7 +96,13 @@ describe('watcher liveness never changes the answer', () => {
 
     // ...and nothing else does. The keys are asserted first so this comparison can never quietly
     // become two empty objects agreeing with each other.
-    expect(Object.keys(substance(cold)).sort()).toEqual(['docs', 'drift', 'graph', 'name', 'root']);
+    //
+    // `branch` joined this list when the branch guard landed (todo20#P1). It is listed rather than
+    // the assertion being loosened: this test caught that addition as a cross-agent contract break —
+    // one agent added a field to `ProjectReport` while another was asserting its exact shape — and a
+    // `toContain` here would have let the next such change through silently, which is the whole
+    // thing it exists to prevent.
+    expect(Object.keys(substance(cold)).sort()).toEqual(['branch', 'docs', 'drift', 'graph', 'name', 'root']);
     expect(substance(live)).toEqual(substance(cold));
     expect(substance(dead)).toEqual(substance(cold));
   });
