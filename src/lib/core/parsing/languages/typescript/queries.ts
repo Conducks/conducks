@@ -49,6 +49,21 @@ export const TYPESCRIPT_QUERIES = `
     (export_clause (export_specifier name: (identifier) @name !alias))
     source: (string) @source) @isBinding
 
+
+  ;; A DESTRUCTURED DYNAMIC IMPORT — the same fact as a named import, written differently:
+  ;;   const { POST: stepAction } = await import('@/app/api/.../route');
+  ;; The local name is an ALIAS for POST, and the source states it. Without this the call to
+  ;; stepAction(...) carried the LOCAL name, which dangled where nothing else owned that name and,
+  ;; worse, bound to an unrelated same-named export where something did — one measured wrong edge
+  ;; (sendMessage -> MessagingService.sendMessage, a different function entirely). Reuses the
+  ;; @isBinding machinery: @name is the local name a node is minted for, @alias the original symbol.
+  (variable_declarator
+    (object_pattern (pair_pattern key: (property_identifier) @alias value: (identifier) @name))
+    value: (await_expression (call_expression function: (import) arguments: (arguments (string) @source)))) @isBinding
+  (variable_declarator
+    (object_pattern (shorthand_property_identifier_pattern) @name)
+    value: (await_expression (call_expression function: (import) arguments: (arguments (string) @source)))) @isBinding
+
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
   (public_field_definition name: (property_identifier) @name) @isProperty

@@ -119,10 +119,11 @@ describe('Barrel re-export — the public binding a barrel republishes becomes a
       e => e.type === 'ALIASES' && e.sourceId === `${barrelId}::db`
     );
     expect(aliasEdge).toBeDefined();
-    // Bare — not yet resolved to the cross-file definition. That is IntraLinker's job (tested below),
-    // and it runs in a separate, later pass over the persisted graph, not inside this in-memory
-    // orchestrator harness.
-    expect(aliasEdge!.targetId).toBe('coredb');
+    // QUALIFIED with the file the specifier resolves to. This asserted the BARE name `coredb` until
+    // 2026-08-01: the bare form left the target to IntraLinker, which scopes the lookup to files the
+    // unit imports — a scope a dynamic import never produces, so those aliases dangled (ADR 0085).
+    // The specifier is present in the match, so it is resolved here and the edge points at a real id.
+    expect(aliasEdge!.targetId).toBe(`${ROOT}/src/core/database/server/databasemanager.ts::coredb`);
   });
 
   it('does not fabricate an ALIASES edge for a plain re-export with no rename', async () => {

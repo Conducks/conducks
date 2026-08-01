@@ -50,7 +50,14 @@ export class CallProcessor {
         resolvedPath = context.resolveLocalBinding(lowTarget.split('.')[0]);
       }
       if (resolvedPath) {
-        targetId = `${resolvedPath}::${lowTarget}`;
+        // A RENAMED binding is called by its local name and DEFINED under its original one, so the
+        // id has to carry the original: `import { POST as stepAction }` then `stepAction(...)` is
+        // `<route>::post`, never `<route>::stepaction` — an id no node has (ADR 0085). Only the
+        // FIRST segment is a binding; a dotted target keeps the rest verbatim.
+        const head = lowTarget.includes('.') ? lowTarget.slice(0, lowTarget.indexOf('.')) : lowTarget;
+        const original = context.resolveBindingOriginal?.(head);
+        const symbol = original ? `${original}${lowTarget.slice(head.length)}` : lowTarget;
+        targetId = `${resolvedPath}::${symbol}`;
       }
       // 2. Resolve Global Atmosphere (Built-ins like 'process', 'os')
       else if (isBuiltIn(target, langId)) {

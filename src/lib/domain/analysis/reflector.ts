@@ -562,7 +562,7 @@ export class ConducksReflector {
                     // not. Falls back to the specifier when resolution finds nothing, which keeps
                     // the previous behaviour for genuinely external modules.
                     const resolvedSpecifier = this.imports.resolve(specifier, file.path, allPaths, provider, context);
-                    context.registerLocalBinding(aliasName, resolvedSpecifier || specifier);
+                    context.registerLocalBinding(aliasName, resolvedSpecifier || specifier, bindingName);
                   }
 
                   // Per-binding IMPORTS relationship for function-level dead code detection
@@ -623,7 +623,25 @@ export class ConducksReflector {
           this.heritage.process(cText, node.name, spectrum, explicit);
         }
         else if (cName === 'alias' && node) {
-          this.bindings.processAlias(node.name, cText, spectrum);
+          // QUALIFY the target where the match names its source module. A bare original name relies
+          // on IntraLinker scoping the lookup to files this unit imports, and a DYNAMIC import
+          // (`const { POST: x } = await import('...')`) produces no such import scope — so those
+          // aliases dangled on a bare `post`/`get`. The specifier is right there in the match, so
+          // resolve it and point at the real file (ADR 0085).
+          const aliasSource = match.captures.find((c: any) => c.name === CaptureTags.SOURCE)?.node?.text;
+          const specifier = aliasSource ? aliasSource.replace(/^['"]|['"]$/g, '') : null;
+          const resolved = specifier ? this.imports.resolve(specifier, file.path, allPaths, provider, context) : null;
+          // An external dependency resolves to a descriptor, not a path — leave those bare, since
+          // there is no project file to qualify against.
+          const resolvedPath = typeof resolved === 'string' ? resolved.toLowerCase() : null;
+          this.bindings.processAlias(node.name, resolvedPath ? `${resolvedPath}::${cText.toLowerCase()}` : cText, spectrum);
+
+          // Register the binding as well, so a CALL through the local name lands on the original.
+          // The import branch above does this for `import { A as B }`; a DESTRUCTURED DYNAMIC import
+          // never reaches that branch, so `await sendMessage(...)` was emitted as a bare local name —
+          // free to be bound by IntraLinker to any imported unit owning that name, which is the
+          // measured wrong edge in ADR 0085.
+          if (resolvedPath && context) context.registerLocalBinding(node.name, resolvedPath, cText);
         }
         else if (cName === 'kinesis_target' || cName === 'kinesis_qualified_target') {
           const scope = getScopeAt(currentMatchRow);

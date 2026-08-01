@@ -1195,3 +1195,8 @@ by construction.
 - Why it matters more than the size suggests: a wrong edge is worse than the dangling edge it replaced. Dangling is visible and counted; a confidently wrong target looks identical to a correct one in every command that reads the graph
 - Why it was found: shadowing was TESTED deliberately, not reported. Nothing failed, no count moved, and the suite was green — the graph simply answered wrongly. Any new per-file map keyed by bare name has this bug until proven otherwise
 - Applies: `reflector.ts` post-loop attach maps; anything building `<file>::<name>` by hand
+
+## Nothing in this project counts a WRONG edge — verify resolutions against source, not the graph
+- Gotcha: every resolution number here counts what is MISSING (dangling). A wrong edge has both endpoints, carries confidence 0.85, and reads as a real call in every command. The suite, `audit` and the dangling count are all blind to it by construction — one was found on 2026-08-01 (`sendMessage` bound to `MessagingService.sendMessage`, a different function) on a day when all three were green and the count had just improved
+- Why the graph cannot check itself: asking the vault whether an edge is right re-runs the rule that produced it. The check has to read the FILES — for a member call, does the target file declare that member on the recorded line, and does the call site write `.<member>(`
+- Applies: `verify-resolutions.mjs` in the session scratchpad is the shape (it is NOT in the suite — it needs a vault and a real subject). Current score: 1,312/1,312 on mentorseed and 1,176/1,176 on conducks. Its three false alarms were all the CHECKER's: a UNIT node spans the file but records lineStart=1, a generic call is `.get<T>(`, and an optional call is `.f?.(`

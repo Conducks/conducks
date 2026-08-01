@@ -25,6 +25,15 @@ export class AnalyzeContext {
   
   /** Local Symbol Bindings (current file only) — Maps LocalName to SourcePath */
   private localBindings: Map<string, string> = new Map();
+  /**
+   * A renamed binding's ORIGINAL exported name, keyed by the local name.
+   *
+   * `import { POST as stepAction }` means calls to `stepAction` run `POST`. Storing only the path
+   * made `CallProcessor` build `<route>::stepaction` — an id no node has, so the call dangled where
+   * nothing else owned the local name and, worse, bound to an unrelated same-named export where
+   * something did (ADR 0085).
+   */
+  private bindingOriginals: Map<string, string> = new Map();
 
   /** Analysis Mode: Discovery (Pass 1) vs Resolution (Pass 2) */
   private discoveryMode: boolean = false;
@@ -103,8 +112,16 @@ export class AnalyzeContext {
   /**
    * Registers a local symbol-to-source mapping for the current unit.
    */
-  public registerLocalBinding(localName: string, sourcePath: string): void {
+  public registerLocalBinding(localName: string, sourcePath: string, originalName?: string): void {
     this.localBindings.set(localName.toLowerCase(), sourcePath.toLowerCase());
+    if (originalName && originalName.toLowerCase() !== localName.toLowerCase()) {
+      this.bindingOriginals.set(localName.toLowerCase(), originalName.toLowerCase());
+    }
+  }
+
+  /** The name a renamed binding really refers to in its source module, if it was renamed. */
+  public resolveBindingOriginal(localName: string): string | undefined {
+    return this.bindingOriginals.get(localName.toLowerCase());
   }
 
   /**
@@ -119,6 +136,7 @@ export class AnalyzeContext {
    */
   public clearLocalBindings(): void {
     this.localBindings.clear();
+    this.bindingOriginals.clear();
   }
 
 
