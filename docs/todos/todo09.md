@@ -64,7 +64,7 @@ emission, pruned at the end). No reflector change.
         PHANTOM dependencies (imported but undeclared — found 4 on conducks: chalk, @jest/globals,
         web-tree-sitter, minimatch). `--deps-only` filters to third-party.
       - [x] Version surface — done via the command's live package.json join (dep + dev + peer).
-      - [ ] Vuln surface — BLOCKED offline: needs an advisory DB / `npm audit` (network). Deferred
+      - [>] Vuln surface — blocked offline: needs an advisory database (`npm audit` / GitHub advisories), unreachable from this environment. Marker corrected 2026-08-01: the text has said "BLOCKED / Deferred" since it was written while the checkbox said OPEN, so the board counted it as workable and it was picked up and put down repeatedly. A deferral that does not carry the deferred marker is invisible as a deferral
         until conducks has a sanctioned data source; the boundary node + version are ready to carry it.
       - [x] WORKSPACE_LEDGER — DONE (conducks ledger; see item below).
 - [>] **Edge resolution for dynamic/interface/entry-point dispatch** — PARTIAL (2026-07-19).

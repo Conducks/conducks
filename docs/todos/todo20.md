@@ -61,6 +61,6 @@ confidently wrong answers to every question with no warning.
 - Depends: todo20#P3
 - [ ] `conducks drift` reports a real change between two layers — it currently CANNOT, because `DriftEngine.compare()` self-joins `nodes` on `pulseId != pulseId` and the table holds one row per id
 - [ ] `conducks audit --history` likewise: `LAG() OVER (PARTITION BY n.id)` is always NULL for the same reason
-- [ ] `AuditResult.status` returns `INSUFFICIENT_DATA` when it means it — the branch handling it in `audit.ts:30` is currently dead code
+- [x] ALREADY DONE — a stale duplicate of `todo22#P3`, which closed it on 2026-07-31 under ADR 0073 while this copy sat open. `audit-service.ts:68` returns `INSUFFICIENT_DATA` when the archeological query compares zero rows, `audit.ts:30`'s branch is live, and `audit-status.test.ts` pins it in 3 cases. It did NOT need layers: the query returns zero rows on every run today because of single-row-per-id storage, so the branch was reachable the whole time. Original: `AuditResult.status` returns `INSUFFICIENT_DATA` when it means it — the branch handling it in `audit.ts:30` is currently dead code
 - [ ] Three-way semantic merge impact: merge-base, mine, theirs — whose change to a function collides with whose change to its callers
 - [ ] Test: two layers with a genuinely different symbol produce a non-empty drift, asserted on a count that is zero today
