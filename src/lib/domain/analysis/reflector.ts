@@ -17,6 +17,46 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 
 import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js";
+import { getProjectRelativePath } from "../../core/utils/path-utils.js";
+
+/**
+ * A `fingerprint` is a symbol's STRUCTURAL identity, so the only path term it may carry is the one
+ * that describes where the symbol sits IN THE PROJECT — never where the project sits on this disk.
+ *
+ * All four fingerprint sites in this file used to hash the ABSOLUTE `file.path`. Measured on two
+ * real layers of this repo's own vault: `fingerprint` differed on 82.8% of rows across UNCHANGED
+ * files while `dna`, its only content input, was identical on 3,613 of 3,613 — the churn was
+ * entirely the path term. Two things broke because of it:
+ *
+ *  1. A vault was not portable. Clone or move the checkout and every symbol read as new.
+ *  2. Rename/move detection cannot fire. `drift-engine.ts:69` joins
+ *     `c.fingerprint = p.fingerprint AND c.nodeId != p.nodeId` — literally "same structure, moved" —
+ *     and a move changes the path, hence the fingerprint, so the join matches nothing.
+ *
+ * **This change fixes (1) and NOT (2).** Measured, so it is not left as an assumption: portability
+ * is now 4,559 of 4,559 symbols identical across two different absolute roots, but 0 of 19 symbols
+ * keep their fingerprint when a file moves directory INSIDE one root — a relative path still
+ * changes on a move. `conducks drift` still reports "Renamed/Moved: 0".
+ *
+ * And the obvious repair is measurably wrong: dropping the path term to leave `name|dna` puts
+ * 2,533 of 4,559 symbols (55.6%) into a colliding bucket — 536 buckets, worst 79-way (`id` x79,
+ * `constructor` x47). Fed to that join, rename detection would be almost entirely noise. A move key
+ * therefore needs its OWN column with more entropy than name+dna, beside `fingerprint` rather than
+ * instead of it. Carried as a spec, not built here.
+ *
+ * The root is NOT lower-cased before `path.relative` runs: on a case-sensitive filesystem
+ * `relative('/users/x/repo', '/Users/X/repo/src/a.ts')` walks out of the tree and back in, which
+ * would put the absolute path straight back into the hash. Lower-case the RESULT instead.
+ *
+ * When there is no project dir (no git, no anchor) this returns the absolute path — the pre-existing
+ * behaviour — rather than resolving against `cwd`, because a fingerprint that silently changes with
+ * the working directory is worse than one that is honestly machine-local.
+ */
+function structuralPath(filePath: string): string {
+  const root = chronicle.getProjectDir();
+  if (!root) return filePath;
+  return getProjectRelativePath(filePath, root).toLowerCase();
+}
 
 /**
  * Conducks — Structural Reflector
@@ -370,7 +410,7 @@ export class ConducksReflector {
               returns: 'void'
             };
 
-            const fingerprint = crypto.createHash('sha256').update(`${file.path}|${name}|${JSON.stringify(dna)}`).digest('hex');
+            const fingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${name}|${JSON.stringify(dna)}`).digest('hex');
 
             nodeCache.set(scopedId, {
               name,
@@ -669,7 +709,7 @@ export class ConducksReflector {
       const meta = (vn.metadata ?? (vn.metadata = {})) as Record<string, any>;
       if (!meta.fingerprint) {
         meta.fingerprint = crypto.createHash('sha256')
-          .update(`${file.path}|${vn.name}|${JSON.stringify(meta)}`)
+          .update(`${structuralPath(file.path)}|${vn.name}|${JSON.stringify(meta)}`)
           .digest('hex');
       }
       if (!meta.layer_path) {
@@ -922,7 +962,7 @@ export class ConducksReflector {
         // (todo26 Phase 1). `dna` here is a best-effort DNA: Gnosis has no modifier captures, so
         // only `isExported` (readable straight off the line) is known; the rest default false.
         const gnosisDna = { isAsync: false, isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: 'void' };
-        const gnosisFingerprint = crypto.createHash('sha256').update(`${file.path}|${name}|${JSON.stringify(gnosisDna)}`).digest('hex');
+        const gnosisFingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${name}|${JSON.stringify(gnosisDna)}`).digest('hex');
 
         spectrum.nodes.push({
           name,
@@ -948,7 +988,7 @@ export class ConducksReflector {
 
         // See the class branch above — same gap, same fix.
         const gnosisFuncDna = { isAsync: line.includes('async'), isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: 'void' };
-        const gnosisFuncFingerprint = crypto.createHash('sha256').update(`${file.path}|${displayName}|${JSON.stringify(gnosisFuncDna)}`).digest('hex');
+        const gnosisFuncFingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${displayName}|${JSON.stringify(gnosisFuncDna)}`).digest('hex');
 
         spectrum.nodes.push({
           name: displayName,
