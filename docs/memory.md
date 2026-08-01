@@ -1182,7 +1182,8 @@ by construction.
 ## `dna.returns` was the literal `'void'` for every function — and `params` still is
 - Gotcha: `reflector.ts` hardcoded `returns: 'void'` in the dna it builds, for every function in every language. 4,267 nodes on the mentorseed vault all claimed void, none of it measured, and `query-service.ts:215` exposes the field to users as though it were read from the source. FIXED 2026-08-01 for TypeScript and TSX (ADR 0084): the declared type is captured, and an undeclared one is `null` rather than `'void'`
 - Why it matters beyond the field: the wrong value AGREED with the wrong conclusion. `todo29` recorded factory-typed calls as needing a type checker, and the one place in the graph that would have contradicted it — the callee's declared return type — said `void`. A fabricated value does not merely lack information; it actively confirms whatever you already believed
-- Applies: `params: []` in the same object is the SAME defect and is NOT fixed. No function in the graph records its parameters. Nothing reads it today, which is the only reason it is not causing a wrong answer right now
+- FIXED for `params` too, later the same day (ADR 0086): name, declared type and optionality are read from the grammar's `pattern` field, including arrow functions assigned to a const. An empty array now MEANS "takes nothing" — 448/563 methods and 337/527 functions on mentorseed carry parameters, the rest are genuinely zero-argument
+- Applies: the two `gnosis` REGEX-FALLBACK branches still write `params: []` and `returns: 'void'`. That path has no AST, so nothing can be read — but the values are the same lie in a smaller place and should be null
 - Applies: JavaScript has no annotations and the other ten languages have no `@return_type` capture, so they record `null` — honest, where `'void'` was not
 
 ## A parameter that is declared and never used is a lie the compiler cannot catch

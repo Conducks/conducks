@@ -172,3 +172,68 @@ describe('getNeighbors filters by edge type', () => {
     expect(types.has('MEMBER_OF')).toBe(true);
   });
 });
+
+/**
+ * The uniqueness gate. Every lookup these rules make resolves through the units a file imports, and
+ * two of those can export the SAME NAME — picking the first is the coincidence-binding ADR 0070
+ * refuses. Costs nothing on the measured subject (77 dangling either way, 100% verified), so it is a
+ * guard for the next codebase rather than a fix for this one; an unexercised guard is an unverified
+ * one, which is what these tests are for.
+ *
+ * The class has to live OUTSIDE the declaring file for the gate to matter: a same-file declaration is
+ * unambiguous by definition and is looked up directly, before any import scope is consulted. The
+ * first version of this test put the rival behind a file that declared the class itself, so the
+ * direct hit won and the refusal never ran — the test failed and the code was right.
+ */
+describe('an ambiguous name is refused, not guessed', () => {
+  const TYPES_A = `${ROOT}/core/database/types-a.ts`;
+  const TYPES_B = `${ROOT}/core/database/types-b.ts`;
+
+  /** `manager.ts` holds the factory and the variable; the CLASS lives elsewhere and is imported. */
+  const buildSplit = (rival: boolean) => {
+    const graph = new ConducksAdjacencyList();
+
+    addUnit(graph, MGR, [
+      { id: 'coredatabasemanager.getinstance', name: 'getInstance', declaredReturn: 'CoreDatabaseManager' },
+      { id: 'coredb', name: 'coreDb', instanceOfCall: 'coredatabasemanager.getinstance' },
+    ]);
+    addUnit(graph, TYPES_A, [
+      { id: 'coredatabasemanager', name: 'CoreDatabaseManager' },
+      { id: 'coredatabasemanager.query', name: 'query' },
+    ]);
+    edge(graph, 'IMPORTS', `${MGR}::unit`, `${TYPES_A}::unit`);
+
+    if (rival) {
+      addUnit(graph, TYPES_B, [
+        { id: 'coredatabasemanager', name: 'CoreDatabaseManager' },
+        { id: 'coredatabasemanager.query', name: 'query' },
+      ]);
+      edge(graph, 'IMPORTS', `${MGR}::unit`, `${TYPES_B}::unit`);
+    }
+
+    addUnit(graph, BARREL, [{ id: 'db', name: 'db' }]);
+    edge(graph, 'ALIASES', `${BARREL}::db`, `${MGR}::coredb`);
+    addUnit(graph, APP, [{ id: 'handler', name: 'handler' }]);
+    edge(graph, 'IMPORTS', `${APP}::unit`, `${BARREL}::unit`);
+
+    graph.addEdge({
+      id: 'CALLS::handler->db.query',
+      sourceId: `${APP}::handler`, targetId: `${BARREL}::db.query`,
+      type: 'CALLS', confidence: 0.4, properties: {},
+    });
+    return graph;
+  };
+
+  /** One declaration, imported: resolves. This is the control — without it the refusal proves nothing. */
+  it('resolves when exactly one imported unit declares the class', () => {
+    const graph = buildSplit(false);
+    new IntraLinker().resolve(graph);
+    expect(targetOf(graph)).toBe(`${TYPES_A}::coredatabasemanager.query`);
+  });
+
+  it('refuses when two imported units declare the same class name', () => {
+    const graph = buildSplit(true);
+    new IntraLinker().resolve(graph);
+    expect(targetOf(graph)).toBe(UNRESOLVED);
+  });
+});

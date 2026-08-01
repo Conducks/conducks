@@ -169,3 +169,76 @@ describe('one name, two declarations', () => {
       .toEqual([undefined]);
   });
 });
+
+/**
+ * `dna.params` — the second fabricated field (ADR 0086). It was the literal `[]` for every function
+ * in the graph, while `taxonomy.ts` documents parameters as living exactly there: parameters are
+ * deliberately not emitted as nodes BECAUSE they are captured on their parent. So the empty array
+ * read as "this function takes none" rather than as "nobody looked".
+ */
+describe('a function records the parameters it declares', () => {
+  const reflector = new ConducksReflector();
+  const provider = new TypeScriptProvider();
+
+  const paramsOf = async (source: string, name: string) => {
+    const context = new AnalyzeContext();
+    const file = { path: '/repo/a.ts', source };
+    const spectrum: any = await reflector.reflect(file, provider as any, context, [file.path]);
+    return spectrum.nodes.find((n: any) => String(n.name).toLowerCase() === name)?.dna?.params;
+  };
+
+  beforeAll(async () => {
+    await grammars.loadLanguage('typescript');
+  });
+
+  it('records name and declared type in order', async () => {
+    expect(await paramsOf('export function f(a: string, b: Foo) {}', 'f')).toEqual([
+      { name: 'a', type: 'string', optional: false },
+      { name: 'b', type: 'Foo', optional: false },
+    ]);
+  });
+
+  it('records null for a parameter with no declared type', async () => {
+    expect(await paramsOf('function f(b = 2) {}', 'f')).toEqual([{ name: 'b', type: null, optional: false }]);
+  });
+
+  it('marks an optional parameter', async () => {
+    expect(await paramsOf('function f(c?: Foo) {}', 'f')).toEqual([{ name: 'c', type: 'Foo', optional: true }]);
+  });
+
+  /** A rest element keeps its `...` — the name alone would claim a single value. */
+  it('keeps the rest marker', async () => {
+    expect(await paramsOf('function f(...rest: number[]) {}', 'f'))
+      .toEqual([{ name: '...rest', type: 'number[]', optional: false }]);
+  });
+
+  /**
+   * A destructured parameter binds several names and has no single one, so the literal pattern is
+   * the honest answer. Inventing a name for it, or dropping it, would both misstate the arity.
+   */
+  it('keeps a destructured parameter as its pattern', async () => {
+    expect(await paramsOf('function f({ y, z }: Bar) {}', 'f'))
+      .toEqual([{ name: '{ y, z }', type: 'Bar', optional: false }]);
+  });
+
+  /** Now MEANINGFUL: an empty array is a measured "takes nothing", not "nobody looked". */
+  it('records an empty list for a function that genuinely takes none', async () => {
+    expect(await paramsOf('function none() {}', 'none')).toEqual([]);
+  });
+
+  /** An arrow function assigned to a const is a function too — 101 of them on the measured subject. */
+  it('records an arrow function parameters and return type', async () => {
+    expect(await paramsOf('const f = (a: string, b?: Foo): Bar => 1;', 'f')).toEqual([
+      { name: 'a', type: 'string', optional: false },
+      { name: 'b', type: 'Foo', optional: true },
+    ]);
+  });
+
+  it('leaves a plain variable untouched by the arrow pattern', async () => {
+    expect(await paramsOf('const plain = 42;', 'plain')).toEqual([]);
+  });
+
+  it('records a method parameters the same way', async () => {
+    expect(await paramsOf('class C { m(x: Foo) {} }', 'm')).toEqual([{ name: 'x', type: 'Foo', optional: false }]);
+  });
+});

@@ -294,7 +294,7 @@ export class IntraLinker {
             // the calling file usually imports the instance and never the class.
             const typeId =
               unitSymbols.get(`${declFile}::unit`)?.get(typeName) ??
-              this.resolveSymbol(typeName, `${declFile}::unit`, unitImports, unitSymbols);
+              this.resolveSymbolUnique(typeName, `${declFile}::unit`, unitImports, unitSymbols);
             const candidate = typeId ? this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols) : null;
             if (candidate) {
               graph.rebindEdgeTarget(edge, candidate);
@@ -473,13 +473,18 @@ export class IntraLinker {
 
       const sep = current.lastIndexOf('::');
       const name = current.slice(sep + 2);
+      // UNIQUE resolution, not first-match-wins: two files behind one barrel can export the same
+      // name, and picking the first is the coincidence-binding ADR 0070 refuses. Every lookup the
+      // typed-receiver rules make is gated this way — the cost of refusing is a dangling edge, the
+      // cost of guessing is a wrong one, and only the second is invisible (ADR 0085).
+      //
       // An ALIASES edge is the direct answer. Where there is none, the node may be one ADR 0071
       // MINTED at a barrel for a name the barrel republishes — a real node with the right name and
       // nothing behind it. Resolve that name through the barrel's OWN imports, which is what the
       // IMPORTS rule above already does for these same nodes.
       const next =
         graph.getNeighbors(current, 'downstream', 'ALIASES' as EdgeType)[0]?.targetId ??
-        this.resolveSymbol(name, `${current.slice(0, sep)}::unit`, unitImports, unitSymbols);
+        this.resolveSymbolUnique(name, `${current.slice(0, sep)}::unit`, unitImports, unitSymbols);
 
       if (!next || seen.has(next) || !graph.hasNode(next)) return current;
       seen.add(next);
@@ -525,7 +530,7 @@ export class IntraLinker {
       // for the same type and the same member, which reads as a flaky rule rather than a wrong one.
       const parentId: string | null = graph.hasNode(raw)
         ? raw
-        : this.resolveSymbol(raw, `${currentId.slice(0, currentId.lastIndexOf('::'))}::unit`, unitImports, unitSymbols);
+        : this.resolveSymbolUnique(raw, `${currentId.slice(0, currentId.lastIndexOf('::'))}::unit`, unitImports, unitSymbols);
       if (!parentId || !graph.hasNode(parentId)) return null;
       currentId = parentId;
       currentName = parentId.slice(parentId.lastIndexOf('::') + 2);
@@ -556,7 +561,7 @@ export class IntraLinker {
     const calleeId = graph.hasNode(sameFile)
       ? sameFile
       : unitSymbols.get(`${callerFile}::unit`)?.get(callTarget)
-        ?? this.resolveSymbol(callTarget, `${callerFile}::unit`, unitImports, unitSymbols);
+        ?? this.resolveSymbolUnique(callTarget, `${callerFile}::unit`, unitImports, unitSymbols);
     if (!calleeId) return undefined;
 
     const calleeProps = graph.getNode(calleeId)?.properties as any;

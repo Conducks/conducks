@@ -87,6 +87,33 @@ const scopedVarKey = (scope: string | null | undefined, name: string): string =>
   `${scope ? `${scope.toLowerCase()}.` : ''}${name.trim().toLowerCase()}`;
 
 /**
+ * The parameters a function/method declares: name, declared type, and whether it is optional.
+ *
+ * `dna.params` was the literal `[]` for every function in the graph — the same fabrication as the
+ * old `returns: 'void'`, and `taxonomy.ts` DOCUMENTS parameters as living here, so the empty array
+ * read as "this function takes none" rather than as "nobody looked" (ADR 0086).
+ *
+ * The grammar's `pattern` field carries the name and survives every shape a parameter can take:
+ * a rest element keeps its `...`, and a destructured parameter keeps its literal pattern
+ * (`{ y, z }`), which is the honest answer — it binds several names and has no single one.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function paramsOf(match: any): Array<{ name: string; type: string | null; optional: boolean }> {
+  const node = match.captures?.find((c: any) => c.name === 'params')?.node;
+  if (!node) return [];
+  const out: Array<{ name: string; type: string | null; optional: boolean }> = [];
+  for (let i = 0; i < node.namedChildCount; i++) {
+    const child = node.namedChild(i);
+    if (!child) continue;
+    const name = child.childForFieldName('pattern')?.text ?? child.text;
+    if (!name) continue;
+    const declared = child.childForFieldName('type')?.text?.replace(/^\s*:\s*/, '').trim();
+    out.push({ name, type: declared && declared.length > 0 ? declared : null, optional: child.type === 'optional_parameter' });
+  }
+  return out;
+}
+
+/**
  * The declared return type of a function/method match, or null when none is written.
  *
  * The capture holds the whole annotation (`": CoreDatabaseManager"`), because the grammar's
@@ -434,7 +461,7 @@ export class ConducksReflector {
               isAbstract: match.captures.some((c: any) => c.name === CaptureTags.IS_ABSTRACT),
               isExported: match.captures.some((c: any) => c.name === CaptureTags.IS_EXPORTED),
               isStatic: match.captures.some((c: any) => c.name === CaptureTags.IS_STATIC),
-              params: [],
+              params: paramsOf(match),
               // The DECLARED return type, or null when the source does not state one.
               //
               // This was the literal `'void'` for every function in every language — 4,267 nodes on

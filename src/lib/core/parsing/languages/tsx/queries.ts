@@ -30,7 +30,11 @@ export const TSX_QUERIES = `
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
   (public_field_definition name: (property_identifier) @name) @isProperty
-  (variable_declarator name: (identifier) @name) @isVariable
+  ;; The optional value pattern carries an ARROW FUNCTION's signature without a second pattern —
+  ;; a second one would match the same declarator and race the first to create the node. A plain
+  ;; variable simply captures neither, so nothing else changes.
+  (variable_declarator name: (identifier) @name
+    value: (arrow_function parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type)?) @isVariable
 
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (type_identifier) @name) @isStruct
@@ -41,8 +45,8 @@ export const TSX_QUERIES = `
   (type_alias_declaration name: (type_identifier) @name) @isInterface
   (enum_declaration name: (identifier) @name) @isEnum
 
-  (function_declaration name: (identifier) @name return_type: (type_annotation)? @return_type) @isFunction
-  (method_definition name: (_) @name return_type: (type_annotation)? @return_type) @isMethod
+  (function_declaration name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isFunction
+  (method_definition name: (_) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isMethod
 
   ;; Heritage: extends / implements (EXTENDS + IMPLEMENTS edges)
   ;; Identical grammar family to typescript (tree-sitter-typescript 0.23.2 exposes tsx as a second
@@ -147,11 +151,11 @@ export const TSX_QUERIES = `
     arguments: (arguments (_)* @kinesis_arg))
 
   ;; --- Modifiers (DNA flags) ---
-  (export_statement (function_declaration name: (identifier) @name return_type: (type_annotation)? @return_type) @isExported) @isFunction
+  (export_statement (function_declaration name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isExported) @isFunction
   (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement (abstract_class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
-  (function_declaration "async" name: (identifier) @name return_type: (type_annotation)? @return_type) @isAsync @isFunction
+  (function_declaration "async" name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isAsync @isFunction
   (abstract_method_signature name: (_) @name) @isAbstract @isMethod
 
   ;; --- Metadata & Debt ---

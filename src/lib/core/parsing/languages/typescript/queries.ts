@@ -67,7 +67,11 @@ export const TYPESCRIPT_QUERIES = `
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
   (public_field_definition name: (property_identifier) @name) @isProperty
-  (variable_declarator name: (identifier) @name) @isVariable
+  ;; The optional value pattern carries an ARROW FUNCTION's signature without a second pattern —
+  ;; a second one would match the same declarator and race the first to create the node. A plain
+  ;; variable simply captures neither, so nothing else changes.
+  (variable_declarator name: (identifier) @name
+    value: (arrow_function parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type)?) @isVariable
   
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (type_identifier) @name) @isStruct
@@ -79,8 +83,8 @@ export const TYPESCRIPT_QUERIES = `
   (type_alias_declaration name: (type_identifier) @name) @isInterface
   (enum_declaration name: (identifier) @name) @isEnum
   
-  (function_declaration name: (identifier) @name return_type: (type_annotation)? @return_type) @isFunction
-  (method_definition name: (_) @name return_type: (type_annotation)? @return_type) @isMethod
+  (function_declaration name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isFunction
+  (method_definition name: (_) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isMethod
   
   ;; Heritage: extends / implements (EXTENDS + IMPLEMENTS edges)
   ;; The subject @name is co-captured in the SAME pattern on purpose — the reflector only processes a
@@ -190,7 +194,7 @@ export const TYPESCRIPT_QUERIES = `
     arguments: (arguments (_)* @kinesis_arg))
   
   ;; --- Modifiers (DNA flags) ---
-  (export_statement (function_declaration name: (identifier) @name return_type: (type_annotation)? @return_type) @isExported) @isFunction
+  (export_statement (function_declaration name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isExported) @isFunction
   (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement (abstract_class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
@@ -200,7 +204,7 @@ export const TYPESCRIPT_QUERIES = `
   ;; sentinel rule reported each one as a violation the moment that rule was made to fire at all.
   (export_statement (interface_declaration name: (type_identifier) @name) @isExported) @isInterface
   (export_statement (type_alias_declaration name: (type_identifier) @name) @isExported) @isInterface
-  (function_declaration "async" name: (identifier) @name return_type: (type_annotation)? @return_type) @isAsync @isFunction
+  (function_declaration "async" name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isAsync @isFunction
   (abstract_method_signature name: (_) @name) @isAbstract @isMethod
 
   ;; --- Metadata & Debt ---
