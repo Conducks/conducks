@@ -136,3 +136,64 @@ describe('a watcher reclaims its own churn when it stops', () => {
     await expect(w.stop()).resolves.toBeUndefined();
   });
 });
+
+/**
+ * The gap the merge closed (ADR 0036, todo21#P3).
+ *
+ * chokidar starts with `ignoreInitial: true`, so before `reconcileOnStart` the watcher saw events
+ * from the moment it started and NOTHING before — every edit made while it was off stayed invisible
+ * until the next full `analyze`. The monitor could already compute that set; the watcher had no way
+ * to ask for it.
+ */
+describe('a watcher catches up on what changed while it was off', () => {
+  /** A real file on disk — the reconcile reads content, so a fake path would prove nothing. */
+  const realFile = (content: string) => {
+    const root = mkRoot();
+    const f = path.join(root, 'sample.ts');
+    fs.writeFileSync(f, content);
+    return f;
+  };
+
+  const mk = (stored: Map<string, string>, pulsed: string[]) => {
+    const root = mkRoot();
+    const w = new ConducksWatcher(root, { getGraph: () => ({}) } as never, {
+      persistence: { getAllFileHashes: async () => stored },
+    } as never);
+    // Record what the reconcile decides to pulse, without running a real micro-pulse.
+    (w as unknown as { handlePulseEvent: unknown }).handlePulseEvent =
+      async (_e: string, f: string) => { pulsed.push(f); };
+    return w;
+  };
+
+  it('pulses a file whose content changed while nothing was watching', async () => {
+    const pulsed: string[] = [];
+    const f = realFile('export const a = 1;');
+    const w = mk(new Map([[f.toLowerCase(), 'a-stale-hash']]), pulsed);
+    const out = await w.reconcileOnStart([f]);
+    expect(out.changed).toBe(1);
+    expect(pulsed).toEqual([f]);
+  });
+
+  it('pulses a file the vault has never seen', async () => {
+    const pulsed: string[] = [];
+    const f = realFile('export const b = 2;');
+    const w = mk(new Map(), pulsed);
+    const out = await w.reconcileOnStart([f]);
+    expect(out.added).toBe(1);
+    expect(pulsed).toEqual([f]);
+  });
+
+  /** A watcher that cannot catch up must still watch — starting blind beats not starting. */
+  it('never throws when the vault cannot answer', async () => {
+    const root = mkRoot();
+    const w = new ConducksWatcher(root, { getGraph: () => ({}) } as never, {
+      persistence: { getAllFileHashes: async () => { throw new Error('vault locked'); } },
+    } as never);
+    await expect(w.reconcileOnStart([realFile('x')])).resolves.toEqual({ changed: 0, added: 0 });
+  });
+
+  it('does nothing without a persistence handle', async () => {
+    const w = new ConducksWatcher(mkRoot(), { getGraph: () => ({}) } as never, {} as never);
+    await expect(w.reconcileOnStart([realFile('y')])).resolves.toEqual({ changed: 0, added: 0 });
+  });
+});

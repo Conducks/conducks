@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
+import { classifyFreshness, isStale } from "@/lib/core/persistence/freshness.js";
 import { buildBoard } from "@/lib/domain/analysis/docs-board.js";
 import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/project-registry.js";
 import { branchMismatch } from "@/lib/core/git/chronicle-interface.js";
@@ -155,38 +156,20 @@ export class ProjectMonitor {
       } catch { /* a vault older than the `branch` column simply has no answer */ }
       base.branch.mismatch = branchMismatch(base.branch.vault, base.branch.checkout) !== null;
 
-      const changedPaths: string[] = [];
-      const seen = new Set<string>();
-
-      for (const abs of onDisk) {
-        const key = abs.toLowerCase();
-        seen.add(key);
-        const previous = stored.get(key);
-        if (previous === undefined) { base.graph.added++; changedPaths.push(abs); continue; }
-        let current: string;
-        try { current = FileHashGate.hash(fs.readFileSync(abs, "utf8")); } catch { continue; }
-        if (current !== previous) { base.graph.changed++; changedPaths.push(abs); }
-      }
-
-      // `removed` means GONE FROM DISK, not "absent from my list". A pulse hashes every file it
-      // analyzed — `package.json`, markdown, config — while this monitor only hashes source
-      // extensions, so set-difference alone reports every one of those as deleted.
-      for (const key of stored.keys()) {
-        if (seen.has(key)) continue;
-        if (!SOURCE_EXTENSIONS.has(path.extname(key))) continue;
-        if (!fs.existsSync(key)) base.graph.removed++;
-      }
-
-      // STALE means the graph holds something WRONG: content that changed under it, or nodes for a file
-      // that is gone. It deliberately excludes `added`.
-      //
-      // `analyze` is incremental by mtime (`domain/analysis/index.ts:87`), so a file whose mtime predates
-      // the last pulse is never in a wave and never gets a hash — on conducks itself that is 46 files,
-      // mostly `scripts/`. Counting those as staleness reported "graph behind" immediately after a
-      // successful full pulse, which reads as a bug and trains the reader to ignore the line. They are a
-      // real coverage gap and are reported as exactly that, separately.
-      base.graph.stale = base.graph.changed + base.graph.removed > 0;
-      base.drift = this.moduleDrift(project.root, changedPaths);
+      // The shared engine (ADR 0036, todo21#P3). This classification used to live inline here and
+      // the watcher had no way to ask for it, which is why a watcher started after edits was blind
+      // to every one of them. Both surfaces now read the same answer.
+      const fresh = classifyFreshness(
+        stored, onDisk, SOURCE_EXTENSIONS,
+        abs => { try { return fs.readFileSync(abs, "utf8"); } catch { return null; } },
+        abs => fs.existsSync(abs),
+        p => path.extname(p),
+      );
+      base.graph.changed = fresh.changed.length;
+      base.graph.added = fresh.added.length;
+      base.graph.removed = fresh.removed.length;
+      base.graph.stale = isStale(fresh);
+      base.drift = this.moduleDrift(project.root, [...fresh.added, ...fresh.changed]);
     } catch (err: any) {
       return { ...base, unavailable: `vault unreadable: ${err?.message ?? err}` };
     } finally {

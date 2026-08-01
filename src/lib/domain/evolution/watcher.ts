@@ -1,3 +1,4 @@
+import { classifyFreshness } from "@/lib/core/persistence/freshness.js";
 import { writeWatcherMarker, clearWatcherMarker, HEARTBEAT_INTERVAL_MS } from "@/lib/domain/evolution/watcher-liveness.js";
 import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
@@ -45,6 +46,12 @@ interface WatcherOptions {
 /**
  * Conducks — Synapse Structural Monitor (Watcher)
  */
+/** Extensions the startup reconcile considers. Mirrors what the pulse actually parses. */
+const WATCHED_EXTENSIONS = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java",
+  ".cs", ".cpp", ".cc", ".c", ".h", ".hpp", ".php", ".rb", ".swift",
+]);
+
 export class ConducksWatcher {
   private watcher: FSWatcher | null = null;
   private linker = new GlobalSymbolLinker();
@@ -174,6 +181,41 @@ export class ConducksWatcher {
   /**
    * Performs an incremental Synapse Pulse for a single file event.
    */
+  /**
+   * Catch up on everything that changed while this watcher was NOT running (ADR 0036, todo21#P3).
+   *
+   * chokidar starts with `ignoreInitial: true`, so without this the watcher sees events from the
+   * moment it starts and NOTHING before — every edit made while it was off stayed invisible until
+   * the next full `analyze`. The monitor could already compute exactly that set and the watcher had
+   * no way to ask for it, which is the duplication ADR 0036 wanted collapsed. Both now read the same
+   * engine.
+   *
+   * Reconciles CHANGED and ADDED, and deliberately not REMOVED: a deletion needs `purgeUnits`, which
+   * the event path already handles, and the next `analyze`'s reconcile scan catches anything missed
+   * while nothing was watching (ADR 0078). Doing it here would duplicate that with no new coverage.
+   *
+   * Never throws. A watcher that cannot catch up must still watch — starting blind is strictly
+   * better than not starting.
+   */
+  public async reconcileOnStart(onDisk: readonly string[]): Promise<{ changed: number; added: number }> {
+    const persistence = this.options.persistence;
+    if (!persistence) return { changed: 0, added: 0 };
+    try {
+      const stored = await persistence.getAllFileHashes();
+      const fresh = classifyFreshness(
+        stored, onDisk, WATCHED_EXTENSIONS,
+        abs => { try { return fs.readFileSync(abs, 'utf8'); } catch { return null; } },
+        abs => fs.existsSync(abs),
+        p => path.extname(p),
+      );
+      const toPulse = [...fresh.added, ...fresh.changed].filter(f => !this.ignoreManager.isIgnored(f));
+      for (const filePath of toPulse) await this.handlePulseEvent('change', filePath);
+      return { changed: fresh.changed.length, added: fresh.added.length };
+    } catch {
+      return { changed: 0, added: 0 };
+    }
+  }
+
   private async handlePulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
     if (!filePath || event === "unlink") {
       // Logic to prune stale synapse nodes would go here

@@ -79,6 +79,18 @@ export class WatchCommand implements ConducksCommand {
     console.log('[Watch] Step 5: calling watcher.start()...');
     watcher.start();
 
+    // Catch up on everything edited while nothing was watching (ADR 0036, todo21#P3).
+    //
+    // chokidar starts with `ignoreInitial: true`, so before this the watcher saw events from the
+    // moment it started and NOTHING before — a session begun after an editing spree was silently
+    // behind until the next full `analyze`. AFTER start(), deliberately: a reconcile that ran first
+    // would leave a window where a file edited during the catch-up produced no event at all.
+    const discovered = await registry.infrastructure.chronicle.discoverFiles();
+    const caught = await watcher.reconcileOnStart(discovered);
+    if (caught.changed + caught.added > 0) {
+      console.log(`[Watch] Caught up on ${caught.changed} changed and ${caught.added} new file(s) from while the watcher was off.`);
+    }
+
     // The docs half of the same heartbeat: a governed doc changing re-lints the tree. Reports only —
     // the exit-code surface stays on `conducks docs-lint` for CI (ADR 0020, todo15).
     const docsWatcher = registry.docs.watcher;
