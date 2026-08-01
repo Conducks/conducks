@@ -1,3 +1,4 @@
+import { grammars } from '@/lib/core/parsing/grammar-registry.js';
 import { ConducksPipeline } from "@/lib/core/parsing/pipeline.js";
 import { GraphSkeletonBuilder } from "@/lib/domain/analysis/graph-skeleton-builder.js";
 import { WorkerPool } from "@/lib/domain/analysis/worker-pool.js";
@@ -68,6 +69,20 @@ export class AnalyzeOrchestrator {
     files: Array<{ path: string, source: string }>, 
     options: { workspaceRoot?: string, projectRoots?: string[] } = {}
   ): Promise<{ pulseId: string, nodeCount: number, edgeCount: number }> {
+    // PREFLIGHT. Native tree-sitter is the only parse path, and it is an OPTIONAL dependency that
+    // compiles from source — on a machine with no C++ toolchain it is simply absent. Since the regex
+    // fallback was removed (ADR 0089), that state would otherwise throw once PER FILE and bury the
+    // one fact that matters in thousands of identical errors. Fail once, and say what to do.
+    if (files.length > 0 && !grammars.isNativeAvailable()) {
+      throw new Error(
+        '[Conducks] native tree-sitter is not available, so no file can be read structurally.\n' +
+        '  It is an optional dependency that compiles from source and needs a C++ toolchain.\n' +
+        '  On Node 23+: CXXFLAGS="-std=c++20" npm install\n' +
+        '  Run `conducks doctor` for the full environment check.\n' +
+        '  Refusing to write a graph rather than writing an empty one that looks real.'
+      );
+    }
+
     traceMemory(`orchestrator entry (${files.length} units)`);
     this.context.reset();
     const context = this.context;
@@ -212,6 +227,18 @@ export class AnalyzeOrchestrator {
         // it and every later statement reports `Current transaction is aborted` — exactly the
         // circuit-breaker mistake removed from the flush above. A silent catch here hid a real
         // constraint violation behind a transaction error for two debugging rounds.
+        // A file that could not be read is REPORTED, never silently skipped (ADR 0089). This loop
+        // used to `continue` past a failure with no count anywhere, which is how a broken grammar or
+        // a malformed query could cost a whole language and still print a healthy-looking pulse.
+        const failures = inductionResults.filter((r: any) => !r.success && !r.skipped);
+        if (failures.length > 0) {
+          logger.error(`🛡️ [Conducks] ${failures.length} file(s) could NOT be read structurally — their symbols and edges are MISSING from this graph:`);
+          for (const f of failures.slice(0, 10)) {
+            logger.error(`   ${(f as any).path}: ${(f as any).error ?? 'no reason recorded'}`);
+          }
+          if (failures.length > 10) logger.error(`   ...and ${failures.length - 10} more`);
+        }
+
         const kineticRows: Array<{ nodeId: string; blame_age_days?: number; churn_count_90d?: number; entropy_score?: number; last_author?: string }> = [];
         for (const res of inductionResults) {
           if (!res.success || !res.spectrum) continue;

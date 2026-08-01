@@ -121,38 +121,9 @@ describe('DriftEngine — a NULL fingerprint is a gap, not a pass', () => {
 
 // ─── Part 2: reflector.ts — real symbols must not be left without a fingerprint ────────────────
 
-describe('ConducksReflector — Gnosis fallback computes fingerprint and layer_path', () => {
-  const SOURCE = [
-    'class Widget:',
-    '    def run(self):',
-    '        pass',
-  ].join('\n');
-
-  it('a Gnosis-parsed class gets a fingerprint and a layer_path', async () => {
-    const reflector = new ConducksReflector();
-    const file = { path: '/repo/widget.py', source: SOURCE };
-    const provider = { langId: 'python' } as any;
-    const context = new AnalyzeContext();
-
-    // reflectGnosis is private; called directly because it is pure regex extraction with no
-    // native tree-sitter dependency, so it needs none of the child-process isolation the native
-    // grammar path requires.
-    const spectrum = (reflector as any).reflectGnosis(file, provider, context);
-
-    const cls = spectrum.nodes.find((n: any) => n.name === 'Widget');
-    expect(cls).toBeDefined();
-    expect(cls.metadata.fingerprint).toBeTruthy();
-    expect(cls.metadata.layer_path).toBeTruthy();
-
-    const method = spectrum.nodes.find((n: any) => n.name === 'Widget.run');
-    expect(method).toBeDefined();
-    expect(method.metadata.fingerprint).toBeTruthy();
-    expect(method.metadata.layer_path).toBeTruthy();
-
-    // Two different declarations must not collide on the same fingerprint.
-    expect(cls.metadata.fingerprint).not.toEqual(method.metadata.fingerprint);
-  });
-});
+// REMOVED with the Gnosis regex fallback (ADR 0089). The native describe below asserts the same
+// two properties — a fingerprint and a layer_path on every emitted node — against the path that is
+// actually taken.
 
 // ─── Part 3: full native pipeline — UNIT.unitId is null, and a route gets a fingerprint ───────
 

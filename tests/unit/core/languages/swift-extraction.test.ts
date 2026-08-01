@@ -12,7 +12,7 @@ import path from 'node:path';
  * Why EVERYTHING runs in a CHILD PROCESS: native tree-sitter can only be driven from the FIRST jest
  * test file that loads it in a worker process. In any later file `tree.rootNode` comes back
  * `undefined`, `Query.matches` throws "Cannot read properties of undefined (reading 'tree')" and the
- * reflector falls back to Gnosis — for reasons that have nothing to do with Swift. Merely importing
+ * reflector produced nothing usable — for reasons that have nothing to do with Swift. Merely importing
  * the grammar registry in-process is enough to poison the NEXT native suite, so this file imports no
  * parsing code at all. Same harness as java-extraction.test.ts. Reproduce the underlying jest problem:
  *   npm test -- --runInBand tests/unit/core/type-only-imports.test.ts <any other native suite>
@@ -144,7 +144,7 @@ func topLevel(a: Int) -> Int {
     expect(result.compileError).toBeNull();
   });
 
-  it('does not degrade to the file-only Gnosis fallback', () => {
+  it('extracts real symbols, not just a file node', () => {
     const named = result.nodes.filter((n) => n.kind !== 'file' && n.kind !== 'unit');
     expect(named.length).toBeGreaterThanOrEqual(12);
   });

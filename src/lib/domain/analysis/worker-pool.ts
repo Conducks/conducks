@@ -181,7 +181,7 @@ export class WorkerPool {
         }
 
         if (!provider) {
-          results.push({ success: false, path: file.path });
+          results.push({ success: false, path: file.path, error: `no language provider for ${ext || 'this file'}` });
           continue;
         }
 
@@ -204,8 +204,7 @@ export class WorkerPool {
         const res = await reflector.reflect(file, provider, context, allPaths);
         results.push({ path: file.path, spectrum: res, state: context.exportState(), success: true });
       } catch (err) {
-        console.error(`🛡️ [MainThread Error] ${file.path}:`, err);
-        results.push({ success: false, path: file.path });
+        results.push({ success: false, path: file.path, error: (err as Error)?.message ?? String(err) });
       }
     }
     return results;

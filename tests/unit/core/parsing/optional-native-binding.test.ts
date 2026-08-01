@@ -6,7 +6,9 @@ import { grammars } from '@/lib/core/parsing/grammar-registry.js';
 /**
  * `tree-sitter` and the 12 grammar packages are OPTIONAL dependencies (ADR 0027). The core package
  * ships no prebuilds, so it compiles from source at install time and is simply absent on a machine
- * with no C++ toolchain — there, every file must fall through to the Gnosis regex extractor.
+ * with no C++ toolchain. Since ADR 0089 removed the regex fallback, that machine gets ONE clear
+ * failure from the orchestrator's preflight — telling it to install a toolchain — instead of a
+ * graph full of edgeless nodes that looks like a real answer.
  *
  * A single static `import Parser from 'tree-sitter'` breaks that: ESM resolves imports before any
  * line of the module runs, so the whole CLI dies at load with ERR_MODULE_NOT_FOUND instead of

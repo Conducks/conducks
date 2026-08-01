@@ -5,14 +5,14 @@ import path from 'node:path';
 /**
  * todo13 — the Java query used to fail tree-sitter compilation (TSQueryErrorStructure at offset 921:
  * in grammar 0.23 the `superclass:` field holds a (superclass) wrapper, not a bare type_identifier).
- * One bad pattern fails the WHOLE query, so every .java file silently collapsed to the Gnosis
+ * One bad pattern fails the WHOLE query, so every .java file silently collapsed to a file node and nothing else — the
  * file-only fallback. These tests make the next grammar bump fail LOUDLY instead of degrading.
  *
  * Why EVERYTHING runs in a CHILD PROCESS: native tree-sitter can only be driven from the FIRST jest
  * test file that loads it in a worker process. In any later file `tree.rootNode` comes back
  * `undefined` (the getter on the shared native Tree prototype stays bound to the first wrapper
  * instance), `Query.matches` throws "Cannot read properties of undefined (reading 'tree')" and the
- * reflector falls back to Gnosis — for reasons that have nothing to do with Java. Merely importing
+ * reflector produced nothing usable — for reasons that have nothing to do with Java. Merely importing
  * the grammar registry in-process is enough to poison the NEXT native suite, so this file imports
  * no parsing code at all. Reproduce the underlying jest problem with:
  *   npm test -- --runInBand tests/unit/core/type-only-imports.test.ts <any other native suite>
@@ -111,7 +111,7 @@ enum Mode {
     expect(result.compileError).toBeNull();
   });
 
-  it('does not degrade to the file-only Gnosis fallback', () => {
+  it('extracts real symbols, not just a file node', () => {
     const named = result.nodes.filter((n) => n.kind !== 'file' && n.kind !== 'unit');
     expect(named.length).toBeGreaterThanOrEqual(9);
   });

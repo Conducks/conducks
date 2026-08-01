@@ -16,7 +16,7 @@ import path from 'node:path';
  *     (class_declaration) — miss it and every abstract base loses its heritage;
  *   - tree-sitter-javascript has NO (extends_clause) and NO (property_signature) /
  *     (public_field_definition). Those TS-only node types made the WHOLE JavaScript query fail to
- *     compile, which silently dropped every .js file to the Gnosis file-only fallback.
+ *     compile, which silently produced a file node and nothing else for every .js file.
  *
  * Why EVERYTHING runs in a CHILD PROCESS: see tests/unit/core/languages/java-extraction.test.ts —
  * native tree-sitter can only be driven from the first jest test file that loads it in a worker, so
@@ -127,7 +127,7 @@ describe.each(['typescript', 'tsx', 'javascript'])('%s heritage', (lang) => {
     expect(results[lang].compileError).toBeNull();
   });
 
-  it('does not degrade to the file-only Gnosis fallback', () => {
+  it('extracts real symbols, not just a file node', () => {
     // The fallback emits a single uppercase-kind FILE node and nothing else.
     const named = results[lang].nodes.filter((n) => n.kind !== 'file' && n.kind !== 'unit');
     expect(named.length).toBeGreaterThanOrEqual(4);

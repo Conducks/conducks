@@ -8,7 +8,7 @@ import { grammars } from '@/lib/core/parsing/grammar-registry.js';
 /**
  * todo13 — the PHP query used to fail tree-sitter compilation (TSQueryErrorNodeType at offset 199)
  * because tree-sitter-php 0.24 deleted `namespace_aliasing_clause`, so every .php file silently
- * dropped to the Gnosis file-only fallback. These tests fail LOUDLY on the next grammar bump: one
+ * produced a file node and nothing else. These tests fail LOUDLY on the next grammar bump: one
  * compiles the whole query, the rest prove real symbols come out of a real pulse.
  */
 describe('PHP extraction', () => {
@@ -66,7 +66,7 @@ function helperFn(int $n): int {
     expect(() => grammars.createQuery(lang, PHP_QUERIES)).not.toThrow();
   });
 
-  it('does not degrade to the file-only Gnosis fallback', () => {
+  it('extracts real symbols, not just a file node', () => {
     const named = spectrum.nodes.filter((n: any) => n.kind !== 'file' && n.kind !== 'unit');
     expect(named.length).toBeGreaterThanOrEqual(8);
   });

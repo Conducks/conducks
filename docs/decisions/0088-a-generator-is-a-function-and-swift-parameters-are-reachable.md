@@ -62,7 +62,9 @@ Generators get their own pattern in all three JS-family files. The regex fallbac
 - Four mutations, each caught: removing the generator pattern, removing `@params_inline`, removing
   the inline type filter, and removing the Swift alias guard.
 - **The backtick trap fired for the FIFTH time** while writing the generator comment, in all three
-  files at once. `tsc` caught it; the guard test did not, because it reads the file only after the
-  parse succeeds. That guard is weaker than it looks and is recorded as such.
+  files at once. This record first said the guard test failed to catch it. **That was wrong** — the
+  guard catches it and names the file and line; it was never RUN, because `tsc` runs first and dies
+  first. The defect was ORDER, not detection, and it is fixed in ADR 0089 by checking before the
+  compiler rather than after it.
 - A single unparenthesised arrow parameter (`const f = a => a`) still cannot be captured — the
   grammar emits no parameter node at all for that shape, in either JavaScript or TypeScript.

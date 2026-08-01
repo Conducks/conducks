@@ -203,6 +203,29 @@ function returnTypeOf(match: any): string | null {
   return text.length > 0 ? text : null;
 }
 
+/**
+ * A file that could NOT be read structurally. Thrown, never swallowed.
+ *
+ * Every one of these used to fall back to a regex extractor that produced nodes and almost no edges.
+ * That is the worst possible failure mode: the graph stays populated, so nothing looks broken, and
+ * the file's symbols simply appear to have no relationships — indistinguishable from code that
+ * genuinely has none. A malformed query in THIS repository degraded to regex per file and reported
+ * success (ADR 0089).
+ *
+ * The callers already record a failed file rather than aborting the pulse, so one unreadable file
+ * costs that file and is counted, instead of costing the truth about every file like it.
+ */
+export class ParseFailure extends Error {
+  constructor(
+    public readonly filePath: string,
+    public readonly langId: string,
+    public readonly reason: string,
+  ) {
+    super(`[Conducks] cannot read ${filePath} as ${langId}: ${reason}`);
+    this.name = 'ParseFailure';
+  }
+}
+
 export class ConducksReflector {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
@@ -301,7 +324,7 @@ export class ConducksReflector {
     const parser = grammars.getUnifiedParser(provider.langId);
 
     if (!parser) {
-      return this.reflectGnosis(file, provider, context);
+      throw new ParseFailure(file.path, provider.langId, 'no parser is registered for this language');
     }
 
     const lang = grammars.getLanguage(provider.langId);
@@ -317,35 +340,27 @@ export class ConducksReflector {
       const bufferSize = byteLen > 31 * 1024 ? byteLen * 2 + 1024 : undefined;
       tree = bufferSize ? parser.parse(file.source, undefined, { bufferSize }) : parser.parse(file.source);
     } catch (err) {
-      if (process.env.CONDUCKS_DEBUG === '1') {
-        console.error(`🛡️ [Conducks Reflector] Native Parse Crash: ${file.path}. Falling back to Gnosis.`, err);
-      }
-      return this.reflectGnosis(file, provider, context);
+      throw new ParseFailure(file.path, provider.langId, `the grammar could not parse this file: ${String((err as Error)?.message ?? err)}`);
     }
 
     let query: any;
     try {
       const lang = grammars.getLanguage(provider.langId);
-      if (!lang) return this.reflectGnosis(file, provider, context);
+      if (!lang) throw new ParseFailure(file.path, provider.langId, 'the grammar is not loaded');
       query = grammars.createQuery(lang, provider.queryScm);
-
     } catch (err) {
-      if (process.env.CONDUCKS_DEBUG === '1') {
-        console.error(`🛡️ [Conducks Reflector] Native Query Creation Failure: ${file.path}. Falling back to Gnosis.`, err);
-      }
-      return this.reflectGnosis(file, provider, context);
+      // A MALFORMED QUERY, which is a defect in this repository rather than in the file being read.
+      // It used to degrade to regex per file, so a broken query looked like sparse code.
+      throw new ParseFailure(file.path, provider.langId, `the language query is invalid: ${String((err as Error)?.message ?? err)}`);
     }
-    
-    if (!query) return this.reflectGnosis(file, provider, context);
+
+    if (!query) throw new ParseFailure(file.path, provider.langId, 'the language query compiled to nothing');
 
     let matches = [];
     try {
       matches = query.matches(tree.rootNode);
     } catch (err) {
-      if (process.env.CONDUCKS_DEBUG === '1') {
-        console.error(`🛡️ [Conducks Reflector] Native Query Crash: ${file.path}. Falling back to Gnosis.`, err);
-      }
-      return this.reflectGnosis(file, provider, context);
+      throw new ParseFailure(file.path, provider.langId, `the query crashed against this file's tree: ${String((err as Error)?.message ?? err)}`);
     }
     if (process.env.CONDUCKS_DEBUG === '1') {
       console.log(`🛡️ [Reflector] ${path.basename(file.path)} matches: ${matches.length}`);
@@ -512,8 +527,9 @@ export class ConducksReflector {
             // NOTE: a name-suffix infra override used to sit here — deleted 2026-07-25 as provably
             // dead: a node-creating match always carries a definition capture, whose kind assignment
             // (the DEFINITION_CAPTURES-gated branch below) overwrites initialKind unconditionally.
-            // The LIVE suffix heuristic is the one in the Gnosis regex fallback (~:770), which has
-            // no captures to defer to.
+            // NOTE: this used to point at a twin heuristic in the Gnosis regex fallback. That
+            // fallback is gone (ADR 0089) — a file that cannot be parsed now fails and is reported
+            // instead of degrading to regex — so this branch is the only one of its kind left.
             // IS_INFRA included so multi-line infra (decorators, providers) get a real span.
             // Note: single-line @isInfra hook patterns (useState/useEffect array_pattern) still
             // collapse to ~1 line — resolving those needs a variable_declarator walk (deferred, low value).
@@ -1119,157 +1135,5 @@ export class ConducksReflector {
     }
   }
 
-  /**
-   * Conducks — Gnosis Dynamic Fallback extractor (Regex-based). 🧬
-   *
-   * Activated when native bindings fail or are unavailable for a specific language.
-   */
-  private reflectGnosis(file: { path: string, source: string }, provider: ConducksProvider, context: AnalyzeContext): PrismSpectrum {
-    const projectRoot = chronicle.getProjectDir()?.toLowerCase() || '';
-    const fileId = `${file.path.toLowerCase()}::unit`;
-    const relativePath = path.relative(projectRoot, file.path).toLowerCase();
-    const rootName = path.basename(projectRoot).toLowerCase();
-
-    const spectrum: PrismSpectrum = {
-      nodes: [{
-        name: path.basename(file.path),
-        kind: 'FILE' as any,
-        canonicalKind: 'STRUCTURE',
-        canonicalRank: 1,
-        metadata: {
-          id: fileId,
-          filePath: file.path,
-          namespaceId: path.dirname(relativePath),
-          rootId: `repository::${rootName}`,
-          layer_path: relativePath,
-          depth: 3
-        },
-        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } },
-        filePath: file.path,
-        isExport: true
-      }],
-      relationships: [],
-      metadata: { language: provider.langId }
-    };
-
-    if (provider.langId !== 'python' && provider.langId !== 'typescript' && provider.langId !== 'javascript') {
-      if (process.env.CONDUCKS_DEBUG === '1') {
-        console.error(`[Conducks Reflector] Gnosis fallback has no regex support for ${provider.langId}. Only file node captured for: ${file.path}`);
-      }
-      return spectrum;
-    }
-
-    const lines = file.source.split('\n');
-    const classMeta = mapToCanonical('class');
-    const funcMeta = mapToCanonical('function');
-
-    let currentClassName: string | undefined;
-    let currentClassId: string | undefined;
-    let classIndentation = -1;
-    let currentScopeName: string | undefined;
-
-    if (process.env.CONDUCKS_DEBUG === '1') {
-      console.log(`🛡️ [Gnosis] Fallback Pulsing: ${file.path} (${lines.length} lines)`);
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const classMatch = line.match(/^(\s*)(?:export\s+)?(?:abstract\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
-      const funcMatch = line.match(/^(\s*)(?:export\s+)?(?:async\s+)?(?:def|function)\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
-      const pyImportMatch = line.match(/^(?:from\s+([a-zA-Z0-9_\.]+)\s+)?import\s+([a-zA-Z0-9_,\s]+)/);
-      const tsImportMatch = line.match(/^(?:import|export)\s+.*from\s+['"]([^'"]+)['"]/);
-      const callMatches = [...line.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_\.]*)\s*\(/g)];
-
-      const indent = line.search(/\S/);
-      if (indent === -1) continue;
-
-      if (classMatch) {
-        const name = classMatch[2];
-        const id = `${fileId}::${name}`;
-        const infraSuffixes = ['Service', 'Router', 'Controller', 'Registry', 'Store', 'Runner', 'Manager', 'Engine', 'Writer', 'Reporter', 'Provider', 'Client'];
-        const isInfra = infraSuffixes.some(s => name.endsWith(s));
-        const activeKind = isInfra ? 'infra' : 'class';
-        const activeMeta = mapToCanonical(activeKind);
-
-        if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isInfra ? 'Infra' : 'Class'}: ${name}`);
-
-        // Same fingerprint/layer_path the native path computes at ~line 355/383 — the regex
-        // fallback ran a real symbol through a different code path and silently dropped both
-        // (todo26 Phase 1). `dna` here is a best-effort DNA: Gnosis has no modifier captures, so
-        // only `isExported` (readable straight off the line) is known; the rest default false.
-        // The REGEX fallback has no AST, so a signature cannot be read here — `null` and `[]` say
-        // "not measured" rather than "measured as void" (ADR 0088). The empty params array carries
-        // the old ambiguity and is kept only because the type wants an array; nothing reads it.
-        const gnosisDna = { isAsync: false, isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: null };
-        const gnosisFingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${name}|${JSON.stringify(gnosisDna)}`).digest('hex');
-
-        spectrum.nodes.push({
-          name,
-          kind: (isInfra ? 'INFRA' : 'STRUCTURE') as any,
-          canonicalKind: activeMeta.kind,
-          canonicalRank: activeMeta.rank,
-          metadata: { id, isStruct: !isInfra, isInfra, lineStart: i + 1, unitId: fileId, fingerprint: gnosisFingerprint, layer_path: `${relativePath}/${name.toLowerCase()}`, dna: gnosisDna },
-          range: { start: { line: i, column: indent }, end: { line: i, column: indent + name.length } },
-          filePath: file.path,
-          isExport: line.includes('export')
-        } as any);
-        currentClassName = name;
-        currentClassId = id;
-        classIndentation = indent;
-        currentScopeName = name;
-      } else if (funcMatch) {
-        const name = funcMatch[2];
-        const id = `${fileId}::${name}`;
-        const isMethod = currentClassId !== undefined && indent > classIndentation;
-        const displayName = isMethod ? `${currentClassName}.${name}` : name;
-
-        if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isMethod ? 'Method' : 'Func'}: ${displayName} (Parent: ${currentClassId})`);
-
-        // See the class branch above — same gap, same fix.
-        const gnosisFuncDna = { isAsync: line.includes('async'), isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: null };
-        const gnosisFuncFingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${displayName}|${JSON.stringify(gnosisFuncDna)}`).digest('hex');
-
-        spectrum.nodes.push({
-          name: displayName,
-          kind: (isMethod ? 'BEHAVIOR' : 'FUNCTION') as any,
-          canonicalKind: funcMeta.kind,
-          canonicalRank: funcMeta.rank,
-          metadata: { id, lineStart: i + 1, parentId: isMethod ? currentClassId : undefined, unitId: fileId, fingerprint: gnosisFuncFingerprint, layer_path: `${relativePath}/${displayName.toLowerCase()}`, dna: gnosisFuncDna },
-          range: { start: { line: i, column: indent }, end: { line: i, column: indent + name.length } },
-          filePath: file.path,
-          isExport: line.includes('export')
-        } as any);
-        currentScopeName = displayName;
-      }
-
-      // Semantic Edge Extraction
-      const specifier = pyImportMatch ? (pyImportMatch[1] || pyImportMatch[2].split(',')[0].trim()) : (tsImportMatch ? tsImportMatch[1] : null);
-      if (specifier) {
-        spectrum.relationships.push({
-          sourceName: 'unit',
-          targetName: specifier,
-          type: 'IMPORTS' as any,
-          confidence: 1.0,
-          metadata: { specifier, isRaw: true }
-        });
-      }
-
-      if (callMatches.length > 0) {
-        for (const match of callMatches) {
-          const target = match[1];
-          if (['if', 'elif', 'def', 'while', 'for', 'return', 'class', 'import', 'from', 'await', 'switch', 'catch', 'function'].includes(target)) continue;
-
-          spectrum.relationships.push({
-            sourceName: currentScopeName || 'unit',
-            targetName: target,
-            type: 'CALLS' as any,
-            confidence: 0.8,
-            metadata: { target, isRaw: true, isGnosis: true }
-          });
-        }
-      }
-    }
-    return spectrum;
-  }
 }
 

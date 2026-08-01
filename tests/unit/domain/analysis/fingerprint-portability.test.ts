@@ -108,36 +108,7 @@ describe('fingerprint is portable — native path', () => {
   });
 });
 
-describe('fingerprint is portable — Gnosis regex fallback', () => {
-  const PY = ['class Widget:', '    def run(self):', '        pass'].join('\n');
-  const original = chronicle.getProjectDir();
-  afterEach(() => chronicle.setProjectDir(original));
-
-  /** reflectGnosis is pure regex — no native binding — so it runs in-process. */
-  function gnosisAt(root: string, relative: string): Map<string, string> {
-    chronicle.setProjectDir(root);
-    const spectrum = (new ConducksReflector() as any).reflectGnosis(
-      { path: path.join(root, relative), source: PY },
-      { langId: 'python' } as any,
-      new AnalyzeContext()
-    );
-    return new Map(
-      spectrum.nodes
-        .filter((n: any) => n.metadata?.fingerprint)
-        .map((n: any) => [n.name, n.metadata.fingerprint as string])
-    );
-  }
-
-  it('the SAME tree at two DIFFERENT absolute roots gives IDENTICAL fingerprints', () => {
-    const a = gnosisAt(ROOT_A, 'pkg/widget.py');
-    const b = gnosisAt(ROOT_B, 'pkg/widget.py');
-    expect(a.size).toBeGreaterThan(0);
-    expect(Object.fromEntries(a)).toEqual(Object.fromEntries(b));
-  });
-
-  it('CONTROL — moving the file INSIDE the root still changes the fingerprint', () => {
-    const a = gnosisAt(ROOT_A, 'pkg/widget.py');
-    const moved = gnosisAt(ROOT_A, 'other/widget.py');
-    for (const [name, fp] of a) expect(moved.get(name)).not.toEqual(fp);
-  });
-});
+// REMOVED with the Gnosis regex fallback itself (ADR 0089). It covered the same two cases as the
+// native describe above — identical fingerprints at two roots, plus the control that a move INSIDE
+// the root does change one — through a code path that no longer exists. The property is still
+// pinned, by the native tests, which is what actually runs.

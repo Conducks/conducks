@@ -97,7 +97,7 @@ type Plain struct { name string }
     expect(result.compileError).toBeNull();
   });
 
-  it('does not degrade to the file-only Gnosis fallback', () => {
+  it('extracts real symbols, not just a file node', () => {
     const named = result.nodes.filter((n) => n.kind !== 'file' && n.kind !== 'unit');
     expect(named.length).toBeGreaterThanOrEqual(6);
   });

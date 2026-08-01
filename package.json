@@ -25,7 +25,7 @@
 		"README.md"
 	],
 	"scripts": {
-		"build": "rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/check-build-aliases.mjs",
+		"build": "node scripts/check-query-backticks.mjs && rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/check-build-aliases.mjs",
 		"postinstall": "node scripts/check-native-parser.mjs",
 		"start": "node ./build/src/interfaces/cli/index.js mirror",
 		"demo": "npm run build && npm run start",
@@ -40,7 +40,8 @@
 		"benchmark": "node tools/measure-pulse.mjs",
 		"test:persistence": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects persistence",
 		"bootstrap": "node scripts/bootstrap.mjs",
-		"hooks": "git config core.hooksPath scripts/hooks && echo \"hooks installed: pre-commit runs conducks docs-lint\""
+		"hooks": "git config core.hooksPath scripts/hooks && echo \"hooks installed: pre-commit runs conducks docs-lint\"",
+		"check:queries": "node scripts/check-query-backticks.mjs"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.22.0",
