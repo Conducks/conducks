@@ -1,3 +1,4 @@
+import path from "node:path";
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { GVREngine, RefactorResult } from "./gvr-engine.js";
 import { ConducksWatcher } from "./watcher.js";
@@ -9,7 +10,20 @@ import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
  * Conducks — Structural Evolution Service 🧬
  */
 export class EvolutionService {
-  private _watcher: ConducksWatcher | null = null;
+  /**
+   * Watchers held by PROJECT ROOT, never one flat singleton.
+   *
+   * A watcher's identity is the pair (this session, that project) — it exists because a session is
+   * using a project right now, and dies with the session (ADR 0036). Keying by root is what encodes
+   * that. The previous single `_watcher` field returned the FIRST watcher ever created no matter
+   * which root was asked for, so a second project in one process would have been handed another
+   * project's watcher and pulsed its edits into the wrong graph. Unreachable today, because one
+   * process serves one project root, and silent the moment that stops being true.
+   *
+   * Being in `~/.conducks/projects.json` never puts an entry in this map. Registration is a list;
+   * this is a set of live attachments, and nothing iterates the former to populate the latter.
+   */
+  private readonly _watchers = new Map<string, ConducksWatcher>();
   public readonly drift: DriftEngine;
   public readonly auditService: AuditService;
 
@@ -30,8 +44,8 @@ export class EvolutionService {
     (this as any).persistence = persistence;
     (this.drift as any).persistence = persistence;
     (this.auditService as any).persistence = persistence;
-    if (this._watcher) {
-      (this._watcher as any).options.persistence = persistence;
+    for (const watcher of this._watchers.values()) {
+      (watcher as any).options.persistence = persistence;
     }
   }
 
@@ -39,22 +53,43 @@ export class EvolutionService {
    * Propagates updated ignore patterns to the watcher (if active).
    */
   public setIgnoreManager(ignoreManager: IgnoreManager): void {
-    if (this._watcher) {
-      this._watcher.setIgnoreManager(ignoreManager);
+    for (const watcher of this._watchers.values()) {
+      watcher.setIgnoreManager(ignoreManager);
     }
   }
 
   /**
-   * Initializes or retrieves the singleton structural watcher.
+   * The watcher attached to this project root, created on first ask.
+   *
+   * Idempotent per root: asking twice for the same project returns the same watcher, so a command
+   * that fetches it in two places does not start two chokidar trees over one directory.
    */
   public getWatcher(projectRoot: string): ConducksWatcher | null {
-    if (projectRoot && projectRoot !== "/" && projectRoot !== "C:\\") {
-      if (!this._watcher) {
-        this._watcher = new ConducksWatcher(projectRoot, this.graph, { persistence: this.persistence });
-      }
-      return this._watcher;
+    if (!projectRoot || projectRoot === "/" || projectRoot === "C:\\") return null;
+
+    const key = path.resolve(projectRoot);
+    let watcher = this._watchers.get(key);
+    if (!watcher) {
+      watcher = new ConducksWatcher(projectRoot, this.graph, { persistence: this.persistence });
+      this._watchers.set(key, watcher);
     }
-    return null;
+    return watcher;
+  }
+
+  /** How many watchers this session holds. A diagnostic: registration must never move this number. */
+  public get watcherCount(): number { return this._watchers.size; }
+
+  /**
+   * Stops every watcher this session opened and forgets them.
+   *
+   * A watcher dies with the session that made it (ADR 0036), and `stop()` is what removes the
+   * liveness marker — so a session that exits without this leaves a marker behind and the project
+   * reads as DEAD rather than unwatched.
+   */
+  public async stopWatchers(): Promise<void> {
+    const watchers = [...this._watchers.values()];
+    this._watchers.clear();
+    for (const watcher of watchers) await watcher.stop();
   }
 
   /**
