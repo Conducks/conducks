@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { CONTENT_NODE_COLUMNS, VOLATILE_NODE_COLUMNS } from "@/lib/core/persistence/content-key.js";
+import { resolveLayerRole, layerRoleRefusal, type LayerRole, type LayerGitFacts } from "@/lib/core/persistence/layer-roles.js";
 import { collectableLayers, UNCOMMITTED_LAYER, type LayerKind, type LayerRow } from "@/lib/core/persistence/layer-reachability.js";
 import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
 import fs from "node:fs";
@@ -1090,6 +1091,32 @@ export class SynapsePersistence {
       throw err;
     }
     return { slots: slots.length, unique: seen.size };
+  }
+
+  /**
+   * Read the nodes of a ROLE — the entry point every layer-aware read goes through (todo20#P3).
+   *
+   * `uncommitted` reads `nodes` and every other role reads layer storage, which is not a special
+   * case so much as the model: ADR 0035 separates the one mutable layer from the many immutable
+   * ones, and they live in different tables for exactly that reason.
+   *
+   * REFUSES rather than falling back. A role that cannot be resolved throws with the reason, and
+   * the reason names what the user can do about it. Silently answering `current` when someone asked
+   * for `target` is a diff against the wrong baseline — the failure ADR 0035 calls out by name, and
+   * the one thing worse than no answer.
+   *
+   * Returns [] for a role that resolves to a layer this vault has never stored, which is a
+   * different fact from "could not resolve" and is left to the caller to interpret: it means the
+   * layer is not built yet, not that the question was unanswerable.
+   */
+  public async readNodesForRole(role: LayerRole, git: LayerGitFacts): Promise<Array<Record<string, unknown>>> {
+    const layerId = resolveLayerRole(role, git);
+    if (!layerId) throw new Error(layerRoleRefusal(role, git) ?? `🛡️ [Conducks] Cannot resolve layer role \`${role}\`.`);
+    if (layerId === UNCOMMITTED_LAYER) {
+      await this.ensureVaultOpen();
+      return this.query<Record<string, unknown>>(`SELECT * FROM nodes ORDER BY id`);
+    }
+    return this.readLayerNodes(layerId);
   }
 
   /** Read a commit layer back, joining each slot to the content it shares. */
