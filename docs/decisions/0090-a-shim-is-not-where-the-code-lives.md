@@ -47,9 +47,19 @@ Three rules, each true of TypeScript rather than of this fixture:
 
 ## Consequences
 
-- The fixture went **10/14 → 13/14**. The remaining failure is stated, not smoothed: a WILDCARD
-  re-export (`export * from './money.js'`) mints a node with no alias edge at all, so there is
-  nothing to follow. The named forms carry one; the wildcard does not.
+- The fixture went **10/14 → 14/14**, and section B (structure) is **7/7**.
+- **The wildcard case was misdiagnosed first, by the scorer.** It reported "resolves to
+  `lib/index.ts::addMoney`" without checking that node exists — it does NOT, and the edge was
+  DANGLING. A scorer that reads an edge's target without verifying the target invents findings, and
+  this one survived into a written record. Every pass is now confirmed to point at a real node. The
+  actual rule: a plain name qualified with a file that does not define it resolves through THAT
+  file's own imports, uniqueness-gated — a wildcard enumerates nothing at the re-exporting file, so
+  unlike the named forms there is no node and no alias to follow.
+- **An EXPORTED arrow function recorded no signature at all.** `export const fmt = (n: number):
+  string` had no params and no return type while the identical unexported form had both — two
+  patterns match the same declarator, and the exported one won the race to create the node carrying
+  no signature captures. The unit test had used the unexported form and passed for weeks. This is
+  the class of defect a fixture written in the shape of REAL code finds and a unit test does not.
 - **The overfitting guard, measured on two subjects nobody wrote for this fixture:** conducks
   1,205/1,205 and mentorseed 1,314/1,314 member-call edges still verify 100% against SOURCE. That is
   the number a bad fix would have broken, and it is why the fixture cannot be trusted alone —

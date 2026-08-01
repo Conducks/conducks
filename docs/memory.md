@@ -1221,3 +1221,13 @@ by construction.
 - CORRECTION, and the useful part: ADR 0088 first recorded that the guard TEST failed to catch the fifth occurrence. That was false — the guard catches it and names the file and line exactly (verified by planting one). It had simply never been RUN, because the workflow typechecks first and tsc dies first. The defect was ORDER, not detection
 - Why that mattered: a wrong diagnosis nearly bought a rewrite of a working guard. Prove a tool is broken by RUNNING it against the failure before recording that it missed one
 - Applies: `npm run build` now runs `scripts/check-query-backticks.mjs` first (ADR 0089), so the cause prints instead of the symptom. `npm run check:queries` runs it alone
+
+## A test that uses the EASIER form of a shape proves nothing about the form real code uses
+- Gotcha: `export const fmt = (n: number): string => ...` recorded NO parameters and NO return type, while the identical `const fmt = ...` recorded both. Two query patterns match the same `variable_declarator` and the EXPORTED one won the race to create the node, carrying no signature captures. A unit test had covered the unexported form and passed the whole time (ADR 0090)
+- Why: real code exports. A fixture written in the shape of production code found this in one run; the unit suite never could, because it tested the shape that was easy to write
+- Applies: any query where an `export_statement` wrapper has its own pattern — check BOTH forms record the same thing. Grep for `export_statement` in the language's queries.ts
+
+## A scorer that reads an edge's target without checking the target EXISTS invents findings
+- Gotcha: the oracle scorer reported "resolves to `lib/index.ts::addMoney`" for a DANGLING edge — no such node exists. That produced a confident, wrong diagnosis ("it resolves to a shim") which survived into a written ADR before the node was queried directly
+- Why: an edge's `targetId` is a string. It is an ANSWER only if a node holds that id; otherwise it is a dangling pointer that happens to look plausible
+- Applies: `CONDUCKS/oracle` scoring scripts, and any analysis reading `edges.targetId` — join to `nodes` or the reading is unverified

@@ -273,6 +273,23 @@ export class IntraLinker {
         const file = edge.targetId.slice(0, sep);
         const symbol = edge.targetId.slice(sep + 2);
         const dot = symbol.indexOf('.');
+
+        // A PLAIN name qualified with a file that does not define it: `lib/index.ts::addMoney`,
+        // where the barrel says `export * from './money.js'`. A wildcard enumerates nothing at the
+        // re-exporting file, so no node is minted and no ALIASES edge exists — there is nothing to
+        // follow, which is what separates this from the named forms (ADR 0071, ADR 0090).
+        //
+        // It IS enumerable at the target: the barrel's own IMPORTS name every file it re-exports
+        // from. Resolve the name through them, uniqueness-gated so two files exporting it refuse.
+        if (dot === -1 && symbol && symbol !== 'unit') {
+          const viaBarrel = this.resolveSymbolUnique(symbol, `${file}::unit`, unitImports, unitSymbols);
+          if (viaBarrel && viaBarrel !== edge.targetId) {
+            graph.rebindEdgeTarget(edge, viaBarrel);
+            resolved.push({ id: edge.id, newTargetId: viaBarrel });
+            continue;
+          }
+        }
+
         if (dot > 0) {
           const receiver = symbol.slice(0, dot);
           const member = symbol.slice(dot + 1);

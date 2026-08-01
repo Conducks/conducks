@@ -205,7 +205,12 @@ export const TYPESCRIPT_QUERIES = `
   (export_statement (function_declaration name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isExported) @isFunction
   (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement (abstract_class_declaration name: (type_identifier) @name) @isExported) @isStruct
-  (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
+  ;; The EXPORTED form needs the signature captures too. Without them this pattern won the race to
+  ;; create the node — it matches the same declarator as the plain rule above — and an exported arrow
+  ;; function recorded no parameters and no return type while an unexported one recorded both. Found
+  ;; by the oracle fixture; the unit test used the unexported form and passed (ADR 0091).
+  (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name
+    value: (arrow_function parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type)?)) @isExported) @isVariable
   ;; Interfaces and type aliases were MISSING here, so an exported type or interface produced a node
   ;; with isExport absent. Anything keyed off isExport then read every exported type as private — on
   ;; conducks itself that was 55 of 98 STRUCTURE nodes under domain/, and the domain-visibility-rule

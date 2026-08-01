@@ -88,7 +88,16 @@ export const JAVASCRIPT_QUERIES = `
   ;; --- Modifiers (DNA flags) ---
   (export_statement (function_declaration name: (identifier) @name parameters: (formal_parameters) @params) @isExported) @isFunction
   (export_statement (class_declaration name: (identifier) @name) @isExported) @isStruct
-  (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
+  ;; The EXPORTED form needs the signature captures too. Without them this pattern won the race to
+  ;; create the node — it matches the same declarator as the plain rule above — and an exported arrow
+  ;; function recorded no parameters and no return type while an unexported one recorded both. Found
+  ;; by the oracle fixture; the unit test used the unexported form and passed (ADR 0091).
+  ;; NO return_type here: JavaScript has no type annotations, so type_annotation is not a node in
+  ;; this grammar and naming it makes the WHOLE query invalid (TSQueryErrorNodeType). Pasting the
+  ;; TypeScript form across cost exactly that — and it failed LOUDLY, which is ADR 0089 working: the
+  ;; same mistake used to degrade every .js file to the regex extractor in silence.
+  (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name
+    value: (arrow_function parameters: (formal_parameters) @params)?)) @isExported) @isVariable
   (function_declaration "async" name: (identifier) @name parameters: (formal_parameters) @params) @isAsync @isFunction
 
   ;; --- Metadata & Debt ---
