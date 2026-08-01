@@ -93,9 +93,19 @@ const scopedVarKey = (scope: string | null | undefined, name: string): string =>
  * old `returns: 'void'`, and `taxonomy.ts` DOCUMENTS parameters as living here, so the empty array
  * read as "this function takes none" rather than as "nobody looked" (ADR 0086).
  *
- * The grammar's `pattern` field carries the name and survives every shape a parameter can take:
- * a rest element keeps its `...`, and a destructured parameter keeps its literal pattern
- * (`{ y, z }`), which is the honest answer — it binds several names and has no single one.
+ * Three name shapes, because the grammars disagree and there is no field every one of them uses
+ * (measured, ADR 0087):
+ *   `pattern`   TypeScript, TSX, Rust
+ *   `name`      Go, Java, C#, Python's default_parameter, Ruby's optional_parameter
+ *   node text   Python's typed_parameter, Ruby's bare identifier — the parameter IS its name
+ *
+ * Whatever the shape, the name is kept VERBATIM: a rest element keeps its `...`, and a destructured
+ * parameter keeps its literal pattern (`{ y, z }`), which is the honest answer — it binds several
+ * names and has no single one.
+ *
+ * FROZEN for the per-language query work. A language is added by capturing `@params` (and optionally
+ * `@return_type`) in its own `queries.ts`; nothing here should need to change, and a language whose
+ * shape this does not cover is a finding to report rather than a reason to edit this function.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function paramsOf(match: any): Array<{ name: string; type: string | null; optional: boolean }> {
@@ -105,8 +115,11 @@ function paramsOf(match: any): Array<{ name: string; type: string | null; option
   for (let i = 0; i < node.namedChildCount; i++) {
     const child = node.namedChild(i);
     if (!child) continue;
-    const name = child.childForFieldName('pattern')?.text ?? child.text;
+    // `pattern` then `name` then the node's own text — see the shape table above.
+    const name = (child.childForFieldName('pattern') ?? child.childForFieldName('name'))?.text ?? child.text;
     if (!name) continue;
+    // Strip a leading `:` (TS, Python, Rust) — the annotation node includes it in some grammars and
+    // not in others (Go and Java give the bare type), so the trim has to be tolerant of both.
     const declared = child.childForFieldName('type')?.text?.replace(/^\s*:\s*/, '').trim();
     out.push({ name, type: declared && declared.length > 0 ? declared : null, optional: child.type === 'optional_parameter' });
   }
@@ -125,7 +138,9 @@ function paramsOf(match: any): Array<{ name: string; type: string | null; option
 function returnTypeOf(match: any): string | null {
   const capture = match.captures?.find((c: any) => c.name === 'return_type');
   if (!capture) return null;
-  const text = String(capture.node.text).replace(/^\s*:\s*/, '').trim();
+  // Leading `:` or `->` stripped: TypeScript and Python write `: Foo`, Go and Java write the bare
+  // type, and a grammar that includes the arrow gives `-> Foo`. All three reduce to the name.
+  const text = String(capture.node.text).replace(/^\s*(:|->)\s*/, '').trim();
   return text.length > 0 ? text : null;
 }
 
