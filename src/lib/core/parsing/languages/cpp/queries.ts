@@ -19,8 +19,24 @@ export const CPP_QUERIES = `
   (template_declaration) @isGeneric
   
   ;; Functions and Methods
-  (function_definition (function_declarator (identifier) @name)) @isFunction
-  (function_definition (function_declarator (field_identifier) @name)) @isMethod
+  ;; Probed against tree-sitter-cpp (node-types.json + a live parse): unlike C, \`type\` is OPTIONAL on
+  ;; function_definition — a constructor/destructor carries no type field at all, so the \`?\` here is
+  ;; load-bearing, not decorative (ADR 0086: "a constructor has no return type; do not invent one").
+  ;; \`parameters\` is REQUIRED on function_declarator, same as C.
+  ;;
+  ;; KNOWN GAP (reported, not fixed — reflector.ts is frozen): same as C — a parameter_declaration's
+  ;; identifier lives on the \`declarator\` field, which paramsOf()'s fallback chain does not check, so
+  ;; a typed parameter's recorded name is the whole declaration text rather than the bare identifier.
+  (function_definition
+    type: (_)? @return_type
+    declarator: (function_declarator
+      (identifier) @name
+      parameters: (parameter_list) @params)) @isFunction
+  (function_definition
+    type: (_)? @return_type
+    declarator: (function_declarator
+      (field_identifier) @name
+      parameters: (parameter_list) @params)) @isMethod
   
   ;; Destructors (Flat Capture)
   (destructor_name) @name

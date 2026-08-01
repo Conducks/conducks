@@ -19,7 +19,17 @@ export const RUST_QUERIES = `
   (field_declaration name: (field_identifier) @name) @isProperty
   
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
-  (function_item name: (identifier) @name) @isFunction
+  ;; Signature capture (ADR 0086/0084): @params tags the whole 'parameters' node, which the frozen
+  ;; reflector.ts helper reads by iterating its namedChildren — including a 'self_parameter'
+  ;; ('&self' or bare 'self') when the function is a method, since it IS a namedChild of
+  ;; 'parameters' in this grammar. That receiver has no 'pattern'/'name'/'type' field, so the
+  ;; helper's text fallback records it verbatim as { name: '&self', type: null, optional: false }
+  ;; (or 'self' for an owned receiver) — the honest answer, not a guess, and consistent with
+  ;; keeping a rest/destructured parameter's literal text (ADR 0086). @return_type is a single
+  ;; node under Rust's own 'return_type' field (never a list — a Rust function has exactly one
+  ;; return type, even a tuple '-> (i32, i32)' is ONE tuple_type node), so a wildcard is safe here
+  ;; and unlike Go there is no multi-value shape to refuse.
+  (function_item name: (identifier) @name parameters: (parameters) @params return_type: (_)? @return_type) @isFunction
   (struct_item name: (type_identifier) @name) @isStruct
   (enum_item name: (type_identifier) @name) @isEnum
   (union_item name: (type_identifier) @name) @isStruct
@@ -43,10 +53,10 @@ export const RUST_QUERIES = `
   ;; Implementation Blocks
   (impl_item type: (type_identifier) @heritage)
 
-  ;; Methods inside impl blocks
+  ;; Methods inside impl blocks — same signature capture as @isFunction above.
   (impl_item
     body: (declaration_list
-      (function_item name: (identifier) @name) @isMethod))
+      (function_item name: (identifier) @name parameters: (parameters) @params return_type: (_)? @return_type) @isMethod))
   
   ;; --- Type positions (todo10 Phase 4) ---
   ;; Probed against tree-sitter-rust 0.24.0 (node-types.json + a live parse, see docs/memory.md).

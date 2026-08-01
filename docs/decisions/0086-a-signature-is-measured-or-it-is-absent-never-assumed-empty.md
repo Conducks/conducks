@@ -1,6 +1,7 @@
 # 0086 — a signature is measured or it is absent, never assumed empty
 Status: Accepted
 - Date: 2026-08-01
+- Amended by: 0087
 - Builds: 0070, 0084
 - Enforced by: tests/unit/core/instance-type-capture.test.ts (name, declared type, optionality, rest marker, destructured pattern, a genuinely empty list, methods and arrow functions), tests/unit/core/graph/linker-factory-receiver.test.ts (the uniqueness gate refuses two imported units declaring one class name, and the same graph without the rival resolves)
 

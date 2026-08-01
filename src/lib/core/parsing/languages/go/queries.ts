@@ -11,7 +11,16 @@ export const GO_QUERIES = `
   (field_declaration name: (field_identifier) @name) @isProperty
 
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
-  (function_declaration name: (identifier) @name) @isFunction
+  ;; Signature capture (ADR 0086/0084): @params tags the WHOLE parameter_list, which the frozen
+  ;; reflector.ts helper reads by iterating its namedChildren. @return_type is the 'result' field
+  ;; (Go's grammar name, not 'return_type' — the CAPTURE name still has to be @return_type, that is
+  ;; what the helper reads). 'result' can ALSO be a bare parameter_list for a multi-value return
+  ;; ('func f() (Foo, error)'), and that shape is deliberately excluded from the alternation below:
+  ;; capturing it verbatim would give the text "(Foo, error)" for a single declared TYPE, which is
+  ;; not what the field means. Refusing (leaving @return_type absent -> null) is the ADR 0070 call;
+  ;; a single named/pointer/qualified/generic result type is still captured verbatim, including a
+  ;; pointer sigil ('*Foo') since that is exactly what the source states, not an approximation.
+  (function_declaration name: (identifier) @name parameters: (parameter_list) @params result: [(type_identifier) (qualified_type) (generic_type) (pointer_type)]? @return_type) @isFunction
   (package_clause (package_identifier) @name) @isPackage
 
   ;; Modern Genetics (Go 1.18+)
@@ -19,13 +28,20 @@ export const GO_QUERIES = `
   (type_parameter_list (type_parameter_declaration) @generic_param)
 
   ;; Methods with Receivers
-  (method_declaration 
-    receiver: (parameter_list (parameter_declaration type: (pointer_type [(type_identifier) (generic_type)] @receiver_type))) 
-    name: (field_identifier) @name) @isMethod
-  
-  (method_declaration 
-    receiver: (parameter_list (parameter_declaration type: [(type_identifier) (generic_type)] @receiver_type)) 
-    name: (field_identifier) @name) @isMethod
+  ;; Same signature capture as @isFunction above. A method has TWO parameter_list nodes (receiver
+  ;; and parameters); @params is anchored to the 'parameters:' field specifically, never the
+  ;; receiver's, so 'func (s *S) M(x int)' records [x], not the receiver.
+  (method_declaration
+    receiver: (parameter_list (parameter_declaration type: (pointer_type [(type_identifier) (generic_type)] @receiver_type)))
+    name: (field_identifier) @name
+    parameters: (parameter_list) @params
+    result: [(type_identifier) (qualified_type) (generic_type) (pointer_type)]? @return_type) @isMethod
+
+  (method_declaration
+    receiver: (parameter_list (parameter_declaration type: [(type_identifier) (generic_type)] @receiver_type))
+    name: (field_identifier) @name
+    parameters: (parameter_list) @params
+    result: [(type_identifier) (qualified_type) (generic_type) (pointer_type)]? @return_type) @isMethod
 
   ;; Structs and Interfaces
   (type_spec name: (type_identifier) @name type: (struct_type)) @isStruct

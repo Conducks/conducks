@@ -16,7 +16,17 @@ export const PYTHON_QUERIES = `
 
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_definition name: (identifier) @name) @isStruct
-  (function_definition name: (identifier) @name) @isFunction
+  ;; --- Signature (ADR 0086/0087): parameters and declared return type. ---
+  ;; 'parameters' is a required field (always present, even "()"). 'return_type' is a required
+  ;; FIELD on the grammar but only present in source when written, so it is wrapped optional here.
+  ;; Both point at the SAME (function_definition) node the existing @isFunction pattern already
+  ;; matches — added to that one pattern rather than a second, to avoid the node-creation race
+  ;; ADR 0086 already names (two patterns matching the same node race to create it).
+  ;;
+  ;; KNOWN GAP, reported rather than fixed (reflector.ts's paramsOf is frozen): a typed_parameter
+  ;; (a: str) has no 'pattern' or 'name' field, so paramsOf falls back to the node's own text and
+  ;; records the WHOLE "a: str" as the name, not "a". See agent-dynamic.md handover for detail.
+  (function_definition name: (identifier) @name parameters: (parameters) @params return_type: (type)? @return_type) @isFunction
   
   ;; Heritage: class Child(Parent):
   (class_definition

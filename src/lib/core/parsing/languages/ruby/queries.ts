@@ -15,8 +15,18 @@ export const RUBY_QUERIES = `
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class name: (constant) @name) @isStruct
   (module name: (constant) @name) @isStruct
-  (method name: (identifier) @name) @isFunction
-  (singleton_method name: (identifier) @name) @isMethod
+  ;; --- Signature (ADR 0086/0087): parameters only — Ruby has no return type annotations, so
+  ;; there is no @return_type capture at all (paramsOf/returnTypeOf treat its absence as an
+  ;; OMIT, and reflector.ts records null, which is honest here). 'parameters' is OPTIONAL on the
+  ;; grammar: a paren-less "def none" has no method_parameters child at all, so an empty
+  ;; @params match correctly yields dna.params: [].
+  ;;
+  ;; KNOWN GAP, reported rather than fixed (reflector.ts's paramsOf is frozen): splat_parameter
+  ;; (*args), block_parameter (&blk) and keyword_parameter (k:) all carry a 'name' field pointing
+  ;; at the BARE identifier, so paramsOf's pattern-then-name fallback picks 'name' and the marker
+  ;; (*, &, trailing :) is LOST. See agent-dynamic.md handover for the measured values.
+  (method name: (identifier) @name parameters: (method_parameters)? @params) @isFunction
+  (singleton_method name: (identifier) @name parameters: (method_parameters)? @params) @isMethod
   
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Rails Resources: resources :users

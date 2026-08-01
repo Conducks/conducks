@@ -16,9 +16,20 @@ export const CSHARP_QUERIES = `
   (interface_declaration (identifier) @name) @isInterface
   (enum_declaration (identifier) @name) @isEnum
   
-  (method_declaration (identifier) @name) @isFunction
-  (constructor_declaration (identifier) @name) @isFunction
-  (destructor_declaration (identifier) @name) @isFunction
+  ;; Probed against tree-sitter-c-sharp (node-types.json + a live parse): method_declaration names its
+  ;; return type field \`returns\`, not \`return_type\` or \`type\` — both \`returns\` and \`parameters\` are
+  ;; REQUIRED there. constructor_declaration and destructor_declaration have no \`returns\` field at
+  ;; all (ADR 0086: "a constructor has no return type; do not invent one"), so only \`parameters\` is
+  ;; added for those two. \`parameter\`'s own \`name\` field matches reflector.ts's paramsOf() fallback
+  ;; directly — C# is one of the languages that fallback chain was already written for.
+  ;;
+  ;; Field order in the pattern must follow the grammar's OWN field order (\`returns\` before \`name\`),
+  ;; not node-types.json's alphabetical listing — \`name ... returns\` compiled but threw
+  ;; TSQueryErrorStructure at match time on this grammar version, while \`returns ... name\` did not.
+  ;; Measured by isolating each field pair against the built grammar; not documented anywhere else.
+  (method_declaration returns: (_) @return_type name: (identifier) @name parameters: (parameter_list) @params) @isFunction
+  (constructor_declaration name: (identifier) @name parameters: (parameter_list) @params) @isFunction
+  (destructor_declaration name: (identifier) @name parameters: (parameter_list) @params) @isFunction
 
   ;; Properties and Events (C# API surface)
   (property_declaration name: (identifier) @name) @isProperty

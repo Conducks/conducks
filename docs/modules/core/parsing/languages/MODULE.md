@@ -48,3 +48,19 @@ javascript), while the handler is gated on an enclosing node: `else if (cName ==
 capture (`@isHeritage`), and so the only one that could reach the handler at all. Fix tracked in
 todo11. **Pattern a capture together with
 the definition it belongs to when its handler needs one.**
+
+## Signature capture, and the one rule behind it
+
+Every language captures `@params` on its parameter-list node and, where the language declares one,
+`@return_type`. The shared helper in `reflector.ts` does the rest — a language is added by writing
+those two captures and nothing else (ADR 0086, ADR 0087).
+
+The name is NOT read from a field. Eleven grammars disagree about which field holds it — `pattern`,
+`name`, `declarator`, or nothing at all — so the annotation is carved out of the parameter's own span
+instead and whatever remains is the name. That keeps `*args`, `&blk`, `k:`, `&$c` and `...$rest`
+intact, which a field lookup silently dropped.
+
+Two grammars have stated gaps rather than workarounds. **Swift** has no parameter-list node — its
+parameters are field-less children of the function itself — so `dna.params` is `[]` there. **A
+standalone JavaScript generator** (`function* g() {}`) is `generator_function_declaration` and no
+pattern matches it, so it produces no node at all.

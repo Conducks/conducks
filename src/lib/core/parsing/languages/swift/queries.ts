@@ -38,10 +38,28 @@ export const SWIFT_QUERIES = `
   ;; non-async, non-public func still produces exactly one match. Safe only because reflector.ts now
   ;; gates the kind branch on DEFINITION_CAPTURES — before that, @isAsync overwrote kind with 'async'
   ;; (canonical ATOM) and demoted the symbol. See todo13.
-  (function_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? name: (simple_identifier) @name "async"? @isAsync) @isFunction
+  ;; Return-type capture (ADR 0086/0084) — but NOT @params. tree-sitter-swift 0.7.1 does not wrap a
+  ;; function's VALUE parameters in any node: 'func f(a: String, b: Int)' puts 'parameter' nodes as
+  ;; direct, field-less children of function_declaration itself, alongside its own name and body (
+  ;; confirmed against node-types.json: function_declaration's 'children' list, not its 'fields',
+  ;; is where 'parameter' lives). The frozen reflector.ts helper reads @params by iterating the
+  ;; NAMED CHILDREN of ONE captured node; capturing function_declaration itself would pull in the
+  ;; function's own name and return type as fake "parameters" — a fabrication worse than an empty
+  ;; array, so @params is deliberately NOT captured here. Reported as a finding rather than worked
+  ;; around: reflector.ts would need to accept a node-TYPE filter ('only namedChildren of type
+  ;; parameter') to support this grammar, and that is a change to the frozen helper, not to a query.
+  ;;
+  ;; @return_type is captured despite the grammar aliasing it to the SAME field id as the function's
+  ;; own name ('name:' — verified by both node-types.json's 'multiple: true' on that field and by a
+  ;; live query probe: 'return_type: (user_type)' compiles but matches NOTHING, silently, the ADR
+  ;; 0071 failure shape). Constraining 'name:' TWICE in one pattern — once to (simple_identifier) for
+  ;; the function's own name, once to the return type's own node kinds — reads correctly: only a
+  ;; function that actually declares '-> T' produces a second 'name:' child, so the capture is
+  ;; absent (not a wrong guess) when nothing is written.
+  (function_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? name: (simple_identifier) @name name: [(user_type) (array_type) (dictionary_type) (optional_type) (tuple_type) (function_type)]? @return_type "async"? @isAsync) @isFunction
   (init_declaration name: _ @name) @isFunction
   (deinit_declaration "deinit" @name) @isFunction
-  (protocol_function_declaration name: (simple_identifier) @name) @isMethod
+  (protocol_function_declaration name: (simple_identifier) @name name: [(user_type) (array_type) (dictionary_type) (optional_type) (tuple_type) (function_type)]? @return_type) @isMethod
 
   ;; --- State ---
   ;; let/var is a (property_declaration) everywhere, so the PARENT decides member vs local.

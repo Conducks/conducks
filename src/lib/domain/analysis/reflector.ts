@@ -93,35 +93,79 @@ const scopedVarKey = (scope: string | null | undefined, name: string): string =>
  * old `returns: 'void'`, and `taxonomy.ts` DOCUMENTS parameters as living here, so the empty array
  * read as "this function takes none" rather than as "nobody looked" (ADR 0086).
  *
- * Three name shapes, because the grammars disagree and there is no field every one of them uses
- * (measured, ADR 0087):
- *   `pattern`   TypeScript, TSX, Rust
- *   `name`      Go, Java, C#, Python's default_parameter, Ruby's optional_parameter
- *   node text   Python's typed_parameter, Ruby's bare identifier — the parameter IS its name
+ * THE NAME IS CARVED, NOT LOOKED UP (ADR 0087). The first version tried the `pattern` field, then
+ * `name`, then the node's own text — and eleven languages proved that chain wrong in BOTH
+ * directions at once:
  *
- * Whatever the shape, the name is kept VERBATIM: a rest element keeps its `...`, and a destructured
- * parameter keeps its literal pattern (`{ y, z }`), which is the honest answer — it binds several
- * names and has no single one.
+ *   Python `a: str`   has NO `name` field, so it fell through to the text -> "a: str", type included
+ *   Ruby   `*args`    HAS a `name` field, so it took it        -> "args", the marker gone
  *
- * FROZEN for the per-language query work. A language is added by capturing `@params` (and optionally
- * `@return_type`) in its own `queries.ts`; nothing here should need to change, and a language whose
- * shape this does not cover is a finding to report rather than a reason to edit this function.
+ * An absent field forced the honest answer; a present one skipped it. Same for PHP's `&$c` and
+ * `...$rest`, and for C's `int a` (the name is under a `declarator` field, a fourth shape).
+ *
+ * So the annotation is REMOVED instead: take the parameter's own text and cut out the `type` node
+ * and any default value, by byte offset. Whatever is left is the name, markers and all. The type
+ * sits on either side depending on the language — a suffix in TypeScript, Python and Rust, a PREFIX
+ * in C, Go and Java — so whichever side survives the cut is the answer. Nothing is guessed: the
+ * annotation's position is read from the parse tree.
+ *
+ * A parameter that is ENTIRELY its type keeps nothing and is not a parameter at all. That is C's
+ * `f(void)`, which otherwise recorded one parameter named "void" for a function taking none.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function paramsOf(match: any): Array<{ name: string; type: string | null; optional: boolean }> {
   const node = match.captures?.find((c: any) => c.name === 'params')?.node;
   if (!node) return [];
+
   const out: Array<{ name: string; type: string | null; optional: boolean }> = [];
   for (let i = 0; i < node.namedChildCount; i++) {
     const child = node.namedChild(i);
     if (!child) continue;
-    // `pattern` then `name` then the node's own text — see the shape table above.
-    const name = (child.childForFieldName('pattern') ?? child.childForFieldName('name'))?.text ?? child.text;
+
+    const typeNode = child.childForFieldName('type');
+    const declared = typeNode?.text?.replace(/^\s*(:|->)\s*/, '').trim() || null;
+    const optional = child.type === 'optional_parameter';
+
+    // Go writes `func f(a, b string)` as ONE node with TWO `name` children sharing one type.
+    // Reading only the first silently dropped `b` — an arity this graph would then state wrongly.
+    const named: any[] = typeof child.childrenForFieldName === 'function'
+      ? child.childrenForFieldName('name') ?? []
+      : [];
+    if (named.length > 1) {
+      for (const n of named) out.push({ name: n.text, type: declared, optional });
+      continue;
+    }
+
+    // Cut the annotation and the default value out of the parameter's own span.
+    const valueNode = child.childForFieldName('value')
+      ?? child.childForFieldName('default_value')
+      ?? child.childForFieldName('right');
+    let from = child.startIndex;
+    let to = child.endIndex;
+    for (const cut of [typeNode, valueNode]) {
+      if (!cut) continue;
+      // A PREFIX annotation (C `int a`, Go `a string` is a suffix, Java `String a` a prefix) starts
+      // at or before the parameter itself, so the name is what follows it; otherwise it trails and
+      // the name is what precedes it.
+      if (cut.startIndex <= from) from = Math.max(from, cut.endIndex);
+      else to = Math.min(to, cut.startIndex);
+    }
+    // An early-out, NOT the load-bearing guard: the empty-name check below catches the same case
+    // (verified by mutation — removing this alone changes nothing, removing both breaks C's
+    // `f(void)`). Kept because it says the intent at the point the span collapses.
+    if (to <= from) continue;   // nothing but an annotation: C's `f(void)` — not a parameter
+
+    // Only the separators the cut exposed are trimmed. A trailing `:` that was NOT cut is part of
+    // the name — Ruby's keyword parameter `k:` means something different from `k`.
+    let name = child.text.slice(from - child.startIndex, to - child.startIndex);
+    // `?` is trimmed ONLY when `optional` already records it — a marker carried by a flag would
+    // otherwise be stated twice, and `c?` is not what anyone searches for. Ruby's `k:` is the
+    // opposite case and keeps its colon, because no flag carries it and `k` means something else.
+    if (to < child.endIndex) name = name.replace(optional ? /[\s:=?]+$/ : /[\s:=]+$/, '');
+    name = name.trim();
     if (!name) continue;
-    // Strip a leading `:` (TS, Python, Rust) — the annotation node includes it in some grammars and
-    // not in others (Go and Java give the bare type), so the trim has to be tolerant of both.
-    const declared = child.childForFieldName('type')?.text?.replace(/^\s*:\s*/, '').trim();
-    out.push({ name, type: declared && declared.length > 0 ? declared : null, optional: child.type === 'optional_parameter' });
+
+    out.push({ name, type: declared, optional });
   }
   return out;
 }

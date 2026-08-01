@@ -26,13 +26,26 @@ export const JAVASCRIPT_QUERIES = `
   ;; (TSQueryErrorNodeType at offset 607), which silently dropped every .js file to the Gnosis
   ;; file-only fallback. The JS class field node is (field_definition property: …).
   (field_definition property: (property_identifier) @name) @isProperty
-  (variable_declarator name: (identifier) @name) @isVariable
+  ;; JavaScript has no type annotations, so there is no @return_type here — @params only. The
+  ;; optional value alternation carries an ARROW FUNCTION or FUNCTION EXPRESSION's parameters
+  ;; without a second pattern on the same declarator — a second pattern would race the first to
+  ;; create the node (ADR 0086, and see the TypeScript query, which this mirrors). A plain
+  ;; variable simply captures neither, so nothing else changes.
+  (variable_declarator name: (identifier) @name
+    value: [
+      (arrow_function parameters: (formal_parameters) @params)
+      (function_expression parameters: (formal_parameters) @params)
+    ]?) @isVariable
 
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (identifier) @name) @isStruct
 
-  (function_declaration name: (identifier) @name) @isFunction
-  (method_definition name: (_) @name) @isMethod
+  (function_declaration name: (identifier) @name parameters: (formal_parameters) @params) @isFunction
+  ;; Covers class methods AND object-literal methods (both are method_definition nodes in this
+  ;; grammar), and every modifier on them (async, generator, static, getter/setter, a private
+  ;; #name, and constructor) — none of those change the node TYPE, only its fields, so one
+  ;; pattern already saw all of them; it just was not reading @params.
+  (method_definition name: (_) @name parameters: (formal_parameters) @params) @isMethod
 
   ;; Heritage: extends (EXTENDS edge). JS has no 'implements'.
   ;; Two bugs fixed here at once:
@@ -65,10 +78,10 @@ export const JAVASCRIPT_QUERIES = `
     arguments: (arguments (_)* @kinesis_arg))
 
   ;; --- Modifiers (DNA flags) ---
-  (export_statement (function_declaration name: (identifier) @name) @isExported) @isFunction
+  (export_statement (function_declaration name: (identifier) @name parameters: (formal_parameters) @params) @isExported) @isFunction
   (export_statement (class_declaration name: (identifier) @name) @isExported) @isStruct
   (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
-  (function_declaration "async" name: (identifier) @name) @isAsync @isFunction
+  (function_declaration "async" name: (identifier) @name parameters: (formal_parameters) @params) @isAsync @isFunction
 
   ;; --- Metadata & Debt ---
   (comment) @comment

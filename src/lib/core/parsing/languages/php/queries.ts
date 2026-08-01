@@ -19,8 +19,22 @@ export const PHP_QUERIES = `
   (trait_declaration (name) @name) @isStruct
   (enum_declaration (name) @name) @isEnum
   
-  (function_definition (name) @name) @isFunction
-  (method_declaration (name) @name) @isMethod
+  ;; --- Signature (ADR 0086/0087): parameters and declared return type. ---
+  ;; 'parameters' and 'return_type' are both real fields on tree-sitter-php 0.24's
+  ;; function_definition / method_declaration; 'parameters' is always present (even "()"),
+  ;; 'return_type' only when written, so it is wrapped optional. return_type is captured as a
+  ;; wildcard (_) rather than a specific node type: PHP writes it as a bare primitive_type
+  ;; ("int", "void"), a named_type (class name), a nullable_type ("?Foo") or a union_type
+  ;; ("Foo|Bar"), and a single field position covers all of them without four separate patterns.
+  ;;
+  ;; KNOWN GAP, reported rather than fixed (reflector.ts's paramsOf is frozen): a by-reference
+  ;; parameter (&$c) and a variadic parameter (...$rest) both carry a 'name' field pointing at the
+  ;; variable_name node ("$c" / "$rest"), which does NOT include the & or ... prefix — the
+  ;; reference_modifier / "..." token is a SIBLING, not part of the name field's own text. So
+  ;; paramsOf's pattern-then-name fallback picks 'name' and the marker is LOST. See
+  ;; agent-dynamic.md handover for the measured values.
+  (function_definition (name) @name parameters: (formal_parameters) @params return_type: (_)? @return_type) @isFunction
+  (method_declaration (name) @name parameters: (formal_parameters) @params return_type: (_)? @return_type) @isMethod
   
   (namespace_definition (namespace_name) @name) @isPackage
   

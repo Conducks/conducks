@@ -18,7 +18,16 @@ export const JAVA_QUERIES = `
   (interface_declaration name: (identifier) @name) @isInterface
   (enum_declaration name: (identifier) @name) @isEnum
   
-  (method_declaration name: (identifier) @name) @isFunction
+  ;; Probed against tree-sitter-java (node-types.json + a live parse): method_declaration's return
+  ;; type field is literally named \`type\` (not \`return_type\`), and both \`type\` and \`parameters\` are
+  ;; REQUIRED — even \`void\` methods carry a void_type node there, so no \`?\` quantifier is needed.
+  ;; formal_parameter's own \`name\` field matches reflector.ts's paramsOf() fallback directly — Java
+  ;; is one of the languages that fallback chain was already written for.
+  ;;
+  ;; Field order in the pattern must follow the grammar's OWN field order (\`type\` before \`name\`), not
+  ;; alphabetical — \`name ... type\` compiled but threw TSQueryErrorStructure at match time on this
+  ;; grammar version (same finding as C#'s \`returns\`/\`name\` ordering, measured the same way).
+  (method_declaration type: (_) @return_type name: (identifier) @name parameters: (formal_parameters) @params) @isFunction
 
   ;; DROPPED: (constructor_declaration name: (identifier) @name) @isFunction
   ;; In Java the constructor's name IS the class name, and the reflector's scoped id excludes a
