@@ -1,3 +1,4 @@
+import { collectableLayers, UNCOMMITTED_LAYER, type LayerKind, type LayerRow } from "@/lib/core/persistence/layer-reachability.js";
 import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -371,6 +372,17 @@ export class SynapsePersistence {
     await run(pulsesSql);
     // Existing vaults predate the column; adding it is what keeps an old vault readable.
     await run(`ALTER TABLE pulses ADD COLUMN IF NOT EXISTS branch TEXT;`);
+    // The layer registry (ADR 0035). ADDITIVE for now: nothing reads `nodes` through a layer yet,
+    // so an existing vault gains an empty table and behaves exactly as before. `commitHash` is
+    // nullable because the `uncommitted` layer has no commit of its own — it is the working tree
+    // over whatever is checked out, and it is the only mutable layer in the model.
+    await run(`CREATE TABLE IF NOT EXISTS layers (
+      layerId VARCHAR PRIMARY KEY,
+      kind VARCHAR,
+      commitHash VARCHAR,
+      branch VARCHAR,
+      createdAt BIGINT
+    );`);
     await run(metaSql);
     await run(fileHashSql);
 
@@ -965,6 +977,65 @@ export class SynapsePersistence {
       `DELETE FROM edges WHERE confidence < ?
          AND targetId NOT IN (SELECT id FROM nodes)`, [minConfidence]);
     return Number(before?.c ?? 0);
+  }
+
+  /**
+   * Record a layer, or refresh what is known about one (ADR 0035, todo20#P3).
+   *
+   * `INSERT OR REPLACE` because a layer is identified by its id and re-recording it is how a branch
+   * pointer moving is expressed — the commit layer is immutable, the row describing it is not.
+   */
+  public async recordLayer(layer: { layerId: string; kind: LayerKind; commitHash?: string | null; branch?: string | null }): Promise<void> {
+    if (this.readOnly) return;
+    await this.ensureVaultOpen();
+    await this.run(
+      `INSERT OR REPLACE INTO layers (layerId, kind, commitHash, branch, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [layer.layerId, layer.kind, layer.commitHash ?? null, layer.branch ?? null, Date.now()],
+    );
+  }
+
+  /** Every layer this vault holds. */
+  public async listLayers(): Promise<LayerRow[]> {
+    await this.ensureVaultOpen();
+    const rows = await this.query<{ layerId: string; kind: string; commitHash: string | null }>(
+      `SELECT layerId, kind, commitHash FROM layers ORDER BY createdAt`);
+    return rows.map(r => ({ layerId: r.layerId, kind: r.kind as LayerKind, commitHash: r.commitHash }));
+  }
+
+  /**
+   * The layer reads resolve through. Defaults to `uncommitted`, which is the answer for every vault
+   * that predates layers — so an old vault reads correctly rather than reporting no active layer.
+   */
+  public async activeLayerId(): Promise<string> {
+    await this.ensureVaultOpen();
+    const rows = await this.query<{ value: string }>(`SELECT value FROM metadata WHERE key = 'active_layer'`);
+    return rows[0]?.value || UNCOMMITTED_LAYER;
+  }
+
+  /** Point reads at a layer. The layer must already be recorded, or a reader resolves to nothing. */
+  public async setActiveLayer(layerId: string): Promise<void> {
+    if (this.readOnly) return;
+    await this.ensureVaultOpen();
+    await this.run(`INSERT OR REPLACE INTO metadata (key, value) VALUES ('active_layer', ?)`, [layerId]);
+  }
+
+  /**
+   * Delete every layer no git pointer names, and report which went (ADR 0035's collection rule).
+   *
+   * `pointedAt` is what `git for-each-ref` resolved to. The decision of WHAT is collectable lives in
+   * `layer-reachability.ts` as pure functions, because that is where the dangerous mistakes are —
+   * collecting the active layer, collecting `uncommitted`, or treating an empty pointer set as
+   * "nothing is reachable" and deleting the whole vault at the moment git is least trustworthy.
+   *
+   * Deleting the layer ROW is the whole operation today, since no node rows are layer-scoped yet.
+   * When they are, this is where their delete joins.
+   */
+  public async collectUnreachableLayers(pointedAt: ReadonlySet<string>): Promise<string[]> {
+    if (this.readOnly) return [];
+    const [layers, active] = [await this.listLayers(), await this.activeLayerId()];
+    const doomed = collectableLayers(layers, pointedAt, active);
+    for (const layerId of doomed) await this.run(`DELETE FROM layers WHERE layerId = ?`, [layerId]);
+    return doomed;
   }
 
   public async sweepRowsNotInPulse(pulseId: string, scope?: string): Promise<{ nodes: number; edges: number }> {
