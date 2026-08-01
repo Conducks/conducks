@@ -72,4 +72,42 @@ export const JAVASCRIPT_QUERIES = `
 
   ;; --- Metadata & Debt ---
   (comment) @comment
+
+  ;; --- Kinesis: the ROUTE half. JavaScript had NEITHER half until now ---
+  ;;
+  ;; The express pattern existed in the TypeScript queries and was never copied here, so a plain
+  ;; .js server declared no route at all. Found by building a two-service fixture and watching the
+  ;; Python caller resolve while the JavaScript route it called stayed invisible.
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (property_identifier) @route_method
+        (#match? @route_method "^(get|post|put|patch|delete|all)$"))
+    arguments: (arguments . (string) @kinesis_route_path)) @kinesis_route
+
+  ;; --- Kinesis: the REQUEST half of a cross-service pair (todo22#P15) ---
+  ;;
+  ;; Seven languages could already declare a ROUTE and none could declare a CALLER, so a
+  ;; cross-service edge was one-directional outside TypeScript. @kinesis_request_url is the URL,
+  ;; and the RECEIVER capture is what proves it is a network call rather than any other .get() —
+  ;; flow.ts rejects an unknown receiver unless the URL carries an absolute protocol.
+
+  ;; fetch('/url')
+  (call_expression
+    function: (identifier) @req_fn (#match? @req_fn "^(fetch)$")
+    arguments: (arguments . (string) @kinesis_request_url)) @kinesis_request
+
+  ;; axios.get('/url') · client.post('/url') · got.put(...)
+  (call_expression
+    function: (member_expression
+      object: (identifier) @kinesis_object
+        (#match? @kinesis_object "^(axios|got|superagent|ky|client|session|http)$")
+      property: (property_identifier) @req_method
+        (#match? @req_method "^(get|post|put|patch|delete|head|options|request)$"))
+    arguments: (arguments . (string) @kinesis_request_url)) @kinesis_request
+
+  ;; axios('/url') — the callable form
+  (call_expression
+    function: (identifier) @req_fn (#match? @req_fn "^(axios|got|ky)$")
+    arguments: (arguments . (string) @kinesis_request_url)) @kinesis_request
 `;

@@ -155,4 +155,16 @@ export const GO_QUERIES = `
 
   ;; --- Debt Markers ---
   (comment) @comment
+
+  ;; --- Kinesis: the REQUEST half of a cross-service pair (todo22#P15) ---
+  ;;
+  ;; http.Get(url) · http.Post(url, ...) · client.Do/Get/Post. Go's stdlib client is the receiver
+  ;; flow.ts needs as evidence — a bare Get(...) proves nothing.
+  (call_expression
+    function: (selector_expression
+      operand: (identifier) @kinesis_object
+        (#match? @kinesis_object "^(http|client|Client|httpClient)$")
+      field: (field_identifier) @req_method
+        (#match? @req_method "^(Get|Post|Put|Patch|Delete|Head|Do|NewRequest|PostForm)$"))
+    arguments: (argument_list . (interpreted_string_literal) @kinesis_request_url)) @kinesis_request
 `;

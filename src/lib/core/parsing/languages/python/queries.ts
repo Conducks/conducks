@@ -99,4 +99,17 @@ export const PYTHON_QUERIES = `
   ;; --- Metadata & Debt ---
   (expression_statement (string) @comment) ; Docstrings
   (comment) @comment
+
+  ;; --- Kinesis: the REQUEST half of a cross-service pair (todo22#P15) ---
+  ;;
+  ;; requests.get(url) · httpx.post(url) · session.put(url) · aiohttp client calls.
+  ;; The receiver is captured because flow.ts uses it as the evidence that this is a network call
+  ;; — .get() on its own is far more often a dict lookup.
+  (call
+    function: (attribute
+      object: (identifier) @kinesis_object
+        (#match? @kinesis_object "^(requests|httpx|aiohttp|session|client|http|urllib)$")
+      attribute: (identifier) @req_method
+        (#match? @req_method "^(get|post|put|patch|delete|head|options|request|urlopen)$"))
+    arguments: (argument_list . (string) @kinesis_request_url)) @kinesis_request
 `;
