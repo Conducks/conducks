@@ -280,7 +280,15 @@ export class IntraLinker {
           // `db` is `export { coreDb as db }`, and `coreDb` is what carries the type. Walk the
           // ALIASES chain to the node that actually declares something, then read from THERE — and
           // resolve the type against THAT file, since the class is imported where it is used.
-          const declId = this.declarationOf(graph, `${file}::${receiver}`, unitImports, unitSymbols);
+          // INNERMOST SCOPE FIRST — a local declaration shadows a module-level one of the same name.
+          // The call target carries the receiver unscoped, so `client.fetchIt()` inside a function
+          // that declares its own `client` looked up the MODULE-level variable and resolved into the
+          // wrong class. Measured on the oracle fixture: a local `new SmtpClient()` answered
+          // `HttpClient.fetchIt`. This is TypeScript's scoping rule, not a heuristic.
+          const callerScope = edge.sourceId.slice(edge.sourceId.lastIndexOf('::') + 2);
+          const scopedReceiver = `${file}::${callerScope}.${receiver}`;
+          const receiverId = graph.hasNode(scopedReceiver) ? scopedReceiver : `${file}::${receiver}`;
+          const declId = this.declarationOf(graph, receiverId, unitImports, unitSymbols);
           const declFile = declId.slice(0, declId.lastIndexOf('::'));
           const receiverProps = graph.getNode(declId)?.properties as any;
           // A direct `new Y()` states the type outright. A factory states it on the CALLEE — read
@@ -326,6 +334,42 @@ export class IntraLinker {
         resolvedId = this.resolveSymbol(bareName, sourceUnitId, unitImports, unitSymbols);
       }
 
+      // 3b-bis. A BARE `receiver.method` whose receiver is a variable with a recorded type.
+      //
+      // This must run BEFORE 3c, which throws the receiver away and matches the method name alone
+      // across every imported unit — a guess that picks the first `fetchIt` it finds. Where the
+      // receiver's type IS known, the exact member is knowable and guessing is inexcusable.
+      //
+      // Innermost scope first: a local declaration shadows a module-level one of the same name.
+      // Measured on the oracle fixture — a local `new SmtpClient()` was answering
+      // `HttpClient.fetchIt`, a different class in the same file.
+      if (!resolvedId && bareName.includes('.')) {
+        const dot = bareName.indexOf('.');
+        const receiver = bareName.slice(0, dot);
+        const member = bareName.slice(dot + 1);
+        const file = sourceUnitId.slice(0, sourceUnitId.lastIndexOf('::'));
+        const callerScope = edge.sourceId.slice(edge.sourceId.lastIndexOf('::') + 2);
+
+        const scoped = `${file}::${callerScope}.${receiver}`;
+        const receiverId = graph.hasNode(scoped) ? scoped
+          : graph.hasNode(`${file}::${receiver}`) ? `${file}::${receiver}`
+          : null;
+
+        if (receiverId) {
+          const declId = this.declarationOf(graph, receiverId, unitImports, unitSymbols);
+          const declFile = declId.slice(0, declId.lastIndexOf('::'));
+          const props = graph.getNode(declId)?.properties as any;
+          const typeName = (props?.instanceOf as string | undefined)
+            ?? this.returnTypeOfCall(graph, props?.instanceOfCall as string | undefined, declFile, unitImports, unitSymbols);
+          if (typeName) {
+            const typeId =
+              unitSymbols.get(`${declFile}::unit`)?.get(typeName) ??
+              this.resolveSymbolUnique(typeName, `${declFile}::unit`, unitImports, unitSymbols);
+            if (typeId) resolvedId = this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols);
+          }
+        }
+      }
+
       // 3c. Method-call resolution: targets arrive as `receiver.method` (e.g. `reflector.reflect`,
       // `graph.getNeighbors`). Resolve the METHOD segment against the source file's imported units
       // only. This binds real internal method calls while leaving external receivers (path.join,
@@ -367,6 +411,37 @@ export class IntraLinker {
       if (resolvedId) {
         graph.rebindEdgeTarget(edge, resolvedId);
         resolved.push({ id: edge.id, newTargetId: resolvedId });
+      }
+    }
+
+    // ── 3f. A target that is a pure ALIAS is not where the code lives ────────
+    //
+    // A barrel node minted for a republished name (ADR 0071) is a real node, so an edge pointing at
+    // it does not dangle and nothing here used to look further. But `lib/index.ts::repo` DEFINES
+    // nothing — it aliases `order-repo.ts::OrderRepo`. An impact query answered from the shim misses
+    // the file that actually changes, and a member lookup on it finds no members at all.
+    //
+    // "Pure alias" is decided by structure, not by name: the node carries an outgoing ALIASES edge
+    // and owns no members of its own. Following it is a READ of what the export statement says.
+    const aliasOf = new Map<string, string>();
+    for (const e of graph.getAllEdges()) {
+      if (e.type !== 'ALIASES') continue;
+      if (!aliasOf.has(e.sourceId) && graph.hasNode(e.targetId)) aliasOf.set(e.sourceId, e.targetId);
+    }
+    if (aliasOf.size > 0) {
+      const ownsMembers = new Set<string>();
+      for (const n of graph.getAllNodes()) {
+        const id = String(n.id);
+        const sep = id.lastIndexOf('::');
+        const dot = id.indexOf('.', sep);
+        if (dot > -1) ownsMembers.add(id.slice(0, dot));
+      }
+      for (const edge of graph.getAllEdges()) {
+        if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type) || edge.type === 'ALIASES') continue;
+        const target = aliasOf.get(edge.targetId);
+        if (!target || ownsMembers.has(edge.targetId)) continue;
+        graph.rebindEdgeTarget(edge, target);
+        resolved.push({ id: edge.id, newTargetId: target });
       }
     }
 
@@ -519,6 +594,16 @@ export class IntraLinker {
       seen.add(currentId);
       const candidate = `${currentId.slice(0, currentId.lastIndexOf('::'))}::${currentName}.${member}`;
       if (graph.hasNode(candidate)) return candidate;
+
+      // The TYPE may itself be a re-export. `const r = new Repo()` where the barrel says
+      // `export { OrderRepo as Repo }` gives a type node that owns no members — the members live on
+      // OrderRepo. Follow the alias before concluding the member does not exist.
+      const typeAlias: string | undefined = graph.getNeighbors(currentId, 'downstream', 'ALIASES' as EdgeType)[0]?.targetId;
+      if (typeAlias && graph.hasNode(typeAlias) && !seen.has(typeAlias)) {
+        currentId = typeAlias;
+        currentName = typeAlias.slice(typeAlias.lastIndexOf('::') + 2);
+        continue;
+      }
 
       const raw: string | undefined =
         graph.getNeighbors(currentId, 'downstream', 'EXTENDS' as EdgeType)[0]?.targetId;

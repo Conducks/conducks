@@ -1,3 +1,4 @@
+import { isBuiltIn, getGlobalId } from '@/lib/core/parsing/built-ins.js';
 import { nextRoutes } from "@/lib/core/parsing/next-routes.js";
 import type Parser from "tree-sitter";
 import { PrismSpectrum, SpectrumNode } from "../../core/parsing/prism-core.js";
@@ -917,7 +918,36 @@ export class ConducksReflector {
     // created in — the same reason the reference-as-value edges are emitted here rather than inline.
     for (const [varName, typeName] of instanceTypes) {
       const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);
-      if (node) (node.metadata ??= {}).instanceOf = typeName;
+      if (!node) continue;
+      (node.metadata ??= {}).instanceOf = typeName;
+
+      // Emit the relationship as a real EDGE, not just a property.
+      //
+      // `pruneTaxonomy` deletes an ATOM that carries no non-structural edge — ADR 0012/0013, and a
+      // measured decision: emitting every local variable floods the graph. A variable whose type was
+      // read had no such edge, so the node was DROPPED, `instanceOf` went with it, and a later
+      // `x.method()` fell through to matching a bare method name across the file. On the oracle
+      // fixture that picked the WRONG CLASS for a shadowed local.
+      //
+      // The fix is not to change the prune rule — it is to make the variable genuinely load-bearing.
+      // A variable that IS a ServiceRegistry has a relationship to ServiceRegistry, so the existing
+      // rule keeps it for the right reason, and only variables with a recorded type survive.
+      spectrum.relationships.push({
+        // The SCOPED key (`localscoped.client`), not the bare name. A file can hold two variables of
+        // the same name in different scopes — the node ids already distinguish them, and using the
+        // bare name here sent BOTH edges to the module-level node, leaving the local one edgeless
+        // and therefore pruned. That is how a shadowed local lost its type entirely.
+        sourceName: varName,
+        // A BUILT-IN type points at its global id rather than dangling. `new Date()` makes the
+        // variable a Date, which is true and worth recording — but Date is not a project node, so a
+        // bare name would be permanently unresolvable. Measured: 128 such edges on mentorseed (65
+        // Date, 22 Set, ...), which would have doubled the dangling rate to record nothing new.
+        // Same treatment calls to built-ins already get.
+        targetName: isBuiltIn(typeName, provider.langId) ? getGlobalId(typeName) : typeName,
+        type: 'CONSTRUCTS' as any,
+        confidence: 1.0,
+        metadata: { isInstanceOf: true },
+      });
     }
     for (const [varName, callTarget] of instanceCalls) {
       const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);
