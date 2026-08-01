@@ -46,7 +46,12 @@ export class FederatedLinker {
   public async hydrate(mainGraph: ConducksAdjacencyList): Promise<void> {
     const links = await this.getLinks();
     for (const linkPath of links) {
-      const p = new SynapsePersistence(linkPath); // Force READ_ONLY for federation neighbors
+      // READ-ONLY, and now actually so. `readOnly` defaults to FALSE, so this comment described an
+      // intent the code did not carry out: it opened a NEIGHBOUR project's vault read-write, taking
+      // an exclusive lock on a database this process does not own and blocking that project's own
+      // readers. Since ADR 0040's reader snapshot, it would also have paid a full vault copy per
+      // neighbour on every federated load.
+      const p = new SynapsePersistence(linkPath, true);
       const before = mainGraph.stats.nodeCount;
       await p.load(mainGraph);
       const success = mainGraph.stats.nodeCount > before;

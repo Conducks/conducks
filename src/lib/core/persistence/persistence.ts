@@ -27,6 +27,14 @@ export class SynapsePersistence {
   // self-committing. An interrupted analyze then never commits → duckdb rolls the whole pulse
   // back on next open, so the previous good graph survives (no silent partial-graph corruption).
   private inPulse: boolean = false;
+  // True when this connection is answering from the reader snapshot rather than the vault itself,
+  // i.e. a pulse held the vault when we opened and we fell back to the PREVIOUS pulse. Read by
+  // `servedFromSnapshot()` so `conducks_status` can say which pulse an answer came from — one
+  // pulse stale is acceptable, one pulse stale and invisible is not (ADR 0040).
+  private answeringFromSnapshot: boolean = false;
+  // Set once this write session has published a reader snapshot, so `close()` knows to take it
+  // away again. The 2x disk cost is meant to last for the write session, not forever.
+  private publishedSnapshot: boolean = false;
 
   /** Open an atomic analyze pulse: every write until save()/abortPulse() is one transaction. */
   public async beginPulse(): Promise<void> {
@@ -66,39 +74,166 @@ export class SynapsePersistence {
     return this.db !== null;
   }
 
+  /** The vault file every process agrees on. Readers open this; a pulse writes it. */
+  private dbFile(): string {
+    return path.join(path.resolve(this.vaultPath, '.conducks'), 'conducks-synapse.db');
+  }
+
+  /**
+   * The sibling a reader falls back to while a pulse holds the vault (ADR 0040).
+   *
+   * A fixed name, not a pid-suffixed one: a reader in ANOTHER process has to be able to find it
+   * without knowing which process is pulsing.
+   */
+  private snapshotFile(): string {
+    return `${this.dbFile()}.reader`;
+  }
+
+  private isLockError(err: unknown): boolean {
+    return /Could not set lock|Conflicting lock/i.test(String((err as { message?: string })?.message ?? err));
+  }
+
+  /** Open one specific file into `this.db`. Split out so the snapshot fallback reuses it verbatim. */
+  private openAt(filePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const db = new duckdb.Database(filePath, { access_mode: this.readOnly ? 'READ_ONLY' : 'READ_WRITE' }, (err) => {
+        if (err) return reject(err);
+        this.db = db;
+        this.initializeSchema().then(() => resolve()).catch(reject);
+      });
+    });
+  }
+
   private async ensureVaultOpen(): Promise<duckdb.Database> {
     if (this.db) return this.db;
-    
+
     const vaultDir = path.resolve(this.vaultPath, '.conducks');
     if (!fs.existsSync(vaultDir)) {
       fs.mkdirSync(vaultDir, { recursive: true });
     }
 
-    const dbPath = path.join(vaultDir, 'conducks-synapse.db');
-    
+    const dbPath = this.dbFile();
+
     const maxAttempts = 3;
     const retryDelay = 500;
+    let lastErr: unknown;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await new Promise((resolve, reject) => {
-          const db = new duckdb.Database(dbPath, { access_mode: this.readOnly ? 'READ_ONLY' : 'READ_WRITE' }, (err) => {
-            if (err) return reject(err);
-            this.db = db;
-            this.initializeSchema().then(() => resolve(db)).catch(reject);
-          });
-        });
+        await this.openAt(dbPath);
+        this.answeringFromSnapshot = false;
+        // A write session publishes the previous pulse for readers to fall back to, so that from
+        // here until close() a read arriving mid-pulse is answered instead of refused.
+        if (!this.readOnly) await this.publishReaderSnapshot();
         return this.db!;
       } catch (err) {
+        lastErr = err;
+        this.db = null;
+
+        // THE POINT OF ADR 0040. A reader that arrives while a pulse holds the vault gets the
+        // PREVIOUS pulse's answer rather than an error. Only on a LOCK error: a corrupt vault or a
+        // missing table is a real failure and must still surface, not be papered over with stale
+        // data. Tried on every attempt because on the very first write session the snapshot may
+        // still be being copied — the retry delay is what covers that window.
+        if (this.readOnly && this.isLockError(err) && fs.existsSync(this.snapshotFile())) {
+          try {
+            await this.openAt(this.snapshotFile());
+            this.answeringFromSnapshot = true;
+            logger.debug(`🛡️ [Vault] Pulse in flight — answering from the previous pulse's snapshot.`);
+            return this.db!;
+          } catch (snapErr) {
+            lastErr = snapErr;
+            this.db = null;
+          }
+        }
+
         // Log ONCE, on the last attempt. Logging per attempt printed the same wall of DuckDB text
         // three times and buried the one line that matters.
         if (attempt === maxAttempts) {
-          logger.error(this.explainOpenFailure(err, dbPath));
-          throw err;
+          logger.error(this.explainOpenFailure(lastErr, dbPath));
+          throw lastErr;
         }
         await new Promise(r => setTimeout(r, retryDelay));
       }
     }
     throw new Error('🛡️ [Vault Error] Failed to open database after all attempts');
+  }
+
+  /**
+   * Copy the vault as it stands to the sibling readers fall back to, and swap it in atomically.
+   *
+   * This is `compact()`'s mechanism used for a different reason (ADR 0040 says so explicitly):
+   * ATTACH a sibling, `COPY FROM DATABASE`, DETACH — which flushes it — then `rename` over the old
+   * snapshot. A crash at any point leaves either the old snapshot or the new one, never a
+   * half-written one, for the same reason compaction is safe.
+   *
+   * The WAL removal is not optional and not tidiness. DuckDB replays `<db>.wal` on the next open by
+   * FILENAME, so the PREVIOUS snapshot's log left beside the file just renamed into its place is
+   * replayed against a database that already has those tables, and the reader's open dies with
+   * "Table with name nodes already exists" — the exact failure ADR 0037 pinned for compaction.
+   *
+   * Never fails the caller. Without a snapshot a reader is back to the old behaviour of erroring on
+   * a locked vault, which is worse than it was but is not a reason to fail somebody's analyze.
+   */
+  private async publishReaderSnapshot(): Promise<void> {
+    if (this.readOnly) return;
+    // Only ever at the START of a write session. Mid-pulse the vault holds rows the pulse has not
+    // committed, and the ATTACH would run inside somebody's open transaction — a snapshot taken
+    // there could publish half a pulse, which is the one thing this must never do.
+    if (this.inPulse) return;
+    const snapPath = this.snapshotFile();
+    const tmpPath = `${snapPath}.tmp-${process.pid}`;
+
+    try {
+      // A vault with nothing in it has no previous pulse to serve, and a snapshot of an empty
+      // database would answer "0 symbols" — a wrong answer is worse than the lock error.
+      const [counts] = await this.query<{ n: number }>(`SELECT count(*)::INT AS n FROM nodes`);
+      if (!Number(counts?.n ?? 0)) return;
+
+      fs.rmSync(tmpPath, { force: true });
+      fs.rmSync(`${tmpPath}.wal`, { force: true });
+
+      // Read the source database's name rather than assuming it — DuckDB names a file-backed
+      // database after its file stem, and hardcoding it breaks the moment the filename changes
+      // (the same trap compact() documents).
+      const [{ database_name: source }] = await this.query<{ database_name: string }>(
+        `SELECT database_name FROM duckdb_databases() WHERE path IS NOT NULL AND path <> '' LIMIT 1`);
+
+      await this.run(`ATTACH '${tmpPath.replace(/'/g, "''")}' AS reader_snapshot`);
+      await this.run(`COPY FROM DATABASE "${source}" TO reader_snapshot`);
+      await this.run(`DETACH reader_snapshot`);
+
+      fs.rmSync(`${tmpPath}.wal`, { force: true });
+      fs.renameSync(tmpPath, snapPath);
+      fs.rmSync(`${snapPath}.wal`, { force: true });
+      this.publishedSnapshot = true;
+    } catch (err) {
+      fs.rmSync(tmpPath, { force: true });
+      fs.rmSync(`${tmpPath}.wal`, { force: true });
+      logger.warn(`🛡️ [Vault] Could not publish a reader snapshot; reads during this pulse may be refused`, err);
+    }
+  }
+
+  /**
+   * Which pulse this connection is answering from, and whether that is the live vault or the
+   * snapshot of the pulse before it.
+   *
+   * `conducks_status` reports staleness against git already; this answers the second question the
+   * same field has to carry now — "one pulse stale" is only acceptable while it is visible.
+   */
+  public servedFromSnapshot(): boolean {
+    return this.answeringFromSnapshot;
+  }
+
+  public async currentPulse(): Promise<{ id: string; timestamp: number; commitHash: string | null; branch: string | null } | null> {
+    const rows = await this.query<{ id: string; timestamp: number; commitHash: string | null; branch: string | null }>(
+      `SELECT id, timestamp, commitHash, branch FROM pulses ORDER BY timestamp DESC LIMIT 1`);
+    if (!rows.length) return null;
+    return {
+      id: rows[0].id,
+      timestamp: Number(rows[0].timestamp),
+      commitHash: rows[0].commitHash ?? null,
+      branch: rows[0].branch ?? null,
+    };
   }
 
   /**
@@ -1270,7 +1405,7 @@ export class SynapsePersistence {
       throw new Error('🛡️ [Persistence] COMPACT BLOCKED: a pulse is in flight.');
     }
 
-    const dbPath = path.join(path.resolve(this.vaultPath, '.conducks'), 'conducks-synapse.db');
+    const dbPath = this.dbFile();
     if (!fs.existsSync(dbPath)) return null;
 
     const before = fs.statSync(dbPath).size;
@@ -1332,6 +1467,16 @@ export class SynapsePersistence {
   }
 
   public async close(): Promise<void> {
+    // The snapshot exists so that readers survive THIS write session. Once the session is over the
+    // vault is unlocked again and readers go straight to it, so keeping the copy would make ADR
+    // 0040's "2x on disk for the duration of a pulse" into 2x on disk forever. Unlinking it does
+    // not disturb a reader that already has it open — on POSIX that reader finishes against the
+    // old inode, the same property the atomic rename relies on.
+    if (!this.readOnly && this.publishedSnapshot) {
+      this.publishedSnapshot = false;
+      fs.rmSync(this.snapshotFile(), { force: true });
+      fs.rmSync(`${this.snapshotFile()}.wal`, { force: true });
+    }
     if (this.db) {
       const closePromise = new Promise<void>((resolve, reject) => {
         this.db!.close((err) => {

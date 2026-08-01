@@ -159,7 +159,10 @@ export class Conducks {
 
   public async compare(otherPath: string): Promise<any> {
     const otherGraph = new ConducksGraph();
-    const otherPersistence = new SynapsePersistence(otherPath);
+    // READ-ONLY: `compare()` only calls `load()`. Opening another project's vault read-write takes
+    // an exclusive lock on it and, since ADR 0040, publishes a reader snapshot beside it — for a
+    // read this process never writes to. Same defect as `linker-federated.ts`, same fix.
+    const otherPersistence = new SynapsePersistence(otherPath, true);
     await otherPersistence.load(otherGraph.getGraph());
     return this.resonance.analyzeResonance(this.graph.getGraph(), otherGraph.getGraph());
   }
