@@ -57,7 +57,7 @@ enum Mode {
 
   const CHILD = `
 (async () => {
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { JavaProvider } = await import('./src/lib/core/parsing/languages/java/index.ts');
   const { JAVA_QUERIES } = await import('./src/lib/core/parsing/languages/java/queries.ts');

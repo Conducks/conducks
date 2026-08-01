@@ -32,7 +32,7 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
   // across the process boundary. Loading it lazily keeps the dependency dynamic: nothing in core
   // pulls domain at module-resolution time, and the worker still gets the real reflector on its
   // first (and only) call. Behaviourally identical — runWorker is invoked immediately at bootstrap.
-  const { ConducksReflector } = await import("../../domain/analysis/reflector.js");
+  const { ConducksReflector } = await import("@/lib/core/parsing/reflector.js");
   const reflector = new ConducksReflector();
   const context = new AnalyzeContext();
   

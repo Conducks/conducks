@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { DriftEngine } from '@/lib/domain/evolution/drift-engine.js';
 import type { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
-import { ConducksReflector } from '@/lib/domain/analysis/reflector.js';
+import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
 import { AnalyzeContext } from '@/lib/core/parsing/context.js';
 
 /**
@@ -135,7 +135,7 @@ app.get('/users', handler);
 const CHILD = `
 (async () => {
   const [filePath, source] = JSON.parse(process.argv[1]);
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { grammars } = await import('./src/lib/core/parsing/grammar-registry.ts');
   const { TypeScriptProvider } = await import('./src/lib/core/parsing/languages/typescript/index.ts');

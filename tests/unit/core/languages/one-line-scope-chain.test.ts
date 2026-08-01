@@ -30,7 +30,7 @@ class Outer { inner(): void {} }
 const CHILD = `
 (async () => {
   const [filePath, source] = JSON.parse(process.argv[1]);
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { grammars } = await import('./src/lib/core/parsing/grammar-registry.ts');
   const { TypeScriptProvider } = await import('./src/lib/core/parsing/languages/typescript/index.ts');

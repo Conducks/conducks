@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
-import { ConducksReflector, ParseFailure } from '@/lib/domain/analysis/reflector.js';
+import { ConducksReflector, ParseFailure } from '@/lib/core/parsing/reflector.js';
 import { AnalyzeContext } from '@/lib/core/parsing/context.js';
 import { TypeScriptProvider } from '@/lib/core/parsing/languages/typescript/index.js';
 import { grammars } from '@/lib/core/parsing/grammar-registry.js';

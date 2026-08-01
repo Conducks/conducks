@@ -46,7 +46,7 @@ type Plain struct { name string }
 
   const CHILD = `
 (async () => {
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { GoProvider } = await import('./src/lib/core/parsing/languages/go/index.ts');
   const { GO_QUERIES } = await import('./src/lib/core/parsing/languages/go/queries.ts');

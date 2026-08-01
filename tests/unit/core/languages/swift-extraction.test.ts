@@ -76,7 +76,7 @@ func topLevel(a: Int) -> Int {
 
   const CHILD = `
 (async () => {
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { SwiftProvider } = await import('./src/lib/core/parsing/languages/swift/index.ts');
   const { SWIFT_QUERIES } = await import('./src/lib/core/parsing/languages/swift/queries.ts');

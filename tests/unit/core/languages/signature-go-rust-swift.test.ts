@@ -30,7 +30,7 @@ function runChild(childScript: string, source: string): any {
 
 const childFor = (providerImport: string, providerClass: string, filePath: string, langId: string) => `
 (async () => {
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { ${providerClass} } = await import('${providerImport}');
   const { grammars } = await import('./src/lib/core/parsing/grammar-registry.ts');

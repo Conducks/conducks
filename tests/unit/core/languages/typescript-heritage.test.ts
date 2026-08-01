@@ -65,7 +65,7 @@ class Plain {}
 const CHILD = `
 (async () => {
   const [lang, provPath, provName, filePath, source] = JSON.parse(process.argv[1]);
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { grammars } = await import('./src/lib/core/parsing/grammar-registry.ts');
   const QUERY_SOURCE = {

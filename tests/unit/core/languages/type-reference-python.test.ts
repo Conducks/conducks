@@ -34,7 +34,7 @@ def process(items: List[Repo]) -> None:
 
   const CHILD = `
 (async () => {
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { PythonProvider } = await import('./src/lib/core/parsing/languages/python/index.ts');
   const { PYTHON_QUERIES } = await import('./src/lib/core/parsing/languages/python/queries.ts');

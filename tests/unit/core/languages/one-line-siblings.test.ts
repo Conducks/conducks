@@ -15,7 +15,7 @@
  * required that the scope contain the declaration.
  */
 import { describe, it, expect } from '@jest/globals';
-import { ConducksReflector } from '@/lib/domain/analysis/reflector.js';
+import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
 import { AnalyzeContext } from '@/lib/core/parsing/context.js';
 import { registry as bootstrapped } from '@/registry/index.js';
 import { grammars } from '@/lib/core/parsing/grammar-registry.js';

@@ -1,12 +1,10 @@
 # core/parsing — source text → spectrum
 
-**Layer:** core — so it may import contracts and nothing else. **One file breaks that today:**
-`pulse-worker.ts:2` imports `ConducksReflector` from `../../domain/analysis/reflector.js`, an upward
-core → domain edge the layer contract forbids. It is a worker entry point reaching for the thing it
-must run, and the graph carries the edge (IMPORTS + CONSTRUCTS + CALLS), so this is a real violation,
-not a type-erasure artefact. Nothing catches it because the layer rule is not loaded
-([sentinel](../../domain/governance/sentinel/MODULE.md)). Fix direction: the worker should receive a
-reflector rather than import one, or the reflector should move to core.
+**Layer:** core — it may import contracts and core siblings, and it does. **The one violation this
+note used to describe is GONE** (ADR 0093): `pulse-worker.ts` imported the reflector from domain, and
+the fix was not the dependency inversion that had been debated for weeks — the reflector imported
+NOTHING from domain, so it was a core module filed in the wrong folder. It now lives here, and the
+layer gate grants zero exceptions.
 
 The largest module in the codebase (67 files), 50 of them per-language surface area.
 

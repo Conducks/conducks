@@ -40,7 +40,7 @@ export class Impl implements HeritageOnly {
 
 const CHILD = `
 (async () => {
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { TypeScriptProvider } = await import('./src/lib/core/parsing/languages/typescript/index.ts');
   const { grammars } = await import('./src/lib/core/parsing/grammar-registry.ts');

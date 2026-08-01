@@ -3,7 +3,7 @@ import { ConducksPipeline } from "@/lib/core/parsing/pipeline.js";
 import { GraphSkeletonBuilder } from "@/lib/domain/analysis/graph-skeleton-builder.js";
 import { WorkerPool } from "@/lib/domain/analysis/worker-pool.js";
 import { ReflectionPipeline } from "@/lib/domain/analysis/reflection-pipeline.js";
-import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
+import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";

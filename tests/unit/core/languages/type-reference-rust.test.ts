@@ -38,7 +38,7 @@ impl Shape for Repo {
 
   const CHILD = `
 (async () => {
-  const { ConducksReflector } = await import('./src/lib/domain/analysis/reflector.ts');
+  const { ConducksReflector } = await import('./src/lib/core/parsing/reflector.ts');
   const { AnalyzeContext } = await import('./src/lib/core/parsing/context.ts');
   const { RustProvider } = await import('./src/lib/core/parsing/languages/rust/index.ts');
   const { RUST_QUERIES } = await import('./src/lib/core/parsing/languages/rust/queries.ts');

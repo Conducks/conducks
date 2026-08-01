@@ -416,11 +416,11 @@ export class AnalysisService {
       // this reverses it. The doc governs the module's own index file, because a directory is not a
       // node and the index is what a reader opens first.
       for (const rel of AnalysisService.walkModuleDocs(path.join(workspaceRoot, 'docs', 'modules'), '', [])) {
-        const modulePath = path.dirname(rel);            // e.g. core/parsing, or domain/analysis/reflector
+        const modulePath = path.dirname(rel);            // e.g. core/parsing, or core/parsing/reflector
         const docFile = path.join(workspaceRoot, 'docs', 'modules', rel);
         // A module note names one of THREE shapes, and assuming only the first linked 6 of 21:
         //   a directory with an index      core/kinetic          -> src/lib/domain/kinetic/index.ts
-        //   a single file                  analysis/reflector    -> src/lib/domain/analysis/reflector.ts
+        //   a single file                  parsing/reflector     -> src/lib/core/parsing/reflector.ts
         //   a directory with neither       core/graph            -> the DIRECTORY node itself
         for (const base of [path.join('src', 'lib', modulePath), path.join('src', modulePath)]) {
           const abs = path.join(workspaceRoot, base);
@@ -595,5 +595,5 @@ export class AnalysisService {
 }
 
 export { AnalyzeOrchestrator } from "./orchestrator.js";
-export { ConducksReflector } from "./reflector.js";
+export { ConducksReflector } from "@/lib/core/parsing/reflector.js";
 export { Conducks } from "./conducks-core.js";

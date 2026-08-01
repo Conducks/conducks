@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { ConducksReflector } from "./reflector.js";
+import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
 import { AnalyzeContext } from "../../core/parsing/context.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { SynapsePersistence } from "../../core/persistence/persistence.js";

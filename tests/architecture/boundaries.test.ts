@@ -48,25 +48,22 @@ const resolveSpecifier = (fromFile: string, spec: string): string | null => {
 };
 
 /**
- * The ONE granted exception, named rather than hidden (ADR 0048).
+ * NO GRANTED EXCEPTIONS — and the list is kept, empty, rather than deleted.
  *
- * `pulse-worker.ts` is a PROCESS ENTRY POINT that happens to live under core. It is spawned
- * standalone — worker thread, fork, or child process — so the reflector cannot be injected across
- * the process boundary; the worker must construct it. Making the import dynamic was the original
- * workaround, and it did not remove the dependency, only its visibility to the graph-based rule.
+ * There was exactly one: `pulse-worker.ts` importing the reflector, a core -> domain edge. It was
+ * defended as unavoidable — the worker is a PROCESS ENTRY POINT, spawned standalone, so nothing can
+ * be injected across the process boundary. Making the import dynamic had hidden it from the rule
+ * without removing it.
  *
- * This entry records the edge as ALLOWED and keeps it enforced: any other core → domain import,
- * static or dynamic, still fails. Removing the exception means moving the reflector into core or
- * inverting it behind a contracts-level port — both are real options and neither is free, which is
- * why this is a decision rather than a TODO.
+ * The defence was answering the wrong question. The reflector imported NOTHING from domain: every
+ * one of its dependencies was core, contracts, or a node builtin. It was not a domain module that
+ * core needed — it was a CORE module filed in the wrong folder. Moving it removed the edge outright,
+ * with no injection, no port, and no exception (ADR 0093).
+ *
+ * The array stays so that granting the next one is a visible, reviewable diff rather than a new
+ * mechanism invented under pressure.
  */
-const GRANTED_EXCEPTIONS: ReadonlyArray<{ file: string; spec: string; why: string }> = [
-  {
-    file: 'src/lib/core/parsing/pulse-worker.ts',
-    spec: '../../domain/analysis/reflector.js',
-    why: 'process entry point; the reflector cannot cross a process boundary by injection',
-  },
-];
+const GRANTED_EXCEPTIONS: ReadonlyArray<{ file: string; spec: string; why: string }> = [];
 
 const isGranted = (v: { file: string; spec: string }) =>
   GRANTED_EXCEPTIONS.some(e => v.file.replace(/\\/g, '/').endsWith(e.file) && v.spec === e.spec);
@@ -119,13 +116,25 @@ describe('layer contract, enforced against this repository', () => {
     expect(bad.map(format)).toEqual([]);
   });
 
-  it('still enforces the layer the one exception sits in', () => {
-    // An exception that disabled the rule for its whole layer would be a suppression wearing a
-    // reason. Every core -> domain edge other than the named one must still be caught, so this
-    // asserts the granted entry is narrow: one file, one specifier.
-    expect(GRANTED_EXCEPTIONS).toHaveLength(1);
-    expect(GRANTED_EXCEPTIONS[0].file).toBe('src/lib/core/parsing/pulse-worker.ts');
-    expect(GRANTED_EXCEPTIONS[0].why).toMatch(/entry point/);
+  it('grants no exceptions at all', () => {
+    // The list was ONE entry — `pulse-worker.ts` importing the reflector — defended as unavoidable
+    // because a process entry point cannot be injected across a process boundary. That reasoning was
+    // sound and irrelevant: the reflector imported nothing from domain, so it was a CORE module in
+    // the wrong folder, and moving it removed the edge (ADR 0093).
+    expect(GRANTED_EXCEPTIONS).toEqual([]);
+  });
+
+  it('would still grant a narrow exception rather than a broad one, if one were ever added', () => {
+    // The mechanism is kept for the next real case, so this pins its SHAPE: an exception names one
+    // file and one specifier. A entry that matched a whole directory, or omitted the specifier,
+    // would be a suppression wearing a reason.
+    for (const e of GRANTED_EXCEPTIONS as ReadonlyArray<{ file: string; spec: string; why: string }>) {
+      expect(e.file).toMatch(/\.tsx?$/);
+      expect(e.spec).toBeTruthy();
+      expect(e.why.length).toBeGreaterThan(20);
+    }
+    // And the matcher must not treat an empty list as a licence: nothing is granted right now.
+    expect(isGranted({ file: 'src/lib/core/parsing/pulse-worker.ts', spec: '@/lib/core/parsing/reflector.js' })).toBe(false);
   });
 
   it('actually scanned the source tree', () => {

@@ -1,4 +1,4 @@
-import { ConducksReflector } from "@/lib/domain/analysis/reflector.js";
+import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
