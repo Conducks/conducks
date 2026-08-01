@@ -150,6 +150,21 @@ export class ConducksWatcher {
     if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = null; }
     // Removed on a CLEAN stop, so a deliberate shutdown reads as "none" rather than "dead".
     clearWatcherMarker(this.rootDir);
+
+    // Reclaim the churn this session created, ON SHUTDOWN and nowhere else (todo21#P1).
+    //
+    // DuckDB never reclaims deleted row versions (ADR 0037), and every micro-pulse purges a unit's
+    // rows and re-inserts them. Only `analyze` called `reclaimIfBloated`, so a long watcher session
+    // grew the vault with nothing ever reclaiming it — verified by grep before this line existed.
+    //
+    // On SHUTDOWN rather than per pulse, deliberately: the check is one cheap query, but when it
+    // fires it rewrites the whole file, and a multi-second pause in the middle of a save-loop is
+    // exactly the "accelerator that became a requirement" ADR 0036 warns about. At shutdown nobody
+    // is waiting. The ratio gate means a healthy vault pays a single query and nothing else.
+    //
+    // Never throws: a failed cleanup must not fail a shutdown, and the worst case is the churn
+    // surviving until the next `analyze`, which is where it lived before this.
+    try { await this.options.persistence?.reclaimIfBloated(3); } catch { /* churn waits for analyze */ }
     if (this.watcher) {
       await this.watcher.close();
       this.watcher = null;

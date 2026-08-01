@@ -1,5 +1,20 @@
 # Memory — conducks
 
+## Two "sentinel rules" exist and they are unrelated mechanisms
+
+`sentinel-rules.ts` and `sentinel.ts` both talk about "rules", and they are different things read by
+different commands. Grepping for one and finding the other has already cost a debugging session.
+
+| file | type | run by | shape |
+|---|---|---|---|
+| `sentinel-rules.ts` | `SentinelRule` | `conducks guard` | hardcoded, code-reviewed, blocks |
+| `sentinel.ts` | `ProjectRule` | `conducks audit` | user-editable `config/sentinel.json`, reports |
+
+They are deliberately NOT merged (ADR 0073): merging would let an edited JSON file change what
+blocks a commit, or force `guard` to pay for arbitrary user policy on every run.
+
+If a rule you edited did not fire, check which of the two you edited.
+
 ## Content-addressed layers cost ~10% read time for 44% less disk
 
 Measured on two real adjacent commits, 8,781 slots, best of 3 warmed: scanning one layer is 23.7 ms

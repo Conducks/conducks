@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from '@jest/globals';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { ConducksWatcher } from '@/lib/domain/evolution/watcher.js';
 import {
   readWatcherLiveness, writeWatcherMarker, clearWatcherMarker, watcherMarkerPath, HEARTBEAT_STALE_MS,
 } from '@/lib/domain/evolution/watcher-liveness.js';
@@ -96,5 +97,42 @@ describe('watcher liveness', () => {
     const root = mkRoot();
     writeRaw(root, { pid: process.pid, startedAt: 'x', heartbeatAt: 'never' });
     expect(readWatcherLiveness(root)).toMatchObject({ state: 'dead' });
+  });
+});
+
+/**
+ * A watcher session's churn is reclaimed on SHUTDOWN (todo21#P1).
+ *
+ * DuckDB never reclaims deleted row versions (ADR 0037), and every micro-pulse purges a unit's rows
+ * and re-inserts them. Only `analyze` called `reclaimIfBloated`, so a long watcher session grew the
+ * vault with nothing ever reclaiming it.
+ *
+ * Shutdown, not per-pulse: the gate is one cheap query, but when it fires it rewrites the whole
+ * file, and a multi-second pause mid-save-loop is the "accelerator that became a requirement"
+ * ADR 0036 warns about. At shutdown nobody is waiting.
+ */
+describe('a watcher reclaims its own churn when it stops', () => {
+  const mkWatcher = (persistence: unknown) => {
+    const root = mkRoot();
+    // Constructed directly with a stub persistence: the reclaim contract is what is under test, and
+    // a real vault would test DuckDB rather than the call.
+    return new ConducksWatcher(root, { getGraph: () => ({}) } as never, { persistence } as never);
+  };
+
+  it('asks the vault to reclaim, with the bloat ratio gate', async () => {
+    const calls: number[] = [];
+    const w = mkWatcher({ reclaimIfBloated: async (r: number) => { calls.push(r); return null; } });
+    await w.stop();
+    expect(calls).toEqual([3]);
+  });
+
+  it('does not fail the shutdown when reclaim throws', async () => {
+    const w = mkWatcher({ reclaimIfBloated: async () => { throw new Error('vault locked'); } });
+    await expect(w.stop()).resolves.toBeUndefined();
+  });
+
+  it('stops cleanly when there is no persistence at all', async () => {
+    const w = mkWatcher(undefined);
+    await expect(w.stop()).resolves.toBeUndefined();
   });
 });
