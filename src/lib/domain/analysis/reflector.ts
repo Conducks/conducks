@@ -1,3 +1,4 @@
+import { nextRoutes } from "@/lib/core/parsing/next-routes.js";
 import type Parser from "tree-sitter";
 import { PrismSpectrum, SpectrumNode } from "../../core/parsing/prism-core.js";
 import { ConducksProvider } from "../../core/parsing/providers/base.js";
@@ -701,6 +702,23 @@ export class ConducksReflector {
         confidence: 0.8,
         metadata: { referenceAsValue: true, original: raw }
       });
+    }
+
+    // Next.js app-router routes, which no query can capture (todo29#P5).
+    //
+    // Every other route pattern matches the EXPRESS shape — `app.get('/path', handler)`, a call
+    // expression naming its own path. Next.js declares a route by FILE POSITION instead, so there is
+    // nothing for a query to match and 118 route files on mentorseed produced ZERO route nodes:
+    // conducks could see who CALLED an endpoint and not who SERVED it, on the most common React
+    // stack.
+    //
+    // Emitted HERE, after the match loop, because it needs the file's EXPORTED names — which are
+    // only complete once the walk has finished. `GET`/`POST` are exports, not calls.
+    for (const { method, path: routePath } of nextRoutes(
+      file.path,
+      [...nodeCache.values()].filter(n => n.metadata?.isExport || n.isExport).map(n => String(n.name)),
+    )) {
+      this.flow.processRoute(routePath, method, 'unit', spectrum, 'nextjs');
     }
 
     // `nodeCache` holds the symbols discovered by the query walk, and this line REPLACES the array
