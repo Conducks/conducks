@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { CONTENT_NODE_COLUMNS, VOLATILE_NODE_COLUMNS } from "@/lib/core/persistence/content-key.js";
 import { collectableLayers, UNCOMMITTED_LAYER, type LayerKind, type LayerRow } from "@/lib/core/persistence/layer-reachability.js";
 import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
 import fs from "node:fs";
@@ -382,6 +384,29 @@ export class SynapsePersistence {
       commitHash VARCHAR,
       branch VARCHAR,
       createdAt BIGINT
+    );`);
+    // Commit-layer storage, content-addressed (ADR 0081), BESIDE `nodes` rather than replacing it.
+    //
+    // ADR 0035's model already splits these: `uncommitted` is the ONE mutable layer, and every
+    // commit layer is immutable. `nodes` IS the uncommitted layer — hot, rewritten every pulse, and
+    // holding exactly one version, so `id` stays a bare PRIMARY KEY there and is correct as such.
+    // Commit layers are many, immutable and share ~97% of their content, which is where addressing
+    // pays and where `nodes.id` alone could not express a key.
+    //
+    // Keeping the pulse's write path untouched is the point: it is the one path every command
+    // depends on, and migrating it to a view would trade a measured win for risk on the hot path.
+    // todo20#P3 asked for `nodes.id` to stop being a bare PRIMARY KEY; that wording presumed one
+    // table for everything, and the goal behind it — two versions coexisting — is met here.
+    await run(`CREATE TABLE IF NOT EXISTS node_content (
+      contentHash VARCHAR PRIMARY KEY,
+      ${CONTENT_NODE_COLUMNS.map(c => `"${c}" VARCHAR`).join(',\n      ')}
+    );`);
+    await run(`CREATE TABLE IF NOT EXISTS node_slots (
+      layerId VARCHAR,
+      id VARCHAR,
+      contentHash VARCHAR,
+      ${VOLATILE_NODE_COLUMNS.map(c => `"${c}" VARCHAR`).join(',\n      ')},
+      PRIMARY KEY (layerId, id)
     );`);
     await run(metaSql);
     await run(fileHashSql);
@@ -977,6 +1002,119 @@ export class SynapsePersistence {
       `DELETE FROM edges WHERE confidence < ?
          AND targetId NOT IN (SELECT id FROM nodes)`, [minConfidence]);
     return Number(before?.c ?? 0);
+  }
+
+  /**
+   * Plain multi-row INSERT, chunked to the bound-parameter ceiling.
+   *
+   * Deliberately not `insertBatched`: that one carries an update/insert split for a DuckDB bug on
+   * re-writing an existing key, and the layer tables never re-write one. Simpler here is also safer
+   * — the bug cannot be hit by a path that only ever inserts new keys.
+   */
+  private async insertRows(table: string, columns: string[], rows: unknown[][]): Promise<void> {
+    if (rows.length === 0) return;
+    const perRow = columns.length;
+    const chunk = Math.max(1, Math.floor(SynapsePersistence.MAX_BOUND_PARAMS / perRow));
+    const cols = columns.map(c => `"${c}"`).join(', ');
+    for (let i = 0; i < rows.length; i += chunk) {
+      const batch = rows.slice(i, i + chunk);
+      const placeholders = batch.map(() => `(${columns.map(() => '?').join(',')})`).join(',');
+      await this.run(`INSERT INTO ${table} (${cols}) VALUES ${placeholders}`, batch.flat());
+    }
+  }
+
+  /**
+   * The content key for one node row: a hash over the columns that do NOT move (ADR 0081).
+   *
+   * The volatile columns are excluded BY CONSTRUCTION rather than by discipline — they are not in
+   * `CONTENT_NODE_COLUMNS`, and a column in neither list fails `content-key-columns.test.ts`.
+   * Including them measured 3.5% dedup against 48.4%, which is the difference between this design
+   * paying for itself and costing 2.14x.
+   */
+  private contentHashOf(node: Record<string, unknown>): string {
+    const h = createHash('sha1');
+    for (const c of CONTENT_NODE_COLUMNS) h.update(`${c}=${JSON.stringify(node[c] ?? null)}\u0000`);
+    return h.digest('hex');
+  }
+
+  /**
+   * Write a commit layer's nodes, sharing every row an existing layer already holds.
+   *
+   * `INSERT OR IGNORE` on content is what makes the sharing happen: a row two layers agree on is
+   * inserted once and referenced twice. MEASURED on two adjacent commits of this repo — 4,535
+   * unique rows backing 8,781 slots, 48.4% deduped, two layers at 1.94x one layer against flat
+   * storage's 3.43x.
+   *
+   * Refuses the `uncommitted` layer: that one lives in `nodes` and is rewritten every pulse, so
+   * addressing it would pay the hash cost for a layer that never shares anything.
+   */
+  public async writeLayerNodes(layerId: string, nodes: Array<Record<string, unknown>>): Promise<{ slots: number; unique: number }> {
+    if (this.readOnly) return { slots: 0, unique: 0 };
+    if (layerId === UNCOMMITTED_LAYER) {
+      throw new Error('🛡️ [Vault] The uncommitted layer lives in `nodes`, not in layer storage — it is rewritten every pulse and shares nothing.');
+    }
+    await this.ensureVaultOpen();
+
+    const contentCols = CONTENT_NODE_COLUMNS;
+    const seen = new Set<string>();
+    const content: unknown[][] = [];
+    const slots: unknown[][] = [];
+    for (const n of nodes) {
+      const hash = this.contentHashOf(n);
+      if (!seen.has(hash)) {
+        seen.add(hash);
+        content.push([hash, ...contentCols.map(c => n[c] ?? null)]);
+      }
+      slots.push([layerId, String(n.id ?? '').toLowerCase(), hash, ...VOLATILE_NODE_COLUMNS.map(c => n[c] ?? null)]);
+    }
+
+    const owned = !this.inPulse;
+    try {
+      if (owned) await this.run('BEGIN TRANSACTION');
+      // A PLAIN INSERT of rows that are not already present, rather than `insertBatched`.
+      //
+      // `insertBatched` exists for the mutable `nodes` table and carries an update/insert split
+      // working around a DuckDB bug on delete-then-insert of the same key (ADR 0064). These tables
+      // never re-write a key: content is immutable by definition, and a layer's slots are written
+      // once. Filtering to the genuinely-new rows first means no key is ever written twice, which
+      // avoids that bug by construction instead of working around it.
+      const already = new Set((await this.query<{ contentHash: string }>(
+        `SELECT contentHash FROM node_content`)).map(r => r.contentHash));
+      const fresh = content.filter(row => !already.has(String(row[0])));
+      await this.insertRows('node_content', ['contentHash', ...contentCols], fresh);
+      await this.run(`DELETE FROM node_slots WHERE layerId = ?`, [layerId]);
+      await this.insertRows('node_slots', ['layerId', 'id', 'contentHash', ...VOLATILE_NODE_COLUMNS], slots);
+      if (owned) await this.run('COMMIT');
+    } catch (err) {
+      if (owned) await this.run('ROLLBACK').catch(() => {});
+      throw err;
+    }
+    return { slots: slots.length, unique: seen.size };
+  }
+
+  /** Read a commit layer back, joining each slot to the content it shares. */
+  public async readLayerNodes(layerId: string): Promise<Array<Record<string, unknown>>> {
+    await this.ensureVaultOpen();
+    const contentCols = CONTENT_NODE_COLUMNS;
+    return this.query<Record<string, unknown>>(
+      `SELECT s.id, ${contentCols.map(c => `c."${c}"`).join(', ')}, ${VOLATILE_NODE_COLUMNS.map(c => `s."${c}"`).join(', ')}
+       FROM node_slots s JOIN node_content c USING (contentHash)
+       WHERE s.layerId = ? ORDER BY s.id`, [layerId]);
+  }
+
+  /**
+   * Drop a layer's slots, and any content no surviving slot references.
+   *
+   * The content sweep is what makes collection actually reclaim: slots are cheap, and the shared
+   * rows are where the bytes are. Ordered slots-then-content so a crash between them leaves
+   * unreferenced content — wasted space that the next collection removes — rather than a slot
+   * pointing at content that is gone, which would read as a corrupt layer.
+   */
+  public async dropLayerNodes(layerId: string): Promise<void> {
+    if (this.readOnly) return;
+    await this.ensureVaultOpen();
+    await this.run(`DELETE FROM node_slots WHERE layerId = ?`, [layerId]);
+    await this.run(`DELETE FROM node_content WHERE contentHash NOT IN (SELECT DISTINCT contentHash FROM node_slots)`);
   }
 
   /**
