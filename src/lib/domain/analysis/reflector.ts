@@ -680,10 +680,23 @@ export class ConducksReflector {
     // "imported here OR defined in this file" — so a local-variable arg never floods the graph or adds
     // a dangler. IntraLinker binds the bare name against imported/same-file symbols afterward.
     for (const { scope, name, raw } of refValueCandidates) {
-      if (!context.resolveLocalBinding(name) && !nodeCache.has(`${file.path.toLowerCase()}::${name}`)) continue;
+      // KEEP the resolved binding rather than using it as a yes/no gate.
+      //
+      // This called `resolveLocalBinding(name)` and threw the string away, then emitted the BARE
+      // name as the target. `call.ts:45-53` uses the same call's result to build
+      // `${resolvedPath}::${target}` — which is exactly why `CONSTRUCTS` landed on
+      // `@heroicons/react/24/outline::academiccapicon` while `ACCESSES` on the same symbol in the
+      // same file dangled on a bare `academiccapicon`. One processor kept the answer and the other
+      // asked the same question and discarded it (todo29#P3b).
+      //
+      // Null is still meaningful: the symbol is then defined in THIS file (the second half of the
+      // gate), and a bare name is correct there because IntraLinker binds same-file references
+      // afterwards.
+      const bound = context.resolveLocalBinding(name);
+      if (!bound && !nodeCache.has(`${file.path.toLowerCase()}::${name}`)) continue;
       spectrum.relationships.push({
         sourceName: scope,
-        targetName: name,
+        targetName: bound ? `${bound}::${name}` : name,
         type: 'ACCESSES' as any,
         confidence: 0.8,
         metadata: { referenceAsValue: true, original: raw }
