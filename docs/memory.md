@@ -1,5 +1,27 @@
 # Memory — conducks
 
+## Reading a git ref is cheap; reading it per file is not
+
+`git archive <ref>` reads this whole repo (551 files, 4.4 MB) in **53 ms**. `git cat-file --batch`
+takes 117 ms. `git show <ref>:<path>` per file takes **5,655 ms** — 107x slower, at 10.3 ms/file,
+which is process spawn and nothing else.
+
+A full `analyze --force` is 5.2 s, so reading an unchecked-out ref costs ~1% of a pulse. Any design
+that reaches for per-file `git show` in a loop is paying 100x for nothing. Measured 2026-08-01
+(todo20#P0); all three methods were verified to return identical content first.
+
+## A fingerprint that includes an absolute path is not a structural identity
+
+`reflector.ts` hashes `${file.path}|${name}|${dna}` with an ABSOLUTE path. Measured across two real
+layers: `fingerprint` differed in 82.8% of rows for unchanged files while `dna` — its only content
+input — was identical in 3,613 of 3,613. The churn was entirely the path term.
+
+Two consequences, the second worse than the first: a vault is not portable across machines or
+checkout paths, and rename detection can never fire, because `drift-engine.ts:69` joins
+`c.fingerprint = p.fingerprint AND c.nodeId != p.nodeId` — which is exactly "same structure, moved" —
+and a move changes the path, therefore the fingerprint. `conducks drift` reports "Renamed/Moved: 0"
+by construction.
+
 ## Heritage for TS/TSX/Go WAS broken and is not any more — this entry was stale for weeks
 - Gotcha: this file used to say "Inheritance is recorded ONLY for Java and Swift — TS/TSX/Go still
   emit ZERO heritage edges". That was true when written and stopped being true after the queries
