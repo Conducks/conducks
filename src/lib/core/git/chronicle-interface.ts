@@ -803,6 +803,104 @@ export class ChronicleInterface {
   }
 
   /**
+   * Resolve a ref to its commit hash, or null when git cannot (ADR 0035, todo20#P3).
+   *
+   * Null rather than a throw, and null rather than a fallback: a ref that does not resolve is the
+   * case ADR 0035 refuses to guess on, because a layer built against the wrong commit is worse than
+   * no layer. `--verify` makes git fail loudly on an ambiguous or missing ref instead of printing
+   * something plausible.
+   */
+  public resolveRef(ref: string): string | null {
+    try {
+      const out = this.git(['rev-parse', '--verify', `${ref}^{commit}`], { quiet: true }).trim();
+      return /^[0-9a-f]{40}$/i.test(out) ? out : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Every tracked file in a ref, WITHOUT checking it out (ADR 0035, todo20#P3).
+   *
+   * MEASURED before it was written, on this repository's 551 tracked files:
+   *
+   *   git archive             53 ms
+   *   git cat-file --batch   117 ms
+   *   git show, per file    5,655 ms   — 107x slower, at 10.3 ms/file of pure process spawn
+   *
+   * A full pulse is ~5 s, so reading a ref costs about 1% of one. `cat-file --batch` is used rather
+   * than the faster `archive` because it hands back `(path, content)` natively while `archive`
+   * returns a tar stream needing its own parser — 64 ms to avoid a second format, on an operation
+   * that happens once per layer. ADR 0035's worry that this would be unaffordable is correct about
+   * `git show` and irrelevant for either of the other two.
+   *
+   * ONE `cat-file` PROCESS for the whole ref. The per-file spawn is the entire 107x, so anything
+   * that reintroduces a process per file gives back the whole win.
+   */
+  public async readRef(ref: string): Promise<Map<string, string> | null> {
+    const commit = this.resolveRef(ref);
+    if (!commit) return null;
+
+    let listing: string;
+    try {
+      listing = this.git(['ls-tree', '-r', '-z', '--format=%(objectmode) %(objecttype) %(objectname) %(path)', commit], { quiet: true });
+    } catch {
+      return null;
+    }
+
+    // `-z` because a path may contain a newline, and git would otherwise quote it into a form that
+    // has to be un-escaped. NUL-separation makes the parse exact.
+    const blobs: Array<{ oid: string; path: string }> = [];
+    for (const entry of listing.split('\0')) {
+      if (!entry) continue;
+      const m = /^\S+ (\S+) (\S+) (.*)$/.exec(entry);
+      if (m && m[1] === 'blob') blobs.push({ oid: m[2], path: m[3] });
+    }
+    if (blobs.length === 0) return new Map();
+
+    // `--batch` reads every requested object from ONE process. The output is a header line
+    // (`<oid> <type> <size>`) followed by exactly <size> bytes and a newline, so the size is what
+    // delimits content — scanning for the next header would break on any blob containing one.
+    let raw: Buffer;
+    try {
+      raw = this.execFile('git', ['cat-file', '--batch'], {
+        cwd: this.projectDir,
+        input: blobs.map(b => b.oid).join('\n') + '\n',
+        // NO `encoding`. Omitting it is what returns a Buffer — `encoding: 'buffer'` is valid for
+        // `spawnSync` but throws `Unknown encoding: buffer` from `execFileSync`, and a string
+        // decode would corrupt the byte offsets this parser walks.
+        encoding: undefined as unknown as BufferEncoding,
+        timeout: 60_000,
+        maxBuffer: 512 * 1024 * 1024,
+        stdio: ['pipe', 'pipe', 'ignore'] as const,
+      }) as unknown as Buffer;
+    } catch {
+      return null;
+    }
+
+    const byOid = new Map<string, string>();
+    let at = 0;
+    while (at < raw.length) {
+      const nl = raw.indexOf(0x0a, at);
+      if (nl === -1) break;
+      const header = raw.subarray(at, nl).toString('utf-8');
+      const parts = header.split(' ');
+      const size = Number(parts[2]);
+      if (parts.length < 3 || !Number.isFinite(size)) break;   // `<oid> missing` — skip, do not guess
+      const start = nl + 1;
+      byOid.set(parts[0], raw.subarray(start, start + size).toString('utf-8'));
+      at = start + size + 1;                                    // +1 for the trailing newline git adds
+    }
+
+    const out = new Map<string, string>();
+    for (const b of blobs) {
+      const content = byOid.get(b.oid);
+      if (content !== undefined) out.set(b.path, content);
+    }
+    return out;
+  }
+
+  /**
    * Conducks — Sync Staleness Sensor
    * Fetches the current HEAD hash of the repository.
    */
