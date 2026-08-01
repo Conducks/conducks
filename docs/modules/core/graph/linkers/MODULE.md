@@ -14,10 +14,12 @@ as orphaned, which keeps it under-reporting.
 
 **Deferred / not built:** dynamic dispatch, and one narrower case now carved out of it. A DI property
 chain (`registry.evolution.watcher`) still cannot be resolved statically and is not attempted. But a
-member call on a variable whose DECLARATION states its type — `const r = new ServiceRegistry()`, then
-`r.get(...)` — IS resolved, because that is a read rather than an inference (ADR 0082). The line
-between them is where the type is written: on the declaration it is read; returned from a factory
-(`X.getInstance()`) it is not guessed. The consequence — a handful of permanent orphan false
+member call on a variable whose TYPE IS WRITTEN SOMEWHERE is resolved, because that is a read rather
+than an inference — `const r = new ServiceRegistry()` states it on the declaration (ADR 0082), and
+`const db = CoreDatabaseManager.getInstance()` states it on the callee, whose declared return type is
+read instead (ADR 0084). The chain follows a re-export to the declaration and EXTENDS to the class
+that actually declares the member. What is still refused is a type NOWHERE written: an undeclared
+return type, or a constructed one (`Promise<Foo>`) whose unwrapping would be a guess. The consequence — a handful of permanent orphan false
 positives — is still accepted rather than papered over with heuristics.
 
 ## Fuzzy matching is the risk, `sameFamily` is the guard

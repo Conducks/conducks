@@ -306,7 +306,14 @@ export class SynapsePersistence {
       -- A variable declared as new Y() records Y here (todo29#P3b). A real column for the same
       -- reason the five above are: IntraLinker reads it, and a value that lives only in the
       -- metadata blob is absent from every SHALLOW load, which is the load the analyze path uses.
-      instance_of VARCHAR
+      instance_of VARCHAR,
+      -- A variable declared from a factory call records the CALL here (ADR 0082 follow-up); the type
+      -- is the callee's declared return type, read by IntraLinker once the whole graph exists.
+      instance_of_call VARCHAR,
+      -- A function's DECLARED return type. Its own column rather than a read of the dna blob,
+      -- because dna is not in the shallow SELECT and shallow is the load analyze uses — the same
+      -- trap the route columns and instance_of each fell into.
+      declared_return VARCHAR
     );`;
 
     const edgesSql = `CREATE TABLE IF NOT EXISTS edges (
@@ -372,7 +379,8 @@ export class SynapsePersistence {
     await run(historySql);
     // Existing vaults predate the HTTP columns; ADD COLUMN IF NOT EXISTS is a no-op on new ones.
     for (const col of ['is_route BOOLEAN', 'is_request BOOLEAN', 'http_method VARCHAR',
-                       'http_path VARCHAR', 'http_url VARCHAR', 'instance_of VARCHAR']) {
+                       'http_path VARCHAR', 'http_url VARCHAR', 'instance_of VARCHAR',
+                       'instance_of_call VARCHAR', 'declared_return VARCHAR']) {
       await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS ${col}`);
     }
     await run(edgesSql);
@@ -516,10 +524,10 @@ export class SynapsePersistence {
       ? `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
                 risk, unitId, parentId, namespaceId, layer_path, depth,
                 fingerprint, rootId, structureId, isEntryPoint, lineStart, lineEnd,
-                is_route, is_request, http_method, http_path, http_url, instance_of FROM nodes`
+                is_route, is_request, http_method, http_path, http_url, instance_of, instance_of_call, declared_return FROM nodes`
       : `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
                 risk, unitId, parentId, namespaceId, layer_path, depth, metadata,
-                is_route, is_request, http_method, http_path, http_url, instance_of FROM nodes`);
+                is_route, is_request, http_method, http_path, http_url, instance_of, instance_of_call, declared_return FROM nodes`);
     traceMemory(`load: ${nodes.length} node rows fetched`);
     const edges = await this.query(
       `SELECT id, sourceId, targetId, type, weight, confidence, properties FROM edges`);
@@ -563,7 +571,9 @@ export class SynapsePersistence {
           method: row.http_method ?? undefined,
           path: row.http_path ?? undefined,
           url: row.http_url ?? undefined,
-          instanceOf: row.instance_of ?? undefined
+          instanceOf: row.instance_of ?? undefined,
+          instanceOfCall: row.instance_of_call ?? undefined,
+          declaredReturn: row.declared_return ?? undefined
         }
       });
     }
@@ -710,7 +720,7 @@ export class SynapsePersistence {
     if (this.readOnly) return;
     await this.ensureVaultOpen();
     const owned = !this.inPulse;
-    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'instance_of'];
+    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'instance_of', 'instance_of_call', 'declared_return'];
     try {
       if (owned) await this.run("BEGIN TRANSACTION");
       const rows = nodes.map(n => {
@@ -729,7 +739,7 @@ export class SynapsePersistence {
           m.layer_path || null, m.depth || 0, m.risk || 0, n.gravity || m.gravity || 0, n.complexity || m.complexity || 1,
           m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(m.dna || {}), JSON.stringify(m.signature || {}), JSON.stringify(m.kinetic || {}),
           JSON.stringify({ ...m, id: n.id, name, range: m.range }),
-          m.isRoute ?? null, m.isRequest ?? null, m.method ?? null, m.path ?? null, m.url ?? null, m.instanceOf ?? null
+          m.isRoute ?? null, m.isRequest ?? null, m.method ?? null, m.path ?? null, m.url ?? null, m.instanceOf ?? null, m.instanceOfCall ?? null, m.dna?.returns ?? null
         ];
       });
       await this.insertBatched('nodes', columns, rows);

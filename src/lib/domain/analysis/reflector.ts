@@ -82,6 +82,22 @@ const normalizeHttpMethod = (raw: string | undefined): string => {
   return v;
 };
 
+/**
+ * The declared return type of a function/method match, or null when none is written.
+ *
+ * The capture holds the whole annotation (`": CoreDatabaseManager"`), because the grammar's
+ * `return_type` field points at the `type_annotation` node and the colon belongs to it. Strip the
+ * colon and the whitespace; keep everything else verbatim, including a generic (`Promise<Foo>`),
+ * because a truncated type is a wrong one rather than a shorter one.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function returnTypeOf(match: any): string | null {
+  const capture = match.captures?.find((c: any) => c.name === 'return_type');
+  if (!capture) return null;
+  const text = String(capture.node.text).replace(/^\s*:\s*/, '').trim();
+  return text.length > 0 ? text : null;
+}
+
 export class ConducksReflector {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
@@ -339,6 +355,9 @@ export class ConducksReflector {
     /** `const x = new Y()` pairs, collected during the walk and attached to nodes after it. */
     const instanceTypes = new Map<string, string>();
     let pendingInstance: string | null = null;
+    /** `const x = Y.factory()` pairs — the CALL, resolved to a type later by IntraLinker. */
+    const instanceCalls = new Map<string, string>();
+    let pendingInstanceCall: string | null = null;
 
     const refValueCandidates: Array<{ scope: string; name: string; raw: string }> = [];
     for (const match of matches) {
@@ -412,8 +431,14 @@ export class ConducksReflector {
               isExported: match.captures.some((c: any) => c.name === CaptureTags.IS_EXPORTED),
               isStatic: match.captures.some((c: any) => c.name === CaptureTags.IS_STATIC),
               params: [],
-              returns: 'void'
-            };
+              // The DECLARED return type, or null when the source does not state one.
+              //
+              // This was the literal `'void'` for every function in every language — 4,267 nodes on
+              // the mentorseed vault all claiming to return void, none of them measured, and
+              // `query-service.ts` reports it to users as if it were a fact. `null` is the honest
+              // value for "not declared": an absent annotation is not a claim of void, and treating
+              // the two as one is what made `getInstance(): CoreDatabaseManager` unreadable.
+              returns: returnTypeOf(match) };
 
             const fingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${name}|${JSON.stringify(dna)}`).digest('hex');
 
@@ -617,6 +642,21 @@ export class ConducksReflector {
             refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a });
           }
         }
+        else if (cName === 'instance_call_name') {
+          // `const db = CoreDatabaseManager.getInstance()` — remember WHICH CALL produced the value.
+          //
+          // The type is not knowable here: it is the callee's declared return type, and the callee
+          // usually lives in another file that this wave may not have parsed yet. So record the call
+          // and let IntraLinker read the answer once the whole graph exists. Still a READ — the
+          // return type is written on the method — and it resolves to nothing when it is not.
+          pendingInstanceCall = cText.trim().toLowerCase();
+        }
+        else if (cName === 'instance_call_target') {
+          if (pendingInstanceCall) {
+            instanceCalls.set(pendingInstanceCall, cText.trim().toLowerCase());
+            pendingInstanceCall = null;
+          }
+        }
         else if (cName === 'instance_name') {
           // `const x = new Y()` — remember that x IS a Y (todo29#P3b).
           //
@@ -734,6 +774,11 @@ export class ConducksReflector {
     for (const [varName, typeName] of instanceTypes) {
       const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);
       if (node) (node.metadata ??= {}).instanceOf = typeName;
+    }
+    for (const [varName, callTarget] of instanceCalls) {
+      const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);
+      // A direct `new Y()` on the same variable is a better answer than a call to resolve, so it wins.
+      if (node && !(node.metadata as any)?.instanceOf) (node.metadata ??= {}).instanceOfCall = callTarget;
     }
 
     // Next.js app-router routes, which no query can capture (todo29#P5).

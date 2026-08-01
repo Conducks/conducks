@@ -1,0 +1,174 @@
+import { describe, it, expect } from '@jest/globals';
+import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
+
+/**
+ * ADR 0084 — a call on a variable produced by a FACTORY.
+ *
+ * `const coreDb = CoreDatabaseManager.getInstance()`, re-exported as `db`, then `db.query(...)` at
+ * 306 call sites. ADR 0082 recorded this as needing a type checker. It does not: TypeScript makes
+ * you WRITE the return type, and `getInstance(): CoreDatabaseManager` says it outright — conducks
+ * simply never captured it and stored the literal `'void'` for every function in the graph.
+ *
+ * Four hops, and every one of them is a read of something the source states:
+ *   1. `db` is a re-export       -> follow ALIASES / the barrel to `coreDb`
+ *   2. `coreDb` came from a call -> read the CALLEE's declared return type
+ *   3. the type is a class       -> resolve it in the declaring file
+ *   4. `query` is on the PARENT  -> follow EXTENDS
+ *
+ * Miss any one and the whole chain refuses. Each is pinned separately below, because a single
+ * end-to-end test that goes green tells you nothing about which hop is carrying it.
+ */
+
+const ROOT = '/repo';
+const MGR = `${ROOT}/core/database/manager.ts`;
+const BARREL = `${ROOT}/core/database/index.ts`;
+const APP = `${ROOT}/app/handler.ts`;
+
+type Sym = { id: string; name: string; instanceOfCall?: string; declaredReturn?: string };
+
+const addUnit = (graph: ConducksAdjacencyList, file: string, symbols: Sym[] = []) => {
+  const unitId = `${file}::unit`;
+  graph.addNode({ id: unitId, label: 'UNIT', isShallow: false, properties: { unitId: null, name: 'unit', filePath: file, canonicalKind: 'UNIT', canonicalRank: 0 } });
+  for (const s of symbols) {
+    graph.addNode({
+      id: `${file}::${s.id}`, label: 'SYMBOL', isShallow: false,
+      properties: {
+        unitId, name: s.name, filePath: file, canonicalKind: 'BEHAVIOR', canonicalRank: 7,
+        instanceOfCall: s.instanceOfCall, declaredReturn: s.declaredReturn,
+      },
+    });
+  }
+  return unitId;
+};
+
+const edge = (graph: ConducksAdjacencyList, type: string, from: string, to: string, id = `${type}::${from}->${to}`) =>
+  graph.addEdge({ id, sourceId: from, targetId: to, type: type as never, confidence: 1.0, properties: {} });
+
+/**
+ * The measured shape. `opts` removes exactly one hop at a time.
+ */
+const buildGraph = (opts: {
+  declaredReturn?: string | null;   // null = the factory declares no return type
+  extendsParent?: boolean;          // false = the class has no parent
+  memberOnParent?: boolean;         // false = nobody declares `query`
+} = {}) => {
+  const { declaredReturn = 'CoreDatabaseManager', extendsParent = true, memberOnParent = true } = opts;
+  const graph = new ConducksAdjacencyList();
+
+  addUnit(graph, MGR, [
+    { id: 'coredatabasemanager', name: 'CoreDatabaseManager' },
+    { id: 'coredatabasemanager.getinstance', name: 'getInstance', declaredReturn: declaredReturn ?? undefined },
+    { id: 'coredb', name: 'coreDb', instanceOfCall: 'coredatabasemanager.getinstance' },
+    { id: 'basedatabasemanager', name: 'BaseDatabaseManager' },
+    ...(memberOnParent ? [{ id: 'basedatabasemanager.query', name: 'query' }] : []),
+  ]);
+  if (extendsParent) edge(graph, 'EXTENDS', `${MGR}::coredatabasemanager`, `${MGR}::basedatabasemanager`);
+
+  // The barrel: `export { coreDb as db }` — a node with the republished name and no definition.
+  addUnit(graph, BARREL, [{ id: 'db', name: 'db' }]);
+  edge(graph, 'ALIASES', `${BARREL}::db`, `${MGR}::coredb`);
+
+  addUnit(graph, APP, [{ id: 'handler', name: 'handler' }]);
+  edge(graph, 'IMPORTS', `${APP}::unit`, `${BARREL}::unit`);
+  edge(graph, 'IMPORTS', `${BARREL}::unit`, `${MGR}::unit`);
+
+  graph.addEdge({
+    id: 'CALLS::handler->db.query',
+    sourceId: `${APP}::handler`,
+    targetId: `${BARREL}::db.query`,     // qualified, and no node has this id
+    type: 'CALLS', confidence: 0.4, properties: {},
+  });
+  return graph;
+};
+
+const targetOf = (graph: ConducksAdjacencyList) =>
+  graph.getAllEdges().find(e => e.id === 'calls::handler->db.query')?.targetId;
+
+const UNRESOLVED = `${BARREL}::db.query`;
+
+describe('a call on a variable a factory produced', () => {
+  it('resolves through the alias, the return type and the parent class', () => {
+    const graph = buildGraph();
+    new IntraLinker().resolve(graph);
+    expect(targetOf(graph)).toBe(`${MGR}::basedatabasemanager.query`);
+  });
+
+  /** Hop 2. No declared return type is the one case that genuinely IS unknowable here. */
+  it('refuses when the factory declares no return type', () => {
+    const graph = buildGraph({ declaredReturn: null });
+    new IntraLinker().resolve(graph);
+    expect(targetOf(graph)).toBe(UNRESOLVED);
+  });
+
+  /**
+   * A constructed type is not a name. `Promise<CoreDatabaseManager>` describes a wrapper around the
+   * value, and unwrapping one is inference rather than reading — ADR 0070's line.
+   *
+   * HONEST NOTE: this test does not prove the identifier guard. Deleting that guard leaves it GREEN,
+   * because `promise<coredatabasemanager>` then resolves to no class and the rule refuses one step
+   * later anyway — verified by mutation. It is kept as a behaviour pin, not as coverage of the rail;
+   * the rail's value is that it refuses at the point of reading rather than by accident downstream.
+   */
+  it('refuses when the declared return type is a constructed type', () => {
+    for (const declared of ['Promise<CoreDatabaseManager>', 'CoreDatabaseManager | null', 'CoreDatabaseManager[]']) {
+      const graph = buildGraph({ declaredReturn: declared });
+      new IntraLinker().resolve(graph);
+      expect(targetOf(graph)).toBe(UNRESOLVED);
+    }
+  });
+
+  /** Hop 4. Without the heritage walk this is the 281-edge case that silently stays dangling. */
+  it('refuses when no class in the chain declares the member', () => {
+    const graph = buildGraph({ memberOnParent: false });
+    new IntraLinker().resolve(graph);
+    expect(targetOf(graph)).toBe(UNRESOLVED);
+  });
+
+  it('refuses when the type has no parent and does not declare the member itself', () => {
+    const graph = buildGraph({ extendsParent: false });
+    new IntraLinker().resolve(graph);
+    expect(targetOf(graph)).toBe(UNRESOLVED);
+  });
+
+  /**
+   * The ordering bug, pinned. `EXTENDS` targets are resolved by this SAME pass, so a heritage edge
+   * may still be a bare name when the rule reads it. Before it was resolved inside the walk, the
+   * identical lookup succeeded 80 times and refused 226 — same type, same member, different edge
+   * order. A rule whose answer depends on iteration order is worse than one that always refuses.
+   */
+  it('resolves even when the heritage edge is still an unresolved bare name', () => {
+    const graph = buildGraph();
+    for (const e of graph.getAllEdges()) {
+      if (e.type === 'EXTENDS') graph.rebindEdgeTarget(e, 'basedatabasemanager');   // bare, as emitted
+    }
+    new IntraLinker().resolve(graph);
+    expect(targetOf(graph)).toBe(`${MGR}::basedatabasemanager.query`);
+  });
+});
+
+describe('getNeighbors filters by edge type', () => {
+  /**
+   * The parameter existed and was never applied, so an alias walk followed a MEMBER_OF edge into the
+   * directory tree. Nothing failed — it just answered with the wrong edge.
+   */
+  /** `db` carries its ALIASES edge plus a containment edge, the way a real symbol node does. */
+  const twoEdged = () => {
+    const graph = buildGraph();
+    edge(graph, 'MEMBER_OF', `${BARREL}::db`, `${BARREL}::unit`);
+    return graph;
+  };
+
+  it('returns only edges of the requested type', () => {
+    const graph = twoEdged();
+    const aliases = graph.getNeighbors(`${BARREL}::db`, 'downstream', 'ALIASES' as never);
+    expect(graph.getNeighbors(`${BARREL}::db`, 'downstream').length).toBeGreaterThan(aliases.length);
+    expect(aliases.map(e => e.type)).toEqual(['ALIASES']);
+  });
+
+  it('returns everything when no type is given', () => {
+    const types = new Set(twoEdged().getNeighbors(`${BARREL}::db`, 'downstream').map(e => e.type));
+    expect(types.has('ALIASES')).toBe(true);
+    expect(types.has('MEMBER_OF')).toBe(true);
+  });
+});

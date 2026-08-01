@@ -61,7 +61,7 @@ export const CONTENT_NODE_COLUMNS = [
   // The type a variable is declared with (todo29#P3b). Content, and on strong grounds rather than
   // the weak ones above: it is read off the declaration, so it can only change when the declaration
   // text changes — which changes the fingerprint and therefore the content row anyway.
-  'instance_of',
+  'instance_of', 'instance_of_call', 'declared_return',
 ] as const;
 
 /** Every node column the layer schema accounts for. A column in neither list is unclassified. */

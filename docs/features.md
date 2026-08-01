@@ -242,7 +242,11 @@
 
 ## Declared-Type Member Resolution — built by `conducks analyze`
 - Purpose: Bind `registry.get(...)` to `ServiceRegistry.get` when the variable was declared `new ServiceRegistry()`, so a call on an instance reaches the method it actually runs.
-- Intent: The receiver was already resolved and the member was already a node; only the link between them was missing, and one variable accounted for 192 dangling edges on a real subject. A factory (`X.getInstance()`) records nothing, because its return type is not stated at the declaration and assuming it is the guess ADR 0070 refuses — so this reads a declaration and never infers. (ADR 0082.)
+- Intent: The receiver was already resolved and the member was already a node; only the link between them was missing, and two variables accounted for 500 dangling edges on a real subject. A factory is resolved too, by reading the DECLARED return type of the method it calls, and the chain follows a re-export to the declaration and `extends` to the class that really declares the member. Nothing is inferred: a type that is written down is read, and a type that is not — an undeclared return, or a constructed one like `Promise<Foo>` — is refused. (ADR 0082, ADR 0084.)
+
+## Declared Return Types — built by `conducks analyze`, reported by `conducks query`
+- Purpose: Record what a function says it returns, so `query` can answer with it and resolution can use it.
+- Intent: The field existed and was the literal `void` for every function in every language — 4,267 nodes on a real subject asserting a type nobody had measured. An undeclared return is now `null` rather than `void`, because an absent annotation is not a claim that the function returns nothing, and collapsing the two is what made a readable type look unknowable. TypeScript and TSX today; other languages record `null` until their queries capture it. (ADR 0084.)
 
 ## Regex Parsing Fallback — used by `conducks analyze`
 - Purpose: Keep structural extraction producing CALLS and IMPORTS edges when a Tree-sitter grammar cannot load in a given environment.

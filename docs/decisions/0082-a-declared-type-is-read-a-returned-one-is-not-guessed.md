@@ -1,6 +1,7 @@
 # 0082 — a declared type is read, a returned one is not guessed
 Status: Accepted
 - Date: 2026-08-01
+- Amended by: 0084
 - Builds: 0070, 0071, 0077
 - Enforced by: tests/unit/core/instance-type-capture.test.ts (each accepted declaration form records its type, and a factory records nothing), tests/unit/core/graph/linker-typed-receiver.test.ts (the member resolves through the recorded type, and refuses when the member, the type or the record is absent)
 

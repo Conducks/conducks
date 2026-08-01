@@ -355,6 +355,8 @@ export class ConducksAdjacencyList {
         // survives a vault load: left out, the link worked on a fresh parse and vanished on reload,
         // the same shape as the route columns below.
         instanceOf: node.properties.instanceOf,
+        instanceOfCall: node.properties.instanceOfCall,
+        declaredReturn: node.properties.declaredReturn ?? (node.properties.dna as any)?.returns,
         isRoute: node.properties.isRoute,
         isRequest: node.properties.isRequest,
         method: node.properties.method,
@@ -586,7 +588,12 @@ export class ConducksAdjacencyList {
     this.assertMaterialised("getNeighbors");
     const normalizedId = nodeId.toLowerCase();
     const edgeSet = direction === 'downstream' ? this.outEdges.get(normalizedId) : this.inEdges.get(normalizedId);
-    return edgeSet ? Array.from(edgeSet) : [];
+    if (!edgeSet) return [];
+    // `type` was DECLARED and never applied — a caller asking for ALIASES got MEMBER_OF and every
+    // other edge, in first-insertion order, with no error. Found by an alias walk that followed a
+    // containment edge into the directory tree. Every other caller omits the argument, so applying
+    // it now changes nothing that already worked.
+    return type ? Array.from(edgeSet).filter(e => e.type === type) : Array.from(edgeSet);
   }
 
   /**

@@ -276,15 +276,27 @@ export class IntraLinker {
         if (dot > 0) {
           const receiver = symbol.slice(0, dot);
           const member = symbol.slice(dot + 1);
-          const typeName = (graph.getNode(`${file}::${receiver}`)?.properties as any)?.instanceOf as string | undefined;
+          // The receiver is often a RE-EXPORT of the declaration, not the declaration: mentorseed's
+          // `db` is `export { coreDb as db }`, and `coreDb` is what carries the type. Walk the
+          // ALIASES chain to the node that actually declares something, then read from THERE — and
+          // resolve the type against THAT file, since the class is imported where it is used.
+          const declId = this.declarationOf(graph, `${file}::${receiver}`, unitImports, unitSymbols);
+          const declFile = declId.slice(0, declId.lastIndexOf('::'));
+          const receiverProps = graph.getNode(declId)?.properties as any;
+          // A direct `new Y()` states the type outright. A factory states it on the CALLEE — read
+          // that method's DECLARED return type, which is written in the source exactly as often as
+          // a `new` is. `getInstance(): CoreDatabaseManager` is 281 dangling edges on mentorseed,
+          // and it was never inference: the annotation was there and nothing captured it.
+          const typeName = (receiverProps?.instanceOf as string | undefined)
+            ?? this.returnTypeOfCall(graph, receiverProps?.instanceOfCall as string | undefined, declFile, unitImports, unitSymbols);
           if (typeName) {
             // The class is looked up from the RECEIVER's file, which is where it is imported —
             // the calling file usually imports the instance and never the class.
             const typeId =
-              unitSymbols.get(`${file}::unit`)?.get(typeName) ??
-              this.resolveSymbol(typeName, `${file}::unit`, unitImports, unitSymbols);
-            const candidate = typeId ? `${typeId.slice(0, typeId.lastIndexOf('::'))}::${typeName}.${member}` : null;
-            if (candidate && graph.hasNode(candidate)) {
+              unitSymbols.get(`${declFile}::unit`)?.get(typeName) ??
+              this.resolveSymbol(typeName, `${declFile}::unit`, unitImports, unitSymbols);
+            const candidate = typeId ? this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols) : null;
+            if (candidate) {
               graph.rebindEdgeTarget(edge, candidate);
               resolved.push({ id: edge.id, newTargetId: candidate });
               continue;
@@ -437,6 +449,121 @@ export class IntraLinker {
       }
     }
     return collapsed;
+  }
+
+  /**
+   * Walk ALIASES from a node to the one that actually declares a type, or return the node unchanged.
+   *
+   * A re-export is a rename, not a definition: `export { coreDb as db }` gives `db` an ALIASES edge
+   * and no type of its own. Stops at the first node carrying `instanceOf` or `instanceOfCall`, and
+   * otherwise at the end of the chain. Termination is by the `seen` set, which only grows — a cycle
+   * (two barrels re-exporting each other) stops at the repeat rather than looping.
+   */
+  private declarationOf(
+    graph: ConducksAdjacencyList,
+    nodeId: string,
+    unitImports: Map<string, string[]>,
+    unitSymbols: Map<string, Map<string, string>>,
+  ): string {
+    const seen = new Set<string>([nodeId]);
+    let current = nodeId;
+    for (;;) {
+      const props = graph.getNode(current)?.properties as any;
+      if (props?.instanceOf || props?.instanceOfCall) return current;
+
+      const sep = current.lastIndexOf('::');
+      const name = current.slice(sep + 2);
+      // An ALIASES edge is the direct answer. Where there is none, the node may be one ADR 0071
+      // MINTED at a barrel for a name the barrel republishes — a real node with the right name and
+      // nothing behind it. Resolve that name through the barrel's OWN imports, which is what the
+      // IMPORTS rule above already does for these same nodes.
+      const next =
+        graph.getNeighbors(current, 'downstream', 'ALIASES' as EdgeType)[0]?.targetId ??
+        this.resolveSymbol(name, `${current.slice(0, sep)}::unit`, unitImports, unitSymbols);
+
+      if (!next || seen.has(next) || !graph.hasNode(next)) return current;
+      seen.add(next);
+      current = next;
+    }
+  }
+
+  /**
+   * The id of `member` on `typeName`, following EXTENDS when the type inherits it. Null if nothing
+   * in the chain declares it.
+   *
+   * Inheritance is not an extra: mentorseed's `CoreDatabaseManager extends BaseDatabaseManager`, and
+   * `query` is declared on the PARENT — so 281 of the dangling edges resolve to a type that really
+   * has the method and really does not declare it. Stopping at the first class would have refused
+   * every one of them and looked like the safety rail working.
+   *
+   * Bounded by `seen`, which only grows, so a cyclic heritage chain stops rather than looping.
+   */
+  private memberOfType(
+    graph: ConducksAdjacencyList,
+    typeId: string,
+    typeName: string,
+    member: string,
+    unitImports: Map<string, string[]>,
+    unitSymbols: Map<string, Map<string, string>>,
+  ): string | null {
+    const seen = new Set<string>();
+    let currentId: string | null = typeId;
+    let currentName = typeName;
+
+    while (currentId && !seen.has(currentId)) {
+      seen.add(currentId);
+      const candidate = `${currentId.slice(0, currentId.lastIndexOf('::'))}::${currentName}.${member}`;
+      if (graph.hasNode(candidate)) return candidate;
+
+      const raw: string | undefined =
+        graph.getNeighbors(currentId, 'downstream', 'EXTENDS' as EdgeType)[0]?.targetId;
+      if (!raw) return null;
+
+      // The heritage edge may still be a BARE NAME — this same pass resolves EXTENDS targets, and
+      // whether it has done so yet depends on edge order. Resolving it here makes the answer
+      // order-independent: without it the identical lookup succeeded 80 times and refused 226,
+      // for the same type and the same member, which reads as a flaky rule rather than a wrong one.
+      const parentId: string | null = graph.hasNode(raw)
+        ? raw
+        : this.resolveSymbol(raw, `${currentId.slice(0, currentId.lastIndexOf('::'))}::unit`, unitImports, unitSymbols);
+      if (!parentId || !graph.hasNode(parentId)) return null;
+      currentId = parentId;
+      currentName = parentId.slice(parentId.lastIndexOf('::') + 2);
+    }
+    return null;
+  }
+
+  /**
+   * The declared return type of `Owner.method`, lowercased, or null.
+   *
+   * Reads `dna.returns` off the callee node, which is on the SKELETON and therefore survives a
+   * shallow load. Refuses in three cases, each of which would otherwise be a guess: the callee is
+   * not in the graph, it declares no return type, or the declared type is a shape rather than a
+   * name (`Promise<Foo>`, `Foo | null`, `Foo[]`). A generic wrapper is not the type of the value —
+   * unwrapping one is inference, and ADR 0070 refuses it.
+   */
+  private returnTypeOfCall(
+    graph: ConducksAdjacencyList,
+    callTarget: string | undefined,
+    callerFile: string,
+    unitImports: Map<string, string[]>,
+    unitSymbols: Map<string, Map<string, string>>,
+  ): string | undefined {
+    if (!callTarget || !callTarget.includes('.')) return undefined;
+    // The direct id first: a singleton's factory sits in the same file as the variable it produces,
+    // so `<declaring file>::<Owner>.<method>` is usually the node outright and needs no lookup.
+    const sameFile = `${callerFile}::${callTarget}`;
+    const calleeId = graph.hasNode(sameFile)
+      ? sameFile
+      : unitSymbols.get(`${callerFile}::unit`)?.get(callTarget)
+        ?? this.resolveSymbol(callTarget, `${callerFile}::unit`, unitImports, unitSymbols);
+    if (!calleeId) return undefined;
+
+    const calleeProps = graph.getNode(calleeId)?.properties as any;
+    const declared = (calleeProps?.declaredReturn ?? calleeProps?.dna?.returns) as string | undefined;
+    if (!declared) return undefined;
+    // A bare identifier only. Anything carrying `<`, `|`, `[` or a space is a constructed type.
+    return /^[A-Za-z_$][\w$]*$/.test(declared) ? declared.toLowerCase() : undefined;
   }
 
   private resolveSymbol(targetId: string, sourceUnitId: string, imports: Map<string, string[]>, symbols: Map<string, Map<string, string>>): string | null {

@@ -26,8 +26,8 @@ export const TSX_QUERIES = `
   (type_alias_declaration name: (type_identifier) @name) @isInterface
   (enum_declaration name: (identifier) @name) @isEnum
 
-  (function_declaration name: (identifier) @name) @isFunction
-  (method_definition name: (_) @name) @isMethod
+  (function_declaration name: (identifier) @name return_type: (type_annotation)? @return_type) @isFunction
+  (method_definition name: (_) @name return_type: (type_annotation)? @return_type) @isMethod
 
   ;; Heritage: extends / implements (EXTENDS + IMPLEMENTS edges)
   ;; Identical grammar family to typescript (tree-sitter-typescript 0.23.2 exposes tsx as a second
@@ -132,11 +132,11 @@ export const TSX_QUERIES = `
     arguments: (arguments (_)* @kinesis_arg))
 
   ;; --- Modifiers (DNA flags) ---
-  (export_statement (function_declaration name: (identifier) @name) @isExported) @isFunction
+  (export_statement (function_declaration name: (identifier) @name return_type: (type_annotation)? @return_type) @isExported) @isFunction
   (export_statement (class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement (abstract_class_declaration name: (type_identifier) @name) @isExported) @isStruct
   (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)) @isExported) @isVariable
-  (function_declaration "async" name: (identifier) @name) @isAsync @isFunction
+  (function_declaration "async" name: (identifier) @name return_type: (type_annotation)? @return_type) @isAsync @isFunction
   (abstract_method_signature name: (_) @name) @isAbstract @isMethod
 
   ;; --- Metadata & Debt ---
@@ -158,6 +158,10 @@ export const TSX_QUERIES = `
   ;; This reads a DECLARATION, it does not infer: the type is written literally in the source. A
   ;; factory (X.getInstance()) is deliberately NOT matched — its return type is not stated here and
   ;; assuming it is the guess ADR 0070 refuses.
+  (variable_declarator
+    name: (identifier) @instance_call_name
+    value: (call_expression function: (member_expression) @instance_call_target)) @isInstanceCall
+
   (variable_declarator
     name: (identifier) @instance_name
     value: (new_expression constructor: [(identifier) (member_expression)] @instance_type)) @isInstanceOf
