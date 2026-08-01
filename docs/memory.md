@@ -1189,3 +1189,9 @@ by construction.
 - Gotcha: `getNeighbors(nodeId, direction, type?)` accepted an edge type and the body never referenced it. A caller asking for `ALIASES` got every outgoing edge in insertion order — no error, no warning, just the wrong edge. It survived because every other caller omitted the argument, so nothing had ever exercised it
 - Why: found only by an alias walk that followed a `MEMBER_OF` edge into the directory tree and produced a nonsense answer. TypeScript checks that the argument TYPE is right, never that the parameter is read, so a dead parameter looks exactly like a live one at every call site
 - Applies: any optional filter parameter. Before relying on one, grep for its name in the body — this is the second dead parameter found in this codebase (`lazy` in `registry-bootstrapper.ts` was the first, todo21#P5)
+
+## A per-file record keyed by NAME collides with any local of the same name
+- Gotcha: the `instanceOf` record (ADR 0082) was keyed `<file>::<name>`, and a node id is `<file>::<scope>.<name>`. A local `const client = new SmtpClient()` inside a function therefore overwrote the MODULE-LEVEL `const client = new HttpClient()`, and every `client.x()` at module scope resolved into the wrong class. Fixed the same day by keying on scope + name, which is what the id is built from
+- Why it matters more than the size suggests: a wrong edge is worse than the dangling edge it replaced. Dangling is visible and counted; a confidently wrong target looks identical to a correct one in every command that reads the graph
+- Why it was found: shadowing was TESTED deliberately, not reported. Nothing failed, no count moved, and the suite was green — the graph simply answered wrongly. Any new per-file map keyed by bare name has this bug until proven otherwise
+- Applies: `reflector.ts` post-loop attach maps; anything building `<file>::<name>` by hand

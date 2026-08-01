@@ -118,3 +118,54 @@ describe('a function records the return type it declares', () => {
     expect(node?.metadata?.instanceOfCall).toBe('coredatabasemanager.getinstance');
   });
 });
+
+/**
+ * Shadowing and reassignment — the two ways one name means two things.
+ *
+ * The shadowing case was a REAL BUG shipped for about an hour: the record was keyed by name alone,
+ * so a local declaration overwrote the module-level symbol's type and every call on the module-level
+ * one resolved into the WRONG CLASS. A wrong edge is worse than the dangling edge it replaced, and
+ * nothing failed — it was found by deliberately testing a shape nobody had asked about.
+ */
+describe('one name, two declarations', () => {
+  const reflector = new ConducksReflector();
+  const provider = new TypeScriptProvider();
+
+  const typesByName = async (source: string, name: string) => {
+    const context = new AnalyzeContext();
+    const file = { path: '/repo/a.ts', source };
+    const spectrum: any = await reflector.reflect(file, provider as any, context, [file.path]);
+    return spectrum.nodes
+      .filter((n: any) => String(n.name).toLowerCase() === name)
+      .map((n: any) => n.metadata?.instanceOf)
+      .sort();
+  };
+
+  beforeAll(async () => {
+    await grammars.loadLanguage('typescript');
+  });
+
+  it('keeps a local declaration from overwriting the module-level symbol of the same name', async () => {
+    const types = await typesByName(
+      'const client = new HttpClient();\nfunction f() { const client = new SmtpClient(); client.send(); }\n',
+      'client',
+    );
+    expect(types).toEqual(['httpclient', 'smtpclient']);
+  });
+
+  /**
+   * A reassignment records the DECLARATION's type, which is also what TypeScript infers for the
+   * variable. A method that exists only on the later value stays dangling — under-reporting, which
+   * is the side this codebase errs on deliberately.
+   */
+  it('records the declared type, not a later assignment', async () => {
+    expect(await typesByName('let svc = new AlphaService();\nfunction f() { svc = new BetaService(); }\n', 'svc'))
+      .toEqual(['alphaservice']);
+  });
+
+  /** Two types on one declaration, so neither is THE type. Reading either would be a coin flip. */
+  it('records nothing for a ternary of two constructors', async () => {
+    expect(await typesByName('const c = flag ? new AlphaService() : new BetaService();\n', 'c'))
+      .toEqual([undefined]);
+  });
+});

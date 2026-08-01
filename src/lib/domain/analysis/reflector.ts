@@ -82,6 +82,10 @@ const normalizeHttpMethod = (raw: string | undefined): string => {
   return v;
 };
 
+/** The `<scope.>name` a variable's node id is built from — the scope prefix is what makes it unique. */
+const scopedVarKey = (scope: string | null | undefined, name: string): string =>
+  `${scope ? `${scope.toLowerCase()}.` : ''}${name.trim().toLowerCase()}`;
+
 /**
  * The declared return type of a function/method match, or null when none is written.
  *
@@ -649,7 +653,7 @@ export class ConducksReflector {
           // usually lives in another file that this wave may not have parsed yet. So record the call
           // and let IntraLinker read the answer once the whole graph exists. Still a READ — the
           // return type is written on the method — and it resolves to nothing when it is not.
-          pendingInstanceCall = cText.trim().toLowerCase();
+          pendingInstanceCall = scopedVarKey(getScopeAt(currentMatchRow), cText);
         }
         else if (cName === 'instance_call_target') {
           if (pendingInstanceCall) {
@@ -668,7 +672,12 @@ export class ConducksReflector {
           // Reads a DECLARATION rather than inferring: the type is written literally on the same
           // line. A factory (`X.getInstance()`) is deliberately not captured, because its return
           // type is NOT stated here and assuming it is the guess ADR 0070 refuses.
-          pendingInstance = cText.trim().toLowerCase();
+          // Keyed by SCOPE + name, the way the node id is. Without the scope a local
+          // `const client = new SmtpClient()` inside a function overwrote the module-level
+          // `const client = new HttpClient()`, and every `client.x()` at module scope then resolved
+          // to the WRONG class — a confidently wrong edge, which is worse than the dangling one it
+          // replaced. Found by testing shadowing rather than by a failure.
+          pendingInstance = scopedVarKey(getScopeAt(currentMatchRow), cText);
         }
         else if (cName === 'instance_type') {
           if (pendingInstance) {

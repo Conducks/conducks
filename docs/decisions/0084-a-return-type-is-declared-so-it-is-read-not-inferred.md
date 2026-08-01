@@ -81,5 +81,14 @@ order is worse than one that always refuses, and it would have read as flakiness
   reads it — but it is a lie of the same kind as the old `returns`.
 - Return types are captured for TypeScript and TSX only. JavaScript has no annotations, and the other
   ten languages keep `null` until their queries emit `@return_type` — honest, where `'void'` was not.
+- **A record keyed by bare name collided with shadowing**, and shipped that way for about an hour:
+  a local `const client = new SmtpClient()` overwrote the module-level `const client = new
+  HttpClient()`, pointing module-scope calls at the wrong class. Keyed on scope + name now, which is
+  what the node id is built from. It was found by TESTING shadowing rather than by any failure —
+  nothing broke, no count moved, and the graph just answered wrongly. A wrong edge is worse than the
+  dangling one it replaces, because nothing counts it.
+- A reassignment (`let s = new A(); s = new B()`) records `A`, matching what TypeScript infers for
+  the variable. A method existing only on `B` stays dangling — under-reporting, which is the side
+  this codebase errs on. A ternary of two constructors records nothing at all.
 - A factory that declares no return type still refuses, and so does one returning a constructed type
   (`Promise<Foo>`, `Foo | null`, `Foo[]`). Unwrapping a generic is inference, not reading.
