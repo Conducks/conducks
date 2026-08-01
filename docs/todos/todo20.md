@@ -14,6 +14,19 @@ the shape ADR 0035 gave it.
 
 Measured 2026-08-01. The gate this paragraph set has been met.
 
+## Phase 0b — the two-layer measurement is DISPUTED, and Phase 3 turns on it
+- Builds: 0035
+- [ ] CONTRADICTION, unresolved, single-source. Phase 0 measured content-addressing at 1.07-1.21x for two layers and concluded it is REQUIRED. A later spike measured the opposite — flat layered storage 1.57x against content-addressed 2.14x at two layers, i.e. content-addressing **LOSES by 1.36x** and only wins past ~4 layers. The proposed explanation is specific and checkable: Phase 0 analyzed its two layers into SEPARATE VAULTS, and two `.db` files cannot share compression, whereas one table lets DuckDB's columnar dictionary/RLE dedup the shared ~90% for free — after which content-addressing only ADDS a 40-byte high-entropy SHA per node-slot, incompressible by construction, plus a second PK index. If that holds it matters, because ADR 0035's GC keeps the steady state at 2-3 layers (uncommitted/current/target), permanently on the losing side. NEITHER measurement has been reproduced by a second party. Fixed when one A/B settles it: two layers in ONE vault, flat against content-addressed, same subject, same run
+- [ ] Whichever way that lands, ADR 0035 needs a stamp. It mandates content-addressing on Phase 0's number; if the spike is right, the record is amended rather than quietly ignored — and if the spike is wrong, that belongs written down too, because it will be re-derived otherwise
+
+The WIP that produced the dispute is preserved on branch `wip/todo20-layered-storage`
+(commit `81b1f3a`): 300 lines in `persistence.ts`, tsc clean, cold and multi-wave pulses clean,
+migration verified on a real 57 MB pre-layer vault. **No tests, suite never ran — do not merge
+as-is.** It builds plain layered storage (`layerId` + composite PK, `nodes`/`edges` as views) and
+deliberately drops `idx_nodes_id`, because under a composite PK an index on `id` alone stops being
+redundant and becomes exactly the secondary-index-on-a-written-column that todo22#P8 measured as
+fatal.
+
 ## Phase 1 — the branch guard, useful on its own
 - Builds: 0035
 - [x] DONE in the contract freeze before the fan-out. `pulses.branch` added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` so old vaults stay readable, written from `chronicle.getCurrentBranch()`, which uses `symbolic-ref --quiet --short HEAD` and returns NULL on a detached HEAD rather than inventing a name
