@@ -63,6 +63,13 @@ export class StatusCommand implements ConducksCommand {
       // 3. Mode: Health (Default)
       (registry.infrastructure.graphEngine as any).resonate();
       const status = registry.audit.status();
+      // `status()` reports the in-memory graph, which does not know which pulse produced it or
+      // whether persistence answered from the live vault or the previous pulse's snapshot (ADR
+      // 0040). `statusFromVault()` carries both — pulled here purely for those two fields so a
+      // reader mid-pulse sees "answering from the previous pulse" instead of silently stale data.
+      const vaultStatus = await registry.audit.statusFromVault();
+      const pulseId = (vaultStatus.staleness as any).pulseId;
+      const servedFrom = (vaultStatus.staleness as any).servedFrom;
       const graph = registry.query.graph.getGraph();
 
       const topGravity = Array.from(graph.getAllNodes())
@@ -81,7 +88,7 @@ export class StatusCommand implements ConducksCommand {
         process.stdout.write(JSON.stringify({
           stats: status.stats,
           status: status.status,
-          staleness: status.staleness,
+          staleness: { ...status.staleness, pulseId, servedFrom },
           health,
           topHotspots: topGravity.map(n => ({
             id: n.id,
@@ -107,6 +114,7 @@ export class StatusCommand implements ConducksCommand {
       } else {
         console.log(`- ${chalk.yellow('Staleness')}: ${chalk.green('SYNCHRONIZED')}`);
       }
+      console.log(`- ${chalk.yellow('Pulse')}:   ${chalk.cyan(pulseId)}${servedFrom === 'previous-pulse-snapshot' ? chalk.yellow(' (served from the previous pulse\'s snapshot — a write is in flight)') : ''}`);
 
       console.log(chalk.bold(`\n--- 🚀 Top Structural Hotspots ---`));
       topGravity.forEach((n, i) => {

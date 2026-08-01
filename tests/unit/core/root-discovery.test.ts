@@ -102,6 +102,52 @@ describe('discoverRoot — a DECLARED workspace outranks an inferred marker (ADR
   });
 });
 
+describe('discoverRoot — a NESTED declaration wins for paths beneath it (ADR 0069 open question)', () => {
+  /**
+   * ADR 0069 left this open: a vendored dependency that is itself a monorepo can declare its own
+   * `conducks.json`. `findDeclaredWorkspace()` takes the NEAREST declaration walking up, so a path
+   * under the vendored tree should anchor at the vendored root, not at the outer workspace — and a
+   * path outside the vendored tree must still anchor at the outer workspace. This was believed right
+   * and untested; this is that test.
+   */
+  it('anchors a path under the nested declaration at the INNER root, not the outer one', () => {
+    const outer = mkRoot();
+    fs.writeFileSync(path.join(outer, 'conducks.json'), JSON.stringify({ services: ['app', 'vendor/dep'] }));
+    const inner = path.join(outer, 'vendor', 'dep');
+    fs.mkdirSync(inner, { recursive: true });
+    fs.writeFileSync(path.join(inner, 'conducks.json'), JSON.stringify({ services: ['sub'] }));
+    const deep = path.join(inner, 'src', 'file');
+    fs.mkdirSync(deep, { recursive: true });
+
+    expect(new RegistryBootstrapper().discoverRoot(deep)).toBe(inner);
+  });
+
+  it('anchors a path OUTSIDE the nested declaration at the outer workspace, unaffected by it', () => {
+    const outer = mkRoot();
+    fs.writeFileSync(path.join(outer, 'conducks.json'), JSON.stringify({ services: ['app', 'vendor/dep'] }));
+    const inner = path.join(outer, 'vendor', 'dep');
+    fs.mkdirSync(inner, { recursive: true });
+    fs.writeFileSync(path.join(inner, 'conducks.json'), JSON.stringify({ services: ['sub'] }));
+    const sibling = path.join(outer, 'app', 'src');
+    fs.mkdirSync(sibling, { recursive: true });
+
+    expect(new RegistryBootstrapper().discoverRoot(sibling)).toBe(outer);
+  });
+
+  it('anchors the nested root itself at the nested declaration, not the outer one', () => {
+    // The boundary case: `from` IS the directory carrying the inner conducks.json, not a descendant
+    // of it. `findDeclaredWorkspace` checks `current` before walking to the parent, so this must
+    // still resolve to `inner`.
+    const outer = mkRoot();
+    fs.writeFileSync(path.join(outer, 'conducks.json'), JSON.stringify({ services: ['vendor/dep'] }));
+    const inner = path.join(outer, 'vendor', 'dep');
+    fs.mkdirSync(inner, { recursive: true });
+    fs.writeFileSync(path.join(inner, 'conducks.json'), JSON.stringify({ services: ['sub'] }));
+
+    expect(new RegistryBootstrapper().discoverRoot(inner)).toBe(inner);
+  });
+});
+
 describe('discoverRoot — a stray vault must not recruit the tree above it', () => {
   /**
    * The exact shape of the measured failure, reproduced with a name the guard rejects everywhere

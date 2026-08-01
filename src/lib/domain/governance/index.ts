@@ -447,6 +447,8 @@ export class GovernanceService {
         lastAnalyzedCommit: lastCommit,
         currentHead: currentHead || 'non-git',
         commitsBehind: isStale ? chronicle.getCommitsBehind(lastCommit) : 0,
+        pulseId: (await this.persistence.currentPulse())?.id ?? 'none',
+        servedFrom: this.persistence.servedFromSnapshot() ? 'previous-pulse-snapshot' : 'vault',
       },
       stats: {
         nodeCount: Number(counts?.nodes ?? 0),
