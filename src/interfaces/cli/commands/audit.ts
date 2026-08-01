@@ -106,7 +106,13 @@ export class AuditCommand implements ConducksCommand {
       console.log("\n\x1b[31m❌ [Sentinel] Custom Governance Violations:\x1b[0m");
       report.violations.forEach((v: any) => console.log(`  - [${v.ruleId}] ${v.nodeId}: ${v.message}`));
     } else {
-      console.log(`\n\x1b[32m✅ [Sentinel] ${rules.length} project rule(s) passed.\x1b[0m`);
+      // A GREEN TICK ON ZERO RULES IS THE FAILURE THIS PROJECT KEEPS FINDING (ADR 0044, ADR 0073,
+      // and the sentinel rule that matched 0 nodes). "0 project rule(s) passed" with a ✅ reads as
+      // governance holding, when nothing was checked. Found on mentorseed, which has no
+      // `config/sentinel.json` at all.
+      console.log(rules.length === 0
+        ? `\n\x1b[2m➖ [Sentinel] No project rules to check — governance is UNVERIFIED here, not clean.\x1b[0m`
+        : `\n\x1b[32m✅ [Sentinel] ${rules.length} project rule(s) passed.\x1b[0m`);
     }
 
     if (auditData.success) {

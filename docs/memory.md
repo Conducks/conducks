@@ -1,5 +1,23 @@
 # Memory — conducks
 
+## Removing the Ghost Local strip RAISED the dangling rate, and that is correct
+
+todo22#P7 removed a strip that degraded a fully-qualified target id to its bare last segment when
+the node was not resident in memory. Measured consequence on mentorseed: dangling went
+**0.501% -> 3.509%**, and on conducks 1.089% -> 1.676%.
+
+That is not a regression. Before, `<file>::db.query` became `db.query` and was then either
+fuzzy-matched onto whatever shared that name — a WRONG edge — or swept as a guess. Now the edge
+keeps its exact target and dangles honestly when the target does not exist.
+
+The bulk of what it exposed is one known shape: **member calls on a re-exported binding**
+(`db.query` x281, `registry.get` x192 on mentorseed). Neither bare form exists as a node, so the old
+behaviour was not resolving them either. Closing them needs the graph to distinguish a re-export
+node from a definition node, which it does not carry (todo29#P3b).
+
+**Read a dangling RATE next to what changed.** A number that gets worse because edges stopped being
+silently re-pointed is a number improving.
+
 ## A tree-sitter query that compiles is not a query that matches
 
 Two patterns shipped-and-reverted in one sitting, both compiling cleanly and matching nothing:
