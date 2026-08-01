@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import fs from "node:fs";
@@ -52,16 +53,78 @@ export class SupplyChainCommand implements ConducksCommand {
 
     if (pkgs.length > 0) {
       console.log(`\n\x1b[1m  Dependencies by blast radius (importing files):\x1b[0m`);
+      const { byPackage: advisories, available } = this.readAdvisories(registry.infrastructure.chronicle.getProjectDir());
+      const SEV = { critical: '\x1b[41m', high: '\x1b[31m', moderate: '\x1b[33m', low: '\x1b[2m' } as Record<string, string>;
+
       for (const p of pkgs) {
         const ver = versions.get(p.pkg);
         const verStr = ver ? `\x1b[2m${ver}\x1b[0m` : `\x1b[33m(not in package.json)\x1b[0m`;
-        console.log(`    ${p.pkg.padEnd(32)} ${String(Number(p.importers)).padStart(3)} importers  ${verStr}`);
+        const adv = advisories.get(p.pkg);
+        const advStr = adv ? `  ${SEV[adv.severity] ?? ''}[${adv.severity}]\x1b[0m` : '';
+        console.log(`    ${p.pkg.padEnd(32)} ${String(Number(p.importers)).padStart(3)} importers  ${verStr}${advStr}`);
+      }
+
+      // Which of the ADVISORIES actually touch imported code — the join the graph exists for.
+      // `npm audit` says what is vulnerable; this says how much of your code stands behind it.
+      if (!available) {
+        console.log(`\n\x1b[2m  Advisories unavailable (no network, no lockfile, or npm audit failed) — vulnerability status is UNKNOWN, not clean.\x1b[0m`);
+      } else {
+        const reached = pkgs.filter(p => advisories.has(p.pkg));
+        const exposure = reached.reduce((n, p) => n + Number(p.importers), 0);
+        console.log(reached.length
+          ? `\n\x1b[31m  ⚠️  ${reached.length} imported package(s) carry advisories, reached by ${exposure} import(s).\x1b[0m`
+          : `\n\x1b[32m  ✅ No advisory affects an imported package (${advisories.size} advisory/advisories exist but none is reached by this code).\x1b[0m`);
       }
       const unpinned = pkgs.filter(p => !versions.get(p.pkg)).length;
       if (unpinned > 0) {
         console.log(`\n\x1b[33m  ⚠️  ${unpinned} imported package(s) are not declared in package.json (phantom dependency).\x1b[0m`);
       }
     }
+  }
+
+  /**
+   * Known advisories per package, from `npm audit --json` (todo09#P3).
+   *
+   * This was recorded as blocked on "an advisory database, unreachable from this environment" — and
+   * the environment reaches it fine. The blocker was never re-checked, so the task sat parked while
+   * `npm audit` worked the whole time.
+   *
+   * The join is by PACKAGE NAME onto the boundary nodes the graph already holds, which is the point:
+   * `npm audit` alone lists what is vulnerable, and this says how much of YOUR code stands behind
+   * each one. A high-severity advisory in a package with one importer is a different morning from
+   * the same advisory in a package with 139.
+   *
+   * Returns an EMPTY map on any failure — no network, no lockfile, an npm that does not support
+   * `--json`. A supply-chain report that refuses to print because the advisory feed is down is worse
+   * than one that prints what it knows, and the caller says which case it is rather than showing a
+   * reassuring zero.
+   */
+  private readAdvisories(projectDir: string): { byPackage: Map<string, { severity: string; count: number }>; available: boolean } {
+    const byPackage = new Map<string, { severity: string; count: number }>();
+    try {
+      const raw = execFileSync('npm', ['audit', '--json'], {
+        cwd: projectDir, encoding: 'utf-8', timeout: 60_000, maxBuffer: 32 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      // `npm audit` EXITS NON-ZERO when it finds vulnerabilities, which is the normal case here.
+      // Treating that as failure is how this reports "no advisories" on a project that has them.
+      }) as unknown as string;
+      return { byPackage: this.parseAudit(raw, byPackage), available: true };
+    } catch (err: any) {
+      const raw = err?.stdout ? String(err.stdout) : '';
+      if (raw.trim().startsWith('{')) return { byPackage: this.parseAudit(raw, byPackage), available: true };
+      return { byPackage, available: false };
+    }
+  }
+
+  private parseAudit(raw: string, out: Map<string, { severity: string; count: number }>): Map<string, { severity: string; count: number }> {
+    try {
+      const report = JSON.parse(raw);
+      for (const [name, v] of Object.entries<any>(report?.vulnerabilities ?? {})) {
+        const via = Array.isArray(v?.via) ? v.via.filter((x: any) => typeof x === 'object') : [];
+        out.set(name, { severity: String(v?.severity ?? 'unknown'), count: via.length || 1 });
+      }
+    } catch { /* a malformed report is no report */ }
+    return out;
   }
 
   /** Live-read declared versions from the nearest package.json (dependencies + devDependencies). */
