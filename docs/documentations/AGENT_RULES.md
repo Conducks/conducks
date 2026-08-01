@@ -41,6 +41,9 @@ why. A token cutoff must leave the next agent able to resume. Never batch this a
 ## 6. Never
 
 - `rm` anything. Hand the command to the orchestrator.
+- `git reset --hard`. It is DENIED by the permission system, and routing around a denied destructive
+  command with an alias is worse than the stale base you are trying to fix. A wrong worktree base is
+  the ORCHESTRATOR'S defect to repair — report your HEAD and stop, exactly as agent-A did.
 - `git add -A`, commit, push, or rebase. The orchestrator merges.
 - `as any` or `@ts-ignore` to force a gate green. That IS the failure, hidden.
 - Touch a file another agent owns, even to fix something obvious.
