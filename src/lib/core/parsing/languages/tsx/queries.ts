@@ -36,6 +36,13 @@ export const TSX_QUERIES = `
   (variable_declarator name: (identifier) @name
     value: (arrow_function parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type)?) @isVariable
 
+  ;; A variable whose value is an OBJECT LITERAL. The whole literal is captured so the reflector can
+  ;; walk it and record which identifier each property path aliases — a DI container is exactly this
+  ;; shape, and a chain like container.services.registry.lookup has no dynamic hop at all (todo30).
+  (variable_declarator
+    name: (identifier) @object_name
+    value: (object) @object_value) @isVariable
+
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (type_identifier) @name) @isStruct
   ;; 'abstract class' is (abstract_class_declaration), a DIFFERENT node type — without this an

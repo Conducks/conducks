@@ -88,6 +88,68 @@ const scopedVarKey = (scope: string | null | undefined, name: string): string =>
   `${scope ? `${scope.toLowerCase()}.` : ''}${name.trim().toLowerCase()}`;
 
 /**
+ * Which identifier each property PATH of an object literal ultimately names.
+ *
+ * A DI container is an object literal, and `container.services.registry.lookup()` has no dynamic hop
+ * in it — every property name is written in the source. It had been filed under "dynamic dispatch,
+ * deliberately unhandled" alongside `handlers[key]()`, which genuinely IS dynamic. Only one of the
+ * two deserved the label, and the mislabel kept it unexamined (todo30).
+ *
+ * Returns `{ "services.registry": "reg", "infrastructure.db": "database" }` — a path to the bare
+ * identifier it aliases, which is the same relationship `export { x as y }` records.
+ *
+ * Three things are deliberately NOT recorded, because each would be a guess rather than a read:
+ *   a COMPUTED key (`[key]: fn`)      — that is the `handlers[key]()` case, correctly refused;
+ *   a value that is a call or an expression (`made: makeThing()`) — it states no identifier;
+ *   a getter whose body is anything but a single `return <identifier>`.
+ *
+ * Those last two still record their PATH with an EMPTY value. The property is demonstrably wired
+ * even though its type is unknown, and dead-code needs to know the name is reachable while the
+ * resolver must not use it. An empty string says exactly that: wired, type unstated.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function objectPathsOf(objectNode: any): Record<string, string> {
+  const out: Record<string, string> = {};
+
+  const walk = (node: any, prefix: string, depth: number): void => {
+    // A container nests a few levels; a deep literal is data, not wiring.
+    if (!node || depth > 6) return;
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (!child) continue;
+
+      if (child.type === 'pair') {
+        const keyNode = child.childForFieldName('key');
+        // A computed key names no property at parse time.
+        if (!keyNode || keyNode.type === 'computed_property_name') continue;
+        const key = keyNode.text;
+        if (!/^[A-Za-z_$][\w$]*$/.test(key)) continue;
+        const path = prefix ? `${prefix}.${key}` : key;
+        const value = child.childForFieldName('value');
+        if (!value) continue;
+        if (value.type === 'object') walk(value, path, depth + 1);
+        else out[path.toLowerCase()] = value.type === 'identifier' ? value.text.toLowerCase() : '';
+        continue;
+      }
+
+      // A GETTER whose body is a single `return <identifier>` is an alias in object form.
+      if (child.type === 'method_definition') {
+        const name = child.childForFieldName('name')?.text;
+        if (!name || !/^[A-Za-z_$][\w$]*$/.test(name)) continue;
+        const path = prefix ? `${prefix}.${name}` : name;
+        const body = child.childForFieldName('body');
+        const stmt = body?.namedChildCount === 1 ? body.namedChild(0) : null;
+        const returned = stmt?.type === 'return_statement' && stmt.namedChildCount === 1 ? stmt.namedChild(0) : null;
+        out[path.toLowerCase()] = returned?.type === 'identifier' ? returned.text.toLowerCase() : '';
+      }
+    }
+  };
+
+  walk(objectNode, '', 0);
+  return out;
+}
+
+/**
  * The parameters a function/method declares: name, declared type, and whether it is optional.
  *
  * `dna.params` was the literal `[]` for every function in the graph — the same fabrication as the
@@ -479,6 +541,9 @@ export class ConducksReflector {
     /** `const x = Y.factory()` pairs — the CALL, resolved to a type later by IntraLinker. */
     const instanceCalls = new Map<string, string>();
     let pendingInstanceCall: string | null = null;
+    /** Object-literal wiring: variable name -> { property path: identifier it aliases }. */
+    const objectPaths = new Map<string, Record<string, string>>();
+    let pendingObject: string | null = null;
 
     const refValueCandidates: Array<{ scope: string; name: string; raw: string }> = [];
     for (const match of matches) {
@@ -797,6 +862,16 @@ export class ConducksReflector {
             pendingInstanceCall = null;
           }
         }
+        else if (cName === 'object_name') {
+          pendingObject = scopedVarKey(getScopeAt(currentMatchRow), cText);
+        }
+        else if (cName === 'object_value') {
+          if (pendingObject) {
+            const paths = objectPathsOf(capture.node);
+            if (Object.keys(paths).length > 0) objectPaths.set(pendingObject, paths);
+            pendingObject = null;
+          }
+        }
         else if (cName === 'instance_name') {
           // `const x = new Y()` — remember that x IS a Y (todo29#P3b).
           //
@@ -948,6 +1023,10 @@ export class ConducksReflector {
         confidence: 1.0,
         metadata: { isInstanceOf: true },
       });
+    }
+    for (const [varName, paths] of objectPaths) {
+      const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);
+      if (node) (node.metadata ??= {}).objectPaths = paths;
     }
     for (const [varName, callTarget] of instanceCalls) {
       const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);

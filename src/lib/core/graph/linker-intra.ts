@@ -274,6 +274,48 @@ export class IntraLinker {
         const symbol = edge.targetId.slice(sep + 2);
         const dot = symbol.indexOf('.');
 
+        // A PROPERTY CHAIN over an object literal: `container.services.registry.lookup`.
+        //
+        // Not dynamic dispatch — every hop is written in the source. The root variable records which
+        // identifier each property PATH aliases, so the chain is walked by taking the LONGEST path
+        // that resolves and treating the rest as the member. Longest-first matters: `services` and
+        // `services.registry` may both be recorded, and only the longer one names a real value.
+        //
+        // A computed key (`handlers[key]()`) records no path and therefore lands nowhere here, which
+        // is the correct outcome and the line between the two shapes (todo30).
+        if (dot > 0) {
+          const rootName = symbol.slice(0, dot);
+          const rootId = `${file}::${rootName}`;
+          const paths = (graph.getNode(rootId)?.properties as any)?.objectPaths as Record<string, string> | undefined;
+          if (paths) {
+            const rest = symbol.slice(dot + 1);
+            const segments = rest.split('.');
+            // Longest prefix first, leaving at least one segment as the member being called.
+            for (let take = segments.length - 1; take >= 1; take--) {
+              // An EMPTY value means "wired, but its type is not stated" — a getter that computes
+              // rather than aliases. Dead-code uses those paths; the resolver must not.
+              const aliased = paths[segments.slice(0, take).join('.')];
+              if (!aliased) continue;
+              const member = segments.slice(take).join('.');
+              const targetNode = graph.getNode(`${file}::${aliased}`);
+              const props = targetNode?.properties as any;
+              const typeName = (props?.instanceOf as string | undefined)
+                ?? this.returnTypeOfCall(graph, props?.instanceOfCall as string | undefined, file, unitImports, unitSymbols);
+              if (!typeName) continue;
+              const typeId =
+                unitSymbols.get(`${file}::unit`)?.get(typeName) ??
+                this.resolveSymbolUnique(typeName, `${file}::unit`, unitImports, unitSymbols);
+              const candidate = typeId ? this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols) : null;
+              if (candidate) {
+                graph.rebindEdgeTarget(edge, candidate);
+                resolved.push({ id: edge.id, newTargetId: candidate });
+                break;
+              }
+            }
+            if (graph.hasNode(edge.targetId)) continue;
+          }
+        }
+
         // A PLAIN name qualified with a file that does not define it: `lib/index.ts::addMoney`,
         // where the barrel says `export * from './money.js'`. A wildcard enumerates nothing at the
         // re-exporting file, so no node is minted and no ALIASES edge exists — there is nothing to

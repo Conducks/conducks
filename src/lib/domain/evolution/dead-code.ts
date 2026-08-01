@@ -74,6 +74,24 @@ export class DeadCodeAnalyzer {
       if (bare.includes('.')) danglingRefNames.add(bare.split('.').pop()!.toLowerCase());
     }
 
+    // Object-literal WIRING is reachable even when nothing points at its node.
+    //
+    // A container records which identifier each property path aliases, and a call through the chain
+    // resolves straight to the destination — `container.infrastructure.db.query` lands on
+    // `BaseDatabase.query`, skipping the `db` getter entirely. The getter IS reached; it simply has
+    // no incoming edge, and reporting it dead is a claim about the resolver rather than the code.
+    //
+    // Keyed by FILE, so a same-named property elsewhere cannot launder an unrelated symbol (todo30).
+    const wiringByFile = new Map<string, Set<string>>();
+    for (const n of nodes as ConducksNode[]) {
+      const paths = (n.properties as any)?.objectPaths as Record<string, string> | undefined;
+      if (!paths) continue;
+      const f = String(n.properties.filePath || '').toLowerCase();
+      const names = wiringByFile.get(f) ?? new Set<string>();
+      for (const path of Object.keys(paths)) for (const seg of path.split('.')) names.add(seg);
+      wiringByFile.set(f, names);
+    }
+
     for (const node of nodes as ConducksNode[]) {
       // Skip virtual/taxonomy nodes that have no file path
       if (!node.properties.filePath || !node.properties.name) continue;
@@ -102,6 +120,8 @@ export class DeadCodeAnalyzer {
       // stdlib or package nodes. An unused dependency is a real and different question, and belongs
       // to `supply-chain`, which knows about manifests.
       const isExternal = String(node.properties.filePath || '').startsWith('external://');
+      const isWiring = wiringByFile.get(String(node.properties.filePath || '').toLowerCase())
+        ?.has(String(node.properties.name || '').toLowerCase()) === true;
       // A ROUTE IS SERVED, NOT CALLED, and a REQUEST is issued to something outside this graph.
       // Both are SYNTHESISED nodes standing for an endpoint, so "nothing references it" is their
       // normal state and says nothing about whether the code behind them runs. Reporting them as
@@ -109,7 +129,7 @@ export class DeadCodeAnalyzer {
       const nodeId = String(node.id || '');
       const isEndpoint = nodeId.includes('route::') || nodeId.includes('request::')
         || node.properties.isRoute === true || node.properties.isRequest === true;
-      const isSynthetic = isExternal || isEndpoint;
+      const isSynthetic = isExternal || isEndpoint || isWiring;
       const isArchitectural = ['STRUCTURE', 'BEHAVIOR', 'INFRA'].includes(node.label) && !isSynthetic;
       const isUntrackableType = DeadCodeAnalyzer.TYPE_KINDS.has((node.properties.kind || '').toLowerCase()) && !graphTracksTypes;
       const referencedByDanglingEdge = danglingRefNames.has(node.properties.name.toLowerCase());
