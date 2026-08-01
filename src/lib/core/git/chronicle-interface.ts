@@ -590,6 +590,26 @@ export class ChronicleInterface {
   }
 
   /**
+   * The branch HEAD currently points at, or null on a detached HEAD.
+   *
+   * `--quiet` plus `--short` is what distinguishes the two cases: on a detached HEAD the command
+   * exits non-zero and prints nothing rather than inventing a name. That is the whole point of the
+   * shape — ADR 0035's model keys layers by COMMIT precisely because a branch is a pointer that may
+   * not exist, and a function that returned "HEAD" or "main" for a detached checkout would make the
+   * branch guard compare a real branch against a fiction.
+   *
+   * Null therefore means "no branch here", which is a legitimate state, not a failure.
+   */
+  public getCurrentBranch(): string | null {
+    try {
+      const out = this.git(['symbolic-ref', '--quiet', '--short', 'HEAD'], { quiet: true }).trim();
+      return out || null;
+    } catch {
+      return null;                 // detached HEAD, or not a repository at all
+    }
+  }
+
+  /**
    * Conducks — Sync Staleness Sensor
    * Fetches the current HEAD hash of the repository.
    */
