@@ -336,6 +336,10 @@ export class ConducksReflector {
     // Reference-as-value candidates: bare identifiers passed as call arguments (callbacks, DI-table
     // values). Collected here, resolved AFTER the match loop — tree-sitter match order is NOT source
     // order, so gating on nodeCache mid-loop would miss a use that precedes its definition.
+    /** `const x = new Y()` pairs, collected during the walk and attached to nodes after it. */
+    const instanceTypes = new Map<string, string>();
+    let pendingInstance: string | null = null;
+
     const refValueCandidates: Array<{ scope: string; name: string; raw: string }> = [];
     for (const match of matches) {
       if (!match || !match.captures || match.captures.length === 0) continue;
@@ -613,6 +617,25 @@ export class ConducksReflector {
             refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a });
           }
         }
+        else if (cName === 'instance_name') {
+          // `const x = new Y()` — remember that x IS a Y (todo29#P3b).
+          //
+          // A CONSTRUCTS edge already exists for the `new Y()`, but its SOURCE is the enclosing
+          // SCOPE, so at module level it says "this file constructs a ServiceRegistry" and not
+          // "Registry is one". Without the variable-to-type link a later `registry.get(...)` has no
+          // way to reach `ServiceRegistry.get` — 192 of mentorseed's dangling edges.
+          //
+          // Reads a DECLARATION rather than inferring: the type is written literally on the same
+          // line. A factory (`X.getInstance()`) is deliberately not captured, because its return
+          // type is NOT stated here and assuming it is the guess ADR 0070 refuses.
+          pendingInstance = cText.trim().toLowerCase();
+        }
+        else if (cName === 'instance_type') {
+          if (pendingInstance) {
+            instanceTypes.set(pendingInstance, cText.trim().split('.').pop()!.toLowerCase());
+            pendingInstance = null;
+          }
+        }
         else if (cName === 'ref_value') {
           // Object-literal value `{ key: someSymbol }` — a reference-as-value (DI table / command
           // map). Same handling as an identifier call-arg: collect now, emit + gate after the loop.
@@ -702,6 +725,15 @@ export class ConducksReflector {
         confidence: 0.8,
         metadata: { referenceAsValue: true, original: raw }
       });
+    }
+
+    // Attach `instanceOf` to the variable nodes the walk produced (todo29#P3b).
+    //
+    // After the loop, because the capture order inside a match is not the order the nodes were
+    // created in — the same reason the reference-as-value edges are emitted here rather than inline.
+    for (const [varName, typeName] of instanceTypes) {
+      const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);
+      if (node) (node.metadata ??= {}).instanceOf = typeName;
     }
 
     // Next.js app-router routes, which no query can capture (todo29#P5).

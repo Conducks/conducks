@@ -257,6 +257,42 @@ export class IntraLinker {
         continue;
       }
 
+      // A TYPED receiver whose member id does not exist: `<file>::registry.get`, where `registry`
+      // was declared `const registry = ... new ServiceRegistry()` in that same file.
+      //
+      // The call processor already resolved the RECEIVER — the target carries the file that defines
+      // it — and then stopped, because the member belongs to the receiver's TYPE and nothing in the
+      // graph said what that type was. `instanceOf` now does (todo29#P3b). On mentorseed this one
+      // shape is 192 dangling edges from a single variable, plus `registry.register` / `registry.has`.
+      //
+      // It has to run HERE, above the `includes('::')` skip: the id is fully qualified, so the
+      // bare-name path below never sees it. The member node must ALREADY EXIST — a type without
+      // that member resolves to nothing rather than to an invented id (ADR 0070).
+      if (edge.targetId.includes('::') && !graph.hasNode(edge.targetId) && IntraLinker.RESOLVABLE_TYPES.has(edge.type)) {
+        const sep = edge.targetId.lastIndexOf('::');
+        const file = edge.targetId.slice(0, sep);
+        const symbol = edge.targetId.slice(sep + 2);
+        const dot = symbol.indexOf('.');
+        if (dot > 0) {
+          const receiver = symbol.slice(0, dot);
+          const member = symbol.slice(dot + 1);
+          const typeName = (graph.getNode(`${file}::${receiver}`)?.properties as any)?.instanceOf as string | undefined;
+          if (typeName) {
+            // The class is looked up from the RECEIVER's file, which is where it is imported —
+            // the calling file usually imports the instance and never the class.
+            const typeId =
+              unitSymbols.get(`${file}::unit`)?.get(typeName) ??
+              this.resolveSymbol(typeName, `${file}::unit`, unitImports, unitSymbols);
+            const candidate = typeId ? `${typeId.slice(0, typeId.lastIndexOf('::'))}::${typeName}.${member}` : null;
+            if (candidate && graph.hasNode(candidate)) {
+              graph.rebindEdgeTarget(edge, candidate);
+              resolved.push({ id: edge.id, newTargetId: candidate });
+              continue;
+            }
+          }
+        }
+      }
+
       // Skip already-resolved edges (fully qualified IDs always contain '::')
       if (edge.targetId.includes('::')) continue;
       if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type)) continue;

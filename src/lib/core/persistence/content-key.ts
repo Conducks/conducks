@@ -58,6 +58,10 @@ export const CONTENT_NODE_COLUMNS = [
   // what the code declares, so stability is the reasonable reading; re-measure on a subject with
   // real routes before relying on it.
   'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'last_author',
+  // The type a variable is declared with (todo29#P3b). Content, and on strong grounds rather than
+  // the weak ones above: it is read off the declaration, so it can only change when the declaration
+  // text changes — which changes the fingerprint and therefore the content row anyway.
+  'instance_of',
 ] as const;
 
 /** Every node column the layer schema accounts for. A column in neither list is unclassified. */

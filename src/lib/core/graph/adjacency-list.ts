@@ -350,6 +350,11 @@ export class ConducksAdjacencyList {
         // Cross-service HTTP binding reads these, and the skeleton is what survives a load — so
         // omitting them made `bindRouteCircuits` match nothing on any graph that came from the
         // vault rather than straight from a parse (todo22#P15).
+        // `const x = new Y()` — the variable's type, read off the declaration (todo29#P3b). On the
+        // skeleton because IntraLinker resolves `x.method()` against it, and the skeleton is what
+        // survives a vault load: left out, the link worked on a fresh parse and vanished on reload,
+        // the same shape as the route columns below.
+        instanceOf: node.properties.instanceOf,
         isRoute: node.properties.isRoute,
         isRequest: node.properties.isRequest,
         method: node.properties.method,

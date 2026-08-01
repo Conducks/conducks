@@ -110,4 +110,24 @@ export const JAVASCRIPT_QUERIES = `
   (call_expression
     function: (identifier) @req_fn (#match? @req_fn "^(axios|got|ky)$")
     arguments: (arguments . (string) @kinesis_request_url)) @kinesis_request
+
+  ;; --- const x = new Y() — the variable's TYPE, read from its own declaration (todo29#P3b) ---
+  ;;
+  ;; A CONSTRUCTS edge already exists for every new Y(), but its SOURCE is the enclosing scope, so
+  ;; at module level it says "this FILE constructs a ServiceRegistry" and not "Registry IS one".
+  ;; Without that link a later registry.get(...) has no way to reach ServiceRegistry.get, which
+  ;; is 192 of mentorseed's dangling edges.
+  ;;
+  ;; This reads a DECLARATION, it does not infer: the type is written literally in the source. A
+  ;; factory (X.getInstance()) is deliberately NOT matched — its return type is not stated here and
+  ;; assuming it is the guess ADR 0070 refuses.
+  (variable_declarator
+    name: (identifier) @instance_name
+    value: (new_expression constructor: [(identifier) (member_expression)] @instance_type)) @isInstanceOf
+
+  ;; The same, through a fallback: const R = globalThing ?? new ServiceRegistry(). The type is
+  ;; still stated literally; only the reachability is conditional.
+  (variable_declarator
+    name: (identifier) @instance_name
+    value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
 `;

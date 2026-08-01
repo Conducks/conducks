@@ -302,7 +302,11 @@ export class SynapsePersistence {
       is_request BOOLEAN,
       http_method VARCHAR,
       http_path VARCHAR,
-      http_url VARCHAR
+      http_url VARCHAR,
+      -- A variable declared as new Y() records Y here (todo29#P3b). A real column for the same
+      -- reason the five above are: IntraLinker reads it, and a value that lives only in the
+      -- metadata blob is absent from every SHALLOW load, which is the load the analyze path uses.
+      instance_of VARCHAR
     );`;
 
     const edgesSql = `CREATE TABLE IF NOT EXISTS edges (
@@ -368,7 +372,7 @@ export class SynapsePersistence {
     await run(historySql);
     // Existing vaults predate the HTTP columns; ADD COLUMN IF NOT EXISTS is a no-op on new ones.
     for (const col of ['is_route BOOLEAN', 'is_request BOOLEAN', 'http_method VARCHAR',
-                       'http_path VARCHAR', 'http_url VARCHAR']) {
+                       'http_path VARCHAR', 'http_url VARCHAR', 'instance_of VARCHAR']) {
       await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS ${col}`);
     }
     await run(edgesSql);
@@ -512,10 +516,10 @@ export class SynapsePersistence {
       ? `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
                 risk, unitId, parentId, namespaceId, layer_path, depth,
                 fingerprint, rootId, structureId, isEntryPoint, lineStart, lineEnd,
-                is_route, is_request, http_method, http_path, http_url FROM nodes`
+                is_route, is_request, http_method, http_path, http_url, instance_of FROM nodes`
       : `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
                 risk, unitId, parentId, namespaceId, layer_path, depth, metadata,
-                is_route, is_request, http_method, http_path, http_url FROM nodes`);
+                is_route, is_request, http_method, http_path, http_url, instance_of FROM nodes`);
     traceMemory(`load: ${nodes.length} node rows fetched`);
     const edges = await this.query(
       `SELECT id, sourceId, targetId, type, weight, confidence, properties FROM edges`);
@@ -558,7 +562,8 @@ export class SynapsePersistence {
           isRequest: row.is_request ?? undefined,
           method: row.http_method ?? undefined,
           path: row.http_path ?? undefined,
-          url: row.http_url ?? undefined
+          url: row.http_url ?? undefined,
+          instanceOf: row.instance_of ?? undefined
         }
       });
     }
@@ -705,7 +710,7 @@ export class SynapsePersistence {
     if (this.readOnly) return;
     await this.ensureVaultOpen();
     const owned = !this.inPulse;
-    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url'];
+    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'instance_of'];
     try {
       if (owned) await this.run("BEGIN TRANSACTION");
       const rows = nodes.map(n => {
@@ -724,7 +729,7 @@ export class SynapsePersistence {
           m.layer_path || null, m.depth || 0, m.risk || 0, n.gravity || m.gravity || 0, n.complexity || m.complexity || 1,
           m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(m.dna || {}), JSON.stringify(m.signature || {}), JSON.stringify(m.kinetic || {}),
           JSON.stringify({ ...m, id: n.id, name, range: m.range }),
-          m.isRoute ?? null, m.isRequest ?? null, m.method ?? null, m.path ?? null, m.url ?? null
+          m.isRoute ?? null, m.isRequest ?? null, m.method ?? null, m.path ?? null, m.url ?? null, m.instanceOf ?? null
         ];
       });
       await this.insertBatched('nodes', columns, rows);
