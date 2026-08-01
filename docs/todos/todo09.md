@@ -88,9 +88,15 @@ emission, pruned at the end). No reflector change.
       passed as args (honest boundary refs). Suite 43/43, no new shadow symbols. `prune` now 16, all
       honest: 9 real unused-exports + 7 orphans below.
       REMAINING (each a distinct deeper layer — do deliberately, NOT more call-arg work):
-      - DI dynamic-property CHAINS: `registry.evolution.watcher` / `registry.evolution.audit()` —
-        multi-hop property access on the composition-root object (chronicle/diff/graphEngine/watcher
-        still orphan). Needs the registry object modeled, or an entry-manifest root list.
+      - [-] DI dynamic-property CHAINS — DROPPED, because its stated motivation is ALREADY DECIDED
+        against three lines below. It names `chronicle`/`diff`/`graphEngine`/`watcher` as the orphans
+        it would connect, and those exact symbols are dropped in this same entry as "5 symbols
+        already PROVEN benign" with "high regression risk". Re-verified 2026-08-01: still zero edges
+        into the getters, and `prune` reports 41 orphans of which these are three. Building chain
+        resolution to connect symbols we have decided not to connect is work with no beneficiary —
+        and the mechanism it needs (member-READ edge capture) is the one that entry calls
+        flood-prone. If chain resolution is ever wanted it should be justified by a DIFFERENT case
+        than the one already settled here.
       - [x] Object-literal value capture — DONE. Added `(pair value: (identifier) @ref_value)` to the
         TS/TSX/JS queries + a reflector handler that feeds it into the reference-as-value emission.
         `initializeRegistry` now has an incoming ACCESSES edge (flipped ORPHAN → UNUSED_EXPORT — it is
