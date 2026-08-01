@@ -181,7 +181,7 @@ impl S {
 });
 
 // ---------------------------------------------------------------------------------------------
-describe('Swift: return type is captured; parameters are not (grammar constraint)', () => {
+describe('Swift: parameters and return type', () => {
   const FIXTURE = `
 func plain() {}
 func withParams(a: String, b: Int) {}
@@ -208,21 +208,27 @@ class C {
   });
 
   /**
-   * Hard case (Swift parameters): tree-sitter-swift 0.7.1 has NO wrapper node for a function's
-   * value parameters — `parameter` nodes are direct, FIELD-LESS children of `function_declaration`
-   * itself, sitting beside its own name and body (confirmed against node-types.json: `parameter`
-   * lives in that node's `children` list, not in any `fields` entry). The frozen `paramsOf()`
-   * contract needs ONE captured node whose `namedChildren` ARE the parameters; capturing
-   * `function_declaration` itself would pull in the function's own name and return type as fake
-   * "parameters" — worse than an empty array. DECISION: do not capture `@params` for Swift at all.
-   * `dna.params` stays `[]` for every Swift function, `withParams` (which genuinely takes two)
-   * included — this is the KNOWN, REPORTED gap, not a silent one: an empty array here means "the
-   * grammar shape does not fit the frozen helper", not "measured as empty". Fixing it needs
-   * `reflector.ts` to accept a node-TYPE filter over a captured node's children, which is a change
-   * to the frozen helper and out of this file's lane.
+   * WAS A REPORTED GAP, now FIXED (ADR 0088). tree-sitter-swift has NO wrapper node for value
+   * parameters — they are field-less children of `function_declaration`, beside its own name and
+   * body — so the original `@params` contract (one node, all children are parameters) could not
+   * express it, and capturing the function itself would have pulled in the name and body as fake
+   * parameters. The helper now accepts a SECOND capture, `@params_inline`, which tags the function
+   * and filters its children by node TYPE. Explicit rather than heuristic: a shape-based guess
+   * ("has a type field") would silently drop Ruby's bare identifier parameters.
+   *
+   * An argument LABEL is kept with the name: `with b: String` records `"with b"`, because both are
+   * written and the caller writes the label. Dropping either would misstate the call site.
    */
-  it('cannot capture parameters for Swift — stays [] even on a function that takes two', () => {
-    expect(node('withParams').params).toEqual([]);
-    expect(node('method').params).toEqual([]);
+  it('captures Swift parameters through the inline form, label included', () => {
+    expect(node('withParams').params).toEqual([
+      { name: 'a', type: 'String', optional: false },
+      { name: 'b', type: 'Int', optional: false },
+    ]);
+    expect(node('method').params).toEqual([{ name: 'x', type: 'Int', optional: false }]);
+  });
+
+  /** A Swift function taking nothing records an empty list that MEANS empty, not "not measured". */
+  it('records zero parameters for a Swift function that takes none', () => {
+    expect(node('plain').params).toEqual([]);
   });
 });

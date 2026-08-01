@@ -56,7 +56,12 @@ export const SWIFT_QUERIES = `
   ;; the function's own name, once to the return type's own node kinds — reads correctly: only a
   ;; function that actually declares '-> T' produces a second 'name:' child, so the capture is
   ;; absent (not a wrong guess) when nothing is written.
-  (function_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? name: (simple_identifier) @name name: [(user_type) (array_type) (dictionary_type) (optional_type) (tuple_type) (function_type)]? @return_type "async"? @isAsync) @isFunction
+  ;; @params_inline, not @params: tree-sitter-swift has NO parameter-list node — parameters are
+  ;; field-less children of the function itself, sitting among its name, return type and body. So
+  ;; the FUNCTION is tagged and the shared helper filters its children by node type (ADR 0088).
+  ;; Capturing each parameter separately is not an option: a repeated capture produces one match
+  ;; per parameter, and every one of those would race to create the function node.
+  (function_declaration (modifiers (visibility_modifier ["public" "open" "package"]) @isExported)? name: (simple_identifier) @name name: [(user_type) (array_type) (dictionary_type) (optional_type) (tuple_type) (function_type)]? @return_type "async"? @isAsync) @isFunction @params_inline
   (init_declaration name: _ @name) @isFunction
   (deinit_declaration "deinit" @name) @isFunction
   (protocol_function_declaration name: (simple_identifier) @name name: [(user_type) (array_type) (dictionary_type) (optional_type) (tuple_type) (function_type)]? @return_type) @isMethod

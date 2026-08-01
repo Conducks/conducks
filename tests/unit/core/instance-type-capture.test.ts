@@ -242,3 +242,49 @@ describe('a function records the parameters it declares', () => {
     expect(await paramsOf('class C { m(x: Foo) {} }', 'm')).toEqual([{ name: 'x', type: 'Foo', optional: false }]);
   });
 });
+
+/**
+ * A GENERATOR was invisible (ADR 0088). `function* g() {}` parses as `generator_function_declaration`,
+ * a different node type from `function_declaration`, and no pattern in any of the three JS-family
+ * query files touched it — so it produced NO NODE AT ALL. Not a missing signature: a missing
+ * function. Nothing that calls it could resolve, and `prune` would never see it as defined.
+ *
+ * Reported by a subagent as JavaScript-only. It was not — TypeScript and TSX had the identical hole,
+ * which is why the fix went to all three. A finding scoped to the file someone happened to be
+ * looking at is worth re-checking against its siblings.
+ */
+describe('a generator is a function', () => {
+  const reflector = new ConducksReflector();
+  const provider = new TypeScriptProvider();
+
+  const nodeNames = async (source: string) => {
+    const context = new AnalyzeContext();
+    const file = { path: '/repo/a.ts', source };
+    const spectrum: any = await reflector.reflect(file, provider as any, context, [file.path]);
+    return spectrum.nodes.map((n: any) => String(n.name).toLowerCase());
+  };
+
+  const paramsOfFn = async (source: string, name: string) => {
+    const context = new AnalyzeContext();
+    const file = { path: '/repo/a.ts', source };
+    const spectrum: any = await reflector.reflect(file, provider as any, context, [file.path]);
+    return spectrum.nodes.find((n: any) => String(n.name).toLowerCase() === name)?.dna?.params;
+  };
+
+  beforeAll(async () => {
+    await grammars.loadLanguage('typescript');
+  });
+
+  it('produces a node for a standalone generator', async () => {
+    expect(await nodeNames('function* g(a) { yield a; }')).toContain('g');
+  });
+
+  it('produces a node for an async generator', async () => {
+    expect(await nodeNames('async function* ag(b) { yield b; }')).toContain('ag');
+  });
+
+  it('records the generator parameters like any other function', async () => {
+    expect(await paramsOfFn('function* g(a: string) { yield a; }', 'g'))
+      .toEqual([{ name: 'a', type: 'string', optional: false }]);
+  });
+});

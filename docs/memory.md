@@ -1210,3 +1210,13 @@ by construction.
 ## Swift has no wrapper node for function parameters, and one field id is reused for two things
 - Gotcha: tree-sitter-swift 0.7.1 gives `parameter` nodes as FIELD-LESS direct children of `function_declaration`, alongside the function's own name and body. There is no `parameters` node to capture, so `dna.params` is `[]` for every Swift function — a documented gap, not a silent one (ADR 0087). Separately, the grammar aliases `return_type` onto the SAME field id as the function's own name, so `return_type: (user_type)` compiles and matches NOTHING (the ADR 0071 shape); the working form writes `name:` twice in one pattern, disambiguated by node type
 - Applies: `swift/queries.ts`. Capturing Swift parameters needs the shared `paramsOf()` to accept a node-TYPE filter over a captured parent's children — a contract change, not a query fix
+
+## A finding scoped to one language is worth re-checking against its siblings
+- Gotcha: a subagent reported "a standalone generator produces no node" as a JavaScript gap. TypeScript and TSX had the identical hole — the three query files are near-copies, so a missing pattern in one is usually missing in all three. Fixing only the reported file would have left two thirds of the bug (ADR 0088)
+- Why: an agent owns a file set and reports what it measured THERE. The report is accurate and its SCOPE is an artefact of the assignment, not of the defect
+- Applies: any per-language finding in `src/lib/core/parsing/languages/`. Grep the sibling files for the same pattern before closing it
+
+## The backtick guard test is weaker than it looks
+- Gotcha: `tests/unit/core/parsing/backticks-in-queries.test.ts` did NOT catch the fifth occurrence of the backtick trap (ADR 0088) — `tsc` did. The test reads a query file's template literal by finding `= \`` and the file's LAST backtick, which only works once the file parses; an unescaped backtick breaks the parse first, and jest reports a compile error rather than the guard's message
+- Why it still earns its place: it catches a backtick added to a file that STILL compiles, which is the silent case. It is not a substitute for reading the tsc error
+- Applies: when a query file suddenly fails with `TS1005: ',' expected` or a wall of SQL-ish text, look for a backtick in a comment before anything else

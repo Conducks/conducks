@@ -45,6 +45,14 @@ export const JAVASCRIPT_QUERIES = `
   ;; grammar), and every modifier on them (async, generator, static, getter/setter, a private
   ;; #name, and constructor) — none of those change the node TYPE, only its fields, so one
   ;; pattern already saw all of them; it just was not reading @params.
+
+  ;; A GENERATOR is a different node type, and nothing matched it — so a starred function produced
+  ;; NO NODE AT ALL (not even a variable), which is a hole in the graph rather than a missing
+  ;; signature. Found while extending signatures to eleven languages; TypeScript and TSX had the
+  ;; same hole, so it was never a JavaScript-only gap (ADR 0088).
+  (generator_function_declaration
+    name: (identifier) @name
+    parameters: (formal_parameters) @params) @isFunction
   (method_definition name: (_) @name parameters: (formal_parameters) @params) @isMethod
 
   ;; Heritage: extends (EXTENDS edge). JS has no 'implements'.

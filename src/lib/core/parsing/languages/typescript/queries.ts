@@ -84,6 +84,14 @@ export const TYPESCRIPT_QUERIES = `
   (enum_declaration name: (identifier) @name) @isEnum
   
   (function_declaration name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isFunction
+
+  ;; A GENERATOR is a different node type, and nothing matched it — so a starred function produced
+  ;; NO NODE AT ALL (not even a variable), which is a hole in the graph rather than a missing
+  ;; signature. Found while extending signatures to eleven languages; TypeScript and TSX had the
+  ;; same hole, so it was never a JavaScript-only gap (ADR 0088).
+  (generator_function_declaration
+    name: (identifier) @name
+    parameters: (formal_parameters) @params) @isFunction
   (method_definition name: (_) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isMethod
   
   ;; Heritage: extends / implements (EXTENDS + IMPLEMENTS edges)

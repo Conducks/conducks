@@ -60,7 +60,11 @@ The name is NOT read from a field. Eleven grammars disagree about which field ho
 instead and whatever remains is the name. That keeps `*args`, `&blk`, `k:`, `&$c` and `...$rest`
 intact, which a field lookup silently dropped.
 
-Two grammars have stated gaps rather than workarounds. **Swift** has no parameter-list node — its
-parameters are field-less children of the function itself — so `dna.params` is `[]` there. **A
-standalone JavaScript generator** (`function* g() {}`) is `generator_function_declaration` and no
-pattern matches it, so it produces no node at all.
+Both gaps this note used to state are CLOSED (ADR 0088). Swift's parameters are captured through a
+second form, `@params_inline`, which tags the FUNCTION and filters its children by node type —
+tree-sitter-swift has no parameter-list node to tag. Generators have their own pattern in all three
+JS-family files; before that a starred function produced no node at all, which was a missing function
+rather than a missing signature.
+
+What remains: a single unparenthesised arrow parameter (`const f = a => a`) has no parameter node in
+the grammar at all, in either JavaScript or TypeScript, so it cannot be captured under either form.

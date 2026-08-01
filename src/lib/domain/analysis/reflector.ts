@@ -114,13 +114,24 @@ const scopedVarKey = (scope: string | null | undefined, name: string): string =>
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function paramsOf(match: any): Array<{ name: string; type: string | null; optional: boolean }> {
-  const node = match.captures?.find((c: any) => c.name === 'params')?.node;
+  // TWO capture forms, because one grammar has no parameter-list node at all.
+  //
+  //   @params         a dedicated list node — EVERY named child is a parameter. Ten languages.
+  //   @params_inline  the function node ITSELF, whose parameters sit among its name, return type
+  //                   and body. Swift only: tree-sitter-swift provides no wrapper (ADR 0088).
+  //
+  // The inline form filters children by node TYPE rather than guessing from shape — a heuristic
+  // like "has a type field" would silently drop Ruby's bare `identifier` parameters.
+  const listNode = match.captures?.find((c: any) => c.name === 'params')?.node;
+  const inlineNode = listNode ? null : match.captures?.find((c: any) => c.name === 'params_inline')?.node;
+  const node = listNode ?? inlineNode;
   if (!node) return [];
 
   const out: Array<{ name: string; type: string | null; optional: boolean }> = [];
   for (let i = 0; i < node.namedChildCount; i++) {
     const child = node.namedChild(i);
     if (!child) continue;
+    if (inlineNode && !/parameter/.test(child.type)) continue;
 
     const typeNode = child.childForFieldName('type');
     const declared = typeNode?.text?.replace(/^\s*(:|->)\s*/, '').trim() || null;
@@ -128,9 +139,13 @@ function paramsOf(match: any): Array<{ name: string; type: string | null; option
 
     // Go writes `func f(a, b string)` as ONE node with TWO `name` children sharing one type.
     // Reading only the first silently dropped `b` — an arity this graph would then state wrongly.
-    const named: any[] = typeof child.childrenForFieldName === 'function'
+    // Swift ALIASES the `name` field onto the type as well, so a plain read returns
+    // ["a", "Int"] for `a: Int` and the type was emitted as a second parameter. Excluding the type
+    // node by identity fixes it without a per-language branch — the same defence Go's real grouped
+    // declaration passes untouched, since there the type is a separate field.
+    const named: any[] = (typeof child.childrenForFieldName === 'function'
       ? child.childrenForFieldName('name') ?? []
-      : [];
+      : []).filter((n: any) => !typeNode || n.startIndex !== typeNode.startIndex);
     if (named.length > 1) {
       for (const n of named) out.push({ name: n.text, type: declared, optional });
       continue;
@@ -1182,7 +1197,10 @@ export class ConducksReflector {
         // fallback ran a real symbol through a different code path and silently dropped both
         // (todo26 Phase 1). `dna` here is a best-effort DNA: Gnosis has no modifier captures, so
         // only `isExported` (readable straight off the line) is known; the rest default false.
-        const gnosisDna = { isAsync: false, isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: 'void' };
+        // The REGEX fallback has no AST, so a signature cannot be read here — `null` and `[]` say
+        // "not measured" rather than "measured as void" (ADR 0088). The empty params array carries
+        // the old ambiguity and is kept only because the type wants an array; nothing reads it.
+        const gnosisDna = { isAsync: false, isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: null };
         const gnosisFingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${name}|${JSON.stringify(gnosisDna)}`).digest('hex');
 
         spectrum.nodes.push({
@@ -1208,7 +1226,7 @@ export class ConducksReflector {
         if (process.env.CONDUCKS_DEBUG === '1') console.log(`🛡️ [Gnosis] Found ${isMethod ? 'Method' : 'Func'}: ${displayName} (Parent: ${currentClassId})`);
 
         // See the class branch above — same gap, same fix.
-        const gnosisFuncDna = { isAsync: line.includes('async'), isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: 'void' };
+        const gnosisFuncDna = { isAsync: line.includes('async'), isAbstract: false, isExported: line.includes('export'), isStatic: false, params: [], returns: null };
         const gnosisFuncFingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${displayName}|${JSON.stringify(gnosisFuncDna)}`).digest('hex');
 
         spectrum.nodes.push({
