@@ -93,7 +93,24 @@ export class DeadCodeAnalyzer {
       // usage of local variables, parameters, class fields, or
       // dynamically-dispatched methods — flagging them produces
       // overwhelming false positives, so they are excluded here.
-      const isArchitectural = ['STRUCTURE', 'BEHAVIOR', 'INFRA'].includes(node.label);
+      // A DEPENDENCY IS NOT DEAD CODE. Virtual induction mints a node for every external module and
+      // symbol it sees, and those carry an `external://` path. They were being reported as orphans
+      // because nothing in the repo DEFINES them — which is true of every dependency and says
+      // nothing: `node:path` was reported dead while being referenced 159 times (ADR 0092).
+      //
+      // Measured before the fix: 20 of 41 orphan findings on conducks, and 31 on mentorseed, were
+      // stdlib or package nodes. An unused dependency is a real and different question, and belongs
+      // to `supply-chain`, which knows about manifests.
+      const isExternal = String(node.properties.filePath || '').startsWith('external://');
+      // A ROUTE IS SERVED, NOT CALLED, and a REQUEST is issued to something outside this graph.
+      // Both are SYNTHESISED nodes standing for an endpoint, so "nothing references it" is their
+      // normal state and says nothing about whether the code behind them runs. Reporting them as
+      // dead is the same category error as reporting a dependency (ADR 0092).
+      const nodeId = String(node.id || '');
+      const isEndpoint = nodeId.includes('route::') || nodeId.includes('request::')
+        || node.properties.isRoute === true || node.properties.isRequest === true;
+      const isSynthetic = isExternal || isEndpoint;
+      const isArchitectural = ['STRUCTURE', 'BEHAVIOR', 'INFRA'].includes(node.label) && !isSynthetic;
       const isUntrackableType = DeadCodeAnalyzer.TYPE_KINDS.has((node.properties.kind || '').toLowerCase()) && !graphTracksTypes;
       const referencedByDanglingEdge = danglingRefNames.has(node.properties.name.toLowerCase());
       if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && this.isModuleScoped(node, graph) && incomingRefs.length === 0 && !this.isEntryPoint(node)) {
@@ -110,7 +127,7 @@ export class DeadCodeAnalyzer {
       // directories, namespaces all carry isExport but are not "exports").
       // Untrackable type declarations are skipped for the same reason as above.
       const isSymbol = ['STRUCTURE', 'BEHAVIOR', 'ATOM', 'INFRA'].includes(node.label);
-      if (isSymbol && !isUntrackableType && !referencedByDanglingEdge && node.properties.isExport) {
+      if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && node.properties.isExport) {
         // Find if any incoming edges are 'IMPORTS' from OTHER files or 'CALLS' from other files
         const externallyUsed = incomingRefs.some((e: any) => {
           const source = graph.getNode(e.sourceId);
