@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { CONTENT_NODE_COLUMNS, VOLATILE_NODE_COLUMNS } from "@/lib/core/persistence/content-key.js";
+import { CONTENT_NODE_COLUMNS, VOLATILE_NODE_COLUMNS, CONTENT_EDGE_COLUMNS, VOLATILE_EDGE_COLUMNS } from "@/lib/core/persistence/content-key.js";
 import { resolveLayerRole, layerRoleRefusal, type LayerRole, type LayerGitFacts } from "@/lib/core/persistence/layer-roles.js";
 import { collectableLayers, UNCOMMITTED_LAYER, type LayerKind, type LayerRow } from "@/lib/core/persistence/layer-reachability.js";
 import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
@@ -409,6 +409,18 @@ export class SynapsePersistence {
       ${VOLATILE_NODE_COLUMNS.map(c => `"${c}" VARCHAR`).join(',\n      ')},
       PRIMARY KEY (layerId, id)
     );`);
+    // Edge layers, same split as nodes: stable content shared, recomputed values per slot.
+    await run(`CREATE TABLE IF NOT EXISTS edge_content (
+      contentHash VARCHAR PRIMARY KEY,
+      ${CONTENT_EDGE_COLUMNS.map(c => `"${c}" VARCHAR`).join(',\n      ')}
+    );`);
+    await run(`CREATE TABLE IF NOT EXISTS edge_slots (
+      layerId VARCHAR,
+      id VARCHAR,
+      contentHash VARCHAR,
+      ${VOLATILE_EDGE_COLUMNS.map(c => `"${c}" VARCHAR`).join(',\n      ')},
+      PRIMARY KEY (layerId, id)
+    );`);
     await run(metaSql);
     await run(fileHashSql);
 
@@ -447,8 +459,44 @@ export class SynapsePersistence {
    * It is opt-in rather than the default because a shallow node genuinely loses its non-skeleton
    * properties, and the mirror's `hydrateNode` depends on them.
    */
-  public async load(graph: any, options: { shallow?: boolean } = {}): Promise<void> {
+  public async load(graph: any, options: { shallow?: boolean; layerId?: string } = {}): Promise<void> {
     const db = await this.ensureVaultOpen();
+
+    // A COMMIT layer loads from layer storage; the uncommitted layer is `nodes`/`edges` (todo20#P3).
+    //
+    // This is why the ~30 read commands needed NO rewiring. They all obtain their graph through
+    // `load()`, so teaching THIS ONE METHOD about layers makes every one of them layer-aware —
+    // `impact`, `trace`, `flows`, `audit` and the rest answer from whichever layer was loaded,
+    // without knowing layers exist. Rewiring each command to a row-reading API would have been
+    // thirty edits to reach the same place, and would have handed each of them rows when what they
+    // actually need is a graph.
+    if (options.layerId && options.layerId !== UNCOMMITTED_LAYER) {
+      const layerNodes = await this.readLayerNodes(options.layerId);
+      const layerEdges = await this.readLayerEdges(options.layerId);
+      for (const row of layerNodes) {
+        graph.addNode({
+          id: row.id as string,
+          label: row.canonicalKind as string,
+          name: row.name as string,
+          isShallow: true,
+          properties: { ...row },
+        });
+      }
+      for (const row of layerEdges) {
+        graph.addEdge({
+          id: row.id as string,
+          sourceId: row.sourceId as string,
+          targetId: row.targetId as string,
+          type: row.type as string,
+          weight: Number(row.weight ?? 0),
+          confidence: Number(row.confidence ?? 0),
+          properties: typeof row.properties === 'string' ? JSON.parse(row.properties || '{}') : (row.properties ?? {}),
+        });
+      }
+      traceMemory(`load: layer ${options.layerId} — ${layerNodes.length} nodes, ${layerEdges.length} edges`);
+      return;
+    }
+
     // Only the columns this method actually reads. `SELECT *` fetched all 26 and the driver
     // materialises every one as a JavaScript value — MEASURED at 190 MB to pull 6,544 node rows,
     // roughly 29 KB per row for data that is a fraction of that. `dna`, `signature` and `kinetic`
@@ -1119,6 +1167,53 @@ export class SynapsePersistence {
     return this.readLayerNodes(layerId);
   }
 
+  /** Write a commit layer's edges. Same sharing as nodes — see `writeLayerNodes`. */
+  public async writeLayerEdges(layerId: string, edges: Array<Record<string, unknown>>): Promise<{ slots: number; unique: number }> {
+    if (this.readOnly) return { slots: 0, unique: 0 };
+    if (layerId === UNCOMMITTED_LAYER) {
+      throw new Error('🛡️ [Vault] The uncommitted layer lives in `edges`, not in layer storage.');
+    }
+    await this.ensureVaultOpen();
+
+    const seen = new Set<string>();
+    const content: unknown[][] = [];
+    const slots: unknown[][] = [];
+    for (const e of edges) {
+      const h = createHash('sha1');
+      for (const c of CONTENT_EDGE_COLUMNS) h.update(`${c}=${JSON.stringify(e[c] ?? null)}\u0000`);
+      const hash = h.digest('hex');
+      if (!seen.has(hash)) {
+        seen.add(hash);
+        content.push([hash, ...CONTENT_EDGE_COLUMNS.map(c => e[c] ?? null)]);
+      }
+      slots.push([layerId, String(e.id ?? ''), hash, ...VOLATILE_EDGE_COLUMNS.map(c => e[c] ?? null)]);
+    }
+
+    const owned = !this.inPulse;
+    try {
+      if (owned) await this.run('BEGIN TRANSACTION');
+      const already = new Set((await this.query<{ contentHash: string }>(
+        `SELECT contentHash FROM edge_content`)).map(r => r.contentHash));
+      await this.insertRows('edge_content', ['contentHash', ...CONTENT_EDGE_COLUMNS], content.filter(r => !already.has(String(r[0]))));
+      await this.run(`DELETE FROM edge_slots WHERE layerId = ?`, [layerId]);
+      await this.insertRows('edge_slots', ['layerId', 'id', 'contentHash', ...VOLATILE_EDGE_COLUMNS], slots);
+      if (owned) await this.run('COMMIT');
+    } catch (err) {
+      if (owned) await this.run('ROLLBACK').catch(() => {});
+      throw err;
+    }
+    return { slots: slots.length, unique: seen.size };
+  }
+
+  /** Read a commit layer's edges back. */
+  public async readLayerEdges(layerId: string): Promise<Array<Record<string, unknown>>> {
+    await this.ensureVaultOpen();
+    return this.query<Record<string, unknown>>(
+      `SELECT s.id, ${CONTENT_EDGE_COLUMNS.map(c => `c."${c}"`).join(', ')}, ${VOLATILE_EDGE_COLUMNS.map(c => `s."${c}"`).join(', ')}
+       FROM edge_slots s JOIN edge_content c USING (contentHash)
+       WHERE s.layerId = ? ORDER BY s.id`, [layerId]);
+  }
+
   /** Read a commit layer back, joining each slot to the content it shares. */
   public async readLayerNodes(layerId: string): Promise<Array<Record<string, unknown>>> {
     await this.ensureVaultOpen();
@@ -1142,6 +1237,8 @@ export class SynapsePersistence {
     await this.ensureVaultOpen();
     await this.run(`DELETE FROM node_slots WHERE layerId = ?`, [layerId]);
     await this.run(`DELETE FROM node_content WHERE contentHash NOT IN (SELECT DISTINCT contentHash FROM node_slots)`);
+    await this.run(`DELETE FROM edge_slots WHERE layerId = ?`, [layerId]);
+    await this.run(`DELETE FROM edge_content WHERE contentHash NOT IN (SELECT DISTINCT contentHash FROM edge_slots)`);
   }
 
   /**

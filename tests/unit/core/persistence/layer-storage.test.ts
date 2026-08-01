@@ -5,6 +5,7 @@ import path from 'node:path';
 import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
 import { UNCOMMITTED_LAYER, layerIdForCommit } from '@/lib/core/persistence/layer-reachability.js';
 import { VOLATILE_NODE_COLUMNS } from '@/lib/core/persistence/content-key.js';
+import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 
 /**
  * Content-addressed commit layers (ADR 0035, ADR 0081, todo20#P3).
@@ -186,5 +187,99 @@ describe('a commit layer shares the rows another layer already holds', () => {
     const b = new SynapsePersistence(root, false);
     expect(await b.readLayerNodes(layerIdForCommit('aaa'))).toHaveLength(2);
     await b.close();
+  });
+});
+
+/**
+ * Loading a GRAPH from a layer (todo20#P3) — the change that made rewiring ~30 read commands
+ * unnecessary.
+ *
+ * Every read command obtains its graph through `persistence.load()`, so teaching that one method
+ * about layers makes all of them layer-aware without knowing layers exist. Rewiring each command to
+ * a row-reading API would have been thirty edits to reach the same place, and would have handed each
+ * of them rows when what they need is a graph.
+ */
+describe('loading a graph from a layer', () => {
+  const roots: string[] = [];
+  const mkR = () => {
+    const r = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-layerload-'));
+    roots.push(r);
+    return r;
+  };
+  afterEach(() => { while (roots.length) fs.rmSync(roots.pop()!, { recursive: true, force: true }); });
+
+  const nrow = (id: string, fp: string) => ({
+    id, fingerprint: fp, name: id.split('::').pop(), file: id.split('::')[0],
+    canonicalKind: 'BEHAVIOR', dna: '{}', gravity: '0.5', metadata: '{}',
+  });
+  const erow = (id: string, from: string, to: string) => ({
+    id, sourceId: from, targetId: to, type: 'CALLS', category: 'semantic',
+    lineNumber: '1', properties: '{}', weight: '1', confidence: '0.9',
+  });
+
+  it('loads a commit layer\'s nodes AND edges into a graph', async () => {
+    const p = new SynapsePersistence(mkR(), false);
+    const layer = layerIdForCommit('aaa');
+    await p.writeLayerNodes(layer, [nrow('a.ts::x', 'f1'), nrow('a.ts::y', 'f2')]);
+    await p.writeLayerEdges(layer, [erow('e1', 'a.ts::x', 'a.ts::y')]);
+
+    const graph = new ConducksAdjacencyList();
+    await p.load(graph, { layerId: layer });
+
+    expect([...graph.getAllNodes()].map(n => n.id).sort()).toEqual(['a.ts::x', 'a.ts::y']);
+    expect(graph.getAllEdges()).toHaveLength(1);
+    // The edge is walkable, which is the whole point — a node-only layer answers no impact question.
+    expect(graph.getNeighbors('a.ts::x').map(e => e.targetId)).toEqual(['a.ts::y']);
+    await p.close();
+  });
+
+  /** Two layers, one graph each, and neither leaks into the other. */
+  it('loads each layer separately', async () => {
+    const p = new SynapsePersistence(mkR(), false);
+    await p.writeLayerNodes(layerIdForCommit('aaa'), [nrow('a.ts::only-in-a', 'f1')]);
+    await p.writeLayerNodes(layerIdForCommit('bbb'), [nrow('a.ts::only-in-b', 'f2')]);
+
+    const ga = new ConducksAdjacencyList();
+    const gb = new ConducksAdjacencyList();
+    await p.load(ga, { layerId: layerIdForCommit('aaa') });
+    await p.load(gb, { layerId: layerIdForCommit('bbb') });
+
+    expect([...ga.getAllNodes()].map(n => n.id)).toEqual(['a.ts::only-in-a']);
+    expect([...gb.getAllNodes()].map(n => n.id)).toEqual(['a.ts::only-in-b']);
+    await p.close();
+  });
+
+  /** No layerId, or the uncommitted one, still reads `nodes` — the existing path is untouched. */
+  it('falls back to the uncommitted tables when no layer is named', async () => {
+    const p = new SynapsePersistence(mkR(), false);
+    await p.saveNodes([{ id: '/p/live.ts::sym', name: 'sym', canonicalKind: 'BEHAVIOR', canonicalRank: 7, filePath: '/p/live.ts', properties: {} } as never], 'pulse_1');
+    await p.writeLayerNodes(layerIdForCommit('aaa'), [nrow('a.ts::archived', 'f1')]);
+
+    const g = new ConducksAdjacencyList();
+    await p.load(g);
+    expect([...g.getAllNodes()].map(n => n.id)).toEqual(['/p/live.ts::sym']);
+    await p.close();
+  });
+
+  it('shares edge content between layers the same way nodes do', async () => {
+    const p = new SynapsePersistence(mkR(), false);
+    const shared = [erow('e1', 'a.ts::x', 'a.ts::y'), erow('e2', 'a.ts::y', 'a.ts::z')];
+    await p.writeLayerEdges(layerIdForCommit('aaa'), shared);
+    await p.writeLayerEdges(layerIdForCommit('bbb'), shared);
+    const content = await p.query<{ n: number }>(`SELECT count(*)::INT AS n FROM edge_content`);
+    const slots = await p.query<{ n: number }>(`SELECT count(*)::INT AS n FROM edge_slots`);
+    expect(slots[0].n).toBe(4);
+    expect(content[0].n).toBe(2);      // stored once, referenced twice
+    await p.close();
+  });
+
+  it('drops a layer\'s edges and reclaims unreferenced edge content', async () => {
+    const p = new SynapsePersistence(mkR(), false);
+    await p.writeLayerEdges(layerIdForCommit('aaa'), [erow('e1', 'a.ts::x', 'a.ts::y')]);
+    await p.writeLayerEdges(layerIdForCommit('bbb'), [erow('e2', 'b.ts::p', 'b.ts::q')]);
+    await p.dropLayerNodes(layerIdForCommit('bbb'));
+    expect((await p.query<{ n: number }>(`SELECT count(*)::INT AS n FROM edge_content`))[0].n).toBe(1);
+    expect(await p.readLayerEdges(layerIdForCommit('aaa'))).toHaveLength(1);
+    await p.close();
   });
 });
