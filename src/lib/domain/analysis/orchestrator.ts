@@ -135,7 +135,12 @@ export class AnalyzeOrchestrator {
     // === Pass 2 & 3: Conducks Streaming Induction & Binding 🛡️ ===
     logger.info(`🛡️ [Conducks] [Pass 2/3] Streaming Resonance: Reflecting ${normalizedFiles.length} units in throttled waves...`);
     
-    const CHUNK_SIZE = 500;
+    // Wave size. Overridable ONLY so the wave boundary can be varied under measurement — a pulse
+    // must produce the same graph at any wave size, and the only way to check that is to run the
+    // same tree at two of them and diff the node ids. A bad value falls back to the default rather
+    // than producing zero-length or NaN-length waves.
+    const chunkOverride = Number.parseInt(process.env.CONDUCKS_CHUNK_SIZE ?? '', 10);
+    const CHUNK_SIZE = Number.isFinite(chunkOverride) && chunkOverride > 0 ? chunkOverride : 500;
     const totalBatches = Math.ceil(normalizedFiles.length / CHUNK_SIZE);
 
     for (let i = 0; i < normalizedFiles.length; i += CHUNK_SIZE) {

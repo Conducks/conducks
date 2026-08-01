@@ -245,6 +245,18 @@ export class SynapsePersistence {
     await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS entropy_score DOUBLE;`);
     await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS last_author TEXT;`);
 
+    // INVARIANT: `nodes` must carry NO secondary index on a column the pulse writes.
+    //
+    // Not a style preference — measured. Adding `CREATE INDEX idx_nodes_gravity ON nodes(gravity)`,
+    // on a column the multi-row `UPDATE ... FROM (VALUES)` writes, makes a cold pulse fail 2 runs
+    // out of 2, deterministically, at the wave-2 node flush:
+    //   Constraint Error: PRIMARY KEY or UNIQUE constraint violation: duplicate key "ecosystem::..."
+    // — a duplicate on a key the statement never duplicates, the same signature as the `edges`
+    // failure ADR 0064 records. Without it, 10+ clean runs.
+    //
+    // So `nodes` is safe because it has no such index, NOT because the multi-row UPDATE shape is
+    // sound. `idx_nodes_id` below is redundant with the PRIMARY KEY and harmless; anything added
+    // beside it is one well-meant index away from a deterministic pulse failure (todo22#P8).
     await run(`CREATE INDEX IF NOT EXISTS idx_nodes_id ON nodes(id);`);
     await run(`CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(sourceId);`);
     await run(`CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(targetId);`);

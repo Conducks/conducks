@@ -346,12 +346,29 @@ export class ConducksGraph {
         if (this.graph.hasNode(localCandidate)) {
           targetId = localCandidate;
         }
-      } else if (targetId.startsWith('/') || targetId.includes('\\')) {
-        // It's a local-prefixed ID. If it doesn't exist, it's a "Ghost Local".
-        if (!this.graph.hasNode(targetId)) {
-          targetId = targetId.split('::').pop()!;
-        }
       }
+      // THE "GHOST LOCAL" STRIP IS GONE, and it was a correctness bug wearing a performance costume.
+      //
+      // It used to degrade a fully-qualified target id to its bare last segment whenever that node
+      // was not resident in the IN-MEMORY graph. The orchestrator CLEARS that graph after every wave
+      // flush (ADR 0041), so residency is a function of wave size and file order — not of the code
+      // being analyzed. The same edge kept its exact target in a one-wave run and fell back to a
+      // fuzzy name lookup in a five-wave one, and the two disagreed.
+      //
+      // MEASURED on this repo, 551 units, cold vault per arm, each arm byte-identical across repeat
+      // runs so it is deterministic rather than noisy: CHUNK_SIZE 500 gave 4,205 vault nodes and
+      // CHUNK_SIZE 100 gave 4,212, with 258 edge ids differing EACH WAY. Two suspects were killed by
+      // measurement first — worker count changes nothing, and the union of node ids the waves put in
+      // memory is identical (7,014) at both sizes, so the divergence is purely in edge target
+      // resolution and the node count follows it, because `pruneTaxonomy` drops an ATOM with no
+      // non-structural edge.
+      //
+      // With the strip removed, wave sizes 37, 100 and 500 produce byte-identical node AND edge id
+      // sets. The trade is stated rather than hidden: against the unpatched 500 arm it is -28 nodes
+      // and +1 edge. IntraLinker's FUZZY resolutions fall 2,925 -> 2,476 because those edges now
+      // carry their exact target instead of being re-guessed by name, persisted binder edges rise
+      // 181 -> 206 and dropped fall 194 -> 169. The 28 lost ATOMs are ones the fuzzy edge was
+      // keeping alive (todo22#P7).
 
       this.graph.addEdge({
         id: `SEMANTIC::${sourceId}->${targetId}::${rel.type.toLowerCase()}`,
