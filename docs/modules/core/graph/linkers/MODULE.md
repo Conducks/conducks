@@ -12,9 +12,13 @@ every file is known. `linker-intra` handles same-repo symbol references; `linker
 left dangling on purpose; dead-code reads danglers as evidence of use rather than treating the target
 as orphaned, which keeps it under-reporting.
 
-**Deferred / not built:** dynamic dispatch. A DI property chain (`registry.evolution.watcher`) cannot
-be resolved statically and is not attempted. The consequence — a handful of permanent orphan false
-positives — is accepted rather than papered over with heuristics.
+**Deferred / not built:** dynamic dispatch, and one narrower case now carved out of it. A DI property
+chain (`registry.evolution.watcher`) still cannot be resolved statically and is not attempted. But a
+member call on a variable whose DECLARATION states its type — `const r = new ServiceRegistry()`, then
+`r.get(...)` — IS resolved, because that is a read rather than an inference (ADR 0082). The line
+between them is where the type is written: on the declaration it is read; returned from a factory
+(`X.getInstance()`) it is not guessed. The consequence — a handful of permanent orphan false
+positives — is still accepted rather than papered over with heuristics.
 
 ## Fuzzy matching is the risk, `sameFamily` is the guard
 

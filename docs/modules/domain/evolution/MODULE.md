@@ -3,7 +3,15 @@
 **Layer:** domain. Imports core + contracts.
 
 **Responsibility:** what changed and what is no longer needed. Dead-code finds orphans and unused
-exports; drift compares the graph against a baseline; the watcher drives incremental re-analysis.
+exports; drift compares the graph against a baseline; the watcher drives incremental re-analysis;
+`layer-diff.ts` and `merge-impact.ts` compare two stored layers structurally.
+
+`diffLayers()` matches by id first and only then by a fingerprint that is UNIQUE on both sides, so a
+"move" is claimed only where there is exactly one candidate; everything else is reported as
+`incomparable` rather than paired on a guess. `mergeImpact()` is three-way, and the finding it exists
+for is `changed-under-caller` — a symbol whose CALLER changed on the other side, which git cannot see
+because neither file conflicts. Identical edits on both branches are explicitly NOT a conflict; that
+case was wrong in the first version and a test caught it.
 
 **Boundaries:** advisory only. Nothing here deletes anything, and nothing here should ever be wired
 to an automatic fix.

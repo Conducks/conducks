@@ -53,3 +53,20 @@ exits 0. Four distinct features have shipped keyed off data this module never pr
 So the verification habit is fixed: after any change here, run a clean `analyze` and compare node
 and edge counts against the previous run. Counts holding steady is the signal that nothing silently
 fell back.
+
+## One thing here is not a query, and cannot be
+
+`next-routes.ts` derives a route from a FILE PATH and a list of exported names. It holds no parser
+and touches no grammar, which looks out of place in a module whose whole job is queries — and that is
+exactly the point. Every other route pattern matches the EXPRESS shape, a call expression naming its
+own path, so a query can capture it. Next.js declares a route by WHERE THE FILE SITS
+(`app/api/plans/[id]/route.ts`), and there is no expression to match. Measured on a real subject
+before it existed: 118 route files, zero route nodes.
+
+The derivation is where the interesting mistakes are, so it is pure functions over a path and a list
+of names: `[id]` becomes `:id`, `[...slug]` becomes `:slug*`, a `(group)` directory is removed
+entirely, and the scan anchors at the LAST `app/` so a repo with two apps resolves each against its
+own root. Method detection is case-sensitive because Next.js only treats an uppercase export as a
+handler.
+
+Anything else declared by convention rather than by an expression belongs here on the same terms.

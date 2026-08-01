@@ -10,9 +10,18 @@ pulse. It is the boundary where an in-memory graph becomes rows and back again.
 deserve to exist — with one deliberate exception, `pruneTaxonomy`, which runs at the end of every
 analyze and is the authority on what survives (see below).
 
-**Deferred / not built:** no migrations. The schema is created if absent; changing a column means
-re-analyzing, and `conducks clean` is the supported path. Acceptable because the vault is a derived
-artifact — it can always be rebuilt from source.
+**Deferred / not built:** no migration FRAMEWORK. There is an additive migration loop — it runs
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for a short list of late columns, so an existing vault
+gains them without a re-analyze — and nothing more: no versioning, no down path, no column rename or
+type change. Those still mean re-analyzing, and `conducks clean` is the supported path. Acceptable
+because the vault is a derived artifact.
+
+**Layer storage lives here too.** `layers`, `node_content`/`node_slots` and `edge_content`/`edge_slots`
+hold committed layers content-addressed: a content row per distinct payload, a slot row per layer
+that points at one. `content-key.ts` owns the split between hashed (stable) and per-layer (volatile)
+columns, `layer-roles.ts` resolves a role to a layer and refuses rather than falling back,
+`layer-reachability.ts` decides what may be collected, and `freshness.ts` is the shared watch/monitor
+staleness rule. The hot path — `nodes`/`edges` — is untouched by any of it; layers sit BESIDE it.
 
 ## The seam that has broken twice
 
@@ -42,3 +51,17 @@ Purge, flush, rank and save run in one transaction. A killed `analyze` never rea
 DuckDB rolls it back on next open and the previous good graph survives. Backstop: `status` flags
 density < 0.5 on 50+ nodes as an incomplete pulse. Only one read-write connection may be open at a
 time — the CLI holds read-write, the MCP server read-only; two writers deadlock.
+
+## Adding a field that survives a load takes SIX edits, and missing one is silent
+
+A value written onto a node reaches the vault only if every place below knows about it. This has now
+bitten twice — the route/request columns (todo22#P15) and `instance_of` (ADR 0082) — with the same
+signature both times: the feature works on a fresh parse and does nothing after a reload.
+
+`addNode` keeps a FIXED SKELETON and discards the rest, and a shallow load fetches real columns only
+and never the `metadata` blob — and shallow is the load `analyze` uses. So the blob is not a place a
+value can live if the pulse must read it.
+
+The six: the `nodes` schema, the additive migration list, BOTH SELECT lists in `load()`, the row
+built in `saveNodes`, the `addNode` skeleton in `adjacency-list.ts`, and the content/volatile
+classification in `content-key.ts` — whose guard test is the only one of the six that fails loudly.

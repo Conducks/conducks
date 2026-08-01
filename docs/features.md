@@ -236,6 +236,14 @@
 - Purpose: Keep build output, vendored code, and dependency trees out of analysis by default, with a per-project override file.
 - Intent: Without exclusions, generated and vendored code dominates every hotspot and risk ranking and drowns out the project's own code.
 
+## File-Position Routes (Next.js app router) — built by `conducks analyze`
+- Purpose: Recognise a route that no call expression declares — `app/api/plans/[id]/route.ts` exporting `GET` — so the served side of an endpoint is in the graph on the most common React stack.
+- Intent: Every other route pattern matches the EXPRESS shape, a call naming its own path, and Next.js declares a route by where the file SITS. Measured on a real subject: 118 route files, ZERO route nodes — conducks could see who CALLED an endpoint and not who SERVED it, exactly where the cross-service pair is most used. A `[id]` segment becomes `:id` so a Next.js route is comparable with every other route in the graph, and a `(group)` directory is removed entirely because it contributes nothing to the URL — leaving it in produces a path that never matches a real request, which is worse than no route because it looks resolved.
+
+## Declared-Type Member Resolution — built by `conducks analyze`
+- Purpose: Bind `registry.get(...)` to `ServiceRegistry.get` when the variable was declared `new ServiceRegistry()`, so a call on an instance reaches the method it actually runs.
+- Intent: The receiver was already resolved and the member was already a node; only the link between them was missing, and one variable accounted for 192 dangling edges on a real subject. A factory (`X.getInstance()`) records nothing, because its return type is not stated at the declaration and assuming it is the guess ADR 0070 refuses — so this reads a declaration and never infers. (ADR 0082.)
+
 ## Regex Parsing Fallback — used by `conducks analyze`
 - Purpose: Keep structural extraction producing CALLS and IMPORTS edges when a Tree-sitter grammar cannot load in a given environment.
 - Intent: Precision is worth trading for a graph that still has edges — an environment-specific grammar failure should cost accuracy, not the whole language.

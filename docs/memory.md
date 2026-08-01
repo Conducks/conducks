@@ -291,7 +291,10 @@ by construction.
 - Gotcha: loading all file essences into memory at once OOMs.
 - Why: for 1,000+ file repos, batch ingestion via `AsyncGenerator` (`voyager.streamBatches`) keeps the
   heap under 200MB.
-- Applies: ingestion pipeline.
+- Applies: ingestion pipeline — the WRITE path only. Do NOT generalise it to `load()`: streaming rows
+  into the graph there was built and measured at 2.4x the peak RSS of the current materialised form
+  (302 MB against 125 MB), and the smaller variant that merely defers the edge query is also worse.
+  Same word, opposite answer, because the two stages hold different things (ADR 0083).
 
 ## Node 23+ build requires C++20
 - Gotcha: `npm install` fails with `"C++20 or later required"` on Node 23/24/25.
@@ -918,7 +921,17 @@ by construction.
   starts reading inherits the original bug silently, because an absent property and a false one are
   the same thing to `if (node.properties.x)`. The request half is still TypeScript-only, so
   `is_request` is 0 on this repo and the binder's other end is untested here (todo22#P15).
-- Applies: `graph-engine.ts` binders, `persistence.ts` column list — add to both or to neither
+- IT RECURRED, exactly as predicted, on the next field anyone added (2026-08-01, ADR 0082). `instanceOf`
+  — the type a variable is declared with — was written onto the node, survived a fresh parse, and was
+  gone after every reload, so the linker rule that reads it resolved nothing in production while
+  passing every test. Same three-place fix: the `addNode` skeleton, a real `instance_of` column, and
+  the SELECT list on both load paths.
+- Why the shallow path is where it bites: a shallow load fetches REAL COLUMNS ONLY and never the
+  `metadata` blob, and shallow is the load `analyze` uses. So a value kept only in the blob works in
+  every command that loads fully and silently does nothing in the pulse.
+- Applies: `graph-engine.ts` binders, `persistence.ts` column list — add to both or to neither. FOUR
+  places, and the count is the point: the schema, the migration loop, BOTH SELECTs, the write row,
+  the `addNode` skeleton, and `content-key.ts`'s classification. Missing any one is silent.
 ## An O(N squared) is not automatically a bottleneck — measure its SHARE, not its shape
 - Gotcha: import resolution rebuilt `new Set(allPaths.map(canonicalize))` per import specifier —
   a genuine quadratic, isolated at **45 ms / 228 ms / 4350 ms** for 300 / 700 / 3000 paths against
@@ -1160,3 +1173,8 @@ by construction.
 - Gotcha: `todo2`, `todo3` and `todo4` predate the line grammar — no `# Title`, no `Status:`, no `- Acceptance:`, no `## Phase N`, with state written as `**STATUS: 100% COMPLETED**` and emoji, which the parser never reads. They sat in `todos/completed/` holding 94 unticked checkboxes. `completed/` is not scanned, so nothing had ever evaluated them
 - Why: todo4 declared "Reshape Fully Reflected ✅" and four of its six acceptance claims are false against the live vault — 670 file-backed nodes carry no fingerprint. A claim in an unscanned folder is a claim nobody can check, which is the same failure as a gate that reports success without running. The surviving work is todo26; the files moved to `legacy/` because they cannot be linted and will not be rewritten
 - Applies: `docs/legacy/`, and any todo about to be closed — if it still has open tasks it stays in `todos/` with `Status: doing` (conducks-docs §6.10)
+
+## A destructuring default fires on an explicit `undefined` — a "no value" test can assert the opposite
+- Gotcha: `const { instanceOf = 'serviceregistry' } = opts` gives `'serviceregistry'` when the caller passes `{ instanceOf: undefined }`. A fixture written as `buildGraph({ instanceOf: undefined })` to mean "no type recorded" therefore builds the graph WITH the type, and the test that should prove the feature is necessary proves nothing
+- Why: a default applies to `undefined`, not to absence — the two are indistinguishable at the destructuring site. This cost a real debug cycle: the negative test failed, the code looked wrong, and three separate mutations were run against a correct implementation before the fixture was suspected
+- Applies: any test fixture with an options object and defaults. Use a distinct sentinel (`null`) for "deliberately absent", or omit the key entirely — never pass `undefined` and expect it to mean nothing

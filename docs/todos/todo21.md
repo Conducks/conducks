@@ -99,7 +99,7 @@ an uncleared `setTimeout` in `persistence.close()` keeping the event loop alive 
 0.54s. Do not re-derive that.
 
 ## Phase 5 — the read path materialises a graph it does not need
-- Builds: 0036, 0038
+- Builds: 0036, 0038, 0083
 - [x] `lazy` was a dead parameter — destructured in `registry-bootstrapper.ts` and never read, while `initializeRegistry(readOnly, root, lazy = readOnly)` plumbed it through two signatures. It now defers the graph load behind `ensureGraphLoaded()`, and every caller that WALKS the graph must ask for it first
 - [x] Forgetting to materialise is now LOUD, which is what makes the deferral safe. A deferred graph reads as an EMPTY one, and the first attempt at this proved how bad that is: four of six MCP tools broke and THREE broke silently — `nodeCount: 0`, zero flows, SYMBOL_NOT_FOUND, no error anywhere. The `graphEngine` accessor throws while a load is pending, and `ensureAnchor`'s `needsGraph` is opt-OUT so a tool must be PROVEN graph-free to skip it
 - [x] Connection ownership across a deferred load: the loader takes the CURRENT persistence rather than capturing one, because the read-only path closes after loading and a captured handle is dead by the time anyone needs the graph. That was the `Database was already closed` failure on the first attempt
