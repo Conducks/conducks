@@ -1,5 +1,6 @@
 # 0035 — the graph is keyed by commit, not by branch
 Status: Accepted
+- Amended by: 0081
 - Date: 2026-07-27
 
 ## Context
