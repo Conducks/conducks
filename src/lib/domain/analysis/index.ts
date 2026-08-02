@@ -290,23 +290,19 @@ export class AnalysisService {
     const resolvedEdges = intraLinker.resolve(this.graph.getGraph());
     await this.persistence.updateEdgeTargets(resolvedEdges);
 
-    // 4.2b COLLAPSE A BARREL RE-EXPORT ONTO THE THING IT RE-EXPORTS.
+    // A BARREL COLLAPSE WAS BUILT HERE AND REMOVED. Recorded because the reasoning is the value.
     //
-    // `export { allocateHostPort } from './host-port'` mints an ATOM in the barrel, and a caller
-    // importing from the barrel lands its CALLS edge there. So the REAL declaration showed no
-    // callers, and `explain allocateHostPort` resolved to the re-export — an ATOM at the export
-    // line, not the function. ADR 0109 made the consumers reachable by traversing ALIASES; this
-    // makes them reachable by asking the declaration directly, which is how anyone actually asks.
+    // It rebound every reference on a re-export ATOM to the declaration — 588 of them on openship —
+    // to make `impact` on a declaration list the consumers that reach it through a barrel.
     //
-    // Only REFERENCE edges move. An IMPORTS edge stays on the barrel because the import genuinely
-    // is from the barrel — rewriting it would misreport where the file's dependency points
-    // (ADR 0112).
-    const collapsed = this.collapseReExports(this.graph.getGraph());
-    if (collapsed.length > 0) {
-      await this.persistence.updateEdgeTargets(collapsed);
-      logger.info(`🛡️ [Conducks] Collapsed ${collapsed.length} reference(s) from a barrel onto the declaration.`);
-    }
-
+    // It was redundant. ADR 0109 had already given the re-export an ALIASES edge and taught the
+    // traversal to follow it, so those consumers were reachable without moving anything; and
+    // `explain <bare name>` resolving to the declaration came from `resolveSymbol` preferring a
+    // declaration, not from this. Measured both ways on a workspace fixture and on openship: the
+    // `impact` output is byte-identical with and without it.
+    //
+    // So the cost was 588 edge mutations plus the loss of the fact that a call arrives through a
+    // barrel, bought nothing, and every check written to justify it passed either way (ADR 0112).
     // 4.3 Cross-Service HTTP Call Detection
     // Scans source files for HTTP URL literals and emits CALLS edges to matched service nodes.
     const serviceLinker = new HttpServiceLinker(this.graph.getGraph());
@@ -410,57 +406,6 @@ export class AnalysisService {
    * by library/namespace. This transforms "Orphans" into "Ecosystem Members".
    */
   /** Every `MODULE.md` under `docs/modules`, as a path relative to that directory. */
-  /**
-   * Point references at the DECLARATION rather than at the barrel that republishes it.
-   *
-   * A re-export node is an ATOM sitting on the `export { x } from './y'` line with an ALIASES edge
-   * to the real `y::x`. Callers importing from the barrel bind to the ATOM, which means asking the
-   * declaration "who calls you" answers nobody, and `explain x` describes an export statement
-   * rather than a function.
-   *
-   * Reference edges are rebound to the alias target; IMPORTS is deliberately left alone, because
-   * the importing file's dependency really is on the barrel and rewriting it would misreport the
-   * module graph. Chains are followed to a fixed point — a barrel re-exporting a barrel is ordinary
-   * — with a visited set, because `a → b → a` is a legal thing for someone to write and a cycle
-   * here would hang the pulse (ADR 0112).
-   */
-  private collapseReExports(graph: any): Array<{ id: string, newTargetId: string }> {
-    const REFERENCE = new Set(['CALLS', 'CONSTRUCTS', 'ACCESSES', 'TYPE_REFERENCE', 'EXTENDS', 'IMPLEMENTS']);
-    const rebinds: Array<{ id: string, newTargetId: string }> = [];
-
-    /** Follow ALIASES from a re-export to the thing that actually declares the symbol. */
-    const declarationOf = (startId: string): string | null => {
-      let current = startId;
-      const seen = new Set<string>([current]);
-      for (let hop = 0; hop < 8; hop++) {
-        const alias = graph.getNeighbors(current, 'downstream')
-          .find((e: any) => e.type === 'ALIASES' && graph.getNode(e.targetId));
-        if (!alias) break;
-        if (seen.has(alias.targetId)) break;
-        current = alias.targetId;
-        seen.add(current);
-      }
-      return current === startId ? null : current;
-    };
-
-    for (const node of graph.getAllNodes()) {
-      // Only a re-export is a candidate: an ATOM that aliases something else.
-      if (String(node.properties?.canonicalKind ?? '') !== 'ATOM') continue;
-      const declaration = declarationOf(node.id);
-      if (!declaration || declaration === node.id) continue;
-
-      for (const edge of graph.getNeighbors(node.id, 'upstream')) {
-        if (!REFERENCE.has(edge.type)) continue;
-        // A file referencing its own re-export is the export statement itself, not a consumer.
-        if (edge.sourceId === declaration) continue;
-        graph.rebindEdgeTarget(edge, declaration);
-        rebinds.push({ id: edge.id, newTargetId: declaration });
-      }
-    }
-
-    return rebinds;
-  }
-
   private static walkModuleDocs(dir: string, base: string, out: string[]): string[] {
     let entries: fsSync.Dirent[];
     try { entries = fsSync.readdirSync(dir, { withFileTypes: true }); } catch { return out; }

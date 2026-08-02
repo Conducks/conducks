@@ -1,8 +1,8 @@
-# 0112 — one risk implementation, and a barrel that collapses
+# 0112 — one risk implementation, and a barrel collapse that was not needed
 Status: Accepted
 - Date: 2026-08-02
 - Builds: 0105, 0109, 0110
-- Enforced by: measured on `reference-project/openship` — 588 references collapsed onto declarations; `explain <bare name>` resolves to the BEHAVIOR at its own line rather than to the ATOM on the export line
+- Enforced by: tests/integration/features/barrel-collapse.test.ts (a cross-package barrel consumer reaches the declaration; a renamed re-export resolves to the original; a plain local alias is NOT collapsed; the barrel node survives; a bare name resolves to the declaration)
 
 ## Context
 
@@ -41,13 +41,19 @@ moved into `ConducksCore` and extended with the signals that one actually has (c
 openable. A missing signal is `null` in JSON where the table prints `n/a`: a consumer must be able to
 tell an absent signal from a real zero, and a string in a number field forces a parse to decide.
 
-**3. Reference edges collapse onto the declaration.** After linking, an ATOM that aliases something
-else has its incoming CALLS/CONSTRUCTS/ACCESSES/TYPE_REFERENCE/EXTENDS/IMPLEMENTS edges rebound to
-the alias target, following chains to a fixed point with a visited set — a barrel re-exporting a
-barrel is ordinary, and `a → b → a` is a legal thing to write.
+**3. ~~Reference edges collapse onto the declaration.~~ BUILT, MEASURED, REVERTED.**
 
-**IMPORTS is deliberately left on the barrel.** The importing file's dependency really is on the
-barrel; rewriting it would misreport the module graph to fix a symbol-level question.
+It rebound every reference on a re-export ATOM to the declaration — 588 of them on openship — so
+that `impact` on a declaration would list the consumers reaching it through a barrel.
+
+**It was redundant.** ADR 0109 had already given the re-export an `ALIASES` edge and taught the
+traversal to follow it, so those consumers were reachable without moving anything. Measured both
+ways on a workspace fixture and on openship: **the `impact` output is byte-identical with and
+without it.** The cost was 588 edge mutations plus the loss of the fact that a call arrives through
+a barrel, and the benefit was zero.
+
+The reversal is recorded rather than the change quietly dropped, because the way it was caught is
+the point — see Consequences.
 
 **4. A declaration outranks a re-export in name resolution.** `resolveSymbol` prefers a
 BEHAVIOR/STRUCTURE/INFRA/UNIT match before falling back to gravity, and `explain` now routes through
@@ -55,10 +61,21 @@ it like every other command instead of taking the top fuzzy hit.
 
 ## Consequences
 
-- MEASURED on openship: **588 references collapsed.** `impact` on the real declaration returns both
-  callers at distance 1 — `deploy.service.ts:995`, `build-pipeline.ts:1265` — and
-  `explain allocateHostPort` returns `kind: BEHAVIOR` at `host-port.ts:48`, where it previously
-  returned `kind: ATOM` at `index.ts:110`.
+- `explain allocateHostPort` returns `kind: BEHAVIOR` at `host-port.ts:48` where it previously
+  returned `kind: ATOM` at `index.ts:110` — and that comes from the resolution preference, NOT from
+  the collapse. Separating the two is what showed the collapse was doing nothing.
+- **Three instruments in a row failed to see the collapse, and each failure was mine.**
+  `verify-edges` is blind to it by construction — it checks that the source text contains the
+  target's last name segment, and a barrel and its declaration share that name, so 71,033 edges and
+  43 wrong came back identical either way. A hand-written check then flagged 900 of 1,320 aliases as
+  "not an export" because it read one line and missed multi-line blocks; a second version still
+  missed `export type { ... }`. Only the third was right, and it found the population clean.
+- **The fixture that finally could have caught it passed either way, twice.** The first used relative
+  barrel imports, which already resolve straight to the declaration — zero collapses, nothing under
+  test. Rebuilt as a workspace with a cross-package import, it triggered the real path and STILL
+  passed without the change, which is what proved the redundancy.
+- The rule this earns: **a change is only justified by a check that fails without it.** Four separate
+  measurements agreed with the change and none of them could have disagreed.
 - No regression on conducks itself: 5,340 nodes, dangling **6.07%**, edge precision **99.98%**, line
   accuracy **100%**, 1,329 tests green.
 - Routing `explain` through `resolveSymbol` broke a suite expectation, and the fix is worth stating:
