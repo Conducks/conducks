@@ -83,6 +83,14 @@ const CHECKS = {
       const path = endpoint[1].split('?')[0];
       return body.includes(path) ? 'ok' : 'wrong';
     }
+    // A DELEGATION resolves past the name the call site writes. `registry.infrastructure.reclaimVault()`
+    // is `reclaimVault: (n) => persistence.reclaimIfBloated(n)`, so the edge correctly names
+    // `reclaimIfBloated` and the call site never contains that word. Unchecked, not wrong — this
+    // shape needs the object-path map to verify, which is re-running the rule (ADR 0094).
+    if (/^[a-z_$][\w$]*$/i.test(name) && !body.includes(name)) {
+      const decl = read(row.tf) || '';
+      if (new RegExp(`\\b${name}\\s*[:(]`, 'i').test(decl)) return null;
+    }
     // JSX is a call. `<Button />` compiles to `Button(...)`, and a member form `<motion.div>` to a
     // property call — demanding a literal paren reported 233 false alarms on a React subject.
     if (new RegExp(`<\\s*[\\w.$]*\\b${name}\\b`, 'i').test(body)) return 'ok';

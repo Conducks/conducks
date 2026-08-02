@@ -1,5 +1,6 @@
 # 0055 — a node is a symbol, not a fragment of source
 Status: Accepted
+- Amended by: 0096
 - Enforced by: tests/unit/core/parsing/guess-confidence.test.ts and tests/integration/features/pulse-writes-every-table.test.ts (a call target that is not an identifier path produces no edge, and no edge survives a pulse pointing at a target nothing could resolve)
 - Builds: 0046
 - Amends: 0053

@@ -162,7 +162,19 @@ describe('SynapsePersistence.compact — reclaims what DuckDB will not', () => {
     // already has those tables and the open dies with "Table with name nodes already exists".
     await churn(p);
 
+    // The WAL must EXIST for this test to mean anything, and whether `churn` leaves one is DuckDB's
+    // internal checkpoint heuristic, not something this test controls. It changed the day a column
+    // was added to `nodes` — a wider table reaches the threshold sooner — and the test failed on its
+    // own PRECONDITION while the behaviour under test was untouched.
+    //
+    // So the precondition is now GUARANTEED rather than hoped for: if DuckDB already checkpointed,
+    // write the stale log itself. That is precisely the state this test exists for — a `.wal` beside
+    // the vault that DuckDB will replay by FILENAME against a database that already has those
+    // tables. Where it comes from is irrelevant; that it is removed is the contract.
     const dir = path.join(root, '.conducks');
+    if (!fs.readdirSync(dir).some(f => f.endsWith('.wal'))) {
+      fs.writeFileSync(path.join(dir, 'conducks-synapse.db.wal'), '');
+    }
     expect(fs.readdirSync(dir).some(f => f.endsWith('.wal'))).toBe(true);
 
     const result = await p.compact();

@@ -30,7 +30,24 @@ literal the chain needs. Both facts are written down; neither is modelled.
 - [x] The remaining 63 paths on `registry` name no identifier and correctly record an EMPTY value —
       they return calls or expressions, which state no binding
 
-## Phase 1 — the parameter's declared type
+## Phase 1 — ATTEMPTED AND REVERTED (the measurement is the value)
+
+- [x] BUILT: parameter types persisted as their own column, a receiver resolved through the enclosing
+      function's parameter list, and a DELEGATING property (`status: () => governance.status()`)
+      recorded as its callee. On conducks: deep chains **113 -> 59**, dangling **191 -> 143**
+- [-] REVERTED — dropped from this shape, not from the goal: the same change took mentorseed from
+      **2 source-contradicted edges to 50**. Better on the subject it was written against, worse on
+      the one it was not, which is the definition of overfitting. Parked in a git stash
+- [x] The delegation capture is CORRECT and was verified by hand — `reclaimVault: (n) => persistence.reclaimIfBloated(n)`
+      really is a delegation, and the edge to `reclaimIfBloated` names what actually runs. The
+      regression is in the RESOLUTION rules, not in reading the object literal
+- [ ] Find which of the two rules causes it. The parameter-type rule resolves a type name against the
+      CALLER's imports, and on a five-service repository a type name is not unique — that is the first
+      suspect and it is a guess until measured
+- [ ] Re-measure BOTH subjects before shipping. A rule that improves one and breaks the other is not
+      a language rule
+
+## Phase 3 — the parameter's declared type (original plan, still open)
 
 - [ ] Resolve a receiver that is not a node by reading the ENCLOSING function's parameter list: a
       parameter with a declared type states what the receiver is, exactly as `new Y()` does
