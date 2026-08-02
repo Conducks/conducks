@@ -1,3 +1,4 @@
+import { isUniversalMemberCall } from '@/lib/core/parsing/built-ins.js';
 import { createHash } from "node:crypto";
 import { CONTENT_NODE_COLUMNS, VOLATILE_NODE_COLUMNS, CONTENT_EDGE_COLUMNS, VOLATILE_EDGE_COLUMNS } from "@/lib/core/persistence/content-key.js";
 import { resolveLayerRole, layerRoleRefusal, type LayerRole, type LayerGitFacts } from "@/lib/core/persistence/layer-roles.js";
@@ -1066,17 +1067,36 @@ export class SynapsePersistence {
    * real reference the resolver could not place — a bug to investigate, not a row to delete — and it
    * survives. Only the band that already says "this was a guess" is swept.
    */
-  public async sweepUnresolvedGuesses(minConfidence: number = 0.6): Promise<number> {
-    if (this.readOnly) return 0;
+  public async sweepUnresolvedGuesses(minConfidence: number = 0.6): Promise<{ deleted: number; kept: number }> {
+    if (this.readOnly) return { deleted: 0, kept: 0 };
     await this.ensureVaultOpen();
-    const [before] = await this.query<{ c: number }>(
-      `SELECT count(*)::INT AS c FROM edges e
+
+    // Decide by CAUSE, not by confidence (ADR 0096, todo35).
+    //
+    // The old rule deleted every dangling edge below 0.6 and reported the survivors as "the dangling
+    // rate" — 1.15% against an honest 14.62% on this repository, because 2,734 rows had been removed
+    // first. Its defence was that low confidence means "a call on a local value", but low confidence
+    // means "the call processor did not resolve this". A real method that failed to resolve —
+    // `graph.getAllNodes`, node present, three call sites — was deleted alongside `arr.map`.
+    //
+    // Now only a UNIVERSAL MEMBER goes: `.map`, `.trim`, `.then` — names every JavaScript value has
+    // and no project declares. Everything else stays as a visible dangler, because an unresolved
+    // reference is a fact about this tool, and deleting it is how the fact was hidden.
+    const dangling = await this.query<{ id: string; targetId: string }>(
+      `SELECT e.id, e.targetId FROM edges e
        LEFT JOIN nodes n ON e.targetId = n.id
        WHERE n.id IS NULL AND e.confidence < ?`, [minConfidence]);
-    await this.run(
-      `DELETE FROM edges WHERE confidence < ?
-         AND targetId NOT IN (SELECT id FROM nodes)`, [minConfidence]);
-    return Number(before?.c ?? 0);
+
+    const removable = dangling
+      .filter(e => isUniversalMemberCall(String(e.targetId).split('::').pop() ?? ''))
+      .map(e => e.id);
+
+    for (let i = 0; i < removable.length; i += 500) {
+      const chunk = removable.slice(i, i + 500);
+      await this.run(
+        `DELETE FROM edges WHERE id IN (${chunk.map(() => '?').join(',')})`, chunk);
+    }
+    return { deleted: removable.length, kept: dangling.length - removable.length };
   }
 
   /**

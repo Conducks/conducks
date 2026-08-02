@@ -40,16 +40,28 @@ resolution failures inherit 0.4 and are deleted alongside `arr.map`.
 
 ## Decision
 
-**Record the honest number, and keep the sweep until it can be split by CAUSE rather than by confidence.**
+**Delete by CAUSE, not by confidence. Report both counts, always.**
 
-The sweep stays for now: 72% of what it removes is genuinely unresolvable, and a graph carrying 2,925
-permanent danglers is worse to read than one carrying 198. But no figure derived from it may be
-quoted as "the dangling rate" without the unswept number beside it.
+Only a UNIVERSAL MEMBER is removed — a method every JavaScript value has and no project declares
+(`.map`, `.trim`, `.then`, `.bind`). Everything else stays as a visible dangling edge, because an
+unresolved reference is a fact about this tool and deleting it is how the fact was hidden.
 
-`CONDUCKS_NO_SWEEP=1` is the escape hatch that produces the honest count.
+The list is deliberately CONSERVATIVE. `get`, `set`, `has`, `add`, `delete` and `find` are left OUT:
+they are Map/Set methods AND extremely common repository and service method names, and an edge
+surviving as a visible dangler costs less than one deleted on a guess.
+
+Every pulse now prints both numbers, so a single figure can never again be quoted as the rate:
+
+    Dropped 1574 universal-member call(s) on local values;
+    KEPT 1166 unresolved reference(s) — those are references this analysis could not place.
 
 ## Consequences
 
+- **THE HONEST RATE, measured after the fix: conducks 7.35%, mentorseed 10.77%.** Against 1.15% and
+  0.49% as previously reported, and 14.62% with no sweep at all. That middle number is the real one:
+  what conducks fails to resolve, with genuinely unresolvable built-ins removed and nothing else.
+- Source-verified precision is unchanged at **99.98% / 99.99%** and the oracle still reads 14/14, so
+  the extra 1,166 kept edges are dangling references, not wrong ones.
 - **Every dangling figure in this repository's records is a post-sweep figure**, including the ones in
   ADRs 0084, 0085, 0090 and 0094. They are correct as written — they compare like with like across a
   change — but none of them is the share of references conducks fails to resolve. That number is

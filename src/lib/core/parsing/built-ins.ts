@@ -73,3 +73,44 @@ export function getGlobalId(symbol: string): string {
   const root = symbol.split('.')[0].toLowerCase();
   return `GLOBAL::${root}`;
 }
+
+/**
+ * Methods every JavaScript value already has — the ones a call on a LOCAL value resolves to and no
+ * project ever declares. `line.trim()`, `args.includes()`, `results.filter()`.
+ *
+ * This is the list the guess sweep is supposed to be about (ADR 0096). It used to delete by
+ * CONFIDENCE instead, which meant a real project method that failed to resolve — `graph.getAllNodes`,
+ * three call sites, node present — was deleted alongside `arr.map`, because low confidence means
+ * "the processor did not resolve this", not "this is a built-in".
+ *
+ * Deliberately CONSERVATIVE. A name that a project might plausibly declare as its own method is left
+ * out, so an edge survives as a visible dangler rather than being deleted on a guess. `get`, `set`,
+ * `has`, `add`, `delete` and `find` are all absent for exactly that reason — they are Map/Set methods
+ * AND extremely common repository and service method names.
+ */
+export const UNIVERSAL_MEMBERS: ReadonlySet<string> = new Set([
+  // Array
+  'map', 'filter', 'foreach', 'reduce', 'reduceright', 'slice', 'splice', 'push', 'pop', 'shift',
+  'unshift', 'concat', 'join', 'reverse', 'flat', 'flatmap', 'fill', 'indexof', 'lastindexof',
+  'includes', 'some', 'every', 'sort', 'at',
+  // String
+  'trim', 'trimstart', 'trimend', 'tolowercase', 'touppercase', 'split', 'replace', 'replaceall',
+  'padstart', 'padend', 'startswith', 'endswith', 'substring', 'substr', 'charat', 'charcodeat',
+  'repeat', 'normalize', 'localecompare', 'match', 'matchall', 'search',
+  // Object / any
+  'tostring', 'tofixed', 'toprecision', 'valueof', 'hasownproperty', 'tojson', 'tolocaledatestring',
+  'tolocaletimestring', 'toisostring', 'gettime',
+  // Promise
+  'then', 'catch', 'finally',
+  // Function
+  'bind', 'call', 'apply',
+  // Iteration protocol
+  'keys', 'values', 'entries', 'next',
+]);
+
+/** True when a dotted target is a universal member on a receiver this project does not declare. */
+export function isUniversalMemberCall(symbol: string): boolean {
+  const dot = symbol.lastIndexOf('.');
+  if (dot < 1) return false;
+  return UNIVERSAL_MEMBERS.has(symbol.slice(dot + 1).toLowerCase());
+}

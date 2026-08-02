@@ -320,9 +320,14 @@ export class AnalysisService {
     // writes a handful of files and would delete the rest of the graph.
     // Guessed edges that never landed go before the stale-row sweep, so the row counts the sweep
     // reports are of live data rather than of rows about to be removed anyway (ADR 0055).
-    const guesses = await this.persistence.sweepUnresolvedGuesses();
-    if (guesses > 0) {
-      logger.info(`🛡️ [Conducks] Dropped ${guesses} unresolved guess edge(s) — calls on local values that name no symbol.`);
+    // BOTH numbers, always. A single figure that has already had its failures deleted is exactly how
+    // the dangling rate came to read 1.15% when it was 14.62% (ADR 0096).
+    const sweep = await this.persistence.sweepUnresolvedGuesses();
+    if (sweep.deleted > 0 || sweep.kept > 0) {
+      logger.info(
+        `🛡️ [Conducks] Dropped ${sweep.deleted} universal-member call(s) on local values; ` +
+        `KEPT ${sweep.kept} unresolved reference(s) — those are references this analysis could not place.`
+      );
     }
 
     // A scoped run sweeps only its own subtree — otherwise it deletes every other service in the
