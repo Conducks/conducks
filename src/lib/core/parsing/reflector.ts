@@ -137,9 +137,21 @@ function objectPathsOf(objectNode: any): Record<string, string> {
         const name = child.childForFieldName('name')?.text;
         if (!name || !/^[A-Za-z_$][\w$]*$/.test(name)) continue;
         const path = prefix ? `${prefix}.${name}` : name;
+        // The LAST return, not the only statement. A getter that guards or logs before returning a
+        // binding is still an alias — `get graphEngine() { /* comment */ ...; return graph; }` names
+        // `graph` exactly as plainly as a one-liner does. Requiring a single statement recorded
+        // nothing for most of a real DI container (todo34).
+        //
+        // Still refused: a getter returning a CALL or an expression, and one with more than one
+        // return, where which binding it names is not stated.
         const body = child.childForFieldName('body');
-        const stmt = body?.namedChildCount === 1 ? body.namedChild(0) : null;
-        const returned = stmt?.type === 'return_statement' && stmt.namedChildCount === 1 ? stmt.namedChild(0) : null;
+        const returns: any[] = [];
+        for (let k = 0; k < (body?.namedChildCount ?? 0); k++) {
+          const st = body.namedChild(k);
+          if (st?.type === 'return_statement') returns.push(st);
+        }
+        const only = returns.length === 1 ? returns[0] : null;
+        const returned = only && only.namedChildCount === 1 ? only.namedChild(0) : null;
         out[path.toLowerCase()] = returned?.type === 'identifier' ? returned.text.toLowerCase() : '';
       }
     }
