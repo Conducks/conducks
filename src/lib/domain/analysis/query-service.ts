@@ -32,16 +32,29 @@ export class QueryService {
     // ── USAGE ANALYSIS ─────────────────────────────────────────────────────────
 
     find_usages: {
-      description: "Find all callers of a specific symbol",
-      params: ["symbolId", "edgeType", "limit"],
+      description: "Find all callers of a symbol — by bare name or full id; edgeType optional",
+      /**
+       * It demanded an EXACT full node id AND an exact edge type, and the CLI passes whatever the
+       * user typed. So `query allocateHostPort --mode template --template find_usages` bound
+       * `targetId = 'allocateHostPort'` — an id no node has — and `type = ''`, and returned `[]`
+       * for a symbol with two real callers. An empty result that means "you phrased it wrong" is
+       * indistinguishable from one that means "nothing calls this" (ADR 0111).
+       *
+       * Now: match the target by id OR by name, treat an empty edgeType as "any reference edge",
+       * and return the LINE so the answer is directly openable.
+       */
+      params: ["symbolId", "symbolId", "edgeType", "edgeType", "limit"],
       sql: `
         SELECT
-          e.sourceId as id, n.name, n.file, n.structureId,
+          e.sourceId as id, n.name, n.file, e.lineNumber as line, e.type as edgeType,
+          n.lineStart, n.structureId,
           n.namespaceId, n.risk, n.canonicalKind, n.canonicalRank
         FROM edges e
         JOIN nodes n ON e.sourceId = n.id
-        WHERE e.targetId = ?
-        AND e.type = ?
+        JOIN nodes t ON t.id = e.targetId
+        WHERE (t.id = CAST(? AS TEXT) OR LOWER(t.name) = LOWER(CAST(? AS TEXT)))
+        AND (CAST(? AS TEXT) = '' OR e.type = CAST(? AS TEXT))
+        AND e.type IN ('CALLS','CONSTRUCTS','ACCESSES','TYPE_REFERENCE','EXTENDS','IMPLEMENTS','IMPORTS','ALIASES')
         ORDER BY n.risk DESC
         LIMIT ?
       `
@@ -488,11 +501,19 @@ export class QueryService {
 
     // Build ordered values in one pass — keeps duplicate param names (e.g. ["symbolId", "symbolId"])
     // from overwriting each other in a Map.
+    // A REPEATED name reuses the value it already resolved to, rather than consuming another user
+    // argument. A template that needs to compare one value in two places — "match this either as a
+    // full id or as a bare name" — declares the param twice, and shifting a second time would take
+    // the NEXT user argument and silently compare two different things (ADR 0111).
+    const seen = new Map<string, any>();
     const orderedValues: any[] = template.params.map((p: string) => {
       if (p === '$pulseId') return latestPulseId;
       if (p === 'limit') return finalLimit;
+      if (seen.has(p)) return seen.get(p);
       const val = sanitizedUserParams.shift();
-      return val === undefined || val === '' ? (PARAM_DEFAULTS[p] ?? '') : val;
+      const resolved = val === undefined || val === '' ? (PARAM_DEFAULTS[p] ?? '') : val;
+      seen.set(p, resolved);
+      return resolved;
     });
 
     // Final mapping — find_by_name needs a custom positional expansion

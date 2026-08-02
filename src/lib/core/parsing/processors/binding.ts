@@ -10,12 +10,15 @@ export class BindingProcessor {
   /**
    * Processes an alias capture (@alias) and links it to the original symbol.
    */
-  public processAlias(alias: string, original: string, spectrum: PrismSpectrum): void {
+  public processAlias(alias: string, original: string, spectrum: PrismSpectrum, line: number = 0): void {
     spectrum.relationships.push({
       sourceName: alias,
       targetName: original,
       type: 'ALIASES',
-      confidence: 1.0
+      confidence: 1.0,
+      // An alias edge without a line printed `file:0` — a position that reads like a real one and
+      // points nowhere. The re-export IS written on a line; carry it (ADR 0111).
+      metadata: { line }
     });
   }
 

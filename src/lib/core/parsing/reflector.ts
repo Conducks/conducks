@@ -899,7 +899,7 @@ export class ConducksReflector {
               const spec = src ? src.replace(/^['"]|['"]$/g, '') : null;
               const target = spec ? this.imports.resolve(spec, file.path, allPaths, provider, context) : null;
               if (typeof target === 'string') {
-                this.bindings.processAlias(node.name, `${target.toLowerCase()}::${node.name.toLowerCase()}`, spectrum);
+                this.bindings.processAlias(node.name, `${target.toLowerCase()}::${node.name.toLowerCase()}`, spectrum, currentMatchRow + 1);
               }
             }
 
@@ -932,7 +932,7 @@ export class ConducksReflector {
           // An external dependency resolves to a descriptor, not a path — leave those bare, since
           // there is no project file to qualify against.
           const resolvedPath = typeof resolved === 'string' ? resolved.toLowerCase() : null;
-          this.bindings.processAlias(node.name, resolvedPath ? `${resolvedPath}::${cText.toLowerCase()}` : cText, spectrum);
+          this.bindings.processAlias(node.name, resolvedPath ? `${resolvedPath}::${cText.toLowerCase()}` : cText, spectrum, currentMatchRow + 1);
 
           // Register the binding as well, so a CALL through the local name lands on the original.
           // The import branch above does this for `import { A as B }`; a DESTRUCTURED DYNAMIC import

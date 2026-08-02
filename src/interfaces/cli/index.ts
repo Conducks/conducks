@@ -203,7 +203,23 @@ export async function main() {
   commands.push(new HelpCommand(commands));
 
   const command = commands.find(c => c.id === commandId);
-  
+
+  // `--help` on a COMMAND prints that command's usage, before anything runs.
+  //
+  // Every command's arg parser skips unknown `--flags`, so `conducks query --help` fell through as
+  // an empty query — and an empty query is read as `*`, which prints the whole symbol inventory.
+  // Asking a tool how to use it and getting a wall of results is the least helpful possible answer,
+  // and it is the same shape for every command that takes a positional argument (ADR 0111).
+  //
+  // Handled in the DISPATCHER rather than per command, because the defect is per command and the
+  // fix should not have to be repeated thirty-nine times.
+  if (command && (args.includes('--help') || args.includes('-h'))) {
+    console.log(`\n\x1b[1m${command.id}\x1b[0m — ${command.description}`);
+    console.log(`\n\x1b[2mUsage:\x1b[0m ${command.usage ?? `conducks ${command.id}`}`);
+    console.log(`\n\x1b[2mRun \`conducks help\` for the full command list.\x1b[0m\n`);
+    process.exit(0);
+  }
+
   // Mirror is a live visualizer and should avoid forcing a full structural load.
   const isStalenessBypass = STALENESS_BYPASS.has(commandId);
   // Commands that answer from markdown and the filesystem alone: skip the engine entirely (ADR 0033).
