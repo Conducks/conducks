@@ -67,7 +67,16 @@ export class AnalyzeOrchestrator {
    */
   public async analyze(
     files: Array<{ path: string, source: string }>, 
-    options: { workspaceRoot?: string, projectRoots?: string[] } = {}
+    options: {
+      workspaceRoot?: string,
+      projectRoots?: string[],
+      /**
+       * Every file discovery returned, not only the ones this pulse parses. Import specifiers are
+       * resolved against it, so on an incremental pulse it must still name the whole project or the
+       * import edges of the changed files cannot be built (ADR 0107).
+       */
+      allDiscoveredPaths?: string[],
+    } = {}
   ): Promise<{ pulseId: string, nodeCount: number, edgeCount: number }> {
     // PREFLIGHT. Native tree-sitter is the only parse path, and it is an OPTIONAL dependency that
     // compiles from source — on a machine with no C++ toolchain it is simply absent. Since the regex
@@ -95,7 +104,22 @@ export class AnalyzeOrchestrator {
       files;
 
     const normalizedFiles = activeFiles.map(f => ({ path: path.resolve(f.path), source: f.source }));
-    const allPaths = normalizedFiles.map(f => f.path);
+
+    // The RESOLUTION UNIVERSE is every file that exists, not every file being parsed.
+    //
+    // `allPaths` is what `imports.link()` searches to turn `'./email.js'` into a real path. Built
+    // from the files in THIS pulse, it is complete on a cold run — where every file is dirty — and
+    // wrong on every incremental one. Measured: add a file that imports an existing one, re-analyze,
+    // and the per-binding `IMPORTS` edge is never created, because the imported file is not in the
+    // list to be found. The CALLS edge still appears (IntraLinker works on the persisted graph
+    // afterwards), so the graph looks linked while the import edges are silently missing.
+    //
+    // That reaches further than it looks: `rename` locates its edit sites from IMPORTS edges, so it
+    // rewrote a call and left the import alone — a broken file — and `prune`'s reachability test
+    // reads the same edges (ADR 0107).
+    const allPaths = (options?.allDiscoveredPaths?.length
+      ? options.allDiscoveredPaths.map((p: string) => path.resolve(p))
+      : normalizedFiles.map(f => f.path));
     const spectra = new Map<string, any>();
 
     // Phase 0: Multi-Project Hierarchy Mapping 🛡️ 🧬

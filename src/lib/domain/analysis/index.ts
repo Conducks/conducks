@@ -222,7 +222,12 @@ export class AnalysisService {
     const projectRoots = bootstrapper ? bootstrapper.discoverProjects(projectRoot) : [projectRoot];
 
     // Execute the core analysis wave with project context
-    const pulseStats = await (this.orchestrator as any).analyze(allUnits, { projectRoots, workspaceRoot: projectRoot });
+    // `filteredFiles` — every discoverable file — not `dirtyFiles`. Import resolution searches this
+    // list, and on an incremental pulse the dirty set does not contain the files being imported
+    // FROM, so every import edge of a changed file went unbuilt (ADR 0107).
+    const pulseStats = await (this.orchestrator as any).analyze(allUnits, {
+      projectRoots, workspaceRoot: projectRoot, allDiscoveredPaths: filteredFiles,
+    });
     const { pulseId, nodeCount, edgeCount } = pulseStats;
 
     // 3. Metadata enrichment that doesn't require the full in-memory graph

@@ -236,6 +236,12 @@ by construction.
   kinds than the enum. Adding a kind means adding its producer in the SAME change.
 
 ## Test `analyze` TWICE, with an edit between — once is the one state the bugs cannot appear in
+- Second instance (ADR 0107): import specifiers were resolved against the DIRTY file list, so a file
+  added incrementally never got its per-binding IMPORTS edge — the imported file was not in the list
+  to be found. The CALLS edge still appeared (IntraLinker resolves by name afterwards), so the graph
+  looked linked. `rename` then rewrote a call and left the import behind, producing a file that does
+  not compile. Parsing and RESOLVING are different questions; `allDiscoveredPaths` now carries the
+  whole project while `dirtyFiles` carries what to parse.
 - Gotcha: `sweepRowsNotInPulse` does `DELETE FROM nodes WHERE pulseId <> ?`. A full pass re-stamps
   everything so it removes nothing; an incremental pass re-stamps only the dirty units, so the whole
   untouched graph read as stale and was deleted — **5,221 nodes → 217** on this repo after a second

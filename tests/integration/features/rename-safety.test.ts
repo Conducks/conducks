@@ -92,6 +92,30 @@ describe('rename edits references and nothing else', () => {
     expect(read('src/collide.ts')).toBe(before);
   }, 300000);
 
+  /**
+   * ADR 0106 left this unclaimed; measured afterwards and it holds, so it is asserted rather than
+   * left to chance. `import { validate as check }` binds the ORIGINAL name to a LOCAL one: the
+   * original must change at the import line and the local must not, anywhere.
+   *
+   * It is correct by construction rather than by a special case — the scanner matches the old name
+   * within a referenced line, and the local alias is a different word — which is exactly why it is
+   * worth pinning: nothing in the engine mentions aliases, so nothing protects this if the matching
+   * strategy changes.
+   */
+  it('renames the original in an aliased import and leaves the local alias alone', () => {
+    writeFile(repo, 'src/aliased.ts',
+      "import { validate as check } from './email.js';\n" +
+      'export function useAlias(x: string): boolean {\n  return check(x);\n}\n');
+    commit(repo, 'aliased');
+    runCli(['analyze', '--yes'], { cwd: repo });
+
+    runCli(['rename', `${repo}/src/email.ts::validate`, 'checkEmail', '--confirm'], { cwd: repo });
+    const after = read('src/aliased.ts');
+    expect(after).toContain('import { checkEmail as check }');
+    expect(after).toContain('return check(x)');
+    expect(after).not.toContain('checkEmail(x)');
+  }, 300000);
+
   it('refuses an unknown symbol', () => {
     const { status } = runCli(['rename', 'zzzNoSuchSymbol', 'whatever', '--confirm'], { cwd: repo, allowFail: true });
     expect(status).not.toBe(0);
