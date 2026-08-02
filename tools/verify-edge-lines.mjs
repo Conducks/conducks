@@ -55,7 +55,13 @@ for (const r of rows) {
   if (wordIn(window, symbol)) { ok++; continue; }
   // A renamed import is called by its LOCAL name (ADR 0085), and the resolved id carries the
   // ORIGINAL — so the target's name is genuinely absent at a correct line. Not decidable here.
-  if (new RegExp(`\\b${symbol}\\s+as\\s+[\\w$]+`, 'i').test(src.join('\n'))) { un++; continue; }
+  // Both spellings of a rename. `import { POST as send }` is the static form; the DESTRUCTURED
+  // dynamic form `const { POST: send } = await import(...)` is the one the oracle's T12 uses, and
+  // omitting it reported that edge as misplaced when its line was exactly right — the call site.
+  // `verify-edges.mjs` already accounts for both; this checker only had the first.
+  const whole = src.join('\n');
+  if (new RegExp(`\\b${symbol}\\s+as\\s+[\\w$]+`, 'i').test(whole)) { un++; continue; }
+  if (new RegExp(`\\b${symbol}\\s*:\\s*[\\w$]+\\s*\\}`, 'i').test(whole)) { un++; continue; }
   // A DELEGATION resolves past the name the call site writes: `registry.audit.guard(...)` is
   // `guard: t => governanceService.shouldBlock(t)`, so the target's own name never appears at the
   // call. Same shape `verify-edges.mjs` already declines to judge.
