@@ -52,7 +52,30 @@ export class ExplainCommand implements ConducksCommand {
     }
 
     const { score, factors, breakdown } = riskData;
-    const hasFallback = breakdown.fallback > 0;
+
+    /**
+     * Read one signal off the breakdown, whatever shape it arrives in.
+     *
+     * There are TWO `calculateCompositeRisk` implementations. `metrics/index.ts` returns
+     * `{ value, weight }` objects; `conducks-core.ts` returns PLAIN NUMBERS — and the registry
+     * wires this command to the second while every line below was written for the first. So
+     * `breakdown.gravity.value` was `undefined`, `undefined * 10` was `NaN`, and `NaN.toFixed(2)`
+     * printed the string "NaN". Every one of the six signals did it, under a composite score that
+     * was computed from the raw numbers and therefore looked perfectly correct (oracle E03,
+     * ADR 0105).
+     *
+     * A missing signal now says so instead of printing NaN. A report that renders a number for a
+     * value it does not have is worse than one that admits the gap — it reads as a measurement.
+     */
+    const sig = (raw: unknown): string => {
+      const n = typeof raw === 'number' ? raw : (raw as { value?: unknown } | null)?.value;
+      return typeof n === 'number' && Number.isFinite(n) ? (n * 10).toFixed(2) : 'n/a';
+    };
+
+    const fallbackValue = typeof breakdown.fallback === 'number'
+      ? breakdown.fallback
+      : (breakdown.fallback?.value ?? 0);
+    const hasFallback = fallbackValue > 0;
 
     console.log(`\n\x1b[1m--- 🛡️ Conducks Structural Explanation ---\x1b[0m`);
     console.log(`Symbol: \x1b[35m${node.properties.name}\x1b[0m (${node.label})`);
@@ -63,15 +86,15 @@ export class ExplainCommand implements ConducksCommand {
     }
     console.log();
     console.log(`\x1b[1mSignal Decomposition:\x1b[0m`);
-    console.log(`  ├── \x1b[36mgravity:\x1b[0m     ${(breakdown.gravity.value * 10).toFixed(2)}  (centrality rank: ${node.properties.rank?.toFixed(4) || 0})`);
-    console.log(`  ├── \x1b[36mcomplexity:\x1b[0m  ${(breakdown.complexity.value * 10).toFixed(2)}  (largest weight in the composite score)`);
-    console.log(`  ├── \x1b[36mfan-out:\x1b[0m     ${(breakdown.fanOut.value * 10).toFixed(2)}  (outgoing structural dependencies)`);
-    console.log(`  ├── \x1b[36mchurn:\x1b[0m       ${(breakdown.churn.value * 10).toFixed(2)}  (resonance / temporal frequency)`);
-    console.log(`  ├── \x1b[36mentropy:\x1b[0m     ${(breakdown.entropy.value * 10).toFixed(2)}  (authorship fragmentation: ${(entropyRes.entropy).toFixed(2)})`);
+    console.log(`  ├── \x1b[36mgravity:\x1b[0m     ${sig(breakdown.gravity)}  (centrality rank: ${node.properties.rank?.toFixed(4) || 0})`);
+    console.log(`  ├── \x1b[36mcomplexity:\x1b[0m  ${sig(breakdown.complexity)}  (largest weight in the composite score)`);
+    console.log(`  ├── \x1b[36mfan-out:\x1b[0m     ${sig(breakdown.fanOut)}  (outgoing structural dependencies)`);
+    console.log(`  ├── \x1b[36mchurn:\x1b[0m       ${sig(breakdown.churn)}  (resonance / temporal frequency)`);
+    console.log(`  ├── \x1b[36mentropy:\x1b[0m     ${sig(breakdown.entropy)}  (authorship fragmentation: ${(entropyRes.entropy).toFixed(2)})`);
     if (hasFallback) {
-      console.log(`  └── \x1b[36mfallback:\x1b[0m    ${(breakdown.fallback.value * 10).toFixed(2)}  (${fallbackAnalysis.isFallback ? 'detected' : 'not detected'})`);
+      console.log(`  └── \x1b[36mfallback:\x1b[0m    ${sig(breakdown.fallback)}  (${fallbackAnalysis.isFallback ? 'detected' : 'not detected'})`);
     } else {
-      console.log(`  └── \x1b[36mfallback:\x1b[0m     ${(breakdown.fallback.value * 10).toFixed(2)}  (no fallback patterns detected)`);
+      console.log(`  └── \x1b[36mfallback:\x1b[0m     ${sig(breakdown.fallback)}  (no fallback patterns detected)`);
     }
 
     console.log(`\n\x1b[2mStructural resonance detected in ${entropyRes.authorCount} authors.\x1b[0m`);

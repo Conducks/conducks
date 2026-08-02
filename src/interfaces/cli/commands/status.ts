@@ -55,7 +55,19 @@ export class StatusCommand implements ConducksCommand {
         console.log(`- Resonance: ${chalk.green(audit.success ? "100%" : "ST structural drift detected")}`);
         if (audit.violations.length > 0) {
           console.log(chalk.bold("\nViolations:"));
-          audit.violations.slice(0, 10).forEach(v => console.log(`  - ${v}`));
+          // A violation is an OBJECT — `{ id, type, message }` — and interpolating it printed
+          // `[object Object]` for every row, so the one part of `--blueprint` that names an actual
+          // problem said nothing at all (oracle S04, ADR 0105). Read the fields; fall back to JSON
+          // rather than to the default stringification, so a future shape change is legible instead
+          // of blank.
+          audit.violations.slice(0, 10).forEach((v: unknown) => {
+            const row = v as { type?: string; message?: string; id?: string };
+            const text = row?.message ?? (typeof v === 'string' ? v : JSON.stringify(v));
+            console.log(`  - ${row?.type ? `[${row.type}] ` : ''}${text}`);
+          });
+          if (audit.violations.length > 10) {
+            console.log(chalk.dim(`  …and ${audit.violations.length - 10} more.`));
+          }
         }
         return;
       }
