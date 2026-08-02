@@ -36,7 +36,7 @@ export const RUST_QUERIES = `
   (trait_item name: (type_identifier) @name) @isInterface
   
   ;; Modules
-  (mod_item name: (identifier) @name) @isPackage
+  (mod_item name: (identifier) @name) @isNamespace
   
   ;; Lifetime parameters
   (lifetime) @isProperty

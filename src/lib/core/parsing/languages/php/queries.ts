@@ -36,7 +36,7 @@ export const PHP_QUERIES = `
   (function_definition (name) @name parameters: (formal_parameters) @params return_type: (_)? @return_type) @isFunction
   (method_declaration (name) @name parameters: (formal_parameters) @params return_type: (_)? @return_type) @isMethod
   
-  (namespace_definition (namespace_name) @name) @isPackage
+  (namespace_definition (namespace_name) @name) @isNamespace
   
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Laravel / Symfony Route Attributes: #[Get('/')]

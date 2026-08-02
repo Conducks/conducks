@@ -13,7 +13,7 @@ export const CPP_QUERIES = `
   (enum_specifier (type_identifier) @name) @isEnum
   
   ;; Namespaces (Resonance Shield)
-  (namespace_definition (_) @name) @isPackage
+  (namespace_definition (_) @name) @isNamespace
   
   ;; Templates
   (template_declaration) @isGeneric

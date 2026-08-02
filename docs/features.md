@@ -7,6 +7,7 @@
 ## Structural Taxonomy (System 1 — containment) — built by `conducks analyze`
 - Purpose: Model code as a containment tree whose deepest routinely-emitted node is the function (BEHAVIOR), so a query lands on a unit an engineer actually reasons about.
 - Intent: Keeps the graph at architectural altitude. Emitting every local variable floods the graph (~72% ATOM on a real repo) and buries the signal; edge-gating keeps only the atoms that are load-bearing. (ADR 0012/0013 — cut DATA, edge-gate ATOM.)
+- Shape: Ten rungs, 0-9 — ecosystem, repository, package, namespace, directory, unit, infra, structure, behavior, atom. Every one has a producer, and a sub-line position is a line number on the edge rather than a node kind. (ADR 0099/0100 — cut STATEMENT and BRANCH, repair NAMESPACE.)
 
 ## Boundary / Supply-Chain Classification (System 2 — data flow) — built by `conducks analyze`, read via `conducks supply-chain`
 - Purpose: Give every reference that leaves the repo an origin — internal, stdlib, or third-party dependency — so "what does this project actually depend on" is a graph query, not a manifest read.

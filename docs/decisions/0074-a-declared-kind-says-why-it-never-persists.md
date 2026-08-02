@@ -1,7 +1,18 @@
 # 0074 — a declared kind says why it never persists
 Status: Accepted
-- Enforced by: tests/unit/core/parsing/taxonomy-reachability.test.ts (no grammar tags a node for NAMESPACE/STATEMENT/BRANCH/DATA today, and `mapToCanonical` still routes their raw-kind strings correctly if that ever changes)
+- Amended by: 0100
+- Enforced by: tests/unit/core/parsing/taxonomy-reachability.test.ts (rewritten by ADR 0100 — it now names the producer of each declared kind, where it used to pin four of them as having none)
 - Date: 2026-07-31
+
+**Amended by ADR 0100 (2026-08-02).** This ADR's answer to an unproducible kind was to ANNOTATE it —
+say why it never persists and keep it. Three of the four it annotated are now cut (STATEMENT, BRANCH,
+DATA) and the fourth is repaired (NAMESPACE, whose sources were tagged `@isPackage`). The annotation
+was not neutral: ADR 0099 derived the taxonomy legend from the enum, so the graph began publishing
+rungs no node could stand on, and PACKAGE's only two nodes here were a C# and a PHP `namespace`. The
+rule is now **every declared kind has a producer**. What this ADR got right and 0100 keeps: the
+distinction between unreachable BY DESIGN and unreachable by GAP, and that "absent from this vault"
+is not "unreachable" — PACKAGE and INFRA are language-gated, and INFRA was nearly deleted on exactly
+that misreading.
 
 ## Context
 

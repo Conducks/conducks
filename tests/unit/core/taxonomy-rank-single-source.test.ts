@@ -60,7 +60,10 @@ describe('rank has a single source of truth', () => {
       ['class', CanonicalKind.STRUCTURE],
       ['function', CanonicalKind.BEHAVIOR],
       ['variable', CanonicalKind.ATOM],
-      ['parameter', CanonicalKind.DATA]
+      // A parameter is an attribute on its parent (`dna.params`), not a node. It reaches the ATOM
+      // default and the edge gate removes it — the DATA kind that used to catch it existed only to
+      // be deleted by `pruneTaxonomy` (ADR 0100).
+      ['parameter', CanonicalKind.ATOM]
     ];
     for (const [semantic, expected] of samples) {
       const got = mapToCanonical(semantic);

@@ -2,8 +2,8 @@
 Status: current
 
 ## Where it stands
-Gates green: 1,291 tests / 155 suites, typecheck, `docs-lint` (117 docs).
-Vault on its own source: 5,220 nodes, 18,637 edges. Edge precision against source **99.98%**.
+Gates green: 1,298 tests / 155 suites, typecheck, `docs-lint`.
+Vault on its own source: 5,221 nodes, 18,646 edges. Edge precision against source **99.98%**.
 **Never released** — `doctor` reports 0.7.7. `todo16` is deliberately left to a human: publishing spends a name once.
 
 ## The thing that is new: the taxonomy is measured against its own design
@@ -16,10 +16,15 @@ That second one settles a standing design question: **STATEMENT and BRANCH stay 
 
 `tools/verify-edge-lines.mjs` checks that a recorded line is the line the reference is WRITTEN on — 6,275 decidable, 0 wrong. Its first two findings were its own fault (a name in a comment, a name in an import alias); the instrument was wrong before the graph was, for the seventh time.
 
-## The open taxonomy question, stated rather than closed
-ADR 0013 edge-gated ATOM and predicted "a few hundred". It is **3,007 of 5,220 nodes — 57.8%**, and only 17 lack a non-structural edge, so the gate runs and barely removes anything. ADR 0090 emits a CONSTRUCTS edge per typed variable precisely so the prune keeps it — that fix is load-bearing for resolution, and it re-inflates the flood ADR 0013 set out to drain. The trade was never priced. Decide before building on top of it.
+## The taxonomy is ten rungs, and every one has a producer
+Thirteen kinds were declared and four could never hold a node. Cut STATEMENT, BRANCH and DATA; repaired NAMESPACE by giving C++/C#/PHP/Rust an `@isNamespace` tag instead of `@isPackage`. The ladder is now 0-9 and `taxonomy-reachability.test.ts` names the producer of each rung (ADR 0100).
 
-`NAMESPACE` is 0 nodes because four grammars capture `@isPackage` where they mean a namespace (ADR 0074). Either fix the captures or merge the two rungs; right now it is a rung nobody stands on.
+Nothing else moved: 5,221 nodes / 18,646 edges, dangling 6.23% (was 6.22%), precision 99.98%, line accuracy 100%. The cut removed names, not behaviour — which is the evidence the four were carrying no load.
+
+Two things that were wrong and are worth remembering. **INFRA was nearly deleted** on the claim it had zero producers; it has five (Java, JS, Ruby, Rust, C#, plus C/C++ macros) and reads 0 here only because conducks is TypeScript. And **two tests in two days were pinning defects in place** — the rank characterization (ADR 0099) and the reachability test that asserted four kinds were unreachable and passed. A test that passes is not a test that is right.
+
+## The open taxonomy question, stated rather than closed
+ADR 0013 edge-gated ATOM and predicted "a few hundred". It is **3,023 of 5,221 nodes — 57.9%**, and only ~17 lack a non-structural edge, so the gate runs and barely removes anything. ADR 0090 emits a CONSTRUCTS edge per typed variable precisely so the prune keeps it — that fix is load-bearing for resolution, and it re-inflates the flood ADR 0013 set out to drain. The trade was never priced. Decide before building on top of it.
 
 ## What is deferred, and why
 1. `todo16` — npm publish. A human decision.

@@ -31,22 +31,39 @@ function allFiles(dir: string, acc: string[] = []): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// ADR 0003 — the taxonomy reconcile is ADDITIVE. Kinds may be added; an existing
-// kind's string value may never be renamed, because ~24 downstream comparisons
-// match on the string. A rename type-checks and silently matches nothing.
+// ADR 0003, as amended by ADR 0100 — a kind's string value may never be RENAMED,
+// because ~24 downstream comparisons match on the string and a rename
+// type-checks while silently matching nothing. That half stands unchanged.
+//
+// What ADR 0100 removed is the "additive only, never prune" half. Additive-only
+// was written to protect those string comparisons, and it was read as a ban on
+// removal — so four kinds nothing could emit stayed declared for weeks, each one
+// a claim the graph could not honour. The rule is now: every declared kind has a
+// producer, and removing one that has none is correct.
 // ---------------------------------------------------------------------------
-describe('ADR 0003 — taxonomy grows, it never renames', () => {
+describe('ADR 0003 + 0100 — a kind never renames, and never outlives its producer', () => {
   const ESTABLISHED = [
     'ECOSYSTEM', 'REPOSITORY', 'PACKAGE', 'NAMESPACE', 'DIRECTORY', 'UNIT',
-    'INFRA', 'STRUCTURE', 'BEHAVIOR', 'STATEMENT', 'BRANCH', 'ATOM', 'DATA',
+    'INFRA', 'STRUCTURE', 'BEHAVIOR', 'ATOM',
   ] as const;
 
   it.each(ESTABLISHED)('still carries %s, with its name as its value', kind => {
     expect(CanonicalKind[kind as keyof typeof CanonicalKind]).toBe(kind);
   });
 
-  it('adding a kind is allowed — this asserts a floor, not an exact set', () => {
-    expect(Object.keys(CanonicalKind).length).toBeGreaterThanOrEqual(ESTABLISHED.length);
+  /**
+   * An EXACT set, not a floor. The old floor assertion could not have caught the defect ADR 0100
+   * fixed — thirteen kinds passed a `>= 13` check exactly as well as ten do, so a kind with no
+   * producer was invisible to it. `taxonomy-reachability.test.ts` is what proves each of these ten
+   * is emitted; this pins that the list has not quietly grown a name that skipped that check.
+   */
+  it('declares exactly these ten kinds', () => {
+    expect(Object.keys(CanonicalKind).sort()).toEqual([...ESTABLISHED].sort());
+  });
+
+  /** The three the cut removed must not come back without a producer and a decision. */
+  it.each(['STATEMENT', 'BRANCH', 'DATA'])('does not declare %s', name => {
+    expect(Object.keys(CanonicalKind)).not.toContain(name);
   });
 });
 

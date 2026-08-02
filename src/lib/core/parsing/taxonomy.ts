@@ -1,62 +1,45 @@
 /**
  * Conducks — Canonical Structural Taxonomy 🧬
  *
- * Defines the language-agnostic structural categories and their
- * architectural ranks (0-11).
+ * The language-agnostic structural categories and their architectural ranks (0-9). This is
+ * SYSTEM 1 of the two ADR 0012 describes — *what a symbol is*. Where its boundary lies (internal /
+ * stdlib / dependency) is System 2 and rides on edges, never on this enum.
  *
- * Reconcile (todo01 C0): added PACKAGE (monorepo deployable unit, split from the
- * REPOSITORY/NAMESPACE overload) and STATEMENT/BRANCH (execution-detail tiers below
- * BEHAVIOR — the floor that live coverage binds to). Additive only: no existing kind
- * string value renamed, so the ~24 downstream string comparisons are untouched. Only
- * the numeric ranks were resequenced, and rank is used solely for relative ordering.
+ * **Every kind here has a producer.** That is the rule the list is maintained to, and it was not
+ * true until ADR 0100. Thirteen kinds were declared and four could never hold a node: STATEMENT,
+ * BRANCH and DATA had no capture tag in any of the ~14 grammars, and NAMESPACE's natural sources
+ * were all tagged `@isPackage`. A declared kind that nothing emits is not a reservation — it is a
+ * claim the graph cannot honour, and it cost real work: the taxonomy LEGEND advertised rungs no
+ * node could stand on, and PACKAGE's only two nodes on this repository were a C# and a PHP
+ * namespace wearing the wrong kind.
  *
- * Reconcile (todo25#Phase8, ADR 0074, 2026-07-31): 13 kinds are declared, 9 persist.
- * Re-measured against two vaults — this repo's own (`SELECT DISTINCT canonicalKind FROM
- * nodes`: ECOSYSTEM, REPOSITORY, PACKAGE, DIRECTORY, UNIT, INFRA, STRUCTURE, BEHAVIOR,
- * ATOM = 9) and mentorseed's (974 units, 5 services, TS/TSX-heavy: the same 9 minus
- * PACKAGE = 8, because nothing in that vault's language mix reaches a `package`-tagged
- * grammar node — PACKAGE is real but language-gated, not unreachable). The four that
- * persist in NEITHER vault are annotated at their declaration below: STATEMENT, BRANCH
- * and DATA are unreachable BY DESIGN (ADR 0004, ADR 0013); NAMESPACE is unreachable by
- * GAP — nothing tags a node for it in any of the ~14 language grammars. Do not "fix" the
- * enum by deleting the four (ADR 0003: additive only, and memory.md already documents
- * the enum/persisted-graph split as intentional for ATOM/DATA) — annotate, don't prune.
+ * Cut (ADR 0100): STATEMENT and BRANCH are answered by `edges.lineNumber` — a sub-line position is
+ * a number on the edge, not a node (ADR 0099). DATA is answered by `dna.params` on the parent
+ * (ADR 0086). NAMESPACE was REPAIRED rather than cut, because four consumers already read it
+ * (cluster-rule, http-service-linker, mirror.engine, dead-code) and its sources existed.
+ *
+ * INFRA is language-gated, not absent: Java, JavaScript, Ruby, Rust and C# tag `@isInfra`, and
+ * C/C++ tag `@isMacro`. It is 0 on a TypeScript-only vault and real on a polyglot one — the same
+ * shape as PACKAGE. Do not read "absent from this vault" as "unreachable"; check the grammars,
+ * which is what `tests/unit/core/parsing/taxonomy-reachability.test.ts` does.
+ *
+ * To ADD a kind: give it a producer in the same change, and a deliberate rank — not the next free
+ * number. Rank drives containment, layer paths and `context`'s rank exclusion (ADR 0067).
+ * To READ a rank: `CanonicalRank`. Never write the integer (ADR 0099).
  */
 
 export enum CanonicalKind {
-  ECOSYSTEM = 'ECOSYSTEM',     // External Deps, Multi-Project Context
-  REPOSITORY = 'REPOSITORY',   // Individual Project, Repo, or Microservice
-  PACKAGE = 'PACKAGE',         // Deployable/versioned unit within a workspace (npm pkg, crate, service)
-  // UNREACHABLE — GAP (ADR 0074): no query in any of the ~14 grammars tags a node
-  // `isNamespace`/`isModule`. The natural source is there — C++ `namespace_definition`,
-  // C# `namespace_declaration`, PHP `namespace_definition`, Rust `mod_item` — but all four
-  // are captured `@isPackage` instead (queries.ts, csharp/cpp/php/rust), so they land on
-  // PACKAGE, not here. This is why the two PACKAGE rows in this repo's own vault are a C#
-  // `namespace G` and a PHP `namespace N` fixture, not a deployable-unit node. Real gap,
-  // not a design choice — fixing it means either a genuine `isNamespace` capture or
-  // deciding the PACKAGE/NAMESPACE split is not worth keeping. Not built here (query files
-  // are out of this change's scope).
-  NAMESPACE = 'NAMESPACE',     // Language namespaces / modules
-  DIRECTORY = 'DIRECTORY',     // Filesystem folders (emitted by orchestrator L2; now first-class)
-  UNIT = 'UNIT',               // Files, Modules
-  INFRA = 'INFRA',             // Routers, Controllers, Decorators
-  STRUCTURE = 'STRUCTURE',     // Classes, Interfaces, Structs, Types
-  BEHAVIOR = 'BEHAVIOR',       // Functions, Methods, Constructors
-  // UNREACHABLE BY DESIGN (ADR 0004): coverage is a range-join onto BEHAVIOR line-spans,
-  // not a node per statement — emitting one would re-flood the graph ADR 0013 just drained.
-  // Kept only as the conceptual rank floor "below BEHAVIOR" that coverage binds against.
-  STATEMENT = 'STATEMENT',     // Executable line — coverage binds here
-  // UNREACHABLE BY DESIGN (ADR 0004): branch coverage is shown as fill detail on the owning
-  // BEHAVIOR row ("taken/total br"), never materialised as its own node. Same reasoning as
-  // STATEMENT above.
-  BRANCH = 'BRANCH',           // Decision arm (if/else, case, ternary) — "error path never ran"
-  ATOM = 'ATOM',               // Variables, Properties, Constants, Fields — persists only if
-                                // `pruneTaxonomy()` finds a non-structural reference edge (ADR 0013)
-  // UNREACHABLE BY DESIGN (ADR 0013): params/args/literals are recorded as attributes on
-  // their parent (`dna.params`), never emitted as nodes, and `pruneTaxonomy()` deletes any
-  // DATA row unconditionally as a second guarantee. Kept in the enum and in `mapToCanonical`
-  // below only so the mapping stays legible if that decision is ever revisited.
-  DATA = 'DATA'                // JSON Literals, Parameters, Arguments
+  ECOSYSTEM = 'ECOSYSTEM',     // External deps, multi-project context
+  REPOSITORY = 'REPOSITORY',   // Individual project, repo, or microservice
+  PACKAGE = 'PACKAGE',         // Deployable/versioned unit — Go `package`, Java `package`
+  NAMESPACE = 'NAMESPACE',     // Language scoping — C++/C#/PHP `namespace`, Rust `mod`
+  DIRECTORY = 'DIRECTORY',     // Filesystem folders (emitted by orchestrator L2)
+  UNIT = 'UNIT',               // Files, modules
+  INFRA = 'INFRA',             // Routers, controllers, decorators, macros — language-gated
+  STRUCTURE = 'STRUCTURE',     // Classes, interfaces, structs, types
+  BEHAVIOR = 'BEHAVIOR',       // Functions, methods, constructors — the deepest routinely-emitted node
+  ATOM = 'ATOM'                // Variables, properties, constants, fields — persists only if
+                               // `pruneTaxonomy()` finds a non-structural reference edge (ADR 0013)
 }
 
 export const CanonicalRank: Record<CanonicalKind, number> = {
@@ -69,18 +52,19 @@ export const CanonicalRank: Record<CanonicalKind, number> = {
   [CanonicalKind.INFRA]: 6,
   [CanonicalKind.STRUCTURE]: 7,
   [CanonicalKind.BEHAVIOR]: 8,
-  [CanonicalKind.STATEMENT]: 9,
-  [CanonicalKind.BRANCH]: 10,
-  [CanonicalKind.ATOM]: 11,
-  [CanonicalKind.DATA]: 12
+  [CanonicalKind.ATOM]: 9
 };
 
 /**
- * Maps legacy or language-specific kinds to the Canonical Taxonomy.
+ * Maps a language's own node kind onto the canonical vocabulary.
+ *
+ * The default is ATOM, and that is load-bearing: an unrecognised kind becomes the one rung the
+ * edge gate can still remove, so a name nobody anticipated cannot flood the graph. It is also why
+ * a modifier capture must never reach here as a kind — `exported` would demote a class (todo13).
  */
 export function mapToCanonical(kind: string): { kind: CanonicalKind, rank: number } {
   const k = kind.toLowerCase();
-  
+
   let ck = CanonicalKind.ATOM;
 
   if (k === 'external_dependency') ck = CanonicalKind.ECOSYSTEM;
@@ -91,10 +75,15 @@ export function mapToCanonical(kind: string): { kind: CanonicalKind, rank: numbe
   else if (k === 'file' || k === 'unit') ck = CanonicalKind.UNIT;
   else if (k === 'class' || k === 'interface' || k === 'type' || k === 'struct' || k === 'enum' || k === 'generic' || k === 'heritage') ck = CanonicalKind.STRUCTURE;
   else if (k === 'function' || k === 'method' || k === 'constructor') ck = CanonicalKind.BEHAVIOR;
-  else if (k === 'statement' || k === 'expression_statement' || k === 'return_statement') ck = CanonicalKind.STATEMENT;
-  else if (k === 'branch' || k === 'if_statement' || k === 'case' || k === 'ternary' || k === 'switch_case') ck = CanonicalKind.BRANCH;
+  // A PARAMETER, ARGUMENT or LITERAL is an attribute of its parent, not a node: the signature lives
+  // on `dna.params` (ADR 0086). These names used to map to a DATA kind that `pruneTaxonomy` then
+  // deleted unconditionally — a rung whose only purpose was to be removed. They fall to the ATOM
+  // default now, where the edge gate reaches the same outcome without a kind nobody could keep.
+  //
+  // A STATEMENT or BRANCH likewise has no entry: a sub-line position is `edges.lineNumber`, not a
+  // node (ADR 0099). No grammar emits a capture for any of these five, which
+  // `taxonomy-reachability.test.ts` pins — if one ever does, that test goes red first.
   else if (k === 'variable' || k === 'property' || k === 'const' || k === 'field' || k === 'export') ck = CanonicalKind.ATOM;
-  else if (k === 'parameter' || k === 'argument' || k === 'literal') ck = CanonicalKind.DATA;
   else if (k === 'route' || k === 'controller' || k === 'infra' || k === 'macro') ck = CanonicalKind.INFRA;
 
   return { kind: ck, rank: CanonicalRank[ck] };

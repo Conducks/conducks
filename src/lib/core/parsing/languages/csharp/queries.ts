@@ -36,7 +36,7 @@ export const CSHARP_QUERIES = `
   (event_declaration name: (identifier) @name) @isProperty
   (indexer_declaration) @isProperty
   
-  (namespace_declaration [(identifier) (qualified_name)] @name) @isPackage
+  (namespace_declaration [(identifier) (qualified_name)] @name) @isNamespace
   
   ;; --- Type positions (todo10 Phase 4) ---
   ;; Probed against tree-sitter-c-sharp 0.23.1 (node-types.json + a live parse, see docs/memory.md).

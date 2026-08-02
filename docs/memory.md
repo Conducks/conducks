@@ -220,17 +220,34 @@ by construction.
   /tmp cannot resolve `tree-sitter` from node_modules). Verify after with a clean `analyze`: node count
   must hold steady; a collapse means the fallback engaged.
 
-## Taxonomy enum lists 13 kinds but the persisted graph has 9 — the prune reconciles them
-- Gotcha: `taxonomy.ts` declares 13 kinds and `mapToCanonical` tags params→DATA, vars→ATOM at
-  emission, but every analyze ends by filtering the vault in `persistence.pruneTaxonomy()` — DATA is
-  deleted, an ATOM survives only if it carries a non-structural reference edge. Enum/emission and the
-  persisted graph DISAGREE by design; do NOT "fix" the enum to match. To change what survives, edit
-  `pruneTaxonomy`, not the enum. Verified 2026-07-25: the vault holds 9 kinds, DATA=0.
-- Why: the edge-gate needs post-link edges, the vault is authoritative (streaming flushes before the
-  prune), and param data already lives in the parent's `dna.params`. Kills the old 72% ATOM flood.
-  Design in ADR 0012, decision in ADR 0013.
-- Applies: any taxonomy / node-kind / `pruneTaxonomy` work; anyone surprised the graph has fewer kinds
-  than the enum.
+## The taxonomy is TEN kinds, and a kind absent from your vault may still be real
+- Gotcha: the ladder is 0-9 — ECOSYSTEM, REPOSITORY, PACKAGE, NAMESPACE, DIRECTORY, UNIT, INFRA,
+  STRUCTURE, BEHAVIOR, ATOM. It was 13 until 2026-08-02; STATEMENT, BRANCH and DATA were cut because
+  no grammar ever tagged them. A vault still shows FEWER than ten, and that is two different
+  situations people conflate: **pruned** (an ATOM survives only if it carries a non-structural
+  reference edge — `persistence.pruneTaxonomy()`) versus **language-gated** (PACKAGE needs Go/Java,
+  INFRA needs Java/JS/Ruby/Rust/C# or a C/C++ macro). On this TypeScript repo both are 0-or-1, and
+  neither is a defect.
+- Why: "absent from the vault I measured" is not "unreachable". INFRA was nearly deleted on exactly
+  that misreading — it has five producers, none of them TypeScript. Check the GRAMMARS, which is
+  what `tests/unit/core/parsing/taxonomy-reachability.test.ts` does; it names the producer of every
+  declared kind. ADR 0100, building on 0012/0013/0074.
+- Applies: any taxonomy / node-kind / `pruneTaxonomy` work; anyone surprised the graph has fewer
+  kinds than the enum. Adding a kind means adding its producer in the SAME change.
+
+## `namespace` and `package` are different rungs — six grammars used to say `@isPackage` for both
+- Gotcha: C++ `namespace_definition`, C# `namespace_declaration`, PHP `namespace_definition` and
+  Rust `mod_item` are language SCOPES and tag `@isNamespace`. Go `package_clause` and Java
+  `package_declaration` name a deployable UNIT and tag `@isPackage`. All six were `@isPackage`, so
+  NAMESPACE had zero nodes while four consumers read it (`cluster-rule.ts`,
+  `http-service-linker.ts`, `mirror.engine.ts`, `dead-code.ts`), and PACKAGE's only two nodes on
+  this repo were a C# and a PHP namespace wearing the wrong kind.
+- Why: the capture tag IS the kind — `reflector.ts` does `cName.slice(2).toLowerCase()` and hands
+  that straight to `mapToCanonical`. Picking the nearest existing tag rather than the right one is
+  invisible until someone counts the nodes per kind.
+- Applies: adding a namespace-shaped or package-shaped pattern to any grammar. Both ends are pinned
+  in `taxonomy-reachability.test.ts` — the four must tag `@isNamespace` and must NOT tag
+  `@isPackage`. ADR 0100.
 
 ## A node's rank is READ from `CanonicalRank` — writing the number is how the ladder split in two
 - Gotcha: `canonicalRank` is a plain integer, so a wrong one type-checks, persists and reads back

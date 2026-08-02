@@ -1,98 +1,131 @@
 import { describe, it, expect } from '@jest/globals';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { CanonicalKind, mapToCanonical } from '@/lib/core/parsing/taxonomy.js';
+import { CanonicalKind, CanonicalRank, mapToCanonical } from '@/lib/core/parsing/taxonomy.js';
 
 /**
- * todo25#Phase8 / ADR 0074 — 13 kinds are declared, 9 persist.
+ * ADR 0100 — every declared kind has a producer.
  *
- * Re-measured on 2026-07-31 against this repo's own vault (9 kinds) and mentorseed's
- * (974 units, TS/TSX-heavy — 8 kinds; PACKAGE additionally absent there because nothing in
- * that language mix reaches a `package`-tagged grammar node). The four kinds absent from
- * BOTH vaults are NAMESPACE, STATEMENT, BRANCH and DATA, annotated in taxonomy.ts as either
- * unreachable BY DESIGN (STATEMENT, BRANCH — ADR 0004; DATA — ADR 0013) or unreachable by
- * GAP (NAMESPACE — no grammar ever tags a node for it).
+ * This test used to assert the OPPOSITE and pass: it pinned that NAMESPACE, STATEMENT, BRANCH and
+ * DATA were unreachable, and treated four kinds nothing could emit as a documented state of
+ * affairs. It was a faithful description of a defect. A declared kind that no grammar produces is
+ * not a reservation — it is a claim the graph cannot honour, and it cost real work: the taxonomy
+ * legend advertised rungs no node could stand on, and PACKAGE's only two nodes on this repository
+ * were a C# and a PHP `namespace` wearing the wrong kind.
  *
- * This test pins the structural claim the annotation rests on: no language grammar's
- * `queries.ts` currently emits a capture tag that would feed NAMESPACE/STATEMENT/BRANCH/DATA.
- * If a future grammar change adds one, this test goes red — which is correct: the taxonomy.ts
- * comments must be re-checked (and the "unreachable" claim narrowed or removed) before the new
- * capture tag ships, not discovered later by a stale comment.
+ * The direction is now inverted. A kind must be reachable, and the test names HOW.
  */
 
 const LANGUAGES_DIR = join(process.cwd(), 'src/lib/core/parsing/languages');
 
-function allQueryFiles(): { lang: string; path: string; source: string }[] {
+function allQueryFiles(): { path: string; source: string }[] {
   return readdirSync(LANGUAGES_DIR, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => join(LANGUAGES_DIR, e.name, 'queries.ts'))
-    .map((path) => ({ lang: path, path, source: readFileSync(path, 'utf8') }));
+    .map((path) => ({ path, source: readFileSync(path, 'utf8') }));
 }
 
-describe('taxonomy.ts kinds declared-but-unreachable stay unreachable', () => {
+/**
+ * The capture tag(s) that produce each kind, or the non-grammar producer that does.
+ *
+ * A kind reached only from code (not from a tree-sitter capture) names the file instead — those
+ * are just as real, and leaving them out would make the check look stricter than it is.
+ */
+const PRODUCERS: Record<CanonicalKind, { tags?: RegExp; via?: string }> = {
+  [CanonicalKind.ECOSYSTEM]:  { via: 'graph-skeleton-builder.ts + reflection-pipeline.ts (boundary nodes)' },
+  [CanonicalKind.REPOSITORY]: { via: 'graph-skeleton-builder.ts' },
+  [CanonicalKind.PACKAGE]:    { tags: /@isPackage\b/ },
+  [CanonicalKind.NAMESPACE]:  { tags: /@isNamespace\b/ },
+  [CanonicalKind.DIRECTORY]:  { via: 'graph-skeleton-builder.ts' },
+  [CanonicalKind.UNIT]:       { via: 'graph-skeleton-builder.ts + reflector.ts' },
+  [CanonicalKind.INFRA]:      { tags: /@isInfra\b|@isMacro\b/ },
+  [CanonicalKind.STRUCTURE]:  { tags: /@isClass\b|@isInterface\b|@isStruct\b|@isEnum\b/ },
+  [CanonicalKind.BEHAVIOR]:   { tags: /@isFunction\b|@isMethod\b/ },
+  [CanonicalKind.ATOM]:       { tags: /@isVariable\b|@isProperty\b|@isField\b/ },
+};
+
+describe('every declared kind has a producer', () => {
   const files = allQueryFiles();
 
-  it('found at least 13 language query files to check (guards against a silently empty scan)', () => {
+  it('found at least 13 language query files (guards against a silently empty scan)', () => {
     expect(files.length).toBeGreaterThanOrEqual(13);
   });
 
-  it('no grammar tags a node @isNamespace or @isModule (NAMESPACE stays unreachable)', () => {
-    const offenders = files.filter((f) => /@isNamespace\b|@isModule\b/.test(f.source));
-    expect(offenders.map((f) => f.path)).toEqual([]);
+  for (const kind of Object.values(CanonicalKind) as CanonicalKind[]) {
+    const producer = PRODUCERS[kind];
+    if (!producer.tags) {
+      it(`${kind} is produced in code — ${producer.via}`, () => {
+        expect(producer.via).toBeTruthy();
+      });
+      continue;
+    }
+    it(`${kind} is tagged by at least one grammar`, () => {
+      const emitters = files.filter((f) => producer.tags!.test(f.source)).map((f) => f.path);
+      expect(emitters.length).toBeGreaterThan(0);
+    });
+  }
+
+  /**
+   * The repair, pinned at both ends. C++/C#/PHP/Rust declare a language SCOPE and Go/Java declare a
+   * deployable UNIT; all six were `@isPackage`, which is the whole reason NAMESPACE had no nodes
+   * and PACKAGE had two wrong ones.
+   */
+  it('namespace-shaped grammars tag @isNamespace, package-shaped ones tag @isPackage', () => {
+    const has = (frag: string, re: RegExp) =>
+      files.some((f) => f.path.includes(`/${frag}/`) && re.test(f.source));
+
+    for (const lang of ['cpp', 'csharp', 'php', 'rust']) {
+      expect({ lang, isNamespace: has(lang, /@isNamespace\b/) }).toEqual({ lang, isNamespace: true });
+      expect({ lang, isPackage: has(lang, /@isPackage\b/) }).toEqual({ lang, isPackage: false });
+    }
+    for (const lang of ['go', 'java']) {
+      expect({ lang, isPackage: has(lang, /@isPackage\b/) }).toEqual({ lang, isPackage: true });
+    }
   });
 
-  it('no grammar tags a node @isStatement (STATEMENT stays unreachable)', () => {
-    const offenders = files.filter((f) => /@isStatement\b/.test(f.source));
-    expect(offenders.map((f) => f.path)).toEqual([]);
-  });
-
-  it('no grammar tags a node @isBranch (BRANCH stays unreachable)', () => {
-    const offenders = files.filter((f) => /@isBranch\b/.test(f.source));
-    expect(offenders.map((f) => f.path)).toEqual([]);
-  });
-
-  it('no grammar tags a node @isParameter, @isArgument or @isLiteral (DATA stays unreachable)', () => {
-    const offenders = files.filter((f) => /@isParameter\b|@isArgument\b|@isLiteral\b/.test(f.source));
-    expect(offenders.map((f) => f.path)).toEqual([]);
-  });
-
-  it('confirms the namespace-shaped C++/C#/PHP/Rust declarations land on PACKAGE instead, via @isPackage', () => {
-    const packageTaggers = files.filter((f) => /@isPackage\b/.test(f.source));
-    // At minimum the four namespace-shaped grammars named in taxonomy.ts's NAMESPACE comment.
-    const langs = packageTaggers.map((f) => f.path);
-    expect(langs.some((p) => p.includes('/cpp/'))).toBe(true);
-    expect(langs.some((p) => p.includes('/csharp/'))).toBe(true);
-    expect(langs.some((p) => p.includes('/php/'))).toBe(true);
-    expect(langs.some((p) => p.includes('/rust/'))).toBe(true);
+  /**
+   * The five names the cut removed must stay unproducible, or the cut was wrong. A capture for any
+   * of them turns this red BEFORE the grammar change ships — which is the point: the decision to
+   * have no STATEMENT node is a decision, and it should be re-opened deliberately, not by a query
+   * edit nobody connected to it.
+   */
+  it('no grammar tags a statement, branch, parameter, argument or literal', () => {
+    const re = /@isStatement\b|@isBranch\b|@isParameter\b|@isArgument\b|@isLiteral\b/;
+    expect(files.filter((f) => re.test(f.source)).map((f) => f.path)).toEqual([]);
   });
 });
 
-describe('mapToCanonical still maps the four unreachable kinds\' raw strings as documented', () => {
+describe('mapToCanonical after the cut', () => {
   it('module / namespace -> NAMESPACE', () => {
     expect(mapToCanonical('module').kind).toBe(CanonicalKind.NAMESPACE);
     expect(mapToCanonical('namespace').kind).toBe(CanonicalKind.NAMESPACE);
   });
 
-  it('statement / expression_statement / return_statement -> STATEMENT', () => {
-    expect(mapToCanonical('statement').kind).toBe(CanonicalKind.STATEMENT);
-    expect(mapToCanonical('expression_statement').kind).toBe(CanonicalKind.STATEMENT);
-    expect(mapToCanonical('return_statement').kind).toBe(CanonicalKind.STATEMENT);
-  });
-
-  it('branch / if_statement / case / ternary / switch_case -> BRANCH', () => {
-    expect(mapToCanonical('branch').kind).toBe(CanonicalKind.BRANCH);
-    expect(mapToCanonical('if_statement').kind).toBe(CanonicalKind.BRANCH);
-    expect(mapToCanonical('switch_case').kind).toBe(CanonicalKind.BRANCH);
-  });
-
-  it('parameter / argument / literal -> DATA', () => {
-    expect(mapToCanonical('parameter').kind).toBe(CanonicalKind.DATA);
-    expect(mapToCanonical('argument').kind).toBe(CanonicalKind.DATA);
-    expect(mapToCanonical('literal').kind).toBe(CanonicalKind.DATA);
-  });
-
-  it('package / workspace_package -> PACKAGE, the one declared-and-language-gated kind that DOES persist', () => {
+  it('package / workspace_package -> PACKAGE', () => {
     expect(mapToCanonical('package').kind).toBe(CanonicalKind.PACKAGE);
     expect(mapToCanonical('workspace_package').kind).toBe(CanonicalKind.PACKAGE);
+  });
+
+  it('route / controller / infra / macro -> INFRA', () => {
+    for (const k of ['route', 'controller', 'infra', 'macro']) {
+      expect(mapToCanonical(k).kind).toBe(CanonicalKind.INFRA);
+    }
+  });
+
+  /**
+   * The five cut names fall to the ATOM default, where the edge gate removes them. That is the
+   * same outcome DATA reached via a kind that existed only to be deleted — one fewer rung, same
+   * behaviour. Asserted rather than assumed, because "it falls through to the default" is exactly
+   * the kind of claim that stops being true when someone adds a branch above it.
+   */
+  it('parameter / argument / literal / statement / branch fall to ATOM, which the edge gate removes', () => {
+    for (const k of ['parameter', 'argument', 'literal', 'statement', 'if_statement', 'switch_case']) {
+      expect(mapToCanonical(k).kind).toBe(CanonicalKind.ATOM);
+    }
+  });
+
+  it('the ladder is dense, ordered, and ten rungs', () => {
+    const ranks = (Object.values(CanonicalKind) as CanonicalKind[]).map((k) => CanonicalRank[k]);
+    expect(ranks).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 });
