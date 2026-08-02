@@ -34,12 +34,15 @@ export class CallProcessor {
       // Strip this. prefix — class self-calls resolve via same-file IntraLinker lookup
       const startsWithThis = target.toLowerCase().startsWith('this.');
       const afterThis = startsWithThis ? target.toLowerCase().slice(5) : target.toLowerCase();
-      // If still dotted after stripping this. (e.g. this.field.method), extract the final
-      // property so IntraLinker can resolve it across imported files. Non-this member
-      // expressions (Math.random, service.foo) keep their full dotted form — safer.
-      const lowTarget = (startsWithThis && afterThis.includes('.'))
-        ? afterThis.split('.').pop()!
-        : afterThis;
+      // Only `this.` comes off. `this.app.get(...)` keeps `app.get`, so the RECEIVER survives and
+      // the typed-receiver rules can resolve it the way they resolve any other one — a class field
+      // with a declared type is no harder than a local variable.
+      //
+      // It used to collapse to the final property, which produced a bare `get`, `set`, `has`. Those
+      // matched nothing, or matched some unrelated `get` by name — 100+ of the unresolved references
+      // on this repository were the receiver being thrown away here rather than a resolution failing
+      // (ADR 0098).
+      const lowTarget = afterThis;
 
       // 1. Resolve Local Bindings (Imports/Aliases)
       let resolvedPath = context.resolveLocalBinding(lowTarget);
