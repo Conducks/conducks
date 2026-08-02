@@ -191,6 +191,11 @@ Returns:
           rank: n.canonicalRank,
           location: {
             file: n.file,
+            // WHERE, not just which file. An agent that gets a path still has to open and scan it;
+            // the vault has carried `lineStart`/`lineEnd` all along and this surface dropped both,
+            // so `conducks_query` could never finish a "find X" task on its own (ADR 0109).
+            line: n.lineStart ?? null,
+            endLine: n.lineEnd ?? null,
             namespace: n.namespaceName,
             parent: n.parentName
           },

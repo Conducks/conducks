@@ -88,7 +88,13 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
           id: n.id,
           name: n.name,
           file: n.filePath,
-          summary: `${n.kind} ${n.name} at distance ${n.distance}`
+          // WHERE this node touches the symbol — at distance 1 that is the call site itself. The
+          // domain layer carries it and this mapping dropped it, so "what breaks if I change X"
+          // answered with a list of file names and an agent still could not open the right line
+          // (ADR 0109).
+          line: n.line ?? n.declaredAt ?? null,
+          distance: n.distance,
+          summary: `${n.kind} ${n.name} at distance ${n.distance}${n.line ? ` (${n.filePath}:${n.line})` : ''}`
         }));
 
         // MCP7: pagination meta, MCP8: clean envelope

@@ -328,6 +328,9 @@ export class QueryService {
       sql: `
         SELECT
           id, name, file, risk, gravity, complexity,
+          -- WHERE the symbol is. "find X" that answers with a file and no line leaves the caller to
+          -- open and scan it, which an agent with only this tool cannot do (ADR 0109).
+          lineStart, lineEnd,
           canonicalKind, semantic_kind, structureId, namespaceId
         FROM nodes
         WHERE (LOWER(name) = LOWER(CAST(? AS TEXT)) OR LOWER(name) LIKE ('%' || LOWER(CAST(? AS TEXT)) || '%'))

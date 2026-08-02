@@ -1,14 +1,44 @@
 import { registry } from "@/registry/index.js";
 import path from 'node:path';
+import fs from 'node:fs';
 
-// S1: Path traversal guard — rejects paths that escape the project root.
+/**
+ * S1: path guard — what a caller may anchor a tool to.
+ *
+ * Two things must both hold, and the original rule delivered only the first:
+ *
+ *   - a tool must not be able to read arbitrary places on the filesystem
+ *   - an agent must be able to work on the project it is actually working on
+ *
+ * The rule was "inside `process.cwd()` or reject", and an MCP server's cwd is wherever the client
+ * happened to launch it. Measured: with the server rooted at `.../CONDUCKS`, every tool call naming
+ * a real analyzed project one directory away answered `Path traversal rejected`, and every call
+ * omitting `path` answered `database does not exist` — because the launch directory has no vault.
+ * So the whole MCP surface was unusable for any project but one, and `ensureAnchor`'s own docstring
+ * says it exists "to prevent Detached Root errors when the MCP server is launched from an arbitrary
+ * directory" (ADR 0109).
+ *
+ * The constraint that keeps the security property while restoring the capability is not "inside the
+ * launch directory" but **"is itself a conducks project"** — a directory holding `.conducks/` or
+ * `conducks.json`. That cannot be used to read `/etc`, and it is exactly the set of places a
+ * structural tool has any business answering about.
+ */
 function validatePath(customPath: string, projectRoot: string): string {
   const resolved = path.resolve(customPath);
   const root = path.resolve(projectRoot);
-  if (!resolved.startsWith(root + path.sep) && resolved !== root) {
-    throw new Error(`Path traversal rejected: ${customPath} is outside project root`);
-  }
-  return resolved;
+
+  // Inside the launch root — always allowed, unchanged.
+  if (resolved === root || resolved.startsWith(root + path.sep)) return resolved;
+
+  // Outside it, but a real analyzed project of its own.
+  const isProject = ['.conducks', 'conducks.json']
+    .some(marker => { try { return fs.existsSync(path.join(resolved, marker)); } catch { return false; } });
+  if (isProject) return resolved;
+
+  throw new Error(
+    `Refusing to anchor to ${customPath}: it is outside the server's root (${root}) and is not a ` +
+    `conducks project — no .conducks/ or conducks.json found. Run \`conducks analyze\` there first.`
+  );
 }
 
 /**
