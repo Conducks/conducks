@@ -232,6 +232,35 @@ by construction.
 - Applies: any taxonomy / node-kind / `pruneTaxonomy` work; anyone surprised the graph has fewer kinds
   than the enum.
 
+## A node's rank is READ from `CanonicalRank` — writing the number is how the ladder split in two
+- Gotcha: `canonicalRank` is a plain integer, so a wrong one type-checks, persists and reads back
+  exactly like a right one. Six producers wrote it by hand from a nine-rung ladder the taxonomy has
+  since outgrown, and the vault ended up holding 215 files at rank 3 and 410 at rank 5 — same kind,
+  same `semantic_kind`, two rungs. Directories sat at 2 instead of 4, library namespaces at 1 instead
+  of 7, routes at 6 instead of 8. Nothing failed: the suite was green and a characterization test was
+  pinning the wrong number in place.
+- Why: rank drives hierarchy, layer paths and `context`'s rank exclusion (ADR 0067), so two ranks for
+  one kind means every consumer sees two classes of the same thing. The defect is not a wrong VALUE,
+  it is a value written in a second place — free to drift again the next time a kind is added.
+- Applies: adding a kind, emitting a node from a new producer, or touching the taxonomy legend (which
+  is derived from the enum now — it used to be a hand-written nine-entry list that described a
+  different taxonomy than the one in use). Guarded by
+  `tests/unit/core/taxonomy-rank-single-source.test.ts`, which greps `src/` for a rank literal. The
+  one exemption is the legend anchor's `-1`. ADR 0099.
+
+## An edge carries the LINE it happened on — this is why there are no STATEMENT nodes
+- Gotcha: `edges.lineNumber` existed and `saveEdges` has always read `properties.line` to fill it, but
+  nothing wrote that key — 18,541 edges, every one null. A column that is always null looks identical
+  to a column nobody needed.
+- Why: "is this class constructed inside a loop" is the question a per-STATEMENT node kind would
+  answer, and it costs ~32,000 nodes on 32k lines against the current 5,220. A position is a number,
+  not an entity: the edge hangs off the enclosing BEHAVIOR and records the line. Reference edge types
+  (CALLS, ACCESSES, IMPORTS, CONSTRUCTS, TYPE_REFERENCE, DEPENDS_ON, EXTENDS, IMPLEMENTS, DEFINES) are
+  100% filled; MEMBER_OF, PULSES_TO and GOVERNS carry none because no call site exists for them.
+- Applies: any new relationship emitter — put `line` in its `metadata` or the edge silently loses it.
+  `reflection-pipeline.ts` rebuilds an import edge's `properties` by hand at four sites rather than
+  spreading the metadata, so a new field must be named there too. ADR 0099.
+
 ## `prune` (dead-code) is advisory-only — never auto-delete from it
 - Gotcha: dynamic-dispatch and entry-wired symbols have no incoming edge, so they read as orphans
   though they are live: the registry getters reached through DI property chains (`diff`, `watcher`,

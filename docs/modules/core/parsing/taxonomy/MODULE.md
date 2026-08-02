@@ -15,8 +15,13 @@ orthogonal systems — *what a symbol is* (this) and *where its boundary lies* (
 stdlib / dependency, ADR 0014). They are deliberately separate axes; do not fold origin into the kind
 enum. (2) `STATEMENT` and `BRANCH` are declared for statement- and branch-level coverage and **nothing
 emits them** — the two names appear nowhere else in `src/`. Coverage therefore range-joins onto
-BEHAVIOR spans instead ([coverage](../../../domain/analysis/coverage/MODULE.md)). Reserved, not
-implemented.
+BEHAVIOR spans instead ([coverage](../../../domain/analysis/coverage/MODULE.md)).
+
+**Why they stay unemitted is now decided, not merely pending** (ADR 0099). A sub-line position is
+answered by `edges.lineNumber` — the source line of the reference, filled on every reference edge — so
+a call inside a loop is the enclosing BEHAVIOR plus a number. Materialising one node per statement
+would take this repository from 5,220 nodes to roughly its 32,069 line count, to answer a question a
+column already answers. A position is not an entity.
 
 ## The enum and the persisted graph disagree, by design
 
@@ -45,3 +50,12 @@ DATA = 0 and ATOM ≈ edge-carrying only. Design in ADR 0012, decision in ADR 00
 
 Rank drives hierarchy, layer paths and several governance rules. A new kind needs a deliberate rank,
 not the next free number — getting it wrong silently reshapes containment for every node of that kind.
+
+**Read `CanonicalRank`; never write the number.** Six producers used to write it by hand, from a
+nine-rung ladder this table has since outgrown, and the vault held two different ranks for the same
+kind — 215 files at 3 and 410 at 5, directories at 2 instead of 4, routes at 6 instead of 8. A rank is
+a plain integer, so a wrong one type-checks and persists exactly like a right one; the guard is a grep
+over `src/` in `tests/unit/core/taxonomy-rank-single-source.test.ts`. The taxonomy LEGEND the graph
+emits is derived from the enum for the same reason — it was a hand-written list, and it described a
+different taxonomy than the one in use. One exemption, commented at its site: the legend's anchor is
+`-1`, because a node describing the ladder cannot stand on a rung of it. ADR 0099.

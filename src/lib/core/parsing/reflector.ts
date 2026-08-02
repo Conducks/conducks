@@ -414,7 +414,7 @@ export class ConducksReflector {
       name: path.basename(file.path),
       kind: 'file' as any,
       canonicalKind: fileMeta.kind,
-      canonicalRank: fileMeta.rank, // Rank 3
+      canonicalRank: fileMeta.rank,
       range: { start: { line: 1, column: 0 }, end: { line: fileLineCount, column: 0 } },
       filePath: file.path,
       isExport: true,
@@ -597,6 +597,9 @@ export class ConducksReflector {
     // order, so gating on nodeCache mid-loop would miss a use that precedes its definition.
     /** `const x = new Y()` pairs, collected during the walk and attached to nodes after it. */
     const instanceTypes = new Map<string, string>();
+    // The DECLARATION line of each typed variable, kept beside the type because the instance-type
+    // edges are emitted after the capture loop and the row is gone by then (ADR 0099).
+    const instanceTypeLines = new Map<string, number>();
     let pendingInstance: string | null = null;
     /** `const x = Y.factory()` pairs — the CALL, resolved to a type later by IntraLinker. */
     const instanceCalls = new Map<string, string>();
@@ -608,7 +611,7 @@ export class ConducksReflector {
     const memberTypes = new Map<string, Record<string, string>>();
     let pendingIface: string | null = null;
 
-    const refValueCandidates: Array<{ scope: string; name: string; raw: string }> = [];
+    const refValueCandidates: Array<{ scope: string; name: string; raw: string; line: number }> = [];
     for (const match of matches) {
       if (!match || !match.captures || match.captures.length === 0) continue;
 
@@ -809,7 +812,7 @@ export class ConducksReflector {
                 targetName: specifier,
                 type: 'IMPORTS' as any,
                 confidence: 1.0,
-                metadata: { specifier, isRaw: true, origin: boundary.origin, package: boundary.package }
+                metadata: { specifier, isRaw: true, origin: boundary.origin, package: boundary.package, line: currentMatchRow + 1 }
               });
 
               for (let i = 0; i < match.captures.length; i++) {
@@ -838,7 +841,7 @@ export class ConducksReflector {
                     targetName: specifier,
                     type: 'IMPORTS' as any,
                     confidence: 0.9,
-                    metadata: { specifier, bindingName: bindingName.toLowerCase(), bindingNameRaw: bindingName, isRawBinding: true, origin: boundary.origin, package: boundary.package }
+                    metadata: { specifier, bindingName: bindingName.toLowerCase(), bindingNameRaw: bindingName, isRawBinding: true, origin: boundary.origin, package: boundary.package, line: currentMatchRow + 1 }
                   });
                 }
               }
@@ -887,7 +890,7 @@ export class ConducksReflector {
           const explicit = cName === 'heritage_extends' ? 'EXTENDS'
             : cName === 'heritage_implements' ? 'IMPLEMENTS'
             : undefined;
-          this.heritage.process(cText, node.name, spectrum, explicit);
+          this.heritage.process(cText, node.name, spectrum, explicit, currentMatchRow + 1);
         }
         else if (cName === 'alias' && node) {
           // QUALIFY the target where the match names its source module. A bare original name relies
@@ -919,7 +922,8 @@ export class ConducksReflector {
           }
 
           const type = this.calls.isConstructor(finalTarget, provider) ? 'CONSTRUCTS' : 'CALLS';
-          this.calls.process(finalTarget, scope, type, spectrum, args, context);
+          // `currentMatchRow` is 0-based (tree-sitter); every line the vault stores is 1-based.
+          this.calls.process(finalTarget, scope, type, spectrum, args, context, currentMatchRow + 1);
 
           // Reference-as-value: a bare identifier passed as a call ARGUMENT (a callback like
           // `addEventListener('load', initUI)`, or a function handed to a DI/command table) is a
@@ -928,7 +932,7 @@ export class ConducksReflector {
           for (const rawArg of args) {
             const a = rawArg.trim();
             if (!/^[A-Za-z_$][\w$]*$/.test(a)) continue; // identifiers only (rejects strings/nums/exprs)
-            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a });
+            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a, line: currentMatchRow + 1 });
           }
         }
         else if (cName === 'instance_call_name') {
@@ -959,7 +963,7 @@ export class ConducksReflector {
               targetName: `${resolved.toLowerCase()}::${cText.toLowerCase()}`,
               type: 'TYPE_REFERENCE' as any,
               confidence: 1.0,
-              metadata: { isAugmentation: true, original: cText },
+              metadata: { isAugmentation: true, original: cText, line: currentMatchRow + 1 },
             });
           }
         }
@@ -1004,6 +1008,7 @@ export class ConducksReflector {
         else if (cName === 'instance_type') {
           if (pendingInstance) {
             instanceTypes.set(pendingInstance, cText.trim().split('.').pop()!.toLowerCase());
+            instanceTypeLines.set(pendingInstance, currentMatchRow + 1);
             pendingInstance = null;
           }
         }
@@ -1013,13 +1018,13 @@ export class ConducksReflector {
           const a = cText.trim();
           if (/^[A-Za-z_$][\w$]*$/.test(a)) {
             const scope = getScopeAt(currentMatchRow);
-            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a });
+            refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a, line: currentMatchRow + 1 });
           }
         }
         else if (cName === 'pulse_assignment_name') {
           const val = captureMap['pulse_assignment_value'] ?? 'unknown';
           const scopeName = getScopeAt(currentMatchRow);
-          this.flow.processAssignment(cText, val, scopeName, spectrum);
+          this.flow.processAssignment(cText, val, scopeName, spectrum, currentMatchRow + 1);
         }
         // Triggered by the PATH capture, which all ten grammars already emit, rather than by a
         // separate @kinesis_route tag that only TypeScript and TSX carried. The grammar's job is to
@@ -1030,7 +1035,7 @@ export class ConducksReflector {
           const pathReg = stripQuotes(cText);
           const method = normalizeHttpMethod(captureMap['route_method'] ?? captureMap['infra_method']);
           const scopeName = getScopeAt(currentMatchRow);
-          this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework());
+          this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework(), currentMatchRow + 1);
 
           const scope = getScopeAt(currentMatchRow);
           const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
@@ -1047,11 +1052,11 @@ export class ConducksReflector {
           // it left the gate with no evidence for a relative URL, so every `fetch('/path')` was
           // rejected as noise. `@req_fn` / `@kinesis_object` carry it depending on call shape.
           const receiver = captureMap['req_fn'] ?? captureMap['kinesis_object'] ?? null;
-          this.flow.processRequest(url, method, scopeName, spectrum, receiver);
+          this.flow.processRequest(url, method, scopeName, spectrum, receiver, currentMatchRow + 1);
         }
         else if (cName === 'pulse_type_target') {
           const scope = getScopeAt(currentMatchRow);
-          this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum, [], context);
+          this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum, [], context, currentMatchRow + 1);
         }
         else if (cName === CaptureTags.COMMENT && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
@@ -1074,7 +1079,7 @@ export class ConducksReflector {
     // Emit reference-as-value edges now that nodeCache holds every definition in this file. Gate on
     // "imported here OR defined in this file" — so a local-variable arg never floods the graph or adds
     // a dangler. IntraLinker binds the bare name against imported/same-file symbols afterward.
-    for (const { scope, name, raw } of refValueCandidates) {
+    for (const { scope, name, raw, line } of refValueCandidates) {
       // KEEP the resolved binding rather than using it as a yes/no gate.
       //
       // This called `resolveLocalBinding(name)` and threw the string away, then emitted the BARE
@@ -1094,7 +1099,7 @@ export class ConducksReflector {
         targetName: bound ? `${bound}::${name}` : name,
         type: 'ACCESSES' as any,
         confidence: 0.8,
-        metadata: { referenceAsValue: true, original: raw }
+        metadata: { referenceAsValue: true, original: raw, line }
       });
     }
 
@@ -1132,7 +1137,7 @@ export class ConducksReflector {
         targetName: isBuiltIn(typeName, provider.langId) ? getGlobalId(typeName) : typeName,
         type: 'CONSTRUCTS' as any,
         confidence: 1.0,
-        metadata: { isInstanceOf: true },
+        metadata: { isInstanceOf: true, line: instanceTypeLines.get(varName) ?? 0 },
       });
     }
     for (const [ifaceName, members] of memberTypes) {

@@ -12,7 +12,16 @@ export class CallProcessor {
   /**
    * Processes a call-site capture (@kinesis_target) and identifies its relationship.
    */
-  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: AnalyzeContext): void {
+  /**
+   * `line` is the 1-based source line of the call site.
+   *
+   * It answers "WHERE inside the function", which is the whole reason the graph does not need a
+   * node per statement or per branch. A call inside a loop is an edge from the enclosing BEHAVIOR
+   * plus a line — a position is a number, not an entity, and materialising one node per line would
+   * take this graph from ~5k nodes to ~32k for a question nobody asks (ADR 0099). 0 means the
+   * caller had no position to give.
+   */
+  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: AnalyzeContext, line: number = 0): void {
     if (!target) return;
     // A call whose RECEIVER is a literal or an expression is not a reference to any symbol, and the
     // edge it produced could never resolve. Two shapes accounted for 169 dangling edges here:
@@ -88,7 +97,8 @@ export class CallProcessor {
       // `WHERE confidence < 0.6` returned zero rows on a graph where half the edges dangle. The
       // column now says how far to trust the edge, not merely which rule emitted it.
       confidence: resolved ? 0.85 : 0.4,
-      metadata: { arguments: args, original: target, resolved }
+      // `line` is the key persistence reads for the `lineNumber` column (persistence.ts, saveEdges).
+      metadata: { arguments: args, original: target, resolved, line }
     });
   }
 

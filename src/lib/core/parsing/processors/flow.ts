@@ -1,5 +1,6 @@
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { NodeId } from "@/lib/core/graph/adjacency-list.js";
+import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 
 /**
  * Conducks — Flow Processor (Phase 2: Pulse Flow) 💎
@@ -10,7 +11,7 @@ export class FlowProcessor {
   /**
    * Processes a variable assignment to track local data handover.
    */
-  public processAssignment(name: string, value: string, scope: string, spectrum: PrismSpectrum): void {
+  public processAssignment(name: string, value: string, scope: string, spectrum: PrismSpectrum, line: number = 0): void {
     // Conducks: Create an ACCESSES relationship representing the flow
     // We treat the assignment as the source of the data pulse.
     spectrum.relationships.push({
@@ -20,14 +21,14 @@ export class FlowProcessor {
       confidence: 1.0,
       // `original` preserves the pre-lowercase name: IDs are case-folded for APFS, which collapses
       // a variable and a same-named type (`nodeId` / `NodeId`). Case-sensitive consumers need this.
-      metadata: { reason: 'assignment', value, original: name }
+      metadata: { reason: 'assignment', value, original: name, line }
     });
   }
 
   /**
    * Processes an HTTP route definition (e.g. FastAPI @app.get('/path')).
    */
-  public processRoute(path: string, method: string, scope: string, spectrum: PrismSpectrum, framework?: string | null): void {
+  public processRoute(path: string, method: string, scope: string, spectrum: PrismSpectrum, framework?: string | null, line: number = 0): void {
     // A route path is a URL path, not arbitrary text (ADR 0055 applied to this processor).
     //
     // The capture matched the first string argument of a call, so `db.all("SELECT id FROM nodes …")`
@@ -50,7 +51,10 @@ export class FlowProcessor {
       filePath: 'network',
       isExport: true,
       canonicalKind: 'BEHAVIOR',
-      canonicalRank: 6,
+      // Read the rank from the enum, never write the number. A route IS a BEHAVIOR, so it must
+      // carry BEHAVIOR's rank — a hand-written 6 was a rank from an older, shorter ladder and it
+      // put these six nodes two rungs above every other BEHAVIOR in the same graph (ADR 0099).
+      canonicalRank: CanonicalRank[CanonicalKind.BEHAVIOR],
       metadata: { isRoute: true, path, method: method.toUpperCase(), framework }
     });
 
@@ -59,7 +63,7 @@ export class FlowProcessor {
       targetName: routeId,
       type: 'DEFINES',
       confidence: 1.0,
-      metadata: { isRouteEdge: true }
+      metadata: { isRouteEdge: true, line }
     });
   }
 
@@ -83,7 +87,7 @@ export class FlowProcessor {
   /**
    * Processes an HTTP client request (e.g. requests.get('/path')).
    */
-  public processRequest(url: string, method: string, scope: string, spectrum: PrismSpectrum, receiver?: string | null): void {
+  public processRequest(url: string, method: string, scope: string, spectrum: PrismSpectrum, receiver?: string | null, line: number = 0): void {
     const rawMethod = method.toLowerCase();
     const rawUrl = url.toLowerCase();
     const rawReceiver = receiver?.toLowerCase() ?? '';
@@ -119,7 +123,7 @@ export class FlowProcessor {
       filePath: 'network',
       isExport: false,
       canonicalKind: 'BEHAVIOR',
-      canonicalRank: 6,
+      canonicalRank: CanonicalRank[CanonicalKind.BEHAVIOR],
       metadata: { isRequest: true, url, method: method.toUpperCase(), receiver }
     });
 
@@ -128,7 +132,7 @@ export class FlowProcessor {
       targetName: requestId,
       type: 'CALLS' as any,
       confidence: 1.0,
-      metadata: { isRequestEdge: true }
+      metadata: { isRequestEdge: true, line }
     });
   }
 }

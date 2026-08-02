@@ -24,7 +24,8 @@ export class HeritageProcessor {
     heritage: string,
     source: string,
     spectrum: PrismSpectrum,
-    explicitType?: 'EXTENDS' | 'IMPLEMENTS'
+    explicitType?: 'EXTENDS' | 'IMPLEMENTS',
+    line: number = 0
   ): void {
     if (!heritage || !source) return;
 
@@ -41,7 +42,7 @@ export class HeritageProcessor {
       // the type of relation, not the existence of it, so it stays a real edge — at a confidence
       // that says the DIRECTION was inferred.
       confidence: inferred ? 0.6 : 1.0,
-      metadata: { inferredRelation: inferred }
+      metadata: { inferredRelation: inferred, line }
     });
   }
 
