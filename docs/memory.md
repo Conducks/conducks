@@ -1239,3 +1239,13 @@ by construction.
 - Gotcha: the oracle scorer reported "resolves to `lib/index.ts::addMoney`" for a DANGLING edge — no such node exists. That produced a confident, wrong diagnosis ("it resolves to a shim") which survived into a written ADR before the node was queried directly
 - Why: an edge's `targetId` is a string. It is an ANSWER only if a node holds that id; otherwise it is a dangling pointer that happens to look plausible
 - Applies: `CONDUCKS/oracle` scoring scripts, and any analysis reading `edges.targetId` — join to `nodes` or the reading is unverified
+
+## A verification grep is a subject, not an authority — scope it or it will lie
+- Gotcha: checking whether a `prune` finding is real by grepping the symbol name gave THREE different confident answers for the same symbol (2026-08-02, todo33). Unscoped: 9 uses — it was matching a same-named file in ANOTHER service. Scoped to the service: 666 — it was matching `.next` build output. Scoped to source extensions and excluding build dirs: 1, the correct answer
+- Why it matters more than it sounds: each wrong answer flipped the verdict on a real finding, and two of them reached a written summary before being caught. The tool was right every time; the check was not
+- Applies: any verification of a graph finding against source. Scope to the finding's OWN service, to `.ts`/`.tsx`, and exclude `node_modules`, `.next`, `dist`, `build`. On a monorepo, a symbol name alone identifies nothing
+
+## TypeScript declaration merging is invisible to the graph
+- Gotcha: `interface ServiceTypeMap` is declared once and AUGMENTED in other files with a same-named `interface` body inside `declare module`. There is no import and no call, so nothing references the original node and `prune` reports it as dead — while four files depend on it
+- Why: augmentation is a relationship the language creates by NAME, not by a reference the parser can see as an edge. Every other cross-file link conducks models is written as an import or a call
+- Applies: `dead-code.ts`, and any judgement about an exported `interface` or `type` in a codebase that uses module augmentation. Recorded as todo33
