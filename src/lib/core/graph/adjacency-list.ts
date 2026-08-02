@@ -359,6 +359,7 @@ export class ConducksAdjacencyList {
         declaredReturn: node.properties.declaredReturn ?? (node.properties.dna as any)?.returns,
         objectPaths: node.properties.objectPaths,
         paramTypes: node.properties.paramTypes,
+        memberTypes: node.properties.memberTypes,
         isRoute: node.properties.isRoute,
         isRequest: node.properties.isRequest,
         method: node.properties.method,

@@ -41,6 +41,14 @@ export const TSX_QUERIES = `
     (module name: (string) @augments_source
       body: (statement_block (interface_declaration name: (type_identifier) @augments_name))))
 
+  ;; An INTERFACE's member types. A parameter typed PrismSpectrum, then a call on its nodes, is
+  ;; readable end to end — the parameter states its type, the interface states that nodes is a
+  ;; SpectrumNode array, and find is an Array method. 293 unresolved references on this repository
+  ;; are that exact shape, and nothing read the middle step (todo36).
+  (interface_declaration
+    name: (type_identifier) @iface_name
+    body: (interface_body) @iface_body)
+
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
   (public_field_definition name: (property_identifier) @name) @isProperty

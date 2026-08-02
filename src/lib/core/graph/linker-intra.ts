@@ -499,6 +499,50 @@ export class IntraLinker {
         }
       }
 
+      // 3b-ter. A chain through an INTERFACE member: `spectrum.nodes.find(...)`.
+      //
+      // Three declarations, no inference: the parameter states `spectrum: PrismSpectrum`, the
+      // interface states `nodes: SpectrumNode[]`, and `find` is an Array method. The middle step was
+      // the one nothing read — 293 unresolved references on this repository (todo36).
+      //
+      // An ARRAY member resolves the call to the array global, because the method belongs to Array
+      // and not to the element type. A member typed with a project type resolves the member on THAT
+      // type. A member whose type is a shape (`Array<{...}>`, a union) states no single type and is
+      // refused.
+      if (!resolvedId && bareName.split('.').length === 3) {
+        const [recv, prop, method] = bareName.split('.');
+        const file = sourceUnitId.slice(0, sourceUnitId.lastIndexOf('::'));
+        const callerScope = edge.sourceId.slice(edge.sourceId.lastIndexOf('::') + 2);
+        const enclosing = graph.getNode(edge.sourceId)?.properties as any;
+        const recvType = (enclosing?.paramTypes as Record<string, string> | undefined)?.[recv]
+          ?? ((graph.getNode(`${file}::${callerScope}.${recv}`) ?? graph.getNode(`${file}::${recv}`))?.properties as any)?.instanceOf;
+
+        if (recvType && /^[a-z_$][\w$]*$/i.test(recvType)) {
+          const ifaceId =
+            unitSymbols.get(sourceUnitId)?.get(recvType) ??
+            this.resolveSymbolUnique(recvType, sourceUnitId, unitImports, unitSymbols);
+          const members = ifaceId ? ((graph.getNode(ifaceId)?.properties as any)?.memberTypes as Record<string, string> | undefined) : undefined;
+          const memberType = members?.[prop];
+          if (memberType) {
+            // An ARRAY member is deliberately NOT resolved. `s.entries.filter(...)` really is an
+            // Array method, so an edge to the array global would be true — and contentless, because
+            // every function in the codebase uses Array. It converts a dangler into a low-information
+            // edge and improves the rate while telling nobody anything, which is the failure mode
+            // ADR 0096 exists to stop. The sweep removes it as a universal member instead, which is
+            // the honest answer (oracle T34).
+            if (memberType.endsWith('[]') || /^(array|readonlyarray)</.test(memberType)) {
+              // nothing — the sweep owns this case
+            } else if (/^[a-z_$][\w$]*$/i.test(memberType)) {
+              const ifaceFile = ifaceId!.slice(0, ifaceId!.lastIndexOf('::'));
+              const targetTypeId =
+                unitSymbols.get(`${ifaceFile}::unit`)?.get(memberType) ??
+                this.resolveSymbolUnique(memberType, `${ifaceFile}::unit`, unitImports, unitSymbols);
+              if (targetTypeId) resolvedId = this.memberOfType(graph, targetTypeId, memberType, method, unitImports, unitSymbols);
+            }
+          }
+        }
+      }
+
       // 3c. Method-call resolution: targets arrive as `receiver.method` (e.g. `reflector.reflect`,
       // `graph.getNeighbors`). Resolve the METHOD segment against the source file's imported units
       // only. This binds real internal method calls while leaving external receivers (path.join,

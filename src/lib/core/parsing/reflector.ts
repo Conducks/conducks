@@ -88,6 +88,31 @@ const scopedVarKey = (scope: string | null | undefined, name: string): string =>
   `${scope ? `${scope.toLowerCase()}.` : ''}${name.trim().toLowerCase()}`;
 
 /**
+ * An interface's members and their declared types: `{ nodes: 'SpectrumNode[]', meta: 'Meta' }`.
+ *
+ * The missing middle step in a chain the source states completely. `spectrum: PrismSpectrum` gives
+ * the receiver's type, `.nodes` is declared on that interface as `SpectrumNode[]`, and `.find` is an
+ * Array method — three declarations, no inference. 293 unresolved references on this repository were
+ * that shape (todo36).
+ *
+ * A METHOD signature is skipped: `run(): void` declares a callable, not a member whose type another
+ * hop can be resolved against, and the call to it resolves by the ordinary member lookup.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function memberTypesOf(bodyNode: any): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let i = 0; i < (bodyNode?.namedChildCount ?? 0); i++) {
+    const member = bodyNode.namedChild(i);
+    if (member?.type !== 'property_signature') continue;
+    const name = member.childForFieldName('name')?.text;
+    if (!name || !/^[A-Za-z_$][\w$]*$/.test(name)) continue;
+    const declared = member.childForFieldName('type')?.text?.replace(/^\s*:\s*/, '').trim();
+    if (declared) out[name.toLowerCase()] = declared.toLowerCase();
+  }
+  return out;
+}
+
+/**
  * Which identifier each property PATH of an object literal ultimately names.
  *
  * A DI container is an object literal, and `container.services.registry.lookup()` has no dynamic hop
@@ -579,6 +604,9 @@ export class ConducksReflector {
     /** Object-literal wiring: variable name -> { property path: identifier it aliases }. */
     const objectPaths = new Map<string, Record<string, string>>();
     let pendingObject: string | null = null;
+    /** Interface name -> { member: declared type }. */
+    const memberTypes = new Map<string, Record<string, string>>();
+    let pendingIface: string | null = null;
 
     const refValueCandidates: Array<{ scope: string; name: string; raw: string }> = [];
     for (const match of matches) {
@@ -935,6 +963,16 @@ export class ConducksReflector {
             });
           }
         }
+        else if (cName === 'iface_name') {
+          pendingIface = cText.trim().toLowerCase();
+        }
+        else if (cName === 'iface_body') {
+          if (pendingIface) {
+            const members = memberTypesOf(capture.node);
+            if (Object.keys(members).length > 0) memberTypes.set(pendingIface, members);
+            pendingIface = null;
+          }
+        }
         else if (cName === 'object_name') {
           pendingObject = scopedVarKey(getScopeAt(currentMatchRow), cText);
         }
@@ -1096,6 +1134,10 @@ export class ConducksReflector {
         confidence: 1.0,
         metadata: { isInstanceOf: true },
       });
+    }
+    for (const [ifaceName, members] of memberTypes) {
+      const node = nodeCache.get(`${file.path.toLowerCase()}::${ifaceName}`);
+      if (node) (node.metadata ??= {}).memberTypes = members;
     }
     for (const [varName, paths] of objectPaths) {
       const node = nodeCache.get(`${file.path.toLowerCase()}::${varName}`);
