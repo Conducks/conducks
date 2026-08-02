@@ -1082,14 +1082,35 @@ export class SynapsePersistence {
     // Now only a UNIVERSAL MEMBER goes: `.map`, `.trim`, `.then` — names every JavaScript value has
     // and no project declares. Everything else stays as a visible dangler, because an unresolved
     // reference is a fact about this tool, and deleting it is how the fact was hidden.
-    const dangling = await this.query<{ id: string; targetId: string }>(
-      `SELECT e.id, e.targetId FROM edges e
-       LEFT JOIN nodes n ON e.targetId = n.id
+    const dangling = await this.query<{ id: string; targetId: string; ty: string; params: string | null }>(
+      `SELECT e.id, e.targetId, e.type AS ty, sn.param_types AS params
+       FROM edges e
+       LEFT JOIN nodes n  ON e.targetId = n.id
+       LEFT JOIN nodes sn ON sn.id = e.sourceId
        WHERE n.id IS NULL AND e.confidence < ?`, [minConfidence]);
 
-    const removable = dangling
-      .filter(e => isUniversalMemberCall(String(e.targetId).split('::').pop() ?? ''))
-      .map(e => e.id);
+    const removable = dangling.filter(e => {
+      const symbol = String(e.targetId).split('::').pop() ?? '';
+      if (isUniversalMemberCall(symbol)) return true;
+
+      // NOT REFERENCES AT ALL — three shapes that should never have produced an edge, removed here
+      // rather than left to look like resolution failures (ADR 0098).
+
+      // A call to a PARAMETER of the enclosing function: `new Promise((resolve) => resolve(x))`.
+      // `resolve` is that function's own argument, so it names nothing outside it.
+      if (!symbol.includes('.') && e.params) {
+        try {
+          if (Object.prototype.hasOwnProperty.call(JSON.parse(e.params), symbol.toLowerCase())) return true;
+        } catch { /* a malformed map is not a licence to delete */ }
+      }
+
+      // A GENERIC TYPE PARAMETER: `<T>` is declared by the signature it appears in. A reference to
+      // one points at the declaration itself, and there is no cross-file symbol to find.
+      if (e.ty === 'TYPE_REFERENCE' && /^[A-Za-z]$|^[A-Za-z][0-9]$|^(T|K|V|U|R|E|P|S)[A-Za-z]*$/.test(symbol)
+          && symbol.length <= 2) return true;
+
+      return false;
+    }).map(e => e.id);
 
     for (let i = 0; i < removable.length; i += 500) {
       const chunk = removable.slice(i, i + 500);

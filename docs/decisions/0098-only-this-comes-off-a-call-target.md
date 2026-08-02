@@ -44,6 +44,12 @@ with every other `get` in the graph.
   resolved to an unrelated method counted as resolved; `app.get` that cannot resolve counts as
   unresolved. Trading a wrong edge for an honest dangler moves the rate the wrong way and the graph
   the right way — which is exactly why ADR 0077 requires reading the rate beside what it is made of.
-- The remaining bare callees are a different problem and are left visible: `resolve`/`reject` are
-  Promise executor PARAMETERS, `super` is a keyword, `t` is a generic type parameter. None is a
-  resolution failure; all three are things that should not have produced an edge at all.
+- **Those three were then fixed too, because none of them is a reference.** `super` names the base
+  class through a KEYWORD and the heritage edge already records what that is — suppressed at
+  emission. A generic type PARAMETER (`<T>`) is declared by the signature it appears in, so a
+  reference to one points at its own declaration. And a call to a PARAMETER of the enclosing function
+  (`new Promise((resolve) => resolve(x))`) names that function's own argument.
+- MEASURED after all four: conducks **4.643%**, mentorseed **8.122%**. `super` and generic `T` are at
+  ZERO. 24 `resolve`/`reject` edges survive, where the enclosing function is an inline arrow whose
+  parameters are not recorded on any node — a smaller version of the same gap, left visible.
+- Precision holds at **99.98%** on both subjects, oracle A 14/14 and B 7/7, 1,284 tests green.

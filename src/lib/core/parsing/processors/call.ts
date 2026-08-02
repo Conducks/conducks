@@ -27,6 +27,11 @@ export class CallProcessor {
     // Starts true so the discovery pass (not resolution mode) is unchanged — those targets are
     // qualified later during ingestion and by IntraLinker, and marking them low here would
     // downgrade edges that do get resolved. Only the explicit give-up branch below sets it false.
+    // `super(...)` and `super.x()` name the base class through a KEYWORD, not through a symbol. The
+    // heritage edge already records what the base class is; an edge to a literal `super` names
+    // nothing and can never resolve (ADR 0098).
+    if (/^super(\.|$)/i.test(target.trim())) return;
+
     let resolved = true;
 
     // Conducks.6: Deterministic Symbol Resolution (The Great Binding)
