@@ -5,7 +5,7 @@
  * Root cause (measured against `.conducks/conducks-synapse.db` on this repo, then confirmed against
  * a fresh stdio JSON-RPC call to `node build/src/interfaces/cli/index.js mcp`): the comment on
  * `rankWeight = 1 / ((node.properties?.rank ?? 4) + 1)` says "lower rank number => higher weight" and
- * clearly means the TAXONOMY rank (`canonicalRank`: STRUCTURE 7, BEHAVIOR 8, ATOM 11). But
+ * clearly means the TAXONOMY rank (`canonicalRank`: STRUCTURE 7, BEHAVIOR 8, ATOM 9). But
  * `node.properties.rank` is a different, already-populated field — the live PageRank importance
  * value written by `src/lib/core/graph/algorithms/ranker.ts` and restored from the `metadata` blob on
  * a full (non-shallow) `SynapsePersistence.load()`, the load every MCP-serving process uses. Every
@@ -30,6 +30,7 @@
  * hand-built graph so the handler's own scoring/filtering branches are under test, not real BFS data.
  */
 import { describe, it, expect, jest } from '@jest/globals';
+import { CanonicalKind, CanonicalRank } from '@/lib/core/parsing/taxonomy.js';
 
 const PROJECT_ROOT = '/fake/root';
 
@@ -43,13 +44,13 @@ const nodes: Record<string, any> = {
   root: {
     id: 'root',
     label: 'STRUCTURE',
-    properties: { name: 'Root', canonicalKind: 'STRUCTURE', canonicalRank: 7, gravity: 1, rank: 0.9 },
+    properties: { name: 'Root', canonicalKind: 'STRUCTURE', canonicalRank: CanonicalRank[CanonicalKind.STRUCTURE], gravity: 1, rank: 0.9 },
   },
   [`${PROJECT_ROOT}/src/core.ts::corefn`]: {
     id: `${PROJECT_ROOT}/src/core.ts::corefn`,
     label: 'BEHAVIOR',
     properties: {
-      name: 'coreFn', canonicalKind: 'BEHAVIOR', canonicalRank: 8, filePath: `${PROJECT_ROOT}/src/core.ts`,
+      name: 'coreFn', canonicalKind: 'BEHAVIOR', canonicalRank: CanonicalRank[CanonicalKind.BEHAVIOR], filePath: `${PROJECT_ROOT}/src/core.ts`,
       rank: 0.5, // high PageRank importance
       range: { start: { line: 10 }, end: { line: 20 } },
     },
@@ -61,7 +62,7 @@ for (let i = 1; i <= 5; i++) {
     id,
     label: 'ATOM',
     properties: {
-      name: `leafVar${i}`, canonicalKind: 'ATOM', canonicalRank: 11, filePath: `${PROJECT_ROOT}/src/core.ts`,
+      name: `leafVar${i}`, canonicalKind: 'ATOM', canonicalRank: CanonicalRank[CanonicalKind.ATOM], filePath: `${PROJECT_ROOT}/src/core.ts`,
       rank: 0.01, // low PageRank importance
       range: { start: { line: 20 + i }, end: { line: 20 + i } },
     },
@@ -77,7 +78,7 @@ nodes[`${PROJECT_ROOT}/src/core.ts::corefn.faintvar`] = {
   id: `${PROJECT_ROOT}/src/core.ts::corefn.faintvar`,
   label: 'ATOM',
   properties: {
-    name: 'faintVar', canonicalKind: 'ATOM', canonicalRank: 11, filePath: `${PROJECT_ROOT}/src/core.ts`,
+    name: 'faintVar', canonicalKind: 'ATOM', canonicalRank: CanonicalRank[CanonicalKind.ATOM], filePath: `${PROJECT_ROOT}/src/core.ts`,
     rank: 0.001,
     range: { start: { line: 42 }, end: { line: 42 } },
   },

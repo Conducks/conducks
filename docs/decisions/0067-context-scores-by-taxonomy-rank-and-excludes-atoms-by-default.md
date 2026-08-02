@@ -1,7 +1,15 @@
 # 0067 — conducks_context scores by taxonomy rank, excludes ATOMs by default, and returns a line
 Status: Accepted
-- Enforced by: tests/unit/interfaces/tools/context-shape.test.ts
+- Amended by: 0103
+- Enforced by: tests/unit/interfaces/tools/context-shape.test.ts, tests/integration/features/context-tool.test.ts
 - Date: 2026-07-31
+
+**Amended by ADR 0103 (2026-08-02).** Two things this record states are now wrong. The ranks quoted
+below are pre-ADR-0100 — ATOM is 9, not 11, and DATA/STATEMENT/BRANCH no longer exist. More
+importantly, this ADR fixed the formula at one end and left it broken at the other: `1/(rank+1)`
+rewards a LOW rank number, and the low numbers are the CONTAINERS. Measured on the oracle fixture,
+`conducks_context logAudit` returned seven files and two directories ABOVE the six functions that
+actually call it. Containers are excluded now, for the same reason ATOMs were.
 
 ## Context
 

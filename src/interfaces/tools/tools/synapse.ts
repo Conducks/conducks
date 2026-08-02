@@ -11,6 +11,19 @@ import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
  */
 
 // S2: Whitelist of allowed Oracle query template names.
+/**
+ * Kinds `conducks_context` never returns: the containment tree above a symbol.
+ *
+ * A caller asking for context around `logAudit` wants the code related to it, not the folder it
+ * lives in — they already have the path. These sit at the LOW end of `canonicalRank`, so the
+ * relevance formula `1/(canonicalRank+1)` scored every one of them above every function (ADR 0103).
+ *
+ * NAMESPACE and PACKAGE are here for the same reason, though neither is emitted by a TypeScript
+ * grammar — a polyglot repository produces both, and leaving them out would make this list correct
+ * only for the language it was tested against.
+ */
+const CONTEXT_CONTAINERS = new Set(['ECOSYSTEM', 'REPOSITORY', 'PACKAGE', 'NAMESPACE', 'DIRECTORY', 'UNIT']);
+
 const ALLOWED_TEMPLATES = new Set([
   'find_usages', 'find_imports', 'unused_exports', 'dead_code', 'high_risk_dead_code',
   'blast_radius', 'deep_impact', 'structural_siblings', 'symbols_in_structure', 'symbols_in_namespace',
@@ -474,7 +487,7 @@ WHEN TO USE: Gathering focused context around a specific symbol for an AI agent 
 AFTER THIS: Use conducks_explain to deep-dive a high-relevance node.
 
 Ranking: score = confidence × (1/(depth+1)) × (1/(canonicalRank+1)) — canonicalRank is the taxonomy
-depth (STRUCTURE 7, BEHAVIOR 8, ATOM 11), so a local variable is worth less than the function or class
+depth (STRUCTURE 7, BEHAVIOR 8, ATOM 9), so a local variable is worth less than the function or class
 that holds it at the same graph depth and confidence.
 Budget: nodes are scored and added highest-first until budget is exhausted or diminishing returns threshold hit.
 ATOMs (local variables, fields) are excluded by default — pass include_atoms:true to get them back.
@@ -531,8 +544,11 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
         // todo28#P4: repo-relative id, for display only — `id` (below) is still the full id and is
         // what must be fed back into trace/impact/explain/context.
         const projectRoot = String((registry.infrastructure as any).chronicle.getProjectDir() ?? '').toLowerCase().replace(/\/$/, '');
+        // The absolute root can appear AFTER a kind prefix, not only at the start: a directory node
+        // is `directory::/abs/path/src/lib`, so a `startsWith` test left it at full length and
+        // `short_id` came back identical to `id` (ADR 0103). Replace the root wherever it occurs.
         const shortenId = (fullId: string): string =>
-          projectRoot && fullId.startsWith(projectRoot + '/') ? fullId.slice(projectRoot.length + 1) : fullId;
+          projectRoot ? fullId.split(projectRoot + '/').join('') : fullId;
 
         // BFS: collect all nodes within radius, tracking depth and best edge weight
         type NodeEntry = { nodeId: string; depth: number; edgeWeight: number };
@@ -574,11 +590,26 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
           // todo28#P4: exclude ATOMs (locals/fields) by default — 51% of the graph is ATOM and they
           // were crowding out the symbols a caller actually wants. include_atoms:true opts back in.
           if (!includeAtoms && node.properties?.canonicalKind === 'ATOM') continue;
+          // CONTAINERS are excluded, and this is the larger half of the same problem ATOM exclusion
+          // was built to solve (ADR 0103).
+          //
+          // `rankWeight = 1/(canonicalRank+1)` says "lower rank number is worth more", and the low
+          // numbers on this ladder are the CONTAINERS: DIRECTORY 4, UNIT 5, against BEHAVIOR 8. So
+          // the formula ranked a folder above every function in it. Measured on the oracle fixture,
+          // `conducks_context logAudit` returned, in this order: audit.ts, caller1..6.ts, lib/,
+          // domain/, and only THEN the six functions that actually call it. Nine of fifteen results
+          // were files and folders, all of them above the answer.
+          //
+          // An agent asking for context around a symbol is already holding the file path. The same
+          // reasoning is written down in `search-engine.ts`'s inventory — "an inventory answering
+          // ECOSYSTEM, REPOSITORY and DIRECTORY before a single function would bury the answer under
+          // the folder tree the user is already looking at" — and it was never applied here.
+          if (CONTEXT_CONTAINERS.has(String(node.properties?.canonicalKind ?? ''))) continue;
           // todo28#P4: this used to read node.properties.rank — the live PageRank importance value,
           // not the taxonomy rank the "lower rank number => higher weight" comment describes. Every
           // node has some small PageRank float, so that term barely separated ATOM from BEHAVIOR from
           // STRUCTURE at all, and could even score a leaf variable above the function holding it.
-          // canonicalRank (STRUCTURE 7, BEHAVIOR 8, ATOM 11 …) is the field the formula was meant to use.
+          // canonicalRank (STRUCTURE 7, BEHAVIOR 8, ATOM 9 …) is the field the formula was meant to use.
           const rankWeight = 1 / ((node.properties?.canonicalRank ?? 4) + 1);
           const relevance_score = (entry.edgeWeight ?? 0.5) * (1 / (entry.depth + 1)) * rankWeight;
           const item = {
@@ -610,7 +641,7 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
           //
           // NOT applied when the caller passed `include_atoms` — that flag exists to say "I know
           // these rank low, give them to me anyway", and this cutoff silently overrode it. With
-          // `rankWeight = 1/(canonicalRank+1)` an ATOM scores 1/12 against a STRUCTURE's 1/8, which
+          // `rankWeight = 1/(canonicalRank+1)` an ATOM scores 1/10 against a STRUCTURE's 1/8, which
           // puts it under 10% of the top score in any real neighbourhood, so `include_atoms: true`
           // admitted ATOMs to scoring (235 candidates -> 273) and then dropped every one of them:
           // identical output at a 20k budget and at the 100k maximum. A flag that cannot change
