@@ -38,6 +38,12 @@ const read = (f) => {
 };
 /** The declaring span of a node, or the whole file for a UNIT (which records lineStart=1). */
 const spanOf = (row) => {
+  // A SYNTHETIC node — a route or a request minted by the cross-service binder — stands for an
+  // endpoint, not for a span of text. There is nothing to read, so its edges are `unchecked` rather
+  // than counted either way. `page.tsx::request::/api/x::get -> route.ts::route::/api/x::get` is a
+  // binder pair whose evidence is a `fetch('/api/x')` elsewhere in the file, which this shape cannot
+  // reconstruct.
+  if (/::(request|route)::/.test(String(row.s))) return null;
   const src = read(row.sf);
   if (!src) return null;
   if (String(row.s).endsWith('::unit')) return src;
@@ -69,13 +75,25 @@ const CHECKS = {
     // is supported by `console.log(...)`, and demanding `console(` reports 619 false alarms on this
     // repository. Checking the checker before trusting its findings is the rule ADR 0090 records.
     if (/^(global|lib|ecosystem)::/.test(String(row.t)) && new RegExp(`(^|[^\\w$])${name}\\s*\\??\\.`, 'i').test(body)) return 'ok';
+    // An endpoint TARGET is evidenced by its PATH, not by a symbol name. `-> request::/api/logs::get`
+    // is supported by `fetch('/api/logs')`, and the last segment is the HTTP METHOD, which is never
+    // written as a callee.
+    const endpoint = /(?:^|::)(?:request|route)::(.+)::[a-z]+$/i.exec(String(row.t));
+    if (endpoint) {
+      const path = endpoint[1].split('?')[0];
+      return body.includes(path) ? 'ok' : 'wrong';
+    }
     // JSX is a call. `<Button />` compiles to `Button(...)`, and a member form `<motion.div>` to a
     // property call — demanding a literal paren reported 233 false alarms on a React subject.
     if (new RegExp(`<\\s*[\\w.$]*\\b${name}\\b`, 'i').test(body)) return 'ok';
-    // A RENAMED import is called by its local name (`import { main as start }`), so the target's own
-    // name never appears at the call site. The edge is right — ADR 0085 is what makes it right — and
-    // this checker cannot see the rename without re-resolving the import.
-    if (new RegExp(`\\b${name}\\s+as\\s+[\\w$]+`, 'i').test(read(row.sf) || '')) return null;
+    // A RENAMED import is called by its LOCAL name, so the target's own name never appears at the
+    // call site. Both spellings count — `import { POST as send }` and the destructured dynamic form
+    // `const { POST: send } = await import(...)`, which mentorseed's lifecycle tests use throughout.
+    // The edge is right; ADR 0085 is what makes it right, and this checker cannot follow the rename
+    // without re-resolving the import.
+    const whole = read(row.sf) || '';
+    if (new RegExp(`\\b${name}\\s+as\\s+[\\w$]+`, 'i').test(whole)) return null;
+    if (new RegExp(`\\b${name}\\s*:\\s*[\\w$]+\\s*\\}`, 'i').test(whole)) return null;
     return 'wrong';
   },
   /** A construction must write `new <Type>` — or be a call the processor classified by capitalisation. */
