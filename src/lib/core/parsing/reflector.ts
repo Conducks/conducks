@@ -127,8 +127,31 @@ function objectPathsOf(objectNode: any): Record<string, string> {
         const path = prefix ? `${prefix}.${key}` : key;
         const value = child.childForFieldName('value');
         if (!value) continue;
-        if (value.type === 'object') walk(value, path, depth + 1);
-        else out[path.toLowerCase()] = value.type === 'identifier' ? value.text.toLowerCase() : '';
+        if (value.type === 'object') { walk(value, path, depth + 1); continue; }
+        if (value.type === 'identifier') { out[path.toLowerCase()] = value.text.toLowerCase(); continue; }
+
+        // A DELEGATING property: `status: () => governance.status()`. The arrow forwards to another
+        // call, written literally — the dominant shape in a hand-wired DI container, and the reason
+        // 107 chains still dangled after the object-literal walk landed. What is recorded is the
+        // CALLEE, so `audit.status` points at `governance.status` and the linker resolves that the
+        // way it resolves any other call target.
+        //
+        // Only a single expression or a single `return <call>`. An arrow with real logic states no
+        // delegation, and guessing which of several calls it stands for is the guess ADR 0070 refuses.
+        if (value.type === 'arrow_function') {
+          const body = value.childForFieldName('body');
+          const call = body?.type === 'call_expression'
+            ? body
+            : (body?.namedChildCount === 1 && body.namedChild(0)?.type === 'return_statement'
+                && body.namedChild(0).namedChildCount === 1
+                && body.namedChild(0).namedChild(0)?.type === 'call_expression')
+              ? body.namedChild(0).namedChild(0)
+              : null;
+          const callee = call?.childForFieldName('function')?.text;
+          out[path.toLowerCase()] = callee && /^[A-Za-z_$][\w$.]*$/.test(callee) ? callee.toLowerCase() : '';
+          continue;
+        }
+        out[path.toLowerCase()] = '';
         continue;
       }
 

@@ -1,5 +1,5 @@
 # todo34 — a receiver that is a typed PARAMETER
-Status: todo
+Status: done
 - Acceptance: `registry.infrastructure.graphEngine.getGraph()` inside a CLI command resolves, and conducks' deep-chain dangling bucket falls from 113.
 
 ## Context
@@ -35,17 +35,21 @@ literal the chain needs. Both facts are written down; neither is modelled.
 - [x] BUILT: parameter types persisted as their own column, a receiver resolved through the enclosing
       function's parameter list, and a DELEGATING property (`status: () => governance.status()`)
       recorded as its callee. On conducks: deep chains **113 -> 59**, dangling **191 -> 143**
-- [-] REVERTED — dropped from this shape, not from the goal: the same change took mentorseed from
-      **2 source-contradicted edges to 50**. Better on the subject it was written against, worse on
-      the one it was not, which is the definition of overfitting. Parked in a git stash
+- [x] REVERTED, then RESTORED — and the reason it looked like overfitting is the finding. Measured
+      against the OLD sweep it took mentorseed from 2 source-contradicted edges to 50. Measured again
+      after ADR 0096 replaced that sweep, the identical code reads **2**. The rules never introduced
+      wrong edges; the confidence sweep was DELETING low-confidence danglers, so an edge these rules
+      resolved escaped deletion, became visible, and was then judged by a checker that could not yet
+      see through a delegation. Two instruments wrong at once looked exactly like a bad rule
 - [x] The delegation capture is CORRECT and was verified by hand — `reclaimVault: (n) => persistence.reclaimIfBloated(n)`
       really is a delegation, and the edge to `reclaimIfBloated` names what actually runs. The
       regression is in the RESOLUTION rules, not in reading the object literal
-- [ ] Find which of the two rules causes it. The parameter-type rule resolves a type name against the
-      CALLER's imports, and on a five-service repository a type name is not unique — that is the first
-      suspect and it is a guess until measured
-- [ ] Re-measure BOTH subjects before shipping. A rule that improves one and breaks the other is not
-      a language rule
+- [x] ISOLATED by disabling each rule in turn against the current sweep: both read 2 wrong, so
+      neither is the cause. The suspect named here — a type name not being unique across five
+      services — was wrong, and naming it as a guess rather than a conclusion is why it cost nothing
+- [x] RE-MEASURED both subjects. conducks: deep chains **113 -> 59**, honest dangling
+      **7.350% -> 7.095%**. mentorseed: **10.766% -> 10.774%**, flat, with the graph larger.
+      Precision **99.98% / 99.99%**, oracle A 14/14 and B 7/7, 1,284 tests green
 
 ## Phase 3 — the parameter's declared type (original plan, still open)
 

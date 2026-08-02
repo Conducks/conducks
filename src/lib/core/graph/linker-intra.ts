@@ -286,25 +286,86 @@ export class IntraLinker {
         if (dot > 0) {
           const rootName = symbol.slice(0, dot);
           const rootId = `${file}::${rootName}`;
-          const paths = (graph.getNode(rootId)?.properties as any)?.objectPaths as Record<string, string> | undefined;
+          let paths = (graph.getNode(rootId)?.properties as any)?.objectPaths as Record<string, string> | undefined;
+          let pathsOwner: string | null = null;
+
+          // The receiver may be a PARAMETER rather than a variable in this file. A CLI command is
+          // `execute(args: string[], registry: Registry)`, and `registry.infrastructure.x.y()` is the
+          // single largest dangling shape on this repository — 113 edges (todo34).
+          //
+          // The parameter's declared type is written in the signature, and the enclosing function
+          // records it. So: find the parameter, resolve its TYPE to a node, and use that node's
+          // object paths. Every step reads something the source states.
+          if (!paths) {
+            const enclosing = graph.getNode(edge.sourceId)?.properties as any;
+            const declaredType = (enclosing?.paramTypes as Record<string, string> | undefined)?.[rootName];
+            if (declaredType) {
+              // Strip array/generic decoration; a decorated type states a shape, not a single value.
+              const bare = declaredType.replace(/\[\]$/, '');
+              if (/^[a-z_$][\w$]*$/i.test(bare)) {
+                // `${file}::unit`, not `sourceUnitId` — this branch runs before that is computed,
+                // and the file is what the qualified target already carries.
+                const typeId =
+                  unitSymbols.get(`${file}::unit`)?.get(bare) ??
+                  this.resolveSymbolUnique(bare, `${file}::unit`, unitImports, unitSymbols);
+                if (typeId) {
+                  paths = (graph.getNode(typeId)?.properties as any)?.objectPaths as Record<string, string> | undefined;
+                  if (paths) pathsOwner = typeId.slice(0, typeId.lastIndexOf('::'));
+                }
+              }
+            }
+          }
           if (paths) {
             const rest = symbol.slice(dot + 1);
             const segments = rest.split('.');
             // Longest prefix first, leaving at least one segment as the member being called.
-            for (let take = segments.length - 1; take >= 1; take--) {
+            // Start at the WHOLE rest, not one short of it. A DELEGATING property consumes every
+            // segment — `registry.audit.status` matches the recorded path `audit.status` and leaves
+            // no member, because the delegation target IS what is being called. Reserving a segment
+            // for a member meant the dominant DI shape never matched at all.
+            for (let take = segments.length; take >= 1; take--) {
               // An EMPTY value means "wired, but its type is not stated" — a getter that computes
               // rather than aliases. Dead-code uses those paths; the resolver must not.
               const aliased = paths[segments.slice(0, take).join('.')];
               if (!aliased) continue;
               const member = segments.slice(take).join('.');
-              const targetNode = graph.getNode(`${file}::${aliased}`);
+              if (!member && !aliased.includes('.')) continue;   // a bare alias with no member names nothing to call
+              // The aliased identifier lives in whichever file DECLARED the object, which is not
+              // this one when the receiver was a typed parameter.
+              const ownerFile = pathsOwner ?? file;
+
+              // A DELEGATION records a dotted callee (`governance.status`), not a variable. Resolve
+              // it the way any other receiver.member target is resolved: the receiver's own type,
+              // then the member on it. The member being CALLED here is the delegate's, not the
+              // caller's, so `member` from the outer split is discarded for this branch.
+              if (aliased.includes('.')) {
+                const dDot = aliased.indexOf('.');
+                const dRecv = aliased.slice(0, dDot);
+                const dMember = aliased.slice(dDot + 1);
+                const rProps = graph.getNode(`${ownerFile}::${dRecv}`)?.properties as any;
+                const rType = (rProps?.instanceOf as string | undefined)
+                  ?? this.returnTypeOfCall(graph, rProps?.instanceOfCall as string | undefined, ownerFile, unitImports, unitSymbols);
+                if (!rType) continue;
+                const rTypeId =
+                  unitSymbols.get(`${ownerFile}::unit`)?.get(rType) ??
+                  this.resolveSymbolUnique(rType, `${ownerFile}::unit`, unitImports, unitSymbols);
+                const delegated = rTypeId ? this.memberOfType(graph, rTypeId, rType, dMember, unitImports, unitSymbols) : null;
+                if (delegated) {
+                  graph.rebindEdgeTarget(edge, delegated);
+                  resolved.push({ id: edge.id, newTargetId: delegated });
+                  break;
+                }
+                continue;
+              }
+
+              const targetNode = graph.getNode(`${ownerFile}::${aliased}`);
               const props = targetNode?.properties as any;
               const typeName = (props?.instanceOf as string | undefined)
-                ?? this.returnTypeOfCall(graph, props?.instanceOfCall as string | undefined, file, unitImports, unitSymbols);
+                ?? this.returnTypeOfCall(graph, props?.instanceOfCall as string | undefined, ownerFile, unitImports, unitSymbols);
               if (!typeName) continue;
               const typeId =
-                unitSymbols.get(`${file}::unit`)?.get(typeName) ??
-                this.resolveSymbolUnique(typeName, `${file}::unit`, unitImports, unitSymbols);
+                unitSymbols.get(`${ownerFile}::unit`)?.get(typeName) ??
+                this.resolveSymbolUnique(typeName, `${ownerFile}::unit`, unitImports, unitSymbols);
               const candidate = typeId ? this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols) : null;
               if (candidate) {
                 graph.rebindEdgeTarget(edge, candidate);
