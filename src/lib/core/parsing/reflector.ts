@@ -883,6 +883,23 @@ export class ConducksReflector {
             pendingInstanceCall = null;
           }
         }
+        else if (cName === 'augments_name') {
+          // An augmentation REFERENCES the type it extends, in the module it names. Both are written
+          // in the source, so this is a read (todo33). Resolved here because the specifier is in the
+          // match; an unresolvable one records nothing rather than a bare guess.
+          const srcCap = match.captures.find((c: any) => c.name === 'augments_source')?.node?.text;
+          const spec = srcCap ? srcCap.replace(/^['"]|['"]$/g, '') : null;
+          const resolved = spec ? this.imports.resolve(spec, file.path, allPaths, provider, context) : null;
+          if (typeof resolved === 'string') {
+            spectrum.relationships.push({
+              sourceName: 'unit',
+              targetName: `${resolved.toLowerCase()}::${cText.toLowerCase()}`,
+              type: 'TYPE_REFERENCE' as any,
+              confidence: 1.0,
+              metadata: { isAugmentation: true, original: cText },
+            });
+          }
+        }
         else if (cName === 'object_name') {
           pendingObject = scopedVarKey(getScopeAt(currentMatchRow), cText);
         }

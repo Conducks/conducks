@@ -1,5 +1,5 @@
 # todo33 — prune's orphan precision on a multi-service subject
-Status: todo
+Status: done
 - Acceptance: a sampled orphan check on mentorseed reaches the precision conducks already has, or each surviving class of false positive is named with its cause.
 
 ## Context
@@ -31,8 +31,24 @@ does not.
 
 ## Phase 1 — model what the language actually does
 
-- [ ] Recognise an interface AUGMENTATION (`declare module` + a same-named `interface` body) as a
-      reference to the original declaration, so declaration merging stops reading as dead code
-- [ ] Re-sample 18 orphans on mentorseed and MEASURE the precision change, with the grep scoped as
-      Phase 0 requires
-- [ ] Re-check conducks: it reads 13/13 today and must not fall
+- [x] DONE. `declare module '<spec>' { interface <Name> ... }` now emits a TYPE_REFERENCE from the
+      augmenting unit to `<resolved spec>::<Name>`. The specifier and the type are both written in
+      the source, so this is a read. The captures carry no `is` prefix on purpose — an is-capture is
+      a DEFINITION and would mint a node, and the augmenting file defines nothing
+- [x] The nested `interface` still mints a node in the AUGMENTING file, which nothing references
+      because nothing should. Dead-code now skips it, reading the augmentation EDGE rather than
+      taking a new column — the edge already carries `isAugmentation` and already persists
+- [x] RE-SAMPLED 18 orphans on mentorseed: **18/18 true**, zero false positives.
+      `ServiceTypeMap` no longer appears; orphan findings **144 -> 136**
+- [x] conducks holds at 13 orphans, source-verified precision **99.98%**; mentorseed **99.97%**.
+      1,284 tests green, `audit` green
+
+## Phase 2 — the instrument, which was wrong FOUR times
+
+- [x] The precision figure moved from 11/18 to 18/18 without the rule changing once. Every step was
+      the CHECK being wrong: unscoped grep crossed services; scoping to the service matched `.next`
+      build output; restricting to source extensions still counted comments and test mocks as uses.
+      The criterion that finally held is the one `prune` actually claims — **is the symbol IMPORTED
+      anywhere in its own service**, not does its name appear
+- [x] The earlier "11/18" in this file's own Phase 0 is left standing rather than rewritten, because
+      the sequence is the finding. A verification instrument gets the same scepticism as the tool

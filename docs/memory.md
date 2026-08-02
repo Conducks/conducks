@@ -1243,7 +1243,8 @@ by construction.
 ## A verification grep is a subject, not an authority — scope it or it will lie
 - Gotcha: checking whether a `prune` finding is real by grepping the symbol name gave THREE different confident answers for the same symbol (2026-08-02, todo33). Unscoped: 9 uses — it was matching a same-named file in ANOTHER service. Scoped to the service: 666 — it was matching `.next` build output. Scoped to source extensions and excluding build dirs: 1, the correct answer
 - Why it matters more than it sounds: each wrong answer flipped the verdict on a real finding, and two of them reached a written summary before being caught. The tool was right every time; the check was not
-- Applies: any verification of a graph finding against source. Scope to the finding's OWN service, to `.ts`/`.tsx`, and exclude `node_modules`, `.next`, `dist`, `build`. On a monorepo, a symbol name alone identifies nothing
+- IT WAS WRONG A FOURTH TIME, and the fourth is the useful one: even scoped to source extensions, a name-appears grep counts COMMENTS and TEST MOCKS as uses. The precision figure moved 11/18 -> 18/18 without the rule changing once. The criterion has to be the one the finding CLAIMS — for `prune`, "is this symbol IMPORTED anywhere in its own service", not "does its name appear"
+- Applies: any verification of a graph finding against source. Scope to the finding's OWN service, to `.ts`/`.tsx`, exclude `node_modules`/`.next`/`dist`/`build`, and match the CLAIM rather than the name. On a monorepo, a symbol name alone identifies nothing
 
 ## TypeScript declaration merging is invisible to the graph
 - Gotcha: `interface ServiceTypeMap` is declared once and AUGMENTED in other files with a same-named `interface` body inside `declare module`. There is no import and no call, so nothing references the original node and `prune` reports it as dead — while four files depend on it

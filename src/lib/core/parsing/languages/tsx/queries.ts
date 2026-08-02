@@ -27,6 +27,20 @@ export const TSX_QUERIES = `
     (object_pattern (shorthand_property_identifier_pattern) @name)
     value: (await_expression (call_expression function: (import) arguments: (arguments (string) @source)))) @isBinding
 
+  ;; MODULE AUGMENTATION — TypeScript declaration merging.
+  ;;
+  ;;   declare module '@/core/registry/Registry' { interface ServiceTypeMap { ... } }
+  ;;
+  ;; The augmenting file states which module and which type it extends, so this is a reference the
+  ;; source writes down — no import and no call, which is why nothing referenced the original and
+  ;; prune reported a live interface as dead on a real subject (todo33).
+  ;;
+  ;; Captures carry no is-prefix on purpose: an is-capture is a DEFINITION and would mint a node here,
+  ;; and this file does not define ServiceTypeMap, it extends one that lives elsewhere.
+  (ambient_declaration
+    (module name: (string) @augments_source
+      body: (statement_block (interface_declaration name: (type_identifier) @augments_name))))
+
   ;; --- Atoms (L6: Persistence & State) ---
   (property_signature name: (property_identifier) @name) @isProperty
   (public_field_definition name: (property_identifier) @name) @isProperty

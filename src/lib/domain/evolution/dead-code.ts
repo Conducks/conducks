@@ -82,6 +82,21 @@ export class DeadCodeAnalyzer {
     // no incoming edge, and reporting it dead is a claim about the resolver rather than the code.
     //
     // Keyed by FILE, so a same-named property elsewhere cannot launder an unrelated symbol (todo30).
+    // An AUGMENTING interface is not a declaration. `declare module 'X' { interface Y { ... } }`
+    // extends a `Y` that lives in X, and the parser mints a `Y` node in the AUGMENTING file too —
+    // which nothing references, because nothing should. Read from the augmentation edges rather than
+    // a new column: the edge already carries `isAugmentation` and already persists (todo33).
+    const augmentedByFile = new Map<string, Set<string>>();
+    for (const e of graph.getAllEdges()) {
+      const props = (e as any).properties;
+      if (!props?.isAugmentation) continue;
+      const file = String(e.sourceId).slice(0, String(e.sourceId).lastIndexOf('::')).toLowerCase();
+      const name = String(e.targetId).slice(String(e.targetId).lastIndexOf('::') + 2).toLowerCase();
+      const names = augmentedByFile.get(file) ?? new Set<string>();
+      names.add(name);
+      augmentedByFile.set(file, names);
+    }
+
     const wiringByFile = new Map<string, Set<string>>();
     for (const n of nodes as ConducksNode[]) {
       const paths = (n.properties as any)?.objectPaths as Record<string, string> | undefined;
@@ -120,8 +135,10 @@ export class DeadCodeAnalyzer {
       // stdlib or package nodes. An unused dependency is a real and different question, and belongs
       // to `supply-chain`, which knows about manifests.
       const isExternal = String(node.properties.filePath || '').startsWith('external://');
-      const isWiring = wiringByFile.get(String(node.properties.filePath || '').toLowerCase())
-        ?.has(String(node.properties.name || '').toLowerCase()) === true;
+      const nodeFile = String(node.properties.filePath || '').toLowerCase();
+      const nodeName = String(node.properties.name || '').toLowerCase();
+      const isWiring = wiringByFile.get(nodeFile)?.has(nodeName) === true;
+      const isAugmenting = augmentedByFile.get(nodeFile)?.has(nodeName) === true;
       // A ROUTE IS SERVED, NOT CALLED, and a REQUEST is issued to something outside this graph.
       // Both are SYNTHESISED nodes standing for an endpoint, so "nothing references it" is their
       // normal state and says nothing about whether the code behind them runs. Reporting them as
@@ -129,7 +146,7 @@ export class DeadCodeAnalyzer {
       const nodeId = String(node.id || '');
       const isEndpoint = nodeId.includes('route::') || nodeId.includes('request::')
         || node.properties.isRoute === true || node.properties.isRequest === true;
-      const isSynthetic = isExternal || isEndpoint || isWiring;
+      const isSynthetic = isExternal || isEndpoint || isWiring || isAugmenting;
       const isArchitectural = ['STRUCTURE', 'BEHAVIOR', 'INFRA'].includes(node.label) && !isSynthetic;
       const isUntrackableType = DeadCodeAnalyzer.TYPE_KINDS.has((node.properties.kind || '').toLowerCase()) && !graphTracksTypes;
       const referencedByDanglingEdge = danglingRefNames.has(node.properties.name.toLowerCase());
