@@ -67,6 +67,31 @@ export async function ensureAnchor(
 ): Promise<void> {
   const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
   const root = customPath ? validatePath(customPath, projectRoot) : projectRoot;
+
+  // An MCP server is often launched at a directory that HOLDS projects rather than being one — a
+  // workspace root with several repos beneath it. Every call then failed with DuckDB's raw
+  // `IO Error: Cannot open database ... does not exist`, which tells an agent nothing it can act on
+  // and reads like the tool is broken rather than like the root is wrong.
+  //
+  // Name the analyzed projects that ARE there. This is a diagnostic only — it fires when the
+  // anchored root has no graph of its own, and never changes which root is used (ADR 0109).
+  if (!customPath && !fs.existsSync(path.join(root, '.conducks', 'conducks-synapse.db'))) {
+    let siblings: string[] = [];
+    try {
+      siblings = fs.readdirSync(root, { withFileTypes: true })
+        .filter(e => e.isDirectory())
+        .filter(e => fs.existsSync(path.join(root, e.name, '.conducks', 'conducks-synapse.db')))
+        .map(e => e.name);
+    } catch { /* unreadable root: fall through to the normal failure */ }
+    if (siblings.length > 0) {
+      throw new Error(
+        `${root} has no structural graph of its own, but ${siblings.length} analyzed project(s) sit ` +
+        `beneath it: ${siblings.join(', ')}. Pass \`path\` to pick one — e.g. ` +
+        `${path.join(root, siblings[0])} — or run \`conducks analyze\` at ${root} to index the whole workspace.`
+      );
+    }
+  }
+
   const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
   const currentPersistence = (registry.infrastructure as any).persistence;
 

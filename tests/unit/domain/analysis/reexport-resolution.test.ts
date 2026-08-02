@@ -126,7 +126,22 @@ describe('Barrel re-export — the public binding a barrel republishes becomes a
     expect(aliasEdge!.targetId).toBe(`${ROOT}/src/core/database/server/databasemanager.ts::coredb`);
   });
 
-  it('does not fabricate an ALIASES edge for a plain re-export with no rename', async () => {
+  /**
+   * REVERSED 2026-08-02 (ADR 0109). This asserted that a plain re-export must NOT get an ALIASES
+   * edge — "does not fabricate" — and the reasoning was that an un-renamed re-export carries the
+   * same name at both ends, so IntraLinker could match it without help.
+   *
+   * Measured on a real monorepo, it cannot. `export { assembleGitClone } from './git-clone'` left
+   * the barrel node an ISLAND whose only edge was MEMBER_OF to its own file, so every consumer that
+   * imported through the barrel was invisible from the declaration. Answering "who uses this"
+   * required querying each node of the re-export chain BY HAND — three separate `impact` calls on
+   * openship to find four caller files.
+   *
+   * With the edge, one call on the declaration returns all four, with correct lines. An un-renamed
+   * re-export is not a fabrication: `export { x } from './y'` states that this barrel's `x` IS
+   * `y`'s `x`, which is exactly what the edge records.
+   */
+  it('emits an ALIASES edge for a plain re-export, so barrel consumers stay reachable', async () => {
     const graph = new ConducksGraph();
     const orchestrator = new AnalyzeOrchestrator(makeRegistry(), graph);
     await orchestrator.analyze(files(), { workspaceRoot: ROOT });
@@ -135,7 +150,10 @@ describe('Barrel re-export — the public binding a barrel republishes becomes a
     const aliasEdge = g.getAllEdges().find(
       e => e.type === 'ALIASES' && e.sourceId === `${barrelId}::pool`
     );
-    expect(aliasEdge).toBeUndefined();
+    expect(aliasEdge).toBeDefined();
+    // Qualified with the file the specifier resolves to, same rule as the renamed form above — a
+    // bare target would leave the resolution to a name match, which is what ADR 0085 refuses.
+    expect(aliasEdge!.targetId).toContain('::pool');
   });
 });
 

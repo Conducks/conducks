@@ -882,6 +882,27 @@ export class ConducksReflector {
             const registryEntry = context.getGlobalSymbol(scopedId);
             if (registryEntry) registryEntry.kind = kind;
 
+            // A BARREL RE-EXPORT points at the thing it re-exports.
+            //
+            // `export { assembleGitClone } from './git-clone'` mints a node in the barrel and, until
+            // now, nothing else — an ISLAND whose only edge was MEMBER_OF to its own file. So the
+            // real declaration showed only the consumers importing it directly, and everyone
+            // reaching it through the barrel was invisible from the declaration. Answering "who uses
+            // this" meant querying every node in the re-export chain by hand, which is exactly the
+            // work the graph exists to remove (ADR 0109).
+            //
+            // The RENAMED form already did this via the `alias` branch below; the un-renamed form
+            // (`export_specifier name: @name !alias`) has no `@alias` capture, so it never reached
+            // it. Same fact, written differently — the gap was in the query shape, not the idea.
+            if (kind === 'binding' && !match.captures.some((c: any) => c.name === 'alias')) {
+              const src = match.captures.find((c: any) => c.name === CaptureTags.SOURCE)?.node?.text;
+              const spec = src ? src.replace(/^['"]|['"]$/g, '') : null;
+              const target = spec ? this.imports.resolve(spec, file.path, allPaths, provider, context) : null;
+              if (typeof target === 'string') {
+                this.bindings.processAlias(node.name, `${target.toLowerCase()}::${node.name.toLowerCase()}`, spectrum);
+              }
+            }
+
             if (provider.calculateComplexity && (kind === 'function' || kind === 'method' || kind === 'class')) {
               const comp = provider.calculateComplexity(capture.node);
               node.metadata.complexity = comp;
