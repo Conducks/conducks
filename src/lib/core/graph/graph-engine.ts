@@ -411,13 +411,39 @@ export class ConducksGraph {
       // 181 -> 206 and dropped fall 194 -> 169. The 28 lost ATOMs are ones the fuzzy edge was
       // keeping alive (todo22#P7).
 
+      // ONE EDGE PER RELATIONSHIP, ALL of its call sites.
+      //
+      // The id carries no line, and `addEdge` returns early on a duplicate id — so a function
+      // calling the same target eleven times produced ONE edge and the other ten lines were
+      // silently dropped. Measured on openship: `git-clone.test.ts` calls `assembleGitClone` at
+      // lines 59, 76, 82, 100, 138, 142, 148, 155, 156, 162 and 173, and the graph knew only 59.
+      // "Every call site of X" was therefore unanswerable however the question was asked.
+      //
+      // The line is NOT put in the id. Something parses that format (see the handover comment
+      // above), edge ids are content-hashed, and multiplying edges would change every count that
+      // uses them as a denominator. Collecting the lines on the one edge keeps the graph's shape
+      // and answers the question (ADR 0110).
+      const edgeId = `SEMANTIC::${sourceId}->${targetId}::${rel.type.toLowerCase()}`;
+      const line = Number((rel.metadata as any)?.line ?? 0) || 0;
+      const existing = this.graph.getNeighbors(sourceId, 'downstream')
+        .find(e => e.id === edgeId.toLowerCase());
+
+      if (existing) {
+        const props = (existing.properties ??= {}) as Record<string, unknown>;
+        const lines = (props.lines ??= []) as number[];
+        if (line && !lines.includes(line)) lines.push(line);
+        continue;
+      }
+
       this.graph.addEdge({
-        id: `SEMANTIC::${sourceId}->${targetId}::${rel.type.toLowerCase()}`,
+        id: edgeId,
         sourceId,
         targetId,
         type: rel.type,
         confidence: rel.confidence || 1.0,
-        properties: rel.metadata || {}
+        // `line` stays as the FIRST site, so every existing reader is unchanged; `lines` is the
+        // complete set.
+        properties: { ...(rel.metadata || {}), ...(line ? { lines: [line] } : {}) }
       });
     }
   }

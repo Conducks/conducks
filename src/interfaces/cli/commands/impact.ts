@@ -94,8 +94,9 @@ export class ImpactCommand implements ConducksCommand {
           const dist = node.distance.toFixed(2);
           // file:line, so the answer is directly openable. `line` is where this file references the
           // chain — the call site — falling back to where the symbol is declared (ADR 0108).
-          const at = node.line ?? node.declaredAt;
-          console.log(`- [d:${dist}] \x1b[36m${node.name}\x1b[0m (${node.filePath}${at ? `:${at}` : ''})`);
+          const lines = node.lines?.length ? node.lines : (node.line ? [node.line] : node.declaredAt ? [node.declaredAt] : []);
+          const at = lines.length > 1 ? `:${lines[0]} (+${lines.length - 1} more)` : lines.length ? `:${lines[0]}` : '';
+          console.log(`- [d:${dist}] \x1b[36m${node.name}\x1b[0m (${node.filePath}${at})`);
         });
       }
 

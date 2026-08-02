@@ -1,6 +1,6 @@
 # 0067 — conducks_context scores by taxonomy rank, excludes ATOMs by default, and returns a line
 Status: Accepted
-- Amended by: 0103
+- Amended by: 0103, 0109
 - Enforced by: tests/unit/interfaces/tools/context-shape.test.ts, tests/integration/features/context-tool.test.ts
 - Date: 2026-07-31
 

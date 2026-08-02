@@ -93,6 +93,8 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
           // answered with a list of file names and an agent still could not open the right line
           // (ADR 0109).
           line: n.line ?? n.declaredAt ?? null,
+          // Every call site this node makes, not only the first (ADR 0110).
+          lines: n.lines?.length ? n.lines : (n.line ? [n.line] : []),
           distance: n.distance,
           summary: `${n.kind} ${n.name} at distance ${n.distance}${n.line ? ` (${n.filePath}:${n.line})` : ''}`
         }));

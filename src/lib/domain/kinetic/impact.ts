@@ -49,6 +49,11 @@ export class BlastRadiusAnalyzer extends BaseAnalyzer implements ConducksCompone
       // (ADR 0108).
       const adjacent = data.path.length > 0 ? data.path[data.path.length - 1] : undefined;
       const refLine = Number((adjacent as any)?.properties?.line ?? 0) || null;
+      // EVERY call site, not just the first. A caller that invokes the target eleven times is one
+      // node with eleven lines, and reporting one of them silently understated the blast radius
+      // (ADR 0110).
+      const refLines = ((adjacent as any)?.properties?.lines as number[] | undefined)?.filter(Boolean)
+        ?? (refLine ? [refLine] : []);
       return {
         id: nodeId,
         name: node?.properties.name || 'Unknown',
@@ -56,6 +61,8 @@ export class BlastRadiusAnalyzer extends BaseAnalyzer implements ConducksCompone
         filePath: node?.properties.filePath || 'unknown',
         /** The line in THIS file that references the chain — the call site. */
         line: refLine,
+        /** Every such line, when the same caller references the target more than once. */
+        lines: refLines,
         /** Where this symbol is itself declared. */
         declaredAt: Number((node?.properties as any)?.range?.start?.line ?? (node?.properties as any)?.lineStart ?? 0) || null,
         distance: data.weight,
