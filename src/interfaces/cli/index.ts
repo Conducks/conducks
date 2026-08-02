@@ -163,11 +163,28 @@ export async function main() {
   const pathCandidate = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
   let targetPath = process.cwd();
+  let explicitTarget = false;
   if (pathCandidate) {
     const resolvedCandidate = pathCandidate.startsWith('/') ? pathCandidate : path.resolve(process.cwd(), pathCandidate);
     if (fs.existsSync(resolvedCandidate) && fs.lstatSync(resolvedCandidate).isDirectory()) {
       targetPath = resolvedCandidate;
+      explicitTarget = true;
     }
+  }
+  // WALK UP to the project, the way git does — using the SAME walk the engine uses.
+  //
+  // The CLI anchored the vault at `cwd` verbatim while `RegistryBootstrapper.discoverRoot` walked up
+  // independently, so one directory inside a project the two disagreed: `cd src && conducks coverage`
+  // opened a vault at `src/.conducks` — which it CREATED on the way — while the engine anchored at
+  // the repository, and the run died printing a raw `DUCKDB_NODEJS_ERROR` object. Creating state on
+  // a failed read is the worse half, because the directory left behind reads as a project on the
+  // next run (ADR 0116).
+  //
+  // Keyed on whether a DIRECTORY was resolved, not on whether a positional was present: `coverage`'s
+  // first positional is the report FILE, so a truthy-`pathCandidate` test would skip the walk for
+  // exactly the command that exposed the need for it.
+  if (!explicitTarget) {
+    targetPath = registry.infrastructure.discoverRoot(targetPath);
   }
   
   // 🛡️ [Root Detachment Check]
@@ -269,7 +286,13 @@ export async function main() {
 
       await command.execute(cmdArgs, registry);
     } catch (err) {
-      console.error(`\x1b[31m[Conducks CLI] Execution Error:\x1b[0m`, err);
+      // The MESSAGE, not the object. Passing `err` to console.error printed the driver's internals —
+      // `errno: -1, code: 'DUCKDB_NODEJS_ERROR', errorType: 'IO'` — which is the same leaked-driver
+      // shape ADR 0115 fixed for `resonance`, here on the path every command falls through
+      // (ADR 0116). The stack is still one flag away for whoever actually wants it.
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\x1b[31m[Conducks CLI] Execution Error:\x1b[0m ${message}`);
+      if (verbose && err instanceof Error && err.stack) console.error(`\x1b[2m${err.stack}\x1b[0m`);
       process.exit(1);
     } finally {
       await persistence.close();

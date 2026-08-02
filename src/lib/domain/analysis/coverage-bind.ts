@@ -18,9 +18,34 @@ export interface ParsedCoverage {
   branchesByFile: Map<string, Array<{ line: number; arms: number[] }>>;
 }
 
-/** Parse an istanbul coverage-final.json into ran-lines + branch arms, keyed by lowercased path. */
+/**
+ * Parse an istanbul coverage-final.json into ran-lines + branch arms, keyed by lowercased path.
+ *
+ * The shape is CHECKED before it is walked. Any JSON object survives this parse — every field is
+ * read defensively, `d.statementMap || {}` — so a `package.json` produced an empty report, bound
+ * nothing, and the command printed *"No BEHAVIOR nodes matched the coverage file. (Ran `analyze` on
+ * this repo first?)"*: a confident answer naming the wrong cause, since the user HAD run analyze and
+ * had simply passed the wrong file (ADR 0116).
+ *
+ * A report with zero entries is a different thing and keeps a different message — that is a real
+ * istanbul report saying nothing was instrumented, which is a fact about the test run, not an error.
+ */
 export function parseIstanbul(covPath: string): ParsedCoverage {
-  const cov: Record<string, any> = JSON.parse(readFileSync(covPath, "utf8"));
+  const raw = JSON.parse(readFileSync(covPath, "utf8"));
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(
+      `${covPath} is not an istanbul coverage report — its top level is ${Array.isArray(raw) ? "an array" : typeof raw}, ` +
+      `and a report is an object keyed by source file.`
+    );
+  }
+  const cov: Record<string, any> = raw;
+  const entries = Object.entries<any>(cov);
+  if (entries.length > 0 && !entries.some(([, d]) => d && typeof d === "object" && d.statementMap)) {
+    throw new Error(
+      `${covPath} is not an istanbul coverage report — no entry has a \`statementMap\`. ` +
+      `jest/c8/nyc write this file as \`coverage/coverage-final.json\`; the keys are source paths.`
+    );
+  }
   const ranByFile = new Map<string, Set<number>>();
   const branchesByFile = new Map<string, Array<{ line: number; arms: number[] }>>();
   for (const [file, d] of Object.entries<any>(cov)) {
@@ -45,6 +70,20 @@ export function parseIstanbul(covPath: string): ParsedCoverage {
     branchesByFile.set(file.toLowerCase(), brs);
   }
   return { ranByFile, branchesByFile };
+}
+
+/**
+ * Line-weighted fill across a set of bound results — covered lines over total lines.
+ *
+ * NOT the mean of the per-function percentages, which is what the HTML view used to print for a
+ * file. That mean lets a fully-covered three-line helper outvote a dark three-hundred-line function.
+ * Measured on conducks itself, `server.ts` read **48% by mean and 80% by line** (ADR 0116).
+ */
+export function weightedPct(results: Array<Pick<CovResult, "start" | "end" | "pct">>): number {
+  const total = results.reduce((sum, r) => sum + (r.end - r.start + 1), 0);
+  if (total === 0) return 0;
+  const hit = results.reduce((sum, r) => sum + (r.pct / 100) * (r.end - r.start + 1), 0);
+  return Math.round((hit / total) * 100);
 }
 
 /** Range-join coverage onto BEHAVIOR node spans → per-function fill % + branch coverage. */

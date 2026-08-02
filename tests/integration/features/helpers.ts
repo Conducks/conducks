@@ -72,14 +72,21 @@ export function commit(repo: string, message: string): void {
 // (see docs/memory.md "Logging always hits stderr"). `--json` output and plain console.log
 // output go to stdout. `combined` merges both for assertions on log banners; `stdout` isolates
 // the machine-readable payload for JSON.parse.
+// `timeout` is not a nicety. A command that enters a watch loop — or hangs on a vault lock — makes
+// spawnSync wait forever, and the whole suite dies on jest's own timeout with no failing assertion
+// to read. That happened writing the coverage suite: `coverage-view --out --watch` swallowed the
+// flag as a filename and then watched, and the run had to be killed at ten minutes. A killed child
+// returns status null, which reads here as a non-zero exit — which is what a hang deserves.
 export function runCli(
   args: string[],
-  opts: { cwd: string; env?: NodeJS.ProcessEnv; allowFail?: boolean } = { cwd: process.cwd() }
+  opts: { cwd: string; env?: NodeJS.ProcessEnv; allowFail?: boolean; timeout?: number } = { cwd: process.cwd() }
 ): { stdout: string; stderr: string; combined: string; status: number } {
   const res = spawnSync('node', [cliPath, ...args], {
     cwd: opts.cwd,
     env: { ...process.env, ...(opts.env || {}) },
     encoding: 'utf-8',
+    timeout: opts.timeout ?? 90000,
+    killSignal: 'SIGKILL',
   });
   const stdout = res.stdout || '';
   const stderr = res.stderr || '';

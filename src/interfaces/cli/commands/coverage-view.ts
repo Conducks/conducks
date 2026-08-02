@@ -19,9 +19,23 @@ export class CoverageViewCommand implements ConducksCommand {
   public usage = "conducks coverage-view <coverage-final.json> [--out coverage.html] [--watch] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
-    const covPath = args.find(a => a.endsWith(".json") && !a.startsWith("--"));
     const outIdx = args.indexOf("--out");
-    const outPath = outIdx !== -1 && args[outIdx + 1] ? args[outIdx + 1] : "coverage.html";
+    const outValue = outIdx !== -1 ? args[outIdx + 1] : undefined;
+
+    // `--out` took the next argv entry whatever it was, so `coverage-view cov.json --out --watch`
+    // wrote a 344 KB HTML file literally NAMED `--watch` and then watched anyway. A flag is never a
+    // filename (ADR 0116).
+    if (outIdx !== -1 && (!outValue || outValue.startsWith("-"))) {
+      console.error(chalk.red(
+        `--out needs a filename${outValue ? `, and \`${outValue}\` is a flag` : " and none was given"}. Usage: `
+      ) + this.usage);
+      process.exitCode = 1;
+      return;
+    }
+
+    // Same rule as `coverage`: the report is the first positional, whatever it is named.
+    const covPath = args.filter((a, i) => !a.startsWith("-") && i !== outIdx + 1)[0];
+    const outPath = outValue ?? "coverage.html";
     const isWatch = args.includes("--watch");
 
     if (!covPath) {
@@ -32,25 +46,13 @@ export class CoverageViewCommand implements ConducksCommand {
 
     const resolvedOut = outPath.startsWith("/") ? outPath : path.resolve(process.cwd(), outPath);
 
-    // Structural side queried ONCE — the graph doesn't change during a test-watch session.
-    const nodes = await registry.infrastructure.persistence.query<{
-      name: string; file: string; lineStart: number; lineEnd: number;
-    }>(
-      `SELECT name, file, lineStart, lineEnd FROM nodes
-       WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart
-       ORDER BY file, lineStart`
-    );
+    // Structural side queried ONCE — the graph doesn't change during a test-watch session. Through
+    // the registry, which holds the single definition of this node set (ADR 0116).
+    const nodes = await registry.coverage.nodes();
 
     // Re-bind the (changing) coverage file against the (fixed) graph and rewrite the HTML.
     // Returns false if the coverage file couldn't be read (e.g. mid-write); caller may retry.
     const regenerate = (): boolean => {
-      let cov: Record<string, any>;
-      try {
-        cov = JSON.parse(readFileSync(covPath, "utf8"));
-      } catch (e) {
-        if (!isWatch) console.error(chalk.red(`Cannot read coverage file ${covPath}: ${(e as Error).message}`));
-        return false;
-      }
       // ONE implementation, shared with `conducks coverage` (ADR 0004, todo25#P8).
       //
       // This file used to carry its own copy of the istanbul parse, the suffix matcher and the
@@ -58,16 +60,37 @@ export class CoverageViewCommand implements ConducksCommand {
       // old bare-basename fallback that lit every same-named file FULL, and that claim was stale —
       // but two implementations of one rule is the condition under which the next fix reaches only
       // one of them, which is exactly what happened last time.
-      const parsed = registry.coverage.parse(covPath);
-      const results = registry.coverage.bindNodes(nodes as any, parsed);
+      //
+      // `parse` now REFUSES a JSON file that is not an istanbul report rather than reading it as an
+      // empty one, so this catch covers both "cannot read" and "is not a coverage report".
+      let results: ReturnType<typeof registry.coverage.bindNodes>;
+      try {
+        results = registry.coverage.bindNodes(nodes as any, registry.coverage.parse(covPath));
+      } catch (e) {
+        if (!isWatch) console.error(chalk.red(`${(e as Error).message}`));
+        return false;
+      }
 
       const bound = results.filter(r => r.bound);
+      // An empty page is the same fabrication the terminal overlay used to print: it renders "0
+      // full · 0 partial · 0 dark" and exits 0, which reads as "this project has no coverage" when
+      // what happened is that the report describes a different tree (ADR 0116).
+      if (bound.length === 0) {
+        if (!isWatch) {
+          console.error(chalk.red(
+            `The coverage report bound to none of this project's ${nodes.length} functions — nothing to render.\n` +
+            `  report names:  ${[...registry.coverage.parse(covPath).ranByFile.keys()][0] ?? "(the report is empty — nothing was instrumented)"}\n` +
+            `  graph holds:   ${(nodes[0] as any)?.file ?? "(the graph holds no function with a line span)"}`
+          ));
+        }
+        return false;
+      }
       const byFile = new Map<string, typeof bound>();
       for (const r of bound) {
         if (!byFile.has(r.file)) byFile.set(r.file, []);
         byFile.get(r.file)!.push(r);
       }
-      writeFileSync(resolvedOut, this.renderHtml(byFile, nodes.length), "utf8");
+      writeFileSync(resolvedOut, this.renderHtml(byFile, nodes.length, registry.coverage.weightedPct), "utf8");
       const full = bound.filter(r => r.pct >= 99).length;
       const part = bound.filter(r => r.pct > 0 && r.pct < 99).length;
       const dark = bound.filter(r => r.pct === 0).length;
@@ -80,8 +103,13 @@ export class CoverageViewCommand implements ConducksCommand {
     };
 
     try {
-      regenerate();
-      if (!isWatch) return;
+      // The return value was discarded, so an unreadable report printed an error and exited 0 —
+      // nothing scripting this command could tell a rendered page from a failure (ADR 0116).
+      const ok = regenerate();
+      if (!isWatch) {
+        if (!ok) process.exitCode = 1;
+        return;
+      }
 
       // C5 (live, v1): re-render whenever the coverage file changes. Run `jest --watch`
       // (or c8 --watch) in another terminal — each test re-run rewrites coverage-final.json,
@@ -104,7 +132,8 @@ export class CoverageViewCommand implements ConducksCommand {
 
   private renderHtml(
     byFile: Map<string, Array<{ name: string; file: string; start: number; end: number; pct: number; bound: boolean }>>,
-    totalNodes: number
+    totalNodes: number,
+    weightedPct: (rows: Array<{ start: number; end: number; pct: number }>) => number
   ): string {
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const colorFor = (pct: number) => pct >= 99 ? "#2ecc71" : pct > 0 ? "#f0ad4e" : "#8a8f98";
@@ -114,7 +143,12 @@ export class CoverageViewCommand implements ConducksCommand {
 
     const fileSections = files.map(([file, fns]) => {
       const sorted = [...fns].sort((a, b) => a.start - b.start);
-      const avgPct = Math.round(sorted.reduce((sum, r) => sum + r.pct, 0) / sorted.length);
+      // Line-weighted, NOT the mean of the per-function percentages. The mean let a fully-covered
+      // three-line helper outvote a dark three-hundred-line function: measured on conducks itself,
+      // `server.ts` read 48% by mean and 80% by line — a 32-point error on the number a reader takes
+      // as the file's coverage (ADR 0116). The `data-weighted` attribute is what the regression test
+      // asserts, because the two agree whenever every function in a file happens to be equal-sized.
+      const avgPct = weightedPct(sorted);
       totalFns += sorted.length;
       totalFull += sorted.filter(r => r.pct >= 99).length;
       totalPart += sorted.filter(r => r.pct > 0 && r.pct < 99).length;
@@ -134,7 +168,7 @@ export class CoverageViewCommand implements ConducksCommand {
       <section class="file-card">
         <header class="file-header">
           <div class="file-name">${esc(file)}</div>
-          <div class="file-summary-track">
+          <div class="file-summary-track" data-weighted="true" title="Lines covered / lines in this file's functions">
             <div class="file-summary-fill" style="width:${avgPct}%;background:${colorFor(avgPct)}"></div>
           </div>
           <span class="file-pct" style="color:${colorFor(avgPct)}">${avgPct}%</span>
@@ -244,6 +278,7 @@ export class CoverageViewCommand implements ConducksCommand {
     <h1>🟩 Conducks Coverage View</h1>
     <p class="subtitle">Runtime coverage overlaid onto the structural graph — generated by <code>conducks coverage-view</code></p>
     <div class="totals">
+      <span><b>${weightedPct([...byFile.values()].flat())}%</b> of lines covered</span>
       <span><b>${totalFull}</b> full</span>
       <span><b>${totalPart}</b> partial</span>
       <span><b>${totalDark}</b> dark</span>

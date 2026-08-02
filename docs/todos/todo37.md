@@ -10,6 +10,11 @@ Ten commands have been measured this way. **All ten had at least one real defect
 visible to the suite, to `audit`, or to the dangling rate. The remaining twenty-nine are unknown, and
 a 10-for-10 rate is not a reason to assume they are clean.
 
+`coverage` (ADR 0116) added a second lesson to the method: **measuring one command found two defects
+in the path all thirty-nine share.** Running it from `src/` — not a case anyone had written a test
+for — showed every read command creating a `.conducks/` where it stood and then dying with a raw
+driver object. So the sweep runs each command from a SUBDIRECTORY too, not only from the root.
+
 The CLI is the right surface: every MCP tool is backed by a CLI command, but not every CLI command is
 exposed over MCP — so sweeping the CLI covers both.
 
@@ -49,8 +54,8 @@ unfamiliar, a real monorepo), and conducks itself.
 
 ## Phase 2 — metrics and history
 
-- [ ] coverage
-- [ ] coverage-view
+- [x] coverage — refuses a file that is not an istanbul report; `--vs-baseline` can fail (ADR 0116)
+- [x] coverage-view — `--out` refuses a flag, exits non-zero, line-weighted summary (ADR 0116)
 - [ ] diff
 - [ ] drift
 - [ ] guard

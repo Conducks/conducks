@@ -71,11 +71,27 @@ export class RegistryBootstrapper {
     return null;
   }
 
+  /** Memoized per start path — see `discoverRoot`. */
+  private rootCache = new Map<string, string>();
+
   /**
    * Resolves the root conducks anchors to: a declared workspace if there is one, otherwise the
    * nearest inferred project marker.
+   *
+   * Memoized because it is now asked TWICE per run: the CLI needs the answer before it can create
+   * persistence, and `initialize` asks again. Without the cache the "no project marker found"
+   * fallback warning — which is the one line a user in the wrong directory must read — printed
+   * twice, and a doubled warning reads as two problems (ADR 0116).
    */
   public discoverRoot(startPath: string): string {
+    const cached = this.rootCache.get(startPath);
+    if (cached !== undefined) return cached;
+    const found = this.discoverRootUncached(startPath);
+    this.rootCache.set(startPath, found);
+    return found;
+  }
+
+  private discoverRootUncached(startPath: string): string {
     const searchPaths = [startPath];
     const forbiddenArtifacts = ['build', 'dist', 'out', 'node_modules'];
 
@@ -227,9 +243,16 @@ export class RegistryBootstrapper {
     const baseRoot = root || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
     const effectiveRoot = (baseRoot === ":memory:") ? baseRoot : this.discoverRoot(baseRoot);
     
+    // The log sink never BRINGS A VAULT INTO BEING. `setLogFile` mkdirs its parent, so anchoring it
+    // here created a `.conducks/` in whatever directory the run started from — and a run that then
+    // failed to find a vault left one behind that reads as a project next time. A write session
+    // creates the directory itself moments later, so the only case skipped is the very first
+    // `analyze` in a fresh tree, which has nothing to log about the previous one anyway (ADR 0116).
     if (effectiveRoot !== ":memory:") {
-      const logPath = path.join(effectiveRoot, '.conducks', 'mcp.log');
-      logger.setLogFile(logPath);
+      const vaultDir = path.join(effectiveRoot, '.conducks');
+      if (!readOnly || fsSync.existsSync(vaultDir)) {
+        logger.setLogFile(path.join(vaultDir, 'mcp.log'));
+      }
     }
 
     logger.boot(`🛡️ [Conducks Bootstrapper] Anchoring structural synapse at: ${effectiveRoot}`);

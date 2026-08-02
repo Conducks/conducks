@@ -18,7 +18,7 @@ import { ProjectRegistry } from "@/lib/domain/federation/project-registry.js";
 import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
 import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
-import { parseIstanbul, bindCoverage, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
+import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
 import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
@@ -139,6 +139,17 @@ let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, pers
 let intelligence = new IntelligenceService(search, federation);
 let evolution = new EvolutionService(graph, persistence);
 const manifest = new ManifestService(manifestEngine);
+
+/**
+ * The one definition of the coverage overlay's node set: every BEHAVIOR node carrying a real line
+ * span. `coverage` and `coverage-view` both need it, and `coverage-view` used to carry its own
+ * identical copy of the SELECT so it could query once and re-bind on each file change. Two copies of
+ * one rule is the condition under which the next fix reaches only one of them (ADR 0116).
+ */
+const coverageNodes = () => persistence.query<CovNode>(
+  `SELECT name, file, lineStart, lineEnd FROM nodes
+   WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart ORDER BY file, lineStart`
+);
 let docsWatcher: DocsWatcher | null = null;
 
 // 5. Lifecycle Management
@@ -265,14 +276,10 @@ export const registry = {
     }
   },
   coverage: {
+    nodes: coverageNodes,
+    weightedPct: (results: Parameters<typeof weightedPct>[0]) => weightedPct(results),
     // Query BEHAVIOR node spans, then range-join the istanbul report onto them (domain logic).
-    bind: async (covPath: string) => {
-      const nodes = await persistence.query<CovNode>(
-        `SELECT name, file, lineStart, lineEnd FROM nodes
-         WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart ORDER BY file, lineStart`
-      );
-      return bindCoverage(nodes, parseIstanbul(covPath));
-    },
+    bind: async (covPath: string) => bindCoverage(await coverageNodes(), parseIstanbul(covPath)),
     // The two halves, for a caller that queries its node set ONCE and re-binds a changing coverage
     // file against it — `coverage-view --watch`. It carried its own copy of both for that reason;
     // routing them through composition keeps one implementation without giving `cli` a domain
@@ -316,6 +323,11 @@ export const registry = {
      * on may already be closed.
      */
     ensureGraphLoaded: () => bootstrapper.ensureGraphLoaded(persistence),
+    // The project root the bootstrapper WILL choose, available before persistence is created. The
+    // CLI anchored the vault at `cwd` verbatim and the bootstrapper walked up independently, so one
+    // directory inside a project the two disagreed: the vault was opened at `src/.conducks` — which
+    // it created on the way — while the engine anchored at the repository (ADR 0116).
+    discoverRoot: (startPath: string) => bootstrapper.discoverRoot(startPath),
     get persistence() { return persistence; },
     /**
      * Reclaim the vault if it has decayed enough to be worth the rewrite.

@@ -113,11 +113,27 @@ export class SynapsePersistence {
     if (this.db) return this.db;
 
     const vaultDir = path.resolve(this.vaultPath, '.conducks');
+    // A READ never creates. It used to mkdir unconditionally, so running any read command outside a
+    // project left a `.conducks/` behind and then failed — and that leftover directory reads as a
+    // project on the next run, which is how a wrong answer becomes durable (ADR 0116). Only a write
+    // session, which is `analyze` and `clean`, may bring a vault into being.
     if (!fs.existsSync(vaultDir)) {
+      if (this.readOnly) {
+        throw new Error(
+          `🛡️ [No Vault] ${this.vaultPath} has no \`.conducks/\` and no parent does either, ` +
+          `so there is nothing to read. Run \`conducks analyze\` here to build one.`
+        );
+      }
       fs.mkdirSync(vaultDir, { recursive: true });
     }
 
     const dbPath = this.dbFile();
+    if (this.readOnly && !fs.existsSync(dbPath) && !fs.existsSync(this.snapshotFile())) {
+      throw new Error(
+        `🛡️ [No Vault] ${vaultDir} exists but holds no synapse yet. ` +
+        `Run \`conducks analyze\` to build one.`
+      );
+    }
 
     const maxAttempts = 3;
     const retryDelay = 500;
