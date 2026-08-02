@@ -55,8 +55,18 @@ export function resolveSymbol(input: string, graph: NameIndex): string {
     );
   }
 
-  // Pick highest-gravity node
-  const best = matches.reduce((a, b) => {
+  // A DECLARATION beats a re-export of it.
+  //
+  // `export { allocateHostPort } from './host-port'` mints an ATOM on the export line, and gravity
+  // alone could pick it over the BEHAVIOR that actually declares the function — so `explain
+  // allocateHostPort` described an export statement, reporting `kind: ATOM` at the barrel's line
+  // instead of the function at its own. Kind first, gravity second (ADR 0112).
+  const DECLARATION_KINDS = new Set(['BEHAVIOR', 'STRUCTURE', 'INFRA', 'UNIT']);
+  const isDeclaration = (n: { properties?: unknown }) =>
+    DECLARATION_KINDS.has(String((n.properties as any)?.canonicalKind ?? ''));
+
+  const preferred = matches.some(isDeclaration) ? matches.filter(isDeclaration) : matches;
+  const best = preferred.reduce((a, b) => {
     const ga = (a.properties as any)?.gravity ?? 0;
     const gb = (b.properties as any)?.gravity ?? 0;
     return gb > ga ? b : a;

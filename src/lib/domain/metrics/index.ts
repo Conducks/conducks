@@ -43,40 +43,17 @@ export class MetricsService {
   }
 
   /**
-   * Computes a multi-signal risk score (0.0 to 10.0).
-   * Signal Weights: Gravity (40%), Entropy (30%), Churn (20%), Fan-out (10%).
+   * `calculateCompositeRisk` lived here TOO, and was dead — zero callers, zero tests.
+   *
+   * The registry wires risk to `ConducksCore.calculateCompositeRisk`, and the two returned
+   * DIFFERENT SHAPES under one name: this one `{ gravity: { value, weight } }`, the live one plain
+   * numbers. `explain` was written against this shape and served by the other, so every signal it
+   * printed read `NaN` while the composite score above them was correct (ADR 0105).
+   *
+   * Deleted rather than reconciled: a second implementation nothing calls is not a fallback, it is
+   * a second answer waiting to be picked by accident. Its `factors` logic — the only thing it had
+   * that the live one lacked — moved to `ConducksCore` rather than being lost with it (ADR 0112).
    */
-  public async calculateCompositeRisk(nodeId: string) {
-    const g = this.graph.getGraph();
-    const node = g.getNode(nodeId);
-    if (!node) return null;
-
-    const rank = node.properties.rank || 0;
-    const entropy = node.properties.entropy || 0;
-    const res = node.properties.resonance || 0;
-    const outgoing = g.getNeighbors(nodeId, 'downstream').length;
-    const complexity = node.properties.complexity || 1;
-
-    const factors: string[] = [];
-    if (rank > 0.7) factors.push("High Structural Gravity (Core system bridge)");
-    if (entropy > 0.6) factors.push("Unstable Ownership (High author entropy)");
-    if (res > 50) factors.push("High Kinetic Churn (Frequent modifications)");
-    if (outgoing > 8) factors.push("God Object Candidate (High fan-out)");
-    if (complexity > 50) factors.push("Critical Complexity (Difficult to maintain)");
-
-    const score = (rank * 0.4) + (entropy * 0.3) + (Math.min(res / 100, 1.0) * 0.2) + (Math.min(outgoing / 10, 1.0) * 0.1);
-
-    return {
-      score,
-      factors,
-      breakdown: {
-        gravity: { value: rank, weight: 0.4 },
-        entropy: { value: entropy, weight: 0.3 },
-        churn: { value: Math.min(res / 100, 1.0), weight: 0.2 },
-        fanOut: { value: Math.min(outgoing / 10, 1.0), weight: 0.1 }
-      }
-    };
-  }
 
   /**
    * Calculates the structural similarity (Jaccard) between two symbols.

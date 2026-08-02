@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import chalk from "chalk";
+import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 
 /**
  * Conducks — Explain Command (Signal Decomposition)
@@ -10,10 +11,11 @@ import chalk from "chalk";
 export class ExplainCommand implements ConducksCommand {
   public id = "explain";
   public description = "Provide a detailed risk signal decomposition for a symbol";
-  public usage = "conducks explain <symbol_id>";
+  public usage = "conducks explain <symbol_id> [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
-    const symbolId = args[0];
+    const useJson = args.includes('--json');
+    const symbolId = args.find(a => !a.startsWith('--'));
     if (!symbolId) {
       console.error("Usage: conducks explain <symbol_id>");
       process.exit(1);
@@ -27,14 +29,21 @@ export class ExplainCommand implements ConducksCommand {
     // Structural Sync via Registry Bridge
     await registry.infrastructure.persistence.load(registry.infrastructure.graphEngine.getGraph());
 
-    let node = registry.infrastructure.graphEngine.getGraph().getNode(symbolId);
-    
-    // Conducks: Intelligent Fallback Resolve
-    if (!node) {
-      const results = await registry.query.query(symbolId, 1);
-      if (results.length > 0) {
-        node = registry.infrastructure.graphEngine.getGraph().getNode(results[0].id);
-      }
+    const graph = registry.infrastructure.graphEngine.getGraph();
+    let node = graph.getNode(symbolId!);
+
+    // Resolve through the SHARED helper, like every other command.
+    //
+    // This took the top fuzzy-search hit instead, which ranks by text score times gravity and knows
+    // nothing about kinds — so a bare name whose barrel re-export outranked its declaration
+    // described the export statement. `resolveSymbol` prefers a declaration and is the same rule
+    // `context`, `impact` and `rename` already use (ADR 0112).
+    //
+    // Guarded on there BEING a match, because `resolveSymbol` reports a miss by exiting the process
+    // with its own wording — which would replace this command's "not found in the Synapse" message
+    // that callers and the suite depend on. Only ambiguity is delegated, never absence.
+    if (!node && graph.findNodesByName(symbolId!).length > 0) {
+      node = graph.getNode(resolveSymbol(symbolId!, graph));
     }
 
     if (!node) {
@@ -76,6 +85,40 @@ export class ExplainCommand implements ConducksCommand {
       ? breakdown.fallback
       : (breakdown.fallback?.value ?? 0);
     const hasFallback = fallbackValue > 0;
+
+    // `explain` is the one risk surface an agent reads, and it had no machine-readable form —
+    // `query`, `status`, `context` and `impact` all do. Parsing box-drawing characters out of a
+    // coloured table is not an interface (ADR 0112).
+    //
+    // `num()` returns null where `sig()` returns 'n/a': a consumer must be able to tell an absent
+    // signal from a real zero, and a string in a number field forces a parse to decide.
+    if (useJson) {
+      const num = (raw: unknown): number | null => {
+        const n = typeof raw === 'number' ? raw : (raw as { value?: unknown } | null)?.value;
+        return typeof n === 'number' && Number.isFinite(n) ? n : null;
+      };
+      process.stdout.write(JSON.stringify({
+        id: node.id,
+        name: node.properties.name,
+        kind: node.label,
+        filePath: node.properties.filePath,
+        line: (node.properties as any)?.range?.start?.line ?? (node.properties as any)?.lineStart ?? null,
+        // 0-10, the same scale the table prints, rather than the raw 0-1 the domain returns.
+        riskRating: Number((score * 10).toFixed(2)),
+        factors: factors ?? [],
+        signals: {
+          gravity: num(breakdown.gravity),
+          complexity: num(breakdown.complexity),
+          fanOut: num(breakdown.fanOut),
+          churn: num(breakdown.churn),
+          entropy: num(breakdown.entropy),
+          fallback: num(breakdown.fallback),
+        },
+        entropyDetail: { entropy: entropyRes.entropy, authorCount: entropyRes.authorCount },
+        fallbackAnalysis: fallbackAnalysis?.isFallback ? fallbackAnalysis : null,
+      }, null, 2) + '\n');
+      return;
+    }
 
     console.log(`\n\x1b[1m--- 🛡️ Conducks Structural Explanation ---\x1b[0m`);
     console.log(`Symbol: \x1b[35m${node.properties.name}\x1b[0m (${node.label})`);

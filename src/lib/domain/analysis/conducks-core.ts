@@ -223,8 +223,25 @@ export class Conducks {
                  (fanOutRisk * weights.fanOut) +
                  (fallbackRisk * weights.fallback);
 
+    // WHY the score is what it is, in words.
+    //
+    // Both `explain` and `impact` have always printed `composite.factors` behind a truthiness
+    // guard, and this — the implementation the registry actually wires — never returned the field.
+    // So the guard never fired and the human-readable half of a risk report was silently absent for
+    // every symbol, in every command, since the two implementations diverged. The DEAD one
+    // (`MetricsService.calculateCompositeRisk`, zero callers) had the logic; deleting it without
+    // moving this across would have destroyed the only copy (ADR 0112).
+    const factors: string[] = [];
+    if (gravity > 0.7) factors.push("High Structural Gravity (core system bridge)");
+    if (entropyRisk > 0.6) factors.push("Unstable Ownership (high author entropy)");
+    if (churnRisk > 0.5) factors.push("High Kinetic Churn (frequently modified)");
+    if (outgoing > 8) factors.push(`God Object Candidate (fan-out ${outgoing})`);
+    if ((node.properties.complexity || 0) > 50) factors.push("Critical Complexity (difficult to maintain)");
+    if (isFallback) factors.push("Fallback Pattern (used as a secondary path)");
+
     return {
       score,
+      factors,
       breakdown: {
         gravity,
         complexity: complexityRisk,
