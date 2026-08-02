@@ -12,14 +12,37 @@ export const GLOBAL_ATMOSPHERE: Record<string, string[]> = {
     'import', 'export', 'Set', 'Map', 'Promise', 'Error', 'JSON', 'Math', 'Date',
     'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp', 'Function',
     'global', 'globalThis', 'window', 'document', 'navigator', 'location', 'fetch',
-    'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'
+    'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+    'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'encodeURIComponent', 'decodeURIComponent',
+    'encodeURI', 'decodeURI', 'structuredClone', 'queueMicrotask', 'AbortController', 'URL',
+    'URLSearchParams', 'TextEncoder', 'TextDecoder', 'Buffer', 'WeakMap', 'WeakSet', 'Symbol',
+    'BigInt', 'Proxy', 'Reflect', 'Intl', 'crypto', 'performance', 'atob', 'btoa',
+    'setImmediate', 'Request', 'Response', 'Headers', 'FormData', 'Blob', 'File', 'FileReader',
+    'EventSource', 'WebSocket', 'localStorage', 'sessionStorage', 'alert', 'confirm',
+    // TypeScript's own utility and lib types. They are declared by the compiler, not by any project,
+    // so a reference to one is a reference OUT of the codebase — the same status `Date` has. Left
+    // out, they were the single largest dangling group on this repository: `Record` alone appeared
+    // 75 times (ADR 0097).
+    'Record', 'Partial', 'Required', 'Readonly', 'Pick', 'Omit', 'Exclude', 'Extract',
+    'NonNullable', 'ReturnType', 'Parameters', 'ConstructorParameters', 'InstanceType',
+    'Awaited', 'ThisType', 'Uppercase', 'Lowercase', 'Capitalize', 'Uncapitalize',
+    'ReadonlyArray', 'ReadonlySet', 'ReadonlyMap', 'Iterable', 'IterableIterator', 'Iterator',
+    'AsyncIterable', 'AsyncIterableIterator', 'Generator', 'AsyncGenerator', 'PromiseLike',
+    'ArrayLike', 'Uint8Array', 'Int32Array', 'Float64Array', 'ArrayBuffer', 'DataView',
+    'RegExpExecArray', 'RegExpMatchArray', 'BufferEncoding', 'NodeJS', 'Console', 'Timer',
   ],
   javascript: [
     'process', 'console', 'require', 'module', 'exports', '__filename', '__dirname',
     'import', 'export', 'Set', 'Map', 'Promise', 'Error', 'JSON', 'Math', 'Date',
     'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp', 'Function',
     'global', 'globalThis', 'window', 'document', 'navigator', 'location', 'fetch',
-    'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'
+    'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+    'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'encodeURIComponent', 'decodeURIComponent',
+    'encodeURI', 'decodeURI', 'structuredClone', 'queueMicrotask', 'AbortController', 'URL',
+    'URLSearchParams', 'TextEncoder', 'TextDecoder', 'Buffer', 'WeakMap', 'WeakSet', 'Symbol',
+    'BigInt', 'Proxy', 'Reflect', 'Intl', 'crypto', 'performance', 'atob', 'btoa',
+    'setImmediate', 'Request', 'Response', 'Headers', 'FormData', 'Blob', 'File', 'FileReader',
+    'EventSource', 'WebSocket', 'localStorage', 'sessionStorage', 'alert', 'confirm',
   ],
   python: [
     'os', 'sys', 'path', 're', 'json', 'datetime', 'time', 'math', 'random',
