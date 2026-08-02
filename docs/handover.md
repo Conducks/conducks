@@ -2,8 +2,17 @@
 Status: current
 
 ## Where it stands
-Gates green: 1,298 tests / 155 suites, typecheck, `docs-lint`.
-Vault on its own source: 5,221 nodes, 18,646 edges. Edge precision against source **99.98%**.
+Gates green: 1,301 tests / 156 suites, typecheck, `docs-lint`, and `audit` **fully clean**.
+Vault on its own source: 5,230 nodes, 18,693 edges. Edge precision against source **99.98%**.
+
+## The biggest thing fixed today was not in the taxonomy
+**A second `analyze` used to destroy the graph** — 5,221 nodes → 217 after one file changed, because
+the end-of-pulse sweep deletes every row not stamped with the current `pulseId` and an incremental
+pass only re-stamps the dirty units. Pre-existing, reproduced on the previous commit, and invisible
+because every test analyzed ONCE. Fixed by gating the sweep on a full pass (ADR 0101).
+
+Two findings that looked separate — 212 orphaned GOVERNS edges, two sentinel rules matching 0 nodes —
+were the same bug seen from a gutted vault. `audit` is green now.
 **Never released** — `doctor` reports 0.7.7. `todo16` is deliberately left to a human: publishing spends a name once.
 
 ## The thing that is new: the taxonomy is measured against its own design
@@ -48,3 +57,5 @@ ADR 0013 edge-gated ATOM and predicted "a few hundred". It is **3,023 of 5,221 n
 - **Prove a tool is broken by RUNNING it against the failure.** A scorer that never checked whether a node existed invented a finding that reached an ADR.
 - **A characterization test records what the code DOES.** One outlived the moment its subject stopped being right, and pinned a wrong rank in place for weeks.
 - **Presence is not correctness.** A field that is filled but wrong reads exactly like a right one; measure the value, not the fill rate.
+- **Run the command twice.** Measuring one command deeply in one state is not measuring it in use. Every number in ADRs 0099 and 0100 was taken on a cold vault, which is exactly the state ADR 0101's bug cannot appear in.
+- **A guard can report a real absence and still name the wrong cause.** The zero-match sentinel guard fired correctly and told us to check three things that were all fine.

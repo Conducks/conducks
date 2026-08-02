@@ -235,6 +235,21 @@ by construction.
 - Applies: any taxonomy / node-kind / `pruneTaxonomy` work; anyone surprised the graph has fewer
   kinds than the enum. Adding a kind means adding its producer in the SAME change.
 
+## Test `analyze` TWICE, with an edit between — once is the one state the bugs cannot appear in
+- Gotcha: `sweepRowsNotInPulse` does `DELETE FROM nodes WHERE pulseId <> ?`. A full pass re-stamps
+  everything so it removes nothing; an incremental pass re-stamps only the dirty units, so the whole
+  untouched graph read as stale and was deleted — **5,221 nodes → 217** on this repo after a second
+  `analyze` with one file changed. Now gated on `isFullPass` (ADR 0101).
+- Why it hid: every test analyzed ONCE, and a cold vault is the single state where this cannot
+  happen. It also does not reproduce with NO edit — zero dirty files returns at the "already at 100%
+  resonance" gate before the sweep. It takes a second run *with a change*.
+- Also: the same bug produced two findings that looked unrelated — `audit` reporting 212 orphaned
+  GOVERNS edges, and two sentinel rules "matching 0 nodes". Both were the emptied vault. **A guard
+  can report a real absence and still name the wrong cause**: the zero-match message said to check
+  `matchPath`/`matchLabel`/`matchSemanticKind`, and all three were correct.
+- Applies: any change to pulse lifecycle, sweeping, purging or incremental discovery; and to writing
+  tests for `analyze` at all — a single-pulse test cannot see this class of defect.
+
 ## `namespace` and `package` are different rungs — six grammars used to say `@isPackage` for both
 - Gotcha: C++ `namespace_definition`, C# `namespace_declaration`, PHP `namespace_definition` and
   Rust `mod_item` are language SCOPES and tag `@isNamespace`. Go `package_clause` and Java

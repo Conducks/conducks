@@ -171,6 +171,24 @@ export class AnalysisService {
       dirtyFiles = filteredFiles;
     }
 
+    // Did this pulse re-stamp EVERY discoverable unit in scope, or only the changed ones?
+    //
+    // `sweepRowsNotInPulse` deletes every row whose `pulseId` is not this one, which is only correct
+    // when this one covers everything. On an INCREMENTAL run it covers the dirty files alone, so a
+    // one-file edit deleted the entire rest of the graph: 5,221 nodes -> 217 on this repository,
+    // reproduced identically on the previous commit, so it is not new. `analyze` was correct exactly
+    // once per vault, and the second run — the ordinary daily one — destroyed it.
+    //
+    // The hazard was already known for the WATCHER ("the watcher's incremental path must never call
+    // this; it writes a handful of files and would delete the rest of the graph", below), and the
+    // CLI's own incremental path called it anyway.
+    //
+    // Nothing is lost by skipping it, which is the part that makes this safe rather than a trade:
+    // a DELETED file is purged by the vault-reconcile block above, and a CHANGED file by
+    // `purgeUnits` below. The sweep's only remaining job is catching rows those two miss, and that
+    // can only be judged against a complete pass (ADR 0101).
+    const isFullPass = dirtyFiles.length >= filteredFiles.filter(f => f.startsWith(targetRoot)).length;
+
     logger.info(`Analyzing ${dirtyFiles.length} units...`);
 
     // [Conducks Incremental Hardening] 🏺
@@ -332,10 +350,13 @@ export class AnalysisService {
     }
 
     // A scoped run sweeps only its own subtree — otherwise it deletes every other service in the
-    // workspace (ADR 0069).
-    const swept = await this.persistence.sweepRowsNotInPulse(pulseId, targetRoot !== projectRoot ? targetRoot : undefined);
-    if (swept.nodes > 0 || swept.edges > 0) {
-      logger.info(`🛡️ [Conducks] Swept ${swept.nodes} node(s) and ${swept.edges} edge(s) left by earlier pulses.`);
+    // workspace (ADR 0069). An INCREMENTAL run does not sweep at all: it re-stamped only the dirty
+    // units, so every untouched row would be "not in this pulse" and deleted (ADR 0101).
+    if (isFullPass) {
+      const swept = await this.persistence.sweepRowsNotInPulse(pulseId, targetRoot !== projectRoot ? targetRoot : undefined);
+      if (swept.nodes > 0 || swept.edges > 0) {
+        logger.info(`🛡️ [Conducks] Swept ${swept.nodes} node(s) and ${swept.edges} edge(s) left by earlier pulses.`);
+      }
     }
 
     // Snapshot AFTER gravity is committed and the taxonomy is settled, so the history records what
