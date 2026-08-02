@@ -26,7 +26,21 @@ export class QueryCommand implements ConducksCommand {
 
     const useJson = args.includes('--json');
 
-    const query = args.filter(a => !a.startsWith('--') && a !== mode && a !== templateId && a !== filterJson && a !== String(limit)).join(" ");
+    // Skip each flag AND the value that follows it, by POSITION. The previous version filtered by
+    // VALUE — `a !== mode && a !== templateId && a !== filterJson && a !== String(limit)` — which
+    // silently deleted any search term that happened to equal one of them. `conducks query fuzzy`
+    // matched the default mode, left an empty query, and `search()` reads empty as `*`, so asking
+    // for a symbol named `fuzzy` returned the whole inventory instead of nothing. `query 10` had the
+    // same fate against the default limit (ADR 0102).
+    const FLAGS_WITH_VALUE = new Set(['--mode', '--template', '--filter', '--limit']);
+    const terms: string[] = [];
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (FLAGS_WITH_VALUE.has(a)) { i++; continue; }
+      if (a.startsWith('--')) continue;
+      terms.push(a);
+    }
+    const query = terms.join(" ");
 
     await syncGraph(registry);
 
@@ -106,7 +120,10 @@ export class QueryCommand implements ConducksCommand {
     } else {
       // Default: Fuzzy Resonance
       try {
-        const nodes = await registry.query.query(query || '*');
+        // `--limit` was parsed into a local and never passed, so every fuzzy search returned
+        // `IntelligenceService.query`'s default of 10 — `--limit 3` gave 10 and `--limit 50` gave 10
+        // (ADR 0102).
+        const nodes = await registry.query.query(query || '*', limit);
 
         if (useJson) {
           process.stdout.write(JSON.stringify(nodes.map(n => ({
@@ -114,6 +131,9 @@ export class QueryCommand implements ConducksCommand {
             kind: n.label,
             filePath: n.properties.filePath,
             rank: n.properties.rank,
+            // 'direct' matched the query text; 'echo' is a neighbour that inherited resonance from
+            // one that did. Both are useful; presenting them identically was not (ADR 0102).
+            match: (n.properties as Record<string, unknown>).matchType ?? 'direct',
           })), null, 2) + '\n');
           return;
         }
@@ -129,7 +149,7 @@ export class QueryCommand implements ConducksCommand {
         // Table header
         console.log(
           '\x1b[2m' +
-          col('RANK', 8) + col('KIND', 12) + col('NAME', 30) + col('FILE', 44) + 'CONFIDENCE' +
+          col('RANK', 8) + col('MATCH', 7) + col('KIND', 12) + col('NAME', 28) + col('FILE', 42) + 'CONFIDENCE' +
           '\x1b[0m'
         );
         nodes.forEach(n => {
@@ -139,11 +159,15 @@ export class QueryCommand implements ConducksCommand {
           const kind = String(n.label || '');
           const file = String(n.properties.filePath || '');
           const confStr = rankVal !== undefined ? rankVal.toFixed(2) : '—';
+          // An ECHO did not match the query — it is a caller of something that did. Saying so is
+          // the difference between a search result and a suggestion.
+          const isEcho = (n.properties as Record<string, unknown>).matchType === 'echo';
           console.log(
             col(rankStr, 8) +
+            (isEcho ? '\x1b[2m' + col('echo', 7) + '\x1b[0m' : col('', 7)) +
             col(kind, 12) +
-            '\x1b[36m' + col(name, 30) + '\x1b[0m' +
-            '\x1b[2m' + col(file, 44) + '\x1b[0m' +
+            '\x1b[36m' + col(name, 28) + '\x1b[0m' +
+            '\x1b[2m' + col(file, 42) + '\x1b[0m' +
             confStr
           );
         });

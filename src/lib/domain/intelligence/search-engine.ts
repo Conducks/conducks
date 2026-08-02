@@ -17,6 +17,18 @@ export class ConducksSearch {
    */
   public search(query: string, limit: number = 20): ConducksNode[] {
     const results = new Map<NodeId, number>();
+    /**
+     * Ids that matched the query TEXT, as opposed to ids that only received echo energy from a
+     * neighbour. Kept apart because the two are not the same claim and were being returned as if
+     * they were: `query logAudit` on the oracle fixture filled SIX of its ten slots with
+     * `action1`..`action6` — the callers — none of which contain the string searched for, and none
+     * of which were marked as anything other than a result.
+     *
+     * The echo is worth keeping: the callers of the thing you searched for are usually what you
+     * wanted next. What is not defensible is letting an echo DISPLACE a direct match under the
+     * limit, or presenting the two identically (ADR 0102).
+     */
+    const direct = new Set<NodeId>();
     const trimmed = query.trim();
 
     // `*` is the documented INVENTORY query (features.md, "Symbol Listing"): the heaviest symbols
@@ -50,10 +62,13 @@ export class ConducksSearch {
 
       if (score > 0) {
         // 2. Kinetic Gravity Multiplier
-        // Important nodes (highly called) resonate stronger.
+        // Important nodes (highly called) resonate stronger. `rank` is recomputed live by
+        // StructuralRanker.calculateGravity when the graph loads, not read from the metadata blob,
+        // so this multiplier is real rather than a constant 1.
         const gravity = node.properties.rank || 1;
         const totalScore = score * gravity;
 
+        direct.add(node.id);
         results.set(node.id, totalScore);
 
         // 3. Wavefront Propagation (Transitive Resonance)
@@ -62,11 +77,25 @@ export class ConducksSearch {
       }
     }
 
-    // Sort and return top nodes
-    return Array.from(results.entries())
-      .sort((a, b) => b[1] - a[1])
+    // A DIRECT match outranks every echo, whatever the scores say. An echo's energy is derived from
+    // a match rather than earned, so letting the two compete on one number is how six neighbours
+    // pushed real matches out of a ten-row answer.
+    const byScore = (a: [NodeId, number], b: [NodeId, number]) => b[1] - a[1];
+    const entries = Array.from(results.entries());
+    const ordered = [
+      ...entries.filter(([id]) => direct.has(id)).sort(byScore),
+      ...entries.filter(([id]) => !direct.has(id)).sort(byScore),
+    ];
+
+    return ordered
       .slice(0, limit)
-      .map(([id]) => this.graph.getNode(id))
+      .map(([id]) => {
+        const node = this.graph.getNode(id);
+        // Tag it, so a caller can tell "this is what you asked for" from "this is next to it".
+        // Without this the two are indistinguishable in every output the CLI prints.
+        if (node) (node.properties as Record<string, unknown>).matchType = direct.has(id) ? 'direct' : 'echo';
+        return node;
+      })
       .filter((n): n is ConducksNode => n !== undefined);
   }
 
