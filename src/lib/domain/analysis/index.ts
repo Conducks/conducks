@@ -14,6 +14,7 @@ import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
 import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
 import { externalNodeProps, libraryNamespaceId } from "@/lib/core/graph/external-nodes.js";
 import { HttpServiceLinker } from "@/lib/core/graph/http-service-linker.js";
+import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 
 import { QueryService } from "./query-service.js";
 
@@ -539,7 +540,7 @@ export class AnalysisService {
               // Shape and parent from `external-nodes.ts`, the one definition of an external node
               // (todo25#P12). `filePath` is overridden below because a library namespace has a
               // meaningful `external://` path where a package boundary does not.
-              ...externalNodeProps({ name: namespace, canonicalKind: 'STRUCTURE', canonicalRank: 1 }),
+              ...externalNodeProps({ name: namespace, canonicalKind: 'STRUCTURE', canonicalRank: CanonicalRank[CanonicalKind.STRUCTURE] }),
               filePath: `external://${namespace}`,
               isShallow: true
             }
@@ -555,7 +556,7 @@ export class AnalysisService {
           properties: {
             // A symbol hangs off its NAMESPACE, not the external root — the one case where the
             // parent is not the default, which is why the factory takes it as a parameter.
-            ...externalNodeProps({ name: symbol, canonicalKind: 'BEHAVIOR', canonicalRank: 7, parentId: libId }),
+            ...externalNodeProps({ name: symbol, canonicalKind: 'BEHAVIOR', canonicalRank: CanonicalRank[CanonicalKind.BEHAVIOR], parentId: libId }),
             filePath: `external://${namespace}/${symbol}`,
             isShallow: true
           }

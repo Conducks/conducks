@@ -6,6 +6,7 @@ import { sameFamily } from "@/lib/core/graph/import-resolver.js";
 import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { ConducksComponent } from "@/contracts/types.js";
 import { ecosystemId, externalNodeProps } from "@/lib/core/graph/external-nodes.js";
+import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 import path from "node:path";
 
 /**
@@ -89,9 +90,13 @@ export class ReflectionPipeline {
     for (const rel of res.spectrum.relationships) {
       if (rel.type === 'IMPORTS' && rel.metadata?.isRaw) {
         const specifier = rel.metadata.specifier;
+        // Each branch rebuilds `properties` by hand rather than spreading the relationship's
+        // metadata, so anything the reflector adds has to be carried here explicitly or it is
+        // silently dropped at the edge — which is exactly what happened to `line` (ADR 0099).
+        const line = (rel.metadata.line as number) ?? 0;
         const emitSelfEdge = () => graph.getGraph().addEdge({
           id: `SELF::${unitId}`, sourceId: unitId, targetId: unitId,
-          type: 'IMPORTS', confidence: 1.0, properties: { specifier, selfImport: true }
+          type: 'IMPORTS', confidence: 1.0, properties: { specifier, selfImport: true, line }
         });
         // Self-import (e.g. `export * from './self'`): emit a durable unit → unit self-edge so
         // the audit flags it as ARCH-4, and skip normal linkage (it would never bind to self).
@@ -115,7 +120,7 @@ export class ReflectionPipeline {
                 // Shape and parent come from `external-nodes.ts` — the one place that defines
                 // what an external node is (todo25#P12). This was the THIRD of four sites setting
                 // `parentId: 'ecosystem::global'` by hand, which is why ADR 0057 was a hunt.
-                ...externalNodeProps({ name: pkg, canonicalKind: 'ECOSYSTEM', canonicalRank: 0 }),
+                ...externalNodeProps({ name: pkg, canonicalKind: 'ECOSYSTEM', canonicalRank: CanonicalRank[CanonicalKind.ECOSYSTEM] }),
                 origin, package: origin === 'dependency' ? pkg : null, isBoundary: true,
               } as any,
             });
@@ -123,7 +128,7 @@ export class ReflectionPipeline {
           graph.getGraph().addEdge({
             id: `DEP::${unitId}->${boundaryId}`, sourceId: unitId, targetId: boundaryId,
             type: 'DEPENDS_ON', confidence: 1.0,
-            properties: { specifier, origin, package: rel.metadata.package },
+            properties: { specifier, origin, package: rel.metadata.package, line },
           });
           continue;
         }
@@ -139,7 +144,7 @@ export class ReflectionPipeline {
             type: linkage.type,
             confidence: 1.0,
             // isTypeOnly (ADR 0016): erased by the compiler, so excluded from cycle/hub findings.
-            properties: { specifier, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true }
+            properties: { specifier, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true, line }
           });
         }
       }
@@ -147,6 +152,7 @@ export class ReflectionPipeline {
       // Per-binding IMPORTS: file::unit → target_file::unit::bindingName
       if (rel.type === 'IMPORTS' && rel.metadata?.isRawBinding) {
         const specifier = rel.metadata.specifier;
+        const line = (rel.metadata.line as number) ?? 0;
         const bindingName = rel.metadata.bindingName as string;
         const linkage = this.reflector.imports.link(specifier, res.path, allPaths, provider, context);
         if (linkage && linkage.type === 'IMPORTS' && linkage.targetId && sameFamily(res.path, linkage.targetId)) {
@@ -158,7 +164,7 @@ export class ReflectionPipeline {
             targetId: targetNodeId,
             type: 'IMPORTS',
             confidence: 0.9,
-            properties: { specifier, bindingName, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true }
+            properties: { specifier, bindingName, origin: rel.metadata.origin, package: rel.metadata.package, isTypeOnly: rel.metadata.isTypeOnly === true, line }
           });
         }
       }

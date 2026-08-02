@@ -1,6 +1,7 @@
 import { EXTERNAL_ROOT } from "@/lib/core/graph/external-nodes.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
+import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 import { logger } from "@/lib/core/utils/logger.js";
 import path from "node:path";
 
@@ -40,11 +41,11 @@ export class GraphSkeletonBuilder {
         name: path.basename(workspaceRoot),
         filePath: workspaceRoot,
         canonicalKind: 'ECOSYSTEM',
-        canonicalRank: 0
+        canonicalRank: CanonicalRank[CanonicalKind.ECOSYSTEM]
       }
     });
 
-    // 2. Create repository Nodes (Rank 1)
+    // 2. Create repository Nodes
     const projectMap = new Map<string, string>(); // filePath -> projectRoot
     for (const root of projectRoots) {
       const rootId = path.basename(root).toLowerCase();
@@ -56,7 +57,7 @@ export class GraphSkeletonBuilder {
           name: path.basename(root),
           filePath: root,
           canonicalKind: 'REPOSITORY',
-          canonicalRank: 1,
+          canonicalRank: CanonicalRank[CanonicalKind.REPOSITORY],
           parentId: ecosystemId // Oracle DNA: Hierarchical Link
         }
       });
@@ -106,7 +107,7 @@ export class GraphSkeletonBuilder {
             name: path.basename(currentDir),
             filePath: canonicalDir,
             canonicalKind: 'DIRECTORY',
-            canonicalRank: 2,
+            canonicalRank: CanonicalRank[CanonicalKind.DIRECTORY],
             parentId
           }
         });
@@ -133,6 +134,8 @@ export class GraphSkeletonBuilder {
       properties: {
         name: 'Structural Legend',
         canonicalKind: 'ECOSYSTEM',
+        // -1 is DELIBERATE and the one rank not drawn from the enum: the legend describes the
+        // ladder, so it cannot stand on a rung of it. Everything else must use `CanonicalRank`.
         canonicalRank: -1,
         parentId: EXTERNAL_ROOT
       }
@@ -146,17 +149,12 @@ export class GraphSkeletonBuilder {
       properties: {}
     });
 
-    const layers = [
-      { id: 'L0', name: 'ECOSYSTEM', rank: 0 },
-      { id: 'L1', name: 'REPOSITORY', rank: 1 },
-      { id: 'L2', name: 'DIRECTORY', rank: 2 },
-      { id: 'L3', name: 'UNIT', rank: 3 },
-      { id: 'L4', name: 'INFRA', rank: 4 },
-      { id: 'L5', name: 'STRUCTURE', rank: 5 },
-      { id: 'L6', name: 'BEHAVIOR', rank: 6 },
-      { id: 'L7', name: 'ATOM', rank: 7 },
-      { id: 'L8', name: 'DATA', rank: 8 }
-    ];
+    // DERIVED from the enum, never listed by hand. This list used to be a literal nine-rung ladder
+    // — ECOSYSTEM 0 … DATA 8 — from a taxonomy that has since grown to thirteen, and it was the
+    // legend, so the graph shipped a self-description that contradicted the graph. Anything written
+    // twice is written wrong once (ADR 0099).
+    const layers = (Object.values(CanonicalKind) as CanonicalKind[])
+      .map(name => ({ id: `l${CanonicalRank[name]}`, name, rank: CanonicalRank[name] }));
 
     for (const layer of layers) {
       graph.getGraph().addNode({
@@ -205,7 +203,7 @@ export class GraphSkeletonBuilder {
           rawPath: file.path,
           projectRelativePath: getProjectRelativePath(file.path, workspaceRoot),
           canonicalKind: 'UNIT',
-          canonicalRank: 3,
+          canonicalRank: CanonicalRank[CanonicalKind.UNIT],
           parentId,
           // Set HERE, for every unit, not only for the ones a language provider claims (todo26).
           // 172 units — 141 `.md`, plus `.mjs`/`.cjs`/`.json`/dotfiles — had none, because the

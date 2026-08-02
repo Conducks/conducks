@@ -6,6 +6,7 @@ import { IgnoreManager } from '@/lib/core/parsing/ignore-manager.js';
 import { TypeScriptProvider } from '@/lib/core/parsing/languages/typescript/index.js';
 import { grammars } from '@/lib/core/parsing/grammar-registry.js';
 import { ConducksComponent } from '@/contracts/types.js';
+import { CanonicalKind, CanonicalRank } from '@/lib/core/parsing/taxonomy.js';
 
 /**
  * Characterization tests for AnalyzeOrchestrator.analyze(), written ahead of the todo03 Phase 5 A1
@@ -60,17 +61,20 @@ describe('AnalyzeOrchestrator.analyze — characterization', () => {
     expect(g.getNode('ecosystem::global')).toBeDefined();
     const repo = g.getNode('repository::repo');
     expect(repo).toBeDefined();
-    expect(repo!.properties.canonicalRank).toBe(1);
+    // Ranks are asserted THROUGH the table, not as literals. This test used to pin DIRECTORY at 2
+    // and that number was wrong — the ladder grew to thirteen rungs and the skeleton builder was
+    // never updated, so the characterization was faithfully locking in the defect (ADR 0099).
+    expect(repo!.properties.canonicalRank).toBe(CanonicalRank[CanonicalKind.REPOSITORY]);
     expect(repo!.properties.canonicalKind).toBe('REPOSITORY');
 
     const dir = g.getNode(`directory::${ROOT}/src`);
     expect(dir).toBeDefined();
-    expect(dir!.properties.canonicalRank).toBe(2);
+    expect(dir!.properties.canonicalRank).toBe(CanonicalRank[CanonicalKind.DIRECTORY]);
     // Kind as well as rank: rank alone passed while the kind was mutated to NAMESPACE, so a skeleton
     // level could change what it IS and the characterization would not notice.
     expect(dir!.properties.canonicalKind).toBe('DIRECTORY');
 
-    // The Phase-1 skeleton node placed here first (canonicalRank 3, parentId = the directory) is
+    // The Phase-1 skeleton node placed here first (UNIT's rank, parentId = the directory) is
     // superseded by ConducksGraph.ingestSpectrum's own per-file "module" node once induction reflects
     // a.ts — same id, different rank/parentId. That overwrite happens in graph-engine.ts, outside this
     // module's boundary, so this pins the net observable result rather than the intermediate state.
@@ -79,10 +83,13 @@ describe('AnalyzeOrchestrator.analyze — characterization', () => {
     expect(unitA!.properties.canonicalKind).toBe('UNIT');
     expect(unitA!.properties.filePath).toBe(`${ROOT}/src/a.ts`);
 
-    // Taxonomy legend: nine layers, anchored under ecosystem::legend.
+    // Taxonomy legend: one layer per declared kind, anchored under ecosystem::legend. The list was
+    // a hand-written nine and the enum had thirteen, so the graph shipped a legend that described a
+    // different taxonomy than the one it used. Derived from the enum now, and asserted from it here
+    // for the same reason (ADR 0099).
     expect(g.getNode('ecosystem::legend')).toBeDefined();
-    for (const id of ['l0', 'l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7', 'l8']) {
-      expect(g.getNode(`taxonomy::${id}`)).toBeDefined();
+    for (const kind of Object.values(CanonicalKind) as CanonicalKind[]) {
+      expect(g.getNode(`taxonomy::l${CanonicalRank[kind]}`)).toBeDefined();
     }
 
     // No persistence configured: node/edge counts reported are the flush totals (0), not the

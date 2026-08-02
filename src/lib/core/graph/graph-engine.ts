@@ -20,6 +20,7 @@ import { canonicalize } from "@/lib/core/utils/path-utils.js";
 import { Logger } from "../utils/logger.js";
 import { PrismRequest } from "@/lib/core/parsing/prism-core.js";
 import { StructuralRanker } from "../../core/graph/algorithms/ranker.js";
+import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 import { Worker } from "node:worker_threads";
 import os from "node:os";
 import path from "node:path";
@@ -344,7 +345,12 @@ export class ConducksGraph {
           range: metaNode.range, 
           isExport: metaNode.isExport || m.isExport,
           canonicalKind: (metaNode as any).canonicalKind || 'UNIT',
-          canonicalRank: (metaNode as any).canonicalRank || 2,
+          // The two fallbacks have to AGREE. The kind fell back to UNIT and the rank to 2, which is
+          // DIRECTORY's rung — so an unranked node arrived claiming to be a file sitting where a
+          // folder sits. Derive the rank from whichever kind actually won (ADR 0099).
+          canonicalRank: (metaNode as any).canonicalRank
+            ?? CanonicalRank[((metaNode as any).canonicalKind || CanonicalKind.UNIT) as CanonicalKind]
+            ?? CanonicalRank[CanonicalKind.UNIT],
           parentId: parentId,
           unitId: ownUnitId,
           rootId: rootId || null
