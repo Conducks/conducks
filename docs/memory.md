@@ -196,6 +196,14 @@ by construction.
   `metadata.original`, which producers set to the pre-lowercase spelling; `markTypeOnlyImports` now
   reads it (`reflector.ts:634-639`, `caseSafeName`) and falls back to a case-folded value-use set so an
   unattributable use still blocks a type-only call.
+- MEASURED at last (2026-08-02, todo32): SIX files on this repository carry the collision —
+  `Logger`/`logger`, `MergeImpact`/`mergeImpact`, `Conducks`/`conducks`, `EssenceLens`/`essenceLens`,
+  `BranchMismatch`/`branchMismatch`, `registry`/`Registry`. First-declared won outright and the
+  second symbol produced NO NODE, so the interface kept the id AND the span and every call the
+  function made was attributed to a block of type declarations. The VALUE now wins the id, which took
+  source-contradicted edges from 21 to 4 on this repo. The entry had recorded the collision for
+  months; nobody had measured what it COST, which is the difference between a known trap and a
+  recorded one
 - Applies: any new consumer keying on symbol names — read `metadata.original`, never the lowercased
   id. A producer that forgets to set `metadata.original` silently degrades the consumer to the
   case-folded fallback (no error).

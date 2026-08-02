@@ -1,5 +1,5 @@
 # todo32 — two exports differing only by case collapse onto one node
-Status: todo
+Status: doing
 - Acceptance: `interface MergeImpact` and `function mergeImpact` are two nodes with their own spans, and `tools/verify-edges.mjs` reports no span-collision contradictions on conducks.
 
 ## Context
@@ -30,7 +30,20 @@ and its factory, or a class and its singleton.
 - [ ] MEASURE how many ids across conducks and mentorseed would change, and what reads an id as a
       string — `rename`, the MCP tools and the layer tables all do
 
-## Phase 1 — separate the two
+## Phase 1 — the VALUE wins the id (done — the measured damage)
+
+- [x] DONE. First-declared used to win outright and the second symbol produced NO node, so the
+      interface — usually written first — kept the id AND the span, and every call the function made
+      was attributed to a block of type declarations. The VALUE now wins, because edges target values
+      and a value has a body to point at. `interface`, `type` and `typealias` are the only kinds that
+      yield, since those are the ones erased at runtime; a class or an enum is a value and keeps its
+      claim
+- [x] MEASURED: conducks source-contradicted edges **21 -> 4** (precision 99.80% -> **99.96%**),
+      mentorseed **65 -> 43** (99.51% -> **99.68%**) with edges GROWING 13,633 -> 14,106. `mergeimpact`
+      now reports lines 62-135, the function, instead of 35-46, the interface
+- [x] Oracle A 14/14 and B 7/7 unchanged, 1,284 tests green, `audit` green
+
+## Phase 2 — separate the two properly
 
 - [ ] Give the symbol segment its real case, or disambiguate a collision by kind, so a type and a
       value with the same spelling are two nodes

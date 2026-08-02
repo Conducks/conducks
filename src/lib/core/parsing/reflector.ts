@@ -586,7 +586,28 @@ export class ConducksReflector {
             context.registerGlobalSymbol(scopedId, { name, kind: 'unknown', filePath: file.path });
           }
 
-          if (!nodeCache.has(scopedId)) {
+          // TWO SYMBOLS, ONE ID: `interface MergeImpact` and `function mergeImpact` both lowercase
+          // to `merge-impact.ts::mergeimpact`. Ids are lowercased for APFS (CONDUCKS-4), and
+          // TypeScript separates its type and value namespaces BY CASE, so this is ordinary code —
+          // a type beside its factory, a class beside its singleton. Six files on this repository.
+          //
+          // First-declared used to win outright and the second produced no node at all. The
+          // interface is usually declared first, so the surviving node carried the INTERFACE's span
+          // while every call the FUNCTION makes was attributed to it — `trace`, `explain` and
+          // `coverage` then showed a reader a block of type declarations that calls nothing.
+          //
+          // The VALUE wins the id, because edges target values and a value has a body to point at.
+          // This does not give the type its own node — that needs an id change and 39% of ids carry
+          // uppercase, so it is a separate decision (todo32). It makes the surviving node point at
+          // REAL CODE, which is the damage that was measured.
+          const existing = nodeCache.get(scopedId) as any;
+          const ERASED_AT_RUNTIME = new Set(['interface', 'type', 'typealias']);
+          const defKindNow = (match.captures.find((c: any) => DEFINITION_CAPTURES.has(c.name))?.name ?? '').slice(2).toLowerCase();
+          const valueOverType = !!existing
+            && ERASED_AT_RUNTIME.has(String(existing.metadata?.kind ?? existing.kind ?? '').toLowerCase())
+            && !ERASED_AT_RUNTIME.has(defKindNow);
+
+          if (!nodeCache.has(scopedId) || valueOverType) {
             const defCapture = match.captures.find((c: any) => DEFINITION_CAPTURES.has(c.name));
             let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
 
