@@ -34,11 +34,24 @@ export class BlastRadiusAnalyzer extends BaseAnalyzer implements ConducksCompone
 
     const affectedNodes = Array.from(findings.entries()).map(([nodeId, data]) => {
       const node = graph.getNode(nodeId);
+      // WHERE this node touches the chain. The edge ADJACENT to it — the last hop — is the one it
+      // actually wrote, so its `line` is the reference site inside THIS file. At distance 1 that is
+      // literally the call site being asked about.
+      //
+      // Without it, "who calls X" answered with a list of file names and the caller still had to
+      // grep for the line. An agent restricted to conducks could not complete the task at all
+      // (ADR 0108).
+      const adjacent = data.path.length > 0 ? data.path[data.path.length - 1] : undefined;
+      const refLine = Number((adjacent as any)?.properties?.line ?? 0) || null;
       return {
         id: nodeId,
         name: node?.properties.name || 'Unknown',
         kind: node?.label || 'unknown',
         filePath: node?.properties.filePath || 'unknown',
+        /** The line in THIS file that references the chain — the call site. */
+        line: refLine,
+        /** Where this symbol is itself declared. */
+        declaredAt: Number((node?.properties as any)?.range?.start?.line ?? (node?.properties as any)?.lineStart ?? 0) || null,
         distance: data.weight,
         path: data.path.map(e => e.type)
       };

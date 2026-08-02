@@ -104,6 +104,38 @@ export class ImportProcessor {
     // here. `declaredExternal` carries that one bit forward.
     const seg = specifier.split('/');
     const pkgName = specifier.startsWith('@') && seg.length >= 2 ? `${seg[0]}/${seg[1]}` : seg[0];
+
+    // 2a. WORKSPACE PACKAGE — a bare specifier whose source is in this tree.
+    //
+    // `@repo/adapters` looks exactly like a third-party package and is not one: a manifest inside
+    // the analyzed tree declares that name, and it resolves to `packages/adapters`. Checked BEFORE
+    // the external branch, because a workspace package is also listed as a dependency by every app
+    // that consumes it, so the two tests both answer yes and only this one is right.
+    //
+    // Resolved to the package's ENTRY file (or the named subpath), then run through the same
+    // extension/index candidates as a relative import — `packages/adapters` has no extension, and
+    // its real file is `packages/adapters/src/index.ts` (ADR 0108).
+    const workspace = context?.resolveWorkspacePackage?.(specifier);
+    if (workspace) {
+      const canonicalPaths = ImportProcessor.canonicalSetFor(allPaths);
+      const roots = workspace.subpath
+        ? [path.join(workspace.dir, workspace.subpath), path.join(workspace.dir, 'src', workspace.subpath)]
+        : [path.join(workspace.dir, 'src', 'index'), path.join(workspace.dir, 'index'),
+           path.join(workspace.dir, 'src'), workspace.dir];
+      const exts = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs',
+                    '/index.ts', '/index.tsx', '/index.js', '/src/index.ts', '/src/index.tsx'];
+      for (const base of roots) {
+        for (const ext of exts) {
+          const candidate = base + ext;
+          if (canonicalPaths.has(canonicalize(candidate))) return candidate;
+        }
+      }
+      // The package is internal but its entry is not in `allPaths` — a scope that did not include
+      // it. Returning undefined lets the caller record an unresolved reference rather than minting
+      // an `external://` node that claims this is a third-party dependency.
+      return undefined;
+    }
+
     const declaredExternal = !specifier.startsWith('.') && !!context?.isExternalPackage(pkgName);
 
     const dir = path.dirname(importerPath);

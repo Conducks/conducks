@@ -37,12 +37,25 @@ const NODE_STDLIB = new Set<string>([
  * @param specifier  the raw module string, e.g. `path`, `node:fs`, `@scope/pkg/sub`, `./util`, `@/lib/x`
  * @param internalAliases  alias prefixes the repo maps to itself (e.g. `@/`, `~/`). Treated as internal.
  */
-export function classifyOrigin(specifier: string, internalAliases: string[] = ['@/', '~/']): BoundaryClassification {
+export function classifyOrigin(
+  specifier: string,
+  internalAliases: string[] = ['@/', '~/'],
+  workspacePackages?: ReadonlySet<string>,
+): BoundaryClassification {
   const spec = (specifier || '').trim().replace(/^['"]|['"]$/g, '');
 
   // Relative or absolute path, or a repo alias → internal (not a boundary).
   if (spec.startsWith('.') || spec.startsWith('/') || internalAliases.some(a => spec.startsWith(a))) {
     return { origin: 'internal', package: null };
+  }
+
+  // A WORKSPACE package is a bare specifier with source in this tree — `@repo/adapters` resolving
+  // to `packages/adapters`. It is not a supply-chain surface and must not be tagged as one, or the
+  // dependency report counts a project's own modules as third-party risk (ADR 0108).
+  if (workspacePackages?.size) {
+    const seg = spec.split('/');
+    const name = (spec.startsWith('@') && seg.length >= 2 ? `${seg[0]}/${seg[1]}` : seg[0]).toLowerCase();
+    if (workspacePackages.has(name)) return { origin: 'internal', package: null };
   }
 
   // `node:`-prefixed, or a bare Node core module → stdlib.

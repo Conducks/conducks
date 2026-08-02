@@ -804,7 +804,14 @@ export class ConducksReflector {
 
               // System 2 (ADR 0012): classify the boundary origin at capture. Edge properties now
               // persist, so this rides through to the vault — internal/stdlib/dependency + package.
-              const boundary = classifyOrigin(specifier);
+              // The workspace map makes a sibling package read as internal rather than as a
+              // third-party dependency — without it a monorepo reports its own modules as its
+              // supply-chain surface (ADR 0108).
+              const boundary = classifyOrigin(
+                specifier,
+                undefined,
+                new Set((context?.getWorkspacePackages?.() ?? []).map(([n]) => n)),
+              );
 
               // Seed the Spectrum with the RAW SPECIFIER for later resolution 🏺
               spectrum.relationships.push({

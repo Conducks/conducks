@@ -130,6 +130,12 @@ export class QueryCommand implements ConducksCommand {
             name: n.properties.name,
             kind: n.label,
             filePath: n.properties.filePath,
+            // WHERE the symbol is. The vault has carried `lineStart`/`lineEnd` all along and no
+            // command printed either, so "find X" answered with a file and left the caller to grep
+            // for the line. An agent restricted to conducks could not finish the job at all — it
+            // burned 47 tool calls proving no surface exposes a line number (ADR 0108).
+            line: (n.properties as any)?.range?.start?.line ?? (n.properties as any)?.lineStart ?? null,
+            endLine: (n.properties as any)?.range?.end?.line ?? (n.properties as any)?.lineEnd ?? null,
             rank: n.properties.rank,
             // 'direct' matched the query text; 'echo' is a neighbour that inherited resonance from
             // one that did. Both are useful; presenting them identically was not (ADR 0102).
@@ -149,7 +155,7 @@ export class QueryCommand implements ConducksCommand {
         // Table header
         console.log(
           '\x1b[2m' +
-          col('RANK', 8) + col('MATCH', 7) + col('KIND', 12) + col('NAME', 28) + col('FILE', 42) + 'CONFIDENCE' +
+          col('RANK', 8) + col('MATCH', 7) + col('KIND', 12) + col('NAME', 26) + col('FILE:LINE', 46) + 'CONFIDENCE' +
           '\x1b[0m'
         );
         nodes.forEach(n => {
@@ -157,7 +163,9 @@ export class QueryCommand implements ConducksCommand {
           const rankStr = rankVal !== undefined ? rankVal.toFixed(4) : '—';
           const name = String(n.properties.name || '');
           const kind = String(n.label || '');
-          const file = String(n.properties.filePath || '');
+          // file:line, so the answer is directly openable rather than needing a follow-up grep.
+          const lineNo = (n.properties as any)?.range?.start?.line ?? (n.properties as any)?.lineStart;
+          const file = String(n.properties.filePath || '') + (lineNo ? `:${lineNo}` : '');
           const confStr = rankVal !== undefined ? rankVal.toFixed(2) : '—';
           // An ECHO did not match the query — it is a caller of something that did. Saying so is
           // the difference between a search result and a suggestion.
@@ -166,8 +174,8 @@ export class QueryCommand implements ConducksCommand {
             col(rankStr, 8) +
             (isEcho ? '\x1b[2m' + col('echo', 7) + '\x1b[0m' : col('', 7)) +
             col(kind, 12) +
-            '\x1b[36m' + col(name, 28) + '\x1b[0m' +
-            '\x1b[2m' + col(file, 42) + '\x1b[0m' +
+            '\x1b[36m' + col(name, 26) + '\x1b[0m' +
+            '\x1b[2m' + col(file, 46) + '\x1b[0m' +
             confStr
           );
         });

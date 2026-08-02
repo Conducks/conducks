@@ -24,7 +24,7 @@ import fs from 'node:fs';
  */
 
 async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = false) {
-  const { units, allPaths, discoveryMode, globalSymbols, externalPackages } = data;
+  const { units, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages } = data;
 
   // The reflector lives in the DOMAIN layer; this worker is in CORE. A static import would be a
   // core → domain edge (ADR 0005). This file is a process entry point, not a core primitive — it is
@@ -47,6 +47,13 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
   // specifier falls through to the basename fallback — which is how `next/headers` came to point at
   // the project's own `headers.ts`.
   for (const pkg of (externalPackages ?? []) as string[]) context.registerExternalPackage(pkg);
+  // WORKSPACE packages travel the same way and for the same reason. Registering them only on the
+  // main thread was why the first attempt at ADR 0108 changed nothing: every file is parsed in a
+  // subprocess, so `@repo/adapters` was still classified as third-party where it actually mattered
+  // and the openship numbers came back byte-identical.
+  for (const [name, dir] of (workspacePackages ?? []) as Array<[string, string]>) {
+    context.registerWorkspacePackage(name, dir);
+  }
 
   const cppProvider = new CPPProvider();
   const cProvider = new CProvider();

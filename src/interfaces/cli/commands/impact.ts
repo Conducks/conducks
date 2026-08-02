@@ -92,7 +92,10 @@ export class ImpactCommand implements ConducksCommand {
         console.log(`\n\x1b[1mAffected Symbols (Top 10):\x1b[0m`);
         impact.affectedNodes.slice(0, 10).forEach((node: any) => {
           const dist = node.distance.toFixed(2);
-          console.log(`- [d:${dist}] \x1b[36m${node.name}\x1b[0m (${node.filePath})`);
+          // file:line, so the answer is directly openable. `line` is where this file references the
+          // chain — the call site — falling back to where the symbol is declared (ADR 0108).
+          const at = node.line ?? node.declaredAt;
+          console.log(`- [d:${dist}] \x1b[36m${node.name}\x1b[0m (${node.filePath}${at ? `:${at}` : ''})`);
         });
       }
 

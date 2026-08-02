@@ -1358,3 +1358,28 @@ by construction.
   input verbatim — so the gap was in the shared helper, not only in `rename`.
 - Applies: any command taking a symbol id. Use `resolveSymbol`; it now tries verbatim, then
   lowercased, then the bare name after `::`. ADR 0106.
+
+## A worker parses in its OWN process — main-thread state it is not sent does not exist
+- Gotcha: every file is parsed in a subprocess that builds a fresh `AnalyzeContext` from an
+  EXPLICITLY-PASSED subset of state (`globalSymbols`, `externalPackages`, …). Registering something
+  on the main thread and not adding it to that list means the feature is live exactly where no
+  parsing happens. The ADR 0108 workspace fix did this: the first attempt produced byte-identical
+  numbers on a 1,897-file subject — 705 phantom nodes before and after.
+- Why: `exportState()`/`mergeState()` carry the full context, but `workerPool.run()` takes named
+  params and the orchestrator hands it `context.exportState().externalPackages` field-by-field. Add
+  to FOUR places: context state, `worker-pool.run` signature, the fork's JSON payload, and
+  `pulse-worker`'s intake — plus the in-process fallback path in worker-pool.
+- Applies: any new resolver input. Verify by re-running on a real subject and checking the number
+  MOVED; "the code looks right" cannot see a process boundary. ADR 0108.
+
+## A workspace package is internal — `@repo/x` is not third-party
+- Gotcha: a bare scoped specifier that resolves to `packages/x` inside the repo was classified as a
+  dependency, so every cross-package reference got a synthetic `external://` node. Measured on a
+  pnpm monorepo: 705 phantom nodes, 1,771 CALLS edges pointing at them, and the real function showing
+  ZERO callers while its two real calls sat on a node with `lineStart: 0`.
+- Why: `classifyOrigin` tested for relative paths and `node:` and treated everything else as npm. The
+  signal is a `package.json` INSIDE the analyzed tree declaring that name — no yaml parsing needed,
+  and it covers npm/pnpm/yarn equally. Check the workspace map BEFORE `isExternalPackage`: a
+  workspace package is also declared as a dependency by its consumers, so both tests answer yes.
+- Applies: monorepos, which is where a cross-package graph is worth the most and was most broken.
+  ADR 0108.

@@ -40,7 +40,13 @@ export class WorkerPool {
     allPaths: string[],
     globalSymbols?: Record<string, any>,
     /** Package names the workspace's manifests declare — see `essence-lens.declaredDependencies`. */
-    externalPackages?: string[]
+    externalPackages?: string[],
+    /**
+     * Local packages: name → the directory of the `package.json` declaring it. A worker resolves
+     * imports itself, so without this a workspace specifier reads as third-party INSIDE the
+     * subprocess — which is where every file is actually parsed (ADR 0108).
+     */
+    workspacePackages?: Array<[string, string]>
   ): Promise<any[]> {
     const unitCount = files.length;
     if (unitCount === 0) return [];
@@ -90,7 +96,7 @@ export class WorkerPool {
           const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
           const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
 
-          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, externalPackages, isFork: true, tempOutputFile: tempOutput }));
+          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages, isFork: true, tempOutputFile: tempOutput }));
 
           const nodeArgs = isTs
             ? ['--no-warnings', '--import', tsxLoader!, workerScript, tempInput]
@@ -200,6 +206,7 @@ export class WorkerPool {
           }
         }
         for (const pkg of externalPackages ?? []) context.registerExternalPackage(pkg);
+        for (const [name, dir] of workspacePackages ?? []) context.registerWorkspacePackage(name, dir);
 
         const res = await reflector.reflect(file, provider, context, allPaths);
         results.push({ path: file.path, spectrum: res, state: context.exportState(), success: true });

@@ -98,7 +98,48 @@ export class AnalyzeContext {
    */
   public isExternalPackage(name: string): boolean {
     const root = name.split('.')[0];
+    // A WORKSPACE package is declared as a dependency by the apps that consume it, so it appears in
+    // `externalPackages` too. Internal wins: it has real source in this tree (ADR 0108).
+    if (this.workspacePackages.has(root.toLowerCase())) return false;
     return this.externalPackages.has(root);
+  }
+
+  /**
+   * Packages whose SOURCE lives in this tree, name → the directory holding their `package.json`.
+   *
+   * In a pnpm/npm/yarn workspace, `@repo/adapters` is a bare specifier that resolves to
+   * `packages/adapters` — not to `node_modules`. `classifyOrigin` saw a bare scoped name and called
+   * it a third-party dependency, so every cross-package call landed on a synthetic `external://`
+   * node instead of the real function. Measured on openship (1,897 files): **705 phantom nodes and
+   * 1,771 CALLS edges** pointing at them, and the real `allocateHostPort` showed ZERO callers while
+   * two calls to it sat on a node with `lineStart: 0` (ADR 0108).
+   *
+   * Any `package.json` inside the analyzed tree declares a local package — no need to parse
+   * `pnpm-workspace.yaml` or the `workspaces` field, and it works for every layout that puts a
+   * manifest beside the code.
+   */
+  private workspacePackages: Map<string, string> = new Map();
+
+  public registerWorkspacePackage(name: string, dir: string): void {
+    if (!name) return;
+    this.workspacePackages.set(name.toLowerCase(), dir);
+  }
+
+  /** The directory a bare specifier belongs to, or null when it is genuinely external. */
+  public resolveWorkspacePackage(specifier: string): { dir: string; subpath: string } | null {
+    const spec = (specifier || '').replace(/^['"]|['"]$/g, '');
+    if (!spec || spec.startsWith('.') || spec.startsWith('/')) return null;
+    const seg = spec.split('/');
+    // A scoped package name is the first TWO segments; anything after is a subpath.
+    const name = (spec.startsWith('@') && seg.length >= 2 ? `${seg[0]}/${seg[1]}` : seg[0]).toLowerCase();
+    const dir = this.workspacePackages.get(name);
+    if (!dir) return null;
+    const consumed = name.split('/').length;
+    return { dir, subpath: seg.slice(consumed).join('/') };
+  }
+
+  public getWorkspacePackages(): Array<[string, string]> {
+    return Array.from(this.workspacePackages.entries());
   }
 
   public setFramework(framework: string): void {
@@ -147,6 +188,9 @@ export class AnalyzeContext {
     return {
       registry: Object.fromEntries(this.registry),
       externalPackages: Array.from(this.externalPackages),
+      // Workers resolve imports themselves, so they need the workspace map or every cross-package
+      // specifier reverts to "external" inside the worker (ADR 0108).
+      workspacePackages: Array.from(this.workspacePackages.entries()),
       importMap: Object.fromEntries(
         Array.from(this.importMap.entries()).map(([k, v]) => [k, Array.from(v)])
       ),
@@ -169,6 +213,12 @@ export class AnalyzeContext {
     if (state.externalPackages) {
       for (const pkg of state.externalPackages) {
         this.externalPackages.add(pkg);
+      }
+    }
+
+    if (state.workspacePackages) {
+      for (const [name, dir] of state.workspacePackages as Array<[string, string]>) {
+        this.workspacePackages.set(name, dir);
       }
     }
 
@@ -203,6 +253,7 @@ export class AnalyzeContext {
     this.folderMap.clear();
     this.registry.clear();
     this.externalPackages.clear();
+    this.workspacePackages.clear();
     this.framework = null;
     this.discoveryMode = false;
   }

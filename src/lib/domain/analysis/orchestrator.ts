@@ -141,6 +141,18 @@ export class AnalyzeOrchestrator {
       for (const dep of essenceLens.declaredDependencies(f.path, f.source)) {
         context.registerExternalPackage(dep.toLowerCase());
       }
+      // A manifest inside the analyzed tree declares a LOCAL package. In a workspace, its name is
+      // the bare specifier every sibling imports it by — `@repo/adapters` resolves to
+      // `packages/adapters`, not to node_modules. Without this the specifier reads as third-party
+      // and every cross-package reference lands on a phantom `external://` node (ADR 0108).
+      if (base === 'package.json') {
+        try {
+          const name = JSON.parse(f.source)?.name;
+          if (typeof name === 'string' && name) {
+            context.registerWorkspacePackage(name, path.dirname(f.path));
+          }
+        } catch { /* an unparseable manifest is not a reason to fail the pulse */ }
+      }
     }
 
     // Phase 0 + Pass 1: L0-L3 containment skeleton (ecosystem/repository/directory/unit) and the
@@ -197,7 +209,10 @@ export class AnalyzeOrchestrator {
         // knowledge the worker does not have. The declared packages have to travel the same way the
         // global symbols do, or step 2 of the resolver stays dead inside every subprocess while
         // looking alive on the main thread.
-        context.exportState().externalPackages
+        context.exportState().externalPackages,
+        // Same journey, same reason. Omitting this is exactly how the first attempt at ADR 0108
+        // produced byte-identical numbers: the map existed on the main thread and nowhere that parses.
+        context.exportState().workspacePackages
       );
       traceMemory(`wave ${batchNum} after parse`);
 
