@@ -41,7 +41,15 @@ export class ConducksAdvisor {
     // Metric: distinct files that import or call this node (cross-file only).
     // Same-file references don't indicate coupling between modules.
     const hubThreshold = Math.max(stats.medianDegree * 5, 10);
+    // A CONTAINER is not a monolithic hub. Every file in a repository depends on the repository, and
+    // every file in a folder depends on the folder — that is containment, not coupling, and there is
+    // no "split this" a reader could act on. Measured on this repository, `advise` reported
+    // `repository::conducks` ("22 distinct files depend on this symbol") and a `docs` DIRECTORY as
+    // its two top findings, which is the same containers-outrank-code shape ADR 0103 fixed in
+    // `context` (ADR 0115).
+    const CONTAINERS = new Set(['ECOSYSTEM', 'REPOSITORY', 'PACKAGE', 'NAMESPACE', 'DIRECTORY', 'UNIT']);
     for (const node of nodes as ConducksNode[]) {
+      if (CONTAINERS.has(String(node.properties?.canonicalKind ?? node.label ?? ''))) continue;
       const nodeFile = node.properties.filePath;
       const crossFileCallerFiles = new Set(
         graph.getNeighbors(node.id, 'upstream')

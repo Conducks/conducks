@@ -891,8 +891,36 @@ export class SynapsePersistence {
     const db = await this.ensureVaultOpen();
     return new Promise((res, rej) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db.all(sql, ...(params as any[]), (err: duckdb.DuckDbError | null, rows: duckdb.TableData) => err ? rej(err) : res(rows as unknown as T[]));
+      db.all(sql, ...(params as any[]), (err: duckdb.DuckDbError | null, rows: duckdb.TableData) =>
+        err ? rej(SynapsePersistence.explainQueryFailure(err)) : res(rows as unknown as T[]));
     });
+  }
+
+  /**
+   * Turn a driver error into something a reader can act on.
+   *
+   * There is no schema version in the vault, so a database written by an older conducks fails on the
+   * first SELECT naming a column that did not exist then. What reached the user was the raw DuckDB
+   * object — `Binder Error: Referenced column "is_route" not found in FROM clause!` plus a caret
+   * diagram — which says nothing about the cause and nothing about the remedy. Measured on a stale
+   * vault via `conducks resonance` (ADR 0115).
+   *
+   * A missing COLUMN is the signature of schema drift specifically: the table exists, the query is
+   * valid against the current schema, and the file predates it. Nothing else is reinterpreted —
+   * every other driver error passes through untouched, because guessing at causes is how a wrong
+   * diagnosis gets printed with confidence.
+   */
+  private static explainQueryFailure(err: duckdb.DuckDbError): Error {
+    const message = String(err?.message ?? err);
+    const missingColumn = /Referenced column "([^"]+)" not found/i.exec(message);
+    if (missingColumn) {
+      return new Error(
+        `This vault predates the current conducks schema — it has no "${missingColumn[1]}" column. ` +
+        `Rebuild it with \`conducks analyze\` (or \`conducks clean\` first for a full rebuild).\n` +
+        `  original: ${message.split('\n')[0]}`
+      );
+    }
+    return err as unknown as Error;
   }
 
   /**

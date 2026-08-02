@@ -41,11 +41,11 @@ unfamiliar, a real monorepo), and conducks itself.
 - [x] audit — covered by the original oracle
 - [x] entry — 1/7 -> 7/7 (ADR 0113)
 - [x] list — 4/7 -> 7/7, scored with `link` (ADR 0114)
-- [ ] flows
-- [ ] entropy
-- [ ] cohesion
-- [ ] resonance
-- [ ] advise
+- [x] flows — --json, states what it hid (ADR 0115)
+- [x] entropy — refuses an unknown symbol, resolves a bare name (ADR 0115)
+- [x] cohesion — refuses when either symbol is unknown (ADR 0115)
+- [x] resonance — validates the target, no leaked driver error (ADR 0115)
+- [x] advise — containers are not monolithic hubs (ADR 0115)
 
 ## Phase 2 — metrics and history
 

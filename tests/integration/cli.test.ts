@@ -58,8 +58,32 @@ describe('Conducks CLI Integration', () => {
     expect(output).toContain('🏺 Structural Synapse Status');
   });
 
-  it('should run entropy analysis', () => {
-    const output = execSync(`node ${cliPath} entropy some::symbol`, { cwd: testRepo }).toString();
+  /**
+   * REVERSED 2026-08-02 (ADR 0115). This called `entropy some::symbol` — an id no node has — and
+   * asserted the output contained "Structural Entropy". It passed because the command printed
+   * `0.0000`, `0` authors and `0.00%` risk for a symbol that does not exist, and the assertion was
+   * satisfied by the header of a fabricated measurement.
+   *
+   * A test that requires a wrong answer keeps it. The command now refuses, so this asserts the
+   * refusal, and a REAL symbol is measured separately below.
+   */
+  it('refuses entropy for a symbol that does not exist', () => {
+    let status = 0;
+    let output = '';
+    try {
+      output = execSync(`node ${cliPath} entropy some::symbol 2>&1`, { cwd: testRepo }).toString();
+    } catch (err: any) {
+      status = err.status ?? 1;
+      output = String(err.stdout ?? '') + String(err.stderr ?? '');
+    }
+    expect(status).not.toBe(0);
+    expect(output).toMatch(/not found/i);
+  });
+
+  it('measures entropy for a symbol that exists', () => {
+    // `feature.ts` is the one node this fixture's vault reliably holds — its only source symbol is
+    // an arrow-function const, which the ATOM edge gate may prune (ADR 0013).
+    const output = execSync(`node ${cliPath} entropy feature.ts`, { cwd: testRepo }).toString();
     expect(output).toContain('Structural Entropy');
   });
 });

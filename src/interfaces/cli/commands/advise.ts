@@ -9,11 +9,18 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 export class AdviseCommand implements ConducksCommand {
   public id = "advise";
   public description = "Get architectural recommendations";
-  public usage = "conducks advise";
+  public usage = "conducks advise [--json]";
 
-  public async execute(_args: string[], registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
+    const useJson = args.includes('--json');
     try {
       const advice: Advice[] = await registry.audit.advise();
+
+      if (useJson) {
+        process.stdout.write(JSON.stringify(advice, null, 2) + '\n');
+        return;
+      }
+
       console.log(`\n\x1b[1m--- 💎 Conducks Architecture Advisor ---\x1b[0m`);
 
       if (advice.length === 0) {
