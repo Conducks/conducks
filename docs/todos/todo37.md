@@ -40,7 +40,7 @@ unfamiliar, a real monorepo), and conducks itself.
 - [x] prune — verdict-vs-question split (ADR 0104)
 - [x] audit — covered by the original oracle
 - [x] entry — 1/7 -> 7/7 (ADR 0113)
-- [ ] list
+- [x] list — 4/7 -> 7/7, scored with `link` (ADR 0114)
 - [ ] flows
 - [ ] entropy
 - [ ] cohesion
@@ -71,7 +71,7 @@ unfamiliar, a real monorepo), and conducks itself.
 - [x] rename — the only mutating command (ADR 0106)
 - [ ] clean
 - [ ] doctor
-- [ ] link
+- [x] link — scored with `list` (ADR 0114)
 - [ ] monitor
 - [ ] watch
 - [ ] setup

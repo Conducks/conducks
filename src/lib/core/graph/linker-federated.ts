@@ -64,13 +64,42 @@ export class FederatedLinker {
     }
   }
 
+  /**
+   * The linked project paths.
+   *
+   * ABSENT and UNREADABLE are different answers and used to be the same one. A single
+   * `catch { return [] }` collapsed "you have never linked anything", "this file is corrupt" and
+   * "this file cannot be read" into an empty array — so `list` printed "No federated projects
+   * linked." and exited 0 on a workspace whose links were merely unparseable. The user linked them;
+   * the tool said they had not (ADR 0114).
+   *
+   * No file is still a legitimate empty. Anything else is reported.
+   */
   public async getLinks(): Promise<string[]> {
+    let content: string;
     try {
-      const content = await this.fsMock.readFile(this.configPath, 'utf-8');
-      return JSON.parse(content);
-    } catch {
-      return [];
+      content = await this.fsMock.readFile(this.configPath, 'utf-8');
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') return [];
+      throw new Error(`Cannot read ${this.configPath}: ${err?.message ?? err}`);
     }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch (err: any) {
+      throw new Error(
+        `${this.configPath} is not valid JSON (${err?.message ?? err}). ` +
+        `Fix or delete the file — an unreadable link list is not the same as having no links.`
+      );
+    }
+
+    // A file holding the wrong SHAPE is as unusable as one that will not parse, and returning it
+    // verbatim would push the problem into every caller.
+    if (!Array.isArray(parsed) || parsed.some(p => typeof p !== 'string')) {
+      throw new Error(`${this.configPath} must be a JSON array of project paths.`);
+    }
+    return parsed as string[];
   }
 
   private async saveLinks(links: string[]): Promise<void> {
