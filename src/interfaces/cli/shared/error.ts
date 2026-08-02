@@ -7,6 +7,8 @@ import chalk from 'chalk';
  */
 export interface NameIndex {
   findNodesByName(name: string): Array<{ id: string; properties?: unknown }>;
+  /** Optional so existing callers that only index by name still satisfy the shape. */
+  getNode?(id: string): { id: string } | undefined;
 }
 
 export function cliError(code: string, message: string, suggestion?: string): never {
@@ -26,7 +28,23 @@ export function cliWarn(message: string): void {
  * Exits with helpful error if no match found.
  */
 export function resolveSymbol(input: string, graph: NameIndex): string {
-  if (input.includes('::')) return input;
+  if (input.includes('::')) {
+    // Node ids are LOWERCASED on write (CONDUCKS-4, for APFS), so an id containing a real-cased
+    // path — which is what a user copies out of their editor, and what every macOS temp dir has —
+    // matched nothing and the command reported "not found" for a symbol that exists. Try the
+    // verbatim id first so nothing that worked before changes, then the lowercased form, then fall
+    // back to the bare name after `::` (ADR 0106).
+    if (graph.getNode?.(input)) return input;
+    const lowered = input.toLowerCase();
+    if (graph.getNode?.(lowered)) return lowered;
+    if (!graph.getNode) return input;   // caller cannot check; preserve the old behaviour
+    const bare = input.slice(input.lastIndexOf('::') + 2);
+    if (!bare) {
+      cliError('SYMBOL_NOT_FOUND', `No symbol matching "${input}"`,
+        `Run: conducks query "${input}" to find valid symbol IDs`);
+    }
+    return resolveSymbol(bare, graph);
+  }
 
   const matches = graph.findNodesByName(input);
   if (matches.length === 0) {

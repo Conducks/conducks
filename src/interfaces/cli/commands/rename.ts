@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
+import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 
 /**
  * Conducks — Rename Command (GVR)
@@ -36,8 +37,14 @@ export class RenameCommand implements ConducksCommand {
     // Structural Sync via Registry Bridge
     await registry.infrastructure.persistence.load(registry.infrastructure.graphEngine.getGraph());
     
+    // Resolve the symbol the way every other command does. `rename` had NO resolution at all — it
+    // passed the string straight to `getNode`, which is keyed on lowercased ids, so a user pasting
+    // the real-cased path their editor shows got "Symbol ... not found" for a symbol that exists.
+    // It was also the only command that could not take a bare name (ADR 0106).
+    const resolvedId = resolveSymbol(symbolId, registry.query.graph.getGraph());
+
     // Conducks: Graph-Verified Refactoring (GVR)
-    const result = await registry.rename.rename(symbolId, newName, dryRun);
+    const result = await registry.rename.rename(resolvedId, newName, dryRun);
 
     if (result.success) {
       const icon = dryRun ? "🔍" : "✅";

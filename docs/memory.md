@@ -1328,3 +1328,27 @@ by construction.
 - Gotcha: `interface ServiceTypeMap` is declared once and AUGMENTED in other files with a same-named `interface` body inside `declare module`. There is no import and no call, so nothing references the original node and `prune` reports it as dead — while four files depend on it
 - Why: augmentation is a relationship the language creates by NAME, not by a reference the parser can see as an edge. Every other cross-file link conducks models is written as an import or a call
 - Applies: `dead-code.ts`, and any judgement about an exported `interface` or `type` in a codebase that uses module augmentation. Recorded as todo33
+
+## `rename` is the only tool that WRITES — treat its bugs as a different class
+- Gotcha: the engine is called "Graph-Verified Refactoring" and its write step used no graph data —
+  `content.replace(/\bname\b/g, newName)` across each whole affected file, with affected files
+  collected partly by NAME MATCH. Measured: it renamed an unrelated same-named function in another
+  file, rewrote a string literal and a comment, and merged two symbols into one name while printing
+  "✅ Successfully renamed".
+- Why: knowing WHICH FILES is not knowing WHERE. Sites now come from the declaration's `lineStart`
+  plus each upstream edge's `properties.line` (the first consumer of ADR 0099's line numbers), and a
+  reference with no line is a REFUSAL — an unedited call site is a broken build.
+- Applies: any change to `gvr-engine.ts`; any new tool that writes to source. Test it as "what must
+  NOT change" — a rename tool gets the positive half right and the negative half wrong. Never run
+  `--confirm` against a real repo while testing; use a throwaway fixture under a scratch dir.
+  Still unclaimed: the aliased import form `import { a as b }`. ADR 0106.
+
+## A node id is LOWERCASED on write — a real-cased path finds nothing
+- Gotcha: ids are lowercased for APFS (CONDUCKS-4), so the id a user copies from their editor — with
+  the real casing of their path — matches no node. `rename` passed the string straight to `getNode`
+  and reported "Symbol ... not found" for a symbol that exists. macOS temp dirs contain uppercase,
+  which is how the integration test found it.
+- Why: every other command routes through `resolveSymbol`, which used to return any `::`-containing
+  input verbatim — so the gap was in the shared helper, not only in `rename`.
+- Applies: any command taking a symbol id. Use `resolveSymbol`; it now tries verbatim, then
+  lowercased, then the bare name after `::`. ADR 0106.
