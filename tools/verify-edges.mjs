@@ -58,6 +58,39 @@ const wordIn = (hay, word) =>
   !!word && new RegExp(`(^|[^\\w$])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\w$]|$)`, 'i').test(hay);
 
 /**
+ * original name -> every alias any file re-exports it under.
+ *
+ * A BARREL rename is invisible to a per-file check: `export { validate as validateEmail } from
+ * './validate-email.js'` lives in `index.ts`, while the call site writes `validateEmail(...)` and
+ * the edge correctly names `validate-email.ts::validate`. Looking for the rename in the CALLING
+ * file — which is what the `import { X as Y }` test does — finds nothing, and a correct edge was
+ * reported as contradicted by source (oracle T10).
+ *
+ * Built once from the files the vault already names, so this stays a read of the SOURCE rather than
+ * a re-run of import resolution.
+ */
+const aliasesOf = new Map();
+const indexReExports = (files) => {
+  for (const f of files) {
+    const src = read(f);
+    if (!src) continue;
+    for (const m of src.matchAll(/\b([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)/g)) {
+      const [, original, alias] = m;
+      if (!aliasesOf.has(original.toLowerCase())) aliasesOf.set(original.toLowerCase(), new Set());
+      aliasesOf.get(original.toLowerCase()).add(alias);
+    }
+  }
+};
+/** True when the span calls the target under a name it is re-exported as. */
+const calledUnderAlias = (body, name) => {
+  for (const alias of aliasesOf.get(String(name).toLowerCase()) ?? []) {
+    if (new RegExp(`(^|[^\\w$])${alias}\\s*(<[^;\\n]*>)?\\s*\\??\\.?\\s*\\(`, 'i').test(body)) return true;
+    if (wordIn(body, alias)) return true;
+  }
+  return false;
+};
+
+/**
  * One entry per edge type. `check` returns 'ok' | 'wrong' | null (unchecked).
  *
  * Each is deliberately CONSERVATIVE: it answers 'wrong' only when the source positively contradicts
@@ -103,6 +136,8 @@ const CHECKS = {
       const decl = read(row.tf) || '';
       if (new RegExp(`\\b${name}\\s*[:(]`, 'i').test(decl)) return null;
     }
+    // Called under a name a BARREL re-exports it as — the edge names the original, correctly.
+    if (calledUnderAlias(body, name)) return 'ok';
     // JSX is a call. `<Button />` compiles to `Button(...)`, and a member form `<motion.div>` to a
     // property call — demanding a literal paren reported 233 false alarms on a React subject.
     if (new RegExp(`<\\s*[\\w.$]*\\b${name}\\b`, 'i').test(body)) return 'ok';
@@ -147,6 +182,10 @@ const CHECKS = {
     return wordIn(body, name) ? 'ok' : 'wrong';
   },
 };
+
+// Seed the re-export index from every file the vault names, before any check runs.
+const allFiles = await q(`SELECT DISTINCT file FROM nodes WHERE file IS NOT NULL`);
+indexReExports(allFiles.map(r => r.file).filter(Boolean));
 
 const types = only ? [only] : Object.keys(CHECKS);
 let gOk = 0, gWrong = 0, gUnchecked = 0;

@@ -1,7 +1,20 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
 
 export interface Finding {
-  type: 'ORPHAN' | 'UNUSED_EXPORT' | 'UNREACHABLE_LOGIC' | 'STALE_IMPORT';
+  /**
+   * `UNIMPORTED_MODULE` is a QUESTION, not a verdict, and it exists because the other four are
+   * verdicts (oracle T28, ADR 0104).
+   *
+   * `memory.md` records the rule: "an unreferenced module is a question, not a finding" — because
+   * *disconnected by accident* and *deliberately not wired yet* are the same zero-incoming-edges
+   * shape to a graph, and deleting the second destroys a capability nobody decided to drop. A
+   * symbol inside a file NOTHING imports cannot be judged from the graph at all: the file may be an
+   * entry point, a script, a route loaded by convention, or genuinely dead.
+   *
+   * The distinction is the FILE, not the symbol. A symbol unused inside a file that IS imported is
+   * a real finding — the module is reachable and the symbol still is not.
+   */
+  type: 'ORPHAN' | 'UNUSED_EXPORT' | 'UNREACHABLE_LOGIC' | 'STALE_IMPORT' | 'UNIMPORTED_MODULE';
   symbol: string;
   file: string;
   message: string;
@@ -107,6 +120,55 @@ export class DeadCodeAnalyzer {
       wiringByFile.set(f, names);
     }
 
+    // Files that ANOTHER file imports. A unit node with an incoming IMPORTS edge from a different
+    // file is reachable; one with none cannot be judged from the graph, because "never wired yet"
+    // and "disconnected by accident" are the same shape (memory.md, ADR 0104).
+    //
+    // Keyed on the unit node rather than on symbol edges: a module is reached by being IMPORTED,
+    // and a symbol inside it may legitimately have no caller while the module is loaded for its
+    // side effects.
+    const importedFiles = new Set<string>();
+    for (const n of nodes as ConducksNode[]) {
+      if (String(n.properties.canonicalKind ?? '') !== 'UNIT') continue;
+      const self = String(n.properties.filePath || '').toLowerCase();
+      const imported = graph.getNeighbors(n.id, 'upstream').some((e: any) => {
+        if (e.type !== 'IMPORTS') return false;
+        const source = graph.getNode(e.sourceId);
+        return !!source && String(source.properties.filePath || '').toLowerCase() !== self;
+      });
+      if (imported) importedFiles.add(self);
+    }
+
+    /**
+     * Files holding at least one reference relationship among their own symbols — anything that
+     * CALLS, CONSTRUCTS, ACCESSES or type-references anything.
+     *
+     * "Nothing imports this file" alone is too blunt to separate the two cases the fixture holds:
+     * `unused.ts` is one exported leaf that calls nothing and is called by nothing, and `prune`
+     * should say it is dead; `orphan-module.ts` is a real module whose `orphanSecond` calls its
+     * `orphanHelper`, and there the graph genuinely cannot tell "never wired up" from "disconnected".
+     * Treating both as questions swallowed the first; treating both as findings was the original
+     * defect (oracle T16 vs T28, ADR 0104).
+     *
+     * An INERT file — no symbol in it participating in any reference, in or out — cannot be a
+     * capability awaiting wiring, because nothing inside it is wired either. That is the line, and
+     * it holds without reference to the fixture.
+     */
+    const wiredFiles = new Set<string>();
+    for (const e of allEdges as ConducksEdge[]) {
+      if (!DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type)) continue;
+      for (const endpoint of [e.sourceId, e.targetId]) {
+        const n = graph.getNode(endpoint);
+        const f = String(n?.properties?.filePath || '').toLowerCase();
+        if (f) wiredFiles.add(f);
+      }
+    }
+    /** A symbol the graph cannot judge: its file is unreachable AND the file does something. */
+    const isOpenQuestion = (filePath: unknown): boolean => {
+      const f = String(filePath).toLowerCase();
+      return !importedFiles.has(f) && wiredFiles.has(f);
+    };
+
     for (const node of nodes as ConducksNode[]) {
       // Skip virtual/taxonomy nodes that have no file path
       if (!node.properties.filePath || !node.properties.name) continue;
@@ -151,11 +213,20 @@ export class DeadCodeAnalyzer {
       const isUntrackableType = DeadCodeAnalyzer.TYPE_KINDS.has((node.properties.kind || '').toLowerCase()) && !graphTracksTypes;
       const referencedByDanglingEdge = danglingRefNames.has(node.properties.name.toLowerCase());
       if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && this.isModuleScoped(node, graph) && incomingRefs.length === 0 && !this.isEntryPoint(node)) {
-        findings.push({
+        // NOTHING IMPORTS THE FILE — so the graph cannot say whether this symbol is dead. Report the
+        // question instead of a verdict (oracle T28, ADR 0104). `orphan-module.ts` in the fixture is
+        // exactly this: two functions in a file no one imports, previously reported as a confident
+        // `[ORPHAN]` alongside genuinely unreferenced symbols in reachable modules.
+        findings.push(!isOpenQuestion(node.properties.filePath) ? {
           type: 'ORPHAN',
           symbol: node.properties.name,
           file: node.properties.filePath,
           message: `Symbol is defined but never referenced (no callers, constructors, or type references).`
+        } : {
+          type: 'UNIMPORTED_MODULE',
+          symbol: node.properties.name,
+          file: node.properties.filePath,
+          message: `Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.`
         });
         continue;
       }
@@ -172,11 +243,21 @@ export class DeadCodeAnalyzer {
         });
 
         if (!externallyUsed && !this.isEntryPoint(node)) {
-          findings.push({
+          // Same gate as the ORPHAN branch above. "Exported but never consumed" is a fact about a
+          // reachable module; in a file nothing imports it is a restatement of the file's own
+          // unreachability, and the reader cannot act on it either way. `orphanHelper` was landing
+          // here — called by `orphanSecond` in the same unimported file — so one symbol of that
+          // fixture read as a question and its sibling as a finding (ADR 0104).
+          findings.push(!isOpenQuestion(node.properties.filePath) ? {
             type: 'UNUSED_EXPORT',
             symbol: node.properties.name,
             file: node.properties.filePath,
             message: `Symbol is exported but never consumed by other modules.`
+          } : {
+            type: 'UNIMPORTED_MODULE',
+            symbol: node.properties.name,
+            file: node.properties.filePath,
+            message: `Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.`
           });
         }
       }

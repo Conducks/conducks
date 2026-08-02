@@ -345,7 +345,10 @@ export class AnalysisService {
     if (sweep.deleted > 0 || sweep.kept > 0) {
       logger.info(
         `🛡️ [Conducks] Dropped ${sweep.deleted} universal-member call(s) on local values; ` +
-        `KEPT ${sweep.kept} unresolved reference(s) — those are references this analysis could not place.`
+        `KEPT ${sweep.kept} unresolved reference(s) — those are references this analysis could not place.` +
+        // Say how many claimed to be resolved and were not. A silent re-stamp is still a mutation,
+        // and this number is the honest size of "the processor believed the receiver was enough".
+        (sweep.downgraded > 0 ? ` Downgraded ${sweep.downgraded} that still claimed a confident target.` : '')
       );
     }
 

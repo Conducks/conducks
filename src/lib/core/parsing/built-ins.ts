@@ -137,3 +137,16 @@ export function isUniversalMemberCall(symbol: string): boolean {
   if (dot < 1) return false;
   return UNIVERSAL_MEMBERS.has(symbol.slice(dot + 1).toLowerCase());
 }
+
+/**
+ * The confidence an edge carries when nothing resolved it.
+ *
+ * `CallProcessor` stamps it at capture time for a target it could not place, and
+ * `sweepUnresolvedGuesses` re-stamps it after linking onto any edge that still dangles — because
+ * whether a reference resolved is only knowable once the whole graph exists, and an edge pointing
+ * at an id no node has did not resolve, whatever the processor believed (ADR 0104).
+ *
+ * It sits below the 0.6 line every "is this trustworthy" query uses, which is the whole point: a
+ * single number that means "do not rely on this target".
+ */
+export const UNRESOLVED_CONFIDENCE = 0.4;

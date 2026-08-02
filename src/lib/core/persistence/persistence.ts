@@ -1,4 +1,4 @@
-import { isUniversalMemberCall } from '@/lib/core/parsing/built-ins.js';
+import { isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from '@/lib/core/parsing/built-ins.js';
 import { createHash } from "node:crypto";
 import { CONTENT_NODE_COLUMNS, VOLATILE_NODE_COLUMNS, CONTENT_EDGE_COLUMNS, VOLATILE_EDGE_COLUMNS } from "@/lib/core/persistence/content-key.js";
 import { resolveLayerRole, layerRoleRefusal, type LayerRole, type LayerGitFacts } from "@/lib/core/persistence/layer-roles.js";
@@ -1073,8 +1073,8 @@ export class SynapsePersistence {
    * real reference the resolver could not place — a bug to investigate, not a row to delete — and it
    * survives. Only the band that already says "this was a guess" is swept.
    */
-  public async sweepUnresolvedGuesses(minConfidence: number = 0.6): Promise<{ deleted: number; kept: number }> {
-    if (this.readOnly) return { deleted: 0, kept: 0 };
+  public async sweepUnresolvedGuesses(minConfidence: number = 0.6): Promise<{ deleted: number; kept: number; downgraded: number }> {
+    if (this.readOnly) return { deleted: 0, kept: 0, downgraded: 0 };
     await this.ensureVaultOpen();
 
     // Decide by CAUSE, not by confidence (ADR 0096, todo35).
@@ -1088,12 +1088,23 @@ export class SynapsePersistence {
     // Now only a UNIVERSAL MEMBER goes: `.map`, `.trim`, `.then` — names every JavaScript value has
     // and no project declares. Everything else stays as a visible dangler, because an unresolved
     // reference is a fact about this tool, and deleting it is how the fact was hidden.
-    const dangling = await this.query<{ id: string; targetId: string; ty: string; params: string | null }>(
-      `SELECT e.id, e.targetId, e.type AS ty, sn.param_types AS params
+    // EVERY dangling edge, not only the ones already marked unresolved.
+    //
+    // This used to read `AND e.confidence < 0.6`, which made the sweep blind to exactly the edges
+    // that lie hardest. `CallProcessor` stamps 0.85 whenever it resolved the RECEIVER's file, even
+    // though that says nothing about whether the file declares the member: `cache.get('k')` where
+    // `makeCache()` has no declared return type produced `cache.ts::cache.get` at 0.85 — an id no
+    // node has, presented as a confident resolution (oracle T02, ADR 0104).
+    //
+    // So the same cause rules now see the whole dangling population, and the survivors are
+    // re-stamped below. `minConfidence` is kept as the parameter name and is no longer a filter —
+    // it is the value an unresolved edge is downgraded TO.
+    const dangling = await this.query<{ id: string; targetId: string; ty: string; params: string | null; conf: number }>(
+      `SELECT e.id, e.targetId, e.type AS ty, sn.param_types AS params, e.confidence AS conf
        FROM edges e
        LEFT JOIN nodes n  ON e.targetId = n.id
        LEFT JOIN nodes sn ON sn.id = e.sourceId
-       WHERE n.id IS NULL AND e.confidence < ?`, [minConfidence]);
+       WHERE n.id IS NULL`);
 
     const removable = dangling.filter(e => {
       const symbol = String(e.targetId).split('::').pop() ?? '';
@@ -1123,7 +1134,24 @@ export class SynapsePersistence {
       await this.run(
         `DELETE FROM edges WHERE id IN (${chunk.map(() => '?').join(',')})`, chunk);
     }
-    return { deleted: removable.length, kept: dangling.length - removable.length };
+
+    // An edge whose target does not exist DID NOT RESOLVE, whatever the processor believed when it
+    // stamped the row. Resolution is only knowable after linking, and this runs after linking.
+    //
+    // Leaving 0.85 on a dangler is the same failure the confidence column was split to prevent
+    // (ADR 0085): `WHERE confidence < 0.6` returned zero rows on a graph where half the edges
+    // dangled. It came back in a narrower form — a dotted target whose RECEIVER resolved to a file
+    // kept the confident score even when the member was never found there.
+    const gone = new Set(removable);
+    const survivors = dangling.filter(e => !gone.has(e.id) && e.conf >= minConfidence).map(e => e.id);
+    for (let i = 0; i < survivors.length; i += 500) {
+      const chunk = survivors.slice(i, i + 500);
+      await this.run(
+        `UPDATE edges SET confidence = ? WHERE id IN (${chunk.map(() => '?').join(',')})`,
+        [UNRESOLVED_CONFIDENCE, ...chunk]);
+    }
+
+    return { deleted: removable.length, kept: dangling.length - removable.length, downgraded: survivors.length };
   }
 
   /**

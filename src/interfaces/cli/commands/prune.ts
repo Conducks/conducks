@@ -18,11 +18,25 @@ export class PruneCommand implements ConducksCommand {
     if (findings.length === 0) {
       console.log(`✅ No dead weight detected. All structural elements are in use.`);
     } else {
-      findings.forEach((f: any) => {
+      // Questions print BELOW the findings and in a different colour, because they are a different
+      // claim: a finding says "this is unused", a question says "the graph cannot tell" (ADR 0104).
+      // Mixing them in one red list is what made `orphan-module.ts` read as a deletion candidate.
+      const questions = findings.filter((f: any) => f.type === 'UNIMPORTED_MODULE');
+      const verdicts = findings.filter((f: any) => f.type !== 'UNIMPORTED_MODULE');
+
+      verdicts.forEach((f: any) => {
         const color = f.type === 'UNUSED_EXPORT' ? '\x1b[33m' : '\x1b[31m';
         console.log(`${color}- [${f.type}] ${f.symbol} (${f.file})\x1b[0m`);
         console.log(`  └─ ${f.message}`);
       });
+
+      if (questions.length > 0) {
+        console.log(`\n\x1b[1m--- ❓ Questions — not findings, and not safe to delete on this evidence ---\x1b[0m`);
+        for (const f of questions) {
+          console.log(`\x1b[36m- [${f.type}] ${f.symbol} (${f.file})\x1b[0m`);
+          console.log(`  └─ ${f.message}`);
+        }
+      }
     }
   }
 }

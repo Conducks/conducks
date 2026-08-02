@@ -1,7 +1,7 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
-import { isBuiltIn, getGlobalId } from "../built-ins.js";
+import { isBuiltIn, getGlobalId, UNRESOLVED_CONFIDENCE } from "../built-ins.js";
 
 /**
  * Conducks — Call Processor
@@ -96,7 +96,10 @@ export class CallProcessor {
       // through to a bare name were indistinguishable in the vault — which is why
       // `WHERE confidence < 0.6` returned zero rows on a graph where half the edges dangle. The
       // column now says how far to trust the edge, not merely which rule emitted it.
-      confidence: resolved ? 0.85 : 0.4,
+      // 0.85 here means "the RECEIVER resolved", not "the member was found" — the latter is not
+      // knowable until the whole graph exists. `sweepUnresolvedGuesses` re-stamps this down to
+      // UNRESOLVED_CONFIDENCE after linking for any edge that still dangles (ADR 0104).
+      confidence: resolved ? 0.85 : UNRESOLVED_CONFIDENCE,
       // `line` is the key persistence reads for the `lineNumber` column (persistence.ts, saveEdges).
       metadata: { arguments: args, original: target, resolved, line }
     });

@@ -429,10 +429,27 @@ by construction.
 - Why: an import path is written differently by every caller (aliased, relative, barrel re-export); the symbol name is not. `grep -rn "\bSymbolName\b" src tests scripts` excluding the defining file is the audit that cannot be fooled by import style.
 - Applies: every `conducks prune` ORPHAN before any deletion. See ADR 0026 for the four findings this method resolved, two of which were not deletable.
 
+## A dangling edge must not carry a confident score — the sweep only looked below 0.6
+- Gotcha: `CallProcessor` stamps 0.85 whenever it resolved the RECEIVER'S FILE, which says nothing
+  about whether that file declares the member. `cache.get('k')` where `makeCache()` has no declared
+  return type produced `cache.ts::cache.get` at 0.85 — an id no node has, presented as a fact. And
+  `sweepUnresolvedGuesses` filtered `WHERE confidence < 0.6`, so it was blind to exactly those rows.
+- Why: whether a reference resolved is only knowable AFTER linking. The sweep runs after linking, so
+  it is where the correction belongs — it now re-stamps every surviving dangler to
+  `UNRESOLVED_CONFIDENCE` and prints the count. Invariant: **no dangling edge carries ≥ 0.6**, which
+  is what makes `WHERE confidence < 0.6` mean something.
+- Applies: anything reading `edges.confidence` as trust; any new emitter choosing a confidence. Do
+  not add a second literal — import `UNRESOLVED_CONFIDENCE` from `built-ins.ts`. ADR 0104.
+
 ## An unreferenced module is a question, not a finding
 - Gotcha: "disconnected by accident" and "deliberately not wired yet" look identical to the graph — both are zero incoming edges.
 - Why: deleting the second kind destroys a capability nobody decided to drop, and git history will not tell the next reader which it was. `clustering/daac.ts` was the example — and asking the question is what killed it: 149 lines that READ as more capable than `mirror.engine.detectCluster()` and MEASURED as a no-op (501 files → 501 clusters). Capability is a measurement, not an impression of the source. Deleted by ADR 0028.
 - Applies: before deleting an orphan, answer "was this disconnected, or never connected?" A capability with no recorded decision gets an ADR line first — and the answer comes from RUNNING it, not from reading it. — ADR 0026, amended by 0028
+- Implemented 2026-08-02 as the `UNIMPORTED_MODULE` finding type (ADR 0104), and the line is NOT
+  "nothing imports this file" — that swallowed genuine dead code when tried. It is whether the file
+  contains any reference at all: an INERT file (no symbol in it calling or called by anything) is a
+  verdict, a WIRED one is a question. A file whose symbols reference nothing cannot be a capability
+  awaiting wiring, because nothing inside it is wired either.
 
 ## A graph-fixture test that invents its own node-id shape asserts nothing
 - Gotcha: `daac.test.ts` was green for months over broken code. The fixture built nodes with
