@@ -69,40 +69,91 @@ export class StructuralRanker {
 
   /**
    * Conducks — Entry Point Intelligence
+   *
+   * An entry point is where EXECUTION begins: a bin script, a server main, a framework route. It is
+   * the first thing a reader asks of an unfamiliar codebase, so a wrong answer sends them to the
+   * wrong end of the project.
+   *
+   * Measured on this repository before the rewrite (ADR 0113): **603 nodes flagged**, including 203
+   * ATOMs — local variables named `start`, `index`, `cmd`, `server` — and 3 DIRECTORIES named `cli`.
+   * The name heuristics tested the NAME and never the KIND, so any symbol sharing a word with the
+   * list qualified. Meanwhile the command displayed 12, all of them test files and debug scripts,
+   * and the real bin was absent.
+   *
+   * Three rules, each with a stated reason, and every one restricted to a kind that can actually be
+   * an entry:
+   *
+   *   route     a framework route or handler — served, not called
+   *   filename  a UNIT whose basename is a conventional program entry
+   *   root      a UNIT nothing in the project imports, and which imports something itself
+   *
+   * `reason` is recorded on the node so the answer is auditable rather than asserted.
    */
   public static detectEntryPoints(graph: ConducksAdjacencyList): void {
-    const entryPointNames = new Set(['main', 'app', 'run', 'start', 'cli', 'index', 'handler', 'server', 'cmd', 'entry']);
-    const entryPointFiles = new Set(['main.py', 'app.py', 'index.ts', 'server.ts', 'cli.ts', 'main.go', 'main.rs']);
+    // Conventional program entries. A BARE `index.ts` is deliberately absent: a barrel is the most
+    // common file in a TypeScript project and is never where execution starts — including it flagged
+    // 25 files here, none of them an entry.
+    const ENTRY_FILES = new Set([
+      'main.py', 'app.py', '__main__.py',
+      'main.go', 'main.rs', 'main.java', 'main.c', 'main.cpp',
+      'server.ts', 'server.js', 'cli.ts', 'cli.js', 'app.ts', 'app.js',
+    ]);
+    /** A test is never an entry point: nothing imports it BY DESIGN, which is the shape rule 3 reads. */
+    const isTest = (f: string) => /(^|\/)(tests?|__tests__|spec)\//.test(f) || /\.(test|spec)\.[jt]sx?$/.test(f);
+    /** A throwaway script is not the way into a project either. */
+    const isScratch = (f: string) => /(^|\/)(scripts?|tools?|examples?|fixtures?)\//.test(f);
 
     for (const node of graph.getAllNodes()) {
       const props = node.properties;
-      const lowerName = props.name?.toLowerCase() || '';
-      const basename = props.filePath ? props.filePath.split('/').pop() || '' : '';
+      const kind = String(props.canonicalKind || node.label || '');
+      const file = String(props.filePath || '');
+      const basename = file ? file.split('/').pop() || '' : '';
 
       let isEntry = false;
+      let reason = '';
 
-      // 1. Explicit Framework Routes (Detected during refraction)
-      if (node.label === 'route' || node.label?.includes('route') || props?.kind?.includes('route')) {
-        isEntry = true;
+      // 1. A framework ROUTE is served rather than called, so "nothing references it" is its normal
+      //    state and it is a genuine way in.
+      const looksRoute = node.label === 'route' || !!node.label?.includes('route')
+        || !!props?.kind?.includes('route') || props.isRoute === true;
+      if (looksRoute && (kind === 'BEHAVIOR' || kind === 'INFRA') && !isTest(file)) {
+        isEntry = true; reason = 'route';
       }
 
-      // 2. Transitive Root Signature
-      const incoming = graph.getNeighbors(node.id, 'upstream').length;
-      const outgoing = graph.getNeighbors(node.id, 'downstream').length;
-
-      if (incoming === 0 && outgoing > 0) {
-        const ck = props.canonicalKind || node.label || '';
-        if (ck === 'BEHAVIOR' || ck === 'STRUCTURE') {
-          isEntry = true;
-        }
+      // 2. A conventional entry FILENAME — UNIT only. This is what flagged directories and local
+      //    variables: the old test read `name` and `basename` against every node in the graph.
+      if (!isEntry && kind === 'UNIT' && ENTRY_FILES.has(basename.toLowerCase())
+          && !isTest(file) && !isScratch(file)) {
+        isEntry = true; reason = 'entry-filename';
       }
 
-      // 3. Global Constants & Naming Heuristics
-      if (entryPointNames.has(lowerName)) isEntry = true;
-      if (basename && entryPointFiles.has(basename)) isEntry = true;
-      if (props.isEntryPoint) isEntry = true;
+      // 3. A ROOT UNIT: nothing in the project imports it, and it imports something. That is what a
+      //    program's starting file looks like — and also what a test file looks like, which is why
+      //    tests and scratch scripts are excluded rather than left to rank low.
+      if (!isEntry && kind === 'UNIT' && !isTest(file) && !isScratch(file)) {
+        // A TEST importing a module does not make it non-entry.
+        //
+        // The bin of this very repository is imported by three test files, and counting them hid it:
+        // `importedBy` was 3, so the rule never fired and the one real entry point in the project
+        // went unreported. `prune` asks "is this used", where a test IS a real consumer; `entry`
+        // asks "is this where the program starts", where a test importer says nothing at all. Same
+        // edges, different question, opposite rule (ADR 0113).
+        const importedBy = graph.getNeighbors(node.id, 'upstream')
+          .filter(e => e.type === 'IMPORTS')
+          .filter(e => {
+            const src = graph.getNode(e.sourceId);
+            return !isTest(String(src?.properties?.filePath ?? ''));
+          }).length;
+        const importsOut = graph.getNeighbors(node.id, 'downstream')
+          .filter(e => e.type === 'IMPORTS').length;
+        if (importedBy === 0 && importsOut > 0) { isEntry = true; reason = 'root-module'; }
+      }
 
+      // NO LATCH. The old rule ended `if (props.isEntryPoint) isEntry = true`, so a node flagged once
+      // stayed flagged forever — a symbol that later gained callers remained an "entry point" across
+      // every subsequent pulse, and the flag could only ever grow.
       node.properties.isEntryPoint = isEntry;
+      if (isEntry) props.entryReason = reason; else delete (props as Record<string, unknown>).entryReason;
     }
   }
 }

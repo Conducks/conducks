@@ -123,6 +123,19 @@ export class ConducksGraph {
   }
 
   /**
+   * Recompute which nodes are entry points against the CURRENT graph.
+   *
+   * Exposed here because `entry` needs it after a plain `load()` — `resonate()` does the whole
+   * ranking pass, which is far more work than the question asks for — and because the CLI may not
+   * name a core type (ADR 0005). The command already called `(graph as any).detectEntryPoints?.()`;
+   * the optional call silently did nothing, since the function is a STATIC on `StructuralRanker`
+   * and was never a method on anything. This is the method it was reaching for (ADR 0113).
+   */
+  public detectEntryPoints(): void {
+    StructuralRanker.detectEntryPoints(this.graph);
+  }
+
+  /**
    * Conducks — Pulse Binding (Variable Handover)
    */
   private bindPulseCircuits(): void {
