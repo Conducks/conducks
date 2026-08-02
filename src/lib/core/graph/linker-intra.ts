@@ -1,3 +1,4 @@
+import { isBuiltIn, getGlobalId } from '@/lib/core/parsing/built-ins.js';
 import { ConducksAdjacencyList, type EdgeType } from './adjacency-list.js';
 import { logger } from '@/lib/core/utils/logger.js';
 import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js';
@@ -482,10 +483,18 @@ export class IntraLinker {
           const typeName = (props?.instanceOf as string | undefined)
             ?? this.returnTypeOfCall(graph, props?.instanceOfCall as string | undefined, declFile, unitImports, unitSymbols);
           if (typeName) {
-            const typeId =
-              unitSymbols.get(`${declFile}::unit`)?.get(typeName) ??
-              this.resolveSymbolUnique(typeName, `${declFile}::unit`, unitImports, unitSymbols);
-            if (typeId) resolvedId = this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols);
+            // A BUILT-IN receiver resolves to its global id. `const seen = new Set()` then
+            // `seen.has(x)` is a Set method — the type IS known, it simply has no project file, and
+            // demanding one left 348 edges dangling on this repository with the answer already
+            // recorded on the variable (ADR 0097). Same treatment a direct call on a built-in gets.
+            if (isBuiltIn(typeName, 'typescript') && graph.hasNode(getGlobalId(typeName))) {
+              resolvedId = getGlobalId(typeName);
+            } else {
+              const typeId =
+                unitSymbols.get(`${declFile}::unit`)?.get(typeName) ??
+                this.resolveSymbolUnique(typeName, `${declFile}::unit`, unitImports, unitSymbols);
+              if (typeId) resolvedId = this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols);
+            }
           }
         }
       }

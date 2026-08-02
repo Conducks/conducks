@@ -74,7 +74,19 @@ const CHECKS = {
     // A GLOBAL/namespace target is the RECEIVER, not the callee: the edge `unit -> global::console`
     // is supported by `console.log(...)`, and demanding `console(` reports 619 false alarms on this
     // repository. Checking the checker before trusting its findings is the rule ADR 0090 records.
-    if (/^(global|lib|ecosystem)::/.test(String(row.t)) && new RegExp(`(^|[^\\w$])${name}\\s*\\??\\.`, 'i').test(body)) return 'ok';
+    // A GLOBAL target is evidenced three ways: as a receiver (`console.log`), as a construction
+    // (`new Set()` — the edge then records a METHOD CALL on that Set, e.g. `seen.has`, and the
+    // global's own name never appears at the call), or as a bare callee (`parseInt(x)`).
+    if (/^(global|lib|ecosystem)::/.test(String(row.t))) {
+      if (new RegExp(`(^|[^\\w$])${name}\\s*\\??\\.`, 'i').test(body)) return 'ok';
+      if (new RegExp(`new\\s+${name}\\b`, 'i').test(body)) return 'ok';
+      if (wordIn(body, name)) return 'ok';
+      // The RECEIVER may be declared at module scope and used inside the function:
+      // `const NODE_STDLIB = new Set([...])` at line 26, `NODE_STDLIB.has(x)` at line 51. The
+      // function's span holds the call and not the construction, so the whole file is the evidence.
+      if (new RegExp(`new\\s+${name}\\b`, 'i').test(read(row.sf) || '')) return null;
+      return 'wrong';
+    }
     // An endpoint TARGET is evidenced by its PATH, not by a symbol name. `-> request::/api/logs::get`
     // is supported by `fetch('/api/logs')`, and the last segment is the HTTP METHOD, which is never
     // written as a callee.

@@ -27,9 +27,16 @@ Added to `GLOBAL_ATMOSPHERE`: TypeScript's utility types (`Record`, `Partial`, `
 (`parseInt`, `parseFloat`, `URL`, `URLSearchParams`, `TextEncoder`, `AbortController`, `Buffer`,
 `Symbol`, `structuredClone`, …).
 
+**And a BUILT-IN receiver resolves to its global id.** `const seen = new Set()` then `seen.has(x)`
+is a Set method: the type is already recorded on the variable (ADR 0082), it simply has no project
+FILE, and `memberOfType` demanded one. 348 edges on this repository dangled with the answer sitting
+on the receiver.
+
 ## Consequences
 
-- MEASURED. conducks **7.10% → 6.28%**, mentorseed **10.77% → 8.86%**, with both graphs LARGER
+- MEASURED in two steps. Adding the language's own names: conducks **7.10% → 6.28%**, mentorseed
+  **10.77% → 8.86%**. Then resolving built-in receivers: conducks **→ 4.69%**, mentorseed
+  **→ 8.46%**. Both graphs LARGER
   (18,503 and 24,641 edges). Source-verified precision unchanged at **99.98%**, 1,284 tests green.
 - **The remaining backlog is now nearly all one shape**, and it is the shape this project decided to
   keep visible: a method call on a local whose type is unknown — `seen.has`, `visited.add`,
