@@ -190,6 +190,27 @@ describe('layer_boundaries — synthetic upward edge is blocked', () => {
     expect(report.violations.filter(v => v.ruleId === 'layer_boundaries')).toHaveLength(0);
   });
 
+  /**
+   * ADR 0121 — the same conflation, one rule over. `rank_violation` reads the canonical ranks as a
+   * DEPENDENCY ladder while they are a CONTAINMENT ladder, and it walked every edge type. A
+   * `GOVERNS` edge — a `MODULE.md` documenting the directory it sits in — became
+   * "Rank inversion: MODULE.md (rank 5) -> graph (rank 4)".
+   *
+   * Twelve of the twenty-one findings `conducks guard` carried as "pre-existing, tracked" were this
+   * pair. The ECOSYSTEM carve-out above it already fixed 458 of the same shape.
+   */
+  it('does not treat a GOVERNS doc edge as a rank inversion', () => {
+    const { graph, addNode, addEdge } = build();
+    const doc = '/repo/src/lib/core/graph/MODULE.md::unit';
+    const dir = '/repo/src/lib/core/graph';
+    graph.addNode({ id: doc, label: 'UNIT', properties: { name: 'MODULE.md', filePath: '/repo/src/lib/core/graph/MODULE.md', canonicalKind: 'UNIT', canonicalRank: 5 } } as never);
+    graph.addNode({ id: dir, label: 'DIRECTORY', properties: { name: 'graph', filePath: dir, canonicalKind: 'DIRECTORY', canonicalRank: 4 } } as never);
+    addEdge('e1', doc, dir, 'GOVERNS');
+
+    const report = auditOf(graph);
+    expect(report.violations.filter(v => v.ruleId === 'rank_violations')).toHaveLength(0);
+  });
+
   /** The other half: an IMPORT across the same pair is still a breach, and must stay one. */
   it('still blocks an IMPORT across the same layer pair', () => {
     const { graph, addNode, addEdge } = build();

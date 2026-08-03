@@ -278,9 +278,18 @@ export class GovernanceService {
           // edge where both ends are symbol-level tiers (rank >= STRUCTURE). Module-level
           // inversions are better caught by the layer_boundaries rule (ADR 0005).
           const SYMBOL_LEVEL = 7; // CanonicalRank[STRUCTURE]; STRUCTURE/BEHAVIOR/ATOM/... are intra-file symbols
+          // A RANK INVERSION IS A DEPENDENCY, so only dependency edges can be one — the same
+          // correction ADR 0120 made to `layer_boundaries`, which had the identical defect: a
+          // comment saying "depending on" above a loop that walked every edge type.
+          //
+          // A `GOVERNS` edge is a `MODULE.md` documenting the directory it sits in, and it read as
+          // "Rank inversion: MODULE.md (rank 5) -> graph (rank 4)". Twelve of the twenty-one
+          // findings `guard` carried as "pre-existing, tracked" were that one pair; the ECOSYSTEM
+          // carve-out below already removed 458 of the same shape (ADR 0121).
+          const DEPENDENCY_EDGES = new Set(['IMPORTS', 'EXTENDS', 'IMPLEMENTS', 'DEPENDS_ON']);
           const allEdges = this.graph.getAllEdges();
           for (const edge of allEdges) {
-            if (edge.type === 'MEMBER_OF') continue;
+            if (!DEPENDENCY_EDGES.has(String(edge.type))) continue;
             const src = this.graph.getNode(edge.sourceId);
             const tgt = this.graph.getNode(edge.targetId);
             if (!src || !tgt) continue;

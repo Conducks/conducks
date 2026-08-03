@@ -340,7 +340,26 @@ export class ConducksGraph {
     // Pass 1: Ingest Semantic Nodes (Symbols)
     for (const metaNode of spectrum.nodes) {
       const m = metaNode.metadata || {};
-      const nodeId = m.id ? m.id.toLowerCase() : `${filePath}::${metaNode.name.toLowerCase()}`;
+      let nodeId = m.id ? m.id.toLowerCase() : `${filePath}::${metaNode.name.toLowerCase()}`;
+
+      // A SYMBOL NAMED `unit` COLLIDES WITH THE FILE THAT CONTAINS IT.
+      //
+      // A file node's id is `<path>::unit`; a symbol's is `<path>::<name>`. So `const unit = …` at
+      // file scope produces the file's own id, and `addNode`/`INSERT OR REPLACE` hands the file's
+      // row to the variable: canonicalKind UNIT -> ATOM, semantic_kind file -> variable, rank 5 -> 9.
+      //
+      // The row is overwritten but every EDGE survives, so the graph then claims a variable contains
+      // twenty functions and is imported by four modules. Measured on conducks: 4 of 666 file nodes
+      // destroyed, and all four files declare `const unit`. It surfaced as nine phantom
+      // `rank_violation` findings that `guard` had carried for months as "pre-existing, tracked"
+      // (ADR 0121).
+      //
+      // The symbol is renamed, not dropped: it is real code and deleting it would trade a wrong node
+      // for a missing one. The file keeps the id every edge in the vault already points at.
+      const kindOf = String((metaNode as any).canonicalKind || 'UNIT');
+      if (unitId && nodeId === unitId && kindOf !== 'UNIT') {
+        nodeId = `${nodeId}::symbol`;
+      }
       // A file node's parent is its DIRECTORY, which the skeleton pass already established and
       // flushed. `unitId` here IS this node's own id, so the old fallback made every unit its own
       // parent — 334 self-loops, and every parent-walk on them ran to its hop limit and gave up.

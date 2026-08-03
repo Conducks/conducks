@@ -115,3 +115,12 @@ purity, an unknown symbol, a mistyped flag, and a run from a subdirectory.
 
 `--help` was clean on all twenty, and refusing with usage when a required argument is missing was
 clean on eleven of twelve. `query` with no pattern answers `*` by design.
+
+## Phase 2d — the sentinel's other rules, checked against their tests
+
+ADR 0120 closed one half of a pattern; this checked whether the rest of the sentinel shared it.
+`has_cycles` did not — it already ignores structural and runtime edges. `rank_violation` did.
+
+- [x] `rank_violation` walked every edge type while its comment said "depending on" — 12 of its 21 findings were `GOVERNS` edges, a `MODULE.md` documenting its own directory. Now reads dependency edges only (ADR 0121).
+- [x] a symbol named `unit` overwrote the FILE that contains it — `<path>::unit` is both a file node's id and the id of a variable called `unit`, so `INSERT OR REPLACE` turned 4 of 666 file nodes into ATOM/variable while every edge to them survived (ADR 0121).
+- [x] `guard` reports 0 structural findings, layer contract clean, exit 0 — it was permanently red at the start of this phase.
