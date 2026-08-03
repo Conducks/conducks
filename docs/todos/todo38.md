@@ -62,3 +62,13 @@ impact '<the real lowercased id>'     affected: REQUEST::/users/profile::GET@1  
 container hops. Fix resolution and it passes for the right reason; then the traversal rule is safe.
 
 - [ ] Adding `findNodesByName(input)` before the bare-tail fallback was tried and is NOT sufficient on its own — it returned a node whose id still did not match the real one, so the name index's entry for synthesised nodes needs its own look first
+
+## Phase 3 — the root cause: every route and request exists twice
+
+Found while fixing resolution (ADR 0130). The vault holds BOTH a file-scoped and a bare node for the
+same route, and each carries part of its edges — so `impact` answers differently depending on which
+one it lands on. Any traversal rule measured against this graph is being measured against an artefact.
+
+- [ ] Decide which node is canonical — the file-scoped one carries the CALLS from its REQUEST, the bare one carries the edge to its file
+- [ ] Merge or alias them so a route has ONE node holding ALL its edges
+- [ ] Then re-evaluate the ADR 0129 traversal rule, which is already proven correct against a single-node graph

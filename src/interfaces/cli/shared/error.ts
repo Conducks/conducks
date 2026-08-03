@@ -34,10 +34,36 @@ export function resolveSymbol(input: string, graph: NameIndex): string {
     // matched nothing and the command reported "not found" for a symbol that exists. Try the
     // verbatim id first so nothing that worked before changes, then the lowercased form, then fall
     // back to the bare name after `::` (ADR 0106).
-    if (graph.getNode?.(input)) return input;
+    // RETURN THE NODE'S ID, NOT THE STRING THAT FOUND IT.
+    //
+    // `getNode` is lenient — it resolves an alias and a case-insensitive form — so a lookup can
+    // SUCCEED while the input differs from the id it matched. Returning `input` handed every caller
+    // a string no node is keyed by:
+    //
+    //   getNode('ROUTE::/users/profile::GET')  ->  found, real id `route::/users/profile::get`
+    //   resolveSymbol(...)                     ->  returned 'ROUTE::/users/profile::GET'
+    //
+    // `impact` then walked from an id the graph does not hold and answered `server.ts@1` for a route
+    // whose only real dependent is the REQUEST that calls it. The lookup was right; the return value
+    // threw the answer away (ADR 0130).
+    const direct = graph.getNode?.(input);
+    if (direct) return direct.id;
     const lowered = input.toLowerCase();
-    if (graph.getNode?.(lowered)) return lowered;
+    const loweredNode = graph.getNode?.(lowered);
+    if (loweredNode) return loweredNode.id;
     if (!graph.getNode) return input;   // caller cannot check; preserve the old behaviour
+
+    // A NAME CAN CONTAIN `::`. Synthesised nodes are named for WHAT THEY ARE rather than where they
+    // live — `ROUTE::/users/profile::GET`, `REQUEST::/users/profile::GET` — so an input shaped like
+    // an id may be a name, and the id lookups above can never match it.
+    //
+    // Without this the whole string fell through to the bare tail (`GET`) and the caller was handed
+    // an id no node has: `impact 'ROUTE::/users/profile::GET'` reported the raw string as its
+    // `symbolId` and then walked from nowhere, answering `server.ts` for a route whose only real
+    // dependent is the REQUEST that calls it (ADR 0130).
+    const named = graph.findNodesByName(input);
+    if (named.length > 0) return named[0].id;
+
     const bare = input.slice(input.lastIndexOf('::') + 2);
     if (!bare) {
       cliError('SYMBOL_NOT_FOUND', `No symbol matching "${input}"`,
