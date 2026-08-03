@@ -37,14 +37,14 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "METRICS (Explain)": {
-        ids: ["explain", "entropy", "cohesion"],
+        ids: ["explain", "entropy", "cohesion", "coverage", "coverage-view"],
         examples: [
           "conducks explain UserService",
           "conducks entropy src/services/",
         ],
       },
       "GOVERNANCE (Audit)": {
-        ids: ["audit", "fallback", "advise", "context", "guard", "drift"],
+        ids: ["audit", "fallback", "advise", "context", "guard", "drift", "ledger", "supply-chain"],
         examples: [
           "conducks audit",
           "conducks context UserService --max-tokens 4000",
@@ -69,7 +69,7 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "SYSTEM (Meta)": {
-        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "bootstrap-docs", "help"],
+        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "monitor", "bootstrap-docs", "docs-lint", "docs-status", "help"],
         examples: [
           "conducks setup",
           "conducks uninstall",
@@ -94,6 +94,27 @@ export class HelpCommand implements ConducksCommand {
       });
       console.log("");
     });
+
+    // ANYTHING THE MAP FORGOT STILL PRINTS.
+    //
+    // The groups above are a hardcoded list of ids, and a command absent from it was invisible: 32
+    // of 39 were listed, and the seven missing included `docs-lint` — the documented CI gate — and
+    // `coverage`, which four ADRs of this sweep were spent fixing. Every one of them worked; none
+    // could be found from the tool itself (ADR 0125).
+    //
+    // Assigning those seven to groups fixes today. This fixes tomorrow: the next command added to
+    // the CLI and forgotten here appears under OTHER rather than nowhere, so the failure mode is a
+    // slightly untidy help screen instead of a feature nobody knows exists.
+    const grouped = new Set(Object.values(domains).flatMap(d => d.ids));
+    const ungrouped = this.commands.filter(c => !grouped.has(c.id));
+    if (ungrouped.length > 0) {
+      console.log(` \x1b[36m\x1b[1mOTHER\x1b[0m`);
+      for (const cmd of ungrouped) {
+        const padding = " ".repeat(Math.max(2, 16 - cmd.id.length));
+        console.log(`   ${cmd.id}\x1b[2m${padding}${cmd.description}\x1b[0m`);
+      }
+      console.log("");
+    }
 
     console.log(` \x1b[1mEXAMPLES\x1b[0m`);
     console.log(`   \x1b[2mconducks analyze ./my-project\x1b[0m`);

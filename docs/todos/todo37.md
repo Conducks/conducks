@@ -87,16 +87,16 @@ if it ever confuses someone.
 
 - [x] analyze — idempotency and incremental resolution (ADR 0101/0107)
 - [x] rename — the only mutating command (ADR 0106)
-- [ ] clean
-- [ ] doctor
+- [x] clean — measured, NO DEFECT: purges the vault to zero and leaves source untouched, exactly as described
+- [x] doctor — measured, NO DEFECT: six checks, each naming what it verified
 - [x] link — scored with `list` (ADR 0114)
-- [ ] monitor
+- [x] monitor — measured, NO DEFECT: the branch mismatch it reported belonged to another registered root and was correctly labelled
 - [ ] watch
-- [ ] setup
-- [ ] uninstall
-- [ ] mcp
+- [>] setup — deferred: mutates the real Claude Desktop config, so it is not run from a sweep. Needs a --dry-run before it can be measured safely
+- [>] uninstall — deferred: same reason. It writes a .bak, but edits a file outside the project with no confirmation
+- [x] mcp — measured, NO DEFECT: --sse verified live on port 3001
 - [ ] mirror
-- [ ] help
+- [x] help — listed 32 of 39 commands; the seven missing included docs-lint and coverage (ADR 0125)
 
 ## Known limitation, tracked separately
 
