@@ -51,6 +51,29 @@ describe('the count a pulse reports is the count the vault holds', () => {
    * The 56x case. An incremental pulse flushes only what changed, so a running sum reports the size
    * of the CHANGE while calling it the size of the project.
    */
+  /**
+   * `status` ran `graphEngine.resonate()` before reporting — a write-side rebuild on a read path —
+   * and then reported the graph it had just mutated. Measured on conducks: 19,528 edges reported
+   * against 19,523 rows held, and **every one of the five was DANGLING** — each had at least one
+   * endpoint that is not a node. The vault refuses those on save, correctly; the in-memory graph
+   * kept them, so the number a user reads was the vault's plus five phantoms.
+   *
+   * Asserting equality between two independent surfaces is the point: a read command must report
+   * what it loaded.
+   */
+  it('status reports the same edge count the pulse reported', () => {
+    // A pulse with nothing to do prints no reflection line at all, and the previous test already
+    // analyzed this tree — so give it a real change to react to.
+    writeFile(repo, 'src/d.ts', 'export function d(): number { return 9; }\n');
+    commit(repo, 'add d');
+    const analyze = runCli(['analyze', '--yes'], { cwd: repo });
+    const m = analyze.combined.match(/Synapse Reflection: [\d,]+ Nodes, ([\d,]+) Edges/);
+    expect(m).toBeTruthy();
+    const pulseEdges = Number(m![1].replace(/,/g, ''));
+    const status = JSON.parse(runCli(['status', '--json'], { cwd: repo }).stdout);
+    expect(status.stats.edgeCount).toBe(pulseEdges);
+  }, 300000);
+
   it('an incremental pulse reports the vault total, not the size of the change', () => {
     writeFile(repo, 'src/c.ts', 'export function c(): number { return 4; }\n');
     commit(repo, 'touch c');

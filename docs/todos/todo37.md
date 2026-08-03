@@ -70,7 +70,7 @@ Both surfaced re-running the fixed build on a one-file fixture. Neither is a `co
 
 - [x] `analyze` reported a count the vault does not hold — `17 Nodes` against 15 rows on a one-file repo, and `96 Nodes` against **5,409** on conducks. Fixed: the headline is now counted from the vault after the sweep (ADR 0117).
 - [-] `query "*" --json` omits ECOSYSTEM, REPOSITORY and DIRECTORY — dropped: **not a defect, and I recorded it wrong.** `search-engine.ts::inventory` excludes those three deliberately, with the reason written above it: an inventory answering with the folder tree before a single function buries the answer. `query fresh1` returns them by name, which is the intended way to reach a container.
-- [ ] `status` reports 5 more edges than the vault holds — 19,528 against 19,523 rows, with no federated project linked, so the loaded graph derives five edges that are never persisted. Same class as the count defect above; cause not yet found, and not guessed at.
+- [x] `status` reported 5 more edges than the vault holds — 19,528 against 19,523. Cause: `status` ran `graphEngine.resonate()`, the write-side rebuild, and reported the graph it had just mutated; all five edges it added were DANGLING (ADR 0118). Not guessing at it was worth it — federation, a double load and a stale vault were all plausible and all wrong.
 
 Also observed, not a defect: **10 of the 15 nodes in a one-file project are legend anchors** (one per
 taxonomy kind, plus `Structural Legend`). Only 5 are real structure. That is by design, but it means

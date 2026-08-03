@@ -225,6 +225,17 @@ export class ConducksGraph {
             // the WHOLE graph from the vault before calling `resonate()` (analysis/index.ts, ADR
             // 0041's clear-per-wave is undone there). Nothing here depends on which wave a file
             // landed in — the same trap todo22#P7 removed from `ingestSpectrum`'s Ghost Local strip.
+            // BOTH ENDS MUST BE NODES. The check above recovers the producing CALL and refuses
+            // without it — "an edge from a non-existent node is worse than a missing edge" — but a
+            // recovered call's TARGET is still only a target, and an unresolved receiver leaves a
+            // bare `receiver.method` string that names nothing here.
+            //
+            // Measured on conducks: `resonate()` added five of these and ALL FIVE were dangling —
+            // `path.resolve -> staticre.exec`, `graph.getnode -> detector.detectfallbackpatterns`,
+            // `resolved.find -> @jest/globals::expect`. The vault refuses them on save, which is why
+            // the in-memory graph reported 19,528 edges against 19,523 rows held. The count gap was
+            // the visible half; the dangling edges were the defect (ADR 0118).
+            if (!this.graph.getNode(producingCall.targetId) || !this.graph.getNode(call.targetId)) continue;
             const edge: ConducksEdge = {
               id: `PULSE::${node.id}::${producingCall.targetId}->${call.targetId}`,
               sourceId: producingCall.targetId,

@@ -73,7 +73,15 @@ export class StatusCommand implements ConducksCommand {
       }
 
       // 3. Mode: Health (Default)
-      (registry.infrastructure.graphEngine as any).resonate();
+      //
+      // NO `resonate()` HERE. It is the write-side rebuild — it runs every binder — and calling it
+      // on a read path meant `status` reported a graph it had just mutated. Measured on conducks it
+      // reported 19,528 edges against 19,523 rows in the vault, because `bindPulseCircuits` added
+      // five handover edges that the vault refuses (they were dangling — ADR 0118 fixes that half).
+      //
+      // Nothing here needs it: the ranks `topGravity` sorts by are recomputed by StructuralRanker
+      // when the graph LOADS, and every count comes from the loaded graph. A read command reports
+      // what it loaded (ADR 0118).
       const status = registry.audit.status();
       // `status()` reports the in-memory graph, which does not know which pulse produced it or
       // whether persistence answered from the live vault or the previous pulse's snapshot (ADR
