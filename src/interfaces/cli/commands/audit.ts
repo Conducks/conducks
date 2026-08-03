@@ -147,6 +147,11 @@ export class AuditCommand implements ConducksCommand {
   private async runFallbackAnalysis(registry: Registry): Promise<void> {
     console.log(`\x1b[35m[Conducks Audit] Analyzing fallback patterns...\x1b[0m`);
 
+    // This path WALKS the graph, so the deferred load (ADR 0038) has to be materialised first.
+    // Without it `audit --fallback` died with "The structural graph is not materialised" — the
+    // guard doing its job, on a documented flag that therefore never ran at all (ADR 0123).
+    await registry.infrastructure.ensureGraphLoaded();
+
     const detector = registry.audit.createFallbackDetector();
     const graph = registry.infrastructure.graphEngine.getGraph();
     const allNodes = Array.from(graph.getAllNodes());
@@ -166,7 +171,14 @@ export class AuditCommand implements ConducksCommand {
       .slice(0, 20); // Top 20 most suspicious
 
     if (fallbackCandidates.length === 0) {
-      console.log("✅ No suspicious fallback patterns found.");
+      // WITH THE DENOMINATOR. "No suspicious patterns found" reads identically whether two thousand
+      // functions were examined or none were, and this project has been caught by that shape three
+      // times (ADR 0044, ADR 0073, and the sentinel rule that matched 0 nodes). Saying how many were
+      // scanned is what separates a clean result from an empty one (ADR 0123).
+      const examined = allNodes.filter(n => n.properties.canonicalKind === 'BEHAVIOR').length;
+      console.log(examined === 0
+        ? "\x1b[33m⚠️  No BEHAVIOR symbols in the graph — nothing was examined, which is not the same as clean.\x1b[0m"
+        : `✅ No suspicious fallback patterns among ${examined} function(s) examined.`);
       return;
     }
 

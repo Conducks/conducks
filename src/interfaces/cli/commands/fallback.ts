@@ -27,7 +27,29 @@ export class FallbackCommand implements ConducksCommand {
         [minConfidence, minTenure, limit]);
 
       if (results.length === 0) {
-        console.log("✅ No suspicious fallback patterns found with current filters.");
+        // AN ABSENCE IS NOT A CLEAN VERDICT. The template filters on
+        // `dna.fallbackAnalysis.isFallback`, and `analyze` does not write that field at all —
+        // measured on conducks, 0 of 5,472 nodes carry it. So this branch was reached on every
+        // project, for every filter, and printed a green tick that read as "your code is clean"
+        // (ADR 0123).
+        //
+        // The two cases are told apart by ASKING WHETHER THE FIELD EXISTS, not by inferring it from
+        // an empty result — the same rule ADR 0115 applied to entropy and cohesion: zero is a value,
+        // and it must be distinguishable from nothing having been measured.
+        const [carrier] = await registry.infrastructure.persistence.query<{ n: number }>(
+          `SELECT count(*) AS n FROM nodes WHERE json_extract(dna, '$.fallbackAnalysis') IS NOT NULL`
+        );
+        const analysed = Number(carrier?.n ?? 0);
+        if (analysed === 0) {
+          console.log(
+            `\x1b[33m⚠️  No node carries a fallback analysis, so nothing was measured — this is NOT a clean result.\x1b[0m\n` +
+            `   \`analyze\` does not produce \`dna.fallbackAnalysis\`; the detector runs on demand.\n` +
+            `   Run \`conducks audit --fallback\` for the live scan.`
+          );
+          process.exitCode = 1;
+          return;
+        }
+        console.log(`✅ ${analysed} symbol(s) carry a fallback analysis; none matched these filters.`);
         return;
       }
 

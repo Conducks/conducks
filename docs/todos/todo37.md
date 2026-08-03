@@ -62,7 +62,7 @@ unfamiliar, a real monorepo), and conducks itself.
 - [x] record — wrote the wrong content to the wrong file with a tick, accepted any type, and produced files failing this project's own docs-lint (ADR 0122)
 - [x] supply-chain — --json advertised and absent; my own ADR 0119 regex matched json_extract_string in SQL rather than a flag read (ADR 0122)
 - [ ] drift — measured: reports honestly, but reaches "no drift verdict" at exit 0 on an unknown pulse. Informational rather than a gate, so the exit code needs its own decision
-- [ ] fallback
+- [x] fallback — printed a green tick for a field nothing writes (0 of 5,472 nodes), and  crashed on a deferred graph (ADR 0123)
 
 ## Phase 2b — found while verifying, chased
 
