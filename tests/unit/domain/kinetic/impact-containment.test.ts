@@ -63,10 +63,7 @@ describe('impact separates dependency from co-location', () => {
     return g;
   };
 
-  // SKIPPED, owned by todo38#P1 (CONDUCKS-36). The defect is real and reproduced here; the fix is
-  // not shipped. See the todo for what is now KNOWN: the traversal rule is correct, and what blocks
-  // it is symbol resolution, not the traversal.
-  it.skip('A — does not report a same-file sibling as affected', () => {
+  it('A — does not report a same-file sibling as affected', () => {
     const r = analyzer().analyzeImpact(siblingGraph(), '/r/src/util.ts::format', 'upstream');
     const names = (r.affectedNodes ?? []).map((n: any) => n.name);
     expect(names).toContain('fetchUser');

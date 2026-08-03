@@ -1,5 +1,5 @@
 # todo38 — impact reaches a sibling through its container
-Status: todo
+Status: doing
 
 - Acceptance: `impact <symbol> upstream` reports no node whose only route to the symbol is a containment hop, AND `cross-service.test.ts` still binds a REQUEST to its ROUTE. Both proven by tests that fail without the change.
 - Depends: none
@@ -35,8 +35,8 @@ contains a real dependent" from "a sibling that merely shares a file".
 - [x] Reproduce both cases in one test file so the fix cannot satisfy one and break the other — `tests/unit/domain/kinetic/impact-containment.test.ts`, case A skipped and owned here
 - [x] Decide the rule — MEASURED: skipping `MEMBER_OF` while walking upstream is CORRECT. Given the ROUTE node's real id it returns `REQUEST@1`, which is exactly right. No cleverer rule is needed.
 - [ ] Fix  so a NAME containing `::` resolves to its node (see below), then re-apply the one-line traversal rule
-- [ ] Verify on the hand-derived fixture that `unusedHelper` is gone and `fetchUser`, `main`, `service.ts`, `main.ts` remain
-- [ ] Un-skip `tests/unit/domain/kinetic/impact-containment.test.ts`
+- [x] Verify on the hand-derived fixture that `unusedHelper` is gone and `fetchUser`, `main`, `service.ts`, `main.ts` remain — exact match (ADR 0131)
+- [x] Un-skip `tests/unit/domain/kinetic/impact-containment.test.ts` — live, zero skipped tests in the suite
 
 ## Phase 2 — the same question for `trace` AND `context`
 
@@ -62,7 +62,7 @@ impact '<the real lowercased id>'     affected: REQUEST::/users/profile::GET@1  
 `cross-service.test.ts` passes today only because that wrong start happens to reach REQUEST through
 container hops. Fix resolution and it passes for the right reason; then the traversal rule is safe.
 
-- [ ] Adding `findNodesByName(input)` before the bare-tail fallback was tried and is NOT sufficient on its own — it returned a node whose id still did not match the real one, so the name index's entry for synthesised nodes needs its own look first
+- [x] The name-index question resolved itself: with the duplicates gone, resolution lands on the one real node (ADR 0131)
 
 ## Phase 3 — the root cause: every route and request exists twice
 
@@ -70,6 +70,6 @@ Found while fixing resolution (ADR 0130). The vault holds BOTH a file-scoped and
 same route, and each carries part of its edges — so `impact` answers differently depending on which
 one it lands on. Any traversal rule measured against this graph is being measured against an artefact.
 
-- [ ] Decide which node is canonical — the file-scoped one carries the CALLS from its REQUEST, the bare one carries the edge to its file
-- [ ] Merge or alias them so a route has ONE node holding ALL its edges
-- [ ] Then re-evaluate the ADR 0129 traversal rule, which is already proven correct against a single-node graph
+- [x] Decide which node is canonical — the file-scoped one; the bare one was a fake library symbol minted from an unresolved edge target (ADR 0131)
+- [x] Merge or alias them so a route has ONE node holding ALL its edges — ingest now resolves the name, induction never sees it, and the re-stamp starves legacy fakes (8 -> 0 on this repo)
+- [x] Then re-evaluate the ADR 0129 traversal rule — SHIPPED, with its test un-skipped

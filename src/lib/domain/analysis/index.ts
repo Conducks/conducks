@@ -630,10 +630,46 @@ export class AnalysisService {
     // sweep of "things this pulse referenced" never reaches it. The first version of this did exactly
     // that and the sweep then deleted both library nodes on the second pulse, which the whole-pulse
     // test caught. Anything not re-stamped keeps an older pulseId and is swept as stale.
+    // ONLY WHAT THE PULSE STILL DEPENDS ON — which is ADR 0050's own sentence, now enforced. The
+    // first version re-stamped EVERY `external://` node unconditionally, so an external symbol was
+    // immortal from the moment it was minted: measured on this repository, 8 fake `route::`/
+    // `request::` library symbols left behind by the pre-ADR-0131 ingest defect survived two
+    // consecutive `analyze --force` runs with ZERO edges pointing at them, because every pulse
+    // stamped them afresh and the sweep could never collect them. The same immortality applied to
+    // legitimate externals whose last reference was deleted — the supply-chain surface only ever
+    // grew.
+    //
+    // The rule: a leaf external survives while some edge still targets it; a container (`lib::`
+    // namespace, the ecosystem root) survives while a surviving node still names it as parent.
+    // Containers are never edge targets — containment is carried on `parentId` (the fact that made
+    // the original edge-walking version delete them, ADR 0050) — so the parent chain is followed to
+    // a fixpoint instead.
     const alreadyCollected = new Set(induced.map(n => n.id));
-    for (const n of graph.getAllNodes()) {
-      if (alreadyCollected.has(n.id)) continue;
-      if (!String(n.properties?.filePath ?? '').startsWith('external://')) continue;
+    const edgeTargets = new Set(allEdges.map((e: any) => String(e.targetId).toLowerCase()));
+    const externals: any[] = Array.from(graph.getAllNodes())
+      .filter((n: any) => !alreadyCollected.has(n.id) && String(n.properties?.filePath ?? '').startsWith('external://'));
+
+    const kept = new Set<string>(induced.map(n => String(n.id).toLowerCase()));
+    for (const n of externals) {
+      if (edgeTargets.has(String(n.id).toLowerCase())) kept.add(String(n.id).toLowerCase());
+    }
+    // Parent chains are at most symbol -> lib::x -> ecosystem::global, but a fixpoint costs nothing
+    // and does not bake that depth in.
+    const parentOf = new Map<string, string>();
+    for (const n of [...externals, ...induced as any[]]) {
+      const p = String((n.properties as any)?.parentId ?? '').toLowerCase();
+      if (p) parentOf.set(String(n.id).toLowerCase(), p);
+    }
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const [child, parent] of parentOf) {
+        if (kept.has(child) && !kept.has(parent)) { kept.add(parent); grew = true; }
+      }
+    }
+
+    for (const n of externals) {
+      if (!kept.has(String(n.id).toLowerCase())) continue;
       induced.push({ id: n.id, name: n.properties.name, label: n.label, properties: n.properties });
       restampedCount++;
     }

@@ -128,6 +128,20 @@ export abstract class BaseAnalyzer {
 
       for (const edge of graph.getNeighbors(currentId, direction)) {
         const nextId = direction === 'downstream' ? edge.targetId : edge.sourceId;
+
+        // CONTAINMENT IS ONE-WAY. A MEMBER_OF edge runs child -> container. Following it FORWARD is
+        // a real claim: change the function and the file changed. Following it BACKWARD says every
+        // OTHER symbol in that file was affected too — co-location, not dependency.
+        //
+        // Measured on a hand-derived fixture: `impact format upstream` reported `unusedHelper` at
+        // distance 3.5. Its only edge in the whole graph is MEMBER_OF service.ts, and it never
+        // references `format`; 3.5 = 2 + 1.5, and 1.5 is precisely the MEMBER_OF weight followed
+        // from the container back down into a sibling.
+        //
+        // This rule was proven in ADR 0129 and could not ship until ADR 0131 removed the duplicate
+        // route nodes — the cross-service test was reaching a REQUEST through container hops only
+        // because resolution had landed on a bare duplicate that lacked the direct CALLS edge.
+        if (edge.type === 'MEMBER_OF' && direction === 'upstream') continue;
         const edgeWeight = weights[edge.type] || 1.0;
         pq.push({ id: nextId.toLowerCase(), weight: currentWeight + edgeWeight, path: [...path, edge] });
       }

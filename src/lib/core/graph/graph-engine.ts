@@ -430,6 +430,22 @@ export class ConducksGraph {
         if (this.graph.hasNode(localCandidate)) {
           targetId = localCandidate;
         }
+      } else if (!this.graph.hasNode(targetId)) {
+        // A NAME CAN CONTAIN `::`. Synthesised nodes are named for what they are —
+        // `ROUTE::/users/profile::GET`, `REQUEST::…` — and this branch assumed any target with `::`
+        // was already a full id, so the edge from the defining scope kept the bare string. External
+        // induction then read that unresolved target as `route` the PACKAGE and `/users/profile`
+        // its member, minting a fake library symbol — and every route existed twice with its edges
+        // split between the copies (ADR 0131, the root cause behind ADR 0129/0130).
+        //
+        // Third site with this exact assumption, after `resolveSymbol`'s two (ADR 0130). The guard
+        // is double: the target does NOT resolve as it stands, and the file-scoped candidate DOES —
+        // so no edge that resolves today can change. A real cross-file id is an absolute path;
+        // prefixing it with another file's path can never name a node, so `hasNode` filters it out.
+        const localCandidate = `${filePath}::${targetId}`;
+        if (this.graph.hasNode(localCandidate)) {
+          targetId = localCandidate;
+        }
       }
       // THE "GHOST LOCAL" STRIP IS GONE, and it was a correctness bug wearing a performance costume.
       //
