@@ -28,12 +28,49 @@ export class SupplyChainCommand implements ConducksCommand {
        GROUP BY 1 ORDER BY 2 DESC`
     );
 
+    const useJson = args.includes("--json");
+
     if (summary.length === 0) {
+      if (useJson) { process.stdout.write(JSON.stringify({ origins: [], packages: [], advisories: { available: false } }, null, 2) + '\n'); return; }
       console.log(`\x1b[33m⚠️  No boundary edges found. Run 'conducks analyze' first.\x1b[0m`);
       return;
     }
 
     const versions = this.readPackageVersions(registry.infrastructure.chronicle.getProjectDir());
+
+    // `--json` was ADVERTISED in this command's usage before it existed. ADR 0119 derived each
+    // command's flag set with a regex over its source, and here that pattern matched
+    // `json_extract_string(...)` inside a SQL string rather than a flag read — so `[--json]` was
+    // added to the usage of a command that had no such flag, and the dispatcher then accepted it
+    // and printed human output. Implementing it makes the advertisement true (ADR 0122).
+    //
+    // `advisories.available` travels in the payload because the human branch already says it out
+    // loud: unavailable advisories mean vulnerability status is UNKNOWN, not clean, and a machine
+    // reader needs that distinction as much as a person does.
+    if (useJson) {
+      const pkgRows = await persistence.query<{ pkg: string; importers: number }>(
+        `SELECT json_extract_string(properties,'$.package') AS pkg,
+                COUNT(DISTINCT sourceId) AS importers
+         FROM edges WHERE type = 'DEPENDS_ON'
+           AND json_extract_string(properties,'$.origin') = 'dependency'
+           AND json_extract_string(properties,'$.package') IS NOT NULL
+         GROUP BY 1 ORDER BY 2 DESC`
+      );
+      const { byPackage, available } = this.readAdvisories(registry.infrastructure.chronicle.getProjectDir());
+      process.stdout.write(JSON.stringify({
+        origins: summary
+          .filter(r => !depsOnly || r.origin === 'dependency')
+          .map(r => ({ origin: r.origin, edges: Number(r.edges), distinctSurfaces: Number(r.surfaces) })),
+        packages: pkgRows.map(p => ({
+          package: p.pkg,
+          importers: Number(p.importers),
+          version: versions.get(p.pkg) ?? null,
+          advisory: byPackage.get(p.pkg) ?? null,
+        })),
+        advisories: { available },
+      }, null, 2) + '\n');
+      return;
+    }
 
     console.log(`\n\x1b[1m--- 🏺 Supply-Chain Surface (System 2) ---\x1b[0m`);
     for (const row of summary) {

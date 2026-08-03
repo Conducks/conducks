@@ -56,13 +56,13 @@ unfamiliar, a real monorepo), and conducks itself.
 
 - [x] coverage — refuses a file that is not an istanbul report; `--vs-baseline` can fail (ADR 0116)
 - [x] coverage-view — `--out` refuses a flag, exits non-zero, line-weighted summary (ADR 0116)
-- [ ] diff
-- [ ] drift
-- [ ] guard
-- [ ] ledger
-- [ ] record
+- [x] diff — compared against a pulse the vault no longer holds, reporting +5472/-0 symbols between two pulses three minutes apart, and the same answer for a pulse id that does not exist (ADR 0122)
+- [x] guard — layer rule and rank rule both judged every edge type; now passes on this repo (ADR 0120/0121)
+- [x] ledger — measured, no defect found: the ORPHAN deduction fires correctly (-18 for 9 orphans). A written prediction that it never fired was WRONG
+- [x] record — wrote the wrong content to the wrong file with a tick, accepted any type, and produced files failing this project's own docs-lint (ADR 0122)
+- [x] supply-chain — --json advertised and absent; my own ADR 0119 regex matched json_extract_string in SQL rather than a flag read (ADR 0122)
+- [ ] drift — measured: reports honestly, but reaches "no drift verdict" at exit 0 on an unknown pulse. Informational rather than a gate, so the exit code needs its own decision
 - [ ] fallback
-- [ ] supply-chain
 
 ## Phase 2b — found while verifying, chased
 

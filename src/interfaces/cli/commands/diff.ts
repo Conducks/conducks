@@ -13,33 +13,58 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class DiffCommand implements ConducksCommand {
   public id = "diff";
   public description = "Analyze structural risk of current changes (staged/unstaged)";
-  public usage = "conducks diff [--base <id>] [--head <id>]";
+  public usage = "conducks diff [--base <id>] [--head <id>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const baseIdx = args.indexOf('--base');
     const headIdx = args.indexOf('--head');
+    const useJson = args.includes('--json');
+
+    // `--head` was read ONLY inside the `--base` branch, so on its own it was accepted and the
+    // command silently ran the git path instead — the caller asked to compare two pulses and got
+    // an answer about their working tree (ADR 0122).
+    if (headIdx !== -1 && baseIdx === -1) {
+      console.error('--head names the pulse to compare TO, and needs --base to compare FROM.');
+      console.error(`Usage: ${this.usage}`);
+      process.exitCode = 1;
+      return;
+    }
 
     if (baseIdx !== -1) {
       const basePulseId = args[baseIdx + 1];
       const headPulseId = headIdx !== -1 ? args[headIdx + 1] : null; // null means current
-      console.log(`[DEBUG] Diffing Base: ${basePulseId}, Head: ${headPulseId}`);
-
-      await this.executeChronoscopicDiff(basePulseId, headPulseId, registry);
+      if (!basePulseId || basePulseId.startsWith('-')) {
+        console.error('--base needs a pulse id. List them with `conducks status --json` (staleness.pulseId).');
+        process.exitCode = 1;
+        return;
+      }
+      await this.executeChronoscopicDiff(basePulseId, headPulseId, registry, useJson);
       return;
     }
 
     // Default: Git-based PR Risk Engine
     await syncGraph(registry);
 
-    console.log(`\n\x1b[1m--- 🛡️ Conducks PR Risk Engine ---\x1b[0m`);
+    if (!useJson) console.log(`\n\x1b[1m--- 🛡️ Conducks PR Risk Engine ---\x1b[0m`);
 
-    // 1. Get changed hunks from Git
+    // 1. Get changed hunks from Git.
+    //
+    // `git diff HEAD`, not `git diff`. The bare form shows UNSTAGED changes only, so a change set
+    // that had been fully `git add`-ed reported "No structural changes detected in workspace" —
+    // while this command's own description says "staged/unstaged". The reading a user wants before
+    // committing is everything not yet in HEAD (ADR 0122).
     let diff = "";
     try {
-      diff = execSync('git diff -U0', { encoding: 'utf-8' });
+      diff = execSync('git diff -U0 HEAD', { encoding: 'utf-8' });
     } catch (e) {
-      console.error("Error: Git diff failed. Is this a git repository?");
-      process.exit(1);
+      // Before the first commit there is no HEAD to diff against; fall back to the worktree form
+      // rather than reporting "not a git repository", which would be a wrong diagnosis.
+      try {
+        diff = execSync('git diff -U0', { encoding: 'utf-8' });
+      } catch {
+        console.error("Error: Git diff failed. Is this a git repository?");
+        process.exit(1);
+      }
     }
     const changes = this.parseDiff(diff);
 
@@ -94,99 +119,123 @@ export class DiffCommand implements ConducksCommand {
     });
   }
 
-  private async executeChronoscopicDiff(baseId: string, headId: string | null, registry: Registry): Promise<void> {
-    // Everything below comes from COMPOSITION. These were three dynamic imports straight into
-    // `core`, which is not a legal edge for `cli` — and being dynamic, they were invisible to the
-    // graph-based layer rule, so `guard` reported the contract clean while they violated it
-    // (ADR 0048).
-    const baseGraph = registry.infrastructure.createGraph();
-    const headGraph = registry.infrastructure.createGraph();
-
+  /**
+   * Compare two pulses using WHAT THE VAULT ACTUALLY RETAINS.
+   *
+   * This used to query `SELECT * FROM nodes WHERE pulseId = ?`. But `sweepRowsNotInPulse` deletes
+   * every row not written by the CURRENT pulse, so a historical pulse has no rows in `nodes` at
+   * all — the base graph loaded EMPTY and the command reported every symbol in the project as newly
+   * added. Measured on conducks, comparing two consecutive pulses three minutes apart:
+   *
+   *     Loaded Base: 0 nodes, 0 edges
+   *     Summary: Delta: +5472/-0 Symbols, +19675/-0 Relationships.
+   *
+   * A pulse id that does not exist produced the identical answer, so nothing told a real comparison
+   * from a fabricated one (ADR 0122).
+   *
+   * `node_history` is the table that keeps per-pulse rows: pulseId, nodeId, gravity, complexity,
+   * fingerprint. Names and kinds are joined from `nodes` where the symbol still exists. There is NO
+   * edge history, so relationship counts are not reported rather than invented — what is retained is
+   * stated in the output instead of implied.
+   */
+  private async executeChronoscopicDiff(baseId: string, headId: string | null, registry: Registry, useJson: boolean): Promise<void> {
     const db = registry.infrastructure.persistence;
-    // A capability check rather than an `instanceof` against a core class: the question is whether
-    // this vault can answer a parameterised query, not which class implements it.
     if (typeof (db as any)?.query !== 'function') {
-      console.error("Chronoscopic diff requires a queryable vault.");
+      console.error('Chronoscopic diff requires a queryable vault.');
       process.exit(1);
     }
 
+    // A pulse the vault does not hold is refused by name. Comparing against nothing and calling the
+    // result a delta is the defect this whole command had.
+    const known = async (id: string) =>
+      (await db.query<{ n: number }>('SELECT count(*) AS n FROM node_history WHERE pulseId = ?', [id]))[0];
+    const baseRows = Number((await known(baseId))?.n ?? 0);
+    if (baseRows === 0) {
+      const recent = await db.query<{ id: string }>('SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 5');
+      console.error(`No history for pulse '${baseId}' — the vault does not hold it.`);
+      if (recent.length > 0) console.error('Pulses it does hold: ' + recent.map(r => r.id).join(', '));
+      process.exitCode = 1;
+      return;
+    }
+    if (headId && Number((await known(headId))?.n ?? 0) === 0) {
+      console.error(`No history for pulse '${headId}' — the vault does not hold it.`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const headPulse = headId ?? (await db.query<{ id: string }>(
+      'SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1'))[0]?.id;
+
+    type Row = { nodeId: string; gravity: number; complexity: number; fingerprint: string };
+    const rowsOf = (id: string) => db.query<Row>(
+      'SELECT nodeId, gravity, complexity, fingerprint FROM node_history WHERE pulseId = ?', [id]);
+    const baseMap = new Map((await rowsOf(baseId)).map(r => [String(r.nodeId), r]));
+    const headMap = new Map((await rowsOf(headPulse)).map(r => [String(r.nodeId), r]));
+
+    const nameRows = await db.query<{ id: string; name: string }>('SELECT id, name FROM nodes');
+    const names = new Map(nameRows.map(r => [String(r.id), String(r.name)]));
+    const label = (id: string) => names.get(id) ?? id;
+
+    const added = [...headMap.keys()].filter(id => !baseMap.has(id));
+    const removed = [...baseMap.keys()].filter(id => !headMap.has(id));
+    const changed: Array<{ id: string; name: string; gravityShift: number; complexityBloat: number; dnaShift: boolean }> = [];
+    for (const [id, h] of headMap) {
+      const b = baseMap.get(id);
+      if (!b) continue;
+      const gravityShift = Number(h.gravity ?? 0) - Number(b.gravity ?? 0);
+      const complexityBloat = Number(h.complexity ?? 0) - Number(b.complexity ?? 0);
+      const dnaShift = !!b.fingerprint && !!h.fingerprint && b.fingerprint !== h.fingerprint;
+      if (gravityShift !== 0 || complexityBloat !== 0 || dnaShift) {
+        changed.push({ id, name: label(id), gravityShift, complexityBloat, dnaShift });
+      }
+    }
+    changed.sort((a, b) => Math.abs(b.gravityShift) - Math.abs(a.gravityShift));
+
+    if (useJson) {
+      process.stdout.write(JSON.stringify({
+        base: baseId,
+        head: headPulse,
+        // Named so a caller cannot mistake a partial comparison for a whole one.
+        retains: 'node identity, gravity, complexity and fingerprint per pulse; edge history is not retained',
+        baseNodeCount: baseMap.size,
+        headNodeCount: headMap.size,
+        nodes: {
+          addedCount: added.length,
+          removedCount: removed.length,
+          changedCount: changed.length,
+          added: added.map(id => ({ id, name: label(id) })),
+          removed: removed.map(id => ({ id, name: label(id) })),
+        },
+        changed: changed.slice(0, 50),
+      }, null, 2) + '\n');
+      return;
+    }
+
     console.log(`\n\x1b[1m--- 🏺 Chronoscopic Structural Diff ---\x1b[0m`);
-    console.log(`Base: \x1b[33m${baseId}\x1b[0m`);
-    console.log(`Head: \x1b[33m${headId || 'Current Workspace'}\x1b[0m`);
+    console.log(`Base: \x1b[33m${baseId}\x1b[0m  (${baseMap.size} symbols)`);
+    console.log(`Head: \x1b[33m${headPulse}\x1b[0m  (${headMap.size} symbols)`);
+    console.log(`\n\x1b[1mSummary:\x1b[0m +${added.length} / -${removed.length} symbols, ${changed.length} changed.`);
+    console.log(`\x1b[2mRelationship deltas are not shown: the vault keeps no edge history.\x1b[0m`);
 
-    // Load Base
-    const baseNodes: any[] = await db.query("SELECT * FROM nodes WHERE pulseId = ?", [baseId]);
-    const baseEdges: any[] = await db.query("SELECT * FROM edges WHERE pulseId = ?", [baseId]);
-    console.log(`[DEBUG] Loaded Base: ${baseNodes.length} nodes, ${baseEdges.length} edges`);
-
-    this.reconstitute(baseGraph, baseNodes, baseEdges);
-
-    // Load Head
-    if (headId) {
-      const headNodes: any[] = await db.query("SELECT * FROM nodes WHERE pulseId = ?", [headId]);
-      const headEdges: any[] = await db.query("SELECT * FROM edges WHERE pulseId = ?", [headId]);
-      console.log(`[DEBUG] Loaded Head: ${headNodes.length} nodes, ${headEdges.length} edges`);
-      this.reconstitute(headGraph, headNodes, headEdges);
-    } else {
-      await registry.infrastructure.persistence.load(headGraph);
+    if (changed.length > 0) {
+      console.log(`\n\x1b[1mArchitectural Drift:\x1b[0m`);
+      for (const d of changed.slice(0, 10)) {
+        let line = `- \x1b[35m${d.name}\x1b[0m: `;
+        if (d.gravityShift) line += `\x1b[36mΔGravity:\x1b[0m ${d.gravityShift > 0 ? '+' : ''}${d.gravityShift.toFixed(4)} `;
+        if (d.complexityBloat) line += `\x1b[31mΔComplexity:\x1b[0m ${d.complexityBloat > 0 ? '+' : ''}${d.complexityBloat} `;
+        if (d.dnaShift) line += `\x1b[34m[DNA shift]\x1b[0m`;
+        console.log(line);
+      }
     }
-
-    const result = registry.query.diff.diff(baseGraph, headGraph);
-
-    console.log(`\n\x1b[1mSummary:\x1b[0m ${result.summary}`);
-
-    if (Object.keys(result.drift).length > 0) {
-      console.log(`\n\x1b[1mArchitectural Drift Detected:\x1b[0m`);
-      Object.entries(result.drift).slice(0, 10).forEach(([id, deltas]: [string, any]) => {
-        let driftMsg = `- \x1b[35m${id}\x1b[0m: `;
-        if (deltas.gravityShift) driftMsg += `\x1b[36mΔGravity:\x1b[0m ${deltas.gravityShift > 0 ? '+' : ''}${deltas.gravityShift.toFixed(4)} `;
-        if (deltas.complexityBloat) driftMsg += `\x1b[31mΔComplexity:\x1b[0m ${deltas.complexityBloat > 0 ? '+' : ''}${deltas.complexityBloat} `;
-        if (deltas.resonanceDrift) driftMsg += `\x1b[32mΔResonance:\x1b[0m ${deltas.resonanceDrift > 0 ? '+' : ''}${deltas.resonanceDrift} `;
-        console.log(driftMsg);
-      });
+    if (added.length > 0) {
+      console.log(`\n\x1b[1mNew Symbols:\x1b[0m`);
+      added.slice(0, 5).forEach(id => console.log(`  + ${label(id)}`));
     }
-
-    if (result.nodes.added > 0) {
-      console.log(`\n\x1b[1mTop New Symbols:\x1b[0m`);
-      result.nodes.list.added.slice(0, 5).forEach((id: string) => console.log(`  + ${id}`));
+    if (removed.length > 0) {
+      console.log(`\n\x1b[1mRemoved Symbols:\x1b[0m`);
+      removed.slice(0, 5).forEach(id => console.log(`  - ${label(id)}`));
     }
-  }
-
-  private reconstitute(graph: any, nodes: any[], edges: any[]) {
-    nodes.forEach(row => {
-      let meta = {};
-      try { meta = JSON.parse(row.metadata || '{}'); } catch (e) { }
-      graph.addNode({
-        id: row.id,
-        label: row.label,
-        properties: {
-          ...meta,
-          name: row.name,
-          filePath: row.filePath,
-          rank: row.rank,
-          complexity: row.complexity,
-          resonance: row.resonance,
-          entropy: row.entropy,
-          primaryAuthor: row.primaryAuthor,
-          authorCount: row.authorCount,
-          lastModified: row.lastModified,
-          tenureDays: row.tenureDays,
-          anomaly: row.anomaly,
-          isTest: !!row.isTest
-        }
-      });
-    });
-
-    edges.forEach(row => {
-      graph.addEdge({
-        id: row.id,
-        sourceId: row.sourceId,
-        targetId: row.targetId,
-        type: row.type,
-        confidence: row.confidence,
-        properties: JSON.parse(row.properties || '{}')
-      });
-    });
+    console.log();
   }
 
   private parseDiff(diff: string): Array<{ file: string, lines: number[] }> {

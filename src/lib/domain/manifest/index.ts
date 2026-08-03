@@ -44,9 +44,18 @@ export class ManifestService {
   public async record(projectRoot: string, projectName: string, type: string, content: string): Promise<boolean> {
     const entry = this.engine.computeRecord(projectRoot, projectName, type, content);
     await fs.mkdir(entry.docsDir, { recursive: true });
-    try {
+
+    // EXISTENCE decides, not a thrown error. `appendFile` CREATES the file when it is missing, so it
+    // never threw — which made the `initialContent` branch unreachable and every file `record` had
+    // ever created start without its `# Title`. The docs grammar requires that title, so this
+    // command's own output failed `conducks docs-lint`: "missing `# Title`" (ADR 0122).
+    //
+    // A dead fallback is worse than no fallback: the header was written, reviewed and tested for,
+    // and could never run.
+    const exists = await fs.access(entry.filePath).then(() => true).catch(() => false);
+    if (exists) {
       await fs.appendFile(entry.filePath, entry.appendContent, 'utf-8');
-    } catch {
+    } else {
       await fs.writeFile(entry.filePath, entry.initialContent, 'utf-8');
     }
     return true;
