@@ -38,8 +38,9 @@ contains a real dependent" from "a sibling that merely shares a file".
 - [ ] Verify on the hand-derived fixture that `unusedHelper` is gone and `fetchUser`, `main`, `service.ts`, `main.ts` remain
 - [ ] Un-skip `tests/unit/domain/kinetic/impact-containment.test.ts`
 
-## Phase 2 — the same question for `trace`
+## Phase 2 — the same question for `trace` AND `context`
 
+- [ ] `context` is the worse of the two and backs the `conducks_context` MCP tool. On the same fixture, `context fetchUser` returns SIX steps of which exactly ONE is real structure: service.ts (its own file), **format** (the only real dependency), util.ts, src, oracle2 (REPOSITORY), oracle2 (ECOSYSTEM — same name again). Its only caller, `main`, is absent entirely. Both commands go through `registry.kinetic.trace`, so this is one root cause with three faces: `impact`, `trace`, `context`.
 - [ ] `trace main` on the fixture returns `main.ts → fetchUser → format → service.ts → src → oracle2 → util.ts → oracle2`. The first three are the real chain; the rest is the containment ladder, and `oracle2` appears twice (REPOSITORY and ECOSYSTEM). Decide whether a dependency trace should climb above UNIT at all.
 
 ## What is now known (measured, not inferred)
