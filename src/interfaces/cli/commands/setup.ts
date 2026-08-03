@@ -10,9 +10,29 @@ import fs from "fs-extra";
 export class SetupCommand implements ConducksCommand {
   public id = "setup";
   public description = "Configure MCP and install skills";
-  public usage = "conducks setup";
+  public usage = "conducks setup [--dry-run]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
+    // `--dry-run`, because this command WRITES OUTSIDE THE PROJECT: it edits the user's Claude
+    // Desktop config, installs skills into `~/.claude/skills`, and registers the root in
+    // `~/.conducks/projects.json`. None of that was inspectable before it happened, which is why
+    // the todo37 sweep could not measure this command at all — running it to see what it does is
+    // the same act as letting it do it (ADR 0126).
+    const dryRun = args.includes("--dry-run");
+    if (dryRun) {
+      const projects = registry.federation.createProjectRegistry();
+      const already = projects.list().some(p => path.resolve(p.root) === path.resolve(process.cwd()));
+      const cliEntry = fileURLToPath(new URL("../index.js", import.meta.url));
+      const ignorePath = path.join(process.cwd(), ".conducksignore");
+      console.log("\x1b[35m[Conducks Setup] --dry-run — nothing will be written.\x1b[0m\n");
+      console.log(`  skills          → ~/.claude/skills (global only, ADR 0029)`);
+      console.log(`  project registry→ ${projects.path}  ${already ? "(already registered)" : "(would add this root)"}`);
+      console.log(`  MCP entry       → the Claude Desktop config, pointing at ${cliEntry}`);
+      console.log(`  ignore file     → ${ignorePath} ${fs.existsSync(ignorePath) ? "(exists — would be left alone)" : "(would be created)"}`);
+      console.log("\n\x1b[2m  Re-run without --dry-run to apply.\x1b[0m\n");
+      return;
+    }
+
     console.log("\x1b[35m[Conducks Setup] Initializing Environment...\x1b[0m");
 
     // 1. Sync Conducks skills (read straight from resources/skills/ — static content).

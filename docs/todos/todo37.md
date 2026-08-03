@@ -91,11 +91,11 @@ if it ever confuses someone.
 - [x] doctor — measured, NO DEFECT: six checks, each naming what it verified
 - [x] link — scored with `list` (ADR 0114)
 - [x] monitor — measured, NO DEFECT: the branch mismatch it reported belonged to another registered root and was correctly labelled
-- [ ] watch
-- [>] setup — deferred: mutates the real Claude Desktop config, so it is not run from a sweep. Needs a --dry-run before it can be measured safely
-- [>] uninstall — deferred: same reason. It writes a .bak, but edits a file outside the project with no confirmation
+- [x] watch — measured, correct: detects changes, heartbeats, states it is read-only. [Watcher Debug] no longer ships (ADR 0126)
+- [x] setup — now takes --dry-run, so what it writes outside the project is inspectable before it happens (ADR 0126)
+- [x] uninstall — now takes --dry-run; verified by checksum that the real Claude config is untouched (ADR 0126)
 - [x] mcp — measured, NO DEFECT: --sse verified live on port 3001
-- [ ] mirror
+- [x] mirror — measured, NO DEFECT: serves on 3333, HTTP 200
 - [x] help — listed 32 of 39 commands; the seven missing included docs-lint and coverage (ADR 0125)
 
 ## Known limitation, tracked separately

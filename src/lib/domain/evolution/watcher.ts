@@ -1,3 +1,4 @@
+import { logger } from "@/lib/core/utils/logger.js";
 import { classifyFreshness } from "@/lib/core/persistence/freshness.js";
 import { writeWatcherMarker, clearWatcherMarker, HEARTBEAT_INTERVAL_MS } from "@/lib/domain/evolution/watcher-liveness.js";
 import chokidar, { FSWatcher } from "chokidar";
@@ -121,9 +122,9 @@ export class ConducksWatcher {
     });
 
     this.watcher
-      .on("add", (filePath: string) => { console.error(`[Watcher Debug] add: ${filePath}`); this.handlePulseEvent("add", filePath); })
-      .on("change", (filePath: string) => { console.error(`[Watcher Debug] change: ${filePath}`); this.handlePulseEvent("change", filePath); })
-      .on("unlink", (filePath: string) => { console.error(`[Watcher Debug] unlink: ${filePath}`); this.handlePulseEvent("unlink", filePath); })
+      .on("add", (filePath: string) => { logger.debug(`watch add: ${filePath}`); this.handlePulseEvent("add", filePath); })
+      .on("change", (filePath: string) => { logger.debug(`watch change: ${filePath}`); this.handlePulseEvent("change", filePath); })
+      .on("unlink", (filePath: string) => { logger.debug(`watch unlink: ${filePath}`); this.handlePulseEvent("unlink", filePath); })
       .on("error", (err: unknown) => { console.error('[Watcher]', err); });
 
     // Publish liveness so a DEAD watcher stops looking like no watcher (todo21#P3). Both render as
@@ -255,7 +256,7 @@ export class ConducksWatcher {
         // This ensures the structural resonance is still mapped for the modified units.
         const lineCount = source.split('\n').length;
         for (let i = 1; i <= lineCount; i++) changedLines.push(i);
-        console.error(`[Watcher Debug] Git diff unavailable. Falling back to full-resonance for: ${path.basename(filePath)}`);
+        logger.debug(`Git diff unavailable; full resonance for ${path.basename(filePath)}`);
       }
 
       // 2. Partial Structural Reflection
