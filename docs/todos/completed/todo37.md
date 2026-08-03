@@ -100,7 +100,7 @@ if it ever confuses someone.
 
 ## Known limitation, tracked separately
 
-- [>] Concurrent vault access — deferred: parallel processes contend on DuckDB and this sweep is sequential, so it does not block the measurement. It DOES block multi-agent use and needs its own decision.
+- [-] Concurrent vault access — dropped: **measured and false.** 6 concurrent reads, 14 reads during a full analyze, 2 concurrent writers, and 6 concurrent MCP calls on ONE shared server (274 ms) all pass; parallel reads scale ~5x. The claim came from a failed experiment whose real cause was an MCP server pointed at the wrong root (ADR 0128).
 
 ## Phase 2c — second pass over the twenty already fixed
 
