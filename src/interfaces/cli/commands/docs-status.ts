@@ -141,7 +141,12 @@ export class DocsStatusCommand implements ConducksCommand {
     if (board.lint.length) {
       console.log(chalk.red(`\n  ✖ ${board.lint.length} file(s) break the grammar — run \`conducks docs-lint\`.`));
     } else {
-      console.log(chalk.dim("\n  grammar: clean ✓"));
+      // "clean ✓" over an empty tree said a project with no docs at all had healthy ones. The
+      // denominator is what separates the two, and this line had none (ADR 0124).
+      const governed = board.todos.length + board.decisions.length + board.other.length;
+      console.log(governed === 0
+        ? chalk.yellow("\n  grammar: nothing to check — this tree holds no governed docs.")
+        : chalk.dim(`\n  grammar: clean ✓ (${governed} governed docs)`));
     }
     console.log();
   }

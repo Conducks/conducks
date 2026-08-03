@@ -79,9 +79,9 @@ if it ever confuses someone.
 
 ## Phase 3 — docs and governance
 
-- [ ] docs-lint
-- [ ] docs-status
-- [ ] bootstrap-docs
+- [x] docs-lint — called a project with no docs clean, and undercounted governed docs 142 vs 170 (ADR 0124)
+- [x] docs-status — same green tick over an empty tree; now carries its denominator (ADR 0124)
+- [x] bootstrap-docs — measured, NO DEFECT: idempotent, and what it writes passes its own linter
 
 ## Phase 4 — lifecycle and environment
 

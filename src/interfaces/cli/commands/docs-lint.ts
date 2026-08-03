@@ -32,7 +32,11 @@ export class DocsLintCommand implements ConducksCommand {
     const single = trees.length === 1;
 
     const reports = trees.map(({ label, board }) => {
-      const governed = board.todos.length + board.decisions.length + board.other.filter(o => o.entries).length;
+      // EVERY governed doc, not only the ones carrying entries. `.filter(o => o.entries)` counted
+      // documents that had content and reported the result as "governed docs", so a freshly
+      // bootstrapped tree of three governed files reported two — and a file the standard governs
+      // that the count cannot see is a file nobody notices going unchecked (ADR 0124).
+      const governed = board.todos.length + board.decisions.length + board.other.length;
       return { label, board, governed };
     });
     const violations = reports.reduce((n, r) => n + r.board.lint.length, 0);
@@ -41,6 +45,18 @@ export class DocsLintCommand implements ConducksCommand {
     if (single) {
       const { board, governed } = reports[0];
       if (board.lint.length === 0) {
+        // NOTHING TO LINT IS NOT A PASS. A repository with no `docs/` at all printed
+        // "✓ docs-lint clean — 0 governed docs conform to the grammar" and exited 0, so a project
+        // that has never written a doc was indistinguishable from one whose docs are complete. This
+        // command IS the enforcement, which is why the shape matters more here than anywhere else
+        // (ADR 0124, and the same failure as ADR 0044 / ADR 0073 / ADR 0123).
+        if (governed === 0) {
+          console.log(chalk.yellow(
+            `\n  ⚠️  No governed docs found under ${root} — nothing was linted, which is not the same as clean.\n` +
+            `     Create the tree with \`conducks bootstrap-docs\`.\n`));
+          process.exitCode = 1;
+          return;
+        }
         console.log(chalk.green(`\n  ✓ docs-lint clean — ${governed} governed docs conform to the grammar.\n`));
         return;
       }
