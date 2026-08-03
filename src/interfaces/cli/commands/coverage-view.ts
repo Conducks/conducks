@@ -33,8 +33,15 @@ export class CoverageViewCommand implements ConducksCommand {
       return;
     }
 
-    // Same rule as `coverage`: the report is the first positional, whatever it is named.
-    const covPath = args.filter((a, i) => !a.startsWith("-") && i !== outIdx + 1)[0];
+    // Same rule as `coverage`: the report is the first positional, whatever it is named — skipping
+    // `--out`'s value, which is a positional but not a report.
+    //
+    // `i !== outIdx + 1` alone is wrong when there is no `--out` at all: `indexOf` returns -1, so
+    // the guard becomes `i !== 0` and discards the report itself. That shipped for one build and
+    // `coverage-view cov.json` answered "Missing coverage file" about the file just typed — the
+    // exact defect this command was being fixed FOR, reintroduced by the fix.
+    const skipIdx = outIdx === -1 ? -1 : outIdx + 1;
+    const covPath = args.filter((a, i) => !a.startsWith("-") && i !== skipIdx)[0];
     const outPath = outValue ?? "coverage.html";
     const isWatch = args.includes("--watch");
 

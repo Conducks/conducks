@@ -130,10 +130,26 @@ describe('coverage commands refuse a file that is not a coverage report', () => 
     expect(status).not.toBe(0);
   }, 120000);
 
+  /**
+   * The `not.toMatch(/Missing coverage file/)` is the point, and it was missing the first time.
+   * This asserted only a non-zero exit — which it got, from the WRONG message: the `--out` skip
+   * index was `outIdx + 1` with no guard for `indexOf` returning -1, so with no `--out` present the
+   * filter discarded the report itself and every invocation answered "Missing coverage file".
+   * The test passed, the command was broken, and only running it by hand found it.
+   */
   it('coverage-view exits non-zero when the coverage file cannot be read', () => {
-    const { status } = runCli(
+    const { combined, status } = runCli(
       ['coverage-view', path.join(repo, 'no-such-report.json')], { cwd: repo, allowFail: true });
     expect(status).not.toBe(0);
+    expect(combined).not.toMatch(/Missing coverage file/i);
+    expect(combined).toMatch(/no-such-report\.json/);
+  }, 120000);
+
+  it('coverage-view renders with no --out at all, to the default filename', () => {
+    const { combined, status } = runCli(['coverage-view', covPath], { cwd: repo, allowFail: true });
+    expect(status).toBe(0);
+    expect(combined).not.toMatch(/Missing coverage file/i);
+    expect(fs.existsSync(path.join(repo, 'coverage.html'))).toBe(true);
   }, 120000);
 
   /** `--out` took the next argv entry unconditionally, so `--out --watch` wrote a file NAMED `--watch`. */

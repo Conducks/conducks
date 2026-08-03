@@ -64,6 +64,19 @@ unfamiliar, a real monorepo), and conducks itself.
 - [ ] fallback
 - [ ] supply-chain
 
+## Phase 2b — found while verifying, measured, not yet chased
+
+Both surfaced re-running the fixed build on a one-file fixture (`fresh1`: one function, one file).
+Recorded with the measurement rather than chased mid-verification, and neither is a `coverage` defect.
+
+- [ ] `analyze` reports a node count the vault does not hold — it printed `17 Nodes` where the `nodes` table holds `15` and `status` agrees with the table. The number a user reads at the end of a pulse is not the number stored.
+- [ ] `query "*" --json` omits ECOSYSTEM, REPOSITORY and DIRECTORY entirely — 8 rows of 15. Not a limit and not a container filter: `query fresh1` and `query src` return those same nodes by name, so the `*` path alone drops three kinds.
+
+Also observed, not a defect: **10 of the 15 nodes in a one-file project are legend anchors** (one per
+taxonomy kind, plus `Structural Legend`). Only 5 are real structure. That is by design, but it means
+`status` node counts on a small project are dominated by the legend — worth a sentence in the output
+if it ever confuses someone.
+
 ## Phase 3 — docs and governance
 
 - [ ] docs-lint
