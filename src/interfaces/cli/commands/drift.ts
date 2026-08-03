@@ -26,6 +26,16 @@ export class DriftCommand implements ConducksCommand {
       console.log(`\n\x1b[1m--- 🕵️‍♂️ Conducks Architectural Drift Analysis ---\x1b[0m`);
       const result = await registry.evolution.compare(prevPulseId);
 
+      // A VERDICT THAT WAS NOT REACHED IS NOT A PASS. `INSUFFICIENT_DATA` and `UNAVAILABLE` mean the
+      // comparison could not be made — `conducks drift pulse_nope` printed "no drift verdict was
+      // reached" and exited 0, so a script could not tell it from "stable". `DECAYING` still exits 0
+      // because decay is an ANSWER, and this command reports rather than gates (ADR 0127).
+      if (result.status === 'INSUFFICIENT_DATA' || result.status === 'UNAVAILABLE') {
+        console.log(`⚠️  \x1b[33m${result.message}\x1b[0m`);
+        process.exitCode = 1;
+        return;
+      }
+
       if (result.status === 'STABLE') {
         console.log(`✅ ${result.message}`);
       } else {

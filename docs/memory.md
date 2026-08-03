@@ -1383,3 +1383,21 @@ by construction.
   workspace package is also declared as a dependency by its consumers, so both tests answer yes.
 - Applies: monorepos, which is where a cross-package graph is worth the most and was most broken.
   ADR 0108.
+
+## A dead fallback looks exactly like a working one
+- Gotcha: `try { appendFile } catch { writeFile(withHeader) }` — `appendFile` CREATES a missing file,
+  so it never throws, so the header branch never ran. Every doc `record` ever created was missing its
+  `# Title` and failed this project's own `docs-lint`.
+- Why: the fallback was written, reviewed and tested for, and could not execute. Nothing distinguishes
+  unreachable code from correct code by reading it; the branch has to be forced.
+- Applies: any `try/catch` where the happy path is itself forgiving. Prefer an explicit existence
+  check over a thrown error as control flow. ADR 0122.
+
+## An incremental pulse hides a parser fix
+- Gotcha: after fixing an ingest defect, the bad rows were still in the vault and the fix looked
+  like it had failed. `analyze` is incremental by mtime — unchanged files are never re-parsed, so
+  rows written by the old code survive indefinitely.
+- Why: `analyze --force` is what re-parses everything. The four file nodes destroyed by the `unit`
+  id collision only disappeared after a forced pulse.
+- Applies: verifying ANY parsing or ingest change on a real subject. Same shape as ADR 0108's
+  workspace fix producing byte-identical numbers. ADR 0121.

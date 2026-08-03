@@ -47,10 +47,17 @@ export function add(a: number, b: number): number {
 
   afterAll(() => rmRepo(repo));
 
+  /**
+   * `allowFail` and the status assertion are NEW (ADR 0127). This case exits non-zero now: a single
+   * pulse means no comparison was made, and "no verdict reached" at exit 0 is indistinguishable from
+   * "stable" to anything reading the status. The MESSAGE assertion is unchanged, which is what this
+   * test was always about — the exit code is an added claim, not a replaced one.
+   */
   it('drift reports insufficient data before a second pulse exists', () => {
     runCli(['analyze', '--yes'], { cwd: repo });
-    const { combined } = runCli(['drift'], { cwd: repo });
+    const { combined, status } = runCli(['drift'], { cwd: repo, allowFail: true });
     expect(combined).toContain('Insufficient historical data');
+    expect(status).not.toBe(0);
   });
 
   it('drift compares two real pulses and names the symbol that decayed', () => {

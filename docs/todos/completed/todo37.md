@@ -1,5 +1,5 @@
 # todo37 — measure every CLI command against an expected answer
-Status: doing
+Status: done
 
 - Acceptance: every command in `src/interfaces/cli/commands/` has an expected answer written BEFORE it runs, a recorded score, and — where a defect was found — a regression test proven to FAIL against the unfixed build.
 - Depends: none
@@ -61,7 +61,7 @@ unfamiliar, a real monorepo), and conducks itself.
 - [x] ledger — measured, no defect found: the ORPHAN deduction fires correctly (-18 for 9 orphans). A written prediction that it never fired was WRONG
 - [x] record — wrote the wrong content to the wrong file with a tick, accepted any type, and produced files failing this project's own docs-lint (ADR 0122)
 - [x] supply-chain — --json advertised and absent; my own ADR 0119 regex matched json_extract_string in SQL rather than a flag read (ADR 0122)
-- [ ] drift — measured: reports honestly, but reaches "no drift verdict" at exit 0 on an unknown pulse. Informational rather than a gate, so the exit code needs its own decision
+- [x] drift — reached "no drift verdict" at exit 0, indistinguishable from stable to any script. INSUFFICIENT_DATA and UNAVAILABLE now exit non-zero; DECAYING still exits 0 because decay is an answer (ADR 0127)
 - [x] fallback — printed a green tick for a field nothing writes (0 of 5,472 nodes), and  crashed on a deferred graph (ADR 0123)
 
 ## Phase 2b — found while verifying, chased
