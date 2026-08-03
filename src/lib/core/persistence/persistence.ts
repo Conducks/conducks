@@ -1445,6 +1445,23 @@ export class SynapsePersistence {
     return doomed;
   }
 
+  /**
+   * What the vault HOLDS — the same rows `status` counts.
+   *
+   * Must be asked AFTER `sweepRowsNotInPulse`, which is what makes it different from any number the
+   * pulse can compute on its way through: the sweep deletes rows left by earlier pulses, so a count
+   * taken before it is high by exactly those (ADR 0117).
+   *
+   * DuckDB returns `count(*)` as a BigInt — it formats as `19n` and breaks arithmetic against a
+   * number — so both are coerced here rather than at each call site.
+   */
+  public async countGraph(): Promise<{ nodes: number; edges: number }> {
+    await this.ensureVaultOpen();
+    const [row] = await this.query<{ n: number | bigint; e: number | bigint }>(
+      `SELECT (SELECT count(*) FROM nodes) AS n, (SELECT count(*) FROM edges) AS e`);
+    return { nodes: Number(row?.n ?? 0), edges: Number(row?.e ?? 0) };
+  }
+
   public async sweepRowsNotInPulse(pulseId: string, scope?: string): Promise<{ nodes: number; edges: number }> {
     if (this.readOnly) return { nodes: 0, edges: 0 };
     await this.ensureVaultOpen();

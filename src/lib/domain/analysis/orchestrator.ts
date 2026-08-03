@@ -321,6 +321,11 @@ export class AnalyzeOrchestrator {
       await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
 
       // Conducks Pulse Hardening: Ensure pulse record knows total count.
+      //
+      // These are WRITE counts — a running sum of what each flush wrote — and the pulse record is
+      // rewritten with the vault's real totals once the sweep has run (ADR 0117). They are kept
+      // because "how much did this pulse write" is a real question; it is just not the same question
+      // as "how big is this project", and one number was answering both.
       await this.persistence.run(
         "INSERT OR REPLACE INTO pulses (id, timestamp, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?)",
         [pulseId, Date.now(), totalNodes, totalEdges, JSON.stringify({ totalUnits: normalizedFiles.length })]
@@ -328,7 +333,12 @@ export class AnalyzeOrchestrator {
     }
 
     logger.info(`🛡️ [Conducks] Structural Resonance Complete. Pulse ${pulseId} is now frozen in the vault.`);
-    logger.info(`🛡️ [Conducks] Synapse Reflection: ${totalNodes} Nodes, ${totalEdges} Edges across ${totalBatches} induction waves.`);
+    // NOT "N Nodes". This is what the pulse WROTE, and it equals the project's size only on a full
+    // pulse of an empty vault. On an incremental one it is the size of the CHANGE: measured on
+    // conducks it read `96 Nodes` against 5,409 held — a 56x understatement that reads as a failed
+    // analysis. The project total is reported after the sweep, which is the first moment it is
+    // knowable (ADR 0117).
+    logger.info(`🛡️ [Conducks] Induction wrote ${totalNodes} node(s) and ${totalEdges} edge(s) across ${totalBatches} wave(s).`);
     return { pulseId, nodeCount: totalNodes, edgeCount: totalEdges };
   }
 

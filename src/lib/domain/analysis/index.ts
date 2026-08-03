@@ -385,8 +385,17 @@ export class AnalysisService {
     // and `audit --history` answerable at all (todo22#P14).
     await this.persistence.snapshotHistory(pulseId);
 
+    // THE headline, and the first moment it is knowable. Everything the pulse counted on its way
+    // through is a count of WRITES: a running sum that double-counts anything the discovery flush
+    // and a wave both wrote, and that on an incremental pulse describes only the change. Measured
+    // before this line existed, `Synapse Reflection` read 17 against 15 rows on a one-file repo and
+    // 96 against 5,409 on conducks. The sweep above is what makes the count final — it deletes rows
+    // left by earlier pulses, so any count taken before it is high by exactly those (ADR 0117).
+    const held = await this.persistence.countGraph();
+    logger.info(`🛡️ [Conducks] Synapse Reflection: ${held.nodes} Nodes, ${held.edges} Edges in the vault.`);
+
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
-    await this.persistence.save(this.graph.getGraph(), { nodeCount, edgeCount });
+    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges });
 
     } catch (pulseErr) {
       // Any failure before the commit rolls the entire pulse back — no partial graph is left behind.

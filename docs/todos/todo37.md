@@ -64,13 +64,13 @@ unfamiliar, a real monorepo), and conducks itself.
 - [ ] fallback
 - [ ] supply-chain
 
-## Phase 2b — found while verifying, measured, not yet chased
+## Phase 2b — found while verifying, chased
 
-Both surfaced re-running the fixed build on a one-file fixture (`fresh1`: one function, one file).
-Recorded with the measurement rather than chased mid-verification, and neither is a `coverage` defect.
+Both surfaced re-running the fixed build on a one-file fixture. Neither is a `coverage` defect.
 
-- [ ] `analyze` reports a node count the vault does not hold — it printed `17 Nodes` where the `nodes` table holds `15` and `status` agrees with the table. The number a user reads at the end of a pulse is not the number stored.
-- [ ] `query "*" --json` omits ECOSYSTEM, REPOSITORY and DIRECTORY entirely — 8 rows of 15. Not a limit and not a container filter: `query fresh1` and `query src` return those same nodes by name, so the `*` path alone drops three kinds.
+- [x] `analyze` reported a count the vault does not hold — `17 Nodes` against 15 rows on a one-file repo, and `96 Nodes` against **5,409** on conducks. Fixed: the headline is now counted from the vault after the sweep (ADR 0117).
+- [-] `query "*" --json` omits ECOSYSTEM, REPOSITORY and DIRECTORY — dropped: **not a defect, and I recorded it wrong.** `search-engine.ts::inventory` excludes those three deliberately, with the reason written above it: an inventory answering with the folder tree before a single function buries the answer. `query fresh1` returns them by name, which is the intended way to reach a container.
+- [ ] `status` reports 5 more edges than the vault holds — 19,528 against 19,523 rows, with no federated project linked, so the loaded graph derives five edges that are never persisted. Same class as the count defect above; cause not yet found, and not guessed at.
 
 Also observed, not a defect: **10 of the 15 nodes in a one-file project are legend anchors** (one per
 taxonomy kind, plus `Structural Legend`). Only 5 are real structure. That is by design, but it means
