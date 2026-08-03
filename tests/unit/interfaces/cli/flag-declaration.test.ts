@@ -39,8 +39,13 @@ describe('every flag a command reads is a flag it advertises', () => {
     // Flag literals the parser compares against: `args.includes('--x')`, `args.indexOf('--x')`,
     // `a.startsWith('--x')`. A bare `'--x'` anywhere else in the file would be a false positive, so
     // the match is anchored on those three call shapes.
+    //
+    // The trailing `=?` is not cosmetic. `guard` reads its threshold as `startsWith("--threshold=")`
+    // and `audit` its window as `startsWith("--history")`, and a pattern that required the quote to
+    // follow the flag name missed both — which is how `guard --threshold` came to be written down as
+    // "advertised and never read" when it works. The blind spot was in the detector, not the code.
     const read = new Set(
-      [...src.matchAll(/\.(?:includes|indexOf|startsWith)\(\s*["'](--[a-z][a-z0-9-]*)["']/g)].map(m => m[1])
+      [...src.matchAll(/\.(?:includes|indexOf|startsWith)\(\s*["'](--[a-z][a-z0-9-]*)=?["']/g)].map(m => m[1])
     );
 
     const undeclared = [...read].filter(f => !declared.has(f) && !GLOBAL.has(f));

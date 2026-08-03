@@ -326,9 +326,26 @@ export class GovernanceService {
             for (const [name, frag] of LAYER_FRAGMENTS) if (f.includes(frag)) return name; // order matters
             return null;
           };
+          // THE CONTRACT IS ABOUT IMPORTS. The comment above has always said so, and the loop
+          // walked EVERY edge type except MEMBER_OF — so a `CALLS` edge from a CLI command to a
+          // domain function counted as a breach, which is precisely what composition exists to make
+          // legal: the CLI names no domain module, the registry hands it the function.
+          //
+          // Measured on conducks, `conducks guard` blocked with four "illegal" dependencies —
+          //   cli → domain   (execute → advise)          mcp → domain  (kinetic.ts → getImpact)
+          //   cli → core     (execute → reclaimIfBloated) mcp → core   (kinetic.ts → getGraph)
+          // — every one of them a call routed through the registry, while
+          // `tests/architecture/boundaries.test.ts`, which reads the actual import statements, was
+          // GREEN. Two gates, one contract, opposite verdicts, and the one that blocks commits was
+          // the wrong one (ADR 0120).
+          //
+          // EXTENDS and IMPLEMENTS are in the set because both require a real import of the base;
+          // TYPE_REFERENCE is NOT, because `import type` erases at compile time and the file-reading
+          // gate exempts it — the two must agree or this is back where it started.
+          const DEPENDENCY_EDGES = new Set(['IMPORTS', 'EXTENDS', 'IMPLEMENTS', 'DEPENDS_ON']);
           const seen = new Set<string>();
           for (const edge of this.graph.getAllEdges()) {
-            if (edge.type === 'MEMBER_OF') continue;
+            if (!DEPENDENCY_EDGES.has(String(edge.type))) continue;
             const src = this.graph.getNode(edge.sourceId);
             const tgt = this.graph.getNode(edge.targetId);
             if (!src || !tgt) continue;

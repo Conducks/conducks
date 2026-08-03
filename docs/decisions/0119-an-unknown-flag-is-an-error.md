@@ -3,6 +3,7 @@
 Status: Accepted
 - Date: 2026-08-03
 - Builds: 0111, 0116
+- Amended by: 0120
 - Enforced by: tests/integration/features/flag-contract.test.ts (a mistyped flag is refused, every advertised flag still works, trace/prune/audit answer in JSON) and tests/unit/interfaces/cli/flag-declaration.test.ts (every flag a command reads is one it advertises, 39 commands) — the contract suite was run against the unfixed build first, 3 failed and the 2 controls passed
 
 ## Context

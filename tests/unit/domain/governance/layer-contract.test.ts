@@ -165,4 +165,41 @@ describe('layer_boundaries — synthetic upward edge is blocked', () => {
     expect(violations).toHaveLength(1);
     expect(violations[0].message).toMatch(/cli → domain/);
   });
+
+  /**
+   * ADR 0120 — the contract is about IMPORTS, and a CALL through composition is not one.
+   *
+   * The evaluator's own comment said "an IMPORT edge from layer A to layer B is legal only if…"
+   * and then walked EVERY edge type except MEMBER_OF. So a `CALLS` edge from a CLI command to a
+   * domain function counted as a layer breach — which is precisely what the registry exists to
+   * make legal: the CLI names no domain module, composition hands it the function.
+   *
+   * Measured on conducks: `conducks guard` blocked with four "illegal" dependencies —
+   * `cli → domain (execute → advise)`, `cli → core (execute → reclaimIfBloated)`,
+   * `mcp → domain (kinetic.ts → getImpact)`, `mcp → core (kinetic.ts → getGraph)` — while
+   * `tests/architecture/boundaries.test.ts`, which reads the actual import statements, was GREEN.
+   * Two gates, one contract, opposite verdicts, and the one that blocks commits was the wrong one.
+   */
+  it('does not treat a CALL through composition as a layer breach', () => {
+    const { graph, addNode, addEdge } = build();
+    addNode('/repo/src/interfaces/cli/commands/advise.ts::execute', 'execute', '/repo/src/interfaces/cli/commands/advise.ts');
+    addNode('/repo/src/lib/domain/governance/advisor.ts::advise', 'advise', '/repo/src/lib/domain/governance/advisor.ts');
+    addEdge('e1', '/repo/src/interfaces/cli/commands/advise.ts::execute', '/repo/src/lib/domain/governance/advisor.ts::advise', 'CALLS');
+
+    const report = auditOf(graph);
+    expect(report.violations.filter(v => v.ruleId === 'layer_boundaries')).toHaveLength(0);
+  });
+
+  /** The other half: an IMPORT across the same pair is still a breach, and must stay one. */
+  it('still blocks an IMPORT across the same layer pair', () => {
+    const { graph, addNode, addEdge } = build();
+    addNode('/repo/src/interfaces/cli/commands/advise.ts::unit', 'advise.ts', '/repo/src/interfaces/cli/commands/advise.ts');
+    addNode('/repo/src/lib/domain/governance/advisor.ts::unit', 'advisor.ts', '/repo/src/lib/domain/governance/advisor.ts');
+    addEdge('e1', '/repo/src/interfaces/cli/commands/advise.ts::unit', '/repo/src/lib/domain/governance/advisor.ts::unit', 'IMPORTS');
+
+    const report = auditOf(graph);
+    const violations = report.violations.filter(v => v.ruleId === 'layer_boundaries');
+    expect(violations).toHaveLength(1);
+    expect(violations[0].message).toMatch(/cli → domain/);
+  });
 });

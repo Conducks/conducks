@@ -110,7 +110,8 @@ purity, an unknown symbol, a mistyped flag, and a run from a subdirectory.
 - [x] a mistyped flag was accepted in silence — `entry --jsn` printed human output at exit 0, and `coverage --vs-baselin` ran the ordinary overlay instead of the regression gate. The dispatcher now refuses any flag the command does not advertise (ADR 0119).
 - [x] `trace`, `prune` and `audit` had no `--json` — the three whose output is a work list rather than a report, two of them gates (ADR 0119).
 - [x] usage strings had drifted both ways — `status --blueprint/--pulse` and `trace --limit` were read but undocumented; `docs-status --root-only`, `supply-chain --json`, `mirror --watch` and `watch --pulse` were read but unadvertised, and deriving the allowed set from usage BROKE all four until they were corrected. A unit test now scans every command's source and requires each flag it reads to appear in its usage.
-- [ ] `guard --threshold` and `mcp --sse` are advertised and never read — the reverse drift, which the check above cannot catch. Left for the phases those commands belong to.
+- [-] `guard --threshold` and `mcp --sse` advertised and never read — dropped: **both findings were wrong.** `guard` reads it as `startsWith("--threshold=")`, `mcp` reads it in `tools/index.ts` via `process.argv`; `mcp --sse` verified live on port 3001. My detector was blind to the `--flag=` form and to a command that delegates flag reading one layer down (ADR 0120).
+- [x] `guard` blocked on this repo with four layer violations that were CALLS through composition, while the file-reading boundary gate was green — the rule walked every edge type while its own comment said imports. `conducks guard` now passes here for the first time (ADR 0120).
 
 `--help` was clean on all twenty, and refusing with usage when a required argument is missing was
 clean on eleven of twelve. `query` with no pattern answers `*` by design.
