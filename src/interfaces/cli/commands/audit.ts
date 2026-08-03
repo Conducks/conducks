@@ -9,7 +9,7 @@ import path from "node:path";
 export class AuditCommand implements ConducksCommand {
   public id = "audit";
   public description = "Audit structural integrity and governance (--fallback for legacy fallback analysis)";
-  public usage = "conducks audit [--fallback] [--history=<window>]";
+  public usage = "conducks audit [--fallback] [--history=<window>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const historyArg = args.find(a => a.startsWith("--history"));
@@ -44,12 +44,13 @@ export class AuditCommand implements ConducksCommand {
       return;
     }
 
-    console.log("\x1b[35m[Conducks Audit] Auditing Core Structural Integrity...\x1b[0m");
+    const useJson = args.includes('--json');
+    if (!useJson) console.log("\x1b[35m[Conducks Audit] Auditing Core Structural Integrity...\x1b[0m");
 
     const auditData = await (registry.audit as any).audit();
-    
+
     // 1. Structural Orphans (Conducks Refactoring Alerts) 🏺
-    if (auditData.stats.orphans > 0) {
+    if (!useJson && auditData.stats.orphans > 0) {
       console.log(`\n\x1b[31m💣 [Refactoring Alert] ${auditData.stats.orphans} Orphaned Synapses Detected:\x1b[0m`);
       // Display first 10 for brevity, user can use GQL for more
       auditData.violations
@@ -60,7 +61,7 @@ export class AuditCommand implements ConducksCommand {
     }
 
     // 2. Circular Dependencies
-    if (auditData.stats.cycles > 0) {
+    if (!useJson && auditData.stats.cycles > 0) {
       console.log(`\n\x1b[31m🔄 [Architectural Alert] ${auditData.stats.cycles} Circular Dependencies Detected:\x1b[0m`);
       auditData.violations
         .filter((v: any) => v.type === 'CIRCULAR')
@@ -72,7 +73,7 @@ export class AuditCommand implements ConducksCommand {
     // them reported nowhere. They are informational: mutual recursion is legal, a knot of six symbols
     // with no entry order is worth a look, and only a human can tell those apart.
     const tangles = (auditData.discoveries || []).filter((d: any) => d.type === 'TANGLE');
-    if (tangles.length > 0) {
+    if (!useJson && tangles.length > 0) {
       console.log(`\n\x1b[33m🪢 [Mutual Calls] ${tangles.length} symbol tangle(s) — informational, not a violation:\x1b[0m`);
       tangles.slice(0, 10).forEach((d: any) => console.log(`  - ${d.message}`));
       if (tangles.length > 10) console.log(`  ... and ${tangles.length - 10} more.`);
@@ -80,7 +81,7 @@ export class AuditCommand implements ConducksCommand {
 
     // 2b. Self-imports (ARCH-4) — a file importing/re-exporting from itself (degenerate, not a cycle)
     const selfImports = auditData.violations.filter((v: any) => v.type === 'SELF_IMPORT');
-    if (selfImports.length > 0) {
+    if (!useJson && selfImports.length > 0) {
       console.log(`\n\x1b[33m♻️  [Self-Import] ${selfImports.length} file(s) import/re-export from themselves:\x1b[0m`);
       selfImports.forEach((v: any) => console.log(`  - ${v.message}`));
     }
@@ -96,6 +97,25 @@ export class AuditCommand implements ConducksCommand {
       return "[]";
     }));
     const report = await sentinel.validate(registry.query.graph.getGraph() as any, rules);
+
+    // `--json` carries BOTH halves and the same exit code. An audit is a gate, so a caller that
+    // reads the JSON and a caller that reads the exit status must never disagree — which is why
+    // this sits after the sentinel run rather than beside the core audit (ADR 0119).
+    //
+    // `ruleCount` is in the payload for the reason the human branch says out loud: zero rules
+    // passing is not governance holding, and a machine reader needs to be able to tell those apart
+    // just as much as a person does.
+    if (useJson) {
+      process.stdout.write(JSON.stringify({
+        success: auditData.success && report.success,
+        stats: auditData.stats,
+        violations: auditData.violations,
+        discoveries: auditData.discoveries ?? [],
+        sentinel: { success: report.success, ruleCount: rules.length, violations: report.violations },
+      }, null, 2) + '\n');
+      if (!report.success || !auditData.success) process.exit(1);
+      return;
+    }
 
     // Both halves report, ALWAYS, and the exit code comes last. The chain here used to be
     // if/else-if, so a run where the rule set passed and the core checks did not took the third

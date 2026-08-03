@@ -14,7 +14,7 @@ import path from "node:path";
 export class SupplyChainCommand implements ConducksCommand {
   public id = "supply-chain";
   public description = "Report the dependency / boundary surface (stdlib vs versioned deps)";
-  public usage = "conducks supply-chain [--deps-only]";
+  public usage = "conducks supply-chain [--deps-only] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const depsOnly = args.includes("--deps-only");

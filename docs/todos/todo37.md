@@ -101,3 +101,16 @@ if it ever confuses someone.
 ## Known limitation, tracked separately
 
 - [>] Concurrent vault access — deferred: parallel processes contend on DuckDB and this sweep is sequential, so it does not block the measurement. It DOES block multi-agent use and needs its own decision.
+
+## Phase 2c — second pass over the twenty already fixed
+
+One MATRIX applied to all twenty rather than a reading of each: `--help`, no arguments, `--json`
+purity, an unknown symbol, a mistyped flag, and a run from a subdirectory.
+
+- [x] a mistyped flag was accepted in silence — `entry --jsn` printed human output at exit 0, and `coverage --vs-baselin` ran the ordinary overlay instead of the regression gate. The dispatcher now refuses any flag the command does not advertise (ADR 0119).
+- [x] `trace`, `prune` and `audit` had no `--json` — the three whose output is a work list rather than a report, two of them gates (ADR 0119).
+- [x] usage strings had drifted both ways — `status --blueprint/--pulse` and `trace --limit` were read but undocumented; `docs-status --root-only`, `supply-chain --json`, `mirror --watch` and `watch --pulse` were read but unadvertised, and deriving the allowed set from usage BROKE all four until they were corrected. A unit test now scans every command's source and requires each flag it reads to appear in its usage.
+- [ ] `guard --threshold` and `mcp --sse` are advertised and never read — the reverse drift, which the check above cannot catch. Left for the phases those commands belong to.
+
+`--help` was clean on all twenty, and refusing with usage when a required argument is missing was
+clean on eleven of twelve. `query` with no pattern answers `*` by design.

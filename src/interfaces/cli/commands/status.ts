@@ -12,7 +12,7 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 export class StatusCommand implements ConducksCommand {
   public id = "status";
   public description = "Show health and symbol counts or pulse a file";
-  public usage = "conducks status [--mode pulse] [--file <path>] [--json] [path]";
+  public usage = "conducks status [--mode pulse|blueprint] [--pulse] [--blueprint] [--file <path>] [--json] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const isPulse = args.includes('--pulse') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'pulse');

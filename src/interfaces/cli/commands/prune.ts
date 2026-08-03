@@ -8,13 +8,29 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class PruneCommand implements ConducksCommand {
   public id = "prune";
   public description = "Identify unused exports and dead code";
-  public usage = "conducks prune";
+  public usage = "conducks prune [--json]";
 
-  public async execute(_args: string[], registry: Registry): Promise<void> {
+  public async execute(args: string[], registry: Registry): Promise<void> {
     await syncGraph(registry);
     const findings = registry.explain.prune();
+
+    // `--json`, because a dead-code list is something a script acts on. Twelve of the fifteen read
+    // commands offered it and `prune`, `trace` and `audit` did not — precisely the three whose
+    // output is a work list rather than a report (ADR 0119).
+    //
+    // The verdict/question split (ADR 0104) travels as a FIELD rather than as two arrays: a caller
+    // that ignores it gets every finding, which is the safe default, and one that reads it can tell
+    // "this is unused" from "the graph cannot tell".
+    if (args.includes('--json')) {
+      process.stdout.write(JSON.stringify(findings.map((f: any) => ({
+        ...f,
+        claim: f.type === 'UNIMPORTED_MODULE' ? 'question' : 'verdict',
+      })), null, 2) + '\n');
+      return;
+    }
+
     console.log(`\n\x1b[1m--- ✂️ Dead Weight Discovery ---\x1b[0m`);
-    
+
     if (findings.length === 0) {
       console.log(`✅ No dead weight detected. All structural elements are in use.`);
     } else {

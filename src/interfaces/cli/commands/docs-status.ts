@@ -16,7 +16,7 @@ import chalk from "chalk";
 export class DocsStatusCommand implements ConducksCommand {
   public id = "docs-status";
   public description = "Open work in the docs, rooted at the ADRs that own it";
-  public usage = "conducks docs-status [--json] [--all] [path]";
+  public usage = "conducks docs-status [--json] [--all] [--root-only] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const useJson = args.includes("--json");

@@ -237,6 +237,43 @@ export async function main() {
     process.exit(0);
   }
 
+  // A FLAG THE COMMAND DOES NOT KNOW IS AN ERROR, NOT A NO-OP.
+  //
+  // Every command's arg parser skips unknown `--flags`, so a typo was accepted in silence and the
+  // command did something else instead (ADR 0119):
+  //
+  //   conducks entry --jsn                      human output, exit 0 — the caller believes it
+  //                                             asked for JSON and that it got it
+  //   conducks coverage cov.json --vs-baselin   ran the ORDINARY overlay, exit 0 — the regression
+  //                                             gate never ran, and nothing said so
+  //
+  // The second is the shape ADR 0116 fixed by hand for that one command: a gate that cannot fail
+  // gates nothing. One dropped letter puts it straight back.
+  //
+  // The allowed set comes from the command's OWN `usage` string, which makes usage the single
+  // source of truth rather than prose beside the code. A command reading a flag it does not
+  // advertise now fails on that flag — so the drift is caught the first time someone uses it,
+  // instead of never. `status` (`--blueprint`, `--pulse`) and `trace` (`--limit`) had exactly that
+  // drift and their usage strings were corrected in the same change.
+  //
+  // In the DISPATCHER for the same reason `--help` is: the defect is per command, and the fix
+  // should not be written thirty-nine times.
+  if (command) {
+    const GLOBAL_FLAGS = new Set(['--help', '-h', '--verbose']);
+    const declared = new Set((command.usage ?? '').match(/--[a-z][a-z0-9-]*/g) ?? []);
+    // `--history=<window>` is passed as `--history=5`; compare on the name, not the pair.
+    const unknown = cmdArgs
+      .filter(a => a.startsWith('--'))
+      .map(a => a.split('=')[0])
+      .filter(a => !declared.has(a) && !GLOBAL_FLAGS.has(a));
+    if (unknown.length > 0) {
+      console.error(
+        `\x1b[31mUnknown flag${unknown.length > 1 ? 's' : ''} for \`${command.id}\`: ${unknown.join(', ')}\x1b[0m`);
+      console.error(`\x1b[2mUsage:\x1b[0m ${command.usage ?? `conducks ${command.id}`}`);
+      process.exit(1);
+    }
+  }
+
   // Mirror is a live visualizer and should avoid forcing a full structural load.
   const isStalenessBypass = STALENESS_BYPASS.has(commandId);
   // Commands that answer from markdown and the filesystem alone: skip the engine entirely (ADR 0033).

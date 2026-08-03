@@ -29,7 +29,7 @@ function reportTruncation(total: number, shown: number): void {
 export class TraceCommand implements ConducksCommand {
   public id = "trace";
   public description = "Trace structural dependencies (use --flow for data lineage)";
-  public usage = "conducks trace <symbol_id> [--flow]";
+  public usage = "conducks trace <symbol_id> [--flow] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const isFlow = args.includes('--flow');
@@ -41,7 +41,8 @@ export class TraceCommand implements ConducksCommand {
     // `limitAt + 1` is only a real index when the flag is PRESENT — with no --limit, limitAt is -1
     // and that expression is 0, which dropped the symbol itself and printed the usage line.
     const valueAt = limitAt > -1 ? limitAt + 1 : -1;
-    const symbolInput = args.filter((a, i) => a !== '--flow' && a !== '--limit' && i !== valueAt)[0];
+    const useJson = args.includes('--json');
+    const symbolInput = args.filter((a, i) => !a.startsWith('--') && i !== valueAt)[0];
 
     if (!symbolInput) {
       console.error("Usage: conducks trace <symbol_id> [--flow]");
@@ -56,6 +57,31 @@ export class TraceCommand implements ConducksCommand {
       if (results.length > 0) {
         symbolId = results[0].id;
       }
+    }
+
+    // `--json`, because a dependency chain is something a caller walks rather than reads. The
+    // heading is suppressed rather than moved: it used to go to stdout unconditionally, so anything
+    // piping this command got the banner in front of its data (ADR 0119).
+    if (useJson) {
+      const steps = isFlow
+        ? registry.kinetic.flow(symbolId).steps ?? []
+        : registry.kinetic.trace(symbolId).map((id: string) => {
+            const n = registry.query.graph.getGraph().getNode(id);
+            // An unresolved target is REPORTED as unresolved rather than dropped — the human
+            // branch prints it as an "Unresolved Ghost Target", and a caller that cannot see the
+            // gap would read a shorter chain as a complete one.
+            return n
+              ? { id, name: n.properties.name, kind: n.label, filePath: n.properties.filePath, resolved: true }
+              : { id, name: id, kind: 'EXTERNAL', filePath: null, resolved: false };
+          });
+      process.stdout.write(JSON.stringify({
+        symbolId,
+        mode: isFlow ? 'flow' : 'trace',
+        limit: stepCap,
+        truncated: steps.length > stepCap,
+        steps: steps.slice(0, stepCap),
+      }, null, 2) + '\n');
+      return;
     }
 
     console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${symbolId} ---\x1b[0m`);

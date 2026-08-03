@@ -8,7 +8,7 @@ import { initGlobalMirror } from "@/interfaces/web/mirror-server.js";
 export class MirrorCommand implements ConducksCommand {
   public id = "mirror";
   public description = "Start high-fidelity visual explorer";
-  public usage = "conducks mirror [--live] [--host <addr>]";
+  public usage = "conducks mirror [--live] [--watch] [--host <addr>]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     console.log("\x1b[35m[Conducks] Initializing Visual Dashboard...\x1b[0m");

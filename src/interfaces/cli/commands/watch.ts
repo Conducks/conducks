@@ -50,7 +50,7 @@ export function watchBranchSwitch(
 export class WatchCommand implements ConducksCommand {
   public id = "watch";
   public description = "Start real-time monitoring of structural shifts";
-  public usage = "conducks watch";
+  public usage = "conducks watch [--pulse]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const isPulse = args.includes('--pulse');
