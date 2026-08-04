@@ -63,6 +63,17 @@ describe('SourceLineReader', () => {
     expect(r.stats().fileReads).toBe(1);
   });
 
+  /**
+   * todo39#P3's cost question, answered as a BOUND rather than a timing: an answer over a symbol
+   * called fifty times must read one file per FILE, never one per call site. A timing would drift
+   * with the machine; this cannot.
+   */
+  it('reads scale with files in the answer, not with call sites', () => {
+    const r = new SourceLineReader();
+    for (let i = 0; i < 50; i++) r.read(file, (i % 5) + 1);
+    expect(r.stats().fileReads).toBe(1);
+  });
+
   it('readMany preserves order and reports each line', () => {
     const r = new SourceLineReader();
     expect(r.readMany(file, [4, 1]).map(l => l.text))

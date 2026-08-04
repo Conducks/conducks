@@ -51,10 +51,25 @@ export class ContextCommand implements ConducksCommand {
         return;
       }
 
-      console.log(`--- Technical Flow Trace: ${resolvedId} ---`);
+      // RELATIVE path and the DECLARATION LINE at each step (ADR 0132, todo39#P3). The absolute
+      // path was ~90 characters of identical prefix on every row; the line is what lets a reader
+      // follow the chain without opening each file in turn.
+      const reader = registry.source.lineReader();
+      const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+      const rel = (p: string) =>
+        p && p.toLowerCase().startsWith(projectRoot.toLowerCase()) ? p.slice(projectRoot.length + 1) : p;
+
+      console.log(`--- Technical Flow Trace: ${rel(resolvedId)} ---`);
       steps.forEach((id: string, i: number) => {
         const node = g.getNode(id);
-        console.log(`  ${i + 1}. ${node?.label || 'node'} ${node?.properties?.name || id} (${node?.properties?.filePath || 'unknown'})`);
+        const file = String(node?.properties?.filePath || '');
+        const line = Number((node?.properties as any)?.range?.start?.line ?? (node?.properties as any)?.lineStart ?? 0) || 0;
+        const at = file ? `${rel(file)}${line ? `:${line}` : ''}` : 'unknown';
+        console.log(`  ${i + 1}. ${node?.label || 'node'} ${node?.properties?.name || id} (${at})`);
+        if (file && line) {
+          const src = reader.read(file, line);
+          if (src.text) console.log(`        ${src.text}`);
+        }
       });
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks

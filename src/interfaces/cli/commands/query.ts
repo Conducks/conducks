@@ -152,6 +152,18 @@ export class QueryCommand implements ConducksCommand {
 
         const col = (s: string, w: number) => s.substring(0, w).padEnd(w);
 
+        // RELATIVE paths and the DECLARATION LINE (ADR 0132, todo39#P3).
+        //
+        // The absolute path is ~90 characters here and was truncated to 46, so the column showed
+        // `/users/saidmustafasaid/documents/gospel_of_tec` — the same prefix on every row, and the
+        // part that identifies the file cut off. Relative to the project root it fits, and the
+        // source line under each hit is what makes "where is X" end in one answer rather than in an
+        // editor.
+        const reader = registry.source.lineReader();
+        const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+        const rel = (p: string) =>
+          p && p.toLowerCase().startsWith(projectRoot.toLowerCase()) ? p.slice(projectRoot.length + 1) : p;
+
         // Table header
         console.log(
           '\x1b[2m' +
@@ -165,7 +177,8 @@ export class QueryCommand implements ConducksCommand {
           const kind = String(n.label || '');
           // file:line, so the answer is directly openable rather than needing a follow-up grep.
           const lineNo = (n.properties as any)?.range?.start?.line ?? (n.properties as any)?.lineStart;
-          const file = String(n.properties.filePath || '') + (lineNo ? `:${lineNo}` : '');
+          const rawPath = String(n.properties.filePath || '');
+          const file = rel(rawPath) + (lineNo ? `:${lineNo}` : '');
           const confStr = rankVal !== undefined ? rankVal.toFixed(2) : '—';
           // An ECHO did not match the query — it is a caller of something that did. Saying so is
           // the difference between a search result and a suggestion.
@@ -178,6 +191,13 @@ export class QueryCommand implements ConducksCommand {
             '\x1b[2m' + col(file, 46) + '\x1b[0m' +
             confStr
           );
+
+          // The declaration itself, under its row. An echo is a NEIGHBOUR of a match rather than a
+          // match, so printing its source line would present a coincidence as a result.
+          if (lineNo && rawPath && !isEcho) {
+            const src = reader.read(rawPath, Number(lineNo));
+            if (src.text) console.log('\x1b[2m' + ' '.repeat(27) + '\x1b[0m' + src.text);
+          }
         });
       } catch (err) {
         console.error(`Search Error: ${(err as Error).message}`);

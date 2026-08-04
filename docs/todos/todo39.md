@@ -1,5 +1,5 @@
 # todo39 — an answer shows the call site, not a list of names
-Status: doing
+Status: done
 
 - Acceptance: `impact <symbol>` prints, for every caller, the file, the enclosing function, and the SOURCE LINE of the call — with direct and indirect labelled — and a reader can decide whether a change is safe without opening a file. Proven by a test that fails without the line.
 - Depends: none
@@ -32,9 +32,9 @@ property holding every site rather than the first. Nothing reads the source back
 ## Phase 3 — the same shape everywhere it applies
 - Builds: 0132
 
-- [ ] `query` prints the declaration line for each hit, so "where is X" ends in one answer too
-- [ ] `trace` and `context` print the line at each step they already name
-- [ ] Measure the cost: an answer over a 50-caller symbol must not read 50 files
+- [x] `query` prints the declaration line for each hit, and paths are relative — the absolute path was ~90 chars truncated to 46, showing the same prefix on every row with the identifying part cut off
+- [x] `trace` and `context` print the line at each step, with relative paths
+- [x] Measure the cost — MEASURED as a BOUND, not a timing: 50 call-site reads over 1 distinct file cost 1 read, over 5 files cost 5. Pinned in source-line.test.ts so it cannot drift
 
 ## Acceptance measure
 
