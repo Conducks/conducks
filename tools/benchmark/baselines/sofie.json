@@ -1,0 +1,79 @@
+{
+  "project": "sofie",
+  "sha": "de19e9f7",
+  "language": "typescript",
+  "nodes": 10398,
+  "units": 1095,
+  "edges": 34558,
+  "documented": {
+    "count": 1783,
+    "of": 10398,
+    "pct": 17.15
+  },
+  "documentedBehaviors": {
+    "count": 990,
+    "of": 2936,
+    "pct": 33.72
+  },
+  "located": {
+    "count": 8992,
+    "of": 10398,
+    "pct": 86.48
+  },
+  "cycles": 1,
+  "orphans": 20,
+  "violations": 21,
+  "dangling": {
+    "count": 3344,
+    "of": 34558,
+    "pct": 9.68
+  },
+  "smoke": {
+    "status": {
+      "code": 0,
+      "ms": 1181,
+      "bytes": 976
+    },
+    "audit": {
+      "code": 1,
+      "ms": 739,
+      "bytes": 3913
+    },
+    "entry": {
+      "code": 0,
+      "ms": 1178,
+      "bytes": 2111
+    },
+    "prune": {
+      "code": 0,
+      "ms": 1483,
+      "bytes": 45016
+    },
+    "flows": {
+      "code": 0,
+      "ms": 1312,
+      "bytes": 535438
+    },
+    "ledger": {
+      "code": 0,
+      "ms": 1489,
+      "bytes": 470
+    },
+    "supply-chain": {
+      "code": 0,
+      "ms": 856,
+      "bytes": 3283
+    },
+    "advise": {
+      "code": 0,
+      "ms": 830,
+      "bytes": 16591
+    },
+    "query": {
+      "code": 0,
+      "ms": 1181,
+      "bytes": 1357
+    }
+  },
+  "smokeFailures": []
+}

@@ -1258,8 +1258,19 @@ export class ConducksReflector {
     // shape this project keeps removing.
     if (docComments.length > 0) {
       const documentable = spectrum.nodes.filter(n => (n.range?.start?.line ?? 0) > 0);
+      // A PARAMETER IS NOT WHAT A DOC COMMENT DESCRIBES, and it shares its function's line. Ranking
+      // it below the declaration is what stops it claiming the docstring first — measured, that one
+      // tie cost two thirds of the Python docstrings and most of the JSDoc.
       const docs = attachDocs(
-        documentable.map(n => ({ lineStart: n.range.start.line, node: n })),
+        documentable.map(n => ({
+          lineStart: n.range.start.line,
+          // Ranked on canonicalKind, because a parameter does NOT arrive as `kind: 'parameter'` —
+          // Python reports its parameters as `variable`/`ATOM`, so a check on `kind` fired never and
+          // the first fix changed nothing. ATOM covers both a parameter and an inline assignment
+          // sharing the line; in either case the declaration is what the comment describes.
+          rank: n.canonicalKind === 'ATOM' || n.kind === 'import' ? 1 : 0,
+          node: n,
+        })),
         docComments
       );
       for (const [target, text] of docs) {

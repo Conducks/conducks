@@ -32,6 +32,17 @@ export interface HarvestedComment {
 export interface DocTarget {
   /** 1-based line the declaration starts on. */
   lineStart: number;
+  /**
+   * Who wins when two targets SHARE a line. Lower wins; absent means 0.
+   *
+   * A parameter sits on its function's own line, and without this it out-claimed the function:
+   * measured on a frozen Python subject, 606 functions carried a docstring and 198 kept it, because
+   * a comment is claimed by at most one symbol and the parameter was reached first. A function with
+   * no parameters kept its doc, which made the loss look random rather than total.
+   *
+   * Rank only breaks a TIE. A nearer declaration still beats a further, better-ranked one.
+   */
+  rank?: number;
 }
 
 /**
@@ -88,10 +99,14 @@ export function docFor(target: DocTarget, comments: HarvestedComment[]): Harvest
   const decl = target.lineStart;
   if (!decl || decl < 1) return null;
 
-  // INSIDE: the first statement of the body, on the line after the declaration (or the one after,
-  // for a signature that wraps).
+  // INSIDE: the first statement of the body, on the declaration's own line or just after it.
+  //
+  // The window starts AT the declaration, not after it, because a MODULE's docstring begins on the
+  // same line the unit is recorded at. With a strictly-greater window every module docstring was
+  // excluded — measured on the frozen Python subject, 69 modules carried one and exactly 1 was
+  // attached.
   const inside = comments
-    .filter(c => c.startLine > decl && c.startLine <= decl + 2)
+    .filter(c => c.startLine >= decl && c.startLine <= decl + 2)
     .sort((a, b) => a.startLine - b.startLine)[0];
   if (inside && /^\s*("""|''')/.test(inside.text)) return inside;
 
@@ -117,8 +132,9 @@ export function attachDocs<T extends DocTarget>(
   const claimed = new Set<HarvestedComment>();
 
   // Nearest declaration wins: sorting by line means an inner symbol claims a comment before an
-  // outer one further up the file can.
-  for (const t of [...targets].sort((a, b) => a.lineStart - b.lineStart)) {
+  // outer one further up the file can. Rank breaks a tie WITHIN a line, so a function outranks the
+  // parameter that shares its declaration line — see `DocTarget.rank`.
+  for (const t of [...targets].sort((a, b) => a.lineStart - b.lineStart || (a.rank ?? 0) - (b.rank ?? 0))) {
     const hit = docFor(t, comments.filter(c => !claimed.has(c)));
     if (!hit) continue;
     const text = cleanDocText(hit.text);

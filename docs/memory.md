@@ -1401,3 +1401,14 @@ by construction.
   id collision only disappeared after a forced pulse.
 - Applies: verifying ANY parsing or ingest change on a real subject. Same shape as ADR 0108's
   workspace fix producing byte-identical numbers. ADR 0121.
+
+## A parameter is a `variable`, and it sits on its function's line
+- Gotcha: two thirds of the Python docstrings were harvested and then discarded, because a parameter
+  is recorded at the same `lineStart` as the function it belongs to, sorted first, and claimed the
+  docstring under the one-comment-one-owner rule. A function with NO parameters kept its doc, so the
+  loss looked random rather than total.
+- Why: the first fix ranked on `kind === 'parameter'` and changed nothing. Python reports its
+  parameters as `kind: 'variable'` / `canonicalKind: 'ATOM'` — `kind` is the grammar's word for the
+  node, not a stable classification. Rank on `canonicalKind`.
+- Applies: anything that joins by line and assumes one symbol per line. Two nodes sharing a line is
+  the normal case, not the edge case. ADR 0135.

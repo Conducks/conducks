@@ -1,0 +1,79 @@
+{
+  "project": "scraper",
+  "sha": "8e558ca",
+  "language": "python",
+  "nodes": 5105,
+  "units": 272,
+  "edges": 16674,
+  "documented": {
+    "count": 1640,
+    "of": 5105,
+    "pct": 32.13
+  },
+  "documentedBehaviors": {
+    "count": 548,
+    "of": 1117,
+    "pct": 49.06
+  },
+  "located": {
+    "count": 4705,
+    "of": 5105,
+    "pct": 92.16
+  },
+  "cycles": 0,
+  "orphans": 0,
+  "violations": 0,
+  "dangling": {
+    "count": 2897,
+    "of": 16674,
+    "pct": 17.37
+  },
+  "smoke": {
+    "status": {
+      "code": 0,
+      "ms": 712,
+      "bytes": 1003
+    },
+    "audit": {
+      "code": 0,
+      "ms": 468,
+      "bytes": 207
+    },
+    "entry": {
+      "code": 0,
+      "ms": 719,
+      "bytes": 466
+    },
+    "prune": {
+      "code": 0,
+      "ms": 851,
+      "bytes": 33569
+    },
+    "flows": {
+      "code": 0,
+      "ms": 760,
+      "bytes": 403761
+    },
+    "ledger": {
+      "code": 0,
+      "ms": 822,
+      "bytes": 440
+    },
+    "supply-chain": {
+      "code": 0,
+      "ms": 621,
+      "bytes": 11921
+    },
+    "advise": {
+      "code": 0,
+      "ms": 513,
+      "bytes": 19081
+    },
+    "query": {
+      "code": 0,
+      "ms": 709,
+      "bytes": 1428
+    }
+  },
+  "smokeFailures": []
+}

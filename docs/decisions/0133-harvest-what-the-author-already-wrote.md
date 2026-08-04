@@ -3,6 +3,7 @@
 Status: Accepted
 - Date: 2026-08-04
 - Builds: 0132
+- Amended by: 0135 — the Python coverage claimed here was never run against Python, and two thirds of it was lost in the join
 - Enforced by: todo40 — no test yet; this ADR states the target the work is measured against
 
 ## Context

@@ -1,0 +1,24 @@
+{
+  "_": "Frozen benchmark subjects. The SHA is the contract: a number that moves while the SHA holds is a change in conducks, not in the subject. Never point these at a repository that receives commits.",
+  "root": "../../../test-projects",
+  "projects": [
+    {
+      "name": "scraper",
+      "sha": "8e558ca",
+      "language": "python",
+      "why": "The non-TypeScript grammar path, and the only honest test of the Python docstring claim in ADR 0133."
+    },
+    {
+      "name": "orchestrator",
+      "sha": "13b46e2",
+      "language": "typescript",
+      "why": "A real monorepo with npm workspaces and Next.js file routing — the phantom-node territory of ADR 0108, and the framework wiring todo41 admits it cannot see."
+    },
+    {
+      "name": "sofie",
+      "sha": "de19e9f7",
+      "language": "typescript",
+      "why": "Electron: main, preload and renderer. A shape that is NOT hexagonal, so the decision table has something it must decline to name."
+    }
+  ]
+}

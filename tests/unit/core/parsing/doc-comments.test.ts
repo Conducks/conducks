@@ -104,5 +104,51 @@ describe('doc comment harvest', () => {
       expect(docs.get(a)).toBe('First.');
       expect(docs.get(b)).toBe('Second.');
     });
+
+    /**
+     * A PARAMETER SHARES ITS FUNCTION'S LINE, and it must not out-claim the function.
+     *
+     * Measured, not imagined. On the frozen Python subject the AST says 606 functions carry a
+     * docstring and conducks attached 198, so two thirds vanished — and the docstrings were being
+     * harvested correctly the whole time. Instrumenting the join printed the cause:
+     *
+     *     [TARGETS] [["logging_setup.py",1],["job_name",7],["setup_logging",7], ...]
+     *
+     * `job_name` is the parameter of `setup_logging`. Both sit on line 7, the parameter sorted
+     * first, and a comment is claimed by at most one symbol — so the parameter took the docstring
+     * and the function got nothing. A function with NO parameters kept its doc, which is why the
+     * failure looked random instead of total.
+     *
+     * The same shape eats JSDoc in TypeScript; it is not a Python problem.
+     */
+    it('gives a shared line to the declaration, not to its parameter', () => {
+      const param = { lineStart: 7, rank: 1 };
+      const fn = { lineStart: 7, rank: 0 };
+      const docs = attachDocs([param, fn], [{ startLine: 8, endLine: 10, text: '"""Sets up a logger."""' }]);
+      expect(docs.get(fn)).toBe('Sets up a logger.');
+      expect(docs.has(param)).toBe(false);
+    });
+
+    /** Rank only breaks a TIE. A nearer declaration still wins over a further, better-ranked one. */
+    it('does not let rank override distance', () => {
+      const near = { lineStart: 9, rank: 1 };
+      const far = { lineStart: 2, rank: 0 };
+      const docs = attachDocs([near, far], [{ startLine: 8, endLine: 8, text: '// Belongs to the next line.' }]);
+      expect(docs.get(near)).toBe('Belongs to the next line.');
+      expect(docs.has(far)).toBe(false);
+    });
+
+    /**
+     * A MODULE DOCSTRING STARTS ON THE DECLARATION'S OWN LINE.
+     *
+     * A unit records `lineStart: 1` and its docstring also starts at line 1, so a window of
+     * `startLine > decl` excluded every one of them. Measured on the frozen Python subject: 69
+     * modules carry a docstring and conducks attached exactly 1.
+     */
+    it('attaches a docstring that begins on the declaration line', () => {
+      const unit = { lineStart: 1, rank: 0 };
+      const docs = attachDocs([unit], [{ startLine: 1, endLine: 4, text: '"""The scraper entry point."""' }]);
+      expect(docs.get(unit)).toBe('The scraper entry point.');
+    });
   });
 });
