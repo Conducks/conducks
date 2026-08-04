@@ -56,8 +56,10 @@ can act on the output, or has to go and open a file.
 
 ## Phase 4 — the unexplained 110
 
-- [ ] 110 nodes on orchestrator are NEW rather than reclassified, and they are real: handlers declared inside a component, verified against the source, with nothing removed by the id diff. Find out why a nested arrow function got no node at all while its sibling did — `removeAttachment` was recorded and `handleSubmit` in the same component was not
-- [ ] Until that is known, treat the node-count rise as a symptom, not a win. An unexplained improvement is still unexplained
+- [x] EXPLAINED, by running both arms against a seven-line file rather than reasoning about the pipeline: with the rule off, 7 of 7 arrow functions produced NO NODE AT ALL; with it on, 7 of 7 are BEHAVIOR
+- [x] The chain: an arrow function was an ATOM, and `pruneTaxonomy` drops an ATOM with no non-structural edge. A component exported for another file has no reference inside its own file, so it had no edge, so it was deleted. Only the ones something in the same file called survived — `removeAttachment` is called by the component's own JSX and lived; `handleSubmit`, passed as an `onClick` prop, did not
+- [x] So the defect was not mislabelling. Conducks was DELETING most React components, and the 123 PascalCase atoms measured on orchestrator were the survivors
+- [ ] `pruneTaxonomy` drops an unreferenced ATOM silently. Whatever it removes should be COUNTED and reportable, so the next symbol class it swallows is visible without a seven-line reproduction
 
 ## Phase 5 — Benchmark A: conducks against grep
 

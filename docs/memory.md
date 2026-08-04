@@ -1412,3 +1412,13 @@ by construction.
   node, not a stable classification. Rank on `canonicalKind`.
 - Applies: anything that joins by line and assumes one symbol per line. Two nodes sharing a line is
   the normal case, not the edge case. ADR 0135.
+
+## An unreferenced ATOM is deleted, so a wrong KIND can mean a missing SYMBOL
+- Gotcha: every React component was recorded as a variable and then removed. `pruneTaxonomy` drops an
+  ATOM with no non-structural edge, and a component exported for another file has no reference inside
+  its own file. Measured: 7 of 7 arrow functions in a seven-line file produced no node at all.
+- Why: the survivors made it look like a labelling problem. Only arrow functions that something in
+  the SAME file called kept an edge — `removeAttachment`, called by its component's JSX, lived;
+  `handleSubmit`, passed as an `onClick` prop, did not.
+- Applies: any time a kind looks merely cosmetic. Downstream steps filter on kind, and one of them
+  deletes. Two arms on a tiny file answered in minutes what reading the pipeline did not. ADR 0136.

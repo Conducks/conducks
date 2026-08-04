@@ -49,12 +49,28 @@ Measured on the frozen subjects, `--force` on both sides:
 
 Python is unchanged, which is the expected result: it has no arrow-function form.
 
-**110 nodes on orchestrator are NEW, not reclassified.** 233 atoms became behaviors, and 110 symbols
-appeared that had no node at all before — handlers declared inside a component, such as
-`ClarificationAlert.handleSubmit` and `ClarificationAlert.handleFileUpload`. A sample was checked
-against the source and every one exists; the id diff removed nothing. **Why they were absent before is
-not explained**, and it is filed as todo44#P4 rather than asserted here. An unexplained improvement is
-still unexplained.
+**110 nodes on orchestrator are NEW, not reclassified** — and running the two arms against a
+seven-line file explained why. The defect was worse than a wrong label.
+
+```
+export const plainTyped   = (index: number) => { ... };
+export const asyncNoParam = async () => { ... };
+export const genericParam = (e: Foo<Bar>) => { ... };
+...seven arrow functions, every shape
+
+with the rule OFF:  7 of 7 produced NO NODE AT ALL
+with the rule ON:   7 of 7 present as BEHAVIOR
+```
+
+The chain: an arrow function was recorded as an `ATOM`, and **`pruneTaxonomy` drops an ATOM with no
+non-structural edge**. A component exported for use in another file has no reference inside its own
+file, so it had no edge, so it was deleted. The only arrow functions that survived were the ones
+something in the same file happened to call — which is why the loss looked partial. `removeAttachment`
+survived because the component's own JSX calls it; `handleSubmit`, passed as an `onClick` prop, did
+not.
+
+So conducks was not mislabelling React components. It was **deleting most of them**, and the 123
+PascalCase atoms found on orchestrator were only the survivors.
 
 A second, smaller rule ships alongside: **a directive addresses the toolchain, not the reader.**
 `debounce` on orchestrator was being served the text
