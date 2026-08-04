@@ -237,6 +237,30 @@ function objectPathsOf(objectNode: any): Record<string, string> {
  * `f(void)`, which otherwise recorded one parameter named "void" for a function taking none.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/**
+ * The kind a definition capture declares — with one correction the capture name cannot make itself.
+ *
+ * A FUNCTION BOUND TO A NAME IS STILL A FUNCTION. `export const Button: React.FC = (props) => {...}`
+ * is how most of a React or Next.js codebase declares its functions, and the grammar tags it
+ * `@isVariable` because syntactically it IS a variable declarator. Measured on the frozen subjects:
+ * 123 PascalCase atoms in orchestrator's `.tsx` files against 128 BEHAVIOR nodes across all 198 of
+ * them. `impact`, `prune`, `coverage` and `flows` all select on BEHAVIOR, so a React codebase was
+ * largely invisible to the commands this project leads with.
+ *
+ * The evidence is the grammar's own and not a name heuristic: a declarator whose value is an arrow
+ * function captures a PARAMETER LIST, and a plain variable captures none. A declaration carrying
+ * parameters is a function in any language, which is why this lives here and not in one query file.
+ *
+ * Stated once because TWO sites derive the kind from a capture name — node creation and the capture
+ * loop that overwrites it — and fixing only the first changed nothing at all.
+ */
+function kindFromCapture(captureName: string, match: any): string {
+  const kind = captureName.slice(2).toLowerCase();
+  if (kind !== 'variable') return kind;
+  const hasParams = match?.captures?.some((c: any) => c.name === 'params' || c.name === 'params_inline');
+  return hasParams ? 'function' : kind;
+}
+
 function paramsOf(match: any): Array<{ name: string; type: string | null; optional: boolean }> {
   // TWO capture forms, because one grammar has no parameter-list node at all.
   //
@@ -678,7 +702,7 @@ export class ConducksReflector {
 
           if (!nodeCache.has(scopedId) || valueOverType) {
             const defCapture = match.captures.find((c: any) => DEFINITION_CAPTURES.has(c.name));
-            let initialKind = defCapture ? defCapture.name.slice(2).toLowerCase() : 'variable';
+            let initialKind = defCapture ? kindFromCapture(defCapture.name, match) : 'variable';
 
             // NOTE: a name-suffix infra override used to sit here — deleted 2026-07-25 as provably
             // dead: a node-creating match always carries a definition capture, whose kind assignment
@@ -798,7 +822,7 @@ export class ConducksReflector {
         const cText = capture.node.text;
 
         if (cName.startsWith('is')) {
-          const kind = cName.slice(2).toLowerCase();
+          const kind = kindFromCapture(cName, match);
 
           if (kind === 'import') {
             const sourceCap = match.captures.find((c: any) => c.name === CaptureTags.SOURCE);

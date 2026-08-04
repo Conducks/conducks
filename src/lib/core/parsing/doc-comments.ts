@@ -96,7 +96,12 @@ export function cleanDocText(raw: string): string {
  * function whose author wrote a useless docstring.
  */
 export function isDescriptive(text: string): boolean {
-  return /\p{L}/u.test(text);
+  if (!/\p{L}/u.test(text)) return false;
+  // A DIRECTIVE ADDRESSES THE TOOLCHAIN, NOT THE READER. Measured on orchestrator, `debounce` was
+  // served `eslint-disable-next-line @typescript-eslint/no-explicit-any` — it has letters, so the
+  // rule above cannot catch it, and it describes the linter. Anchored to the START of the comment so
+  // prose that merely MENTIONS a directive is still prose.
+  return !/^\s*(eslint-|@ts-|prettier-|biome-|noqa\b|istanbul\s|c8\s|v8\s|type-coverage:|@jsx\b|#!)/i.test(text);
 }
 
 /**

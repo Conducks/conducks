@@ -168,6 +168,27 @@ describe('doc comment harvest', () => {
      * and it beat the real docstring whenever the signature wrapped. Seventeen of them, measured. A
      * comment with no letters in it says nothing about the symbol.
      */
+    /**
+     * A DIRECTIVE ADDRESSES THE TOOLCHAIN, NOT THE READER.
+     *
+     * Measured on orchestrator: `debounce` was served the text
+     * `eslint-disable-next-line @typescript-eslint/no-explicit-any`, which sat directly above it. It
+     * has letters, so the banner rule does not catch it, and it describes the linter rather than the
+     * function.
+     */
+    it('refuses a linter directive as documentation', () => {
+      const fn = { lineStart: 64, rank: 0 };
+      const docs = attachDocs([fn], [{ startLine: 63, endLine: 63, text: '// eslint-disable-next-line @typescript-eslint/no-explicit-any' }]);
+      expect(docs.has(fn)).toBe(false);
+    });
+
+    /** A real doc that merely MENTIONS a directive is still a doc. */
+    it('keeps prose that happens to name a directive', () => {
+      const fn = { lineStart: 5, rank: 0 };
+      const docs = attachDocs([fn], [{ startLine: 4, endLine: 4, text: '/** Debounce a call. Uses any, so eslint-disable is needed at the call site. */' }]);
+      expect(docs.get(fn)).toContain('Debounce a call.');
+    });
+
     it('refuses a rule of dashes as documentation', () => {
       const fn = { lineStart: 5, rank: 0 };
       expect(attachDocs([fn], [{ startLine: 4, endLine: 4, text: '# ------------------------------' }]).has(fn)).toBe(false);

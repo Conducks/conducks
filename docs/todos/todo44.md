@@ -44,7 +44,22 @@ can act on the output, or has to go and open a file.
 - [x] Result: 599 of 606 exact text matches, 0 false attachments. Behaviors 548 to 632 on scraper
 - [x] `located` was measuring nothing: the missing fifth on orchestrator was 488 directories, 42 npm packages and a folder of markdown, none of which is a line of code. On the honest denominator — a symbol in a file this repository owns — it is 100% on all three, so anything under 100% is now a real regression
 
-## Phase 3 — Benchmark A: conducks against grep
+## Phase 3 — is the doc gap OURS or the author's
+
+- [x] `doc-truth.mjs` scores per symbol against the language's own parser — Python's `ast`, the TypeScript compiler — because a coverage percentage cannot tell "the authors wrote nothing" apart from "we lost what they wrote", and on Python it read 17.7% and was a bug
+- [x] Answered: it is an AUTHOR gap. Of the symbols whose author wrote a doc, conducks carries 99.2% on scraper, 99.3% on sofie, 95.6% on orchestrator
+- [x] The checker's OWN first version keyed by basename, which collapsed every `route.ts` and `index.ts` in a Next.js app together and reported 106 and 178 false attachments that were entirely its own bug. Keyed by full path: 4 and 1
+- [x] A React component recorded as a variable — 123 PascalCase atoms in orchestrator's `.tsx` against 128 BEHAVIOR nodes across all 198 files. Fixed in ADR 0136: behaviors 1,493 to 1,836, and doc fidelity 88.5% to 95.6%
+- [x] A linter directive served as documentation — `debounce` carried `eslint-disable-next-line @typescript-eslint/no-explicit-any`. Refused, anchored to the start so prose mentioning a directive survives
+- [ ] Four false attachments remain on orchestrator: a class-level JSDoc reaching a method declared beneath it. `registry.ts:43` and `:62` both carry the class's paragraph instead of their own
+- [ ] 26 declarations on orchestrator still have no node at the author's line — down from 76, and the remainder is unexamined
+
+## Phase 4 — the unexplained 110
+
+- [ ] 110 nodes on orchestrator are NEW rather than reclassified, and they are real: handlers declared inside a component, verified against the source, with nothing removed by the id diff. Find out why a nested arrow function got no node at all while its sibling did — `removeAttachment` was recorded and `handleSubmit` in the same component was not
+- [ ] Until that is known, treat the node-count rise as a symptom, not a win. An unexplained improvement is still unexplained
+
+## Phase 5 — Benchmark A: conducks against grep
 
 - [ ] Task set written down BEFORE any run, with the expected answer per task hand-derived from the source — a benchmark scored after the fact scores whatever happened
 - [ ] Grep gets its best realistic invocation per task: `rg -w`, `-t py`, the flags a competent developer types. A strawman comparison is worth nothing and this project has rigged an experiment before
