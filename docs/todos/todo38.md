@@ -34,7 +34,7 @@ contains a real dependent" from "a sibling that merely shares a file".
 
 - [x] Reproduce both cases in one test file so the fix cannot satisfy one and break the other — `tests/unit/domain/kinetic/impact-containment.test.ts`, case A skipped and owned here
 - [x] Decide the rule — MEASURED: skipping `MEMBER_OF` while walking upstream is CORRECT. Given the ROUTE node's real id it returns `REQUEST@1`, which is exactly right. No cleverer rule is needed.
-- [ ] Fix `resolveSymbol` so a NAME containing `::` resolves to its node (see below), then re-apply the one-line traversal rule
+- [x] Fix resolution of a NAME containing `::` — shipped: ADR 0130 returned the id it matched, ADR 0131 removed the duplicate the name was resolving to, and the traversal rule is live
 - [x] Verify on the hand-derived fixture that `unusedHelper` is gone and `fetchUser`, `main`, `service.ts`, `main.ts` remain — exact match (ADR 0131)
 - [x] Un-skip `tests/unit/domain/kinetic/impact-containment.test.ts` — live, zero skipped tests in the suite
 

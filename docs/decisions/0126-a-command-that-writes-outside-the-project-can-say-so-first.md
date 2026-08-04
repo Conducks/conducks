@@ -3,6 +3,7 @@
 Status: Accepted
 - Date: 2026-08-03
 - Builds: 0125
+- Enforced by: tests/integration/features/dry-run-writes-nothing.test.ts (both dry runs leave a redirected HOME byte-identical, and the entry uninstall would remove survives) — the assertion is proven to discriminate: --dry-run leaves 1 file where a real setup writes 7
 
 ## Context
 

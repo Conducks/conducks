@@ -53,18 +53,18 @@ literal the chain needs. Both facts are written down; neither is modelled.
 
 ## Phase 3 — the parameter's declared type (original plan, still open)
 
-- [ ] Resolve a receiver that is not a node by reading the ENCLOSING function's parameter list: a
+- [-] Resolve a receiver that is not a node by reading the ENCLOSING function's parameter list: a — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
       parameter with a declared type states what the receiver is, exactly as `new Y()` does
-- [ ] `dna.params` is not on the SHALLOW load, and shallow is the load analyze uses — the same trap
+- [-] `dna.params` is not on the SHALLOW load, and shallow is the load analyze uses — the same trap — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
       ADR 0084 and 0086 each paid for once. Either add the column or put params on the skeleton, and
       say which in the record
-- [ ] Refuse an untyped parameter outright. `registry` with no annotation states nothing
+- [-] Refuse an untyped parameter outright. `registry` with no annotation states nothing — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
 
 ## Phase 2 — the `typeof` alias
 
-- [ ] Resolve `type X = typeof y` to the variable `y`, so a parameter typed `Registry` reaches the
+- [-] Resolve `type X = typeof y` to the variable `y`, so a parameter typed `Registry` reaches the — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
       object literal whose paths ADR 0094 already records
-- [ ] Uniqueness-gate it and refuse a chain where any hop is ambiguous, per ADR 0085
-- [ ] MEASURE on conducks and mentorseed: dangling, source-verified precision and orphan count
+- [-] Uniqueness-gate it and refuse a chain where any hop is ambiguous, per ADR 0085 — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
+- [-] MEASURE on conducks and mentorseed: dangling, source-verified precision and orphan count — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
       together, per ADR 0077 — a count that improves while a rate worsens is a denominator being
       destroyed
