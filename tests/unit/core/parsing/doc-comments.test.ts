@@ -139,6 +139,41 @@ describe('doc comment harvest', () => {
     });
 
     /**
+     * A SIGNATURE THAT WRAPS PUSHES THE DOCSTRING OUT OF A FIXED WINDOW.
+     *
+     * Measured on the frozen Python subject: 89 functions carried a docstring more than two lines
+     * under their `def`, because the parameter list wrapped or a decorator sat above. A bigger
+     * constant is not the fix — it would let a nested function's docstring reach its parent. The
+     * bound is the declaration's OWN END, and never past the next declaration.
+     */
+    it('reaches a docstring under a signature that wraps', () => {
+      const fn = { lineStart: 10, lineEnd: 40, rank: 0 };
+      const docs = attachDocs([fn], [{ startLine: 14, endLine: 16, text: '"""Resolves the final URL."""' }]);
+      expect(docs.get(fn)).toBe('Resolves the final URL.');
+    });
+
+    /** The reach stops at the next declaration: an inner function's docstring is not its parent's. */
+    it('does not reach past the next declaration into a nested body', () => {
+      const outer = { lineStart: 10, lineEnd: 40, rank: 0 };
+      const inner = { lineStart: 20, lineEnd: 30, rank: 0 };
+      const docs = attachDocs([outer, inner], [{ startLine: 21, endLine: 21, text: '"""Belongs to inner."""' }]);
+      expect(docs.get(inner)).toBe('Belongs to inner.');
+      expect(docs.has(outer)).toBe(false);
+    });
+
+    /**
+     * A BANNER IS NOT A DESCRIPTION.
+     *
+     * `# ------------------------------` above a declaration was being attached as its documentation,
+     * and it beat the real docstring whenever the signature wrapped. Seventeen of them, measured. A
+     * comment with no letters in it says nothing about the symbol.
+     */
+    it('refuses a rule of dashes as documentation', () => {
+      const fn = { lineStart: 5, rank: 0 };
+      expect(attachDocs([fn], [{ startLine: 4, endLine: 4, text: '# ------------------------------' }]).has(fn)).toBe(false);
+    });
+
+    /**
      * A MODULE DOCSTRING STARTS ON THE DECLARATION'S OWN LINE.
      *
      * A unit records `lineStart: 1` and its docstring also starts at line 1, so a window of

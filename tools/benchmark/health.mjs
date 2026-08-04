@@ -127,7 +127,16 @@ async function measure(project) {
       COUNT(*)                                                     AS nodes,
       COUNT(*) FILTER (WHERE canonicalKind = 'UNIT')               AS units,
       COUNT(*) FILTER (WHERE doc IS NOT NULL AND doc <> '')        AS documented,
-      COUNT(*) FILTER (WHERE lineStart IS NOT NULL AND lineStart > 0) AS located,
+      -- LOCATED counts only what CAN have a line: a symbol declared in a file this repository owns
+      -- and this parser reads. Counting everything reported 81% on orchestrator and read as a
+      -- defect; the missing fifth was 488 directories, 42 npm packages and a folder of markdown,
+      -- none of which is a line of code. Measured on the honest denominator it is 0 missing on all
+      -- three subjects, so any number below 100% here is a real regression rather than noise.
+      COUNT(*) FILTER (WHERE canonicalKind IN ('STRUCTURE', 'BEHAVIOR', 'ATOM')
+                         AND file IS NOT NULL AND file <> '' AND file NOT LIKE 'external://%') AS locatable,
+      COUNT(*) FILTER (WHERE canonicalKind IN ('STRUCTURE', 'BEHAVIOR', 'ATOM')
+                         AND file IS NOT NULL AND file <> '' AND file NOT LIKE 'external://%'
+                         AND lineStart IS NOT NULL AND lineStart > 0) AS located,
       COUNT(*) FILTER (WHERE canonicalKind = 'BEHAVIOR')           AS behaviors,
       COUNT(*) FILTER (WHERE canonicalKind = 'BEHAVIOR' AND doc IS NOT NULL AND doc <> '') AS documentedBehaviors
     FROM nodes`);
@@ -140,7 +149,7 @@ async function measure(project) {
   // Counts and rates travel together. A rate alone can be improved by deleting the denominator.
   result.documented = { count: Number(counts.documented), of: result.nodes, pct: rate(Number(counts.documented), result.nodes) };
   result.documentedBehaviors = { count: Number(counts.documentedBehaviors), of: Number(counts.behaviors), pct: rate(Number(counts.documentedBehaviors), Number(counts.behaviors)) };
-  result.located = { count: Number(counts.located), of: result.nodes, pct: rate(Number(counts.located), result.nodes) };
+  result.located = { count: Number(counts.located), of: Number(counts.locatable), pct: rate(Number(counts.located), Number(counts.locatable)) };
 
   // ---- integrity ----
   const audit = sh('audit', ['--json'], dir);

@@ -43,6 +43,15 @@ export interface DocTarget {
    * Rank only breaks a TIE. A nearer declaration still beats a further, better-ranked one.
    */
   rank?: number;
+  /**
+   * 1-based line the declaration ENDS on, when it is known.
+   *
+   * A docstring sits under the signature, and a signature can wrap over several lines — measured on
+   * the frozen Python subject, 89 functions carried their docstring more than two lines below the
+   * `def`. Knowing where the declaration ends is what lets the search reach them without a bigger
+   * constant, which would let a nested function's docstring reach its parent.
+   */
+  lineEnd?: number;
 }
 
 /**
@@ -78,6 +87,19 @@ export function cleanDocText(raw: string): string {
 }
 
 /**
+ * Does this text say anything ABOUT the symbol?
+ *
+ * `# ------------------------------` is a section rule, not a description, and it was being attached
+ * as documentation — seventeen times on the frozen Python subject, where it also beat the real
+ * docstring whenever the signature wrapped. A comment with no letter in it describes nothing, and
+ * printing it under a symbol is worse than printing nothing: the reader cannot tell it apart from a
+ * function whose author wrote a useless docstring.
+ */
+export function isDescriptive(text: string): boolean {
+  return /\p{L}/u.test(text);
+}
+
+/**
  * The FIRST LINE of a doc, for a header where there is room for one line and no more.
  *
  * Stops at the first blank line rather than the first newline: a docstring whose opening sentence
@@ -95,9 +117,15 @@ export function firstLineOf(doc: string): string {
  * because when both exist the inner one is the language's own convention and the outer one is
  * usually a section banner.
  */
-export function docFor(target: DocTarget, comments: HarvestedComment[]): HarvestedComment | null {
+export function docFor(
+  target: DocTarget,
+  comments: HarvestedComment[],
+  /** Last line the INSIDE search may reach. Defaults to two lines under the declaration. */
+  insideUntil?: number
+): HarvestedComment | null {
   const decl = target.lineStart;
   if (!decl || decl < 1) return null;
+  const until = Math.max(decl + 2, insideUntil ?? 0);
 
   // INSIDE: the first statement of the body, on the declaration's own line or just after it.
   //
@@ -106,7 +134,7 @@ export function docFor(target: DocTarget, comments: HarvestedComment[]): Harvest
   // excluded — measured on the frozen Python subject, 69 modules carried one and exactly 1 was
   // attached.
   const inside = comments
-    .filter(c => c.startLine >= decl && c.startLine <= decl + 2)
+    .filter(c => c.startLine >= decl && c.startLine <= until)
     .sort((a, b) => a.startLine - b.startLine)[0];
   if (inside && /^\s*("""|''')/.test(inside.text)) return inside;
 
@@ -134,11 +162,23 @@ export function attachDocs<T extends DocTarget>(
   // Nearest declaration wins: sorting by line means an inner symbol claims a comment before an
   // outer one further up the file can. Rank breaks a tie WITHIN a line, so a function outranks the
   // parameter that shares its declaration line — see `DocTarget.rank`.
-  for (const t of [...targets].sort((a, b) => a.lineStart - b.lineStart || (a.rank ?? 0) - (b.rank ?? 0))) {
-    const hit = docFor(t, comments.filter(c => !claimed.has(c)));
+  const ordered = [...targets].sort((a, b) => a.lineStart - b.lineStart || (a.rank ?? 0) - (b.rank ?? 0));
+
+  // Where each declaration's INSIDE search may reach: its own end, but never into the next
+  // declaration's body. A constant window cannot express that — too small and a wrapped signature
+  // hides its docstring, too large and an inner function's docstring is handed to its parent.
+  const declLines = ordered.filter(t => (t.rank ?? 0) === 0).map(t => t.lineStart);
+  const reachOf = (t: DocTarget): number | undefined => {
+    if (t.lineEnd === undefined) return undefined;
+    const nextDecl = declLines.find(l => l > t.lineStart);
+    return nextDecl === undefined ? t.lineEnd : Math.min(t.lineEnd, nextDecl - 1);
+  };
+
+  for (const t of ordered) {
+    const hit = docFor(t, comments.filter(c => !claimed.has(c)), reachOf(t));
     if (!hit) continue;
     const text = cleanDocText(hit.text);
-    if (!text) continue;
+    if (!text || !isDescriptive(text)) continue;
     claimed.add(hit);
     out.set(t, text);
   }

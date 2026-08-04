@@ -155,3 +155,11 @@
 ## CONDUCKS-39 — A finding from reading is a hypothesis until it is run
 - Rule: A defect discovered by reading source is not recorded as a defect until the command has been executed and the behaviour observed. This applies to findings produced by greps and static scans over the codebase, including one's own tooling.
 - Reason: Four findings were withdrawn in a single sweep after being written down. `query "*"` dropping containers was deliberate and documented. `guard --threshold` and `mcp --sse` were recorded as "advertised and never read" and both worked — the detector's regex missed a trailing `=` and a command that delegates flag reading one layer down, so the blind spot was in the detector (ADR 0120). `monitor` was nearly recorded for reporting a branch belonging to no part of this project; it belonged to another registered root and was correctly labelled, with the header cut off by the command used to read the output (ADR 0125). Leaving a wrong finding recorded costs the next reader the investigation plus the time spent trusting it.
+
+## CONDUCKS-40 — score what was found WRONG, not only what was found
+A recall number rises by attaching anything. The docstring join scored 496 attachments and looked
+like a win; comparing the TEXT against the source showed 17 of them were `# ------` rules that had
+beaten the real docstring. Any measurement of "did we find it" carries a paired measurement of "is
+what we found correct", and a metric with no denominator of truth is a count, not a score.
+Also: a number going DOWN is not automatically a regression. The TypeScript doc count fell by 13 when
+banners started being refused. Look at what left before calling it either way. ADR 0135.

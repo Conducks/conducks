@@ -72,9 +72,25 @@ Measured after the fix, on the same frozen subjects:
 
 | subject | documented behaviors before | after |
 |---|---|---|
-| scraper | 198/1,117 (17.7%) | 548/1,117 (49.1%) |
-| orchestrator | 563/1,493 (37.7%) | 591/1,493 (39.6%) |
-| sofie | 916/2,936 (31.2%) | 990/2,936 (33.7%) |
+| scraper | 198/1,117 (17.7%) | 632/1,117 (56.6%) |
+| orchestrator | 563/1,493 (37.7%) | 578/1,493 (38.7%) |
+| sofie | 916/2,936 (31.2%) | 988/2,936 (33.7%) |
+
+**Recall was scored first and would have been enough to declare victory.** Scoring the TEXT against
+the AST instead of counting attachments showed 17 FALSE attachments, each one a `# ------------` rule
+that beat the real docstring whenever the signature wrapped. A benchmark that counts only what it
+found cannot see what it found wrongly, so both axes are scored: 599 of 606 exact matches now, and 0
+false attachments. Two rules did it — the inside search reaches the declaration's own `lineEnd` but
+never past the next declaration, and a comment with no letter in it is refused as documentation.
+
+The TypeScript counts FELL after that second rule, by 13 on orchestrator. That is junk leaving: all 27
+refused comments there were rules and commented-out clock times. A number going down is not
+automatically a regression, and the only way to tell is to look at what left.
+
+**`located` was measuring nothing.** It read 81% on orchestrator, which looked like a fifth of the
+graph having no position. The missing fifth was 488 directories, 42 npm packages and a folder of
+markdown — none of which is a line of code. Counted on what CAN have a line, it is 100% on all three
+subjects, so any value below 100% is now a real regression rather than a permanent shrug.
 
 The first attempt at the fix changed nothing, and the benchmark said so. It ranked on `kind ===
 'parameter'`, and Python reports its parameters as `kind: 'variable'` — so the check fired never.

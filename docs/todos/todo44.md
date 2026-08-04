@@ -38,8 +38,11 @@ can act on the output, or has to go and open a file.
 - [x] `DocTarget.rank` breaks a tie within a line so a declaration outranks its parameter; the inside window starts AT the declaration so a module docstring is reachable
 - [x] The first fix ranked on `kind === 'parameter'` and changed NOTHING — Python reports its parameters as `kind: 'variable'`. The benchmark is what caught it; ranking on `canonicalKind === 'ATOM'` is what works
 - [x] Result on the frozen subjects: scraper 198 to 548 behaviors, orchestrator 563 to 591, sofie 916 to 990. Suite green at 1,494
-- [ ] The remaining 58: a docstring below a signature that WRAPS sits more than two lines under the declaration, outside the window. Widening the window blindly would attach a nested function's docstring to its parent, so the bound must be the next declaration, not a bigger constant
-- [ ] `located` is 81% on orchestrator and 92% on scraper — find what the missing fifth is before quoting either number as coverage
+- [x] Scored on BOTH axes, because recall alone rises by attaching anything: text compared against the AST docstring, not merely counted. Before the reach fix — 496 exact matches and 17 FALSE attachments, every false one a `# ------` rule that beat the real docstring whenever the signature wrapped
+- [x] The reach is the declaration's own `lineEnd`, never past the next declaration — a constant cannot express that, since too small hides a wrapped signature's docstring and too large hands an inner function's docstring to its parent
+- [x] A banner is not a description: a comment with no letter in it is refused. 27 refused on orchestrator, all of them rules and commented-out clock times, which is why the TypeScript count FELL by 13 and that fall is junk leaving
+- [x] Result: 599 of 606 exact text matches, 0 false attachments. Behaviors 548 to 632 on scraper
+- [x] `located` was measuring nothing: the missing fifth on orchestrator was 488 directories, 42 npm packages and a folder of markdown, none of which is a line of code. On the honest denominator — a symbol in a file this repository owns — it is 100% on all three, so anything under 100% is now a real regression
 
 ## Phase 3 — Benchmark A: conducks against grep
 

@@ -1269,6 +1269,8 @@ export class ConducksReflector {
           // the first fix changed nothing. ATOM covers both a parameter and an inline assignment
           // sharing the line; in either case the declaration is what the comment describes.
           rank: n.canonicalKind === 'ATOM' || n.kind === 'import' ? 1 : 0,
+          // The declaration's own end, so a docstring under a WRAPPED signature is still reachable.
+          lineEnd: n.range?.end?.line,
           node: n,
         })),
         docComments
