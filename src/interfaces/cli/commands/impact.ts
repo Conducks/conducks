@@ -89,15 +89,56 @@ export class ImpactCommand implements ConducksCommand {
         console.log(`\n\x1b[1mDependency Tree:\x1b[0m`);
         renderTree(resolvedId, impact.affectedNodes.slice(0, 20));
       } else if (impact.affectedNodes.length > 0) {
-        console.log(`\n\x1b[1mAffected Symbols (Top 10):\x1b[0m`);
-        impact.affectedNodes.slice(0, 10).forEach((node: any) => {
-          const dist = node.distance.toFixed(2);
-          // file:line, so the answer is directly openable. `line` is where this file references the
-          // chain — the call site — falling back to where the symbol is declared (ADR 0108).
-          const lines = node.lines?.length ? node.lines : (node.line ? [node.line] : node.declaredAt ? [node.declaredAt] : []);
-          const at = lines.length > 1 ? `:${lines[0]} (+${lines.length - 1} more)` : lines.length ? `:${lines[0]}` : '';
-          console.log(`- [d:${dist}] \x1b[36m${node.name}\x1b[0m (${node.filePath}${at})`);
-        });
+        // FILE -> ENCLOSING FUNCTION -> THE SOURCE LINE (ADR 0132).
+        //
+        // The old shape printed one flat row per symbol: `execute (…/cohesion.ts:38)`. This
+        // repository holds seven different `execute`s, so the name identified nothing and the reader
+        // opened the file — and once they are opening files, grep got them there in 17 ms. The line
+        // numbers were already here; nothing read the source back.
+        //
+        // Grouping by file also collapses the repetition: seven callers in seven files printed the
+        // absolute path seven times, which is most of the width and none of the information.
+        const shown = impact.affectedNodes.slice(0, 10);
+        const reader = registry.source.lineReader();
+        const root = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+        const rel = (p: string) => (p && p.toLowerCase().startsWith(root.toLowerCase()) ? p.slice(root.length + 1) : p);
+
+        const byFile = new Map<string, any[]>();
+        for (const n of shown) {
+          const f = n.filePath || '(no file)';
+          if (!byFile.has(f)) byFile.set(f, []);
+          byFile.get(f)!.push(n);
+        }
+
+        const kept = impact.affectedNodes.length - shown.length;
+        console.log(`\n\x1b[1mUsed in ${byFile.size} file(s)\x1b[0m` +
+          (kept > 0 ? chalk.dim(`  (top ${shown.length} of ${impact.affectedNodes.length})`) : ''));
+
+        for (const [file, nodes] of byFile) {
+          console.log(`\n  \x1b[4m${rel(file)}\x1b[0m`);
+          for (const node of nodes) {
+            // DIRECT means this symbol names the target itself; anything further is reached through
+            // something else, and merging the two would overstate what a change touches. Grep cannot
+            // see the indirect caller at all, which is the half of the answer it can never give.
+            const direct = node.distance <= 1;
+            const tag = direct ? chalk.green('direct') : chalk.yellow('indirect');
+            const lines: number[] = node.lines?.length ? node.lines
+              : node.line ? [node.line]
+              : node.declaredAt ? [node.declaredAt] : [];
+
+            console.log(`    ${chalk.cyan(node.name)}  ${tag}${chalk.dim(`  d:${node.distance.toFixed(2)}`)}`);
+            for (const l of lines.slice(0, 3)) {
+              const src = reader.read(file, l);
+              // A line the working tree no longer holds says so rather than printing whatever now
+              // sits at that number — the vault can be older than the file (CONDUCKS-37).
+              const text = src.text === null
+                ? chalk.dim(src.reason === 'past-end' ? '(line no longer in this file — re-run analyze)' : '(file unreadable)')
+                : src.text;
+              console.log(`      ${chalk.dim(String(l).padStart(5) + ':')}  ${text}`);
+            }
+            if (lines.length > 3) console.log(chalk.dim(`      … and ${lines.length - 3} more call site(s)`));
+          }
+        }
       }
 
     } catch (err) {

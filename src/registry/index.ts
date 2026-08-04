@@ -19,6 +19,7 @@ import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
 import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
 import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
+import { SourceLineReader } from "@/lib/core/utils/source-line.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
 import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
@@ -274,6 +275,12 @@ export const registry = {
       docsWatcher ??= new DocsWatcher(chronicle.getProjectDir() || process.cwd());
       return docsWatcher;
     }
+  },
+  // Reading a stored `(file, line)` back into the LINE OF CODE, at answer time (ADR 0132). A fresh
+  // reader per call so its cache — and its read count — is scoped to one answer rather than living
+  // for the process; the whole point of the cache is "one read per file IN THIS ANSWER".
+  source: {
+    lineReader: () => new SourceLineReader(),
   },
   coverage: {
     nodes: coverageNodes,

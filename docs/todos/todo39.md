@@ -1,5 +1,5 @@
 # todo39 — an answer shows the call site, not a list of names
-Status: todo
+Status: doing
 
 - Acceptance: `impact <symbol>` prints, for every caller, the file, the enclosing function, and the SOURCE LINE of the call — with direct and indirect labelled — and a reader can decide whether a change is safe without opening a file. Proven by a test that fails without the line.
 - Depends: none
@@ -17,17 +17,17 @@ property holding every site rather than the first. Nothing reads the source back
 ## Phase 1 — read the line back
 - Builds: 0132
 
-- [ ] `edges.lineNumber` and the `lines` property reach the CLI answer layer for `impact` — measure first whether both survive today's query path, since a field that never arrives is the defect this project keeps finding
-- [ ] A shared reader turns `(file, line)` into the trimmed source line, with one file read per distinct file in the answer, not one per call site
-- [ ] A line the working tree no longer has says so, and never prints whatever now sits at that number
+- [x] `edges.lineNumber` and the `lines` property reach the CLI answer layer — MEASURED and they already did: 6,077 of 6,077 CALLS edges carry both in the vault, all 7 survive into the in-memory graph, and `--json` already emitted `line`/`lines`/`declaredAt`. The gap was never the plumbing
+- [x] A shared reader turns `(file, line)` into the trimmed source line — `SourceLineReader`, caching by path and reporting its own read count so the bound is checkable
+- [x] A line the working tree no longer has says so — `past-end` and `unreadable` are distinct, and a BLANK line is `''` rather than null because empty and unreadable are different facts
 
 ## Phase 2 — the three-layer answer
 - Builds: 0132
 
-- [ ] `impact` groups by FILE, then names the ENCLOSING FUNCTION, then prints the line — the shape in ADR 0132
-- [ ] Direct and indirect callers are labelled, never merged into one list
-- [ ] `--json` carries the same three fields so an agent gets what a human gets
-- [ ] The hand-derived fixture from ADR 0129 is the test subject: `format` must report `fetchUser` with `return format(id);` and `main` marked indirect
+- [x] `impact` groups by FILE, then names the ENCLOSING FUNCTION, then prints the line (ADR 0132)
+- [x] Direct and indirect callers are labelled, never merged into one list
+- [x] `--json` carries the same three fields — it already did; verified rather than assumed
+- [x] The hand-derived fixture from ADR 0129 is the test subject — `impact-call-sites.test.ts`, run against the unfixed build first: the two new claims failed, the two controls passed
 
 ## Phase 3 — the same shape everywhere it applies
 - Builds: 0132
