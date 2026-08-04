@@ -347,6 +347,14 @@ export class ConducksAdjacencyList {
         dna: node.properties.dna,
         kinetic: node.properties.kinetic,
         signature: node.properties.signature,
+        // The author's own description of this symbol (ADR 0133). On the SKELETON because the
+        // skeleton is what survives a vault load and what `saveNodes` reads — a field left out here
+        // is harvested correctly, carried through the worker correctly, and then silently dropped at
+        // the graph boundary. Measured exactly that way: the join reported `attached: 1` while the
+        // `doc` column stayed NULL, which is the same shape as the route columns and `instanceOf`
+        // above, both of which cost a debugging session before they were added.
+        doc: node.properties.doc,
+        docFirstLine: node.properties.docFirstLine,
         // Cross-service HTTP binding reads these, and the skeleton is what survives a load — so
         // omitting them made `bindRouteCircuits` match nothing on any graph that came from the
         // vault rather than straight from a parse (todo22#P15).

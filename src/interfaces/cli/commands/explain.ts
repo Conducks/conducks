@@ -103,6 +103,10 @@ export class ExplainCommand implements ConducksCommand {
         kind: node.label,
         filePath: node.properties.filePath,
         line: (node.properties as any)?.range?.start?.line ?? (node.properties as any)?.lineStart ?? null,
+        // WHAT IT DOES, in the author's own words (ADR 0133). Null when undocumented — never
+        // inferred from the name, because a guess in the same font as evidence is the failure this
+        // project keeps removing. "undocumented" is itself a fact worth reporting.
+        doc: (node.properties as any)?.doc ?? null,
         // 0-10, the same scale the table prints, rather than the raw 0-1 the domain returns.
         riskRating: Number((score * 10).toFixed(2)),
         factors: factors ?? [],
@@ -123,6 +127,13 @@ export class ExplainCommand implements ConducksCommand {
     console.log(`\n\x1b[1m--- 🛡️ Conducks Structural Explanation ---\x1b[0m`);
     console.log(`Symbol: \x1b[35m${node.properties.name}\x1b[0m (${node.label})`);
     console.log(`Path:   ${node.properties.filePath}`);
+    const doc = (node.properties as any)?.doc;
+    if (doc) {
+      console.log();
+      for (const l of String(doc).split("\n")) console.log(`  ${l}`);
+    } else {
+      console.log(chalk.dim(`  (undocumented)`));
+    }
     console.log(`${chalk.blue('Composite Risk Rating')}: ${(score * 10).toFixed(1)} / 10.0`);
     if (factors && factors.length > 0) {
       factors.forEach((f: string) => console.log(`  ${chalk.yellow('⚠')} ${f}`));

@@ -62,6 +62,10 @@ export const CONTENT_NODE_COLUMNS = [
   // the weak ones above: it is read off the declaration, so it can only change when the declaration
   // text changes — which changes the fingerprint and therefore the content row anyway.
   'instance_of', 'instance_of_call', 'declared_return', 'object_paths', 'param_types', 'member_types',
+  // The author's description of the symbol (ADR 0133). Content on the same strong grounds as the
+  // declared types above: it is the comment attached to the declaration, so it cannot change without
+  // the source changing — which changes the fingerprint and therefore the content row anyway.
+  'doc',
 ] as const;
 
 /** Every node column the layer schema accounts for. A column in neither list is unclassified. */

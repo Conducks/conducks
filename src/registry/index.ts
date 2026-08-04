@@ -20,6 +20,7 @@ import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/filter
 import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
 import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
 import { SourceLineReader } from "@/lib/core/utils/source-line.js";
+import { firstLineOf } from "@/lib/core/parsing/doc-comments.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
 import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
@@ -281,6 +282,10 @@ export const registry = {
   // for the process; the whole point of the cache is "one read per file IN THIS ANSWER".
   source: {
     lineReader: () => new SourceLineReader(),
+    // One line of a harvested doc, for a header (ADR 0133). Through composition because the CLI
+    // may name no core module (ADR 0005), and because a vault-loaded node carries `doc` but not
+    // the derived first line — that is computed, not stored.
+    firstLineOf: (doc: string) => firstLineOf(doc),
   },
   coverage: {
     nodes: coverageNodes,

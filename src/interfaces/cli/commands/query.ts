@@ -9,9 +9,66 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class QueryCommand implements ConducksCommand {
   public id = "query";
   public description = "Search code (use --mode template --template <id> for Oracle patterns, or --mode filter --filter <json>)";
-  public usage = "conducks query <pattern> [--mode fuzzy|template|filter] [--template <id>] [--filter <json>] [--limit <n>] [--json]";
+  public usage = "conducks query <pattern> [--mode fuzzy|template|filter] [--template <id>] [--filter <json>] [--doc <term>] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
+    // SEARCH BY PURPOSE, not by name (ADR 0133, todo40#P4).
+    //
+    // `rg retry` finds the word wherever it appears — in a variable, in an unrelated comment, in a
+    // string. `--doc retry` finds the symbol whose DESCRIPTION mentions retry, which is a different
+    // question and one neither grep nor conducks could answer before the harvest.
+    //
+    // Answered from SQL rather than the in-memory graph because `doc` is a real column, which is the
+    // whole reason ADR 0133 refused to put it in the metadata blob.
+    const docIdx = args.indexOf('--doc');
+    if (docIdx !== -1) {
+      const term = args[docIdx + 1];
+      if (!term || term.startsWith('-')) {
+        console.error('--doc needs a term. Usage: ' + this.usage);
+        process.exitCode = 1;
+        return;
+      }
+      const limitFor = args.indexOf('--limit');
+      const max = limitFor !== -1 ? parseInt(args[limitFor + 1], 10) || 10 : 10;
+      const rows = await registry.infrastructure.persistence.query<{ id: string; name: string; file: string; lineStart: number; doc: string }>(
+        `SELECT id, name, file, lineStart, doc FROM nodes
+         WHERE doc IS NOT NULL AND lower(doc) LIKE ?
+         ORDER BY gravity DESC LIMIT ${max}`,
+        [`%${term.toLowerCase()}%`]
+      );
+
+      if (args.includes('--json')) {
+        process.stdout.write(JSON.stringify(rows.map(r => ({
+          id: r.id, name: r.name, filePath: r.file, line: Number(r.lineStart) || null,
+          doc: r.doc,
+          // WHICH claim matched. A name hit and a purpose hit are different answers, and a reader
+          // who cannot tell them apart cannot judge the result (ADR 0133).
+          matched: 'purpose' as const,
+        })), null, 2) + '\n');
+        return;
+      }
+
+      console.log(`\n\x1b[1m--- Symbols whose PURPOSE mentions "${term}" ---\x1b[0m`);
+      if (rows.length === 0) {
+        // An empty result here has two causes and they are not the same fact (CONDUCKS-37).
+        const [{ n }] = await registry.infrastructure.persistence.query<{ n: number }>(
+          'SELECT count(*) AS n FROM nodes WHERE doc IS NOT NULL');
+        console.log(Number(n) === 0
+          ? '\x1b[33mNo symbol in this vault carries a doc comment — nothing was searched. Run `conducks analyze --force` to harvest them.\x1b[0m'
+          : `No symbol's description mentions "${term}" (searched ${Number(n)} documented symbol(s)).`);
+        return;
+      }
+      const root = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+      for (const r of rows) {
+        const rel = String(r.file || '').toLowerCase().startsWith(root.toLowerCase())
+          ? String(r.file).slice(root.length + 1) : r.file;
+        console.log(`\n  \x1b[36m${r.name}\x1b[0m \x1b[2m${rel}:${r.lineStart}\x1b[0m`);
+        console.log(`    ${String(r.doc).split('\n')[0]}`);
+      }
+      console.log();
+      return;
+    }
+
     const modeIdx = args.indexOf('--mode');
     const mode = modeIdx !== -1 ? args[modeIdx + 1] : 'fuzzy';
 
@@ -197,6 +254,11 @@ export class QueryCommand implements ConducksCommand {
           if (lineNo && rawPath && !isEcho) {
             const src = reader.read(rawPath, Number(lineNo));
             if (src.text) console.log('\x1b[2m' + ' '.repeat(27) + '\x1b[0m' + src.text);
+            // ONE LINE of what it is for, under the declaration it belongs to (ADR 0133). The full
+            // text lives in `explain`; a paragraph per row would bury the results it is meant to
+            // describe, which is why the serving is asymmetric rather than uniform.
+            const first = (n.properties as any)?.docFirstLine ?? registry.source.firstLineOf(String((n.properties as any)?.doc ?? ''));
+            if (first) console.log('\x1b[2m' + ' '.repeat(27) + first.slice(0, 96) + '\x1b[0m');
           }
         });
       } catch (err) {

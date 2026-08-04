@@ -291,6 +291,7 @@ export class SynapsePersistence {
       canonicalKind VARCHAR,
       canonicalRank INTEGER,
       semantic_kind VARCHAR,
+      doc TEXT,
       name TEXT,
       file VARCHAR,
       lineStart INTEGER,
@@ -409,7 +410,13 @@ export class SynapsePersistence {
     // Existing vaults predate the HTTP columns; ADD COLUMN IF NOT EXISTS is a no-op on new ones.
     for (const col of ['is_route BOOLEAN', 'is_request BOOLEAN', 'http_method VARCHAR',
                        'http_path VARCHAR', 'http_url VARCHAR', 'instance_of VARCHAR',
-                       'instance_of_call VARCHAR', 'declared_return VARCHAR', 'object_paths JSON', 'param_types JSON', 'member_types JSON']) {
+                       'instance_of_call VARCHAR', 'declared_return VARCHAR', 'object_paths JSON', 'param_types JSON', 'member_types JSON',
+                       // The harvested doc comment (ADR 0133). Adding it to the CREATE alone would
+                       // have broken EVERY existing vault on upgrade: `CREATE TABLE IF NOT EXISTS`
+                       // never alters a table that already exists, so the first read naming the
+                       // column failed with the schema-drift message ADR 0115 added. Measured on
+                       // the CLI fixture before this line existed.
+                       'doc TEXT']) {
       await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS ${col}`);
     }
     await run(edgesSql);
@@ -550,11 +557,11 @@ export class SynapsePersistence {
     // analyze path. The full load keeps the blob because `explain`, `rename`, `diff` and the
     // mirror's `hydrateNode` do read it.
     const nodes = await this.query(options.shallow
-      ? `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
+      ? `SELECT id, canonicalKind, name, file, semantic_kind, doc, canonicalRank, gravity, complexity,
                 risk, unitId, parentId, namespaceId, layer_path, depth,
                 fingerprint, rootId, structureId, isEntryPoint, lineStart, lineEnd,
                 is_route, is_request, http_method, http_path, http_url, instance_of, instance_of_call, declared_return, object_paths, param_types, member_types FROM nodes`
-      : `SELECT id, canonicalKind, name, file, semantic_kind, canonicalRank, gravity, complexity,
+      : `SELECT id, canonicalKind, name, file, semantic_kind, doc, canonicalRank, gravity, complexity,
                 risk, unitId, parentId, namespaceId, layer_path, depth, metadata,
                 is_route, is_request, http_method, http_path, http_url, instance_of, instance_of_call, declared_return, object_paths, param_types, member_types FROM nodes`);
     traceMemory(`load: ${nodes.length} node rows fetched`);
@@ -583,6 +590,7 @@ export class SynapsePersistence {
           name: row.name,
           filePath: row.file,
           kind: row.semantic_kind,
+          doc: row.doc ?? undefined,
           canonicalKind: row.canonicalKind,
           canonicalRank: row.canonicalRank,
           gravity: row.gravity,
@@ -752,7 +760,7 @@ export class SynapsePersistence {
     if (this.readOnly) return;
     await this.ensureVaultOpen();
     const owned = !this.inPulse;
-    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'instance_of', 'instance_of_call', 'declared_return', 'object_paths', 'param_types', 'member_types'];
+    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'doc', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'instance_of', 'instance_of_call', 'declared_return', 'object_paths', 'param_types', 'member_types'];
     try {
       if (owned) await this.run("BEGIN TRANSACTION");
       const rows = nodes.map(n => {
@@ -766,7 +774,7 @@ export class SynapsePersistence {
         const canonicalRank = m.canonicalRank || n.canonicalRank || 0;
 
         return [
-          n.id.toLowerCase(), pulseId, m.fingerprint || null, canonicalKind, canonicalRank, semanticKind, name, filePath.toLowerCase(), m.range?.start.line || 0, m.range?.end.line || 0,
+          n.id.toLowerCase(), pulseId, m.fingerprint || null, canonicalKind, canonicalRank, semanticKind, m.doc || null, name, filePath.toLowerCase(), m.range?.start.line || 0, m.range?.end.line || 0,
           m.parentId?.toLowerCase() || null, m.rootId?.toLowerCase() || null, m.namespaceId?.toLowerCase() || null, m.unitId?.toLowerCase() || null, m.structureId?.toLowerCase() || null,
           m.layer_path || null, m.depth || 0, m.risk || 0, n.gravity || m.gravity || 0, n.complexity || m.complexity || 1,
           m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(m.dna || {}), JSON.stringify(m.signature || {}), JSON.stringify(m.kinetic || {}),

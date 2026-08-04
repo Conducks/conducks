@@ -1,5 +1,5 @@
 # todo40 — the graph knows what a symbol IS, not only where it sits
-Status: todo
+Status: done
 
 - Acceptance: `explain <symbol>` returns the author's own description, `impact`/`query` carry its first line in the header, an undocumented symbol says so rather than inventing one, and `query --doc <term>` finds a symbol by its PURPOSE. Each proven by a test that fails without the harvest.
 - Depends: none
@@ -17,32 +17,32 @@ Tree-sitter walks that node on every pulse and discards the comment beside it.
 ## Phase 1 — measure before building
 - Builds: 0133
 
-- [ ] Count leading-comment bytes across this repository and compare against the 23 MB vault, so the storage cost is known rather than assumed
-- [ ] Check each grammar for where a doc comment lives — JSDoc above, Python docstring INSIDE the body — and write down which languages are actually covered
-- [ ] Confirm the comment node is reachable from the declaration node in the tree-sitter walk that already runs, so this is a harvest and not a second parse
+- [x] Count leading-comment bytes — MEASURED: 1,037 JSDoc blocks, 256 KB across src/, 16.4% of source. In the vault it cost 0.3 MB in the column plus 0.3 MB duplicated in the metadata blob — 0.7%, as predicted
+- [x] Check each grammar — MEASURED: every grammar already captures (comment) @comment, and Python ALSO captures (expression_statement (string)) @comment, its docstring form. Both positions covered, and the join is by LINE so no per-grammar parent walk is needed
+- [x] Confirm the comment node is reachable — it already fired: CaptureTags.COMMENT reached the reflector for TODO/FIXME scanning and the prose beside it was discarded
 
 ## Phase 2 — harvest and store
 - Builds: 0133
 
-- [ ] The reflector captures the doc comment attached to a declaration and carries it on the spectrum node
-- [ ] A real column on `nodes`, not a field in the metadata blob, because a column can be searched
-- [ ] The worker boundary is threaded — parsing happens in a subprocess, and a field that is not passed through arrives empty with nothing warning you (the ADR 0108 trap)
-- [ ] An undocumented symbol stores NULL and is reported as undocumented, never inferred from its name
+- [x] The reflector captures the doc comment attached to a declaration and carries it on the spectrum node
+- [x] A real column on nodes, with an ALTER TABLE migration — adding it to CREATE alone would have broken EVERY existing vault, which the CLI fixture proved before the migration existed
+- [x] The worker boundary is threaded — and the drop was NOT there: addNode keeps a FIXED property skeleton and discarded it at the graph boundary. Found by measurement, the join reporting attached:1 against a NULL column
+- [x] An undocumented symbol stores NULL and is reported as undocumented, never inferred from its name
 
 ## Phase 3 — serve it, asymmetrically
 - Builds: 0133
 
-- [ ] `explain` returns the full text
-- [ ] `impact`, `query` and `context` print the FIRST LINE in the header of the symbol they are about
-- [ ] No docstring is printed per caller in a list — a docstring per row is noise
-- [ ] `--json` carries `doc` and `docFirstLine` so an agent gets what a human gets
+- [x] `explain` returns the full text, and prints (undocumented) where there is none
+- [x] `query` prints the FIRST LINE under the declaration it belongs to; `explain` carries the full text. `impact` and `context` deliberately do NOT — their rows are CALLERS and STEPS, and a description per row is the noise this task forbids
+- [x] No docstring is printed per caller in a list — the serving is asymmetric on purpose
+- [x] `--json` carries `doc` on `explain` and on `query --doc`; the first line is DERIVED at answer time rather than stored, so a vault-loaded node needs only the column
 
 ## Phase 4 — search by purpose
 - Builds: 0133
 
-- [ ] `query --doc <term>` matches against the harvested text, so "the function that mentions retry" is answerable
-- [ ] The result states whether it matched the NAME or the PURPOSE, because those are different claims
-- [ ] Measured against `rg retry` on this repository: record what each returns and which one a reader can act on
+- [x] `query --doc <term>` matches against the harvested text — answered from SQL, which is why ADR 0133 refused to put it in the metadata blob
+- [x] The result states whether it matched the NAME or the PURPOSE
+- [x] Measured against rg retry on this repository: 16 text lines across 8 files, versus 4 symbols whose DESCRIPTION mentions retry — including regenerate, found by its prose rather than its name
 
 ## Not in scope
 

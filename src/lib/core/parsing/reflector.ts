@@ -1,4 +1,5 @@
 import { isBuiltIn, getGlobalId } from '@/lib/core/parsing/built-ins.js';
+import { attachDocs, firstLineOf, type HarvestedComment } from '@/lib/core/parsing/doc-comments.js';
 import { nextRoutes } from "@/lib/core/parsing/next-routes.js";
 import type Parser from "tree-sitter";
 import { PrismSpectrum, SpectrumNode } from "../../core/parsing/prism-core.js";
@@ -490,6 +491,8 @@ export class ConducksReflector {
     }
 
     const nodeCache = new Map<string, SpectrumNode>();
+    // Every comment in this file, joined to declarations after the walk (ADR 0133).
+    const docComments: HarvestedComment[] = [];
 
     nodeCache.set(fileId, unitNode);
 
@@ -1086,7 +1089,22 @@ export class ConducksReflector {
           const scope = getScopeAt(currentMatchRow);
           this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum, [], context, currentMatchRow + 1);
         }
-        else if (cName === CaptureTags.COMMENT && provider.extractDebt) {
+        else if (cName === CaptureTags.COMMENT) {
+          // HARVEST THE PROSE, not only the debt markers (ADR 0133). This capture already fired on
+          // every comment in every language — Python additionally tags its docstring here via
+          // `(expression_statement (string)) @comment` — and only TODO/FIXME scanning read it. The
+          // author's description of the symbol was parsed and discarded on every pulse.
+          //
+          // Collected flat and joined to declarations AFTER the walk, because the two conventions
+          // sit on opposite sides of the declaration line and a row comparison covers both without
+          // a per-grammar parent walk (`doc-comments.ts`).
+          docComments.push({
+            startLine: capture.node.startPosition.row + 1,
+            endLine: capture.node.endPosition.row + 1,
+            text: capture.node.text,
+          });
+        }
+        if (cName === CaptureTags.COMMENT && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
             const scopeName = getScopeAt(currentMatchRow);
@@ -1229,6 +1247,29 @@ export class ConducksReflector {
 
     spectrum.nodes = [...Array.from(nodeCache.values()), ...virtualNodes];
 
+    // JOIN THE HARVESTED PROSE TO ITS DECLARATION (ADR 0133).
+    //
+    // After the walk, because a comment ABOVE a declaration is seen before the declaration exists,
+    // and Python's docstring is seen after — a flat collection joined by line handles both, where a
+    // per-grammar parent walk would need a different rule for each language.
+    //
+    // A comment is claimed by at most one symbol, so a banner above a class is not also handed to
+    // its first method: the same paragraph describing two different things is the confidently-wrong
+    // shape this project keeps removing.
+    if (docComments.length > 0) {
+      const documentable = spectrum.nodes.filter(n => (n.range?.start?.line ?? 0) > 0);
+      const docs = attachDocs(
+        documentable.map(n => ({ lineStart: n.range.start.line, node: n })),
+        docComments
+      );
+      for (const [target, text] of docs) {
+        const n = (target as { node: SpectrumNode }).node;
+        n.metadata.doc = text;
+        n.metadata.docFirstLine = firstLineOf(text);
+      }
+    }
+
+
     // Conducks: Hierarchical Unification (L2-L7 Parentage)
     // [Conducks Rule] MEMBER_OF edges are no longer persisted as structural scaffolding.
     // All containment is now column-based (parentId, unitId, structureId, etc.). 🏺
@@ -1273,6 +1314,7 @@ export class ConducksReflector {
 
         n.metadata.kinetic = {
           resonance: resonance.count,
+
           entropy: entropyRisk,
           primaryAuthor: primary,
           authorCount: count,
