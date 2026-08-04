@@ -2,6 +2,7 @@
   "project": "sofie",
   "sha": "de19e9f7",
   "language": "typescript",
+  "analyzeMs": 17975,
   "nodes": 10398,
   "units": 1095,
   "edges": 34558,
@@ -31,47 +32,47 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 1195,
+      "ms": 1165,
       "bytes": 976
     },
     "audit": {
       "code": 1,
-      "ms": 747,
+      "ms": 729,
       "bytes": 3913
     },
     "entry": {
       "code": 0,
-      "ms": 1154,
+      "ms": 1163,
       "bytes": 2111
     },
     "prune": {
       "code": 0,
-      "ms": 1481,
+      "ms": 1463,
       "bytes": 45016
     },
     "flows": {
       "code": 0,
-      "ms": 1315,
+      "ms": 1277,
       "bytes": 535438
     },
     "ledger": {
       "code": 0,
-      "ms": 1659,
+      "ms": 1467,
       "bytes": 470
     },
     "supply-chain": {
       "code": 0,
-      "ms": 961,
+      "ms": 860,
       "bytes": 3283
     },
     "advise": {
       "code": 0,
-      "ms": 916,
+      "ms": 831,
       "bytes": 16591
     },
     "query": {
       "code": 0,
-      "ms": 1665,
+      "ms": 1172,
       "bytes": 1357
     }
   },

@@ -2,6 +2,7 @@
   "project": "scraper",
   "sha": "8e558ca",
   "language": "python",
+  "analyzeMs": 5997,
   "nodes": 5105,
   "units": 272,
   "edges": 16674,
@@ -31,47 +32,47 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 2060,
+      "ms": 681,
       "bytes": 1003
     },
     "audit": {
       "code": 0,
-      "ms": 937,
+      "ms": 444,
       "bytes": 207
     },
     "entry": {
       "code": 0,
-      "ms": 950,
+      "ms": 659,
       "bytes": 466
     },
     "prune": {
       "code": 0,
-      "ms": 973,
+      "ms": 779,
       "bytes": 33569
     },
     "flows": {
       "code": 0,
-      "ms": 865,
+      "ms": 722,
       "bytes": 403761
     },
     "ledger": {
       "code": 0,
-      "ms": 1006,
+      "ms": 784,
       "bytes": 440
     },
     "supply-chain": {
       "code": 0,
-      "ms": 743,
+      "ms": 605,
       "bytes": 11921
     },
     "advise": {
       "code": 0,
-      "ms": 578,
+      "ms": 489,
       "bytes": 19081
     },
     "query": {
       "code": 0,
-      "ms": 764,
+      "ms": 667,
       "bytes": 1582
     }
   },
