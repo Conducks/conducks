@@ -349,7 +349,17 @@ export class AnalysisService {
     // 4.6 Taxonomy reconcile (ADR 0013): cut DATA, edge-gate ATOM. Runs last so every reference
     // edge (intra/service/federated/virtual) is present when deciding which atoms are load-bearing.
     traceMemory('after linkers and virtual induction');
-    await this.persistence.pruneTaxonomy();
+    // The counts are printed EVERY pulse, by kind. A silent delete downstream of a classification is
+    // how every React component vanished (ADR 0136) — "dropped 233 function" in this line is what
+    // would have named that bug on first sight, and its absence is what cost a hand-built repro.
+    const prunedByKind = await this.persistence.pruneTaxonomy();
+    const prunedTotal = Object.values(prunedByKind).reduce((s, n) => s + n, 0);
+    if (prunedTotal > 0) {
+      const breakdown = Object.entries(prunedByKind)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `${n} ${k}`).join(', ');
+      logger.info(`🛡️ [Taxonomy] Pruned ${prunedTotal} unreferenced value node(s): ${breakdown}.`);
+    }
 
     // Sweep what this pulse did not touch (ADR 0050). Safe HERE and nowhere else: this is the full
     // pulse, so every live row has just been re-written with this pulseId — including the virtual

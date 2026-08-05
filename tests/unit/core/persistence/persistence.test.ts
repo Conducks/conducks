@@ -323,7 +323,12 @@ describe('SynapsePersistence', () => {
         'pulse1'
       );
 
-      await persistence.pruneTaxonomy();
+      const dropped = await persistence.pruneTaxonomy();
+
+      // The drop is REPORTED, counted per kind. This method deleting silently is how every React
+      // component vanished (ADR 0136): arrow functions filed as ATOM, no same-file reference, gone —
+      // and nothing said so. Two entries here, one per removed node, keyed by semantic kind.
+      expect(Object.values(dropped).reduce((s, n) => s + n, 0)).toBe(2);
 
       const nodeIds = (await persistence.query<{ id: string }>('SELECT id FROM nodes ORDER BY id')).map(n => n.id);
       expect(nodeIds).toEqual(['src/a.ts::a-kept', 'src/a.ts::p', 'src/a.ts::target-x', 'src/a.ts::target-y'].sort());

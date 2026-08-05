@@ -1632,8 +1632,16 @@ export class SynapsePersistence {
     return { nodes, links, clusters, truncated: Number(total) > nodes.length, totalNodes: Number(total) };
   }
 
-  public async pruneTaxonomy(): Promise<void> {
-    if (this.readOnly) return;
+  /**
+   * Returns what it removed, counted per semantic kind — because this method deletes SILENTLY, and a
+   * silent delete downstream of a classification is how every React component vanished (ADR 0136):
+   * arrow functions were filed as ATOM, an exported component has no reference inside its own file,
+   * and this method removed them all. Nothing reported it; the graph was simply thin. The counts make
+   * the next swallowed symbol class visible in the analyze log instead of needing a hand-built
+   * reproduction to find.
+   */
+  public async pruneTaxonomy(): Promise<Record<string, number>> {
+    if (this.readOnly) return {};
     await this.ensureVaultOpen();
     const STRUCTURAL = `('MEMBER_OF','CONTAINS','HAS_METHOD','HAS_PROPERTY')`;
 
@@ -1645,6 +1653,13 @@ export class SynapsePersistence {
                SELECT 1 FROM edges e
                WHERE (e.sourceId = n.id OR e.targetId = n.id)
                  AND e.type NOT IN ${STRUCTURAL}))`);
+
+    // Counted by the node's SEMANTIC kind, not its canonical one: the canonical kinds here are DATA
+    // and ATOM by construction, and "dropped 233 variable" vs "dropped 233 function" is exactly the
+    // distinction that would have named the component bug on first sight.
+    const droppedRows = await this.query(
+      `SELECT coalesce(n.semantic_kind, n.canonicalKind) AS kind, COUNT(*) AS c
+         FROM nodes n JOIN _pruned p ON n.id = p.id GROUP BY 1`) as Array<{ kind: string; c: unknown }>;
 
     // 2. Reroute reference edges off the dropped nodes onto their parent (dependency preserved).
     await this.run(`UPDATE edges SET sourceId = (SELECT parentId FROM _pruned WHERE id = edges.sourceId)
@@ -1663,6 +1678,10 @@ export class SynapsePersistence {
     // 4. Drop the nodes.
     await this.run(`DELETE FROM nodes WHERE id IN (SELECT id FROM _pruned)`);
     await this.run(`DROP TABLE _pruned`);
+
+    const dropped: Record<string, number> = {};
+    for (const row of droppedRows) dropped[String(row.kind)] = Number(row.c);
+    return dropped;
   }
 
   public async clear(): Promise<void> {

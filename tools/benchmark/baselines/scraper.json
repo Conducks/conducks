@@ -2,7 +2,6 @@
   "project": "scraper",
   "sha": "8e558ca",
   "language": "python",
-  "analyzeMs": 6027,
   "nodes": 5105,
   "units": 272,
   "edges": 16674,
@@ -37,42 +36,42 @@
     },
     "audit": {
       "code": 0,
-      "ms": 477,
+      "ms": 480,
       "bytes": 207
     },
     "entry": {
       "code": 0,
-      "ms": 710,
+      "ms": 709,
       "bytes": 466
     },
     "prune": {
       "code": 0,
-      "ms": 850,
+      "ms": 824,
       "bytes": 33569
     },
     "flows": {
       "code": 0,
-      "ms": 774,
+      "ms": 782,
       "bytes": 403761
     },
     "ledger": {
       "code": 0,
-      "ms": 835,
+      "ms": 850,
       "bytes": 440
     },
     "supply-chain": {
       "code": 0,
-      "ms": 630,
+      "ms": 640,
       "bytes": 11921
     },
     "advise": {
       "code": 0,
-      "ms": 535,
+      "ms": 538,
       "bytes": 19081
     },
     "query": {
       "code": 0,
-      "ms": 715,
+      "ms": 706,
       "bytes": 1582
     }
   },

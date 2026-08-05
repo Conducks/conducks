@@ -16,7 +16,10 @@ import { TypeScriptBindings } from "../typescript/bindings.js";
 export class JavaScriptProvider extends NativeProvider implements ILanguagePlugin {
   public readonly id = "javascript-provider";
   public readonly version = "1.0.0";
-  public readonly extensions = [".js", ".jsx"];
+  // .mjs/.cjs are the SAME grammar — the extension states the module system, not the language.
+  // Unclaimed, a .mjs file got a UNIT from discovery and zero symbols inside: 27 such files on the
+  // frozen orchestrator subject, invisible to every symbol-level command (ADR 0136 follow-up).
+  public readonly extensions = [".js", ".jsx", ".mjs", ".cjs"];
   public readonly langId = "javascript";
   public readonly importSemantics: ImportSemantics = 'named';
 
