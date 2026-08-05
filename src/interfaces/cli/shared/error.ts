@@ -92,7 +92,20 @@ export function resolveSymbol(input: string, graph: NameIndex): string {
     DECLARATION_KINDS.has(String((n.properties as any)?.canonicalKind ?? ''));
 
   const preferred = matches.some(isDeclaration) ? matches.filter(isDeclaration) : matches;
-  const best = preferred.reduce((a, b) => {
+
+  // SOURCE BEATS TEST (todo43). On a repository with 189 suites the tests outnumber the sources,
+  // and gravity follows edge count, not authority — so `impact format` resolved to
+  // `boundaries.test.ts::format`, a test file's local, over the real declaration. A test file
+  // mentioning a name is not the same claim as a source file declaring it. Only when NO source
+  // candidate exists may a test symbol win, so asking about a test helper still answers.
+  const isTestFile = (n: { properties?: unknown }) => {
+    const f = String((n.properties as any)?.filePath ?? '').toLowerCase();
+    return /(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
+  };
+  const fromSource = preferred.filter(n => !isTestFile(n));
+  const pool = fromSource.length > 0 ? fromSource : preferred;
+
+  const best = pool.reduce((a, b) => {
     const ga = (a.properties as any)?.gravity ?? 0;
     const gb = (b.properties as any)?.gravity ?? 0;
     return gb > ga ? b : a;

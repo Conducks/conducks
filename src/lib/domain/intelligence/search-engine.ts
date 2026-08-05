@@ -80,7 +80,20 @@ export class ConducksSearch {
     // A DIRECT match outranks every echo, whatever the scores say. An echo's energy is derived from
     // a match rather than earned, so letting the two compete on one number is how six neighbours
     // pushed real matches out of a ten-row answer.
-    const byScore = (a: [NodeId, number], b: [NodeId, number]) => b[1] - a[1];
+    // A TEST FILE MATCHING IS NOT THE SAME CLAIM AS A SOURCE FILE MATCHING (todo43). On 189 suites
+    // the tests outnumber the sources and gravity follows edge count, not authority — measured:
+    // `query "baseline drift coverage"` ranked two test files above `coverage-baseline.ts`, the
+    // file actually asked for. Applied HERE and not at the seed, because the first attempt demoted
+    // only a node's own score and the wavefront put the energy back: symbols INSIDE a test file
+    // matched, echoed onto their unit, and the unit outranked source again. Demotion, not
+    // exclusion: a query for a test still finds it.
+    const demoted = (id: NodeId, raw: number): number => {
+      const p = (this.graph.getNode(id)?.properties ?? {}) as Record<string, unknown>;
+      const f = String(p.filePath ?? '').toLowerCase();
+      return /(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f) ? raw * 0.4 : raw;
+    };
+    const byScore = (a: [NodeId, number], b: [NodeId, number]) =>
+      demoted(b[0], b[1]) - demoted(a[0], a[1]);
     const entries = Array.from(results.entries());
     const ordered = [
       ...entries.filter(([id]) => direct.has(id)).sort(byScore),

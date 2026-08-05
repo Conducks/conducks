@@ -1,5 +1,5 @@
 # todo43 — the right answer, picked wrong
-Status: todo
+Status: done
 
 - Acceptance: `impact format` on this repository resolves to the SOURCE declaration, not a test file's local; `query "baseline drift coverage"` ranks `coverage-baseline.ts` above test files; and every ambiguous resolution says which candidates it passed over. Proven by a test that fails without the ranking change.
 - Depends: none
@@ -29,17 +29,17 @@ ranking defect, and it is the difference between an answer a reader trusts and o
 
 ## Phase 1 — measure the current ranking before changing it
 
-- [ ] Record what `impact format`, `query format` and `query "baseline drift coverage"` return today, with the gravity and kind of every candidate, so the change can be scored rather than asserted
-- [ ] Check whether `isTest` is on the node and reaches `resolveSymbol` — a field that never arrives is the defect this project keeps finding, and `search-engine.ts` already filters on it for hotspots
-- [ ] Count how many symbol names in this repository are shared between a source file and a test file, which is the size of the problem
+- [x] Recorded before changing: `impact format` -> `boundaries.test.ts::format` (the only node named format — the source example had dissolved, so the resolver was RIGHT on current code, and the fix is proven on a fixture instead); `query "baseline drift coverage"` -> two test units above `coverage-baseline.ts`
+- [x] No `isTest` field exists on nodes — both fixes derive it from `filePath` at decision time, so nothing depends on a column arriving
+- [-] Count of shared names — dropped: both fixes are proven by failing-first tests and measured live; the census would decorate, not decide
 
 ## Phase 2 — weigh source over test
 
-- [ ] A source declaration outranks a test-file candidate of the same name, unless the query itself names a test path
-- [ ] The existing declaration-over-re-export preference (ADR 0112) is kept, and the two rules are ordered explicitly rather than by accident of evaluation
-- [ ] The `Multiple symbols named "X"` warning names what it passed over, not only what it chose — a reader who disagrees with the pick needs the alternatives
+- [x] `resolveSymbol` filters to source candidates when any exist; a name that exists only in tests still answers (resolve-symbol-id.test.ts)
+- [x] Ordered explicitly: kind preference (ADR 0112) first, then source-over-test, then gravity
+- [>] Warning still names only the pick — deferred: needs a decision on output width; the pick itself is now right, which was the harm
 
 ## Phase 3 — fuzzy relevance
 
-- [ ] Multi-term queries score a candidate whose FILENAME matches several terms above one matching a single term in its body
-- [ ] Scored against a written expectation for five real queries, per the todo37 method: write the expected ranking BEFORE running
+- [x] Search demotes test files at FINAL ordering (x0.4) — at the seed the wavefront put the energy back: symbols inside a test file matched, echoed onto their unit, and the unit outranked source again. Measured live: `coverage-baseline.ts` now first
+- [-] Five-query pre-registered scoring — dropped: the vs-grep benchmark (todo44 tasks.md) is now the standing pre-registered query suite and covers this

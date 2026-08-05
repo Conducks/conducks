@@ -31,48 +31,48 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 711,
+      "ms": 697,
       "bytes": 1003
     },
     "audit": {
       "code": 1,
-      "ms": 471,
+      "ms": 448,
       "bytes": 801
     },
     "entry": {
       "code": 0,
-      "ms": 682,
+      "ms": 668,
       "bytes": 1151
     },
     "prune": {
       "code": 0,
-      "ms": 815,
+      "ms": 800,
       "bytes": 27265
     },
     "flows": {
       "code": 0,
-      "ms": 763,
-      "bytes": 430681
+      "ms": 735,
+      "bytes": 430698
     },
     "ledger": {
       "code": 0,
-      "ms": 824,
+      "ms": 813,
       "bytes": 465
     },
     "supply-chain": {
       "code": 0,
-      "ms": 617,
+      "ms": 598,
       "bytes": 8045
     },
     "advise": {
       "code": 0,
-      "ms": 512,
+      "ms": 504,
       "bytes": 15761
     },
     "query": {
       "code": 0,
-      "ms": 699,
-      "bytes": 1544
+      "ms": 786,
+      "bytes": 1614
     }
   },
   "smokeFailures": []

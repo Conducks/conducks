@@ -4,7 +4,7 @@
   "language": "typescript",
   "nodes": 6647,
   "units": 955,
-  "edges": 23766,
+  "edges": 23797,
   "documented": {
     "count": 1193,
     "of": 6647,
@@ -24,55 +24,55 @@
   "orphans": 23,
   "violations": 25,
   "dangling": {
-    "count": 1938,
-    "of": 23766,
-    "pct": 8.15
+    "count": 1887,
+    "of": 23797,
+    "pct": 7.93
   },
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 837,
+      "ms": 817,
       "bytes": 909
     },
     "audit": {
       "code": 1,
-      "ms": 531,
+      "ms": 518,
       "bytes": 5326
     },
     "entry": {
       "code": 0,
-      "ms": 822,
+      "ms": 804,
       "bytes": 51295
     },
     "prune": {
       "code": 0,
-      "ms": 1005,
+      "ms": 973,
       "bytes": 87593
     },
     "flows": {
       "code": 0,
-      "ms": 873,
-      "bytes": 317377
+      "ms": 872,
+      "bytes": 317860
     },
     "ledger": {
       "code": 0,
-      "ms": 1003,
+      "ms": 977,
       "bytes": 470
     },
     "supply-chain": {
       "code": 0,
-      "ms": 6319,
+      "ms": 2294,
       "bytes": 3396
     },
     "advise": {
       "code": 0,
-      "ms": 581,
+      "ms": 565,
       "bytes": 19644
     },
     "query": {
       "code": 0,
-      "ms": 813,
-      "bytes": 1140
+      "ms": 949,
+      "bytes": 1216
     }
   },
   "smokeFailures": []

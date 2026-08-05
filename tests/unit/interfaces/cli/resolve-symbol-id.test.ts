@@ -33,3 +33,38 @@ describe('resolveSymbol returns the id it matched', () => {
     expect(resolveSymbol(realId, graph(realId) as never)).toBe(realId);
   });
 });
+
+/**
+ * todo43 — a TEST file mentioning a name is not the same claim as a source file declaring it.
+ *
+ * Measured on this repository: `impact format` resolved to `boundaries.test.ts::format`, a test
+ * file's local variable, over `source-line.ts`'s real declaration — because on a repository with
+ * 189 suites the tests outnumber the sources, and gravity follows edge count, not authority.
+ * Source beats test; only when NO source candidate exists may a test file's symbol win.
+ */
+describe('resolveSymbol prefers source over test files', () => {
+  const mk = (id: string, file: string, gravity: number) => ({
+    id, properties: { canonicalKind: 'BEHAVIOR', filePath: file, gravity },
+  });
+
+  it('picks the source declaration over a higher-gravity test local', () => {
+    const g = {
+      getNode: () => undefined,
+      findNodesByName: () => [
+        mk('/r/tests/architecture/boundaries.test.ts::format', '/r/tests/architecture/boundaries.test.ts', 0.9),
+        mk('/r/src/lib/core/utils/source-line.ts::format', '/r/src/lib/core/utils/source-line.ts', 0.2),
+      ],
+    };
+    expect(resolveSymbol('format', g as never)).toBe('/r/src/lib/core/utils/source-line.ts::format');
+  });
+
+  it('still answers with a test symbol when nothing else declares the name', () => {
+    const g = {
+      getNode: () => undefined,
+      findNodesByName: () => [
+        mk('/r/tests/helpers.test.ts::mkgitrepo', '/r/tests/helpers.test.ts', 0.4),
+      ],
+    };
+    expect(resolveSymbol('mkGitRepo', g as never)).toBe('/r/tests/helpers.test.ts::mkgitrepo');
+  });
+});

@@ -4,11 +4,11 @@
   "language": "typescript",
   "nodes": 10534,
   "units": 1095,
-  "edges": 34814,
+  "edges": 34929,
   "documented": {
-    "count": 1789,
+    "count": 1791,
     "of": 10534,
-    "pct": 16.98
+    "pct": 17
   },
   "documentedBehaviors": {
     "count": 1029,
@@ -24,55 +24,55 @@
   "orphans": 20,
   "violations": 21,
   "dangling": {
-    "count": 3361,
-    "of": 34814,
-    "pct": 9.65
+    "count": 3150,
+    "of": 34929,
+    "pct": 9.02
   },
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 1194,
+      "ms": 1163,
       "bytes": 976
     },
     "audit": {
       "code": 1,
-      "ms": 740,
+      "ms": 736,
       "bytes": 3913
     },
     "entry": {
       "code": 0,
-      "ms": 1177,
+      "ms": 1156,
       "bytes": 2111
     },
     "prune": {
       "code": 0,
-      "ms": 1480,
+      "ms": 1453,
       "bytes": 45483
     },
     "flows": {
       "code": 0,
-      "ms": 1322,
-      "bytes": 535533
+      "ms": 1288,
+      "bytes": 545682
     },
     "ledger": {
       "code": 0,
-      "ms": 1496,
+      "ms": 1470,
       "bytes": 470
     },
     "supply-chain": {
       "code": 0,
-      "ms": 859,
+      "ms": 851,
       "bytes": 3283
     },
     "advise": {
       "code": 0,
-      "ms": 839,
-      "bytes": 16591
+      "ms": 828,
+      "bytes": 16837
     },
     "query": {
       "code": 0,
-      "ms": 1187,
-      "bytes": 1357
+      "ms": 1413,
+      "bytes": 1282
     }
   },
   "smokeFailures": []

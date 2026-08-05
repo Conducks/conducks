@@ -497,6 +497,34 @@ export class IntraLinker {
             }
           }
         }
+
+        // 3b-quater. The receiver is a TYPED PARAMETER with no node of its own (todo42#P1).
+        //
+        // `function run(registry: Registry) { registry.lookup(...) }` — a parameter is an ATOM and
+        // an unreferenced ATOM is pruned, so the receiver lookup above finds nothing. But the TYPE
+        // is written in the signature and the enclosing function records it as `paramTypes` — the
+        // same map the three-segment chain (3b-ter) has read all along. The PLAIN two-segment form,
+        // which is the more common shape, never did.
+        //
+        // An untyped parameter is refused outright: `registry` with no annotation states nothing,
+        // and guessing from the name is how the vault filled with `results.foreach`.
+        if (!resolvedId) {
+          const enclosing = graph.getNode(edge.sourceId)?.properties as any;
+          const declared = (enclosing?.paramTypes as Record<string, string> | undefined)?.[receiver];
+          const bare = declared?.replace(/\[\]$/, '');
+          if (bare && /^[a-z_$][\w$]*$/i.test(bare)) {
+            if (isBuiltIn(bare, 'typescript') && graph.hasNode(getGlobalId(bare))) {
+              resolvedId = getGlobalId(bare);
+            } else {
+              const typeId =
+                unitSymbols.get(sourceUnitId)?.get(bare) ??
+                unitSymbols.get(sourceUnitId)?.get(bare.toLowerCase()) ??
+                this.resolveSymbolUnique(bare, sourceUnitId, unitImports, unitSymbols) ??
+                this.resolveSymbolUnique(bare.toLowerCase(), sourceUnitId, unitImports, unitSymbols);
+              if (typeId) resolvedId = this.memberOfType(graph, typeId, bare, member, unitImports, unitSymbols);
+            }
+          }
+        }
       }
 
       // 3b-ter. A chain through an INTERFACE member: `spectrum.nodes.find(...)`.

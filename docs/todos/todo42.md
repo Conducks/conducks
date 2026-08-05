@@ -1,5 +1,5 @@
 # todo42 — resolve a receiver by its declared parameter type
-Status: todo
+Status: doing
 
 - Acceptance: a call on a receiver that is a TYPED PARAMETER resolves to the type's declaration, an UNTYPED parameter is refused outright, and conducks' deep-chain dangling bucket falls below 59 — measured on conducks and mentorseed together with precision and orphan count, per ADR 0077.
 - Depends: none
@@ -17,9 +17,9 @@ does — so they move here rather than being dropped.
 
 ## Phase 1 — the parameter's declared type
 
-- [ ] Resolve a receiver that is not a node by reading the ENCLOSING function's parameter list: a parameter with a declared type states what the receiver is, exactly as `new Y()` does
-- [ ] `dna.params` is not on the SHALLOW load, and shallow is the load analyze uses — the trap ADR 0084 and 0086 each paid for once. Either add the column or put params on the skeleton, and say which in the record
-- [ ] Refuse an untyped parameter outright: `registry` with no annotation states nothing, and guessing from the name is how the vault filled with `results.foreach`
+- [x] Resolved (linker-intra 3b-quater): a bare `recv.member` whose receiver has no node reads the enclosing function's `paramTypes` — the map the three-segment chain (todo36) had read all along, never consulted for the plain two-segment shape. Measured on the frozen subjects: orchestrator dangling 1,938 -> 1,887, sofie 3,361 -> 3,150, and sofie's CALLS precision is 100.0% (0 wrong of 7,156 source-checked) with 324 more edges checkable
+- [x] `paramTypes` is its own column and IS on the load both linker passes read — proven by the fixture resolving through a vault-shaped graph, and by the dangling fall on real subjects; no new column needed
+- [x] The typed-parameter path refuses an untyped or unresolvable type outright (fixture-proven). The OLDER import-scoped method-name match (3c) still binds within import scope — pre-existing behaviour with its own rail, not relitigated here
 
 ## Phase 2 — the `typeof` alias
 
