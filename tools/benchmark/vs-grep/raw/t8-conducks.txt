@@ -1,0 +1,198 @@
+
+[1m--- ✂️ Dead Weight Discovery ---[0m
+
+[1m--- ❓ Questions — not findings, and not safe to delete on this evidence ---[0m
+[36m- [UNIMPORTED_MODULE] select_fields (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/main.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_amnesia_fix (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/diagnostic_stress_test.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_writeback_fix (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/diagnostic_stress_test.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_archetype_serialization (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/diagnostic_stress_test.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] inspect (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/inspect_badges.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_dna_fast (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/test_dna_fast.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_dna (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/test_dna_match.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_dna_offline (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/test_dna_offline.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] run_validation (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/validate_data.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_resolver_repair (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/verify_resolver_fix.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] test_structural_flow (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/verify_structural_fix.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _getXPath (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/scratch/xpath_fix.js)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] chrome_service_args (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/engine.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] click_element (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/human/mouse.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] type_text (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/human/typing.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] type_fast (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/human/typing.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] unblock_images (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/network/resource_blocker.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] clear (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/session/cookie_store.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] random_profile (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/stealth/hardware_emulation.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] Tab (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/browser/tab_pool.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _foundation_exc (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/errors/classifier.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] classify (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/errors/classifier.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] classify_http (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/errors/classifier.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] RetryDecision (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/errors/error_types.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] DecayManager (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/learning/decay_manager.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] MolecularLogger (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/learning/molecular_logger.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] PromotionManager (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/learning/promotion_manager.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] get_logger (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/logging/logger.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] AdaptiveSpecialist (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/adaptive_specialist.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] FieldAligner (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/genesis/aligner.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] Clusterer (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/genesis/clusterer.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] FieldFingerprinter (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/genesis/fingerprinter.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _score_entity (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/genesis/live_structure.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] DnaMerger (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/infrastructure/merger.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _now_iso (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/runtime/dna_writeback.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] partition_by_structural_context (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/runtime/dom_tree.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] sweep_global_metadata (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/mapper/runtime/record_ops.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] dedup_against_file (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/output/deduplication.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] ChunkedWriter (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/output/writer.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] Hands (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/hands.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] traverse (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] display_info (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] set_display_size (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] portals (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] follow_portal (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] values (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] scroll (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] wait (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] upload_via_click (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] debug_eval (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] login (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _start_secret_ui_thread (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/mcp_server.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] SecretBroker (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/service/secrets.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _load_key (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/store/crypto.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] validate_short_text (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/validation/validators.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] validate_long_text (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/validation/validators.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] validate_icon (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/validation/validators.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] validate_float_1_5 (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/validation/validators.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] validate_phone (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/validation/validators.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] validate_non_empty (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/validation/validators.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] validate_integer_count (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/validation/validators.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] StealthMode (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/base_interfaces.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] BaseWriter (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/base_interfaces.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] BaseQueue (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/base_interfaces.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] ScraperPlatformError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] JobError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] RegistryError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] FlowStepNotFound (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] ExtractionError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] PageLoadError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] SelectorNotFound (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] ProtectionTriggered (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] UIGhosted (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] InfrastructureError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] BrowserError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] CheckpointError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] OutputWriteError (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/exceptions.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _null_context (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/flow_engine.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] JobRunner (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/job_runner.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] StepMetadata (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/observer.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] ConsoleInspector (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/observer.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] get_project_root (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/paths.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] get_data_dir (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/paths.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] Registry (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/registry.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] PhoneExtractor (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/extractors/contact.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] WebsiteExtractor (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/extractors/contact.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] NameExtractor (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/extractors/identity.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] MenuItemsExtractor (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/extractors/menu.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] Hierarchy (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/hierarchy.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] Level1 (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/levels/level1.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] Level2 (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/levels/level2.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] _load_discovery_adapters (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/levels/level3.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] QueryBuilder (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/query_builder.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] GoogleMapsSpecialist (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/google_maps/specialist.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] ListingLevel (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/scholarships/levels/level1.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] DetailLevel (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/scholarships/levels/level2.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.
+[36m- [UNIMPORTED_MODULE] ScholarshipSpecialist (/users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/specialists/scholarships/specialist.py)[0m
+  └─ Nothing imports this file, so the graph cannot tell dead code from a capability that was never wired up. Answer "was this disconnected, or never connected?" before deleting.

@@ -1,0 +1,33 @@
+
+[1m--- Symbols whose PURPOSE mentions "retry" ---[0m
+
+  [36mBaseSpecialist[0m [2msrc/foundation/base_interfaces.py:315[0m
+    Contract for a site-specific specialist (google_maps, yelp, tripadvisor...).
+
+  [36mcombo_select[0m [2msrc/core/service/hands.py:2194[0m
+    Drive a react-select autocomplete in one call (todo7 §4.5;
+
+  [36mErrorType[0m [2msrc/core/errors/error_types.py:11[0m
+    Canonical classification of all scraping failures.
+
+  [36mRetryDecision[0m [2msrc/core/errors/error_types.py:27[0m
+    Retry decision constants — returned by RetryPolicy.decide()
+
+  [36mread[0m [2msrc/core/service/hands.py:1280[0m
+    Reading-order document of the current page (todo4) — the page as a
+
+  [36m_heal_stateful[0m [2msrc/core/service/hands.py:2756[0m
+    Self-heal a stateful field whose value-type routed to the wrong
+
+  [36mdetect_challenge[0m [2msrc/core/service/mcp_server.py:173[0m
+    DETECTION-ONLY bot-wall/captcha signal (todo7 Phase 7). Scans the live
+
+  [36mProtectionTriggered[0m [2msrc/foundation/exceptions.py:188[0m
+    Raised when the page shows a CAPTCHA, consent wall, or other
+
+  [36mUIGhosted[0m [2msrc/foundation/exceptions.py:199[0m
+    Raised when the page loaded successfully (HTTP 200) but the expected
+
+  [36mDomainChanged[0m [2msrc/foundation/exceptions.py:210[0m
+    Raised when navigating to a stored URL results in a redirect to
+

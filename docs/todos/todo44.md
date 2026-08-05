@@ -70,9 +70,11 @@ can act on the output, or has to go and open a file.
 
 ## Phase 6 — Benchmark A: conducks against grep
 
-- [ ] Task set written down BEFORE any run, with the expected answer per task hand-derived from the source — a benchmark scored after the fact scores whatever happened
-- [ ] Grep gets its best realistic invocation per task: `rg -w`, `-t py`, the flags a competent developer types. A strawman comparison is worth nothing and this project has rigged an experiment before
-- [ ] Tasks grep SHOULD win are included and their results reported: literal string, config value, where a file is
-- [ ] Scored on four axes — recall against hand-derived truth, noise (results that are not answers), self-contained (can the reader decide without opening a file), and round trips to a decision
-- [ ] The tasks grep cannot answer at all — indirect callers, unused exports, the shape of the whole codebase — are reported as unanswerable rather than scored as a zero, because a zero implies it tried
-- [ ] Raw outputs saved beside the scores. The judgement axes are mine, and a number nobody can audit is a claim, not a measurement
+- [x] Task set pre-registered and COMMITTED before either tool ran (`tools/benchmark/vs-grep/tasks.md`), truth hand-derived with rg — which biases truth toward grep, so conducks matching it is the strong direction
+- [x] Grep given its best realistic form per task; the tasks grep should win included and reported: it won T2 (literal string) as predicted, and T8 reported as UNANSWERABLE for grep rather than zero
+- [x] Scored on the four axes, raw outputs committed in `raw/` (`results.md`)
+- [x] VERDICT: on Python, conducks LOSES its flagship question. `impact resolve_project_path` returned 0 callers against 10 measured call sites — every one calls through the module alias (`paths.resolve_project_path`), the normal Python form, and none of those references resolve. todo42 is not an improvement; it is the difference between winning and losing T3/T4
+- [x] Second finding: a TRUE zero and a BROKEN zero print the same output. `impact classify` said 0 and was right; `impact resolve_project_path` said 0 and was wrong; the reader cannot tell. CONDUCKS-37 in its most expensive form
+- [ ] `impact` zero-result honesty: state what was examined and how many references in this graph are unresolved, so an empty answer carries its own confidence
+- [ ] Re-run this benchmark after todo42 lands — tasks.md is the fixed measure; same truth, same commands
+- [ ] `--depth` does not exist on `impact` — the pre-registered T4 command was wrong as written; decide whether depth control is wanted or the default depth is the contract

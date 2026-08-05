@@ -1,0 +1,11 @@
+src/specialists/scholarships/specialist.py:96:             return str(paths.resolve_project_path(job.output.path))
+src/specialists/scholarships/specialist.py:97:        base = paths.resolve_project_path("data/results/scholarships")
+src/specialists/google_maps/specialist.py:122:        base = paths.resolve_project_path(job.output.path)
+src/foundation/job_runner.py:122:        index_path = paths.resolve_project_path("data/index/global_identity_index.json")
+src/foundation/job_runner.py:291:             source = str(paths.resolve_project_path(source))
+src/foundation/paths.py:23:def resolve_project_path(relative_path: Union[str, Path]) -> Path:
+src/core/logging_setup.py:13:    log_dir = paths.resolve_project_path("data/logs")
+src/core/logging/logger.py:161:_DEFAULT_LOG_DIR = paths.resolve_project_path("data/logs")
+src/core/output/writer.py:208:        configured_path = paths.resolve_project_path(job.output.path)
+src/core/mapper/adaptive_specialist.py:77:            manifest_path = paths.resolve_project_path(
+tests/foundation/test_job_runner.py:29:    assert job_config.input.source == str(paths.resolve_project_path("tests/fixtures/urls.txt"))

@@ -1,0 +1,3 @@
+
+[1m--- Structural Discovery: "data/logs" ---[0m
+No symbols found matching your query.

@@ -1,0 +1,2 @@
+src/core/logging_setup.py:13:    log_dir = paths.resolve_project_path("data/logs")
+src/core/logging/logger.py:161:_DEFAULT_LOG_DIR = paths.resolve_project_path("data/logs")

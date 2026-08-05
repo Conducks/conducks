@@ -1,0 +1,19 @@
+
+[1m--- 🛡️ Conducks Structural Explanation ---[0m
+Symbol: [35msetup_logging[0m (BEHAVIOR)
+Path:   /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/logging_setup.py
+
+  Sets up a centralized logger that outputs to both console and a per-run file.
+      Returns the path to the created log file.
+Composite Risk Rating: 2.4 / 10.0
+  ⚠ God Object Candidate (fan-out 20)
+
+[1mSignal Decomposition:[0m
+  ├── [36mgravity:[0m     1.59  (centrality rank: 0.1591)
+  ├── [36mcomplexity:[0m  1.50  (largest weight in the composite score)
+  ├── [36mfan-out:[0m     10.00  (outgoing structural dependencies)
+  ├── [36mchurn:[0m       0.00  (resonance / temporal frequency)
+  ├── [36mentropy:[0m     0.00  (authorship fragmentation: 0.00)
+  └── [36mfallback:[0m     0.00  (no fallback patterns detected)
+
+[2mStructural resonance detected in 1 authors.[0m

@@ -1,0 +1,2 @@
+[31mUnknown flag for `impact`: --depth[0m
+[2mUsage:[0m conducks impact <symbolId> [direction: upstream|downstream] [--json] [--tree]

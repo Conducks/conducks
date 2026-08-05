@@ -1,0 +1,42 @@
+src/specialists/google_maps/extractors/menu.py:129:                    "MenuItemsExtractor: adaptive menu_tab candidate was not menu-like, retrying with deterministic fallback")
+src/specialists/google_maps/extractors/reviews.py:152:            retry_count = 0
+src/specialists/google_maps/extractors/reviews.py:167:            while len(results) < limit and retry_count < max_retries:
+src/specialists/google_maps/extractors/reviews.py:196:                    retry_count += 1
+src/specialists/google_maps/extractors/reviews.py:198:                    retry_count = 0
+src/specialists/google_maps/extractors/hours.py:112:                    "HoursExtractor: Adaptive dropdown candidate failed semantic validation, retrying via direct selector probing")
+src/specialists/google_maps/levels/level2.py:47:            retry_max_attempts=job.runtime.retry_max_attempts
+src/specialists/google_maps/levels/level1.py:47:            retry_max_attempts=job.runtime.retry_max_attempts
+src/specialists/google_maps/levels/level1.py:72:        # Run via BatchRunner to benefit from core retry/rotation logic
+src/foundation/job_runner.py:357:        raw_retry = raw_runtime.get("retry", {})
+src/foundation/job_runner.py:376:            retry_max_attempts=int(raw_retry.get("max_attempts", 3)),
+src/foundation/job_runner.py:377:            retry_backoff=str(raw_retry.get("backoff", "exponential")),
+src/foundation/base_interfaces.py:185:    retry_max_attempts: int = 3
+src/foundation/base_interfaces.py:186:    retry_backoff: str = "exponential"   # "exponential" | "fixed"
+src/foundation/base_interfaces.py:329:    - Retry logic         (→ core/queue)
+src/foundation/exceptions.py:194:    — Queue retry policy: back off + rotate session before retrying.
+src/foundation/exceptions.py:205:    — Queue retry policy: retry once immediately, then dead-letter.
+src/foundation/exceptions.py:217:    — Queue retry policy: log and dead-letter, do not retry.
+src/core/errors/error_types.py:4:Typed error enums used by the error classifier and retry policy.
+src/core/errors/error_types.py:16:    so the retry policy can read them without importing exceptions.
+src/core/errors/error_types.py:26:# Retry decision constants — returned by RetryPolicy.decide()
+src/core/errors/error_types.py:27:class RetryDecision(str, Enum):
+src/core/errors/error_types.py:28:    RETRY_NOW     = "RETRY_NOW"      # retry immediately (UI_GHOSTED, first attempt)
+src/core/errors/error_types.py:29:    RETRY_BACKOFF = "RETRY_BACKOFF"  # wait exponentially, then retry
+src/core/__init__.py:19:from core.errors.error_types import ErrorType, RetryDecision
+src/core/__init__.py:38:    "RetryDecision",
+src/core/errors/classifier.py:6:Used by RetryPolicy to decide the retry behaviour for a given failure.
+src/core/queue/batch_runner.py:4:Executes a batch of tasks with concurrency control and a Two-Phase retry strategy:
+src/core/queue/batch_runner.py:38:        retry_max_attempts: int = 3,
+src/core/queue/batch_runner.py:42:        self._retry_max_attempts = retry_max_attempts
+src/core/queue/batch_runner.py:57:        for attempt in range(1, self._retry_max_attempts + 1):
+src/core/queue/batch_runner.py:62:                logger.info(f"BatchRunner: Attempt {attempt}/{self._retry_max_attempts} for {len(current_items)} failed items.")
+src/core/queue/batch_runner.py:64:                    logger.info("BatchRunner: Rotating fingerprint before retry phase...")
+src/core/queue/batch_runner.py:78:            if attempt < self._retry_max_attempts:
+src/core/queue/batch_runner.py:79:                logger.warning(f"BatchRunner: {len(current_items)} items failed. Waiting for batch completion before retry phase.")
+src/core/service/mcp_server.py:183:        means ROUTE TO the attended/human-bootstrap flow (todo5), do not retry.
+src/core/service/hands.py:1296:        the graph). Keeping observe pure is what makes the empty-read retry and
+src/core/service/hands.py:2205:        `resuresume…`) — clear the typed text (guarded on non-empty) and retry
+src/core/service/hands.py:2240:                    pass  # no commit → verify below reports it, retry path handles it
+src/core/service/hands.py:2250:        # nothing committed: clear the dirty input ONCE (guarded), retry ONCE
+src/core/service/hands.py:2358:                # caught it (ok False) — re-derive the LIVE class and retry once
+src/core/service/hands.py:2760:        the LIVE widget_class and retry ONCE via the matching handler. Returns the

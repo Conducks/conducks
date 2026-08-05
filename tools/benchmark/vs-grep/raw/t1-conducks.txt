@@ -1,0 +1,7 @@
+
+[1m--- Structural Discovery: "resolve_project_path" ---[0m
+[2mRANK    MATCH  KIND        NAME                      FILE:LINE                                     CONFIDENCE[0m
+0.1041         BEHAVIOR    [36mresolve_project_path      [0m[2msrc/foundation/paths.py:23                    [0m0.10
+[2m                           [0mdef resolve_project_path(relative_path: Union[str, Path]) -> Path:
+[2m                           Resolve a path relative to the PROJECT_ROOT.[0m
+0.0301  [2mecho   [0mATOM        [36mpath                      [0m[2msrc/foundation/paths.py:28                    [0m0.03

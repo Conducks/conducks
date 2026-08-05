@@ -1,0 +1,5 @@
+src/core/logging_setup.py:7:def setup_logging(job_name: str) -> str:
+src/core/logging_setup.py-8-    """
+src/core/logging_setup.py-9-    Sets up a centralized logger that outputs to both console and a per-run file.
+src/core/logging_setup.py-10-    Returns the path to the created log file.
+src/core/logging_setup.py-11-    """
