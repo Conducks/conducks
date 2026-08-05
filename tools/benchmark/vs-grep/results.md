@@ -51,3 +51,23 @@ docstrings never say the word.
 | todo42 jumps the queue | it decides T3/T4, the investor question |
 | `impact` zero-result honesty | separate "nobody calls this" from "nothing resolved to this" |
 | re-run after todo42 | tasks.md is now the fixed measure; same truth, same commands |
+
+---
+
+# Re-run, 2026-08-05 — after ADR 0137 and the follow-up fixes
+
+Same tasks, same pre-registered truth, same grep outputs (the subject is frozen; grep's answers
+cannot change). Raw re-run outputs in `raw/*-rerun.txt`.
+
+| task | before | after |
+|---|---|---|
+| T3 who calls X | conducks 0/10 — LOST | **11 symbols, 8 files, the source line under each, direct/indirect marked — recall 10/10 vs truth** |
+| T4 indirect impact | nobody | **`--depth` exists; second-hop dependents appear, marked indirect (job_runner.py:457, d:2.00)** |
+| T7 noise test | tie, but the honest zero was indistinguishable from the broken one | **the zero states its basis: "2,106 unresolved reference(s), none of them share this name"** |
+| T8b what IS this codebase | not a command | **`conducks arch`: no pattern detected on scraper — with the shape, 6 bidirectional pairs and the heaviest flows** |
+
+The scoreboard's verdict changes: grep keeps T1/T2 (definition lookup, literal strings — as
+predicted and pre-registered), conducks now takes T3, T4, T5, T6-noise, T7-honesty and T8, and T8b
+exists. The vs-grep sentence as of this run: **grep finds text; conducks answers who calls X, what
+breaks including indirect callers with the line under each, what X does, what nobody uses, what the
+codebase IS — and states its own uncertainty when the answer is empty.**

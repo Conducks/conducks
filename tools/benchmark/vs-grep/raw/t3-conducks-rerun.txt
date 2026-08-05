@@ -1,0 +1,55 @@
+
+Structural Diagnostic Summary:
+Node ID: /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/paths.py::resolve_project_path
+Composite Risk Score: 1.7 / 10.0
+
+[1m--- Conducks UPSTREAM Impact Report: /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/paths.py::resolve_project_path ---[0m
+[35mWeighted Impact Coverage:[0m 11 Symbols affected
+[35mShortest Weighted Path:[0m 1.00
+[35mImpact Score:[0m 9.08
+
+[1mComposite Risk Breakdown:[0m
+[32mOverall Risk: 1.69 / 10.0[0m
+- [33mStructural Gravity (PageRank):[0m 10.41%
+- [33mOwnership Entropy (Shannon):[0m 0.00%
+- [33mCode Churn (Commit Density):[0m 0.00%
+- [33mStructural Fan-out (Coupling):[0m 60.00%
+
+[1mUsed in 8 file(s)[0m  (top 10 of 11)
+
+  [4msrc/core/logging/logger.py[0m
+    logger.py  direct  d:1.00
+        161:  _DEFAULT_LOG_DIR = paths.resolve_project_path("data/logs")
+
+  [4msrc/specialists/scholarships/specialist.py[0m
+    resolve_output_path  direct  d:1.00
+         96:  return str(paths.resolve_project_path(job.output.path))
+         97:  base = paths.resolve_project_path("data/results/scholarships")
+
+  [4msrc/core/logging_setup.py[0m
+    setup_logging  direct  d:1.00
+         13:  log_dir = paths.resolve_project_path("data/logs")
+
+  [4msrc/specialists/google_maps/specialist.py[0m
+    resolve_output_path  direct  d:1.00
+        122:  base = paths.resolve_project_path(job.output.path)
+
+  [4msrc/core/output/writer.py[0m
+    _resolve_path  direct  d:1.00
+        208:  configured_path = paths.resolve_project_path(job.output.path)
+
+  [4msrc/foundation/job_runner.py[0m
+    _input_config  direct  d:1.00
+        291:  source = str(paths.resolve_project_path(source))
+    run  direct  d:1.00
+        122:  index_path = paths.resolve_project_path("data/index/global_identity_index.json")
+    job_runner.py  indirect  d:2.00
+        457:  asyncio.run(JobRunner.run(yaml_file))
+
+  [4msrc/core/mapper/adaptive_specialist.py[0m
+    _load_from_manifest  direct  d:1.00
+         77:  manifest_path = paths.resolve_project_path(
+
+  [4msrc/core/__init__.py[0m
+    __init__.py  indirect  d:3.00
+         23:  from core.logging.logger import get_logger, PlatformLogger

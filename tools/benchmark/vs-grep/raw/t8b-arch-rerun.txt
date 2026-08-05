@@ -1,0 +1,18 @@
+
+--- 🏛️  Architecture ---
+
+No pattern detected. The shape, so the answer is still usable:
+
+Shape
+  · 0 driving adapter(s)
+  · no shared composition root
+  · 32 directory-level dependency edge(s), 6 bidirectional pair(s) — src/core/output <-> src/foundation; src/core/service <-> src/core/mapper; src/core/browser <-> src/foundation; src/core <-> src/foundation; src/core/checkpoint <-> src/foundation; src/core/mapper <-> src/core/store
+  · 272 file(s) measured
+
+Heaviest directory flows
+  · src/core/mapper -> src/foundation  (29)
+  · src/specialists/google_maps -> src/foundation  (17)
+  · src/core/output -> src/foundation  (5)
+  · src/specialists/scholarships -> src/foundation  (5)
+  · src/core/service -> src/core/mapper  (4)
+  · src/core/browser -> src/foundation  (3)
