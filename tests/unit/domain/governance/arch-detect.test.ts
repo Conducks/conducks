@@ -127,6 +127,25 @@ describe('architecture measurements', () => {
     expect(detectLayers(g).layerEdges.some(e => e.from.includes('tests'))).toBe(false);
   });
 
+  /**
+   * DI WIRING LEAVES NO IMPORT (todo41#P2). An adapter that receives the domain through the
+   * composition root never imports it — its witness is a CALLS edge through the root. Reachability
+   * must see that call, or a DI codebase reads as unrelated islands; DIRECTION must not, or every
+   * callback reads as a layering violation. The two walks answer different questions.
+   */
+  it('reaches a DI-wired module through a CALLS edge, for reachability only', () => {
+    const g = hexagon();
+    g.addNode({ id: '/r/src/lib/domain/hidden/svc.ts', label: 'UNIT', properties: { name: 'svc.ts', filePath: '/r/src/lib/domain/hidden/svc.ts', canonicalKind: 'UNIT' } } as never);
+    g.addNode({ id: '/r/src/lib/domain/hidden/svc.ts::run', label: 'BEHAVIOR', properties: { name: 'run', filePath: '/r/src/lib/domain/hidden/svc.ts', canonicalKind: 'BEHAVIOR' } } as never);
+    g.addEdge({ id: 'c1', sourceId: '/r/src/registry/index.ts', targetId: '/r/src/lib/domain/hidden/svc.ts::run', type: 'CALLS', confidence: 1, properties: {} } as never);
+
+    const withCalls = dependencyDistances(g, '/r/src/interfaces/cli/index.ts', { includeCalls: true });
+    expect(withCalls.has('/r/src/lib/domain/hidden/svc.ts')).toBe(true);   // the module, via the symbol
+
+    const importsOnly = dependencyDistances(g, '/r/src/interfaces/cli/index.ts');
+    expect(importsOnly.has('/r/src/lib/domain/hidden/svc.ts')).toBe(false);
+  });
+
   it('walks only dependency edges, never containment', () => {
     const g = hexagon();
     g.addNode({ id: '/r/src/lib/core/graph/engine.ts::helper', label: 'BEHAVIOR', properties: { name: 'helper', filePath: '/r/src/lib/core/graph/engine.ts', canonicalKind: 'BEHAVIOR' } } as never);

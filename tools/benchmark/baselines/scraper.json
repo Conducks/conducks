@@ -31,47 +31,47 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 697,
+      "ms": 705,
       "bytes": 1003
     },
     "audit": {
       "code": 1,
-      "ms": 448,
+      "ms": 474,
       "bytes": 801
     },
     "entry": {
       "code": 0,
-      "ms": 668,
+      "ms": 703,
       "bytes": 1151
     },
     "prune": {
       "code": 0,
-      "ms": 800,
+      "ms": 821,
       "bytes": 27265
     },
     "flows": {
       "code": 0,
-      "ms": 735,
+      "ms": 750,
       "bytes": 430698
     },
     "ledger": {
       "code": 0,
-      "ms": 813,
+      "ms": 827,
       "bytes": 465
     },
     "supply-chain": {
       "code": 0,
-      "ms": 598,
+      "ms": 619,
       "bytes": 8045
     },
     "advise": {
       "code": 0,
-      "ms": 504,
+      "ms": 519,
       "bytes": 15761
     },
     "query": {
       "code": 0,
-      "ms": 786,
+      "ms": 809,
       "bytes": 1614
     }
   },

@@ -54,17 +54,46 @@ export interface ArchMeasurements {
   unitCount: number;
 }
 
-/** BFS over dependency edges only. */
-export function dependencyDistances(graph: ConducksAdjacencyList, startId: NodeId): Map<NodeId, number> {
+/**
+ * BFS over dependency edges — and, when asked, CALLS.
+ *
+ * Two different questions share this walk (todo41#P2). REACHABILITY — "which modules does this
+ * adapter's world contain" — must see a call through the composition root, because DI wiring is
+ * exactly the case where an adapter never imports the domain it drives; without CALLS such a
+ * codebase reads as unrelated islands, which is the ADR 0120 mistake from the other direction.
+ * DIRECTION — "which layer depends on which" — must NOT see calls: a callback from core into an
+ * adapter is runtime flow, not architecture, and counting it would report every event emitter as a
+ * layering violation. The caller states which question it is asking.
+ */
+export function dependencyDistances(
+  graph: ConducksAdjacencyList,
+  startId: NodeId,
+  opts: { includeCalls?: boolean } = {}
+): Map<NodeId, number> {
   const d = new Map<NodeId, number>([[startId, 0]]);
   const queue: NodeId[] = [startId];
   while (queue.length) {
     const id = queue.shift()!;
     for (const e of graph.getNeighbors(id, 'downstream')) {
-      if (!DEPENDENCY_EDGES.has(String(e.type))) continue;
+      const t = String(e.type);
+      if (!DEPENDENCY_EDGES.has(t) && !(opts.includeCalls && t === 'CALLS')) continue;
       if (d.has(e.targetId)) continue;
+      // A CALLS edge lands on a SYMBOL; the module it witnesses is the symbol's file. Walk on from
+      // the unit so the cone contains modules, not stray members.
       d.set(e.targetId, d.get(id)! + 1);
       queue.push(e.targetId);
+      if (opts.includeCalls && t === 'CALLS') {
+        const file = String(graph.getNode(e.targetId)?.properties?.filePath ?? '').toLowerCase();
+        // Both unit spellings exist across the codebase: the pulse writes `<file>::unit`, older
+        // fixtures and some synthesized nodes key the unit by the bare file path.
+        for (const unitId of [file ? `${file}::unit` : '', file] as NodeId[]) {
+          if (unitId && graph.hasNode(unitId) && !d.has(unitId)) {
+            d.set(unitId, d.get(id)! + 1);
+            queue.push(unitId);
+            break;
+          }
+        }
+      }
     }
   }
   return d;
@@ -98,10 +127,13 @@ export function detectAdapters(graph: ConducksAdjacencyList, interfaceFragments:
 
   // A SYSTEM DOOR LIVES NEAR THE TOP OF THE TREE. Without a depth gate, sofie's calendar plugin —
   // `src/plugins/tools/calendar/adapters/` — matched the `/adapters/` fragment five directories
-  // down and the whole repository was named "hexagonal" off one plugin's internal folder: the
-  // nearest-label failure the decision table exists to refuse. The gate is positional, not
-  // semantic: the fragment must open within MAX_DOOR_DEPTH directories of the common source root.
-  const MAX_DOOR_DEPTH = 2;
+  // down and the whole repository was named "hexagonal" off one plugin's internal folder; at depth
+  // 2 openship's dashboard still leaked `src/components/apps/` as a door. The gate is positional,
+  // not semantic: the fragment opens at the root or under ONE parent (`src/interfaces` — the shape
+  // a source root gives it), and the match position, subsystem and gate all read the SAME relative
+  // path, because the full path contains the service's own name (`apps/dashboard/...` matches
+  // `/apps/` in its prefix) and mixing the two picked different matches for gate and subsystem.
+  const MAX_DOOR_DEPTH = 1;
   const unitPaths = [...graph.getAllNodes()]
     .filter(n => n.properties.canonicalKind === 'UNIT')
     .map(n => String(n.properties.filePath ?? '').toLowerCase())
@@ -122,17 +154,18 @@ export function detectAdapters(graph: ConducksAdjacencyList, interfaceFragments:
     // A TEST that imports an interface is not a door into the system.
     if (/(^|\/)tests?\//.test(file) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)) continue;
 
-    const fragment = interfaceFragments.find(f => file.includes(f));
-    if (!fragment) continue;
     const relative = file.startsWith(commonRoot) ? file.slice(commonRoot.length) : file;
-    const depth = relative.slice(0, relative.indexOf(fragment)).split('/').filter(Boolean).length;
+    const fragment = interfaceFragments.find(f => relative.includes(f));
+    if (!fragment) continue;
+    const at = relative.indexOf(fragment);
+    const depth = relative.slice(0, at).split('/').filter(Boolean).length;
     if (depth > MAX_DOOR_DEPTH) continue;
     // The segment after the fragment must be a DIRECTORY — `src/cli/config.ts` has a filename
     // there, and a single file matching a naming convention is not a subsystem.
-    const tail = file.slice(file.indexOf(fragment) + fragment.length);
+    const tail = relative.slice(at + fragment.length);
     if (!tail.includes('/')) continue;
     // The subsystem is the segment AFTER the interface fragment: interfaces/cli, interfaces/tools.
-    const after = file.slice(file.indexOf(fragment) + fragment.length).split('/')[0];
+    const after = tail.split('/')[0];
     if (!after) continue;
     const subsystem = `${fragment.replace(/^\/|\/$/g, '')}/${after}`;
 
@@ -165,6 +198,33 @@ export function detectAdapters(graph: ConducksAdjacencyList, interfaceFragments:
       reason: `${subsystem} — ${members.length} module(s), entered at ${entry.file.split('/').pop()}`,
     });
   }
+  // ENTRY-FILE FALLBACK. A single service inside a monorepo has no `interfaces/` convention — its
+  // door is `src/index.ts` or `src/main.ts`, which no fragment names. Fires only when the fragment
+  // rule found NOTHING, so a repo with a real convention never mixes the two vocabularies. Same
+  // honesty gates: near the root, not a test, depends outward, and nothing in-repo (tests aside)
+  // depends on it — an entry is entered by a RUNTIME, not by other modules.
+  if (out.length === 0) {
+    for (const node of graph.getAllNodes()) {
+      if (node.properties.canonicalKind !== 'UNIT') continue;
+      const file = String(node.properties.filePath ?? '').toLowerCase();
+      if (!file) continue;
+      if (/(^|\/)tests?\//.test(file) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)) continue;
+      const relative = file.startsWith(commonRoot) ? file.slice(commonRoot.length) : file;
+      if (!/^\/(?:src\/)?(?:index|main|cli|server|app)\.[cm]?[jt]sx?$/.test(relative)) continue;
+      const outgoing = graph.getNeighbors(node.id, 'downstream')
+        .filter(e => DEPENDENCY_EDGES.has(String(e.type))).length;
+      if (outgoing === 0) continue;
+      const incoming = graph.getNeighbors(node.id, 'upstream')
+        .filter(e => DEPENDENCY_EDGES.has(String(e.type)))
+        .filter(e => {
+          const src = String(graph.getNode(e.sourceId)?.properties?.filePath ?? '').toLowerCase();
+          return !/(^|\/)tests?\//.test(src) && !/\.(test|spec)\.[cm]?[jt]sx?$/.test(src);
+        }).length;
+      if (incoming > 0) continue;
+      out.push({ id: node.id, file, role: 'driving', reason: `entry file at ${relative}` });
+    }
+  }
+
   return out.sort((a, b) => a.file.localeCompare(b.file));
 }
 
@@ -186,7 +246,8 @@ export function detectCompositionRoot(
   const driving = adapters.filter(a => a.role === 'driving');
   if (driving.length < 2) return null;
 
-  const dists = driving.map(a => dependencyDistances(graph, a.id));
+  // Reachability question — CALLS included, so DI-wired adapters still converge (todo41#P2).
+  const dists = driving.map(a => dependencyDistances(graph, a.id, { includeCalls: true }));
   const shared = [...dists[0].keys()].filter(id => dists.every(d => d.has(id)));
 
   let best: CompositionRoot | null = null;
@@ -207,12 +268,39 @@ export function detectCompositionRoot(
   return best;
 }
 
-/** The directory a file belongs to, at the depth architecture is discussed in. */
-export function clusterOf(file: string, depth = 3): string {
-  const parts = String(file).split('/').filter(Boolean);
+/** The longest path prefix every unit shares — the tree's own root, computed rather than passed. */
+export function commonRootOf(graph: ConducksAdjacencyList): string {
+  const paths = [...graph.getAllNodes()]
+    .filter(n => n.properties.canonicalKind === 'UNIT')
+    .map(n => String(n.properties.filePath ?? '').toLowerCase())
+    .filter(Boolean);
+  if (paths.length === 0) return '';
+  let prefix = paths[0];
+  for (const p of paths) {
+    while (prefix && !p.startsWith(prefix)) prefix = prefix.slice(0, prefix.lastIndexOf('/'));
+  }
+  return prefix;
+}
+
+/**
+ * The directory a file belongs to, at the depth architecture is discussed in.
+ *
+ * The APP PREFIX IS KEPT. The old rule cut everything before the last `src`, so on a monorepo
+ * `apps/cli/src/commands` and `apps/api/src/commands` collapsed into one `src/commands` cluster and
+ * the direction report mixed seven applications into one imaginary tree — 88 "bidirectional pairs"
+ * on openship, most of them cross-app artifacts of the collapse. `root` strips the machine-specific
+ * part so an absolute path cannot leak into a cluster name.
+ */
+export function clusterOf(file: string, depth = 3, root = ''): string {
+  let f = String(file);
+  if (root && f.toLowerCase().startsWith(root)) f = f.slice(root.length);
+  const parts = f.split('/').filter(Boolean);
   const srcAt = parts.lastIndexOf('src');
+  const prefix = srcAt > 0 ? parts.slice(0, srcAt) : [];
   const from = srcAt >= 0 ? srcAt : 0;
-  return parts.slice(from, from + depth + 1).slice(0, -1).join('/') || parts.slice(0, depth).join('/');
+  const tail = parts.slice(from, from + depth + 1).slice(0, -1);
+  const joined = [...prefix, ...tail].join('/');
+  return joined || parts.slice(0, depth).join('/');
 }
 
 /**
@@ -226,6 +314,7 @@ export function detectLayers(graph: ConducksAdjacencyList): {
   bidirectional: Array<{ a: string; b: string }>;
 } {
   const counts = new Map<string, number>();
+  const root = commonRootOf(graph);
   for (const edge of graph.getAllEdges()) {
     if (!DEPENDENCY_EDGES.has(String(edge.type))) continue;
     const s = graph.getNode(edge.sourceId), t = graph.getNode(edge.targetId);
@@ -234,7 +323,7 @@ export function detectLayers(graph: ConducksAdjacencyList): {
     if (!sf || !tf) continue;
     // Tests import what they test; that is the definition of a test, not a layer violation.
     if (/(^|\/)tests?\//.test(sf)) continue;
-    const a = clusterOf(sf), b = clusterOf(tf);
+    const a = clusterOf(sf, 3, root), b = clusterOf(tf, 3, root);
     if (!a || !b || a === b) continue;
     counts.set(`${a} ${b}`, (counts.get(`${a} ${b}`) ?? 0) + 1);
   }
@@ -252,6 +341,50 @@ export function detectLayers(graph: ConducksAdjacencyList): {
     bidirectional.push({ a: e.from, b: e.to });
   }
   return { layerEdges, bidirectional };
+}
+
+/**
+ * A MONOREPO HOLDS SEVERAL ARCHITECTURES, and one verdict over the whole tree is wrong by
+ * construction (todo41#P4). Service roots are derived from the layout convention npm itself uses:
+ * a top-level `apps/`, `packages/` or `services/` directory holds one service per child; any other
+ * top-level directory with enough files is a candidate root of its own. A tree yielding fewer than
+ * two services is not a monorepo and reports whole.
+ */
+export function detectServiceRoots(graph: ConducksAdjacencyList, minUnits = 15): string[] {
+  const root = commonRootOf(graph);
+  const counts = new Map<string, number>();
+  for (const n of graph.getAllNodes()) {
+    if (n.properties.canonicalKind !== 'UNIT') continue;
+    const f = String(n.properties.filePath ?? '').toLowerCase();
+    if (!f.startsWith(root)) continue;
+    const parts = f.slice(root.length).split('/').filter(Boolean);
+    if (parts.length < 3) continue;
+    // ONLY the workspace convention makes a service. The first version also counted any large
+    // top-level directory, and conducks itself promptly reported "5 services" — src, tests and
+    // docs are directories, not deployables. `apps/*`, `packages/*`, `services/*` is the layout
+    // npm workspaces standardised; a tree not using it reports whole.
+    if (!['apps', 'packages', 'services'].includes(parts[0])) continue;
+    const service = `${parts[0]}/${parts[1]}`;
+    counts.set(service, (counts.get(service) ?? 0) + 1);
+  }
+  const roots = [...counts].filter(([, c]) => c >= minUnits).map(([s]) => `${root}/${s}`);
+  return roots.length >= 2 ? roots.sort() : [];
+}
+
+/** The subgraph under one path prefix — nodes and the edges both of whose ends live there. */
+export function subgraphUnder(graph: ConducksAdjacencyList, prefix: string): ConducksAdjacencyList {
+  const sub = new ConducksAdjacencyList();
+  const inScope = (id: NodeId): boolean => {
+    const f = String(graph.getNode(id)?.properties?.filePath ?? '').toLowerCase();
+    return f.startsWith(prefix);
+  };
+  for (const n of graph.getAllNodes()) {
+    if (inScope(n.id)) sub.addNode(n as never);
+  }
+  for (const e of graph.getAllEdges()) {
+    if (sub.hasNode(e.sourceId) && sub.hasNode(e.targetId)) sub.addEdge(e as never);
+  }
+  return sub;
 }
 
 /** Every measurement, with no naming — naming is a separate decision (todo41#P3). */

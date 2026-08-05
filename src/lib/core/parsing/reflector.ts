@@ -517,6 +517,8 @@ export class ConducksReflector {
     const nodeCache = new Map<string, SpectrumNode>();
     // Every comment in this file, joined to declarations after the walk (ADR 0133).
     const docComments: HarvestedComment[] = [];
+    /** Lines holding OVERLOAD SIGNATURES, per symbol name — the doc join anchors at the first. */
+    const overloadLines = new Map<string, number[]>();
 
     nodeCache.set(fileId, unitNode);
 
@@ -964,6 +966,22 @@ export class ConducksReflector {
             }
           }
         }
+        else if (cName === 'overload_name') {
+          // An overload SIGNATURE has no body and mints no node — only its LINE is recorded, so the
+          // doc join can anchor at the first signature instead of the implementation. Measured on
+          // orchestrator's registry.ts: the doc sat above overload :43, the node was minted at the
+          // implementation :45, and a two-line window could not bridge them.
+          const key = cText.toLowerCase();
+          if (!overloadLines.has(key)) overloadLines.set(key, []);
+          overloadLines.get(key)!.push(capture.node.startPosition.row + 1);
+        }
+        else if (cName === 'typeof_target' && node) {
+          // `type Registry = typeof registry` — the TYPE is the shape of the VARIABLE, stated in
+          // the source (todo42#P2). Recorded on the type node so the linker can follow a parameter
+          // typed `Registry` through to the variable's object paths (ADR 0094) instead of stopping
+          // at a type node that owns nothing.
+          node.metadata.typeofTarget = cText.toLowerCase();
+        }
         else if ((cName === 'heritage' || cName === 'heritage_extends' || cName === 'heritage_implements') && node) {
           // The clause keyword IS the relation type. Queries whose grammar separates the two
           // clauses (typescript, tsx) capture @heritage_extends / @heritage_implements, so the
@@ -1312,9 +1330,24 @@ export class ConducksReflector {
       // A PARAMETER IS NOT WHAT A DOC COMMENT DESCRIBES, and it shares its function's line. Ranking
       // it below the declaration is what stops it claiming the docstring first — measured, that one
       // tie cost two thirds of the Python docstrings and most of the JSDoc.
+      // THE DOC SITS ABOVE THE FIRST OVERLOAD; THE NODE IS MINTED AT THE IMPLEMENTATION. Anchor the
+      // join at the first signature of a CONTIGUOUS run ending just above the declaration — each
+      // hop ≤2 lines, same rule as the doc gap itself, so an interface's same-named method three
+      // screens up cannot chain in.
+      const anchorOf = (n: SpectrumNode): number => {
+        let anchor = n.range.start.line;
+        const lines = overloadLines.get(String(n.name ?? '').toLowerCase());
+        if (!lines) return anchor;
+        const sorted = [...lines].sort((a, b) => b - a);
+        for (const l of sorted) {
+          if (l < anchor && anchor - l <= 2) anchor = l;
+        }
+        return anchor;
+      };
+
       const docs = attachDocs(
         documentable.map(n => ({
-          lineStart: n.range.start.line,
+          lineStart: anchorOf(n),
           // Ranked on canonicalKind, because a parameter does NOT arrive as `kind: 'parameter'` —
           // Python reports its parameters as `variable`/`ATOM`, so a check on `kind` fired never and
           // the first fix changed nothing. ATOM covers both a parameter and an inline assignment

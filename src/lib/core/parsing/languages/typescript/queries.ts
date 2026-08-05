@@ -102,6 +102,15 @@ export const TYPESCRIPT_QUERIES = `
     name: (identifier) @object_name
     value: (object) @object_value) @isVariable
 
+
+  ;; OVERLOAD SIGNATURES (todo44#P5 residue): a doc comment sits above the FIRST overload, and the
+  ;; node is minted at the IMPLEMENTATION — so the doc sat outside the join window and \`register\`
+  ;; carried nothing while \`has\` beside it carried its own. Captured as lines, not as nodes: an
+  ;; overload signature declares no body and mints nothing; its LINE is what lets the doc join
+  ;; anchor at the first signature instead of the implementation.
+  (method_signature name: (property_identifier) @overload_name)
+  (function_signature name: (identifier) @overload_name)
+
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (type_identifier) @name) @isStruct
   ;; 'abstract class' is (abstract_class_declaration), a DIFFERENT node type — without these two an
@@ -109,7 +118,13 @@ export const TYPESCRIPT_QUERIES = `
   ;; heritage-less abstract base (e.g. ConducksPrism, prism-core.ts:11) produced no node at all.
   (abstract_class_declaration name: (type_identifier) @name) @isStruct
   (interface_declaration name: (type_identifier) @name) @isInterface
-  (type_alias_declaration name: (type_identifier) @name) @isInterface
+  ;; TYPEOF ALIAS (todo42#P2): \`type Registry = typeof registry\` states, in the source, that the
+  ;; TYPE is the shape of the VARIABLE. ONE pattern with a value ALTERNATION — a second pattern
+  ;; matching the same node would race it to create the node (ADR 0086), and a \`?\` quantifier on
+  ;; the field child was measured to drop the capture even when the branch matched. The wildcard
+  ;; arm keeps every plain alias matching exactly as before, capturing nothing.
+  (type_alias_declaration name: (type_identifier) @name
+    value: [(type_query (identifier) @typeof_target) (_)]) @isInterface
   (enum_declaration name: (identifier) @name) @isEnum
   
   (function_declaration name: (identifier) @name parameters: (formal_parameters) @params return_type: (type_annotation)? @return_type) @isFunction

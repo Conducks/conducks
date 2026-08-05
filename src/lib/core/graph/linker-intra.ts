@@ -312,6 +312,22 @@ export class IntraLinker {
                 if (typeId) {
                   paths = (graph.getNode(typeId)?.properties as any)?.objectPaths as Record<string, string> | undefined;
                   if (paths) pathsOwner = typeId.slice(0, typeId.lastIndexOf('::'));
+
+                  // THE TYPEOF ALIAS (todo42#P2): the type resolved, but it is
+                  // `type Registry = typeof registry` — a type node that OWNS no paths and states,
+                  // in the source, which VARIABLE carries the shape. Follow that one hop, in the
+                  // TYPE's own file (a typeof target is a local name where the alias is written).
+                  // One hop only, and only when the variable actually records paths — a chain with
+                  // an unresolvable hop refuses rather than guesses (ADR 0085).
+                  if (!paths) {
+                    const typeofTarget = (graph.getNode(typeId)?.properties as any)?.typeofTarget as string | undefined;
+                    if (typeofTarget) {
+                      const typeFile = typeId.slice(0, typeId.lastIndexOf('::'));
+                      const varId = `${typeFile}::${typeofTarget}`;
+                      paths = (graph.getNode(varId)?.properties as any)?.objectPaths as Record<string, string> | undefined;
+                      if (paths) pathsOwner = typeFile;
+                    }
+                  }
                 }
               }
             }

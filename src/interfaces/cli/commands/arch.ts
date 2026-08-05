@@ -23,14 +23,29 @@ export class ArchCommand implements ConducksCommand {
       : undefined;
 
     await syncGraph(registry);
-    const { measurements, report } = registry.audit.arch(fragments);
+    const { measurements, report, services } = registry.audit.arch(fragments);
 
     if (useJson) {
-      process.stdout.write(JSON.stringify({ measurements, report }, null, 2) + '\n');
+      process.stdout.write(JSON.stringify({ measurements, report, services }, null, 2) + '\n');
       return;
     }
 
     console.log(`\n${chalk.bold('--- 🏛️  Architecture ---')}`);
+
+    // A MONOREPO REPORTS PER SERVICE (todo41#P4). One verdict over seven applications is wrong by
+    // construction — each service gets its own measurements and its own row in the table, and the
+    // whole-tree shape prints below as context rather than as a verdict.
+    if (services.length > 0) {
+      console.log(chalk.dim(`\n${services.length} services detected — verdicts are per service; the whole-tree shape follows.`));
+      for (const s of services) {
+        const name = s.root.split('/').slice(-2).join('/');
+        const label = s.report.verdicts.length
+          ? s.report.verdicts.map(v => `${v.pattern} [${v.confidence}]`).join(' + ')
+          : 'no pattern — shape only';
+        console.log(`\n  ${chalk.bold(name)}  ${label}`);
+        for (const line of s.report.shape.slice(0, 3)) console.log(`    ${chalk.dim('·')} ${line}`);
+      }
+    }
 
     if (report.verdicts.length === 0) {
       // The honest miss. Naming the nearest label here is the confident-wrong answer the decision

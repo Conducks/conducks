@@ -6,14 +6,14 @@
   "units": 955,
   "edges": 23797,
   "documented": {
-    "count": 1193,
+    "count": 1195,
     "of": 6647,
-    "pct": 17.95
+    "pct": 17.98
   },
   "documentedBehaviors": {
-    "count": 670,
+    "count": 672,
     "of": 1962,
-    "pct": 34.15
+    "pct": 34.25
   },
   "located": {
     "count": 4065,
@@ -31,47 +31,47 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 817,
+      "ms": 855,
       "bytes": 909
     },
     "audit": {
       "code": 1,
-      "ms": 518,
+      "ms": 547,
       "bytes": 5326
     },
     "entry": {
       "code": 0,
-      "ms": 804,
+      "ms": 841,
       "bytes": 51295
     },
     "prune": {
       "code": 0,
-      "ms": 973,
+      "ms": 1017,
       "bytes": 87593
     },
     "flows": {
       "code": 0,
-      "ms": 872,
+      "ms": 907,
       "bytes": 317860
     },
     "ledger": {
       "code": 0,
-      "ms": 977,
+      "ms": 1034,
       "bytes": 470
     },
     "supply-chain": {
       "code": 0,
-      "ms": 2294,
+      "ms": 2205,
       "bytes": 3396
     },
     "advise": {
       "code": 0,
-      "ms": 565,
+      "ms": 591,
       "bytes": 19644
     },
     "query": {
       "code": 0,
-      "ms": 949,
+      "ms": 989,
       "bytes": 1216
     }
   },

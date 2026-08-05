@@ -65,6 +65,15 @@ export const TSX_QUERIES = `
     name: (identifier) @object_name
     value: (object) @object_value) @isVariable
 
+
+  ;; OVERLOAD SIGNATURES (todo44#P5 residue): a doc comment sits above the FIRST overload, and the
+  ;; node is minted at the IMPLEMENTATION — so the doc sat outside the join window and \`register\`
+  ;; carried nothing while \`has\` beside it carried its own. Captured as lines, not as nodes: an
+  ;; overload signature declares no body and mints nothing; its LINE is what lets the doc join
+  ;; anchor at the first signature instead of the implementation.
+  (method_signature name: (property_identifier) @overload_name)
+  (function_signature name: (identifier) @overload_name)
+
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration name: (type_identifier) @name) @isStruct
   ;; 'abstract class' is (abstract_class_declaration), a DIFFERENT node type — without this an

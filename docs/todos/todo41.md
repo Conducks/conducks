@@ -31,8 +31,8 @@ layer, and doing that once serves both.
 ## Phase 2 — read through the injection
 - Builds: 0134
 
-- [ ] Detection reads calls-through-the-composition-root as well as imports — ADR 0120 was exactly this mistake, and without it this codebase reads as five unrelated islands
-- [ ] Verified by the disagreement it should NOT produce: the inferred layer table must match the hand-written `LAYER_FRAGMENTS`, and any difference is a detector bug or a drifted table
+- [x] `dependencyDistances` takes `includeCalls` and the CONVERGENCE question uses it, so a DI-wired adapter still reaches its domain; the DIRECTION question deliberately does not — a callback from core into an adapter is runtime flow, and counting it would report every event emitter as a layering violation. A CALLS edge lands on a symbol and the walk continues from its FILE, so the cone holds modules
+- [x] Verified: 15 of 15 mappable cross-layer edges on this repository agree with `ALLOWED_DEPENDENCIES`, zero violations. (The probe itself first reported 0/7 — it destructured LAYER_FRAGMENTS backwards, the fourth harness bug this benchmark cycle caught before it reached a conclusion)
 
 ## Phase 3 — the decision table
 - Builds: 0134
@@ -45,9 +45,9 @@ layer, and doing that once serves both.
 ## Phase 4 — prove it somewhere unfamiliar
 - Builds: 0134
 
-- [ ] Run against `reference-project/openship` (1,897 files, a real monorepo nobody here designed) and score the verdict by hand
-- [ ] A monorepo reports PER SERVICE, never one verdict for the whole tree
-- [ ] Record what it cannot see: framework magic that wires routes no edge records
+- [x] Run against openship (2,760 files measured, 30,891 nodes, ~3 min analyze) and hand-scored: apps/api and apps/cli answer layered monolith [LOW] with src/index.ts as the door — correct for a Hono API and a commander CLI; dashboard, web and email decline the label — correct, they are Next.js and a client/server split
+- [x] Services from the npm workspace convention only (`apps/*`, `packages/*`, `services/*` — the first version counted any large top directory and conducks reported itself as five services); each gets its own subgraph, measurements and verdict, and the whole-tree verdict STANDS DOWN when two or more exist. Single-service entry detection is the entry-file rule: `src/index.ts`-shaped, near the root, depends outward, nothing in-repo depends on it
+- [x] Recorded and now measured: openship's dashboard and web report 0 doors because Next.js enters through file-system routing that no import edge records — the known limit, landing exactly where predicted. Also found and fixed en route: `clusterOf` cut everything before the last `src`, so seven apps collapsed into one imaginary tree and most of the 88 "bidirectional pairs" were cross-app artifacts
 
 ## Known limits, recorded before they are discovered
 

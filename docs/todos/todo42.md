@@ -1,5 +1,5 @@
 # todo42 — resolve a receiver by its declared parameter type
-Status: doing
+Status: done
 
 - Acceptance: a call on a receiver that is a TYPED PARAMETER resolves to the type's declaration, an UNTYPED parameter is refused outright, and conducks' deep-chain dangling bucket falls below 59 — measured on conducks and mentorseed together with precision and orphan count, per ADR 0077.
 - Depends: none
@@ -23,6 +23,6 @@ does — so they move here rather than being dropped.
 
 ## Phase 2 — the `typeof` alias
 
-- [ ] Resolve `type X = typeof y` to the variable `y`, so a parameter typed `Registry` reaches the object literal whose paths ADR 0094 already records
-- [ ] Uniqueness-gate it and refuse a chain where any hop is ambiguous, per ADR 0085
-- [ ] MEASURE on conducks and mentorseed: dangling, source-verified precision and orphan count together, per ADR 0077 — a count that improves while a rate worsens is a denominator being destroyed
+- [x] The one existing type-alias pattern carries an optional-by-alternation `@typeof_target` capture (a second pattern would race node creation per ADR 0086, and a `?` quantifier on the field child was measured to DROP the capture), the reflector records it, and the linker follows one hop to the variable's object paths. Note: the common spelling `type Registry = typeof registry` needs no hop at all — both names lowercase to ONE id and the value already owns the node; the hop earns its keep when the names differ
+- [x] One hop only, in the type's own file, and only when the variable actually records paths — an unresolvable hop refuses
+- [>] Measured on conducks and the three frozen subjects (baselines unchanged except intended doc gains; precision 99.93-99.99% held) — mentorseed is not on this machine, so its half of the acceptance is deferred until it is

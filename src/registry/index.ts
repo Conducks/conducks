@@ -6,7 +6,7 @@ import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, RegressionGuard } from "@/lib/domain/governance/index.js";
-import { measure as measureArch } from "@/lib/domain/governance/arch-detect.js";
+import { measure as measureArch, detectServiceRoots, subgraphUnder } from "@/lib/domain/governance/arch-detect.js";
 import { decide as decideArch } from "@/lib/domain/governance/arch-verdict.js";
 
 /**
@@ -258,8 +258,20 @@ export const registry = {
     // "What IS this codebase" — measurements first, then the decision table (ADR 0134, todo41#P3).
     // Composed HERE so the CLI names no domain module (ADR 0005).
     arch: (interfaceFragments?: string[]) => {
-      const m = measureArch(graph.getGraph(), interfaceFragments ?? DEFAULT_INTERFACE_FRAGMENTS);
-      return { measurements: m, report: decideArch(m) };
+      const fragments = interfaceFragments ?? DEFAULT_INTERFACE_FRAGMENTS;
+      const g = graph.getGraph();
+      const m = measureArch(g, fragments);
+      // A monorepo reports PER SERVICE (todo41#P4) — one verdict over seven apps is wrong by
+      // construction. The whole-tree measurement still rides along as the shape.
+      const services = detectServiceRoots(g).map(root => {
+        const sub = subgraphUnder(g, root);
+        const sm = measureArch(sub, fragments);
+        return { root, measurements: sm, report: decideArch(sm) };
+      });
+      // With services detected, the whole-tree verdict stands down — its own caveat says one
+      // verdict over N applications is wrong by construction. The shape still prints.
+      const report = services.length >= 2 ? { verdicts: [], shape: decideArch(m).shape } : decideArch(m);
+      return { measurements: m, report, services };
     },
     audit: () => governance.audit(),
     advise: () => governance.advise(),
