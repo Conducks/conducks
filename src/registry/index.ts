@@ -6,6 +6,15 @@ import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService, DeadCodeAnalyzer, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
 import { GovernanceService, ConducksAdvisor, ConducksSentinel, RegressionGuard } from "@/lib/domain/governance/index.js";
+import { measure as measureArch } from "@/lib/domain/governance/arch-detect.js";
+import { decide as decideArch } from "@/lib/domain/governance/arch-verdict.js";
+
+/**
+ * Where a DOOR lives, by convention. `interfaces/` is this repository's own; the rest are the
+ * common spellings. A repo matching none of them gets "0 driving adapters" and the decision table
+ * answers "no pattern detected, here is the shape" — which is the honest verdict, not a failure.
+ */
+const DEFAULT_INTERFACE_FRAGMENTS = ['/interfaces/', '/adapters/', '/apps/', '/cli/', '/api/', '/web/'];
 import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView, buildTrees } from "@/lib/domain/analysis/docs-board.js";
@@ -246,6 +255,12 @@ export const registry = {
     compare: (otherPath: string) => metrics.compare(otherPath)
   },
   audit: {
+    // "What IS this codebase" — measurements first, then the decision table (ADR 0134, todo41#P3).
+    // Composed HERE so the CLI names no domain module (ADR 0005).
+    arch: (interfaceFragments?: string[]) => {
+      const m = measureArch(graph.getGraph(), interfaceFragments ?? DEFAULT_INTERFACE_FRAGMENTS);
+      return { measurements: m, report: decideArch(m) };
+    },
     audit: () => governance.audit(),
     advise: () => governance.advise(),
     status: () => governance.status(),

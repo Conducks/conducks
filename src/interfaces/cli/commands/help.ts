@@ -44,7 +44,7 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "GOVERNANCE (Audit)": {
-        ids: ["audit", "fallback", "advise", "context", "guard", "drift", "ledger", "supply-chain"],
+        ids: ["audit", "arch", "fallback", "advise", "context", "guard", "drift", "ledger", "supply-chain"],
         examples: [
           "conducks audit",
           "conducks context UserService --max-tokens 4000",

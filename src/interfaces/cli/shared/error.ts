@@ -112,7 +112,13 @@ export function resolveSymbol(input: string, graph: NameIndex): string {
   });
 
   if (matches.length > 1) {
-    cliWarn(`Multiple symbols named "${input}" — using highest-gravity match: ${best.id}`);
+    // Name what was PASSED OVER, not only what was chosen (todo43). A reader who disagrees with
+    // the pick needs the alternatives to disagree with — without them the warning says "trust me".
+    // Capped at three: past that, `query` is the tool.
+    const passedOver = matches.filter(m => m.id !== best.id).slice(0, 3).map(m => m.id);
+    const more = matches.length - 1 - passedOver.length;
+    cliWarn(`Multiple symbols named "${input}" — using highest-gravity match: ${best.id}` +
+      (passedOver.length ? `\n  passed over: ${passedOver.join(', ')}${more > 0 ? ` (+${more} more)` : ''}` : ''));
   }
 
   return best.id;

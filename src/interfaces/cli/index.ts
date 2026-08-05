@@ -7,6 +7,7 @@ import { StatusCommand } from "./commands/status.js";
 import { QueryCommand } from "./commands/query.js";
 import { ContextCommand } from "./commands/context.js";
 import { AuditCommand } from "./commands/audit.js";
+import { ArchCommand } from "./commands/arch.js";
 import { CleanCommand } from "./commands/clean.js";
 import { SetupCommand } from "./commands/setup.js";
 import { ListCommand } from "./commands/list.js";
@@ -202,7 +203,7 @@ export async function main() {
 
   // Registry of modular commands
   const commands: ConducksCommand[] = [
-    new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
+    new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(), new ArchCommand(),
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
     new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
     new AdviseCommand(), new PruneCommand(),

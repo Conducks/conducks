@@ -96,6 +96,25 @@ export function detectAdapters(graph: ConducksAdjacencyList, interfaceFragments:
   // precise. It is still fixed here, because 48 is a wrong ANSWER even when it is a harmless input.)
   const bySubsystem = new Map<string, Array<{ id: NodeId; file: string; incoming: number; outgoing: number }>>();
 
+  // A SYSTEM DOOR LIVES NEAR THE TOP OF THE TREE. Without a depth gate, sofie's calendar plugin —
+  // `src/plugins/tools/calendar/adapters/` — matched the `/adapters/` fragment five directories
+  // down and the whole repository was named "hexagonal" off one plugin's internal folder: the
+  // nearest-label failure the decision table exists to refuse. The gate is positional, not
+  // semantic: the fragment must open within MAX_DOOR_DEPTH directories of the common source root.
+  const MAX_DOOR_DEPTH = 2;
+  const unitPaths = [...graph.getAllNodes()]
+    .filter(n => n.properties.canonicalKind === 'UNIT')
+    .map(n => String(n.properties.filePath ?? '').toLowerCase())
+    .filter(Boolean);
+  const commonRoot = (() => {
+    if (unitPaths.length === 0) return '';
+    let prefix = unitPaths[0];
+    for (const p of unitPaths) {
+      while (prefix && !p.startsWith(prefix)) prefix = prefix.slice(0, prefix.lastIndexOf('/'));
+    }
+    return prefix;
+  })();
+
   for (const node of graph.getAllNodes()) {
     if (node.properties.canonicalKind !== 'UNIT') continue;
     const file = String(node.properties.filePath ?? '').toLowerCase();
@@ -105,6 +124,13 @@ export function detectAdapters(graph: ConducksAdjacencyList, interfaceFragments:
 
     const fragment = interfaceFragments.find(f => file.includes(f));
     if (!fragment) continue;
+    const relative = file.startsWith(commonRoot) ? file.slice(commonRoot.length) : file;
+    const depth = relative.slice(0, relative.indexOf(fragment)).split('/').filter(Boolean).length;
+    if (depth > MAX_DOOR_DEPTH) continue;
+    // The segment after the fragment must be a DIRECTORY — `src/cli/config.ts` has a filename
+    // there, and a single file matching a naming convention is not a subsystem.
+    const tail = file.slice(file.indexOf(fragment) + fragment.length);
+    if (!tail.includes('/')) continue;
     // The subsystem is the segment AFTER the interface fragment: interfaces/cli, interfaces/tools.
     const after = file.slice(file.indexOf(fragment) + fragment.length).split('/')[0];
     if (!after) continue;

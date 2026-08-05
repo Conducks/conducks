@@ -37,10 +37,10 @@ layer, and doing that once serves both.
 ## Phase 3 — the decision table
 - Builds: 0134
 
-- [ ] Name from the measurements: ≥2 adapters + one convergence + one-way layers → hexagonal; one entry + linear chain → layered monolith; many entries with disjoint cones → plugin or multi-service; one high-fan-in-and-out hub → event-driven
-- [ ] Every verdict prints its evidence with `file:line`, or it is not printed
-- [ ] Confidence can be LOW, and a repository matching nothing gets "no pattern detected, here is the shape" rather than the nearest label
-- [ ] A codebase mid-migration reports BOTH matches rather than picking one
+- [x] `conducks arch` ships (arch-verdict.ts + commands/arch.ts, routed through the registry per ADR 0005): ≥2 doors + convergence → hexagonal (HIGH only at distance 1 AND one-way flow); ≥2 doors + disjoint cones → plugin/multi-service; one door + layer edges → layered monolith. Event-driven hub — deferred to the same measurement discipline: no hub metric exists yet and naming without one would be narration
+- [x] Every verdict prints its evidence rows (door files, the convergence file and hop count, the direction claim), and the raw SHAPE prints whatever the verdicts say
+- [x] Proven on the frozen subjects: scraper, sofie and orchestrator all answer "no pattern detected" with the shape. sofie is the case that MATTERED — before the door-depth gate it was named "hexagonal LOW" off a calendar plugin's internal `adapters/` folder five directories down; a system door must open within 2 directories of the common root, and the segment after the fragment must be a directory (`src/cli/config.ts` is a file matching a naming convention, not a subsystem)
+- [x] The table appends every rule that fires and the CLI flags a double match explicitly; fixture-tested
 
 ## Phase 4 — prove it somewhere unfamiliar
 - Builds: 0134
