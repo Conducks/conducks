@@ -10,13 +10,26 @@ import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 export class ImpactCommand implements ConducksCommand {
   public id = "impact";
   public description = "Perform blast radius analysis on a symbol";
-  public usage = "conducks impact <symbolId> [direction: upstream|downstream] [--json] [--tree]";
+  public usage = "conducks impact <symbolId> [direction: upstream|downstream] [--json] [--tree] [--depth <n>]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];
     const direction = (args[1] === "downstream" ? "downstream" : "upstream") as "upstream" | "downstream";
     const useJson = args.includes('--json');
     const useTree = args.includes('--tree');
+    // The engine has taken a depth all along (default 5); the CLI never passed it, and the vs-grep
+    // benchmark pre-registered `--depth 2` in good faith and hit "Unknown flag" (todo44#P6).
+    // A depth that does not parse as a positive integer is an error, not a silent default —
+    // `--depth abc` falling back to 5 would be a flag that reads as obeyed and is not.
+    const depthIdx = args.indexOf('--depth');
+    let depth = 5;
+    if (depthIdx !== -1) {
+      depth = Number(args[depthIdx + 1]);
+      if (!Number.isInteger(depth) || depth < 1) {
+        console.error(`Error: --depth needs a positive integer, got "${args[depthIdx + 1] ?? ''}".`);
+        process.exit(1);
+      }
+    }
 
     if (!symbolId) {
       console.error("Error: Please provide a symbol ID for impact analysis.");
@@ -34,7 +47,7 @@ export class ImpactCommand implements ConducksCommand {
     };
 
     try {
-      const impact = registry.kinetic.getImpact(resolvedId, direction);
+      const impact = registry.kinetic.getImpact(resolvedId, direction, depth);
       if (!impact) {
         console.error(`No impact data for: "${resolvedId}". Run: conducks query "${symbolId}" to find valid symbol IDs.`);
         process.exit(1);
@@ -69,6 +82,36 @@ export class ImpactCommand implements ConducksCommand {
 
       console.log(`\n\x1b[1m--- Conducks ${direction.toUpperCase()} Impact Report: ${resolvedId} ---\x1b[0m`);
       console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${impact.affectedCount} Symbols affected`);
+
+      // A TRUE ZERO AND A BROKEN ZERO MUST NOT PRINT THE SAME OUTPUT (todo44#P6, CONDUCKS-37).
+      //
+      // Measured on the frozen scraper subject: `impact classify` said 0 and was right — nobody
+      // calls it. `impact resolve_project_path` said 0 and was wrong — ten callers existed, every
+      // one sitting in the unresolved bucket as `paths.resolve_project_path`. The reader could not
+      // tell the honest empty from the resolution failure. So an empty answer states its basis:
+      // how many edges were examined, how many references this graph could not place, and — the
+      // number that decides whether the zero is trustworthy — how many of those share this
+      // symbol's name.
+      if (impact.affectedCount === 0) {
+        const wanted = resolvedId.split('::').pop()!.split('.').pop()!.toLowerCase();
+        let edgeCount = 0, unresolvedTotal = 0, sameName = 0;
+        for (const e of g.getAllEdges()) {
+          edgeCount++;
+          if (g.getNode(e.targetId)) continue;
+          unresolvedTotal++;
+          const leaf = String(e.targetId).toLowerCase().split('::').pop()!.split('.').pop()!;
+          if (leaf === wanted) sameName++;
+        }
+        console.log(chalk.dim(`  (examined ${edgeCount.toLocaleString()} edges; ` +
+          `${unresolvedTotal.toLocaleString()} unresolved reference(s) in this graph, ` +
+          (sameName > 0
+            ? `and ${sameName} of them end in "${wanted}" — the zero above may be a resolution gap, not an absence)`
+            : `none of them share this name — no caller exists in what was analyzed)`)));
+        if (sameName > 0) {
+          console.log(chalk.yellow(`  ⚠ ${sameName} unresolved reference(s) match this symbol's name. ` +
+            `Run \`conducks audit --json\` to list them.`));
+        }
+      }
       console.log(`\x1b[35mShortest Weighted Path:\x1b[0m ${impact.affectedNodes[0]?.distance.toFixed(2) || 0}`);
       console.log(`\x1b[35mImpact Score:\x1b[0m ${impact.impactScore}`);
 

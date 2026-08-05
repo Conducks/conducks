@@ -195,6 +195,56 @@ describe('doc comment harvest', () => {
     });
 
     /**
+     * A DIRECTIVE BETWEEN THE DOC AND THE DECLARATION MUST NOT BLOCK THE DOC.
+     *
+     * Measured on orchestrator's `debounce`:
+     *
+     *     /** Debounce a function call *\/
+     *     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     *     export function debounce(...)
+     *
+     * The directive is the NEAREST comment above, it was returned, refused as non-descriptive, and
+     * the search stopped — so the real doc two lines up was never reached and `debounce` carried
+     * nothing. A refused comment is invisible, not a wall.
+     */
+    it('reaches past a directive to the real doc above it', () => {
+      const fn = { lineStart: 61, rank: 0 };
+      const docs = attachDocs([fn], [
+        { startLine: 57, endLine: 59, text: '/** Debounce a function call */' },
+        { startLine: 60, endLine: 60, text: '// eslint-disable-next-line @typescript-eslint/no-explicit-any' },
+      ]);
+      expect(docs.get(fn)).toBe('Debounce a function call');
+    });
+
+    /**
+     * A TOP-OF-FILE HEADER GOES TO THE FIRST SYMBOL — because the language says so.
+     *
+     * A rule giving it to the UNIT was built and REVERTED: the TypeScript compiler binds a JSDoc to
+     * the following declaration regardless of blank lines, and measured against compiler-derived
+     * truth the header rule stole 20 symbol docs on one subject (a gap-2 doc for `nonEmpty` in
+     * schemas.ts became "the file's"). The compiler's convention wins over the visual one.
+     */
+    it('gives a top-of-file block to the first symbol, per the compiler', () => {
+      const unit = { lineStart: 1, lineEnd: 122, rank: 0 };
+      const iface = { lineStart: 9, rank: 0 };
+      const docs = attachDocs([unit, iface], [
+        { startLine: 1, endLine: 7, text: '/** Service Registry (The Hub). The central junction. */' },
+      ]);
+      expect(docs.get(iface)).toContain('Service Registry');
+      expect(docs.has(unit)).toBe(false);
+    });
+
+    it('still gives a touching top-of-file comment to the declaration under it', () => {
+      const unit = { lineStart: 1, lineEnd: 40, rank: 0 };
+      const fn = { lineStart: 2, rank: 0 };
+      const docs = attachDocs([unit, fn], [
+        { startLine: 1, endLine: 1, text: '/** Trims a name. */' },
+      ]);
+      expect(docs.get(fn)).toBe('Trims a name.');
+      expect(docs.has(unit)).toBe(false);
+    });
+
+    /**
      * A MODULE DOCSTRING STARTS ON THE DECLARATION'S OWN LINE.
      *
      * A unit records `lineStart: 1` and its docstring also starts at line 1, so a window of

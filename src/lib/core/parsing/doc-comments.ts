@@ -143,6 +143,13 @@ export function docFor(
     .sort((a, b) => a.startLine - b.startLine)[0];
   if (inside && /^\s*("""|''')/.test(inside.text)) return inside;
 
+  // NOT claimed for the unit: a top-of-file block with a blank line before the first symbol looks
+  // like a file header, and a rule attaching it to the UNIT was built and REVERTED here. The
+  // language's own arbiter disagrees: the TypeScript compiler binds a JSDoc to the following
+  // declaration regardless of blank lines, and measured against it the header rule stole 20 symbol
+  // docs on one subject (schemas.ts's gap-2 doc for `nonEmpty` became "the file's"). Python's
+  // module doc needs no such rule — its docstring form is INSIDE, handled above.
+
   // ABOVE: the comment whose LAST line is nearest the declaration, within the gap.
   const above = comments
     .filter(c => c.endLine < decl && decl - c.endLine <= MAX_GAP_ABOVE)
@@ -164,6 +171,16 @@ export function attachDocs<T extends DocTarget>(
   const out = new Map<T, string>();
   const claimed = new Set<HarvestedComment>();
 
+  // A NON-DESCRIPTIVE COMMENT NEVER CLAIMS AND NEVER BLOCKS. Refusing it after selection made it a
+  // WALL: orchestrator's `debounce` has its doc two lines up and an eslint directive directly above
+  // the declaration — the directive was the nearest candidate, it was refused, and the search
+  // stopped, so the real doc was never reached. Filtering here makes a banner or directive
+  // invisible to the join instead of load-bearing.
+  const descriptive = comments.filter(c => {
+    const text = cleanDocText(c.text);
+    return !!text && isDescriptive(text);
+  });
+
   // Nearest declaration wins: sorting by line means an inner symbol claims a comment before an
   // outer one further up the file can. Rank breaks a tie WITHIN a line, so a function outranks the
   // parameter that shares its declaration line — see `DocTarget.rank`.
@@ -180,10 +197,10 @@ export function attachDocs<T extends DocTarget>(
   };
 
   for (const t of ordered) {
-    const hit = docFor(t, comments.filter(c => !claimed.has(c)), reachOf(t));
+    const hit = docFor(t, descriptive.filter(c => !claimed.has(c)), reachOf(t));
     if (!hit) continue;
     const text = cleanDocText(hit.text);
-    if (!text || !isDescriptive(text)) continue;
+    if (!text) continue;
     claimed.add(hit);
     out.set(t, text);
   }

@@ -70,6 +70,40 @@ describe('impact prints the call site', () => {
     expect(combined).toMatch(/indirect/);
   }, 120000);
 
+  /**
+   * A TRUE ZERO AND A BROKEN ZERO MUST NOT PRINT THE SAME OUTPUT (todo44#P6).
+   *
+   * Measured on the frozen scraper subject: `impact classify` said `0 Symbols affected` and was
+   * RIGHT — nobody calls it. `impact resolve_project_path` said the same and was WRONG — ten callers
+   * existed, every one sitting in the graph's unresolved bucket. The reader could not tell the
+   * honest empty from the resolution failure, which is CONDUCKS-37 in its most expensive form.
+   * An empty answer now states what was examined and how many unresolved references share the
+   * symbol's name — the number that decides whether the zero is trustworthy.
+   */
+  it('an empty answer states what it examined', () => {
+    const { combined } = runCli(['impact', 'unusedHelper'], { cwd: repo, allowFail: true });
+    expect(combined).toMatch(/0 Symbols affected/);
+    // What the zero rests on: edges examined, unresolved total, and same-name unresolved.
+    expect(combined).toMatch(/examined [0-9,]+ edge/i);
+    expect(combined).toMatch(/unresolved/i);
+    // Nothing unresolved shares this name in this fixture, and the output says so outright.
+    expect(combined).toMatch(/none of them (share|match)|0 of them/i);
+  }, 120000);
+
+  /**
+   * `--depth` bounds the walk. The vs-grep benchmark pre-registered `impact X --depth 2` and the
+   * flag did not exist — the engine had taken a depth parameter all along (default 5) and the CLI
+   * never passed it. At depth 1 only the direct caller may appear; `main`, which reaches `format`
+   * through `fetchUser`, must not.
+   */
+  it('honours --depth', () => {
+    const deep = runCli(['impact', 'format'], { cwd: repo, allowFail: true }).combined;
+    expect(deep).toMatch(/main/);
+    const shallow = runCli(['impact', 'format', '--depth', '1'], { cwd: repo, allowFail: true }).combined;
+    expect(shallow).toMatch(/fetchUser/);
+    expect(shallow).not.toMatch(/\bmain\b/);
+  }, 240000);
+
   it('still carries the machine-readable fields for an agent', () => {
     const { stdout } = runCli(['impact', 'format', '--json'], { cwd: repo, allowFail: true });
     const j = JSON.parse(stdout);

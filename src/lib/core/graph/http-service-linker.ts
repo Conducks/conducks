@@ -15,6 +15,17 @@ const HTTP_URL_RE = /https?:\/\/([a-z][a-z0-9-]{2,})(:\d+)?(?:\/|$)/g;
 /** Canonical kinds that represent a service boundary. */
 const SERVICE_KINDS = new Set(['DIRECTORY', 'NAMESPACE', 'REPOSITORY', 'ECOSYSTEM']);
 
+/**
+ * A DOCUMENT THAT MENTIONS A URL IS NOT A CALLER.
+ *
+ * This linker reads RAW TEXT, so prose qualifies exactly like code — and on the frozen sofie
+ * subject it minted `docs/memory.md::unit -CALLS-> src/plugins/providers/said-server` because the
+ * memory doc names the server's URL while describing it. Both wrong CALLS edges the first
+ * `verify-edges` run found on that subject were markdown sources (todo44#P5). Prose extensions are
+ * skipped; code stays scanned.
+ */
+const PROSE_EXTENSIONS = /\.(md|mdx|markdown|rst|txt|adoc)$/i;
+
 export class HttpServiceLinker {
   constructor(private readonly graph: ConducksAdjacencyList) {}
 
@@ -48,6 +59,7 @@ export class HttpServiceLinker {
     const created: ConducksEdge[] = [];
 
     for (const filePath of filePaths) {
+      if (PROSE_EXTENSIONS.test(filePath)) continue;
       // Unit node ID matches how the orchestrator creates them in Pass 1.
       const fileNodeId = `${filePath.toLowerCase()}::unit`;
       if (!this.graph.hasNode(fileNodeId)) continue;
