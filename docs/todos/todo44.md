@@ -61,7 +61,14 @@ can act on the output, or has to go and open a file.
 - [x] So the defect was not mislabelling. Conducks was DELETING most React components, and the 123 PascalCase atoms measured on orchestrator were the survivors
 - [ ] `pruneTaxonomy` drops an unreferenced ATOM silently. Whatever it removes should be COUNTED and reportable, so the next symbol class it swallows is visible without a seven-line reproduction
 
-## Phase 5 — Benchmark A: conducks against grep
+## Phase 5 — edge precision on the frozen subjects
+
+- [x] `verify-edges.mjs` run against all three for the first time — every claim checked against the SOURCE, with `unchecked` stated rather than counted as a pass
+- [x] scraper 99.94% (5 wrong / 7,948), orchestrator 99.99% (2 / 14,239), sofie 99.93% (14 / 20,108). 21 wrong edges across 42,295 checked
+- [ ] sofie mints CALLS edges FROM markdown files — `docs/memory.md::unit -> said-server`. A doc that mentions a module is not a caller of it; find where a `.md` unit acquires call edges
+- [ ] The 24 remaining no-node declarations were `.mjs` — CLAIMED now (extensions fix). The doc-truth residue after it: 4 + 2 + 1 no-node, 4 + 1 false attachments (class JSDoc onto the method beneath), unexamined
+
+## Phase 6 — Benchmark A: conducks against grep
 
 - [ ] Task set written down BEFORE any run, with the expected answer per task hand-derived from the source — a benchmark scored after the fact scores whatever happened
 - [ ] Grep gets its best realistic invocation per task: `rg -w`, `-t py`, the flags a competent developer types. A strawman comparison is worth nothing and this project has rigged an experiment before
