@@ -849,6 +849,33 @@ export class ConducksReflector {
                 metadata: { specifier, isRaw: true, origin: boundary.origin, package: boundary.package, line: currentMatchRow + 1 }
               });
 
+              // A NAMED IMPORT THAT IS A MODULE imports that module's FILE, and only the file's
+              // import scope makes its members reachable. `from foundation import paths` binds the
+              // module `foundation/paths.py`, and until this existed the unit's import scope held
+              // only the package `__init__.py` — so every `paths.resolve_project_path(...)` call
+              // dangled, and `impact` answered 0 callers for a function with 10 measured call sites
+              // (todo44#P6, the vs-grep benchmark's headline finding). The `@named_import` capture
+              // carried exactly this information and was consumed NOWHERE.
+              //
+              // Gated on namespace import semantics (Python's), and on `<spec>.<name>` resolving to
+              // a real in-repo file — a named SYMBOL import (`from foundation import JobRunner`)
+              // resolves to no file and changes nothing.
+              if (provider.importSemantics === 'namespace') {
+                for (const cap of match.captures) {
+                  if (cap.name !== 'named_import' || !cap.node) continue;
+                  const subSpec = `${specifier}.${cap.node.text}`;
+                  const subModule = this.imports.resolve(subSpec, file.path, allPaths, provider, context);
+                  if (typeof subModule !== 'string') continue;
+                  spectrum.relationships.push({
+                    sourceName: 'unit',
+                    targetName: subSpec,
+                    type: 'IMPORTS' as any,
+                    confidence: 1.0,
+                    metadata: { specifier: subSpec, isRaw: true, origin: 'internal', package: null, line: currentMatchRow + 1 }
+                  });
+                }
+              }
+
               for (let i = 0; i < match.captures.length; i++) {
                 const cap = match.captures[i];
                 if (cap.name === CaptureTags.NAME && cap.node) {

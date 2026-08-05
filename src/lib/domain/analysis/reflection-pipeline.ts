@@ -109,8 +109,23 @@ export class ReflectionPipeline {
         // resolves to an in-repo node, and during streaming no ECOSYSTEM node exists yet, so the
         // old code dropped it entirely — the dependency surface was invisible. Emit a durable
         // boundary node + a DEPENDS_ON edge tagged with origin/package: the supply-chain surface.
+        // RESOLUTION BEATS CLASSIFICATION. `classifyOrigin` is a pure function over the specifier
+        // string, and its vocabulary is npm's: a bare word that is not a Node core module is a
+        // third-party dependency. Every bare PYTHON import is a bare word — `foundation`,
+        // `core.errors` — so the whole in-repo module tree of a Python project classified as
+        // external, this branch fired, and the language's own resolver was NEVER CONSULTED.
+        // Measured on the frozen scraper subject: all of `foundation.*` sat in
+        // `DEPENDS_ON ecosystem::`, and `impact` answered 0 callers for a function with 10
+        // (todo44#P6 — the benchmark's headline finding).
+        //
+        // Only the provider's own SPECIALIZED resolver may overturn the classification — it answers
+        // with an exact module-path match or not at all. The generic fallback chain (basename,
+        // prefix) stays out of this: ADR 0070 records what fuzzy matching does to a bare specifier.
         const origin = rel.metadata.origin;
-        if (origin && origin !== 'internal') {
+        const specialized = origin && origin !== 'internal'
+          ? provider?.resolveImport?.(specifier, res.path, allPaths)
+          : undefined;
+        if (origin && origin !== 'internal' && !(specialized && sameFamily(res.path, specialized))) {
           const pkg = (rel.metadata.package as string | null) || specifier.replace(/^node:/, '');
           const boundaryId = ecosystemId(pkg);
           if (!graph.getGraph().getNode(boundaryId)) {
