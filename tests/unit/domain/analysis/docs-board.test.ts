@@ -486,3 +486,39 @@ describe('hygiene — the finished-but-still-open blind spot', () => {
     expect(board.warns.flatMap((w: any) => w.errs).join(' ')).not.toContain('every task is closed');
   });
 });
+
+describe('buildState survives a todo being closed (one definition, not two)', () => {
+  // The drift this pins: `completed/` is not walked, so promoting a todo removes the phases that
+  // linked an ADR and every one it built fell to "unlinked" — 141 of 142 on the day the board was
+  // finally clean. The `unlinked` LIST honoured `- Enforced by:` / `- Resolved by:`; the FIELD did
+  // not, and `agentView` filters on the field.
+  const boardWith = (adrBody: string) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'conducks-bs-'));
+    mkdirSync(path.join(root, 'docs', 'decisions'), { recursive: true });
+    mkdirSync(path.join(root, 'docs', 'todos'), { recursive: true });
+    writeFileSync(path.join(root, 'docs', 'decisions', '0001-a.md'), adrBody);
+    const board = buildBoard(root);
+    rmSync(root, { recursive: true, force: true });
+    return board;
+  };
+  const adr = (extra: string) =>
+    `# 0001 — a decision\nStatus: Accepted\n- Date: 2026-01-01\n${extra}\n\n## Context\nx\n\n## Decision\ny\n\n## Consequences\nz\n`;
+
+  it('an `- Enforced by:` test proves it with no phase linking it', () => {
+    const board = boardWith(adr('- Enforced by: tests/unit/thing.test.ts'));
+    expect(board.decisions[0].buildState).toBe('proven');
+    expect(board.unlinked).toEqual([]);
+  });
+
+  it('a `- Resolved by:` successor carries it — evidence moved, it did not vanish', () => {
+    const board = boardWith(adr('- Resolved by: 0002'));
+    expect(board.decisions[0].buildState).toBe('resolved');
+    expect(board.unlinked).toEqual([]);
+  });
+
+  it('neither stamp nor phase is genuinely unlinked, and the list agrees with the field', () => {
+    const board = boardWith(adr('- Builds: none'));
+    expect(board.decisions[0].buildState).toBe('unlinked');
+    expect(board.unlinked).toEqual(['0001']);
+  });
+});

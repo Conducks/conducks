@@ -26,7 +26,11 @@ export interface DocsBoard {
   todos: any[]; decisions: any[]; other: any[];
   lint: Array<{ file: string; type: DocType; errs: string[] }>;
   warns: Array<{ file: string; errs: string[] }>;
-  /** ADRs with no `- Builds:` phase and no `- Enforced by:` — nothing proves they were ever built. */
+  /**
+   * ADRs whose `buildState` is `unlinked` — no phase, no `- Enforced by:`, no `- Resolved by:`, so
+   * nothing anywhere proves they were ever built. Derived from that one field rather than
+   * recomputed, because when the two were computed separately they drifted (see `linkDecisions`).
+   */
   unlinked: string[];
   /**
    * Architecture notes reviewed against their module's code that have DRIFTED since (todo17 Phase 3).
@@ -516,10 +520,15 @@ function linkPhases(board: DocsBoard): void {
  * So the honest move is to stop using a word that claims more than the derivation supports, and to
  * promote the one field that IS evidence of coverage:
  *
- *   `claimed`  every linked phase is done — the work someone claimed is finished
- *   `proven`   the same, AND `- Enforced by:` names a file that exists, so a test holds it
+ *   `claimed`   every linked phase is done — the work someone claimed is finished
+ *   `proven`    `- Enforced by:` names a file that exists, so a test holds it — whether or not a
+ *               phase still links here, because a closed todo's phases leave the board and the
+ *               test does not
+ *   `resolved`  no phase and no test, but `- Resolved by:` hands the open question to a successor
+ *               that carries it — the evidence moved, it did not vanish
+ *   `unlinked`  none of the above: nothing anywhere proves this decision was ever built
  *
- * Neither says every consequence is covered. `proven` says something checked it.
+ * None says every consequence is covered. `proven` says something checked it.
  */
 function linkDecisions(board: DocsBoard): void {
   for (const d of board.decisions) {
@@ -529,7 +538,16 @@ function linkDecisions(board: DocsBoard): void {
         if ((p.builds as string[]).includes(d.id)) d.builtBy.push(p);
     const open = d.builtBy.filter((p: { state: string }) => p.state !== "done");
     const finished = d.builtBy.length > 0 && open.length === 0;
-    d.buildState = !d.builtBy.length ? "unlinked"
+    // A PHASE LINK IS NOT THE ONLY EVIDENCE, and treating it as the only one made this field lie at
+    // exactly the moment the docs were healthiest. `completed/` is deliberately not walked, so the
+    // instant a todo is promoted its phases stop existing for this computation and every ADR they
+    // built falls to "unlinked" — 141 of 142 here, the day every open record was closed. The
+    // DURABLE evidence is the stamp: `- Enforced by:` names a test that still runs, `- Resolved by:`
+    // hands the open question to a successor that carries it. The `unlinked` LIST already honoured
+    // both (below); this field did not, so the two disagreed about the same question and `agentView`
+    // filtered on the wrong one.
+    d.buildState = !d.builtBy.length
+      ? (d.enforcedBy ? "proven" : d.resolvedBy?.length ? "resolved" : "unlinked")
       : finished ? (d.enforcedBy ? "proven" : "claimed")
       : d.builtBy.some((p: { done: number }) => p.done) ? "partial" : "unbuilt";
     d.openPhases = open.map((p: { addr: string }) => p.addr);
@@ -647,9 +665,13 @@ function hygiene(board: DocsBoard): void {
   // and it was reported on EVERY run and always would have been. A warning that is permanently
   // wrong is worse than no warning: it teaches the reader to skip the line, which is the same
   // failure as the untriaged findings this todo already tracks.
+  // DERIVED from the field rather than re-deciding the same question: the two used to compute
+  // "does this ADR have build evidence" separately and drifted apart the day every todo closed —
+  // the field said 141 unlinked while this list said none. One definition, in `linkDecisions`;
+  // this filter now only adds the `superseded` exemption, which is about the ADR's STATUS rather
+  // than its evidence.
   board.unlinked = board.decisions
-    .filter(d => d.buildState === "unlinked" && !d.enforcedBy
-      && !d.resolvedBy?.length && !/^superseded$/i.test(d.state || ""))
+    .filter(d => d.buildState === "unlinked" && !/^superseded$/i.test(d.state || ""))
     .map(d => d.id);
 }
 
