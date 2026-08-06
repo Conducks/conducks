@@ -50,14 +50,18 @@ export class MirrorServer {
 
     // v2.0.0 Gateway: Unified Synapse Exploration
     this.app.get('/api/synapse', async (req, res) => {
-      const { layers, clusters, spread, compact } = req.query;
+      const { layers, clusters, spread, compact, limit } = req.query;
       const l = layers ? (layers as string).split(',').map(n => parseInt(n, 10)) : undefined;
       const c = clusters ? (clusters as string).split(',') : undefined;
       const s = spread ? parseInt(spread as string, 10) : undefined;
       const compactFlag = compact === '1' || compact === 'true' || compact === 'yes';
+      // An override the caller has to mean: a non-numeric or non-positive `limit` is IGNORED rather
+      // than silently becoming 0, which would serve an empty wave that reads as an empty graph.
+      const parsedLimit = limit === undefined ? undefined : Number.parseInt(limit as string, 10);
+      const waveLimit = Number.isFinite(parsedLimit) && (parsedLimit as number) > 0 ? parsedLimit : undefined;
 
       try {
-        const wave = await this.gateway.getWave(l, c, s, compactFlag);
+        const wave = await this.gateway.getWave(l, c, s, compactFlag, waveLimit);
         res.json(wave);
       } catch (err) {
         res.status(500).json({ error: 'Failed to build wave.' });

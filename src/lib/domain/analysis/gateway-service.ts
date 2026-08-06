@@ -77,9 +77,17 @@ export class GatewayService {
    * `as any`. No such method existed. The cast made it compile, and the catch below turned the
    * runtime failure into `{nodes: [], edges: []}` — so the "fast path" was a silent empty result.
    */
-  public async getWave(layers?: number[], _clusters?: string[], spread?: number, _compact: boolean = false) {
+  /** The cap this gateway serves when a request does not name one (`mirror --wave-cap`). */
+  private waveCap: number | undefined;
+  public setWaveCap(limit: number): void { this.waveCap = limit; }
+
+  public async getWave(layers?: number[], _clusters?: string[], spread?: number, _compact: boolean = false, limit?: number) {
     try {
-      const wave = await this.persistence.getVisualWave(layers, spread ?? 1200);
+      // The cap is OVERRIDABLE (todo48#P1). It exists because a force graph of ten thousand nodes is
+      // unreadable, not because the rest is uninteresting — measured on a five-service monorepo the
+      // default hides about a third of eligible nodes, and with no way to raise it that slice was
+      // unreachable through this surface entirely.
+      const wave = await this.persistence.getVisualWave(layers, spread ?? 1200, limit ?? this.waveCap);
       if (wave.truncated) {
         logger.info(`🛡️ [Mirror] Showing ${wave.nodes.length} of ${wave.totalNodes} nodes — the heaviest slice, not the whole graph.`);
       }

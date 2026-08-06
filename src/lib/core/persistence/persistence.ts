@@ -1507,6 +1507,17 @@ export class SynapsePersistence {
   }
 
   /**
+   * The default cap on a visual wave (ADR 0079). Named rather than inline because it is a DEFAULT
+   * now, not a constant: `?limit=` and `mirror --wave-cap` override it, and a number that can be
+   * overridden should say so where it is declared.
+   *
+   * The value is not claimed to be the RIGHT number — only that truncation keeps the heaviest slice
+   * (`ORDER BY gravity DESC`) and reports itself. Measured on a five-service monorepo: 2,321 of
+   * 6,002 nodes eligible, so the default hides about a third there.
+   */
+  private static readonly DEFAULT_WAVE_CAP = 1500;
+
+  /**
    * The visual wave, answered from SQL (ADR 0042).
    *
    * The mirror used to render from the IN-MEMORY graph, which meant `conducks mirror` had to
@@ -1526,7 +1537,7 @@ export class SynapsePersistence {
   public async getVisualWave(
     layers?: number[],
     spread: number = 1200,
-    limit: number = 1500
+    limit: number = SynapsePersistence.DEFAULT_WAVE_CAP
   ): Promise<{ nodes: any[]; links: any[]; clusters: any[]; truncated: boolean; totalNodes: number }> {
     await this.ensureVaultOpen();
 
