@@ -1,11 +1,11 @@
 # todo09 — Taxonomy reconcile (C0) + tracked design debt
-Status: blocked
-- Blocked by: offline — the vuln-surface task needs an advisory DB (`npm audit` / GitHub advisories), unreachable in this environment
-- Progress: Phase 1+2 done · Phase 3 largely done — only externally-blocked items remain (vuln
-  surface needs a network advisory DB; live overlay needs a target app; EXPRESSION is a no-op marker).
-- Open items are ONLY: vuln surface (needs an advisory DB / network), live cross-service overlay
-  (needs a running target app), and the EXPRESSION marker (no-work). Everything else is done or a
-  documented reasoned won't-fix (registry getters + initUI). See per-item status below.
+Status: done
+- Progress: every phase closed. The header above this line claimed "blocked: offline" for five days
+  AFTER the vuln-surface task was built (2026-08-01, task below) and the blocker was found false —
+  the task line was updated and the header never was, so the board carried a stale block nobody
+  re-checked. Re-verified 2026-08-06: `conducks supply-chain` runs live (3 advisoried packages
+  reached by 32 imports, 9 phantom dependencies). The live overlay and EXPRESSION items are
+  documented drops, not open work.
 - Acceptance: on a real TS repo, ATOM drops from ~72% of nodes to a few hundred (edge-carrying only),
   DATA is gone as a node kind, node count falls ~5,000 → ~1,400, and coverage/audit/impact/query all
   still pass. Decision recorded in ADR 0013 (resolves ADR 0012).
@@ -46,7 +46,6 @@ emission, pruned at the end). No reflector change.
 - [x] Regression: full suite 43/43 green; typecheck 0 errors. No feature silently lost data.
 
 ## Phase 3 — tracked design debt (recovered from chat, do not lose again)
-- Blocked by: offline — the vuln-surface task needs an advisory DB (`npm audit` / GitHub advisories), unreachable in this environment
 - [x] **PREREQUISITE BUG — edge properties never persist.** FIXED 2026-07-19. `persistence.saveEdges` (`persistence.ts:265`)
       reads `e.metadata`/`e.weight`/`e.metadata?.line`, but flushAndClear passes `ConducksEdge` objects
       with `.properties`/`.confidence` (no `.metadata`/`.weight`). Result: EVERY edge row has

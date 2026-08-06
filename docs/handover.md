@@ -7,11 +7,11 @@ Gates fully green: **1,598 tests / 199 suites**, typecheck 0, `guard` clean, `do
 source: 6,144 nodes, 22,469 edges. One branch, `main`, local == origin — the 16-branch backlog was
 merged and deleted, remote included.
 
-## The board is empty
-Every todo through 47 is closed and in `completed/`, except:
-- **todo09#P3** — waits offline: the vuln-surface task needs an advisory DB, unreachable here.
-- **todo31** — deliberately parked: three reopen-triggers recorded as deferred-with-condition
-  (query backticks; the pre-build gate holds at 7/7 catches).
+## The board is empty — "Nothing open. Every phase is finished."
+Every todo through 47 is closed and in `completed/`. todo09's "blocked: offline" header was STALE —
+the vuln-surface task was built 2026-08-01 and the blocker found false the same day, but only the
+task line was updated and the header sat wrong for five days. Re-proven live and closed. todo31
+stays deliberately parked: three reopen-triggers as deferred-with-condition.
 
 ## What this stretch built (read the ADRs, they carry the reasoning)
 - **The visuals pipeline** (ADR 0138–0142): anchors checked against the working tree; drift proven
@@ -44,4 +44,4 @@ Every todo through 47 is closed and in `completed/`, except:
 ## If you pick something up
 The natural next pieces of work, none urgent: the deferred canvas→note link map in sofie (a curated
 mapping of 25 blocks to the notes they cover), raising the DERIVED-header warn to an error once every
-adopter's templates carry it, and todo09#P3 whenever network access exists.
+adopter's templates carry it, and the sofie branch push whenever Said wants it.
