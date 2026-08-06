@@ -1,7 +1,7 @@
 # domain/analysis/orchestrator — the pulse
 
-**Part of:** [domain/analysis](../analysis.md). Includes `micro-pulse` (single-file re-analysis for the
-watcher), `pipeline` (topological batching), and three collaborators split out of the orchestrator
+**Part of:** [domain/analysis](../analysis.md). Includes `analysis/orchestrator.ts`,
+`analysis/micro-pulse.ts` (single-file re-analysis for the watcher), `pipeline` (topological batching), and three collaborators split out of the orchestrator
 when it reached 640 lines (todo03#P5): `graph-skeleton-builder` (the L0-L3 containment hierarchy,
 built before any file is parsed), `worker-pool` (dispatch to spawned subprocesses, or the main-thread
 fallback when `CONDUCKS_WORKERS=0`), and `reflection-pipeline` (one file's spectrum becoming edges:

@@ -46,6 +46,11 @@ jobs:
     - name: Lint Authored Docs
       run: node ./build/src/interfaces/cli/index.js docs-lint
 
+    # The tool passes its own visuals gate (ADR 0140): module-note anchors resolve, no page is
+    # unverifiable without declaring itself authored, review stamps compare clean.
+    - name: Lint Visuals
+      run: node ./build/src/interfaces/cli/index.js visuals-lint .
+
     - name: Run Integrity Tests
       run: npm test -- --runInBand
       env:

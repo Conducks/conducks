@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   lintVisuals, resolveAnchor, definesSymbol, constantValue, collectVisualPages,
+  buildStamps, staleStamps,
   type VisualPage,
 } from "@/lib/domain/analysis/visuals-lint.js";
 
@@ -128,11 +129,12 @@ describe("lintVisuals", () => {
     expect(r.violations[0].reason).toContain("no such file");
   });
 
-  it("a page with NO anchors is a warning, never a silent pass", () => {
-    // The ADR 0044 / 0124 shape: nothing-checked must not read as clean.
+  it("a page with NO anchors and no declaration FAILS, never a silent pass", () => {
+    // The ADR 0044 / 0124 shape: nothing-checked must not read as clean — and "0 still true,
+    // exit 0" is the denominator trap, so the undeclared case is an ERROR (todo47#P1).
     const r = lintVisuals([page("<p>a picture with no file references at all</p>")], FILES, read);
     expect(r.violations).toHaveLength(1);
-    expect(r.violations[0].reason).toContain("nothing in this page can be verified");
+    expect(r.violations[0].severity).toBe("error");
     expect(r.pagesWithAnchors).toBe(0);
   });
 
@@ -211,15 +213,78 @@ describe("markdown module notes mark a claim by backticking it (ADR 0140)", () =
   });
 
   it("a bare backticked filename is prose, not a claim — `index.ts` cannot cry wolf", () => {
-    const r = lintVisuals([mdPage("open `index.ts` and look around")], FILES, read);
-    // The only violation allowed is the honest "no anchors" warn — never an ambiguity error.
-    expect(r.violations.filter(v => v.severity === "error")).toHaveLength(0);
+    const r = lintVisuals([mdPage("open `index.ts` and look around — authored, no code claims")], FILES, read);
+    // A bare filename must never become an ambiguity error; the page declares authored to pass.
+    expect(r.violations).toHaveLength(0);
     expect(r.pagesWithAnchors).toBe(0);
   });
 
   it("unbackticked paths in markdown are not scanned — the backtick IS the mark", () => {
-    const r = lintVisuals([mdPage("prose mentioning renderer/src/index.ts:900 without a mark")], FILES, read);
-    expect(r.violations.filter(v => v.severity === "error")).toHaveLength(0);
+    const r = lintVisuals([mdPage("authored prose mentioning renderer/src/index.ts:900 without a mark")], FILES, read);
+    // An unbackticked path is not scanned, so the dead line 900 cannot fail — the backtick is the mark.
+    expect(r.violations).toHaveLength(0);
     expect(r.pagesWithAnchors).toBe(0);
+  });
+});
+
+describe("review stamps — the second tier of rot (ADR 0141)", () => {
+  const note = (text: string): VisualPage => ({ path: "docs/visuals/modules/voice.md", text });
+  const SRC: Record<string, string> = {
+    "src/daemon.py": [
+      "SAMPLE = 1",
+      "def run():",
+      "    a = 1",
+      "    b = 2",
+      "",
+      "def other():",
+      "    pass",
+    ].join("\n"),
+  };
+  const files = Object.keys(SRC);
+  const readSrc = (p: string): string | null => SRC[p] ?? null;
+
+  it("stamps every resolving anchor with a span hash", () => {
+    const stamps = buildStamps([note("see `src/daemon.py::run` and `src/daemon.py:1`")], files, readSrc);
+    expect(Object.keys(stamps["docs/visuals/modules/voice.md"])).toHaveLength(2);
+  });
+
+  it("an edit INSIDE the cited symbol flags the claim; an edit elsewhere does not", () => {
+    const pages = [note("see `src/daemon.py::run`")];
+    const stamps = buildStamps(pages, files, readSrc);
+    const editedElsewhere: Record<string, string> = { ...SRC, "src/daemon.py": SRC["src/daemon.py"].replace("pass", "return 9") };
+    expect(staleStamps(pages, files, p => editedElsewhere[p] ?? null, stamps)).toHaveLength(0);
+    const editedInside: Record<string, string> = { ...SRC, "src/daemon.py": SRC["src/daemon.py"].replace("b = 2", "b = 3") };
+    const flags = staleStamps(pages, files, p => editedInside[p] ?? null, stamps);
+    expect(flags).toHaveLength(1);
+    expect(flags[0].severity).toBe("warn");
+  });
+
+  it("a line anchor flags only when ITS line changes, and a pure re-indent never fires", () => {
+    const pages = [note("see `src/daemon.py:1`")];
+    const stamps = buildStamps(pages, files, readSrc);
+    const reindented: Record<string, string> = { ...SRC, "src/daemon.py": "  " + SRC["src/daemon.py"] };
+    expect(staleStamps(pages, files, p => reindented[p] ?? null, stamps)).toHaveLength(0);
+    const changed: Record<string, string> = { ...SRC, "src/daemon.py": SRC["src/daemon.py"].replace("SAMPLE = 1", "SAMPLE = 2") };
+    expect(staleStamps(pages, files, p => changed[p] ?? null, stamps)).toHaveLength(1);
+  });
+
+  it("an unstamped anchor is never flagged — stamping IS the review", () => {
+    const pages = [note("see `src/daemon.py::run`")];
+    expect(staleStamps(pages, files, readSrc, {})).toHaveLength(0);
+  });
+});
+
+describe("a page with no anchors must declare itself authored", () => {
+  it("declared authored → passes honestly", () => {
+    const p: VisualPage = { path: "docs/visuals/index.html", text: "<p>Provenance: authored — brand page, no code claims.</p>" };
+    const r = lintVisuals([p], FILES, read);
+    expect(r.violations).toHaveLength(0);
+  });
+
+  it("neither anchors nor a declaration → ERROR, not a warning", () => {
+    const p: VisualPage = { path: "docs/visuals/trace.html", text: "<p>a long system trace with unmarked claims</p>" };
+    const r = lintVisuals([p], FILES, read);
+    expect(r.violations).toHaveLength(1);
+    expect(r.violations[0].severity).toBe("error");
   });
 });

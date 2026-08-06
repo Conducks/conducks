@@ -2,9 +2,10 @@
 
 **Layer:** domain. Imports core + contracts.
 
-**Responsibility:** what changed and what is no longer needed. Dead-code finds orphans and unused
-exports; drift compares the graph against a baseline; the watcher drives incremental re-analysis;
-`layer-diff.ts` and `merge-impact.ts` compare two stored layers structurally.
+**Responsibility:** what changed and what is no longer needed. Dead-code (`evolution/dead-code.ts`)
+finds orphans and unused exports; drift (`evolution/drift-engine.ts`) compares the graph against a
+baseline; the watcher (`evolution/watcher.ts`) drives incremental re-analysis;
+`evolution/layer-diff.ts` and `evolution/merge-impact.ts` compare two stored layers structurally.
 
 `diffLayers()` matches by id first and only then by a fingerprint that is UNIQUE on both sides, so a
 "move" is claimed only where there is exactly one candidate; everything else is reported as

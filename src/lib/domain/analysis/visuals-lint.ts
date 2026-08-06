@@ -1,5 +1,6 @@
 import path from "node:path";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 /**
  * Conducks — Visuals Lint 🖼️🛡️
@@ -71,6 +72,7 @@ interface RawAnchor {
   raw: string;
   file: string;
   line?: number;
+  endLine?: number;
   symbol?: string;
 }
 
@@ -143,7 +145,7 @@ function stripTags(s: string): string {
  * The trailing `(?![\w/])` matters: without it `index.ts:150-192, 156` swallows the `, 156` and the
  * anchor stops matching anything real.
  */
-const ANCHOR_RE = /([\w.@/-]+\.[a-z]{1,4})(?:::(\w+)|:(\d+)(?:-\d+)?)?/g;
+const ANCHOR_RE = /([\w.@/-]+\.[a-z]{1,4})(?:::(\w+)|:(\d+)(?:-(\d+))?)?/g;
 
 /** Every anchor written in one context. */
 function anchorsIn(text: string): RawAnchor[] {
@@ -151,9 +153,9 @@ function anchorsIn(text: string): RawAnchor[] {
   ANCHOR_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = ANCHOR_RE.exec(text)) !== null) {
-    const [raw, file, symbol, line] = m;
+    const [raw, file, symbol, line, endLine] = m;
     if (!ANCHORABLE.test(file)) continue;
-    out.push({ raw, file, symbol, line: line ? Number(line) : undefined });
+    out.push({ raw, file, symbol, line: line ? Number(line) : undefined, endLine: endLine ? Number(endLine) : undefined });
   }
   return out;
 }
@@ -324,13 +326,15 @@ export function lintVisuals(
     }
 
     if (sawAnchor) pagesWithAnchors++;
-    else {
+    else if (!/\bauthored\b/i.test(page.text)) {
       // A visual with no anchor at all cannot be checked by anything, ever. That is not a pass —
       // it is the exact state this command exists to make visible (the ADR 0044 / 0124 shape:
-      // nothing-checked must never read as clean).
+      // nothing-checked must never read as clean). A page may DECLARE itself `authored` (§6.13's
+      // provenance stamp) — brand, concept, product — and pass honestly; a page that neither
+      // anchors nor declares FAILS, because "0 still true, exit 0" is the denominator trap.
       violations.push({
-        page: page.path, anchor: "—", severity: "warn",
-        reason: "no file anchors — nothing in this page can be verified against the code",
+        page: page.path, anchor: "—", severity: "error",
+        reason: "no file anchors and no `authored` declaration — anchor the claims, or stamp the page authored (§6.13)",
       });
     }
   }
@@ -374,5 +378,104 @@ export function collectVisualPages(root: string): VisualPage[] {
     }
   };
   walk(base, path.join("docs", "visuals"));
+  return out;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Review stamps — the second tier of rot (ADR 0141).
+ *
+ * An anchor that RESOLVES can still lie: line 169 exists, `run` is still defined, and the logic
+ * inside is completely different from what the note describes. No linter can judge the claim, but
+ * it CAN know the cited code changed since a person last read it. So a review is a STAMP: a hash of
+ * exactly the cited span, recorded the moment someone verified the claim. When the span's hash no
+ * longer matches, the note is flagged for re-reading — a short, precise list instead of "re-check
+ * everything", which is the version nobody does.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Stored per note: anchor-as-written → hash of the cited span at review time. */
+export type ReviewStamps = Record<string, Record<string, string>>;
+
+const sha = (s: string): string => createHash("sha256").update(s).digest("hex").slice(0, 16);
+
+/**
+ * Hash of exactly what an anchor cites — the narrowest span that can carry the claim.
+ *
+ * `:line` hashes that one line, `:a-b` the range, `::symbol` the definition block (the definition
+ * line plus every following line indented deeper — a heuristic, but a stamp only needs to CHANGE
+ * when the code does, not to parse it). A bare file hashes whole. Lines are trimmed so a pure
+ * re-indent does not fire a flag.
+ */
+export function spanHashOf(source: string, a: { line?: number; endLine?: number; symbol?: string }): string {
+  const lines = source.split("\n");
+  if (a.line !== undefined) {
+    const from = a.line - 1;
+    const to = a.endLine !== undefined ? a.endLine - 1 : from;
+    return sha(lines.slice(from, to + 1).map(l => l.trim()).join("\n"));
+  }
+  if (a.symbol) {
+    const n = a.symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const defRe = new RegExp(`\\b(?:function|class|const|let|var|interface|type|enum|def)\\s+${n}\\b|^\\s*(?:export\\s+)?(?:public|private|protected|static|async|\\*)?\\s*${n}\\s*[(<:=]`);
+    const at = lines.findIndex(l => defRe.test(l));
+    if (at === -1) return sha(source);
+    const indent = lines[at].match(/^\s*/)![0].length;
+    let end = at;
+    for (let i = at + 1; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.trim() === "") continue;
+      if (l.match(/^\s*/)![0].length <= indent) break;
+      end = i;
+    }
+    return sha(lines.slice(at, end + 1).map(l => l.trim()).join("\n"));
+  }
+  return sha(lines.map(l => l.trim()).join("\n"));
+}
+
+/** Every resolving anchor of every page, hashed as cited — the `--stamp` write. */
+export function buildStamps(
+  pages: VisualPage[],
+  files: string[],
+  read: (repoRelPath: string) => string | null,
+): ReviewStamps {
+  const out: ReviewStamps = {};
+  for (const page of pages) {
+    for (const ctx of contextsOf(page)) {
+      for (const a of anchorsIn(ctx.text)) {
+        if (PROSE_DOC_NAMES.has(path.basename(a.file))) continue;
+        const r = resolveAnchor(a.file, files);
+        if (!r.ok) continue;
+        const src = read(r.path);
+        if (src === null) continue;
+        (out[page.path] ??= {})[a.raw] = spanHashOf(src, a);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Anchors whose cited span changed since the recorded stamp. WARN, never error: the claim may still
+ * be true — only a reader can say — so the flag's job is to make the re-read list short and
+ * precise. Cleared by re-stamping after the re-read; a flag nobody clears is wallpaper, which is a
+ * workflow rule (§6.13), not more machinery. An anchor with no stamp is not flagged — stamping is
+ * the act of reviewing, and pretending unreviewed claims were reviewed would be a false green.
+ */
+export function staleStamps(
+  pages: VisualPage[],
+  files: string[],
+  read: (repoRelPath: string) => string | null,
+  stamps: ReviewStamps,
+): VisualsViolation[] {
+  const current = buildStamps(pages, files, read);
+  const out: VisualsViolation[] = [];
+  for (const [pagePath, anchors] of Object.entries(stamps)) {
+    for (const [raw, stamped] of Object.entries(anchors)) {
+      const now = current[pagePath]?.[raw];
+      if (now === undefined || now === stamped) continue; // unresolvable is the lint's finding, not a stale stamp
+      out.push({
+        page: pagePath, anchor: raw, severity: "warn",
+        reason: "cited code changed since this claim was last reviewed — re-read it, then re-stamp (visuals-lint --stamp)",
+      });
+    }
+  }
   return out;
 }

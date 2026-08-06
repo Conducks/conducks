@@ -3,7 +3,7 @@
 **Layer:** core. Imports contracts, plus core siblings (the prism/spectrum types, `utils`) — nothing
 from domain or above. Everything above depends on it.
 
-**Responsibility:** owning the in-memory graph — the shape of a node and an edge, adjacency, the ID
+**Responsibility:** owning the in-memory graph (`core/graph/adjacency-list.ts`, `core/graph/graph-engine.ts`) — the shape of a node and an edge, adjacency, the ID
 normalization rules everything else must obey, and ingestion of a spectrum into that structure.
 
 **Boundaries:** it holds structure and answers structural questions. It does not parse, does not

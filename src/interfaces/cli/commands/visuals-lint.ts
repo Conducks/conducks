@@ -21,11 +21,20 @@ import chalk from "chalk";
 export class VisualsLintCommand implements ConducksCommand {
   public id = "visuals-lint";
   public description = "Check every anchor in docs/visuals against the code it claims to describe";
-  public usage = "conducks visuals-lint [path]";
+  public usage = "conducks visuals-lint [path] [--stamp]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const posArg = args.find(a => !a.startsWith("--"));
     const root = posArg ? (posArg.startsWith("/") ? posArg : path.resolve(process.cwd(), posArg)) : process.cwd();
+
+    // `--stamp` records every resolving anchor's span hash as reviewed-now (ADR 0141). It is the
+    // act of saying "I re-read these claims against the code" — so it runs INSTEAD of judging,
+    // and the next plain run compares against what was stamped.
+    if (args.includes("--stamp")) {
+      const n = await registry.visuals.stamp(root);
+      console.log(chalk.green(`\n  ✓ stamped ${n} anchor(s) as reviewed — recorded in .conducks/note-reviews.json\n`));
+      return;
+    }
 
     const report = await registry.visuals.lint(root);
 
@@ -78,7 +87,23 @@ export class VisualsLintCommand implements ConducksCommand {
    * never silent, because a gate that checks less than it appears to is worse than no gate (ADR 0124).
    */
   private async driftGate(root: string, registry: Registry): Promise<void> {
+    // Review stamps first (ADR 0141): a resolving anchor whose cited span changed since the last
+    // `--stamp` is flagged for a re-read. Warn, never fail — only a reader can judge the claim.
+    const review = await registry.visuals.review(root);
+    if (review.flags.length > 0) {
+      console.log(chalk.yellow(`  ⚠ ${review.flags.length} reviewed claim(s) cite code that changed since the last stamp:`));
+      for (const f of review.flags) console.log(chalk.yellow(`      - ${f.page} → ${f.anchor}`));
+      console.log(chalk.dim(`      Re-read each claim, then \`conducks visuals-lint --stamp\`.\n`));
+    } else if (review.stamped > 0) {
+      console.log(chalk.green(`  ✓ review stamps clean — ${review.stamped} reviewed claim(s) cite unchanged code.\n`));
+    }
+
     const drift = await registry.visuals.drift(root);
+    if (drift.derivedHeaderMissing && drift.derivedHeaderMissing.length > 0) {
+      console.log(chalk.yellow(`  ⚠ ${drift.derivedHeaderMissing.length} generated page(s) carry no DERIVED header — an edit made there is discarded by the next render:`));
+      for (const p of drift.derivedHeaderMissing) console.log(chalk.yellow(`      - ${p}`));
+      console.log("");
+    }
     if (drift.status === "skipped") {
       if (drift.command !== null) return; // declared but nothing to diff — the lint already said the folder is empty
       console.log(chalk.dim(`  ·  drift not checked — no visuals.generate declared in conducks.json\n`));

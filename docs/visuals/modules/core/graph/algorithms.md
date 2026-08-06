@@ -1,7 +1,8 @@
 # core/graph/algorithms — cycle detection, ranking, traversal
 
-**Part of:** [core/graph](../graph.md). Three static classes: `CycleDetector`, `StructuralRanker`,
-`GraphTraversal`.
+**Part of:** [core/graph](../graph.md). Three static classes: `CycleDetector`
+(`graph/algorithms/cycle-detector.ts`), `StructuralRanker` (`graph/algorithms/ranker.ts`),
+`GraphTraversal` (`graph/algorithms/traversal.ts`).
 
 **Responsibility:** graph math, and only graph math. Tarjan SCC for cycles, damped PageRank for
 gravity plus entry-point detection, BFS/A* for traversal and blast radius.

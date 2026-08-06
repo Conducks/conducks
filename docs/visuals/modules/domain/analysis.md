@@ -2,7 +2,8 @@
 
 **Layer:** domain. Imports core + contracts.
 
-**Responsibility:** everything that turns source into knowledge — reflecting files, sequencing a
+**Responsibility:** everything that turns source into knowledge (`domain/analysis/index.ts` is the
+facade) — reflecting files, sequencing a
 pulse, answering structural queries, and the feature-shaped analyses that sit on top (coverage, the
 docs grammar).
 

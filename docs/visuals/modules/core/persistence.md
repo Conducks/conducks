@@ -3,7 +3,7 @@
 **Layer:** core. Imports contracts plus core siblings (`git`, `utils`, `core/registry`) — nothing from
 domain or above.
 
-**Responsibility:** owns the vault at `.conducks/`, the node/edge schema, and the atomicity of a
+**Responsibility:** owns the vault at `.conducks/` (`core/persistence/persistence.ts`), the node/edge schema, and the atomicity of a
 pulse. It is the boundary where an in-memory graph becomes rows and back again.
 
 **Boundaries:** it stores what it is given and does not interpret it. It does not decide which nodes

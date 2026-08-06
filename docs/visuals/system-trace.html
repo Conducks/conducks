@@ -377,7 +377,7 @@
         <tr><td>file unreadable</td><td>returns <code>null</code>; the pulse drops it</td><td><span class="st fx">fixed</span></td><td>it used to be hashed, gated and given a unit node with no symbols, so a permissions error looked exactly like a blank file — and the hash gate then skipped it on every later run. Dropped files are now named in a warning</td><td class="src">todo24#P2</td></tr>
         <tr><td>git blame fails</td><td>adds <code>unavailable: true</code></td><td><span class="st fx">fixed</span></td><td>the flag separates "no history" from "could not read history". Entropy scored an unreadable file identically to a brand-new one — a risk signal and its absence, reported the same way</td><td class="src">todo24#P2</td></tr>
         <tr><td>no project marker found</td><td>uses <code>cwd</code>, and says so</td><td><span class="st fx">fixed</span></td><td>the fallback stays — refusing breaks a scratch dir, a fresh checkout and every fixture — but it now names the directory it chose and every marker it failed to find. Silence was the defect: the <code>/private/tmp</code> analyze looked normal throughout because nothing ever named its root</td><td class="src">todo24#P2</td></tr>
-        <tr><td>no ignore manager</td><td>filters nothing</td><td><span class="st g">guesses</span></td><td>"no ignore manager" is treated as "nothing is ignored". The registry always supplies one; <code>conducks-core.ts:58</code> builds an orchestrator without it, and whether that path runs is unconfirmed</td><td class="src">analysis/index:81 · conducks-core:58</td></tr>
+        <tr><td>no ignore manager</td><td>filters nothing</td><td><span class="st g">guesses</span></td><td>"no ignore manager" is treated as "nothing is ignored". The registry always supplies one; <code class="anchor">conducks-core.ts:58</code> builds an orchestrator without it, and whether that path runs is unconfirmed</td><td class="src">analysis/index:81 · conducks-core:58</td></tr>
         <tr><td>import unresolved</td><td>matches by basename, <strong>uniquely</strong></td><td><span class="st fx">fixed</span></td><td>it used to take the first same-named file in path order. In this repo 15 basenames are duplicated — <code>index.ts</code> occurs 24 times — so that was right about one time in twenty-four and wrote an edge indistinguishable from a correct one. It now answers only when the match is unambiguous</td><td class="src">todo24#P2</td></tr>
         <tr><td>call target unknown</td><td>emits the bare name at <strong>0.4</strong></td><td><span class="st fx">fixed</span></td><td>still emitted — dropping it would delete half this graph — but no longer recorded at the resolved edge's 0.85, so a query can finally separate the two</td><td class="src">ADR 0046</td></tr>
         <tr><td>capitalised bare name</td><td>calls it a constructor</td><td><span class="st g">guesses</span></td><td><strong>measured at 11%</strong>: of 602 CONSTRUCTS, 144 resolve — 128 to a struct (right) and 16 to a variable or property (wrong). Deferred, not ignored: the CALLS/CONSTRUCTS choice is made before the processor sees it, so ADR 0046's confidence channel cannot carry it</td><td class="src">todo24#P2</td></tr>
@@ -404,9 +404,9 @@
   <div class="callout">
     <strong>Confidence cannot tell a guess from a fact.</strong> The register above is not visible in
     the data, because every guessing path writes the same confidence its resolved sibling does.
-    <code>call.ts:58</code> stamps <strong>0.85</strong> on a <code>CALLS</code> edge whether the
+    <code class="anchor">call.ts:58</code> stamps <strong>0.85</strong> on a <code>CALLS</code> edge whether the
     target was resolved to a real file or fell through to a bare name.
-    <code>heritage.ts:38</code> stamps <strong>1.0</strong> whether the query supplied the clause or
+    <code class="anchor">heritage.ts:38</code> stamps <strong>1.0</strong> whether the query supplied the clause or
     an <code>I</code>-prefix regex guessed it — a guessed <code>EXTENDS</code> is recorded as
     certain.
     <span class="st">traced</span>
@@ -428,8 +428,8 @@
   <div class="cards">
     <div class="card">
       <h3>status --mode pulse</h3>
-      <p><code>index.ts:121</code> opens the vault read-only for every command except <code>analyze</code>
-      and <code>clean</code>. <code>micro-pulse.ts:68</code> guards its write on
+      <p><code class="anchor">cli/index.ts:121</code> opens the vault read-only for every command except <code>analyze</code>
+      and <code>clean</code>. <code class="anchor">micro-pulse.ts:68</code> guards its write on
       <code>!readOnly</code> — and the success line sits <em>outside</em> the guard.</p>
       <p>Was: <code>🛡️ [Micro-Pulse] logger.ts resurrected (19 nodes).</code> — nothing written.</p>
       <p>Now the success line sits inside the write branch, and the read-only path reports
@@ -523,13 +523,13 @@
     </div>
   </div>
   <div class="callout">
-    <strong>Corrupted reverse index.</strong> <code>adjacency-list.ts:318</code> provides
+    <strong>Corrupted reverse index.</strong> <code class="anchor">adjacency-list.ts:318</code> provides
     <code>rebindEdgeTarget</code>, whose own comment says it is "essential for neural binding".
-    <code>bindNeuralCircuits</code> does not call it — <code>graph-engine.ts:322</code> assigns
+    <code>bindNeuralCircuits</code> does not call it — <code class="anchor">graph-engine.ts:322</code> assigns
     <code>edge.targetId</code> directly, leaving <code>inEdges</code> filed under the old target. After
     binding, <code>impact</code> asks "who calls this" and misses exactly the edges that were just
     repaired. <code>IntraLinker</code> does the same operation correctly at
-    <code>linker-intra.ts:141</code>. Now routed through <code>rebindEdgeTarget</code>; both
+    <code class="anchor">linker-intra.ts:141</code>. Now routed through <code>rebindEdgeTarget</code>; both
     assertions in the enforcing test were confirmed red against the bare assignment first.
     <span class="st fx">fixed</span> <span class="src">ADR 0045</span>
   </div>

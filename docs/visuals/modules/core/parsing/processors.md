@@ -1,7 +1,8 @@
 # core/parsing/processors — capture → relationship
 
-**Part of:** [core/parsing](../parsing.md). Five small units: `import`, `call`, `heritage`, `binding`,
-`flow`.
+**Part of:** [core/parsing](../parsing.md). Five small units: `parsing/processors/import.ts`,
+`parsing/processors/call.ts`, `parsing/processors/heritage.ts`, `parsing/processors/binding.ts`,
+`parsing/processors/flow.ts`.
 
 **Responsibility:** turning a raw capture into a spectrum relationship, and resolving what can be
 resolved with only the current file in hand. `import` additionally owns module resolution — extension

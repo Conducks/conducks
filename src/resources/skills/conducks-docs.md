@@ -464,6 +464,21 @@ enter into it. A part earns its own note when its intent differs from its parent
 becomes a link-only overview. On-demand is the rule that keeps the folder honest — never bootstrapped,
 never "completed" (§6.13's own rule, applied to notes).
 
+**Anchor the claims, then stamp the review (ADR 0141).** In a note, a backticked span with a path
+separator or a `:line`/`::symbol` is a CLAIM the gate checks; a bare backticked filename is prose.
+Three tiers of rot, three answers:
+
+| tier | example | who catches it |
+|---|---|---|
+| the anchor no longer resolves | file moved, line past EOF, symbol renamed | `visuals-lint` — error |
+| the cited code CHANGED since last read | same line, different logic | a review stamp — warn: "re-read, then re-stamp" |
+| the claim is false about unchanged code | was never true | only a reader |
+
+`conducks visuals-lint --stamp` records a hash of each cited span as reviewed-now; the next runs flag
+exactly the claims whose span changed — a short, precise re-read list. Two rules no machinery holds:
+**re-stamp only after actually re-reading** (stamping unread claims is lying to the gate), and
+**clear flags before closing the todo that touched the code** — a flag nobody clears is wallpaper.
+
 ```markdown
 # <module> — <one line: what it is>
 
@@ -942,9 +957,15 @@ a reader must be able to trust — a visual supports understanding, it never set
 resolve to exactly one tracked file, every `::symbol` must be defined, every `NAME=value` must still
 be the value the code assigns (ADR 0138). If the pages are GENERATED, declare the generator in
 `conducks.json` — `{"visuals": {"generate": "npm run visuals"}}` — and the same command also re-runs
-it and fails on any byte of drift, restoring the tree afterwards (ADR 0139). It checks the working
-tree, never the vault; prose staleness remains the reader's problem, which is what the provenance
-stamps are for.
+it and fails on any byte of drift, restoring the tree afterwards (ADR 0139); a generated page must
+say `DERIVED — edit <source>` in its own text, or an agent edits the render and the next render
+discards the edit (ADR 0011). It checks the working tree, never the vault.
+
+**A page with no anchors must declare itself `authored`** — brand, concept, product, no code claims
+— in its own text, and then passes honestly. A page that neither anchors nor declares FAILS: "0
+checked, exit 0" is a gate that checks less than it appears to (ADR 0124). Prose staleness beyond
+the anchors is tier three — see the review stamps in §6.3 (ADR 0141): `visuals-lint --stamp` after
+a real re-read, and the gate flags exactly the claims whose cited code changed since.
 
 ---
 

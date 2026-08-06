@@ -18,7 +18,7 @@ const DEFAULT_INTERFACE_FRAGMENTS = ['/interfaces/', '/adapters/', '/apps/', '/c
 import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView, buildTrees } from "@/lib/domain/analysis/docs-board.js";
-import { lintVisuals, collectVisualPages, type VisualsViolation } from "@/lib/domain/analysis/visuals-lint.js";
+import { lintVisuals, collectVisualPages, buildStamps, staleStamps, type VisualsViolation, type ReviewStamps } from "@/lib/domain/analysis/visuals-lint.js";
 import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/analysis/visuals-drift.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
@@ -340,11 +340,43 @@ export const registry = {
       return { ...lintVisuals(pages, rel, read), pages: pages.length };
     },
     /**
+     * Review stamps (ADR 0141): stale = the cited span changed since the recorded stamp; stamp =
+     * record every resolving anchor's span hash as reviewed-now. The store is `.conducks/
+     * note-reviews.json` — beside `doc-reviews.json`, its module-level ancestor.
+     */
+    review: async (root?: string): Promise<{ flags: VisualsViolation[]; stamped: number }> => {
+      const dir = root || chronicle.getProjectDir() || process.cwd();
+      const pages = collectVisualPages(dir);
+      let stamps: ReviewStamps = {};
+      try { stamps = JSON.parse(fs.readFileSync(path.join(dir, ".conducks", "note-reviews.json"), "utf8")); } catch { /* never stamped */ }
+      const stamped = Object.values(stamps).reduce((n, a) => n + Object.keys(a).length, 0);
+      if (pages.length === 0 || stamped === 0) return { flags: [], stamped };
+      const abs = await chronicle.discoverFiles();
+      const rel = abs.map(f => path.relative(dir, f)).filter(f => f.length > 0 && !f.startsWith('..'));
+      const read = (p: string): string | null => {
+        try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
+      };
+      return { flags: staleStamps(pages, rel, read, stamps), stamped };
+    },
+    stamp: async (root?: string): Promise<number> => {
+      const dir = root || chronicle.getProjectDir() || process.cwd();
+      const pages = collectVisualPages(dir);
+      const abs = await chronicle.discoverFiles();
+      const rel = abs.map(f => path.relative(dir, f)).filter(f => f.length > 0 && !f.startsWith('..'));
+      const read = (p: string): string | null => {
+        try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
+      };
+      const stamps = buildStamps(pages, rel, read);
+      fs.mkdirSync(path.join(dir, ".conducks"), { recursive: true });
+      fs.writeFileSync(path.join(dir, ".conducks", "note-reviews.json"), JSON.stringify(stamps, null, 2) + "\n");
+      return Object.values(stamps).reduce((n, a) => n + Object.keys(a).length, 0);
+    },
+    /**
      * The generator-drift half of the gate (ADR 0139): re-run the repo's DECLARED generator and diff
      * `docs/visuals/` byte-for-byte. `skipped` when the repo declares none — most repos never will,
      * and the CLI says so rather than passing silently.
      */
-    drift: async (root?: string): Promise<DriftResult & { command: string | null }> => {
+    drift: async (root?: string): Promise<DriftResult & { command: string | null; derivedHeaderMissing?: string[] }> => {
       const dir = root || chronicle.getProjectDir() || process.cwd();
       let confText: string | null = null;
       try { confText = fs.readFileSync(path.join(dir, "conducks.json"), "utf8"); } catch { /* no declaration */ }
@@ -380,7 +412,15 @@ export const registry = {
           }
         },
       };
-      return { ...checkVisualsDrift(dir, command, io), command };
+      const result = { ...checkVisualsDrift(dir, command, io), command };
+      // A repo that declares a generator has DERIVED pages, and every one must say so in its own
+      // text — ADR 0011's failure mode (edit the render, the next render discards the edit) returns
+      // the moment renders exist. Warn-only until the reference project's templates carry the
+      // header (todo47); the drift check itself already guards the content.
+      const derivedHeaderMissing = collectVisualPages(dir)
+        .filter(p => !/\.md$/i.test(p.path) && !/DERIVED/.test(p.text))
+        .map(p => p.path);
+      return { ...result, derivedHeaderMissing };
     },
   },
   coverage: {
