@@ -52,6 +52,8 @@ export interface ArchMeasurements {
   /** Cluster pairs pointing BOTH ways — a one-way DAG has none. */
   bidirectional: Array<{ a: string; b: string }>;
   unitCount: number;
+  /** Fan-in/fan-out per cluster — hub-and-spoke vs mesh vs pipeline is read from this (todo41#P1). */
+  shape: ClusterShape;
 }
 
 /**
@@ -397,5 +399,47 @@ export function measure(graph: ConducksAdjacencyList, interfaceFragments: string
     layerEdges,
     bidirectional,
     unitCount: [...graph.getAllNodes()].filter(n => n.properties.canonicalKind === 'UNIT').length,
+    shape: clusterShape(layerEdges),
+  };
+}
+
+/**
+ * The SHAPE of the cluster graph (todo41#P1): per-cluster fan-in/fan-out, summarized just enough to
+ * tell hub-and-spoke from mesh from pipeline. Distributions, not a verdict — naming stays in
+ * arch-verdict, and only when a measurement clears a bar (ADR 0134).
+ *
+ *   hub-and-spoke  one cluster's degree dwarfs the median — most edges touch it
+ *   pipeline       degrees hug 1-2 and the graph is a near-chain (edges ≈ clusters - 1, no hub)
+ *   mesh           density high, degrees even — everything talks to everything
+ */
+export interface ClusterShape {
+  perCluster: Array<{ cluster: string; fanIn: number; fanOut: number }>;
+  /** Share of all cluster edges that touch the busiest cluster. 1.0 = pure star. */
+  hubShare: number;
+  busiest: string | null;
+  /** Edges over possible directed pairs. Meaningful from 3 clusters up. */
+  density: number;
+}
+
+export function clusterShape(layerEdges: LayerEdge[]): ClusterShape {
+  const degrees = new Map<string, { fanIn: number; fanOut: number }>();
+  const touch = (c: string) => degrees.get(c) ?? degrees.set(c, { fanIn: 0, fanOut: 0 }).get(c)!;
+  for (const e of layerEdges) {
+    touch(e.from).fanOut++;
+    touch(e.to).fanIn++;
+  }
+  const perCluster = [...degrees.entries()]
+    .map(([cluster, d]) => ({ cluster, ...d }))
+    .sort((a, b) => (b.fanIn + b.fanOut) - (a.fanIn + a.fanOut));
+  const total = layerEdges.length;
+  const busiest = perCluster[0] ?? null;
+  const touching = busiest === null ? 0
+    : layerEdges.filter(e => e.from === busiest.cluster || e.to === busiest.cluster).length;
+  const n = perCluster.length;
+  return {
+    perCluster,
+    hubShare: total === 0 ? 0 : touching / total,
+    busiest: busiest?.cluster ?? null,
+    density: n < 2 ? 0 : total / (n * (n - 1)),
   };
 }

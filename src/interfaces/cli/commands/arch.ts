@@ -74,5 +74,15 @@ export class ArchCommand implements ConducksCommand {
       console.log(`\n${chalk.bold('Heaviest directory flows')}`);
       for (const e of top) console.log(`  ${chalk.dim('·')} ${e.from} ${chalk.dim('->')} ${e.to}  ${chalk.dim(`(${e.count})`)}`);
     }
+
+    // Fan-in/fan-out per cluster (todo41#P1): the numbers a hub-and-spoke / mesh / pipeline claim
+    // would be read from. Distributions only — a name is earned in the verdict table or not at all.
+    const sh = measurements.shape;
+    if (sh.perCluster.length > 0) {
+      console.log(`\n${chalk.bold('Cluster shape')}  ${chalk.dim(`(hub share ${(sh.hubShare * 100).toFixed(0)}% on ${sh.busiest}, density ${sh.density.toFixed(2)})`)}`);
+      for (const c of sh.perCluster.slice(0, 6)) {
+        console.log(`  ${chalk.dim('·')} ${c.cluster}  ${chalk.dim(`in ${c.fanIn} / out ${c.fanOut}`)}`);
+      }
+    }
   }
 }

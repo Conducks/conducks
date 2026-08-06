@@ -29,9 +29,9 @@ success is the reason it is tolerable rather than the reason it is fine.
 
 ## Phase 1 — the triggers that should reopen this
 
-- [ ] It fires inside a PATTERN BODY rather than a comment. The guard's narrow assumption — that only
+- [>] It fires inside a PATTERN BODY rather than a comment. The guard's narrow assumption — that only
       prose carries backticks — would then be false, and the gate would be catching less than it appears
-- [ ] A second person works on these files. They would be inheriting a hazard they did not choose,
+- [>] A second person works on these files — waits on that person existing. They would be inheriting a hazard they did not choose,
       and "the gate catches it" is a poor answer to someone meeting it for the first time
-- [ ] The queries need tooling the string form cannot give — syntax highlighting, a tree-sitter
+- [>] The queries need tooling the string form cannot give — syntax highlighting, a tree-sitter
       formatter, or a query linter. All three exist for `.scm` and none for a `.ts` string

@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
-import { detectAdapters, detectCompositionRoot, detectLayers, dependencyDistances } from '@/lib/domain/governance/arch-detect.js';
+import { detectAdapters, detectCompositionRoot, detectLayers, dependencyDistances, clusterShape } from '@/lib/domain/governance/arch-detect.js';
 
 /**
  * ADR 0134 / todo41#P1 — the four measurements, each verified before any naming exists.
@@ -152,5 +152,26 @@ describe('architecture measurements', () => {
     g.addEdge({ id: 'm1', sourceId: '/r/src/lib/core/graph/engine.ts::helper', targetId: '/r/src/lib/core/graph/engine.ts', type: 'MEMBER_OF', confidence: 1, properties: {} } as never);
     const d = dependencyDistances(g, '/r/src/interfaces/cli/index.ts');
     expect(d.has('/r/src/lib/core/graph/engine.ts::helper')).toBe(false);
+  });
+});
+
+describe('clusterShape (todo41#P1) — the numbers a hub/mesh/pipeline claim is read from', () => {
+  const edges = (list: Array<[string, string]>) => list.map(([from, to], i) => ({ from, to, count: i + 1 }));
+
+  it('a star reads as a hub: the busiest cluster touches every edge', () => {
+    const s = clusterShape(edges([['a', 'hub'], ['b', 'hub'], ['c', 'hub'], ['hub', 'd']]));
+    expect(s.busiest).toBe('hub');
+    expect(s.hubShare).toBe(1);
+  });
+
+  it('a chain reads as a pipeline: degrees hug 1 and no cluster dominates', () => {
+    const s = clusterShape(edges([['a', 'b'], ['b', 'c'], ['c', 'd'], ['d', 'e'], ['e', 'f']]));
+    expect(s.hubShare).toBeLessThan(0.6);
+    expect(Math.max(...s.perCluster.map((c: any) => c.fanIn + c.fanOut))).toBeLessThanOrEqual(2);
+  });
+
+  it('no edges → empty shape, zero share, no invented busiest', () => {
+    const s = clusterShape([]);
+    expect(s).toEqual({ perCluster: [], hubShare: 0, busiest: null, density: 0 });
   });
 });

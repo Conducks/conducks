@@ -14,6 +14,7 @@ const base = (over: Partial<ArchMeasurements>): ArchMeasurements => ({
   adapters: [],
   compositionRoot: null,
   layerEdges: [],
+  shape: { perCluster: [], hubShare: 0, busiest: null, density: 0 },
   bidirectional: [],
   unitCount: 100,
   ...over,

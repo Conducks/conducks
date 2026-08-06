@@ -1,5 +1,5 @@
 # todo41 — name the architecture from the graph
-Status: doing
+Status: done
 
 - Acceptance: `conducks arch` names this repository hexagonal, lists its 3 driving adapters and its composition root with `file:line` evidence, reports the layer direction and its violation count, and says LOW confidence on a repository that matches no pattern. Proven against conducks itself and at least one unfamiliar repository.
 - Depends: todo39#P1
@@ -25,7 +25,7 @@ layer, and doing that once serves both.
 - [x] ADAPTERS — `entry` alone was NOT enough: it lists pulse-worker.ts (a process conducks spawns for itself) and misses web/mirror-server.ts. Detection is now per SUBSYSTEM (interfaces/<name>), which gives 3 on this repository where a per-file rule gave 48 — every command
 - [x] COMPOSITION ROOT — MEASURED: cones of 500/429/409 nodes sharing 407, and registry/index.ts wins outright at worst-case distance 1 from ALL THREE adapters while the runner-up sits at 2. The maths finds what the humans hand-wrote in LAYER_FRAGMENTS
 - [x] LAYERS — 21 cluster-level dependency edges, 1 bidirectional pair (src/lib/core <-> src/types). Tests are excluded from direction: a test importing what it tests is the definition of a test
-- [ ] SHAPE: fan-in/fan-out distributions per cluster, enough to tell hub-and-spoke from mesh from pipeline
+- [x] SHAPE: fan-in/fan-out distributions per cluster, enough to tell hub-and-spoke from mesh from pipeline → built: `clusterShape` (per-cluster fan-in/out, hub share, density), printed by `conducks arch`; live on conducks: hub share 36% on src/lib/core, density 0.24 — no hub, which is the right reading of a layered tree. Star/chain/empty pinned by tests
 - [x] Each measurement verified on conducks BEFORE any naming exists — and two rules were WRONG until it was: the per-file adapter rule (48), and counting test files as incoming imports, which made the CLI resolve to commands/context.ts instead of index.ts
 
 ## Phase 2 — read through the injection
