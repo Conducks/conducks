@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { BlastRadiusAnalyzer } from '@/lib/domain/kinetic/impact.js';
+import { TraceAnalyzer } from '@/lib/domain/kinetic/trace.js';
 
 /**
  * ADR 0129 / todo38 — containment is not impact, and the fix must not cost cross-service discovery.
@@ -81,5 +82,50 @@ describe('impact separates dependency from co-location', () => {
     const r = analyzer().analyzeImpact(routeGraph(), 'route::/users/profile::get', 'upstream');
     const names = (r.affectedNodes ?? []).map((n: any) => n.name);
     expect(names).toContain('REQUEST::/users/profile::GET');
+  });
+});
+
+/**
+ * todo38#P2 — the same separation for `trace`. Dijkstra reports every node it VISITS, so
+ * `trace main` answered with the containment ladder (own file → src → repository → ecosystem,
+ * the repository twice). The rule: containment may CARRY a walk — imports are unit-scoped, so an
+ * import-carried dependency is reached through the container — but a step ENTERED by MEMBER_OF is
+ * location, never a dependency, and is not reported.
+ */
+describe('trace separates dependency from co-location (todo38#P2)', () => {
+  const traceGraph = (withDirectCall: boolean) => {
+    const g = new ConducksAdjacencyList();
+    const node = (id: string, name: string, kind: string, fp: string) =>
+      g.addNode({ id, label: kind, properties: { name, filePath: fp, canonicalKind: kind } } as never);
+    node('/r/src/util.ts::format', 'format', 'BEHAVIOR', '/r/src/util.ts');
+    node('/r/src/util.ts::unit', 'util.ts', 'UNIT', '/r/src/util.ts');
+    node('/r/src/service.ts::fetchuser', 'fetchUser', 'BEHAVIOR', '/r/src/service.ts');
+    node('/r/src/service.ts::unit', 'service.ts', 'UNIT', '/r/src/service.ts');
+    node('/r/src::dir', 'src', 'DIRECTORY', '/r/src');
+    node('/r::repo', 'oracle2', 'REPOSITORY', '/r');
+    const edge = (id: string, s: string, t: string, type: string) =>
+      g.addEdge({ id, sourceId: s, targetId: t, type, confidence: 1, properties: {} } as never);
+    if (withDirectCall) edge('t1', '/r/src/service.ts::fetchuser', '/r/src/util.ts::format', 'CALLS');
+    edge('t2', '/r/src/service.ts::fetchuser', '/r/src/service.ts::unit', 'MEMBER_OF');
+    edge('t3', '/r/src/util.ts::format', '/r/src/util.ts::unit', 'MEMBER_OF');
+    edge('t4', '/r/src/service.ts::unit', '/r/src/util.ts::format', 'IMPORTS');
+    edge('t5', '/r/src/service.ts::unit', '/r/src::dir', 'MEMBER_OF');
+    edge('t6', '/r/src::dir', '/r::repo', 'MEMBER_OF');
+    return g;
+  };
+
+  it('the containment ladder is not reported — no own file, no directory, no repository', () => {
+    const steps = new TraceAnalyzer(traceGraph(true)).trace('/r/src/service.ts::fetchuser');
+    expect(steps).toContain('/r/src/util.ts::format');
+    expect(steps).not.toContain('/r/src/service.ts::unit');
+    expect(steps).not.toContain('/r/src::dir');
+    expect(steps).not.toContain('/r::repo');
+  });
+
+  it('an import-carried dependency still arrives THROUGH the container it must pass', () => {
+    // No direct CALLS edge: format is reachable only via fetchUser -MEMBER_OF-> unit -IMPORTS-> format.
+    const steps = new TraceAnalyzer(traceGraph(false)).trace('/r/src/service.ts::fetchuser');
+    expect(steps).toContain('/r/src/util.ts::format');
+    expect(steps).not.toContain('/r/src/service.ts::unit');
   });
 });

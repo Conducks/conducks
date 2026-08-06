@@ -24,10 +24,16 @@ export class ContextCommand implements ConducksCommand {
       const g = registry.query.graph.getGraph();
       const resolvedId = resolveSymbol(symbolId, g);
       const steps = registry.kinetic.trace(resolvedId);
+      // The OTHER half of a symbol's context (todo38#P2). `context fetchUser` answered with six
+      // steps of containment and never named `main`, its only caller — because it only ever walked
+      // downstream. Direct callers ARE context; a reader deciding whether a change is safe needs
+      // both directions, and `impact` already computes the upstream half.
+      const callers = registry.kinetic.getImpact(resolvedId, 'upstream', 1).affectedNodes
+        .filter((n: any) => n.path.length > 0 && n.path[n.path.length - 1] === 'CALLS');
 
-      if (steps.length === 0) {
+      if (steps.length === 0 && callers.length === 0) {
         if (useJson) {
-          process.stdout.write(JSON.stringify({ symbolId: resolvedId, steps: [] }, null, 2) + '\n');
+          process.stdout.write(JSON.stringify({ symbolId: resolvedId, callers: [], steps: [] }, null, 2) + '\n');
           return;
         }
         console.error(`❌ No flows found for: ${resolvedId}`);
@@ -37,6 +43,9 @@ export class ContextCommand implements ConducksCommand {
       if (useJson) {
         process.stdout.write(JSON.stringify({
           symbolId: resolvedId,
+          callers: callers.map((c: any) => ({
+            id: c.id, name: c.name, filePath: c.filePath, line: c.line, lines: c.lines,
+          })),
           steps: steps.map((id: string, i: number) => {
             const node = g.getNode(id);
             return {
@@ -60,6 +69,14 @@ export class ContextCommand implements ConducksCommand {
         p && p.toLowerCase().startsWith(projectRoot.toLowerCase()) ? p.slice(projectRoot.length + 1) : p;
 
       console.log(`--- Technical Flow Trace: ${rel(resolvedId)} ---`);
+      if (callers.length > 0) {
+        console.log(`  Called by:`);
+        for (const c of callers) {
+          const at = c.filePath !== 'unknown' ? `${rel(c.filePath)}${c.line ? `:${c.line}` : ''}` : 'unknown';
+          console.log(`    ← ${c.name} (${at})`);
+        }
+        console.log(`  Depends on:`);
+      }
       steps.forEach((id: string, i: number) => {
         const node = g.getNode(id);
         const file = String(node?.properties?.filePath || '');

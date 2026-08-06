@@ -169,7 +169,15 @@ export class TraceAnalyzer extends BaseAnalyzer {
     const g = this.graph || (null as any);
     if (!g) return [];
     const results = this.bfs(g, symbolId, 'downstream', depth);
-    return Array.from(results.keys());
+    // A step ENTERED through MEMBER_OF is location, not dependency (todo38#P2). `trace main`
+    // reported `main.ts → src → oracle2 → oracle2` — the containment ladder, with the repository
+    // twice — because Dijkstra reports every node it visits. The traversal still WALKS the edge:
+    // imports are unit-scoped (`service.ts::unit -IMPORTS-> format`), so a symbol's import-carried
+    // dependency is reached THROUGH its container, and cutting the edge would lose it. Containment
+    // may carry a walk; it is never itself the answer.
+    return Array.from(results.entries())
+      .filter(([, data]) => data.path.length === 0 || data.path[data.path.length - 1].type !== 'MEMBER_OF')
+      .map(([id]) => id);
   }
 
   /**

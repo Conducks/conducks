@@ -1,5 +1,5 @@
 # todo35 — split the guess sweep by cause, not by confidence
-Status: doing
+Status: done
 - Acceptance: `analyze` reports the honest unresolved count, and what it deletes is decidable from the RECEIVER rather than from a confidence number.
 
 ## Context
@@ -34,5 +34,5 @@ Low confidence means "the call processor did not resolve this", not "this is a b
 
 ## Phase 2 — re-baseline
 
-- [ ] Restate the dangling figures in ADRs 0084, 0085, 0090 and 0094 as post-sweep, or re-measure
+- [x] Restate the dangling figures in ADRs 0084, 0085, 0090 and 0094 as post-sweep, or re-measure
       them honestly. They compare like with like and are not wrong; they are not the failure rate

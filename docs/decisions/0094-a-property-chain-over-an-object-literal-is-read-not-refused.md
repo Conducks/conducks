@@ -3,6 +3,7 @@ Status: Accepted
 - Date: 2026-08-02
 - Builds: 0084, 0090, 0092
 - Enforced by: the oracle fixture T30/T31/T32 (a property chain, a chain through a getter, and the container's own properties not reported dead) — expected answers committed before the first run
+- Amended by: todo35 — the dangling rates quoted here were measured BEFORE the guess sweep split deletes from keeps; they compare like with like and stand as relative improvements, but the honest absolute rate after the sweep is 7.35% on conducks (todo35 Phase 1), not the ~1% basis these figures imply
 
 ## Context
 

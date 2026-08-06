@@ -4,6 +4,7 @@ Status: Accepted
 - Amends: 0082
 - Builds: 0070, 0071
 - Enforced by: tests/unit/core/instance-type-capture.test.ts (a declared return type is recorded verbatim, an absent one is null rather than void, and a factory records the call), tests/unit/core/graph/linker-factory-receiver.test.ts (each of the four hops refused separately, plus the edge-order case)
+- Amended by: todo35 — the dangling rates quoted here were measured BEFORE the guess sweep split deletes from keeps; they compare like with like and stand as relative improvements, but the honest absolute rate after the sweep is 7.35% on conducks (todo35 Phase 1), not the ~1% basis these figures imply
 
 ## Context
 

@@ -3,6 +3,7 @@ Status: Accepted
 - Date: 2026-08-01
 - Builds: 0070, 0071, 0084
 - Enforced by: tests/unit/core/renamed-binding.test.ts (a renamed static import, a renamed destructured dynamic import, an unrenamed import left alone, only the receiver segment of a dotted call rewritten, and the alias edge qualified with the resolved file)
+- Amended by: todo35 — the dangling rates quoted here were measured BEFORE the guess sweep split deletes from keeps; they compare like with like and stand as relative improvements, but the honest absolute rate after the sweep is 7.35% on conducks (todo35 Phase 1), not the ~1% basis these figures imply
 
 ## Context
 

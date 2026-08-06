@@ -1,5 +1,5 @@
 # todo38 — impact reaches a sibling through its container
-Status: doing
+Status: done
 
 - Acceptance: `impact <symbol> upstream` reports no node whose only route to the symbol is a containment hop, AND `cross-service.test.ts` still binds a REQUEST to its ROUTE. Both proven by tests that fail without the change.
 - Depends: none
@@ -40,8 +40,8 @@ contains a real dependent" from "a sibling that merely shares a file".
 
 ## Phase 2 — the same question for `trace` AND `context`
 
-- [ ] `context` is the worse of the two and backs the `conducks_context` MCP tool. On the same fixture, `context fetchUser` returns SIX steps of which exactly ONE is real structure: service.ts (its own file), **format** (the only real dependency), util.ts, src, oracle2 (REPOSITORY), oracle2 (ECOSYSTEM — same name again). Its only caller, `main`, is absent entirely. Both commands go through `registry.kinetic.trace`, so this is one root cause with three faces: `impact`, `trace`, `context`.
-- [ ] `trace main` on the fixture returns `main.ts → fetchUser → format → service.ts → src → oracle2 → util.ts → oracle2`. The first three are the real chain; the rest is the containment ladder, and `oracle2` appears twice (REPOSITORY and ECOSYSTEM). Decide whether a dependency trace should climb above UNIT at all.
+- [x] `context` is the worse of the two and backs the `conducks_context` MCP tool. On the same fixture, `context fetchUser` returns SIX steps of which exactly ONE is real structure: service.ts (its own file), **format** (the only real dependency), util.ts, src, oracle2 (REPOSITORY), oracle2 (ECOSYSTEM — same name again). Its only caller, `main`, is absent entirely. Both commands go through `registry.kinetic.trace`, so this is one root cause with three faces: `impact`, `trace`, `context`. → fixed both halves: trace suppresses containment-entered steps (below), and context gains a `Called by:` section from the upstream walk with call-site lines — live: `context resolveSymbol` names its 7 callers with file:line, then only real dependencies
+- [x] `trace main` on the fixture returns `main.ts → fetchUser → format → service.ts → src → oracle2 → util.ts → oracle2`. The first three are the real chain; the rest is the containment ladder, and `oracle2` appears twice (REPOSITORY and ECOSYSTEM). Decide whether a dependency trace should climb above UNIT at all. → decided: containment may CARRY a walk, never BE a step. Cutting MEMBER_OF downstream outright would lose import-carried dependencies (imports are unit-scoped: `service.ts::unit -IMPORTS-> format`), so the traversal keeps the edge and the REPORT drops any node entered by MEMBER_OF. Both directions pinned in impact-containment.test.ts
 
 ## What is now known (measured, not inferred)
 
