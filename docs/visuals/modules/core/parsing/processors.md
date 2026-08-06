@@ -36,8 +36,7 @@ import to a same-named `.tsx` or `.go` file. `sameFamily()` guards every tier th
 guard exists because the confidence-1 resolution path produced most of the false cross-language edges
 before it was added — do not add a resolution tier without it.
 
-Same family is not enough on its own: the fallback also binds within a family, so a repo owning
-`human/typing.py` captured every `from typing import ...` in it (316 dangling edges, measured). A
+Same family is not enough on its own: the fallback also binds within a family, so a repo owning its own typing.py captured every `from typing import ...` in it (316 dangling edges, measured). A
 provider can now REFUSE a specifier outright — `isBoundaryModule` (ADR 0143), Python's standard
 library — and a refusal skips the fallback while still falling through to induction. Refusing by
 returning `undefined` from `resolveImport` does NOT work and is the bug that ADR names: it is the
