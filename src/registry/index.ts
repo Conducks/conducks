@@ -19,6 +19,7 @@ import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/doma
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView, buildTrees } from "@/lib/domain/analysis/docs-board.js";
 import { lintVisuals, collectVisualPages, type VisualsViolation } from "@/lib/domain/analysis/visuals-lint.js";
+import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/analysis/visuals-drift.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
 import { assessRoot, explainScope } from "@/lib/core/utils/scope-guard.js";
@@ -337,6 +338,49 @@ export const registry = {
         try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
       };
       return { ...lintVisuals(pages, rel, read), pages: pages.length };
+    },
+    /**
+     * The generator-drift half of the gate (ADR 0139): re-run the repo's DECLARED generator and diff
+     * `docs/visuals/` byte-for-byte. `skipped` when the repo declares none — most repos never will,
+     * and the CLI says so rather than passing silently.
+     */
+    drift: async (root?: string): Promise<DriftResult & { command: string | null }> => {
+      const dir = root || chronicle.getProjectDir() || process.cwd();
+      let confText: string | null = null;
+      try { confText = fs.readFileSync(path.join(dir, "conducks.json"), "utf8"); } catch { /* no declaration */ }
+      const command = generatorCommandOf(confText);
+      if (!command) return { status: "skipped", reason: "no visuals.generate declared in conducks.json", command: null };
+
+      const { execSync } = await import("node:child_process");
+      const io = {
+        listFiles: (base: string): string[] => {
+          const out: string[] = [];
+          const walk = (d: string, rel: string): void => {
+            let entries: string[] = [];
+            try { entries = fs.readdirSync(d); } catch { return; }
+            for (const name of entries.sort()) {
+              const abs = path.join(d, name);
+              let isDir = false;
+              try { isDir = fs.statSync(abs).isDirectory(); } catch { continue; }
+              if (isDir) walk(abs, path.join(rel, name));
+              else out.push(path.join(rel, name));
+            }
+          };
+          walk(base, "");
+          return out;
+        },
+        read: (abs: string): Buffer | null => { try { return fs.readFileSync(abs); } catch { return null; } },
+        write: (abs: string, data: Buffer): void => { fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, data); },
+        remove: (abs: string): void => { try { fs.rmSync(abs); } catch { /* already gone */ } },
+        run: (cmd: string, cwd: string): { ok: true } | { ok: false; output: string } => {
+          try { execSync(cmd, { cwd, stdio: "pipe" }); return { ok: true }; }
+          catch (e: any) {
+            const output = [e?.stdout?.toString(), e?.stderr?.toString()].filter(Boolean).join("") || String(e?.message ?? e);
+            return { ok: false, output };
+          }
+        },
+      };
+      return { ...checkVisualsDrift(dir, command, io), command };
     },
   },
   coverage: {

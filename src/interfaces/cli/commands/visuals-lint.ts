@@ -43,6 +43,7 @@ export class VisualsLintCommand implements ConducksCommand {
     if (report.violations.length === 0) {
       console.log(chalk.green(
         `\n  ✓ visuals-lint clean — ${report.checked} anchors across ${report.pages} page(s) still match the code.\n`));
+      await this.driftGate(root, registry);
       return;
     }
 
@@ -67,5 +68,35 @@ export class VisualsLintCommand implements ConducksCommand {
     console.log(`  ${parts.join(", ")} — ${chalk.green(`${report.checked} still true`)}.\n`);
 
     if (errors.length > 0) process.exitCode = 1;
+    await this.driftGate(root, registry);
+  }
+
+  /**
+   * The second half of the gate (ADR 0139): anchors prove what a page CLAIMS still resolves; this
+   * proves the page was RE-DRAWN after its data changed — a staleness anchors cannot see. Runs only
+   * when the repo declares its generator (`conducks.json` → `visuals.generate`); the skip is printed,
+   * never silent, because a gate that checks less than it appears to is worse than no gate (ADR 0124).
+   */
+  private async driftGate(root: string, registry: Registry): Promise<void> {
+    const drift = await registry.visuals.drift(root);
+    if (drift.status === "skipped") {
+      if (drift.command !== null) return; // declared but nothing to diff — the lint already said the folder is empty
+      console.log(chalk.dim(`  ·  drift not checked — no visuals.generate declared in conducks.json\n`));
+      return;
+    }
+    if (drift.status === "crashed") {
+      console.log(chalk.red(`  ✗ the declared generator itself refused to run (${drift.command}):`));
+      console.log(chalk.dim(drift.output.trim().split("\n").map(l => `      ${l}`).join("\n")) + "\n");
+      process.exitCode = 1;
+      return;
+    }
+    if (drift.status === "drift") {
+      console.log(chalk.red(`  ✗ drift — ${drift.files.length} page(s) are stale against the data they are generated from:`));
+      for (const f of drift.files) console.log(chalk.red(`      - ${f}`));
+      console.log(chalk.dim(`      Run \`${drift.command}\` and commit the result.\n`));
+      process.exitCode = 1;
+      return;
+    }
+    console.log(chalk.green(`  ✓ drift clean — ${drift.files} file(s) match a fresh render (${drift.command}).\n`));
   }
 }

@@ -927,6 +927,14 @@ moment and starts rotting immediately. `docs-lint` does not grammar-check it (§
 **Do not put here:** the module graph (`architecture.md`), tool output (`.conducks/`, §8), or anything
 a reader must be able to trust — a visual supports understanding, it never settles an argument.
 
+**The gate: `conducks visuals-lint`.** The computable half is enforced: every `file:line` must
+resolve to exactly one tracked file, every `::symbol` must be defined, every `NAME=value` must still
+be the value the code assigns (ADR 0138). If the pages are GENERATED, declare the generator in
+`conducks.json` — `{"visuals": {"generate": "npm run visuals"}}` — and the same command also re-runs
+it and fails on any byte of drift, restoring the tree afterwards (ADR 0139). It checks the working
+tree, never the vault; prose staleness remains the reader's problem, which is what the provenance
+stamps are for.
+
 ---
 
 ## §7 Reading and enforcing
