@@ -45,6 +45,12 @@ export const PYTHON_QUERIES = `
   (type (identifier) @pulse_type_target)
   (type (attribute) @pulse_type_target)
   (type (generic_type (identifier) @pulse_type_target))
+  ;; A FORWARD REFERENCE is a string: 'def handle(o: "Order")'. Quoting is not a style choice here
+  ;; — it is what a name imported under 'if TYPE_CHECKING:' requires, since the name does not exist
+  ;; at runtime, so the type-only imports this most needs to see were exactly the ones it could not
+  ;; (todo48#P3). (string_content) is captured rather than (string) so the quotes never reach the
+  ;; target name.
+  (type (string (string_content) @pulse_type_target))
   ;; PEP 604 unions (int | str): the grammar has NO union node for this syntax, it's a plain
   ;; binary_operator, so only depth-1 operands are captured — 'A | B | C' chains lose the innermost
   ;; operand (nested binary_operator isn't itself wrapped in 'type'). Documented limit, not a lie:

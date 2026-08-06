@@ -30,6 +30,15 @@ export interface ConducksProvider {
    * Optional specialized import resolver for language-specific logic (e.g., Python PEP 328).
    */
   resolveImport?(rawPath: string, currentFile: string, allFiles: string[]): string | undefined;
+  /**
+   * True when this specifier NAMES A BOUNDARY the language guarantees is not in the tree — Python's
+   * standard library, for instance. Distinct from `resolveImport` returning undefined, which means
+   * "I could not resolve this" and lets the generic fallbacks try: an explicit refusal must not be
+   * indistinguishable from silence, or a repo with its own `typing.py` captures every
+   * `from typing import ...` in the codebase (measured: 316 dangling edges on the frozen Python
+   * subject, all pointing into `human/typing.py`).
+   */
+  isBoundaryModule?(specifier: string): boolean;
 
   /**
    * Optional extractor for language-specific named bindings.

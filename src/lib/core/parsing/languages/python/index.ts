@@ -32,6 +32,16 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   }
 
   /**
+   * The standard library is a boundary by DEFINITION, never a file in the tree (ADR 0137's rule
+   * applied to a language's own guarantees). Stated separately from `resolveImport` so a refusal
+   * reads as a refusal: returning undefined there lets the basename fallback bind `typing` to any
+   * `typing.py` the repo happens to contain.
+   */
+  public isBoundaryModule(specifier: string): boolean {
+    return this.resolver.isStdlib(specifier);
+  }
+
+  /**
    * Extracts Python-specific named bindings for aliased imports.
    */
   public extractNamedBindings(node: any): Array<{ name: string; alias?: string }> {

@@ -105,6 +105,7 @@ export class ImportProcessor {
     const seg = specifier.split('/');
     const pkgName = specifier.startsWith('@') && seg.length >= 2 ? `${seg[0]}/${seg[1]}` : seg[0];
 
+
     // 2a. WORKSPACE PACKAGE — a bare specifier whose source is in this tree.
     //
     // `@repo/adapters` looks exactly like a third-party package and is not one: a manifest inside
@@ -137,6 +138,13 @@ export class ImportProcessor {
     }
 
     const declaredExternal = !specifier.startsWith('.') && !!context?.isExternalPackage(pkgName);
+    // A LANGUAGE-DECLARED boundary is the same bit from a different authority: the manifest says
+    // `next/headers` is a package; Python's own spec says `typing` is the standard library. Both
+    // refuse the basename fallback below and BOTH fall through to induction rather than
+    // short-circuiting here — collapsing them into one package link is measured, in the comment
+    // above, to destroy two thirds of the graph (todo48#P3 repeated that measurement by accident:
+    // 5,062 nodes -> 819 on the frozen Python subject).
+    const boundaryModule = provider?.isBoundaryModule?.(specifier) === true;
 
     const dir = path.dirname(importerPath);
 
@@ -228,7 +236,7 @@ export class ImportProcessor {
     // names a package, so a file that happens to share its last segment is a coincidence, never a
     // resolution. Returning undefined hands it to induction, which mints `lib::<pkg>::<symbol>` and
     // keeps the symbol-level answer.
-    if (declaredExternal) return undefined;
+    if (declaredExternal || boundaryModule) return undefined;
 
     const baseName = path.basename(specifier);
     const exact = ImportProcessor.basenameIndexFor(allPaths).get(baseName);

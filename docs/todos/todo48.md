@@ -44,11 +44,28 @@ record is the difference between deferred and forgotten.
 
 ## Phase 3 — type-only import detection is TS/TSX-only
 
-- [ ] `markTypeOnlyImports` needs a per-binding `@name` capture inside a language's `isImport`
+- [x] `markTypeOnlyImports` needs a per-binding `@name` capture inside a language's `isImport`
       pattern; TS and TSX have it, the other ELEVEN languages do not (Go captures only `@source`),
       so they are type-blind and every type-only import survives compilation into the graph as a
       real edge. Decide which languages have type-only imports worth marking (Go does not; Python's
       `TYPE_CHECKING` does), and wire the capture where it pays.
+      → SCOPED BY MEASUREMENT, then built for the one language that has the construct. "Eleven
+      blind languages" was the wrong frame twice over: most of them (Go, Rust, C#, PHP, Ruby,
+      Swift, C, C++) have no type-only import CONSTRUCT at all — an import there is a real link
+      dependency and marking it would be a lie — and most DO already carry a binding capture. The
+      real second case is Python's `if TYPE_CHECKING:`, which exists precisely so a name can be
+      annotated without existing at runtime, and is the standard fix for a Python import cycle —
+      exactly the finding an unmarked edge pollutes. Three defects fixed to make it work, each
+      found by running rather than reading: (1) the binding loop accepted only `@name` and Python
+      spells it `@named_import`, so Python produced NO per-binding IMPORTS edges at all — costing
+      type marking AND function-level dead-code detection; (2) a forward reference is a STRING
+      (`o: "Order"`), which is what a TYPE_CHECKING import forces, and no query captured it —
+      `(type (string (string_content)))` added; (3) ADR 0143, the one that mattered: the resolver's
+      stdlib REFUSAL was expressed as `undefined`, indistinguishable from ignorance, so
+      `from typing import Optional` bound to the subject's own `human/typing.py` — 316 dangling
+      edges into one file. MEASURED on the frozen Python subject: **679 per-binding import edges
+      where there were zero**, 335 marked type-only (the `typing`/`Optional`/`Dict` family, which
+      is exactly right), and dangling **12.58% → 8.15%** with the edge count GROWING.
 
 ## Phase 4 — layer storage is built but no pulse writes it
 

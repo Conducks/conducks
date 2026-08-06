@@ -21,17 +21,17 @@
   "docs/visuals/modules/core/parsing/languages.md": {
     "src/lib/core/parsing/languages/typescript/queries.ts:30-32": "3db55f89df1bd55e",
     "src/lib/core/parsing/languages/python/queries.ts:22-23": "521204228ac94c16",
-    "src/lib/core/parsing/reflector.ts:985": "7dfc0ef7544241ff"
+    "src/lib/core/parsing/reflector.ts:1003": "7dfc0ef7544241ff"
   },
   "docs/visuals/modules/core/parsing/processors.md": {
-    "src/lib/core/parsing/processors/import.ts": "192062dba4338124",
+    "src/lib/core/parsing/processors/import.ts": "a0a3365315cca775",
     "src/lib/core/parsing/processors/call.ts": "91ff386950510f68",
     "src/lib/core/parsing/processors/heritage.ts": "c596e93a82c45477",
     "src/lib/core/parsing/processors/binding.ts": "9b8dd34ad4e10cf3",
     "src/lib/core/parsing/processors/flow.ts": "bf9e2649c0ac706b"
   },
   "docs/visuals/modules/core/parsing/reflector.md": {
-    "src/lib/core/parsing/reflector.ts": "8853db7624559310"
+    "src/lib/core/parsing/reflector.ts": "b4aff66b4e2fa5cf"
   },
   "docs/visuals/modules/core/parsing/taxonomy.md": {
     "src/lib/core/parsing/taxonomy.ts": "dcea21bd98d38f64",
@@ -42,7 +42,7 @@
     "src/types/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
-    "src/lib/core/persistence/persistence.ts": "1bc1980db4d8bafb"
+    "src/lib/core/persistence/persistence.ts": "9d949a6b3bdbb26f"
   },
   "docs/visuals/modules/domain/analysis/coverage.md": {
     "src/lib/domain/analysis/coverage-bind.ts:50": "fdd480cd0bda4134",

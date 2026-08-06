@@ -2,6 +2,7 @@
   "project": "orchestrator",
   "sha": "13b46e2",
   "language": "typescript",
+  "analyzeMs": 13371,
   "nodes": 6647,
   "units": 955,
   "edges": 23797,
@@ -31,47 +32,47 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 855,
+      "ms": 1014,
       "bytes": 909
     },
     "audit": {
       "code": 1,
-      "ms": 547,
+      "ms": 606,
       "bytes": 5326
     },
     "entry": {
       "code": 0,
-      "ms": 841,
+      "ms": 980,
       "bytes": 51295
     },
     "prune": {
       "code": 0,
-      "ms": 1017,
+      "ms": 1215,
       "bytes": 87593
     },
     "flows": {
       "code": 0,
-      "ms": 907,
+      "ms": 1045,
       "bytes": 317860
     },
     "ledger": {
       "code": 0,
-      "ms": 1034,
+      "ms": 1171,
       "bytes": 470
     },
     "supply-chain": {
       "code": 0,
-      "ms": 2205,
+      "ms": 2954,
       "bytes": 3396
     },
     "advise": {
       "code": 0,
-      "ms": 591,
+      "ms": 682,
       "bytes": 19644
     },
     "query": {
       "code": 0,
-      "ms": 989,
+      "ms": 1175,
       "bytes": 1216
     }
   },

@@ -2,18 +2,19 @@
   "project": "sofie",
   "sha": "de19e9f7",
   "language": "typescript",
-  "nodes": 10534,
+  "analyzeMs": 21797,
+  "nodes": 10545,
   "units": 1095,
-  "edges": 34929,
+  "edges": 34931,
   "documented": {
     "count": 1791,
-    "of": 10534,
-    "pct": 17
+    "of": 10545,
+    "pct": 16.98
   },
   "documentedBehaviors": {
     "count": 1029,
-    "of": 3262,
-    "pct": 31.55
+    "of": 3268,
+    "pct": 31.49
   },
   "located": {
     "count": 7808,
@@ -24,54 +25,54 @@
   "orphans": 20,
   "violations": 21,
   "dangling": {
-    "count": 3150,
-    "of": 34929,
-    "pct": 9.02
+    "count": 3146,
+    "of": 34931,
+    "pct": 9.01
   },
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 1215,
+      "ms": 1496,
       "bytes": 976
     },
     "audit": {
       "code": 1,
-      "ms": 754,
+      "ms": 872,
       "bytes": 3913
     },
     "entry": {
       "code": 0,
-      "ms": 1207,
+      "ms": 1411,
       "bytes": 2111
     },
     "prune": {
       "code": 0,
-      "ms": 1523,
+      "ms": 1831,
       "bytes": 45483
     },
     "flows": {
       "code": 0,
-      "ms": 1352,
-      "bytes": 545682
+      "ms": 1562,
+      "bytes": 545558
     },
     "ledger": {
       "code": 0,
-      "ms": 1512,
+      "ms": 1819,
       "bytes": 470
     },
     "supply-chain": {
       "code": 0,
-      "ms": 878,
+      "ms": 1113,
       "bytes": 3283
     },
     "advise": {
       "code": 0,
-      "ms": 853,
+      "ms": 987,
       "bytes": 16837
     },
     "query": {
       "code": 0,
-      "ms": 1474,
+      "ms": 1754,
       "bytes": 1282
     }
   },

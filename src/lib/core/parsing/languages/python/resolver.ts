@@ -32,14 +32,22 @@ const PYTHON_STDLIB = new Set([
 ]);
 
 export class PythonResolver {
+
+  /**
+   * A bare specifier whose head is a standard-library module. Public because a REFUSAL has to be
+   * expressible to the caller: `resolve` returning undefined means "not found here" and lets the
+   * generic basename fallback try, which is how a repo's own `typing.py` swallowed every
+   * `from typing import ...` (todo48#P3).
+   */
+  public isStdlib(specifier: string): boolean {
+    return !specifier.startsWith('.') && PYTHON_STDLIB.has(specifier.split('.')[0]);
+  }
   /**
    * Resolves a Python import relative to the current file.
    */
   public resolve(rawImportPath: string, currentFile: string, allFiles: string[]): string | undefined {
     // 0. The standard library is a boundary, never an in-repo file — see PYTHON_STDLIB.
-    if (!rawImportPath.startsWith('.') && PYTHON_STDLIB.has(rawImportPath.split('.')[0])) {
-      return undefined;
-    }
+    if (this.isStdlib(rawImportPath)) return undefined;
 
     // 1. Absolute Resolution (Bare Imports)
     // import x.y -> x/y.py or x/y/__init__.py

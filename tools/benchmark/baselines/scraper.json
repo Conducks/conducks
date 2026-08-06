@@ -2,77 +2,78 @@
   "project": "scraper",
   "sha": "8e558ca",
   "language": "python",
-  "nodes": 5062,
+  "analyzeMs": 7221,
+  "nodes": 5293,
   "units": 272,
-  "edges": 16746,
+  "edges": 17341,
   "documented": {
-    "count": 1713,
-    "of": 5062,
-    "pct": 33.84
+    "count": 1712,
+    "of": 5293,
+    "pct": 32.34
   },
   "documentedBehaviors": {
     "count": 632,
-    "of": 1117,
-    "pct": 56.58
+    "of": 1331,
+    "pct": 47.48
   },
   "located": {
-    "count": 4539,
-    "of": 4539,
+    "count": 4510,
+    "of": 4510,
     "pct": 100
   },
   "cycles": 1,
   "orphans": 0,
   "violations": 1,
   "dangling": {
-    "count": 2106,
-    "of": 16746,
-    "pct": 12.58
+    "count": 1411,
+    "of": 17341,
+    "pct": 8.14
   },
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 705,
-      "bytes": 1003
+      "ms": 791,
+      "bytes": 975
     },
     "audit": {
       "code": 1,
-      "ms": 474,
+      "ms": 510,
       "bytes": 801
     },
     "entry": {
       "code": 0,
-      "ms": 703,
+      "ms": 773,
       "bytes": 1151
     },
     "prune": {
       "code": 0,
-      "ms": 821,
-      "bytes": 27265
+      "ms": 920,
+      "bytes": 33779
     },
     "flows": {
       "code": 0,
-      "ms": 750,
-      "bytes": 430698
+      "ms": 904,
+      "bytes": 399012
     },
     "ledger": {
       "code": 0,
-      "ms": 827,
+      "ms": 1030,
       "bytes": 465
     },
     "supply-chain": {
       "code": 0,
-      "ms": 619,
+      "ms": 841,
       "bytes": 8045
     },
     "advise": {
       "code": 0,
-      "ms": 519,
-      "bytes": 15761
+      "ms": 612,
+      "bytes": 16354
     },
     "query": {
       "code": 0,
-      "ms": 809,
-      "bytes": 1614
+      "ms": 972,
+      "bytes": 1223
     }
   },
   "smokeFailures": []

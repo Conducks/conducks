@@ -880,9 +880,27 @@ export class ConducksReflector {
 
               for (let i = 0; i < match.captures.length; i++) {
                 const cap = match.captures[i];
-                if (cap.name === CaptureTags.NAME && cap.node) {
-                  const aliasCap = (i + 1 < match.captures.length && match.captures[i + 1].name === 'alias')
-                    ? match.captures[i + 1] : undefined;
+                // `@named_import` IS a binding capture (todo48#P3). Python spells it that way and
+                // this loop only accepted `@name`, so Python produced NO per-binding IMPORTS edges
+                // at all — which costs two things, not one: function-level dead-code detection for
+                // imports, and type-only marking (ADR 0016), whose only real second case is
+                // Python's `if TYPE_CHECKING:` block. That block exists precisely so a name can be
+                // annotated without existing at runtime, and it is the standard fix for a Python
+                // import cycle — exactly the finding an unmarked edge pollutes.
+                //
+                // The submodule branch above reads the same capture for a different question
+                // (`from pkg import module` binding a FILE) and pushes its own `isRaw` edge; this
+                // pushes an `isRawBinding` one. Different metadata, different consumers, no
+                // double-count — `markTypeOnlyImports` and dead-code both filter on isRawBinding.
+                const isBindingCapture = cap.name === CaptureTags.NAME || cap.name === 'named_import';
+                if (isBindingCapture && cap.node) {
+                  // An alias is `@alias` in most grammars and `@metadata` in Python's
+                  // `(aliased_import (dotted_name) @named_import (identifier) @metadata)`. Reading
+                  // only the capture that FOLLOWS a binding keeps a wildcard's bare `@metadata`
+                  // out of it, since that one has no binding capture before it.
+                  const nextCap = i + 1 < match.captures.length ? match.captures[i + 1] : undefined;
+                  const aliasCap = nextCap && (nextCap.name === 'alias' || (cap.name === 'named_import' && nextCap.name === 'metadata'))
+                    ? nextCap : undefined;
                   const bindingName = cap.node.text;
                   const aliasName = (aliasCap && aliasCap.node) ? aliasCap.node.text : bindingName;
 

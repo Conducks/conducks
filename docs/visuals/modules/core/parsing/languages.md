@@ -44,7 +44,7 @@ true today; a vault edge census shows no heritage edge of either type. The herit
 syntactically correct and hit when probed, but every one of them is standalone
 (`typescript/queries.ts:30-32`, `python/queries.ts:22-23`, and the same shape in go, rust, java,
 javascript), while the handler is gated on an enclosing node: `else if (cName === 'heritage' && node)`
-(`parsing/reflector.ts:985`). Ruby is the only language whose heritage pattern carries a definition
+(`parsing/reflector.ts:1003`). Ruby is the only language whose heritage pattern carries a definition
 capture (`@isHeritage`), and so the only one that could reach the handler at all. Fix tracked in
 todo11. **Pattern a capture together with
 the definition it belongs to when its handler needs one.**
