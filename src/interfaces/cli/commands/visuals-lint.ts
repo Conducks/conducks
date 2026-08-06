@@ -121,9 +121,13 @@ export class VisualsLintCommand implements ConducksCommand {
 
     const drift = await registry.visuals.drift(root);
     if (drift.derivedHeaderMissing && drift.derivedHeaderMissing.length > 0) {
-      console.log(chalk.yellow(`  ⚠ ${drift.derivedHeaderMissing.length} generated page(s) carry no DERIVED header — an edit made there is discarded by the next render:`));
-      for (const p of drift.derivedHeaderMissing) console.log(chalk.yellow(`      - ${p}`));
-      console.log("");
+      // An ERROR since the reference adopter's templates carry the header (todo47): a generated
+      // page without one invites the edit the next render silently discards (ADR 0011).
+      console.log(chalk.red(`  ✗ ${drift.derivedHeaderMissing.length} generated page(s) carry no DERIVED header — an edit made there is discarded by the next render:`));
+      for (const p of drift.derivedHeaderMissing) console.log(chalk.red(`      - ${p}`));
+      console.log(chalk.dim(`      Add the header to the generator template, or declare the page \`Provenance: hand-written\`.
+`));
+      process.exitCode = 1;
     }
     if (drift.status === "skipped") {
       if (drift.command !== null) return; // declared but nothing to diff — the lint already said the folder is empty
