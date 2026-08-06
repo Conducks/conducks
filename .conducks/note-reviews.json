@@ -96,5 +96,9 @@
     "src/lib/core/graph/adjacency-list.ts:318": "c8e0d39aa04bbdee",
     "src/lib/core/graph/graph-engine.ts:322": "684888c0ebb17f37",
     "src/lib/core/graph/linker-intra.ts:141": "c9f0393fed4a61c8"
+  },
+  "docs/visuals/modules/domain/analysis/docs-board.md": {
+    "src/lib/domain/analysis/docs-board.ts": "82c4980b5abdc370",
+    "src/lib/domain/analysis/docs-watcher.ts": "d4ace5f451c7fbc2"
   }
 }
