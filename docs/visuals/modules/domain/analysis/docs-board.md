@@ -45,9 +45,14 @@ phases that claim it. None of it is authored anywhere, so none of it can drift (
 CONDUCKS-19/20). The one authored claim that survives — a todo's `Status:` — is deliberately NOT
 trusted: `hygiene()` compares it against the checkboxes and reports the gap.
 
-`unlinked` is a distinct build state from `built`, and the distinction is load-bearing. An ADR that
-nobody linked has no evidence either way; collapsing it into "built" would make silence read as
-success, which is the failure the whole link graph exists to prevent.
+`unlinked` is a distinct build state, and the distinction is load-bearing. An ADR that nobody
+linked has no evidence either way; collapsing it into a success state would make silence read as
+success, which is the failure the whole link graph exists to prevent. But a PHASE LINK is not the
+only evidence: `completed/` is never walked, so promoting a todo removes the phases that linked its
+ADRs — 141 of 142 fell to `unlinked` the day this repo's board was finally clean. So `proven` (a
+`- Enforced by:` test) and `resolved` (a `- Resolved by:` successor) hold whether or not a phase
+still links, and `board.unlinked` is DERIVED from the field rather than re-deciding the question —
+computed separately, the two drifted apart and disagreed about the same ADRs.
 
 ## Two severities, because a gate that cries wolf gets turned off
 
