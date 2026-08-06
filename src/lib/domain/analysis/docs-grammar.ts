@@ -76,10 +76,10 @@ export function inferType(fp: string): DocType {
   if (/conventions\.md$/.test(fp)) return "conventions";
   if (/handover\.md$/.test(fp)) return "handover";
   // Architecture is AUTHORED, not derived: a human explaining a module/subsystem's purpose, layer,
-  // boundaries, and deferred design — the WHY the code can't tell you (see sofie's per-module
-  // MODULE.md). It is free-form (no skeleton), never lint-flagged, and must NEVER be auto-generated.
-  // file-OR-folder: `architecture.md` (the graph and its contract), a per-module `MODULE.md` under
-  // `modules/`, or the legacy `architecture/` folder that predates the split.
+  // boundaries, and deferred design — the WHY the code can't tell you. It is free-form (no
+  // skeleton), never lint-flagged. Module notes live at `visuals/modules/<path>.md` (ADR 0140);
+  // `/\/modules\//` matches that path AND the legacy `docs/modules/` + `MODULE.md` layouts, so an
+  // unmigrated repo classifies identically. `architecture/` is the folder that predates the split.
   if (/architecture\.md$/.test(fp) || /\/architecture\//.test(fp) || /\/modules\//.test(fp) || /MODULE\.md$/.test(fp)) return "architecture";
   // `map.md` / `drift.md` are pure wiring — that IS derived structure; don't author it, query the
   // graph (audit / impact / trace / coverage) instead. `progress.md` joined them (ADR 0024): what

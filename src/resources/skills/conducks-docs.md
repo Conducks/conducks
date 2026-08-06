@@ -30,7 +30,7 @@ Inside a governed doc `###` still opens nothing — §5.1.)
 | mark a task done, deferred or dropped | §5.2 |
 | write a todo | §6.7 shape · **§6.8 what a task says** · §6.9 unanswered questions · §6.10 sizing |
 | write an ADR | §6.6 — including where an open question goes |
-| write features, architecture, a MODULE.md, conventions or memory | §6.1–§6.5 |
+| write features, architecture, a module note, conventions or memory | §6.1–§6.5 |
 | draw a diagram, or anything someone will LOOK at | §6.13 — and stamp every claim with how it was checked |
 | close a todo or accept an ADR | §6.10 "On close" · §8 promote-on-close |
 | run or read the tooling | §7 |
@@ -67,7 +67,7 @@ Write it the turn you decide it: a choice → ADR, a trap → `memory.md`, work 
 
 | | living — overwrite in place | record — frozen |
 |---|---|---|
-| | `features` `architecture` `modules/` `visuals/` `conventions` `memory` `handover` | `decisions/` `todos/` |
+| | `features` `architecture` `visuals/` (incl. `visuals/modules/` notes) `conventions` `memory` `handover` | `decisions/` `todos/` |
 
 A record's only permitted mutation is a **stamp**: a status line, or a pointer to where truth moved.
 Changing its reasoning or outcome is forbidden.
@@ -104,8 +104,9 @@ docs/
 ├── architecture.md   the module graph + the contract its arrows obey  living
 ├── conventions.md    binding rules, IDed, with reasons          living
 ├── memory.md         traps the code cannot show                 living
-├── modules/          one note per module                        living
 ├── visuals/          rendered pictures — ONLY when asked for    living
+│   └── modules/      per-module notes (.md SOURCE, on demand;   living
+│                      HTML beside them is DERIVED — ADR 0140)
 ├── decisions/        one ADR per numbered file                  record
 ├── todos/            todoNN.md + completed/                     record
 ├── handover.md       snapshot for the next session              living, dated
@@ -134,7 +135,7 @@ docs/                    ROOT — what no single service owns
 app/docs/                SERVICE — same for admin, database, packages/*
 ├── features.md          what this service does
 ├── architecture.md      this service's module graph + its layer contract
-├── modules/             MODULE.md notes
+├── visuals/modules/     this service's module notes (notes only — the canvas is root's)
 ├── decisions/           this service's own ADRs
 └── todos/               this service's work + completed/
 ```
@@ -145,8 +146,8 @@ app/docs/                SERVICE — same for admin, database, packages/*
 |---|---|---|---|
 | `features.md` | index only, no facts | the facts | root links down; a fact is in exactly one |
 | `architecture.md` | the service graph | that service's module graph | same shape, one altitude apart |
-| `modules/` | — | yes | root has no modules; it owns no code |
-| `visuals/` | yes | **never** | — |
+| `visuals/` (canvas + pages) | yes | **never** | — |
+| `visuals/modules/` (notes) | — | yes | root owns no code, so it holds no module notes |
 | `decisions/` | seam ADRs | that service's ADRs | numbered per tree; cross-tree refs are `app:0014` (§4) |
 | `todos/` | codependent epics only | that service's work | epic points down, slice points up |
 | `conventions.md` | yes | **never** | — |
@@ -168,7 +169,7 @@ to arrive. An empty `docs/` gives the next reader nothing to find and nowhere to
 
 | create now, even if thin | create when first needed |
 |---|---|
-| `features.md`, `architecture.md`, `handover.md` (root only) | `modules/<path>/MODULE.md` — one per module that earns a note |
+| `features.md`, `architecture.md`, `handover.md` (root only) | `visuals/modules/<path>.md` — one per module that earns a note |
 | `decisions/`, `todos/` (folders) | `conventions.md`, `memory.md` (root only) — once there is a rule or a trap |
 | — | `visuals/` (root only) — **only when someone asks for a picture**, never to fill the set (§6.13) |
 
@@ -330,7 +331,7 @@ only as a `Status:`, a `- Key: value`, or a `- [ ]`. **There is no fourth way.**
 ### §5.4 What docs-lint fails on
 
 **Only six types are linted:** `todos` · `decisions` · `features` · `conventions` · `memory` ·
-`handover`. `architecture.md`, `MODULE.md`, `visuals/` and the soft folders are parsed but NOT
+`handover`. `architecture.md`, module notes, `visuals/` and the soft folders are parsed but NOT
 grammar-checked — a broken heading there fails nothing, so the structures above are conventions you
 keep, not gates. Nothing catches a `visuals/` file going stale but a reader, which is why §6.13 makes
 it carry its own provenance.
@@ -405,8 +406,8 @@ flowchart TD
 
 | node | note |
 |---|---|
-| `interfaces/cli` | [modules/interfaces/cli/MODULE.md](./modules/interfaces/cli/MODULE.md) |
-| `core/parsing` | [modules/core/parsing/MODULE.md](./modules/core/parsing/MODULE.md) |
+| `interfaces/cli` | [visuals/modules/interfaces/cli.md](./visuals/modules/interfaces/cli.md) |
+| `core/parsing` | [visuals/modules/core/parsing.md](./visuals/modules/core/parsing.md) |
 
 ## Contract
 1. Nothing under `core/` imports from `interfaces/`.
@@ -414,8 +415,8 @@ flowchart TD
 - Enforced by: tests/unit/core/scope-guard.test.ts
 ````
 
-A node links to its MODULE.md **if it has one**. Notes are written only where intent is not obvious
-(see `modules/`), so a node with no note leaves the link cell empty — that is normal, not a gap. A
+A node links to its module note **if it has one**. Notes are written only where intent is not obvious
+(§6.3), so a node with no note leaves the link cell empty — that is normal, not a gap. A
 contract states its enforcing test.
 
 **Root level** — the same shape one altitude up: services as nodes, the contracts between them, what
@@ -432,26 +433,36 @@ stays queried.
 | the fact is about | goes to |
 |---|---|
 | the shape, or which arrows are legal | `architecture.md` |
-| exactly one module | that module's `MODULE.md` |
+| exactly one module | that module's note (§6.3) |
 | a trap, a name collision, a deleted module | `memory.md` |
 
 *Layer* is the one word both files use. `architecture.md` holds the **contract** — which dependencies
-are legal, whole tree. A MODULE.md `**Layer:**` says **where that one module sits in it**. About to
-repeat a rule in a MODULE.md? It belongs in `architecture.md`.
+are legal, whole tree. A module note's `**Layer:**` says **where that one module sits in it**. About to
+repeat a rule in a module note? It belongs in `architecture.md`.
 
-### §6.3 `modules/<path>/MODULE.md`
+### §6.3 `visuals/modules/<path>.md` — module notes
 
-**Mirror the source tree** — layout under `modules/` matches source layout, nested as deep. Finding a
-note is a path translation, not a search.
+Module notes live INSIDE the visuals pipeline (ADR 0140). The `.md` is **SOURCE** — authored,
+authoritative, it settles arguments, and §6.13's "a visual is never the source of truth" applies to
+RENDERS, not to these files. Where the repo declares a generator (`conducks.json` →
+`visuals.generate`, ADR 0139), each note is rendered into the styled page a human opens from the
+canvas; the generated HTML carries a visible `DERIVED — edit <name>.md` header and is never edited
+directly (ADR 0011). Without a generator the notes are plain markdown — still anchor-checked by
+`visuals-lint`, just not rendered. There is no separate `docs/modules/` folder; a repo still carrying
+one holds a legacy tree.
+
+**Mirror the source tree** — layout under `visuals/modules/` matches source layout, nested as deep.
+Finding a note is a path translation, not a search.
 
 | form | for |
 |---|---|
-| `modules/<path>/MODULE.md` | a folder-shaped module or part |
-| `modules/<path>/<name>.MODULE.md` | a single file whose intent needs its own note |
+| `visuals/modules/<path>.md` | a folder-shaped module or part (`src/core/graph/` → `visuals/modules/core/graph.md`) |
+| `visuals/modules/<path>/<name>.md` | a single file whose intent needs its own note |
 
 **Write a note when intent stops being obvious from the code, never to complete a set.** Size does not
 enter into it. A part earns its own note when its intent differs from its parent's; the parent then
-becomes a link-only overview.
+becomes a link-only overview. On-demand is the rule that keeps the folder honest — never bootstrapped,
+never "completed" (§6.13's own rule, applied to notes).
 
 ```markdown
 # <module> — <one line: what it is>
@@ -462,7 +473,7 @@ becomes a link-only overview.
 **Deferred / not built:** designed, chosen not to build, and why
 
 ## Sub-modules            only when parts have their own notes
-- [part](./part/MODULE.md) — one line each
+- [part](./graph/part.md) — one line each
 
 ## Traps                  optional
 - the thing that looks wrong and is not, or looks fine and bites
@@ -499,7 +510,7 @@ narrower than a rule:
 | the rule is about | goes to |
 |---|---|
 | which dependencies are legal | that service's `architecture.md` `## Contract` |
-| one module's own behaviour | that module's `MODULE.md` under `**Boundaries:**` |
+| one module's own behaviour | that module's note (§6.3) under `**Boundaries:**` |
 
 ### §6.5 `memory.md` — root only
 
@@ -516,7 +527,7 @@ Two kinds of entry belong here that look like architecture and are not:
 
 - **Names that collide.** One word meaning several things in the codebase, one entry each. Usually the
   highest-value thing in the file.
-- **Removed modules — do not re-add.** A deleted module has no MODULE.md left to hold the warning, so
+- **Removed modules — do not re-add.** A deleted module has no note left to hold the warning, so
   without an entry here the next reader re-creates it. Say what went and why.
 
 ### §6.6 `decisions/NNNN-title.md`
@@ -922,7 +933,7 @@ says which visuals to re-check. Same one-fact-one-place logic as the rest of the
 
 **NEVER the source of truth.** Precedence is code → `architecture.md` → the visual. It is traced at a
 moment and starts rotting immediately. `docs-lint` does not grammar-check it (§5.4), the same as
-`architecture.md` and `MODULE.md`, so nothing catches it going stale but a reader.
+`architecture.md` and the soft folders, so nothing catches PROSE going stale but a reader — the anchors in module notes are checked (ADR 0140).
 
 **Do not put here:** the module graph (`architecture.md`), tool output (`.conducks/`, §8), or anything
 a reader must be able to trust — a visual supports understanding, it never settles an argument.
@@ -985,7 +996,7 @@ list to re-read when a change feels ambiguous, and each points back at the secti
 | **One docs root per service** (§3) | A governed filename outside one is invisible to the tooling. |
 | **Numbers are per tree** (§4) | An address crossing a tree carries it: `app:todo123#P2`. |
 | **Generated output stays out** (§6.12) | Blueprints, dumps, pulse summaries live in `.conducks/`, gitignored. Never author `map.md`, `drift.md` or `progress.md` — all three are derived and classify as unread. A generated `.md` at the repo root outranks authored docs by accident and is stale within a commit. |
-| **Architecture is authored** (§6.2) | A person writes `architecture.md` and every MODULE.md. Wiring is queried. |
+| **Architecture is authored** (§6.2) | A person writes `architecture.md` and every module note. Wiring is queried. |
 | **Code outranks the doc** | Except a doc explicitly marked a **spec**, which decides what the code should do. `docs/product/*.md` are specs; everything else describes. A doc neither marked a spec nor matching the code is wrong — fix it in the change that revealed it. Code comments count as docs. |
 | **`archive/` and `legacy/` are the last stop** | Nothing live links into them. Promote anything still true before moving; the move is one-way. |
 | **One fact, one place** | Derive what can be derived. Where a claim is kept anyway, let lint compare it against the truth and treat the gap as the finding. |

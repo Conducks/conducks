@@ -441,9 +441,16 @@ function driftedReviews(root: string): Array<{ module: string; moduleDoc: string
   for (const [module, record] of Object.entries(reviews)) {
     if (typeof record !== "string") continue;
     const [reviewedHash, intent] = record.split("|");
-    const doc = path.join("docs", "modules", module.replace(/^src\/(lib\/)?/, ""), "MODULE.md");
+    // Module notes live at docs/visuals/modules/<path>.md (ADR 0140); docs/modules/<path>/MODULE.md
+    // is the legacy layout, still resolved so an unmigrated repo keeps its drift reports.
+    const stem = module.replace(/^src\/(lib\/)?/, "");
+    const candidates = [
+      path.join("docs", "visuals", "modules", `${stem}.md`),
+      path.join("docs", "modules", stem, "MODULE.md"),
+    ];
     // existsSync, NOT statSyncSafe — that helper answers isDirectory(), so it is always false for a file.
-    if (!existsSync(path.join(root, doc))) continue;
+    const doc = candidates.find(c => existsSync(path.join(root, c)));
+    if (!doc) continue;
     if (moduleHashOf(path.join(root, module)) !== reviewedHash) out.push({ module, moduleDoc: doc, intent });
   }
   return out.sort((a, b) => a.module.localeCompare(b.module));

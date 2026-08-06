@@ -31,9 +31,9 @@ committed page was never re-rendered. The anchors all still resolve, so `visuals
 the page is a lie. The reference project caught this only because the number printed by the
 generator (`207 nodes`) disagreed with the page on disk (`117`) and a human happened to look.
 
-- [ ] Decide whether conducks can own this at all. It requires knowing how to REBUILD a project's visuals, which is project-specific — conducks would need a declared build command (e.g. a `visuals.build` key) and would then be running arbitrary project code.
-- [ ] If yes: `conducks visuals-check` runs the declared command into a scratch copy and byte-compares, restoring the tree either way so the check is read-only from the caller's side.
-- [ ] If no: say so in the standard, and document the pattern the reference project used so each adopter writes the same thing rather than inventing one.
+- [x] Decide whether conducks can own this at all. It requires knowing how to REBUILD a project's visuals, which is project-specific — conducks would need a declared build command (e.g. a `visuals.build` key) and would then be running arbitrary project code. → YES: the repo declares `visuals.generate` in `conducks.json` (ADR 0139).
+- [x] If yes: `conducks visuals-check` runs the declared command into a scratch copy and byte-compares, restoring the tree either way so the check is read-only from the caller's side. → built INTO `visuals-lint` rather than a second command: one gate, both checks; tests pin the restore contract (tests/unit/domain/analysis/visuals-drift.test.ts). The reference project's `check.mjs` is deleted.
+- [-] If no: say so in the standard, and document the pattern the reference project used so each adopter writes the same thing rather than inventing one — dropped: the decision above went yes, so the no-branch has nothing to document.
 
 ## Not in scope
 

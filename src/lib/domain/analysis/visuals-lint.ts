@@ -105,13 +105,30 @@ const CONTEXT_PATTERNS = [
   /data-anchor[^>]*>([\s\S]*?)</g,
 ];
 
+/**
+ * A MARKDOWN page (module notes, ADR 0140) marks a claim by backticking it: `core/graph.ts:41`,
+ * `daemon.py::run`. A bare backticked filename (`index.ts`) is prose, not a claim — requiring a
+ * path separator or a line/symbol keeps "open `index.ts`" from failing as ambiguous, the same
+ * anti-wolf rule the HTML contexts follow.
+ */
+const MD_CODE_SPAN = /`([^`\n]+)`/g;
+
 /** Pull the stretches of a page in which an anchor may live. */
-function contextsOf(text: string): AnchorContext[] {
+function contextsOf(page: VisualPage): AnchorContext[] {
   const out: AnchorContext[] = [];
+  if (/\.md$/i.test(page.path)) {
+    MD_CODE_SPAN.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = MD_CODE_SPAN.exec(page.text)) !== null) {
+      const span = m[1];
+      if (span.includes("/") || /:\d+|::\w+/.test(span)) out.push({ text: span });
+    }
+    return out;
+  }
   for (const re of CONTEXT_PATTERNS) {
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) out.push({ text: stripTags(m[1]) });
+    while ((m = re.exec(page.text)) !== null) out.push({ text: stripTags(m[1]) });
   }
   return out;
 }
@@ -233,7 +250,7 @@ export function lintVisuals(
   let pagesWithAnchors = 0;
 
   for (const page of pages) {
-    const contexts = contextsOf(page.text);
+    const contexts = contextsOf(page);
     let sawAnchor = false;
 
     for (const ctx of contexts) {

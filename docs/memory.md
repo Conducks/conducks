@@ -576,8 +576,8 @@ by construction.
   only `parentId` leaves the identity wrong. On conducks the remaining "class parented by a method"
   cases are 3 genuinely local types declared inside a method body, which is correct. — todo10#P2
 
-## A module with NO `MODULE.md` is a decision, not a gap — do not complete the set
-- Gotcha: most modules have an authored note under `docs/modules/`; a dozen deliberately have none —
+## A module with NO note is a decision, not a gap — do not complete the set
+- Gotcha: most modules have an authored note under `docs/visuals/modules/` (ADR 0140); a dozen deliberately have none —
   `kinetic`, `metrics`, `intelligence`, `federation`, `manifest`, `visual`, `web`, `core/algorithms`,
   `core/git`, `core/mirror`, `core/utils`, `parsing/providers`, `contracts`. The gap is the answer:
   each is small or self-describing, so its source already says what a note would.
@@ -585,11 +585,11 @@ by construction.
   look even. A note added to complete the set restates the source, then drifts from it, and the next
   reader has two descriptions and no way to tell which is current. The rule is intent, not size: a
   large obvious module needs none, a ten-line one with a non-obvious reason to exist does.
-- Applies: `docs/modules/`. Add a note when a module's intent stops being obvious, and expect the list
+- Applies: `docs/visuals/modules/`. Add a note when a module's intent stops being obvious, and expect the list
   above to shrink for that reason only. `docs/architecture.md` leaves the link cell empty for these.
 
 ## A "part" with its own note is a unit of intent, not a directory
-- Gotcha: several `MODULE.md` notes speak for a GROUP of flat sibling files rather than a folder, so
+- Gotcha: several module notes speak for a GROUP of flat sibling files rather than a folder, so
   the note path does not always mirror a real directory — `linkers/` covers `graph/linker*.ts` plus
   `import-resolver.ts`; `orchestrator/` covers `orchestrator.ts`, `micro-pulse.ts` and `pipeline.ts`;
   `sentinel/` covers `sentinel*.ts` plus `guard.ts`. Others cover exactly one file (`taxonomy.ts`,

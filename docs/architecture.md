@@ -41,15 +41,15 @@ flowchart TD
 | node | note |
 |---|---|
 | `contracts` | |
-| `core/parsing` | [modules/core/parsing/MODULE.md](./modules/core/parsing/MODULE.md) |
-| `core/graph` | [modules/core/graph/MODULE.md](./modules/core/graph/MODULE.md) |
-| `core/persistence` | [modules/core/persistence/MODULE.md](./modules/core/persistence/MODULE.md) |
-| `domain/analysis` | [modules/domain/analysis/MODULE.md](./modules/domain/analysis/MODULE.md) |
-| `domain/governance` | [modules/domain/governance/MODULE.md](./modules/domain/governance/MODULE.md) |
-| `domain/evolution` | [modules/domain/evolution/MODULE.md](./modules/domain/evolution/MODULE.md) |
-| `registry` | [modules/registry/MODULE.md](./modules/registry/MODULE.md) |
-| `interfaces/cli` | [modules/interfaces/cli/MODULE.md](./modules/interfaces/cli/MODULE.md) |
-| `interfaces/tools` | [modules/interfaces/tools/MODULE.md](./modules/interfaces/tools/MODULE.md) |
+| `core/parsing` | [visuals/modules/core/parsing.md](./visuals/modules/core/parsing.md) |
+| `core/graph` | [visuals/modules/core/graph.md](./visuals/modules/core/graph.md) |
+| `core/persistence` | [visuals/modules/core/persistence.md](./visuals/modules/core/persistence.md) |
+| `domain/analysis` | [visuals/modules/domain/analysis.md](./visuals/modules/domain/analysis.md) |
+| `domain/governance` | [visuals/modules/domain/governance.md](./visuals/modules/domain/governance.md) |
+| `domain/evolution` | [visuals/modules/domain/evolution.md](./visuals/modules/domain/evolution.md) |
+| `registry` | [visuals/modules/registry.md](./visuals/modules/registry.md) |
+| `interfaces/cli` | [visuals/modules/interfaces/cli.md](./visuals/modules/interfaces/cli.md) |
+| `interfaces/tools` | [visuals/modules/interfaces/tools.md](./visuals/modules/interfaces/tools.md) |
 | `interfaces/web` | |
 
 ## Contract

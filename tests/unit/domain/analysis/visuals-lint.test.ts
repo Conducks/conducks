@@ -196,3 +196,30 @@ describe("where an anchor is looked for — the page's side of the contract", ()
     expect(r.violations.every(v => !v.reason.includes("ambiguous"))).toBe(true);
   });
 });
+
+describe("markdown module notes mark a claim by backticking it (ADR 0140)", () => {
+  const mdPage = (text: string): VisualPage => ({ path: "docs/visuals/modules/core/graph.md", text });
+
+  it("a backticked path:line is a claim and a dead line fails it", () => {
+    const r = lintVisuals([mdPage("The loop lives at `renderer/src/index.ts:900`.")], FILES, read);
+    expect(r.violations.map(v => v.reason).join(" ")).toContain("line 900 does not exist");
+  });
+
+  it("a backticked path::symbol is a claim", () => {
+    const r = lintVisuals([mdPage("See `src/systems/dispatch.ts::gone`.")], FILES, read);
+    expect(r.violations.map(v => v.reason).join(" ")).toContain("no definition of `gone`");
+  });
+
+  it("a bare backticked filename is prose, not a claim — `index.ts` cannot cry wolf", () => {
+    const r = lintVisuals([mdPage("open `index.ts` and look around")], FILES, read);
+    // The only violation allowed is the honest "no anchors" warn — never an ambiguity error.
+    expect(r.violations.filter(v => v.severity === "error")).toHaveLength(0);
+    expect(r.pagesWithAnchors).toBe(0);
+  });
+
+  it("unbackticked paths in markdown are not scanned — the backtick IS the mark", () => {
+    const r = lintVisuals([mdPage("prose mentioning renderer/src/index.ts:900 without a mark")], FILES, read);
+    expect(r.violations.filter(v => v.severity === "error")).toHaveLength(0);
+    expect(r.pagesWithAnchors).toBe(0);
+  });
+});

@@ -42,7 +42,7 @@ ADR 0013 edge-gated ATOM and predicted "a few hundred". It is **3,023 of 5,221 n
 
 ## Accepted limits, recorded rather than hidden
 - Dynamic dispatch (`handlers[key]()`) is not resolved, by decision (ADR 0070's line).
-- Registry DI property chains produce ~6 permanent orphan false positives — `core/graph/linkers/MODULE.md` accepts this explicitly.
+- Registry DI property chains produce ~6 permanent orphan false positives — `visuals/modules/core/graph/linkers.md` accepts this explicitly.
 - A single unparenthesised arrow parameter (`a => a`) has no parameter node in the grammar, so it cannot be captured.
 - `reflection-pipeline.ts` rebuilds an import edge's `properties` by hand at four sites. Any new field on an IMPORTS relationship must be named there or it is dropped at the edge.
 
