@@ -474,10 +474,17 @@ Three tiers of rot, three answers:
 | the cited code CHANGED since last read | same line, different logic | a review stamp — warn: "re-read, then re-stamp" |
 | the claim is false about unchanged code | was never true | only a reader |
 
-`conducks visuals-lint --stamp` records a hash of each cited span as reviewed-now; the next runs flag
-exactly the claims whose span changed — a short, precise re-read list. Two rules no machinery holds:
-**re-stamp only after actually re-reading** (stamping unread claims is lying to the gate), and
-**clear flags before closing the todo that touched the code** — a flag nobody clears is wallpaper.
+`conducks visuals-lint --stamp <page>` records a hash of each cited span in that page as
+reviewed-now; the next runs flag exactly the claims whose span changed — a short, precise re-read
+list. Bare `--stamp` re-stamps EVERY page, which asserts you re-read everything — use the per-page
+form unless that is true (ADR 0142). Stamps are keyed by the resolved span, so rewording an anchor
+keeps its review; a deleted claim orphans its stamp visibly. The store
+(`.conducks/note-reviews.json`) is COMMITTED — a stamp is a shared assertion, and a PR that
+re-stamps 40 claims invites the question whether 40 claims were read. To claim a constant in a
+note, put it in the same backtick as its file: `` `daemon.py:169 TTS_DRAIN_SEC=0.4` ``. Two rules no
+machinery holds: **re-stamp only after actually re-reading** (stamping unread claims is lying to
+the gate), and **clear flags before closing the todo that touched the code** — a flag nobody clears
+is wallpaper.
 
 ```markdown
 # <module> — <one line: what it is>
@@ -961,11 +968,12 @@ it and fails on any byte of drift, restoring the tree afterwards (ADR 0139); a g
 say `DERIVED — edit <source>` in its own text, or an agent edits the render and the next render
 discards the edit (ADR 0011). It checks the working tree, never the vault.
 
-**A page with no anchors must declare itself `authored`** — brand, concept, product, no code claims
-— in its own text, and then passes honestly. A page that neither anchors nor declares FAILS: "0
+**A page with no anchors must declare `Provenance: authored`** — brand, concept, product, no code
+claims — in its own text, and then passes honestly. The declaration is structured; the bare word
+"authored" in prose does not count (ADR 0142). A page that neither anchors nor declares FAILS: "0
 checked, exit 0" is a gate that checks less than it appears to (ADR 0124). Prose staleness beyond
-the anchors is tier three — see the review stamps in §6.3 (ADR 0141): `visuals-lint --stamp` after
-a real re-read, and the gate flags exactly the claims whose cited code changed since.
+the anchors is tier three — see the review stamps in §6.3 (ADR 0141/0142): `visuals-lint --stamp
+<page>` after a real re-read, and the gate flags exactly the claims whose cited code changed since.
 
 ---
 

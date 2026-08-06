@@ -326,15 +326,17 @@ export function lintVisuals(
     }
 
     if (sawAnchor) pagesWithAnchors++;
-    else if (!/\bauthored\b/i.test(page.text)) {
+    else if (!/provenance\b\W{0,4}(?:<\/?\w+>)?\W{0,4}authored\b/i.test(page.text)) {
       // A visual with no anchor at all cannot be checked by anything, ever. That is not a pass —
       // it is the exact state this command exists to make visible (the ADR 0044 / 0124 shape:
-      // nothing-checked must never read as clean). A page may DECLARE itself `authored` (§6.13's
+      // nothing-checked must never read as clean). A page may DECLARE itself authored (§6.13's
       // provenance stamp) — brand, concept, product — and pass honestly; a page that neither
       // anchors nor declares FAILS, because "0 still true, exit 0" is the denominator trap.
+      // The declaration is STRUCTURED (`Provenance: authored`, bold/em-dash variants allowed) —
+      // the bare word `authored` appearing in prose must not open the escape hatch (ADR 0142).
       violations.push({
         page: page.path, anchor: "—", severity: "error",
-        reason: "no file anchors and no `authored` declaration — anchor the claims, or stamp the page authored (§6.13)",
+        reason: "no file anchors and no `Provenance: authored` declaration — anchor the claims, or declare the page authored (§6.13)",
       });
     }
   }
@@ -392,10 +394,24 @@ export function collectVisualPages(root: string): VisualPage[] {
  * everything", which is the version nobody does.
  * ---------------------------------------------------------------------------------------------- */
 
-/** Stored per note: anchor-as-written → hash of the cited span at review time. */
+/**
+ * Stored per note: CANONICAL span key → hash of the cited span at review time.
+ *
+ * The key is the RESOLVED path plus the span (`src/a/daemon.py::run`), never the anchor as the
+ * author abbreviated it — rewording `daemon.py::run` to `voice/daemon.py::run` cites the same code,
+ * and a stamp that died on a spelling change would let an inconvenient flag be dodged by editing
+ * the note (ADR 0142).
+ */
 export type ReviewStamps = Record<string, Record<string, string>>;
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex").slice(0, 16);
+
+/** The canonical identity of a cited span — what a stamp is FOR, independent of author spelling. */
+export function spanKeyOf(resolvedPath: string, a: { line?: number; endLine?: number; symbol?: string }): string {
+  if (a.symbol) return `${resolvedPath}::${a.symbol}`;
+  if (a.line !== undefined) return `${resolvedPath}:${a.line}${a.endLine !== undefined ? `-${a.endLine}` : ""}`;
+  return resolvedPath;
+}
 
 /**
  * Hash of exactly what an anchor cites — the narrowest span that can carry the claim.
@@ -417,6 +433,10 @@ export function spanHashOf(source: string, a: { line?: number; endLine?: number;
     const defRe = new RegExp(`\\b(?:function|class|const|let|var|interface|type|enum|def)\\s+${n}\\b|^\\s*(?:export\\s+)?(?:public|private|protected|static|async|\\*)?\\s*${n}\\s*[(<:=]`);
     const at = lines.findIndex(l => defRe.test(l));
     if (at === -1) return sha(source);
+    // Decorators directly above the definition are part of what the claim describes — `@lru_cache`
+    // appearing or vanishing changes behaviour as surely as an edit to the body.
+    let start = at;
+    while (start > 0 && lines[start - 1].trim().startsWith("@")) start--;
     const indent = lines[at].match(/^\s*/)![0].length;
     let end = at;
     for (let i = at + 1; i < lines.length; i++) {
@@ -425,19 +445,25 @@ export function spanHashOf(source: string, a: { line?: number; endLine?: number;
       if (l.match(/^\s*/)![0].length <= indent) break;
       end = i;
     }
-    return sha(lines.slice(at, end + 1).map(l => l.trim()).join("\n"));
+    return sha(lines.slice(start, end + 1).map(l => l.trim()).join("\n"));
   }
   return sha(lines.map(l => l.trim()).join("\n"));
 }
 
-/** Every resolving anchor of every page, hashed as cited — the `--stamp` write. */
+/**
+ * Every resolving anchor of every page, hashed as cited and keyed canonically — the `--stamp`
+ * write. `only` limits the write to one page, so a review of one note does not assert a review of
+ * every other (ADR 0142: the all-or-nothing stamp degrades to all).
+ */
 export function buildStamps(
   pages: VisualPage[],
   files: string[],
   read: (repoRelPath: string) => string | null,
+  only?: string,
 ): ReviewStamps {
   const out: ReviewStamps = {};
   for (const page of pages) {
+    if (only !== undefined && page.path !== only) continue;
     for (const ctx of contextsOf(page)) {
       for (const a of anchorsIn(ctx.text)) {
         if (PROSE_DOC_NAMES.has(path.basename(a.file))) continue;
@@ -445,7 +471,7 @@ export function buildStamps(
         if (!r.ok) continue;
         const src = read(r.path);
         if (src === null) continue;
-        (out[page.path] ??= {})[a.raw] = spanHashOf(src, a);
+        (out[page.path] ??= {})[spanKeyOf(r.path, a)] = spanHashOf(src, a);
       }
     }
   }
@@ -458,24 +484,30 @@ export function buildStamps(
  * precise. Cleared by re-stamping after the re-read; a flag nobody clears is wallpaper, which is a
  * workflow rule (§6.13), not more machinery. An anchor with no stamp is not flagged — stamping is
  * the act of reviewing, and pretending unreviewed claims were reviewed would be a false green.
+ *
+ * `orphans` are stamps whose span is no longer cited anywhere in that page — the claim was deleted
+ * or re-pointed. Reported, not silent: a vanishing flag must be SEEN vanishing, or editing the note
+ * becomes the way around the gate (ADR 0142). Pruned by the next `--stamp` of that page.
  */
 export function staleStamps(
   pages: VisualPage[],
   files: string[],
   read: (repoRelPath: string) => string | null,
   stamps: ReviewStamps,
-): VisualsViolation[] {
+): { flags: VisualsViolation[]; orphans: Array<{ page: string; key: string }> } {
   const current = buildStamps(pages, files, read);
-  const out: VisualsViolation[] = [];
+  const flags: VisualsViolation[] = [];
+  const orphans: Array<{ page: string; key: string }> = [];
   for (const [pagePath, anchors] of Object.entries(stamps)) {
-    for (const [raw, stamped] of Object.entries(anchors)) {
-      const now = current[pagePath]?.[raw];
-      if (now === undefined || now === stamped) continue; // unresolvable is the lint's finding, not a stale stamp
-      out.push({
-        page: pagePath, anchor: raw, severity: "warn",
+    for (const [key, stamped] of Object.entries(anchors)) {
+      const now = current[pagePath]?.[key];
+      if (now === undefined) { orphans.push({ page: pagePath, key }); continue; }
+      if (now === stamped) continue;
+      flags.push({
+        page: pagePath, anchor: key, severity: "warn",
         reason: "cited code changed since this claim was last reviewed — re-read it, then re-stamp (visuals-lint --stamp)",
       });
     }
   }
-  return out;
+  return { flags, orphans };
 }

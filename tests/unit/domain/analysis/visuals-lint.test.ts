@@ -213,14 +213,14 @@ describe("markdown module notes mark a claim by backticking it (ADR 0140)", () =
   });
 
   it("a bare backticked filename is prose, not a claim — `index.ts` cannot cry wolf", () => {
-    const r = lintVisuals([mdPage("open `index.ts` and look around — authored, no code claims")], FILES, read);
+    const r = lintVisuals([mdPage("open `index.ts` and look around — Provenance: authored, no code claims")], FILES, read);
     // A bare filename must never become an ambiguity error; the page declares authored to pass.
     expect(r.violations).toHaveLength(0);
     expect(r.pagesWithAnchors).toBe(0);
   });
 
   it("unbackticked paths in markdown are not scanned — the backtick IS the mark", () => {
-    const r = lintVisuals([mdPage("authored prose mentioning renderer/src/index.ts:900 without a mark")], FILES, read);
+    const r = lintVisuals([mdPage("Provenance: authored — prose mentioning renderer/src/index.ts:900 without a mark")], FILES, read);
     // An unbackticked path is not scanned, so the dead line 900 cannot fail — the backtick is the mark.
     expect(r.violations).toHaveLength(0);
     expect(r.pagesWithAnchors).toBe(0);
@@ -252,31 +252,62 @@ describe("review stamps — the second tier of rot (ADR 0141)", () => {
     const pages = [note("see `src/daemon.py::run`")];
     const stamps = buildStamps(pages, files, readSrc);
     const editedElsewhere: Record<string, string> = { ...SRC, "src/daemon.py": SRC["src/daemon.py"].replace("pass", "return 9") };
-    expect(staleStamps(pages, files, p => editedElsewhere[p] ?? null, stamps)).toHaveLength(0);
+    expect(staleStamps(pages, files, p => editedElsewhere[p] ?? null, stamps).flags).toHaveLength(0);
     const editedInside: Record<string, string> = { ...SRC, "src/daemon.py": SRC["src/daemon.py"].replace("b = 2", "b = 3") };
-    const flags = staleStamps(pages, files, p => editedInside[p] ?? null, stamps);
+    const { flags } = staleStamps(pages, files, p => editedInside[p] ?? null, stamps);
     expect(flags).toHaveLength(1);
     expect(flags[0].severity).toBe("warn");
+  });
+
+  it("a stamp is keyed by the RESOLVED span, so rewording the anchor keeps the review (ADR 0142)", () => {
+    const stamps = buildStamps([note("see `src/daemon.py::run`")], files, readSrc);
+    // The author rewrites the abbreviation; the claim cites the same code.
+    const reworded = [note("see `daemon.py::run`")];
+    const r = staleStamps(reworded, files, readSrc, stamps);
+    expect(r.flags).toHaveLength(0);
+    expect(r.orphans).toHaveLength(0);
+  });
+
+  it("a DELETED claim orphans its stamp VISIBLY — editing the note is not a way around the gate", () => {
+    const stamps = buildStamps([note("see `src/daemon.py::run`")], files, readSrc);
+    const r = staleStamps([note("the claim is gone")], files, readSrc, stamps);
+    expect(r.flags).toHaveLength(0);
+    expect(r.orphans).toEqual([{ page: "docs/visuals/modules/voice.md", key: "src/daemon.py::run" }]);
+  });
+
+  it("a decorator appearing above the cited symbol fires the flag — it changes behaviour", () => {
+    const pages = [note("see `src/daemon.py::run`")];
+    const stamps = buildStamps(pages, files, readSrc);
+    const decorated: Record<string, string> = { ...SRC, "src/daemon.py": SRC["src/daemon.py"].replace("def run():", "@lru_cache\ndef run():") };
+    expect(staleStamps(pages, files, p => decorated[p] ?? null, stamps).flags).toHaveLength(1);
   });
 
   it("a line anchor flags only when ITS line changes, and a pure re-indent never fires", () => {
     const pages = [note("see `src/daemon.py:1`")];
     const stamps = buildStamps(pages, files, readSrc);
     const reindented: Record<string, string> = { ...SRC, "src/daemon.py": "  " + SRC["src/daemon.py"] };
-    expect(staleStamps(pages, files, p => reindented[p] ?? null, stamps)).toHaveLength(0);
+    expect(staleStamps(pages, files, p => reindented[p] ?? null, stamps).flags).toHaveLength(0);
     const changed: Record<string, string> = { ...SRC, "src/daemon.py": SRC["src/daemon.py"].replace("SAMPLE = 1", "SAMPLE = 2") };
-    expect(staleStamps(pages, files, p => changed[p] ?? null, stamps)).toHaveLength(1);
+    expect(staleStamps(pages, files, p => changed[p] ?? null, stamps).flags).toHaveLength(1);
   });
 
   it("an unstamped anchor is never flagged — stamping IS the review", () => {
     const pages = [note("see `src/daemon.py::run`")];
-    expect(staleStamps(pages, files, readSrc, {})).toHaveLength(0);
+    const r = staleStamps(pages, files, readSrc, {});
+    expect(r.flags).toHaveLength(0);
+    expect(r.orphans).toHaveLength(0);
+  });
+
+  it("`--stamp <page>` stamps only that page — reviewing one note asserts nothing about the others", () => {
+    const two = [note("see `src/daemon.py::run`"), { path: "docs/visuals/modules/other.md", text: "see `src/daemon.py:1`" }];
+    const stamps = buildStamps(two, files, readSrc, "docs/visuals/modules/voice.md");
+    expect(Object.keys(stamps)).toEqual(["docs/visuals/modules/voice.md"]);
   });
 });
 
 describe("a page with no anchors must declare itself authored", () => {
   it("declared authored → passes honestly", () => {
-    const p: VisualPage = { path: "docs/visuals/index.html", text: "<p>Provenance: authored — brand page, no code claims.</p>" };
+    const p: VisualPage = { path: "docs/visuals/index.html", text: "<p><b>Provenance:</b> authored — brand page, no code claims.</p>" };
     const r = lintVisuals([p], FILES, read);
     expect(r.violations).toHaveLength(0);
   });
@@ -286,5 +317,18 @@ describe("a page with no anchors must declare itself authored", () => {
     const r = lintVisuals([p], FILES, read);
     expect(r.violations).toHaveLength(1);
     expect(r.violations[0].severity).toBe("error");
+  });
+
+  it("the bare word `authored` in prose does NOT open the escape hatch (ADR 0142)", () => {
+    const p: VisualPage = { path: "docs/visuals/trace.html", text: "<p>this section was authored in July</p>" };
+    const r = lintVisuals([p], FILES, read);
+    expect(r.violations).toHaveLength(1);
+    expect(r.violations[0].severity).toBe("error");
+  });
+
+  it("a constant claimed in the SAME backtick as its file is checked in a markdown note", () => {
+    const p: VisualPage = { path: "docs/visuals/modules/voice.md", text: "the gate is `daemon.py:3 VAD_THRESHOLD=0.9`" };
+    const r = lintVisuals([p], FILES, read);
+    expect(r.violations.map(v => v.reason).join(" ")).toContain("now has VAD_THRESHOLD = 0.5");
   });
 });

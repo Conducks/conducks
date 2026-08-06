@@ -43,8 +43,12 @@ venv/
 *.swp
 .cache/
 dist/
-.conducks/
-.conducks
+# The vault is per-machine; the review-stamp store is NOT — a stamp is a shared assertion
+# ("someone read this claim") and per-machine stamps would mean tier-2 rot detection exists only
+# on the reviewer's laptop (ADR 0142). `dir/*` instead of `dir/` because git cannot re-include a
+# file whose parent DIRECTORY is excluded.
+.conducks/*
+!.conducks/note-reviews.json
 scratch/
 
 # agent worktree scratch (47M, never commit)

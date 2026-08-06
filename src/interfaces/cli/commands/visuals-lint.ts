@@ -21,18 +21,32 @@ import chalk from "chalk";
 export class VisualsLintCommand implements ConducksCommand {
   public id = "visuals-lint";
   public description = "Check every anchor in docs/visuals against the code it claims to describe";
-  public usage = "conducks visuals-lint [path] [--stamp]";
+  public usage = "conducks visuals-lint [path] [--stamp [page]]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
-    const posArg = args.find(a => !a.startsWith("--"));
+    const stampIdx = args.indexOf("--stamp");
+    // The token after --stamp is a PAGE only when it looks like one; `visuals-lint --stamp .` still
+    // means "stamp everything under .".
+    const isPage = (a: string | undefined): a is string => a !== undefined && /\.(md|html|svg)$/i.test(a);
+    const stampPage = stampIdx !== -1 && isPage(args[stampIdx + 1]) ? args[stampIdx + 1] : undefined;
+    const posArg = args.find((a, i) => !a.startsWith("--") && a !== stampPage);
     const root = posArg ? (posArg.startsWith("/") ? posArg : path.resolve(process.cwd(), posArg)) : process.cwd();
 
-    // `--stamp` records every resolving anchor's span hash as reviewed-now (ADR 0141). It is the
-    // act of saying "I re-read these claims against the code" — so it runs INSTEAD of judging,
-    // and the next plain run compares against what was stamped.
-    if (args.includes("--stamp")) {
-      const n = await registry.visuals.stamp(root);
-      console.log(chalk.green(`\n  ✓ stamped ${n} anchor(s) as reviewed — recorded in .conducks/note-reviews.json\n`));
+    // `--stamp [page]` records resolving anchors' span hashes as reviewed-now (ADR 0141). It is the
+    // act of saying "I re-read these claims against the code" — so it runs INSTEAD of judging, and
+    // the next plain run compares against what was stamped. With a page path it stamps that one
+    // page; without, it re-stamps EVERYTHING, which is an assertion the caller has to mean
+    // (ADR 0142) — so the all-form says what it is doing, loudly.
+    if (stampIdx !== -1) {
+      const only = stampPage;
+      const n = await registry.visuals.stamp(root, only);
+      if (only) {
+        console.log(chalk.green(`\n  ✓ stamped ${n} anchor(s) in ${only} as reviewed.\n`));
+      } else {
+        console.log(chalk.green(`\n  ✓ stamped ${n} anchor(s) as reviewed — ACROSS ALL PAGES.`));
+        console.log(chalk.yellow(`    A stamp asserts "I re-read this claim against the code." If that is only true for`));
+        console.log(chalk.yellow(`    one page, stamp that page: visuals-lint --stamp <page-path>\n`));
+      }
       return;
     }
 
@@ -93,9 +107,16 @@ export class VisualsLintCommand implements ConducksCommand {
     if (review.flags.length > 0) {
       console.log(chalk.yellow(`  ⚠ ${review.flags.length} reviewed claim(s) cite code that changed since the last stamp:`));
       for (const f of review.flags) console.log(chalk.yellow(`      - ${f.page} → ${f.anchor}`));
-      console.log(chalk.dim(`      Re-read each claim, then \`conducks visuals-lint --stamp\`.\n`));
+      console.log(chalk.dim(`      Re-read each claim, then \`conducks visuals-lint --stamp <page>\`.\n`));
     } else if (review.stamped > 0) {
       console.log(chalk.green(`  ✓ review stamps clean — ${review.stamped} reviewed claim(s) cite unchanged code.\n`));
+    }
+    // A stamp whose claim vanished from the page is SEEN vanishing (ADR 0142) — silence here would
+    // make editing the note the way around the gate.
+    if (review.orphans.length > 0) {
+      console.log(chalk.dim(`  ·  ${review.orphans.length} stamp(s) cite claims no longer in their page (deleted or re-pointed) — pruned by the next --stamp of that page:`));
+      for (const o of review.orphans) console.log(chalk.dim(`      - ${o.page} → ${o.key}`));
+      console.log("");
     }
 
     const drift = await registry.visuals.drift(root);

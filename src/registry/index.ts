@@ -344,21 +344,26 @@ export const registry = {
      * record every resolving anchor's span hash as reviewed-now. The store is `.conducks/
      * note-reviews.json` — beside `doc-reviews.json`, its module-level ancestor.
      */
-    review: async (root?: string): Promise<{ flags: VisualsViolation[]; stamped: number }> => {
+    review: async (root?: string): Promise<{ flags: VisualsViolation[]; orphans: Array<{ page: string; key: string }>; stamped: number }> => {
       const dir = root || chronicle.getProjectDir() || process.cwd();
       const pages = collectVisualPages(dir);
       let stamps: ReviewStamps = {};
       try { stamps = JSON.parse(fs.readFileSync(path.join(dir, ".conducks", "note-reviews.json"), "utf8")); } catch { /* never stamped */ }
       const stamped = Object.values(stamps).reduce((n, a) => n + Object.keys(a).length, 0);
-      if (pages.length === 0 || stamped === 0) return { flags: [], stamped };
+      if (stamped === 0) return { flags: [], orphans: [], stamped };
       const abs = await chronicle.discoverFiles();
       const rel = abs.map(f => path.relative(dir, f)).filter(f => f.length > 0 && !f.startsWith('..'));
       const read = (p: string): string | null => {
         try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
       };
-      return { flags: staleStamps(pages, rel, read, stamps), stamped };
+      return { ...staleStamps(pages, rel, read, stamps), stamped };
     },
-    stamp: async (root?: string): Promise<number> => {
+    /**
+     * `only` (a page path) stamps ONE page's anchors, merged over the store — reviewing one note
+     * must not assert a review of every other (ADR 0142). No `only` re-stamps everything, which is
+     * an assertion the caller has to mean.
+     */
+    stamp: async (root?: string, only?: string): Promise<number> => {
       const dir = root || chronicle.getProjectDir() || process.cwd();
       const pages = collectVisualPages(dir);
       const abs = await chronicle.discoverFiles();
@@ -366,10 +371,15 @@ export const registry = {
       const read = (p: string): string | null => {
         try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
       };
-      const stamps = buildStamps(pages, rel, read);
+      const fresh = buildStamps(pages, rel, read, only);
+      let stamps: ReviewStamps = fresh;
+      if (only !== undefined) {
+        try { stamps = JSON.parse(fs.readFileSync(path.join(dir, ".conducks", "note-reviews.json"), "utf8")); } catch { stamps = {}; }
+        if (fresh[only]) stamps[only] = fresh[only]; else delete stamps[only];
+      }
       fs.mkdirSync(path.join(dir, ".conducks"), { recursive: true });
       fs.writeFileSync(path.join(dir, ".conducks", "note-reviews.json"), JSON.stringify(stamps, null, 2) + "\n");
-      return Object.values(stamps).reduce((n, a) => n + Object.keys(a).length, 0);
+      return Object.values(fresh).reduce((n, a) => n + Object.keys(a).length, 0);
     },
     /**
      * The generator-drift half of the gate (ADR 0139): re-run the repo's DECLARED generator and diff
