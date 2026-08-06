@@ -65,3 +65,12 @@ value can live if the pulse must read it.
 The six: the `nodes` schema, the additive migration list, BOTH SELECT lists in `load()`, the row
 built in `saveNodes`, the `addNode` skeleton in `adjacency-list.ts`, and the content/volatile
 classification in `content-key.ts` — whose guard test is the only one of the six that fails loudly.
+
+## The visual wave cap is a DEFAULT, not a contract
+
+`getVisualWave` caps at `DEFAULT_WAVE_CAP` (1,500) because a force graph of every node is
+unreadable, and it reports truncation rather than hiding it (ADR 0079). The number is not claimed to
+be right — only that the surviving slice is the heaviest (`ORDER BY gravity DESC`) and that the
+caller is told. It is overridable from both surfaces: `conducks mirror --wave-cap <n>` and
+`GET /api/synapse?limit=<n>`. Measured on a five-service monorepo the default hides about a third of
+eligible nodes (2,321 of 6,002), which is why an override had to exist at all.

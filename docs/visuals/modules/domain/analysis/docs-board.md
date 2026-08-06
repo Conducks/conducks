@@ -83,3 +83,12 @@ Two things the tests forced, both real:
 - **`files[]`, not `filePath`.** The pulse originally reported the last event in the debounce window
   as "the file you edited". It is not — it is whatever landed last. The pulse now carries every file
   in the window, and `filePath` is explicitly just the newest of them, for display.
+
+## The module hash lives in one file, and that is the whole point
+
+A reviewed module note is compared against `moduleHashOf` (`analysis/module-hash.ts`). That function
+used to exist TWICE — here and in `ProjectMonitor` — coupled only by a "must match" comment. Two
+copies of a hash is a drift waiting for its moment: the two disagreeing marks every reviewed note
+drifted, or none, and either way silently. Both callers import the one function now and the equality
+is pinned by a test rather than by a comment. Non-recursive on purpose: a note covers its own
+directory, so hashing subtrees would fire a flag for a change in a submodule that has its own note.

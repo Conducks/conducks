@@ -8,6 +8,13 @@ Python class and a Go struct answer the same question. Every node carries a `can
 ecosystem → repository → package → namespace → directory → unit → infra → structure → behavior →
 atom.
 
+**Two kind columns, and a query filtering the wrong one reads as clean.** `canonicalKind` holds the
+taxonomy kind (`NAMESPACE`, uppercase); `semantic_kind` holds the language's RAW kind (`namespace`,
+lowercase, plus shapes the taxonomy has no rung for — `library_symbol`, `binding`). So
+`WHERE semantic_kind IN ('PACKAGE')` matches nothing and answers zero, which is
+indistinguishable from a true zero. Both an ADR count and a namespace check were written that way
+in one session before the shape was noticed. Filter `canonicalKind` for taxonomy questions.
+
 **Boundaries:** naming only. It does not decide which nodes survive — see below.
 
 **Deferred / not built:** the second classification system. ADR 0012 describes two orthogonal systems

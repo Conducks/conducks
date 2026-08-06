@@ -44,6 +44,22 @@ The same computation inverted does *not* give you unused-import detection: "no e
 mean *unused*, the aggressive direction. That is why STALE_IMPORT is a separate, still-unshipped
 problem (todo11).
 
+## A binding capture is not always spelled `@name`
+
+Per-binding `IMPORTS` relationships — the ones function-level dead code and type-only marking both
+read — are emitted only for captures the binding loop recognises. It accepted `@name` alone, and
+Python's import query spells the same thing `@named_import`, so **Python produced no per-binding
+import edges at all** until 2026-08-07 (ADR 0143's change). The cost was invisible because nothing
+downstream errors on their absence; it just answers less. When adding a language, check that its
+`isImport` pattern's binding capture is one this loop accepts, and assert an edge rather than
+assuming one.
+
+Type-only marking is INFERRED from use (a binding referenced only in type positions), never from a
+keyword — so it works for any language whose type positions are captured, and a missing type-position
+pattern reads as "this import is a value use". Python's forward reference is the case that bites:
+`o: "Order"` is a STRING, which is exactly what a name imported under `if TYPE_CHECKING:` requires,
+so the imports the feature most needs to see were the ones no query captured.
+
 ## Gnosis fallback
 
 When a grammar is unavailable or a parse/query fails, the reflector falls back to a regex extractor
