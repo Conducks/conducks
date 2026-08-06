@@ -18,6 +18,7 @@ const DEFAULT_INTERFACE_FRAGMENTS = ['/interfaces/', '/adapters/', '/apps/', '/c
 import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView, buildTrees } from "@/lib/domain/analysis/docs-board.js";
+import { lintVisuals, collectVisualPages, type VisualsViolation } from "@/lib/domain/analysis/visuals-lint.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
 import { assessRoot, explainScope } from "@/lib/core/utils/scope-guard.js";
@@ -65,6 +66,7 @@ import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
 import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -313,6 +315,29 @@ export const registry = {
     // may name no core module (ADR 0005), and because a vault-loaded node carries `doc` but not
     // the derived first line — that is computed, not stored.
     firstLineOf: (doc: string) => firstLineOf(doc),
+  },
+  /**
+   * The visuals gate (ADR 0138). Separate from `docs` because it answers a different question with a
+   * different source of truth: `docs` parses AUTHORED grammar, this checks DERIVED anchors against
+   * the working tree. Discovery lives here — the lint itself takes its file list as an argument so it
+   * stays pure, and so it can never be pointed at a stale graph by accident.
+   */
+  visuals: {
+    lint: async (root?: string) => {
+      const dir = root || chronicle.getProjectDir() || process.cwd();
+      const pages = collectVisualPages(dir);
+      if (pages.length === 0) return { violations: [] as VisualsViolation[], checked: 0, pagesWithAnchors: 0, pages: 0 };
+      // The FILESYSTEM is ground truth, never the vault — a graph keyed to the last pulse describes a
+      // tree that may no longer exist (ADR 0035), and a stale input makes this gate a false green.
+      const abs = await chronicle.discoverFiles();
+      const rel = abs
+        .map(f => path.relative(dir, f))
+        .filter(f => f.length > 0 && !f.startsWith('..'));
+      const read = (p: string): string | null => {
+        try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
+      };
+      return { ...lintVisuals(pages, rel, read), pages: pages.length };
+    },
   },
   coverage: {
     nodes: coverageNodes,

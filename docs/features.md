@@ -45,6 +45,10 @@
 - Purpose: Fail a doc that breaks the standard — a wrapped value, a duplicate phase number, a link pointing at a record that does not exist, a supersede that abandons unbuilt work — and report hygiene separately without failing.
 - Intent: A standard nothing enforces is advice. Hygiene is split from grammar because a gate that fails on housekeeping gets switched off.
 
+## Visual Anchor Gate — `conducks visuals-lint`
+- Purpose: Check every anchor a diagram makes against the working tree — the file resolves to exactly one place, the line exists, the symbol is still defined, and a constant written in the page is still the value the code assigns. An ambiguous abbreviation fails instead of resolving to a guess.
+- Intent: A picture is a claim about code at a moment, and it decays silently — the more precise it looks, the more it is trusted. The filesystem is the source of truth and not the vault, because a graph keyed to the last pulse would let a lying page report clean, and a false green is worse than no gate (ADR 0138, ADR 0035).
+
 ## Mirror Live Sync — `conducks mirror` (with `conducks watch` running)
 - Purpose: Push graph changes to connected dashboard clients as they land, so the picture on screen matches the code on disk.
 - Intent: A dashboard that needs a manual refresh loses the value of watch mode — the two are meant to be used together.
