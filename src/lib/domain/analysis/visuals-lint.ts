@@ -326,6 +326,10 @@ export function lintVisuals(
     }
 
     if (sawAnchor) pagesWithAnchors++;
+    // A DERIVED render is exempt from declare-or-fail: its claims live in the SOURCE beside it,
+    // which IS checked, and the drift gate (ADR 0139) proves the render matches a fresh pass over
+    // that source. Requiring anchors of the render would double every finding without adding one.
+    else if (/\bDERIVED\b/.test(page.text)) { /* covered by its source + the drift gate */ }
     else if (!/provenance\b\W{0,4}(?:<\/?\w+>)?\W{0,4}authored\b/i.test(page.text)) {
       // A visual with no anchor at all cannot be checked by anything, ever. That is not a pass —
       // it is the exact state this command exists to make visible (the ADR 0044 / 0124 shape:

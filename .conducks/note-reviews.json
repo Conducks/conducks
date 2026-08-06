@@ -70,7 +70,7 @@
     "src/lib/domain/governance/index.ts:266": "128b5c4d4f8f1e06",
     "config/sentinel.json": "152f1597f569c396",
     "src/interfaces/cli/commands/audit.ts:82-88": "6e779c6032f1433f",
-    "src/registry/index.ts": "b4da144c8db98cff"
+    "src/registry/index.ts": "fe5eb48a6ac29084"
   },
   "docs/visuals/modules/domain/governance.md": {
     "src/lib/domain/governance/index.ts:106-158": "18aae9a4ef4e6086"
@@ -85,7 +85,7 @@
     "tests/unit/domain/stale-import.test.ts": "3aeb7ac01fe2ce3b"
   },
   "docs/visuals/modules/registry.md": {
-    "src/registry/index.ts": "b4da144c8db98cff"
+    "src/registry/index.ts": "fe5eb48a6ac29084"
   },
   "docs/visuals/system-trace.html": {
     "src/lib/domain/analysis/conducks-core.ts:58": "a8100dcb07ab26b4",

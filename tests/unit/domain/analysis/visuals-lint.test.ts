@@ -332,3 +332,11 @@ describe("a page with no anchors must declare itself authored", () => {
     expect(r.violations.map(v => v.reason).join(" ")).toContain("now has VAD_THRESHOLD = 0.5");
   });
 });
+
+describe("a DERIVED render is exempt from declare-or-fail", () => {
+  it("its claims live in the checked source; the drift gate proves fidelity", () => {
+    const p: VisualPage = { path: "docs/visuals/modules/voice.html", text: "<div><b>DERIVED</b> — rendered from voice.md. no marked anchors here</div>" };
+    const r = lintVisuals([p], FILES, read);
+    expect(r.violations).toHaveLength(0);
+  });
+});

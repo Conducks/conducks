@@ -427,8 +427,13 @@ export const registry = {
       // text — ADR 0011's failure mode (edit the render, the next render discards the edit) returns
       // the moment renders exist. Warn-only until the reference project's templates carry the
       // header (todo47); the drift check itself already guards the content.
+      // A page may instead declare itself hand-written (`Provenance: hand-written` / `authored`) —
+      // not everything in a generated tree is generated, and warning the five hand-maintained pages
+      // teaches everyone to ignore the warning.
       const derivedHeaderMissing = collectVisualPages(dir)
-        .filter(p => !/\.md$/i.test(p.path) && !/DERIVED/.test(p.text))
+        .filter(p => !/\.md$/i.test(p.path)
+          && !/\bDERIVED\b/.test(p.text)
+          && !/provenance\b\W{0,4}(?:<\/?\w+>)?\W{0,4}(?:authored|hand-written)\b/i.test(p.text))
         .map(p => p.path);
       return { ...result, derivedHeaderMissing };
     },
