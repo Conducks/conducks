@@ -60,6 +60,7 @@ docs/
 ├── architecture/     one note per module — see below            (living)
 ├── decisions/        one ADR per numbered file                  (record)
 ├── todos/            todoNN.md · completed/                     (record)
+├── visuals/          rendered pictures — ROOT ONLY, only when asked (living)
 ├── handover.md       snapshot for the next session; overwritten (living, dated)
 └── <soft>/           product/ business/ design/ — free prose, never linted
 ```
@@ -98,6 +99,75 @@ each hold a `todo01`; merging would make every address ambiguous and hide which 
 
 This mattered: before it was recursive, a root run reported **43 governed docs clean and exited 0**
 while a broken phase sat unread in `app/docs/`. "Clean" meant "clean at root", and nothing said so.
+
+---
+
+## `visuals/` — rendered pictures, root only, only when asked
+
+**Created ONLY when someone asks for one.** Unlike every other file here, this folder is never
+bootstrapped and never "completed" to fill a set. Nobody maintains a picture they did not want, and an
+unwanted one rots into a confident lie.
+
+**Root only, and one per subject.** A visual usually spans the whole system, and one per unit costs
+more upkeep than it returns. Any subject, any format — `.html`, `.svg`, `.md` with a diagram. This is
+the one folder the standard does not constrain by content or file type, because what makes it a visual
+is that it is *looked at*, not that it is about code.
+
+**What `architecture/` will not hold.** A module note is anatomy — the parts and which arrows between
+them are legal. A detailed runtime trace is physiology: what happens on one path, in order, what each
+step hands the next, what each fallback decides. That falls through every slot in "Where a fact goes"
+— not a trap, not a rule, not one module's business, and **not queryable**, because no static graph
+can say what a catch block decides.
+
+### Every visual carries provenance, per claim
+
+A picture *looks* authoritative whether or not anyone checked it. Head the file with what it depicts,
+what it was built from, and when. Then mark each class of claim:
+
+| stamp | the claim is | how it was checked |
+|---|---|---|
+| `queried` | structure — who calls whom, the module graph, dead code | `conducks trace` / `impact` / `audit`. **Name the command in the visual.** |
+| `traced` | behaviour — ordering, what a fallback decides, a threshold | a `file:line` anchor, a test, or a measurement. **conducks cannot help here** |
+| `measured` | a number — a ratio, a count, a timing | the run that produced it, with its date |
+| `authored` | not a claim about code — brand, product, a concept | nothing to verify. Saying so is what stops a reader treating it as fact |
+| `UNVERIFIED` | a code claim with none of the above | **say it in the visual, visibly** |
+
+**An inferred claim that looks identical to a traced one is the failure this folder must not produce.**
+If you read a comment rather than the implementation, that is `UNVERIFIED` until you read the
+implementation. Marking it costs a line; not marking it costs the next reader a wrong belief they have
+no way to detect.
+
+**`conducks trace` verifies wiring, never logic** — it answers "does A call B", not "does A clear the
+counter before B increments it". A `queried` stamp never stands in for a `traced` one.
+
+**When conducks cannot run, say so in the visual** — a missing `.conducks/` graph, a repo it was never
+pointed at. Write *"conducks unavailable; structural claims are read, not queried"* rather than leaving
+a `queried` stamp nobody could have earned.
+
+### The anchor gate — `conducks visuals-lint` (ADR 0138)
+
+`docs-lint` does not grammar-check this folder. `visuals-lint` checks the ANCHORS instead, which is
+the half of a picture that can be computed: an anchor must resolve to exactly one tracked file, a
+`:line` must exist, a `::symbol` must be defined, and a `NAME=value` written in the page must still be
+the value the code assigns. **An abbreviation matching more than one file FAILS** rather than resolving
+to a guess — `dispatch.ts` naming two different files is how a reader ends up in the wrong one. A page
+with no anchors at all is reported, never passed, because nothing in it can be verified.
+
+**Mark your anchors.** Only text a page marks as a claim is checked — a `<title>` (an SVG block's
+hover), an element whose `class` contains `file`, `where` or `anchor`, or one carrying `data-anchor`.
+Ordinary prose is deliberately not scanned, or "open `index.ts`" would fail as an ambiguous anchor and
+the gate would be switched off within a week. Subfolders are walked. Broken anchors fail the run;
+symbol warnings do not.
+
+It checks against the **working tree, never the vault** — a graph keyed to the last pulse describes a
+tree that may no longer exist, and a stale input makes the gate a false green.
+
+**A visual names the records it rests on** (`Depends on: 0046, 0052, todo14#P5`). A rule saying
+"recheck every visual whenever an ADR changes" is not one anybody keeps; a declared dependency is
+greppable. **Living, not a record** — overwrite in place, re-stamp the date.
+
+**NEVER the source of truth.** Precedence is code → `architecture/` → the visual. Prose staleness is
+caught by nobody, which is why the provenance stamps above are not optional.
 
 ---
 

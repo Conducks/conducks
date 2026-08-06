@@ -9,6 +9,7 @@ import { GovernanceService, ConducksAdvisor, ConducksSentinel, RegressionGuard }
 import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView } from "@/lib/domain/analysis/docs-board.js";
+import { lintVisuals, collectVisualPages, type VisualsViolation } from "@/lib/domain/analysis/visuals-lint.js";
 import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
 import { parseIstanbul, bindCoverage, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
@@ -46,6 +47,7 @@ import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
 import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -241,6 +243,29 @@ export const registry = {
       docsWatcher ??= new DocsWatcher(chronicle.getProjectDir() || process.cwd());
       return docsWatcher;
     }
+  },
+  /**
+   * The visuals gate (ADR 0138). Separate from `docs` because it answers a different question with a
+   * different source of truth: `docs` parses AUTHORED grammar, this checks DERIVED anchors against
+   * the working tree. Discovery lives here — the lint itself takes its file list as an argument so it
+   * stays pure, and so it can never be pointed at a stale graph by accident.
+   */
+  visuals: {
+    lint: async (root?: string) => {
+      const dir = root || chronicle.getProjectDir() || process.cwd();
+      const pages = collectVisualPages(dir);
+      if (pages.length === 0) return { violations: [] as VisualsViolation[], checked: 0, pagesWithAnchors: 0, pages: 0 };
+      // The FILESYSTEM is ground truth, never the vault — a graph keyed to the last pulse describes a
+      // tree that may no longer exist (ADR 0035), and a stale input makes this gate a false green.
+      const abs = await chronicle.discoverFiles();
+      const rel = abs
+        .map(f => path.relative(dir, f))
+        .filter(f => f.length > 0 && !f.startsWith('..'));
+      const read = (p: string): string | null => {
+        try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
+      };
+      return { ...lintVisuals(pages, rel, read), pages: pages.length };
+    },
   },
   coverage: {
     // Query BEHAVIOR node spans, then range-join the istanbul report onto them (domain logic).

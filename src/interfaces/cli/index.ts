@@ -39,6 +39,7 @@ import { CoverageViewCommand } from "./commands/coverage-view.js";
 import { DocsStatusCommand } from "./commands/docs-status.js";
 import { MonitorCommand } from "./commands/monitor.js";
 import { DocsLintCommand } from "./commands/docs-lint.js";
+import { VisualsLintCommand } from "./commands/visuals-lint.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
 import { LedgerCommand } from "./commands/ledger.js";
 import { ConducksCommand } from "./command.js";
@@ -57,6 +58,7 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
 export const STALENESS_BYPASS = new Set([
   'analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback',
   'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
+  'visuals-lint',
 ]);
 
 /**
@@ -75,7 +77,7 @@ export const STALENESS_BYPASS = new Set([
  * asked for a graph nobody loaded — asserted by `tests/unit/interfaces/cli/no-registry-commands.test.ts`.
  */
 export const NEEDS_NO_REGISTRY = new Set([
-  'help', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
+  'help', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor', 'visuals-lint',
 ]);
 
 /**
@@ -133,7 +135,7 @@ export async function main() {
     new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
-    new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(),
+    new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(), new VisualsLintCommand(),
     new SupplyChainCommand(), new LedgerCommand(), new MonitorCommand()
   ];
 
