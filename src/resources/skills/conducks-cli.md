@@ -68,8 +68,11 @@ and the bare board for a single repo. `--root-only` on either command restores t
 - `conducks rename <id> <new> [--confirm]` — graph-verified rename
 
 ## Lifecycle
-- `conducks setup` — install skills into `~/.claude/skills`, register the project, configure MCP, write `.conducksignore`
+- `conducks setup` — install skills into `~/.claude/skills`, register the project, configure MCP, write `.conducksignore`, and install the pre-commit gates
   - skills are GLOBAL only; a repo-local copy is a duplicate that loads twice, and setup prunes one if it finds it
+  - skills also re-sync on every `npm run build` of conducks itself (postbuild), so the installed copy never lags the source
+- `conducks install-hooks [path] [--force]` — write the docs-lint/visuals-lint gates into `.git/hooks/pre-commit`, behind managed markers
+  - idempotent; a foreign hook is appended to (its own lines untouched, gates placed before a trailing `exit 0`); a symlinked hook is left alone with an instruction; no `.git` exits quietly; `--force` rewrites wholesale
 - `conducks uninstall` — remove the skills conducks installed
 - `conducks mcp [--sse] [--root <path>]` — run the MCP server (stdio by default)
 - `conducks watch` — live re-analysis on save · `conducks mirror` — web dashboard on port 3333

@@ -41,6 +41,7 @@ import { DocsStatusCommand } from "./commands/docs-status.js";
 import { MonitorCommand } from "./commands/monitor.js";
 import { DocsLintCommand } from "./commands/docs-lint.js";
 import { VisualsLintCommand } from "./commands/visuals-lint.js";
+import { InstallHooksCommand } from "./commands/install-hooks.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
 import { LedgerCommand } from "./commands/ledger.js";
 import { ConducksCommand } from "./command.js";
@@ -59,7 +60,7 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
 export const STALENESS_BYPASS = new Set([
   'analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback',
   'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
-  'visuals-lint',
+  'visuals-lint', 'install-hooks',
 ]);
 
 /**
@@ -79,6 +80,7 @@ export const STALENESS_BYPASS = new Set([
  */
 export const NEEDS_NO_REGISTRY = new Set([
   'help', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor', 'visuals-lint',
+  'install-hooks',
 ]);
 
 /**
@@ -217,7 +219,7 @@ export async function main() {
     // `link` was imported and never instantiated, so `conducks link <path>` answered
     // `Unknown command "link"` while FederatedLinker underneath worked fine. Nothing caught it:
     // the import satisfied the compiler and no test drove the command surface.
-    new SupplyChainCommand(), new LedgerCommand(), new MonitorCommand(), new LinkCommand()
+    new SupplyChainCommand(), new LedgerCommand(), new MonitorCommand(), new LinkCommand(), new InstallHooksCommand()
   ];
 
   commands.push(new HelpCommand(commands));

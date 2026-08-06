@@ -70,7 +70,7 @@
     "src/lib/domain/governance/index.ts:266": "128b5c4d4f8f1e06",
     "config/sentinel.json": "152f1597f569c396",
     "src/interfaces/cli/commands/audit.ts:82-88": "6e779c6032f1433f",
-    "src/registry/index.ts": "fe5eb48a6ac29084"
+    "src/registry/index.ts": "9c49c135d4b7d493"
   },
   "docs/visuals/modules/domain/governance.md": {
     "src/lib/domain/governance/index.ts:106-158": "18aae9a4ef4e6086"
@@ -85,13 +85,13 @@
     "tests/unit/domain/stale-import.test.ts": "3aeb7ac01fe2ce3b"
   },
   "docs/visuals/modules/registry.md": {
-    "src/registry/index.ts": "fe5eb48a6ac29084"
+    "src/registry/index.ts": "9c49c135d4b7d493"
   },
   "docs/visuals/system-trace.html": {
     "src/lib/domain/analysis/conducks-core.ts:58": "a8100dcb07ab26b4",
     "src/lib/core/parsing/processors/call.ts:58": "2ea8f2650c3c17e4",
     "src/lib/core/parsing/processors/heritage.ts:38": "63ba1ed96ff6d880",
-    "src/interfaces/cli/index.ts:121": "e3b0c44298fc1c14",
+    "src/interfaces/cli/index.ts:203-204": "6bd5f2d873d60c4c",
     "src/lib/domain/analysis/micro-pulse.ts:68": "a2c2339691fc48fb",
     "src/lib/core/graph/adjacency-list.ts:318": "c8e0d39aa04bbdee",
     "src/lib/core/graph/graph-engine.ts:322": "684888c0ebb17f37",

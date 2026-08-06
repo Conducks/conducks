@@ -428,7 +428,7 @@
   <div class="cards">
     <div class="card">
       <h3>status --mode pulse</h3>
-      <p><code class="anchor">cli/index.ts:121</code> opens the vault read-only for every command except <code>analyze</code>
+      <p><code class="anchor">cli/index.ts:203-204</code> opens the vault read-only for every command except <code>analyze</code>
       and <code>clean</code>. <code class="anchor">micro-pulse.ts:68</code> guards its write on
       <code>!readOnly</code> — and the success line sits <em>outside</em> the guard.</p>
       <p>Was: <code>🛡️ [Micro-Pulse] logger.ts resurrected (19 nodes).</code> — nothing written.</p>

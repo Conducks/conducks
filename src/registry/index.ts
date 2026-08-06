@@ -35,6 +35,7 @@ import { firstLineOf } from "@/lib/core/parsing/doc-comments.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
 import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
+import { installHook, type HookInstallResult } from "@/lib/domain/federation/hook-installer.js";
 import { MCPConfigurator } from "@/lib/domain/federation/mcp-configurator.js";
 import {
   defaultBaselinePath,
@@ -456,6 +457,10 @@ export const registry = {
   },
   federation: {
     createInstaller: (root: string) => new ConducksInstaller(root),
+    // The pre-commit gates, installed by the tool that owns them (todo46). `cliPath` is this very
+    // process's entry script, so the hook always points at the build that installed it.
+    installHook: (root: string, force = false): HookInstallResult =>
+      installHook(root, process.argv[1], force),
     createMCPConfigurator: () => new MCPConfigurator(),
     createLinker: (root: string) => new FederatedLinker(root),
     createProjectRegistry: () => new ProjectRegistry(),

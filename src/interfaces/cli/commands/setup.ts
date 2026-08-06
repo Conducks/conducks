@@ -29,6 +29,7 @@ export class SetupCommand implements ConducksCommand {
       console.log(`  project registry→ ${projects.path}  ${already ? "(already registered)" : "(would add this root)"}`);
       console.log(`  MCP entry       → the Claude Desktop config, pointing at ${cliEntry}`);
       console.log(`  ignore file     → ${ignorePath} ${fs.existsSync(ignorePath) ? "(exists — would be left alone)" : "(would be created)"}`);
+      console.log(`  pre-commit gates→ .git/hooks/pre-commit (docs-lint / visuals-lint, behind managed markers; a symlinked hook is left alone)`);
       console.log("\n\x1b[2m  Re-run without --dry-run to apply.\x1b[0m\n");
       return;
     }
@@ -103,6 +104,12 @@ export class SetupCommand implements ConducksCommand {
     } else {
       console.log("ℹ️  .conducksignore already exists. Skipping generation.");
     }
+
+    // 4. The pre-commit gates (todo46): setup is the one command every project runs first, so
+    // adoption is one command instead of a hand-written hook per repo. A check nobody runs is advice.
+    const hook = registry.federation.installHook(process.cwd());
+    if (hook.status === "skipped") console.log(`ℹ️  Hooks: ${hook.reason}`);
+    else console.log(`✅ Pre-commit gates (docs-lint / visuals-lint) → .git/hooks/pre-commit (${hook.status})`);
 
     console.log("\n\x1b[32m[Conducks] Setup complete.\x1b[0m");
   }
