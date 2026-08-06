@@ -19,6 +19,7 @@ import {
   GOVERNED, REL, RE, type DocType, inferType, parseBody, shape, lint,
 } from "@/lib/domain/analysis/docs-grammar.js";
 import { resolveDocsTrees } from "@/lib/domain/analysis/service-docs.js";
+import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 
 export interface DocsBoard {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -456,20 +457,6 @@ function driftedReviews(root: string): Array<{ module: string; moduleDoc: string
   return out.sort((a, b) => a.module.localeCompare(b.module));
 }
 
-/** Combined hash of the source files directly in a directory. Must match ProjectMonitor.moduleHash. */
-function moduleHashOf(dir: string): string {
-  const exts = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java",
-    ".cs", ".cpp", ".cc", ".c", ".h", ".hpp", ".php", ".rb", ".swift"]);
-  let entries: string[] = [];
-  try {
-    entries = readdirSync(dir).filter(f => exts.has(path.extname(f))).sort();
-  } catch { return ""; }
-  const parts = entries.map(f => {
-    try { return createHash("sha256").update(readFileSync(path.join(dir, f), "utf8")).digest("hex"); }
-    catch { return ""; }
-  });
-  return createHash("sha256").update(parts.join("|")).digest("hex");
-}
 
 /**
  * Resolve `- Depends:` into blocked state. A phase waiting on an unfinished phase IS blocked, and
@@ -629,6 +616,12 @@ function hygiene(board: DocsBoard): void {
       warn(board, t.file, `\`Status: done\` but ${t.total - t.done} task(s) are unchecked`);
     if (claim === "doing" && t.total && t.done === t.total)
       warn(board, t.file, "`Status: doing` but every task is checked");
+    // The blind spot that hid FIVE finished todos for weeks: `Status: todo` with every task closed
+    // evades both checks above — the board counts open tasks (zero) and the done-in-todos/ warn
+    // keys on the claim (which says todo). A file in this state is invisible to every surface.
+    // Deferred `[>]` tasks exempt it: a legitimately parked record claims `todo` truthfully.
+    if (claim === "todo" && t.total && t.done === t.total && !t.deferred && !/\/completed\//.test(t.file))
+      warn(board, t.file, "`Status: todo` but every task is closed — verify the acceptance, set `Status: done`, and move it to `todos/completed/`");
     // `t.blocked` already covers a phase-level `- Blocked by:` (ADR 0034) because `linkPhases` sets a
     // phase's state to "blocked" on either cause — so nothing extra is needed here, only the comment:
     // a todo with a Blocked-by phase and Status: blocked is telling the truth, not lying.

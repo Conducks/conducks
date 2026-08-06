@@ -1,6 +1,7 @@
 # 0048 — a gate checks the thing, not a proxy for it
 Status: Accepted
 - Date: 2026-07-30
+- Enforced by: tests/architecture/boundaries.test.ts and tests/database/ts/structural.test.ts (gates assert the thing itself, not a proxy)
 
 ## Context
 

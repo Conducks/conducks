@@ -2,6 +2,7 @@
 Status: Accepted
 - Amended by: 0081
 - Date: 2026-07-27
+- Enforced by: tests/unit/core/persistence/layer-storage.test.ts (content-addressed commit layers) and the branch guard in tests/unit/interfaces/cli (refusal when the vault describes another branch)
 
 ## Context
 

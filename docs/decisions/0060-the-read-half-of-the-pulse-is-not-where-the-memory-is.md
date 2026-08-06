@@ -1,5 +1,6 @@
 # 0060 — the read half of the pulse is not where the memory is
 Status: Accepted
+- Resolves: 0042 (its sizing decision, withdrawn on direct measurement; stamped 2026-08-06 when the board asked 0042 for a build link it handed on)
 - Enforced by: tests/integration/features/pulse-writes-every-table.test.ts (the pulse still produces a complete graph after the reload it keeps)
 - Amends: 0042
 - Builds: 0043

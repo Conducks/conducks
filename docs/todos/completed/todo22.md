@@ -1,6 +1,7 @@
 # todo22 — the gates that do not run, and the claims that are not true
-Status: todo
+Status: done
 - Acceptance: every rule this repo declares is evaluated by something that runs automatically, and no doc claims an enforcement that does not happen.
+- On close (2026-08-06): all 107 tasks closed with their measurements; the acceptance is the repo's standing state — docs-lint, the citations test, the marker-table mutation checks and the boundary gates all run in CI. This record sat finished-but-open in the exact blind spot its own Phase 4 work was about (`Status: todo`, zero open tasks, invisible to the board), and was caught by the new hygiene rule ON ITS FIRST RUN — after a manual audit an hour earlier had mislabeled it "legitimately parked" off a grep that counted `[>]` mentions in prose. The parser beat the human twice in one day.
 
 ## Context
 

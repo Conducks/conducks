@@ -1,6 +1,7 @@
 # 0047 — conducks trusts neither the repository it reads nor the caller that drives it
 Status: Accepted
 - Date: 2026-07-30
+- Enforced by: tests/integration/features/shell-injection.test.ts (untrusted repository content and caller input never reach a shell unfiltered)
 
 ## Context
 

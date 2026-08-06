@@ -1,6 +1,7 @@
 # todo25 — close the audit: trust boundary, real gates, honest subprocesses
-Status: todo
+Status: done
 - Acceptance: no input reaches a shell or a file read unfiltered, and no gate in the suite can report clean without having checked the thing it names.
+- On close (2026-08-06): shell surfaces re-swept — the only non-git execSync builds a STATIC command (`cochange-engine.ts:31`, no user input in the string); the drift-check runner executes only the command the repo itself declares in conducks.json, which is the repo author's own code by definition. Every gate-honesty task below closed with its measurement. The three findings these tasks marked "worth a fresh task" are now todo48 — a finding recorded only inside a closed task's prose is invisible to the board, and that near-loss is exactly why todo48 exists.
 
 ## Context
 

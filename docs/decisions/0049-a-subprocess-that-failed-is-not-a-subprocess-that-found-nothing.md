@@ -1,6 +1,7 @@
 # 0049 — a subprocess that failed is not a subprocess that found nothing
 Status: Accepted
 - Date: 2026-07-30
+- Enforced by: tests/unit/domain/analysis/worker-accounting.test.ts (a failed subprocess is accounted as failed, never as empty output)
 
 ## Context
 

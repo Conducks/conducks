@@ -1,4 +1,5 @@
 import { readWatcherLiveness, type WatcherLiveness } from "@/lib/domain/evolution/watcher-liveness.js";
+import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -230,15 +231,9 @@ export class ProjectMonitor {
 
   /** Combined hash of every source file directly in a module directory. */
   public moduleHash(root: string, moduleDir: string): string {
-    const dir = path.join(root, moduleDir);
-    let entries: string[] = [];
-    try {
-      entries = fs.readdirSync(dir).filter(f => SOURCE_EXTENSIONS.has(path.extname(f))).sort();
-    } catch { return ""; }
-    const parts = entries.map(f => {
-      try { return FileHashGate.hash(fs.readFileSync(path.join(dir, f), "utf8")); } catch { return ""; }
-    });
-    return FileHashGate.hash(parts.join("|"));
+    // ONE implementation with docs-board's drift check (todo21's acceptance): both used to carry a
+    // copy coupled by a "must match" comment — the shared function is what makes matching a fact.
+    return moduleHashOf(path.join(root, moduleDir));
   }
 
   /** Dismissals live in the PROJECT, beside its vault — they are a fact about this code, not this machine. */

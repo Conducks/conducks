@@ -1,6 +1,7 @@
 # todo21 — one incremental engine behind watch and monitor
-Status: todo
+Status: done
 - Acceptance: a one-line edit updates only the symbols that changed, measured; `watch` and `monitor` share one engine and one module-hash implementation; nothing is watched that no session is using.
+- On close (2026-08-06): the micro-pulse and watcher-lease halves were built and measured in the phases below. The "one module-hash implementation" clause was NOT true until today — `docs-board` and `ProjectMonitor` each carried a copy coupled by a "must match" comment. Extracted to `src/lib/domain/analysis/module-hash.ts`, both callers import it, and the equality is pinned by test (module-hash.test.ts) instead of by comment. Same algorithm both sides (sha256), so stored doc-reviews survive.
 
 ## Context
 

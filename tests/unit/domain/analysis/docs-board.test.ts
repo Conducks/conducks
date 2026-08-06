@@ -462,3 +462,27 @@ describe('a finished claim is not a proven one', () => {
     expect(byId['0002'].buildState).toBe('proven');
   });
 });
+
+describe('hygiene — the finished-but-still-open blind spot', () => {
+  // FIVE finished todos hid for weeks in this exact state: Status: todo, every task closed. The
+  // board counts open tasks (zero) and the done-in-todos/ warn keys on the claim (which says todo),
+  // so the file was invisible to every surface until a human asked "is it complete?".
+  const boardFor = (todoBody: string) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'conducks-hidden-'));
+    mkdirSync(path.join(root, 'docs', 'todos'), { recursive: true });
+    writeFileSync(path.join(root, 'docs', 'todos', 'todo01.md'), todoBody);
+    const board = buildBoard(root);
+    rmSync(root, { recursive: true, force: true });
+    return board;
+  };
+
+  it('Status: todo with every task closed warns', () => {
+    const board = boardFor('# todo01 — t\nStatus: todo\n- Acceptance: x.\n\n## Phase 1\n- [x] done thing\n- [-] dropped — reason\n');
+    expect(board.warns.flatMap((w: any) => w.errs).join(' ')).toContain('every task is closed');
+  });
+
+  it('a deferred task legitimately parks the record — no warn', () => {
+    const board = boardFor('# todo01 — t\nStatus: todo\n- Acceptance: x.\n\n## Phase 1\n- [x] done thing\n- [>] parked — waits on a trigger\n');
+    expect(board.warns.flatMap((w: any) => w.errs).join(' ')).not.toContain('every task is closed');
+  });
+});

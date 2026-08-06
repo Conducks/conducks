@@ -1,6 +1,7 @@
 # 0043 — the pulse already writes and forgets; RSS is a high-water mark, not a holding
 Status: Accepted
 - Amends: 0042
+- Enforced by: tests/unit/core/persistence/compact.test.ts and tests/unit/core/persistence/freshness.test.ts (the reclaim path the measurement justified); the decision's other half is a REFUSAL — no eviction layer gets built — and a refusal is enforced by the absence it protects, not by a test
 - Date: 2026-07-30
 
 ADR 0042 attributed a 994 MB peak to two causes: ~200 MB of rows held by the single pulse

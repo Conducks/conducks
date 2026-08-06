@@ -1,6 +1,7 @@
 # todo20 — give the graph a git identity
-Status: todo
+Status: done
 - Acceptance: `conducks` refuses to answer from a graph pulsed on another branch; a layer is keyed by commit and resolvable without checkout; `conducks drift` reports a real change between two layers on this repo.
+- On close (2026-08-06): all three clauses built and asserted — the branch guard refuses live, `readRef` reads a commit's tree in 123 ms without checkout, and `diffLayers` was asserted end-to-end on a real vault (edit/delete/add each in its own bucket). The activation tails its tasks deliberately left unwired — a pulse actually WRITING layers, the GC call, a mergeImpact command — are carried by todo48#P4 rather than buried here; the dropped WIP branch is named there so nobody resurrects an unverified diff.
 
 ## Phase 0 — measure before designing further
 - Builds: 0035

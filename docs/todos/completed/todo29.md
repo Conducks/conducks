@@ -1,5 +1,5 @@
 # todo29 — the monorepo work ADR 0069 decided and did not build
-Status: todo
+Status: done
 - Acceptance: conducks answers correctly on all three repository topologies — one git at the workspace root, nested repositories inside it, and no repository at the root at all — and every service of a declared workspace can be analyzed without the others degrading.
 
 ## Context

@@ -2,6 +2,7 @@
 Status: Accepted
 - Amends: 0031
 - Date: 2026-07-27
+- Enforced by: tests/unit/core/lazy-graph.test.ts and tests/unit/domain/analysis/worker-pool-concurrency.test.ts (one engine; watch and monitor stay surfaces)
 
 ## Context
 

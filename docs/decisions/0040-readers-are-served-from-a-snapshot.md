@@ -2,6 +2,7 @@
 Status: Accepted
 - Amends: 0032
 - Date: 2026-07-28
+- Enforced by: tests/unit/core/persistence/reader-snapshot.test.ts (a pulse never fails a read; readers answer from the snapshot)
 
 ## Context
 

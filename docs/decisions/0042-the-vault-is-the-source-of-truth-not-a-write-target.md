@@ -1,6 +1,7 @@
 # 0042 — the vault is the source of truth; memory holds a working set, not the graph
 Status: Accepted
 - Amended by: 0043, 0060
+- Resolved by: 0060 — the sizing this record decided was withdrawn after direct measurement; the projection discipline it introduced lives on in its successors, which carry the build links
 - Date: 2026-07-30
 
 0060 then withdrew what remained of the sizing. Measured twice on `mentorseed`, the reload this
