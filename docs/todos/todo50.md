@@ -26,11 +26,21 @@ every subsequent test looked like a new regression rather than the first look at
       unless it is genuinely an entry point
 
 ## Phase 2 — graph traversal, against a hand-derived fixture
-- [ ] `impact`, `trace`, `context`, `flows`, `cohesion`, `entropy` on a fixture whose every edge is
+- [x] `impact`, `trace`, `context`, `flows`, `cohesion`, `entropy` on a fixture whose every edge is
       written by hand, so each answer has a known-correct expectation rather than a plausible one
-- [ ] The property to check per command is DIRECTION and DEPTH, since both are invisible in a
+      → `tests/integration/features/traversal-truth.test.ts`. The fixture is built so each command
+      has one right answer and several tempting wrong ones: two orphans that SHARE A FILE with the
+      real chain, which is the only way co-location can masquerade as dependency. ALL FOUR PASS —
+      `impact format` reaches fetchUser and run and neither orphan, `trace run` reports no container
+      as a step, `context` names its callers, and an uncalled symbol's zero states its basis. This
+      family is CORRECT; the one failure was my assertion, not the code (see below)
+- [x] The property to check per command is DIRECTION and DEPTH, since both are invisible in a
       plausible-looking answer: `impact` upstream must not report a sibling reached through a shared
       container (ADR 0129), `trace` must not report the containment ladder as a dependency (todo38)
+      → both hold on the fixture. Worth recording: the single failing case was a regex I GUESSED
+      rather than read — `impact` says "0 Symbols affected" and had printed its full basis line all
+      along. That is the fourth time in this walk the check was wrong rather than the code, which is
+      now the more common failure mode and the reason CONDUCKS-41 exists.
 
 ## Phase 3 — judgments, scored against a repo whose real state is known
 - [ ] `audit`, `arch`, `guard`, `advise`, `drift`, `fallback`, `ledger` — each returns a VERDICT, so
