@@ -161,6 +161,16 @@ export class AnalysisService {
     }
 
     traceMemory('after vault reconcile');
+    // NOTHING FOUND is not NOTHING CHANGED, and the two used to print the same sentence. An empty
+    // directory — or a wrong path, which is the common way to reach one — answered "already at 100%
+    // resonance", a success message for a root holding no code at all (ADR 0124: nothing checked
+    // must never read as clean). ADR 0021 grades a root that is too BIG; this is the same mistake
+    // from the other end.
+    if (filteredFiles.length === 0) {
+      logger.warn(`No analyzable source files found under ${targetRoot}. Nothing was analyzed — this is not a clean result. Check the path, or .conducksignore.`);
+      return { success: false, files: 0 };
+    }
+
     if (dirtyFiles.length === 0 && !options.force) {
       logger.warn("No changes detected. Structural Synapse is already at 100% resonance.");
       return { success: true, files: 0 };

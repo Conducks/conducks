@@ -36,12 +36,18 @@ export class AnalyzeCommand implements ConducksCommand {
 
     try {
       // Delegate to the unified Analysis domain with scoped root
-      await (registry.analyze as any).full({
+      const result = await (registry.analyze as any).full({
         root: targetPath,
         staged: isStaged,
         verbose: isVerbose,
         force: isForce
       });
+
+      // A run that analyzed NOTHING exits non-zero. The domain already distinguishes "no source
+      // files here" from "no changes since last time" and returns success:false for the first —
+      // and the CLI discarded the result, so a wrong path exited 0 and any script calling this read
+      // it as a successful analysis of an empty codebase.
+      if (result && result.success === false) process.exitCode = 1;
 
       // Reclaim the vault now the pulse has published. A pulse purges and re-inserts every unit it
       // touched, and DuckDB keeps the old row versions forever — so the file grows on every analyze

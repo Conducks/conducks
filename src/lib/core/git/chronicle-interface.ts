@@ -247,12 +247,21 @@ export class ChronicleInterface {
 
     // 1. Attempt Git Discovery
     try {
+      // `-c core.quotePath=false` on EVERY listing: git's default quotes any path containing a
+      // non-ASCII byte — `İstanbul_x.csv` comes back as the 52-character literal
+      // `"data/source/\304\260stanbul_x.csv"`, quotes and octal escapes included. Taken as a path
+      // that opens nothing, so the file is dropped from the graph. Found by running `analyze` on the
+      // frozen Python subject, which owns exactly one such file; it happens to be a CSV, and a
+      // `café.py` would have been silently absent from every answer with only a skipped-file warning
+      // to show for it. The flag is passed per-invocation rather than set in the repo's config,
+      // because conducks must not write to a repository it is only reading.
+      const quoteless = ['-c', 'core.quotePath=false'];
       let commands: string[][] = [
-        ['ls-files', '--cached', '--recurse-submodules'],
-        ['ls-files', '--others', '--exclude-standard'],
+        [...quoteless, 'ls-files', '--cached', '--recurse-submodules'],
+        [...quoteless, 'ls-files', '--others', '--exclude-standard'],
       ];
       if (stagedOnly) {
-        commands = [['diff', '--cached', '--name-only']];
+        commands = [[...quoteless, 'diff', '--cached', '--name-only']];
       }
 
       // Ask EVERY repository under the anchor, not only the anchor's own (todo29#P0, ADR 0069).
@@ -263,7 +272,10 @@ export class ChronicleInterface {
       for (const root of targets) {
         for (const cmd of commands) {
           try {
-            const output = this.git(cmd, { cwd: root });
+            // `quiet`: a non-git directory is a SUPPORTED input (ADR 0035), so git's own
+            // `fatal: not a git repository` is an expected condition, not news — it was printing
+            // raw to the user's terminal twice per run before the fallback did its job.
+            const output = this.git(cmd, { cwd: root, quiet: true });
             (output as string).split('\n')
               .filter(f => f.trim().length > 0)
               .map(f => path.resolve(root, f))
