@@ -113,6 +113,18 @@ const CHECKS = [
 // Checks that are about the TOOL rather than about a subject — run once, not per project.
 const GLOBAL_CHECKS = [
   {
+    cmd: 'analyze <scope that matches nothing>',
+    run: () => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'conducks-scope-'));
+      try { return run(dir, ['analyze', 'does/not/exist', '--yes']); }
+      finally { rmSync(dir, { recursive: true, force: true }); }
+    },
+    checks: [
+      ['a scope naming no file EXITS non-zero', r => r.code !== 0],
+      ['and never claims "100% resonance"', r => !/100% resonance/i.test(r.out)],
+    ],
+  },
+  {
     cmd: 'analyze <empty dir>',
     run: () => {
       const dir = mkdtempSync(path.join(tmpdir(), 'conducks-empty-'));

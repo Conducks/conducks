@@ -75,7 +75,14 @@ export class AnalysisService {
 
     // [Conducks State-Sync] Change Detection & Incremental Targeting 🏺
     // We filter the discovery set to only include "Dirty Units" (changed since last synapse)
-    const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses ORDER BY timestamp DESC LIMIT 1");
+    // The last UNSCOPED pulse, not the last pulse. This clock means "everything discoverable was
+    // analyzed at this moment", and a subfolder pulse cannot say that — it filtered the dirty set to
+    // its scope and never read the rest. Advancing it anyway silently consumed every out-of-scope
+    // change: the next full `analyze` answered "No changes detected. Structural Synapse is already
+    // at 100% resonance" over files whose symbols were never re-read, and the stale definitions sat
+    // in the graph until someone happened to run `--force` for unrelated reasons. Pinned by
+    // tests/integration/features/scoped-analyze.test.ts, whose second case is exactly that survival.
+    const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses WHERE scoped IS NOT TRUE ORDER BY timestamp DESC LIMIT 1");
     const lastSyncTime = lastPulse.length > 0 ? Number(lastPulse[0].timestamp) : 0;
     const ignoreManager = (this.orchestrator as any).ignoreManager;
     
@@ -129,6 +136,15 @@ export class AnalysisService {
 
     // Conducks Filter: Scoped Discovery 🏺
     if (targetRoot !== projectRoot) {
+      // A SCOPE THAT MATCHES NOTHING is a typo, not a clean result. `analyze does/not/exist`
+      // reported "already at 100% resonance" and exited 0, because the empty-root check above tests
+      // the whole discovery set and this path narrows only the DIRTY one — so a scope naming no
+      // file at all looked identical to a scope with no changes in it. The two are answered
+      // separately now, and only one of them is good news.
+      if (!filteredFiles.some(f => f.startsWith(targetRoot))) {
+        logger.warn(`Scope ${targetRoot} contains no analyzable file. Nothing was analyzed — check the path.`);
+        return { success: false, files: 0 };
+      }
       dirtyFiles = dirtyFiles.filter(f => f.startsWith(targetRoot));
     }
 
@@ -415,7 +431,7 @@ export class AnalysisService {
     logger.info(`🛡️ [Conducks] Synapse Reflection: ${held.nodes} Nodes, ${held.edges} Edges in the vault.`);
 
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
-    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges });
+    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges, scoped: targetRoot !== projectRoot });
 
     } catch (pulseErr) {
       // Any failure before the commit rolls the entire pulse back — no partial graph is left behind.

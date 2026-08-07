@@ -423,6 +423,7 @@ export class SynapsePersistence {
     await run(pulsesSql);
     // Existing vaults predate the column; adding it is what keeps an old vault readable.
     await run(`ALTER TABLE pulses ADD COLUMN IF NOT EXISTS branch TEXT;`);
+    await run(`ALTER TABLE pulses ADD COLUMN IF NOT EXISTS scoped BOOLEAN;`);
     // The layer registry (ADR 0035). ADDITIVE for now: nothing reads `nodes` through a layer yet,
     // so an existing vault gains an empty table and behaves exactly as before. `commitHash` is
     // nullable because the `uncommitted` layer has no commit of its own — it is the working tree
@@ -858,7 +859,7 @@ export class SynapsePersistence {
   // comments described it as the switch that suppressed row writes, so the obvious fix for a
   // binder whose output vanished was to flip it — which would have changed nothing. save() writes
   // metadata and the pulse row and commits; it has never written node or edge rows in any mode.
-  public async save(graph: any, options: { nodeCount?: number, edgeCount?: number } = {}): Promise<void> {
+  public async save(graph: any, options: { nodeCount?: number, edgeCount?: number, scoped?: boolean } = {}): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     const pulseId = graph.getMetadata('targetPulseId') || `pulse_${Date.now()}`;
@@ -875,14 +876,17 @@ export class SynapsePersistence {
       for (const [key, value] of metadata.entries()) {
         await this.run(`INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`, [key, String(value)]);
       }
-      await this.run(`INSERT OR REPLACE INTO pulses (id, timestamp, commitHash, branch, nodeCount, edgeCount, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+      // `scoped` decides whether this pulse may serve as the "everything is analyzed up to here"
+      // mark. A subfolder pulse is a real pulse and gets a real row — it just cannot answer that
+      // question for the files it never looked at (see the incremental gate in domain/analysis).
+      await this.run(`INSERT OR REPLACE INTO pulses (id, timestamp, commitHash, branch, nodeCount, edgeCount, metadata, scoped) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
         // `stats` is a GETTER on ConducksAdjacencyList — there is no nodeCount()/edgeCount() method,
         // and calling one threw for every caller that omitted the counts. That was the watcher: both
         // its auto-pulse and its writer save() call sites pass no options, so every incremental save
         // died with "graph.nodeCount is not a function", got logged by the watcher's catch, and the
         // delta was never written to the vault. The two callers that pass counts explicitly never hit
         // this line, which is why it survived.
-        pulseId, Date.now(), headHash, branch, options.nodeCount ?? graph.stats?.nodeCount ?? 0, options.edgeCount ?? graph.stats?.edgeCount ?? 0, JSON.stringify(Object.fromEntries(metadata))
+        pulseId, Date.now(), headHash, branch, options.nodeCount ?? graph.stats?.nodeCount ?? 0, options.edgeCount ?? graph.stats?.edgeCount ?? 0, JSON.stringify(Object.fromEntries(metadata)), options.scoped === true
       ]);
       await this.run(`COMMIT`);   // publishes the pulse (owned tx, or the big inPulse tx)
       this.inPulse = false;
