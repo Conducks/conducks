@@ -1,7 +1,7 @@
 # todo49 — a repository's first analyze produces a thinner graph than its second
 Status: todo
 - Acceptance: analyzing a repository from no vault produces the same edge set as `--force` over the result, per edge type, on all three frozen subjects — and a test pins the parity so it cannot regress quietly.
-- Builds: 0051
+- Builds: 0051, 0144
 
 ## Context
 
