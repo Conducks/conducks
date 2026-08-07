@@ -42,7 +42,8 @@
     "bootstrap": "node scripts/bootstrap.mjs",
     "hooks": "git config core.hooksPath scripts/hooks && echo \"hooks installed: pre-commit runs conducks docs-lint\"",
     "check:queries": "node scripts/check-query-backticks.mjs",
-    "postbuild": "node scripts/sync-skills-postbuild.mjs"
+    "postbuild": "node scripts/sync-skills-postbuild.mjs",
+    "cli:smoke": "node tools/benchmark/cli-smoke.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.22.0",
