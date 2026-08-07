@@ -316,6 +316,14 @@ export class AnalysisService {
     const resolvedEdges = intraLinker.resolve(this.graph.getGraph());
     await this.persistence.updateEdgeTargets(resolvedEdges);
 
+    // Apply the SAME resolutions to the in-memory graph. They were written only to the vault, so
+    // every consumer running later in this pulse still saw the bare names — which is what made a
+    // first analyze produce a thinner graph than the second one that merely re-read the vault.
+    const g = this.graph.getGraph();
+    let reapplied = 0;
+    for (const r of resolvedEdges) if (g.retargetEdge(r.id, r.newTargetId)) reapplied++;
+    if (reapplied > 0) logger.info(`🛡️ [IntraLinker] Applied ${reapplied} resolution(s) to the in-memory graph.`);
+
     // A BARREL COLLAPSE WAS BUILT HERE AND REMOVED. Recorded because the reasoning is the value.
     //
     // It rebound every reference on a re-export ATOM to the declaration — 588 of them on openship —
@@ -358,7 +366,21 @@ export class AnalysisService {
     // bare call targets and induction has materialised the external ones, so an endpoint that can
     // resolve has resolved. Anything still unresolved is dropped rather than written — ADR 0051:
     // both ends of an edge are node ids, or the edge is not written.
-    const builtEdges = this.graph.lastResonanceEdges;
+    // Handovers are re-bound HERE, after IntraLinker and induction, because the binder matches a
+    // producing call to a consuming one by TARGET and those targets were bare names when
+    // `resonate()` ran. Without this a first-ever analyze wrote 6 of 63 handover edges on the Python
+    // subject and nothing said so — the graph looked complete and `flows` answered from a tenth of
+    // the data until someone happened to run `analyze --force`.
+    this.graph.rebindHandovers();
+
+    // De-duplicated by id: the same handover can be built in both passes, and the log below counts
+    // what was persisted rather than how many times a binder ran.
+    const seenEdgeIds = new Set<string>();
+    const builtEdges = this.graph.lastResonanceEdges.filter(e => {
+      if (seenEdgeIds.has(e.id)) return false;
+      seenEdgeIds.add(e.id);
+      return true;
+    });
     if (builtEdges.length > 0) {
       const g = this.graph.getGraph();
       const writable = builtEdges.filter(e => g.hasNode(e.sourceId) && g.hasNode(e.targetId));

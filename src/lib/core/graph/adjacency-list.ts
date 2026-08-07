@@ -595,6 +595,34 @@ export class ConducksAdjacencyList {
   /**
    * Fetches neighbors in a specific direction.
    */
+  /**
+   * Point an existing edge at a different target, keeping both indexes consistent.
+   *
+   * `IntraLinker` resolves bare cross-file targets and hands the caller a list of
+   * `{id, newTargetId}` — which used to be applied to the VAULT only. The in-memory graph kept the
+   * unresolved names, so every consumer running after the linker in the same pulse still saw them.
+   * That is why a repository's first analyze wrote 6 of 63 handover edges: the binder matches a
+   * producing call to a consuming one by target, and in memory those targets had not moved.
+   *
+   * Returns false when the edge is unknown, so a caller cannot mistake "not found" for "retargeted".
+   */
+  public retargetEdge(edgeId: string, newTargetId: NodeId): boolean {
+    const id = edgeId.toLowerCase();
+    const target = newTargetId.toLowerCase();
+    for (const [, outSet] of this.outEdges) {
+      for (const edge of outSet) {
+        if (edge.id !== id) continue;
+        if (edge.targetId === target) return true;
+        this.inEdges.get(edge.targetId)?.delete(edge);
+        edge.targetId = target;
+        if (!this.inEdges.has(target)) this.inEdges.set(target, new Set());
+        this.inEdges.get(target)!.add(edge);
+        return true;
+      }
+    }
+    return false;
+  }
+
   public getNeighbors(nodeId: NodeId, direction: 'upstream' | 'downstream' = 'downstream', type?: EdgeType): ConducksEdge[] {
     this.assertMaterialised("getNeighbors");
     const normalizedId = nodeId.toLowerCase();

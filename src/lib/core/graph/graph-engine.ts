@@ -136,6 +136,24 @@ export class ConducksGraph {
   }
 
   /**
+   * Re-run the handover binder once every RESOLVER has finished.
+   *
+   * `resonate()` has to run early — `updateRanks` needs gravity before the linkers touch the graph —
+   * but `bindPulseCircuits` matches a producing call to a consuming one BY TARGET, and at that point
+   * a cross-file target is still the bare name the parser saw. `IntraLinker` rebinds those names
+   * afterwards, so on a repository's FIRST analyze almost nothing matched: measured on the Python
+   * subject, 6 handover edges cold against 63 after a second pass, and the second pass only worked
+   * because the first had persisted resolved targets for it to read. Every other edge type was
+   * identical, so this one binder was the entire cold-start gap.
+   *
+   * Idempotent by id: an edge built in both passes carries the same id and collapses on insert, and
+   * the caller de-duplicates before persisting.
+   */
+  public rebindHandovers(): void {
+    this.bindPulseCircuits();
+  }
+
+  /**
    * Conducks — Pulse Binding (Variable Handover)
    */
   private bindPulseCircuits(): void {
