@@ -10,7 +10,7 @@
 // A check asserts the FIX, not just that the command exited 0. "It ran" is what every one of these
 // defects already did.
 import { execFileSync } from 'node:child_process';
-import { readdirSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { readdirSync, existsSync, statSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -115,9 +115,18 @@ const GLOBAL_CHECKS = [
   {
     cmd: 'analyze <scope that matches nothing>',
     run: () => {
+      // The directory MUST hold source. Mutation-testing caught this check passing for the wrong
+      // reason: run in an EMPTY dir, the empty-ROOT refusal fires first and exits 1 whatever the
+      // scope logic does, so deleting the scope refusal left the check green. A project with files
+      // and a scope naming none of them is the only shape where this check can only be satisfied by
+      // the thing it claims to test.
       const dir = mkdtempSync(path.join(tmpdir(), 'conducks-scope-'));
-      try { return run(dir, ['analyze', 'does/not/exist', '--yes']); }
-      finally { rmSync(dir, { recursive: true, force: true }); }
+      try {
+        mkdirSync(path.join(dir, 'src'), { recursive: true });
+        writeFileSync(path.join(dir, 'package.json'), '{"name":"s","version":"1.0.0","type":"module"}');
+        writeFileSync(path.join(dir, 'src', 'a.ts'), 'export function realOne(): number { return 1; }\n');
+        return run(dir, ['analyze', 'does/not/exist', '--yes']);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
     },
     checks: [
       ['a scope naming no file EXITS non-zero', r => r.code !== 0],
