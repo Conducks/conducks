@@ -18,9 +18,25 @@ identical to the row, and `PULSES_TO` goes **6 → 63** on scraper. So the whole
 handover binder, and the inputs it reads are not the difference — `reason='assignment'` edges are
 4,182 in both states.
 
-Everyone analyzes a repository for the first time exactly once, and that run is the one that answers
-`flows` from a tenth of the handovers with nothing saying so. A second `analyze --force` fixes it,
-which is why this survived: the projects it was developed against had all been analyzed many times.
+Everyone analyzes a repository for the first time exactly once, and a second `analyze --force` fixes
+it, which is why this survived: the projects it was developed against had all been analyzed many
+times.
+
+**PRIORITY CORRECTED 2026-08-07, and the correction matters more than the finding.** This record
+first claimed the cold run "answers `flows` from a tenth of the handovers". That was asserted, not
+measured, and it is WRONG. Measured since:
+
+- The gap is **0.33% / 0.40% / 0.71%** of all edges on the three subjects — 57, 96 and 248 of
+  17,342 / 23,797 / 34,931.
+- It is confined to `PULSES_TO`, which is **0.39%** of the graph.
+- `flow-engine.ts` reads `CALLS` and `ACCESSES` and does **not** read `PULSES_TO` at all. Neither do
+  `impact`, `trace` or `context`. Its consumers are `linker-intra` (resolution) and one dangling
+  check in governance.
+
+So no user-facing answer measurably changes between a cold graph and a warm one. This is a real
+correctness defect — a first analyze must equal a second — and it is NOT the user-visible emergency
+the original wording implied. Fix it for determinism, on its own schedule, and do not let the word
+"handover" in an edge name stand in for a measurement of what reads it.
 
 ## Phase 1 — what has already been done, and what it did not fix
 

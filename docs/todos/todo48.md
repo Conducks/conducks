@@ -69,4 +69,11 @@ record is the difference between deferred and forgotten.
 
 ## Phase 4 — layer storage is built but no pulse writes it
 
+- [ ] MEASURED 2026-08-07, and the numbers decide the question rather than taste: **454 lines** of
+      layer machinery (`layer-storage`, `layer-reachability`, `layer-diff`, `merge-impact`) with
+      **95 test cases**, and **zero user-facing surface** — no CLI command, no registry entry, no MCP
+      tool references any of it, and nothing calls the writers. It is compiled, maintained and tested
+      on every run, and answers no question anyone can ask today. ACTIVATE (one command surface plus
+      the pulse write) or DELETE (the tests go with it and ADR 0035 gets a stamp saying the model was
+      built, measured and withdrawn). Both are defensible; carrying it is the one option that is not.
 - [ ] Everything under todo20#P3 is built and mutation-checked (content-addressed node+edge layers, read-through load, reachability GC rules, `diffLayers`, `mergeImpact`) — and no pulse WRITES a layer yet, so it all runs only in tests. The activation tails, each named in its closed task: the per-pulse `collectableLayers()` call, a command surface for `mergeImpact` (whose `callersOf` today can only come from the working tree's graph), and the pulse writing layer rows at all. Activate together or drop together, with the measurement either way; the WIP branch that attempted this (`wip/todo20-layered-storage`) was dropped as unverified — start from the tested mechanisms, not from that diff.
