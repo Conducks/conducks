@@ -1,5 +1,6 @@
 # 0141 — a review is a stamp of the cited span
 Status: Accepted
+- Amends: 0138 — the freshness half it deferred to todo45
 - Builds: 0140, 0138
 - Date: 2026-08-06
 - Enforced by: tests/unit/domain/analysis/visuals-lint.test.ts (the edit-inside-flags / edit-elsewhere-does-not pair carries the decision)

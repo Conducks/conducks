@@ -5,6 +5,7 @@ Status: Accepted
 - Builds: 0077, 0112, 0114, 0133
 - Amends: 0133 — its Python claim rested on reading a grammar file, and the join lost two thirds of what it harvested
 - Enforced by: tools/benchmark/health.mjs — `--compare` exits 1 on drift; tests/unit/core/parsing/doc-comments.test.ts covers the defect it found
+- Amended by: todo44 — the second benchmark this record calls "not built yet" was built: `tools/benchmark/vs-grep/` (8 pre-registered tasks, re-run recorded in results.md) plus the per-symbol doc-truth witness. Correctness is measured against hand-derived truth now, not only shape
 
 ## Context
 

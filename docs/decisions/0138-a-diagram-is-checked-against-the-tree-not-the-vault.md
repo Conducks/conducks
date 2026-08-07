@@ -3,6 +3,7 @@ Status: Accepted
 - Builds: 0001, 0011, 0035
 - Date: 2026-08-05
 - Enforced by: tests/unit/domain/analysis/visuals-lint.test.ts (every failure mode below is a case; the ambiguity refusal and the constant check are the two that carry the decision)
+- Amended by: 0141, 0142 — the freshness half this record hands to todo45 shipped as review stamps: a hash of the exact cited span, per page, with the stamp's meaning protected (per-page stamping, committed store, resolved-span keys)
 
 ## Context
 

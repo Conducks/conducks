@@ -5,6 +5,7 @@ Status: Accepted
 - Implements: the "System 2 — data-flow / boundary nodes tagged by origin" half of ADR 0012.
 - Depends on: the edge-properties persist fix (memory.md) — origin tags ride on edge properties.
 - Promoted: docs/features.md ("Boundary / Supply-Chain Classification (System 2 — data flow)"); docs/architecture/modules/core/parsing/taxonomy/MODULE.md
+- Amended by: todo09 — all three items this record deferred have SHIPPED and are verified running (2026-08-07): `conducks supply-chain` (advisories joined onto boundary nodes), version pinning + vuln surface, and `conducks ledger`. The Deferred paragraph below describes the state at the time of writing, not today
 
 ## Context
 ADR 0012 recovered the design: System 1 is the containment tree; System 2 is reference edges whose
