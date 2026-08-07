@@ -10,14 +10,33 @@
 // A check asserts the FIX, not just that the command exited 0. "It ran" is what every one of these
 // defects already did.
 import { execFileSync } from 'node:child_process';
+import { readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(HERE, '../../build/src/interfaces/cli/index.js');
-const SUBJECTS = ['scraper', 'orchestrator', 'sofie'].map(name => ({
-  name, dir: path.resolve(HERE, '../../../test-projects', name),   // sibling of conducks/, per projects.json
-}));
+// DISCOVERED, never listed. A hardcoded set is a harness that checks less than it appears to: add a
+// fourth subject and it is silently untested while the run still says "all passed". Every directory
+// under test-projects/ that holds a vault is a subject.
+const SUBJECT_ROOT = path.resolve(HERE, '../../../test-projects');
+const SUBJECTS = readdirSync(SUBJECT_ROOT)
+  .map(name => ({ name, dir: path.join(SUBJECT_ROOT, name) }))
+  .filter(s => {
+    try { return statSync(s.dir).isDirectory(); } catch { return false; }
+  })
+  .filter(s => {
+    // A directory with no vault has never been analyzed — reported, not silently skipped.
+    const hasVault = existsSync(path.join(s.dir, '.conducks'));
+    if (!hasVault) console.log(`  ·  ${s.name}: no .conducks vault — run 'conducks analyze' there first; NOT checked`);
+    return hasVault;
+  });
+
+if (SUBJECTS.length === 0) {
+  console.error(`No analyzed subjects under ${SUBJECT_ROOT} — nothing was checked, which is not a pass.`);
+  process.exit(1);
+}
+console.log(`Subjects (${SUBJECTS.length}): ${SUBJECTS.map(s => s.name).join(', ')}`);
 
 /** Run a command in a subject. Never throws: a non-zero exit is a RESULT, since some checks want it. */
 function run(dir, args) {
@@ -103,5 +122,5 @@ for (const subject of SUBJECTS) {
     }
   }
 }
-console.log(`\n${passed} passed, ${failed} failed`);
+console.log(`\n${passed} passed, ${failed} failed  (${SUBJECTS.length} subject(s) × ${CHECKS.reduce((n, c) => n + c.checks.length, 0)} checks)`);
 process.exit(failed > 0 ? 1 : 0);
