@@ -287,6 +287,10 @@ export class AnalysisService {
     traceMemory('after reloading the whole graph for PageRank');
 
     this.graph.resonate();
+    if (process.env.CONDUCKS_HANDOVER_TRACE) {
+      const built = this.graph.lastResonanceEdges.filter(e => e.type === 'PULSES_TO').length;
+      logger.info(`🛡️ [Handover first-bind] built=${built} droppedMissingEndpoint=${this.graph.handoverEndpointDrops}`);
+    }
     traceMemory('after PageRank');
 
     // `resonate()` runs after the last wave flush, and `save()` below writes no node or edge rows

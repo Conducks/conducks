@@ -113,9 +113,20 @@ export class ConducksGraph {
    */
   public lastResonanceEdges: ConducksEdge[] = [];
 
+  /**
+   * Handover candidates DROPPED because an endpoint node did not exist yet (todo49#P4).
+   *
+   * The pair matched — a producing call feeding a consuming one — and was discarded only because
+   * `getNode` could not find one of its ends. That is the number that separates "the binder found
+   * nothing" from "the binder found it and the graph was not ready", and the two were
+   * indistinguishable while this was uncounted.
+   */
+  public handoverEndpointDrops = 0;
+
   public resonate(): void {
     this.logger.info(`[Conducks Synapse] Pushing Structural Resonance Flow...`);
     this.lastResonanceEdges = [];
+    this.handoverEndpointDrops = 0;
     this.bindNeuralCircuits();
     this.bindRouteCircuits();
     this.bindPulseCircuits();
@@ -269,7 +280,24 @@ export class ConducksGraph {
             // `resolved.find -> @jest/globals::expect`. The vault refuses them on save, which is why
             // the in-memory graph reported 19,528 edges against 19,523 rows held. The count gap was
             // the visible half; the dangling edges were the defect (ADR 0118).
-            if (!this.graph.getNode(producingCall.targetId) || !this.graph.getNode(call.targetId)) continue;
+            // THE ENDPOINT CHECK IS DEFERRED, not skipped (todo49#P4).
+            //
+            // This used to `continue` when either end was missing, and that is what made a
+            // repository's FIRST analyze thinner than its second. MEASURED on the Python subject:
+            // the binder finds exactly 213 candidate pairs either way, and the only difference is
+            // how many survive this line — 207 dropped cold against 150 warm, which is precisely
+            // the 57-edge gap. The endpoints are not absent; they are not YET present.
+            // `induceVirtualLibraries` materialises external symbols AFTER `resonate()` runs, so on
+            // a warm pulse `load()` has already brought them in from the vault and on a cold one
+            // nobody has.
+            //
+            // So the edge is COLLECTED and the existence check happens where the answer is final:
+            // the persist step filters on `hasNode` for both ends after every resolver and
+            // induction have run. It is NOT added to the in-memory graph unless both ends exist,
+            // because a dangling in-memory edge is what ADR 0118 was written about — the graph
+            // would then report more edges than the vault holds.
+            const endpointsKnown = !!this.graph.getNode(producingCall.targetId) && !!this.graph.getNode(call.targetId);
+            if (!endpointsKnown) this.handoverEndpointDrops++;
             const edge: ConducksEdge = {
               id: `PULSE::${node.id}::${producingCall.targetId}->${call.targetId}`,
               sourceId: producingCall.targetId,
@@ -278,7 +306,7 @@ export class ConducksGraph {
               confidence: 0.7,
               properties: { reason: 'handover', variable: arg, scope: node.id }
             };
-            this.graph.addEdge(edge);
+            if (endpointsKnown) this.graph.addEdge(edge);
             this.lastResonanceEdges.push(edge);
           }
         }

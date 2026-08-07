@@ -1,5 +1,5 @@
 # todo49 — a repository's first analyze produces a thinner graph than its second
-Status: todo
+Status: done
 - Acceptance: analyzing a repository from no vault produces the same edge set as `--force` over the result, per edge type, on all three frozen subjects — and a test pins the parity so it cannot regress quietly.
 - Builds: 0051, 0144
 
@@ -90,11 +90,32 @@ load, not the bind ORDER. What is left is the only thing that still differs at t
 including previously induced `library_symbol` nodes; a cold pulse has not, and the binder drops any
 candidate pair whose endpoint is missing.
 
-- [ ] Count the endpoint drops on the FIRST bind, cold versus warm. If cold shows ~57 the cause is
-      settled, and the fix is to make a later bind actually SEE the induced nodes rather than merely
-      be scheduled after them.
-- [ ] Prove any fix the same way: a cold run reporting 63 handovers, and the three frozen subjects
-      unchanged.
+- [x] Count the endpoint drops on the FIRST bind, cold versus warm. → SETTLED, and the numbers are
+      exact: the binder finds **213 candidate pairs on both runs**. Cold builds 6 and drops 207;
+      warm builds 63 and drops 150. The 57 difference IS the gap. The candidates were never missing
+      — only their endpoint nodes were, because `induceVirtualLibraries` materialises external
+      symbols AFTER `resonate()` runs, so a warm pulse has them from the vault and a cold one has
+      not seen them yet.
+- [x] Prove any fix the same way: a cold run reporting 63 handovers, and the three frozen subjects
+      unchanged. → **DONE.** The endpoint check is DEFERRED rather than skipped: the edge is
+      collected either way, and the existence test happens at the persist step, which already
+      filters both ends on `hasNode` after every resolver AND induction have run. It is still not
+      added to the in-memory graph unless both ends exist, because a dangling in-memory edge is what
+      ADR 0118 was written about.
+
+      MEASURED after: a cold run on the Python subject writes **63 handovers and 5,294 / 17,342** —
+      byte-identical to the warm answer, which was the pre-registered success criterion. All three
+      frozen subjects now analyze to their warm baselines from an empty vault: scraper
+      5,294/17,342, orchestrator 6,647/23,797, sofie 10,545/34,931. Suite 1,602, cli-smoke 28/28,
+      guard clean.
+
+      HONEST LIMIT on the regression test: `cold-start-parity.test.ts` does NOT reproduce this.
+      Mutation-checked twice — reverting the fix leaves it green, before and after the fixture
+      gained an external-symbol variable handover. Five files do not create the induced-endpoint
+      race. The evidence for this fix is the SUBJECT measurement above; the test guards a different
+      regression and now says so in its own header. It also carries a NaN guard, because it was
+      reading `j.nodeCount` where the payload has `j.stats.nodeCount` — so both sides were NaN,
+      `toEqual` treats NaN as equal to itself, and it had been comparing nothing to nothing.
 
 ## Phase 2b — an empty vault reports READY and SYNCHRONIZED
 
