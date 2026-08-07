@@ -5,14 +5,13 @@
 **Responsibility:** what changed and what is no longer needed. Dead-code (`evolution/dead-code.ts`)
 finds orphans and unused exports; drift (`evolution/drift-engine.ts`) compares the graph against a
 baseline; the watcher (`evolution/watcher.ts`) drives incremental re-analysis;
-`evolution/layer-diff.ts` and `evolution/merge-impact.ts` compare two stored layers structurally.
+layer-diff and merge-impact, which compared two stored layers structurally, were removed with commit
+layers (todo48#P4).
 
-`diffLayers()` matches by id first and only then by a fingerprint that is UNIQUE on both sides, so a
-"move" is claimed only where there is exactly one candidate; everything else is reported as
-`incomparable` rather than paired on a guess. `mergeImpact()` is three-way, and the finding it exists
-for is `changed-under-caller` — a symbol whose CALLER changed on the other side, which git cannot see
-because neither file conflicts. Identical edits on both branches are explicitly NOT a conflict; that
-case was wrong in the first version and a test caught it.
+The `diffLayers()` reasoning that stood here is kept in the closed record rather than in a live
+note: it matched by id first and only then by a fingerprint UNIQUE on both sides, so an overload
+pair could not be reported as a move nobody made. That rule is worth re-reading if layer diffing is
+ever rebuilt — see todo48#P4 and ADR 0035.
 
 **Boundaries:** advisory only. Nothing here deletes anything, and nothing here should ever be wired
 to an automatic fix.

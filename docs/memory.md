@@ -1458,3 +1458,14 @@ by construction.
   (`runCli(['query', ...])`) instead, or open the vault only after the last CLI invocation. Note also
   that `runCli` returns `{stdout, stderr, combined, status}` — not a string.
 
+## There is no CI — the gates run locally, and a clean-machine break is invisible
+- Gotcha: `.github/` was removed on 2026-08-08 because the workflow kept failing. `docs-lint`,
+  `visuals-lint`, `guard` and `npm test` still run — in the pre-commit hook (`conducks
+  install-hooks`) and on demand — but nothing runs them on a FRESH CHECKOUT with a clean
+  `npm install` any more.
+- Why: the class of break that survives is the one only a clean machine sees — a missing dependency,
+  a file that exists locally and is gitignored, a build step that works because of something already
+  on disk. The local hook cannot see any of those, because it runs where all of them are true.
+- Applies: before trusting "all gates green", note WHERE they ran. If CI is ever restored, the first
+  thing to check is whether `analyze` needs `--yes` there: `confirmScope` refuses without a TTY for
+  any scope above `ok` (ADR 0021), and the workflow invoked it bare.

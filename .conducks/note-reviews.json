@@ -42,7 +42,7 @@
     "src/types/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
-    "src/lib/core/persistence/persistence.ts": "6c7f59cfb6e526c6"
+    "src/lib/core/persistence/persistence.ts": "4f0fb5e400f2fc60"
   },
   "docs/visuals/modules/domain/analysis/coverage.md": {
     "src/lib/domain/analysis/coverage-bind.ts:50": "fdd480cd0bda4134",
@@ -62,9 +62,7 @@
   "docs/visuals/modules/domain/evolution.md": {
     "src/lib/domain/evolution/dead-code.ts": "763c048c7689c916",
     "src/lib/domain/evolution/drift-engine.ts": "8b435801d446d048",
-    "src/lib/domain/evolution/watcher.ts": "a48a65e42a86a361",
-    "src/lib/domain/evolution/layer-diff.ts": "ba612b4ae04934ef",
-    "src/lib/domain/evolution/merge-impact.ts": "94865d8c2d80c5a7"
+    "src/lib/domain/evolution/watcher.ts": "a48a65e42a86a361"
   },
   "docs/visuals/modules/domain/governance/sentinel.md": {
     "src/lib/domain/governance/index.ts:266": "128b5c4d4f8f1e06",

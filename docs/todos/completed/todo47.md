@@ -15,7 +15,7 @@ migration.
 
 - [x] `visuals-lint` checks every generated file for the `DERIVED — edit <name>.md` header when the repo declares a generator, and fails a generated page missing it. Without the header, ADR 0011's failure mode returns: an agent edits the HTML, the next render silently discards the edit. → shipped WARN-first; raise to error in Phase 2 when the reference templates carry the header, or the gate breaks the repo it was proven on.
 - [x] A page with no anchors must either carry anchors or declare itself `authored` in the page; a declared-nothing page FAILS instead of warning. Kills the "0 still true, exit 0" false-clean the self-review found on conducks' own `system-trace.html`. → done; system-trace now carries 8 marked anchors, all true.
-- [x] conducks CI runs `visuals-lint` beside `docs-lint` (.github/workflows/main.yml) — the tool must pass its own gate.
+- [x] conducks CI runs `visuals-lint` beside `docs-lint` (.github/workflows/main.yml) — the tool must pass its own gate. → STAMP 2026-08-08: `.github/` was REMOVED at Said's request; the workflow kept failing and the runs were not visible from this machine to diagnose. The gate itself is unaffected — `visuals-lint` and `docs-lint` both run in the pre-commit hook `conducks install-hooks` writes, and in `npm test`. What is lost is the clean-machine run, which is a real loss and is recorded as such rather than waved off.
 
 ## Phase 3 — review stamps: the second tier of rot (ADR 0141) — DONE
 

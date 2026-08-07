@@ -17,11 +17,12 @@ type change. Those still mean re-analyzing, and `conducks clean` is the supporte
 because the vault is a derived artifact.
 
 **Layer storage lives here too.** `layers`, `node_content`/`node_slots` and `edge_content`/`edge_slots`
-hold committed layers content-addressed: a content row per distinct payload, a slot row per layer
-that points at one. `content-key.ts` owns the split between hashed (stable) and per-layer (volatile)
-columns, `layer-roles.ts` resolves a role to a layer and refuses rather than falling back,
-`layer-reachability.ts` decides what may be collected, and `freshness.ts` is the shared watch/monitor
-staleness rule. The hot path — `nodes`/`edges` — is untouched by any of it; layers sit BESIDE it.
+held committed layers content-addressed — and were REMOVED on 2026-08-07 (todo48#P4, ADR 0035
+amended). 454 lines, five tables and 95 tests existed to answer a question no command could ask: no
+CLI, registry entry or MCP tool referenced any of it, and no pulse ever wrote a layer. What survives
+from ADR 0035 is the half that protects an answer — the branch guard in `chronicle.branchRefusal`,
+which refuses to answer from a graph pulsed on another branch. `freshness.ts` is unaffected and
+remains the shared watch/monitor staleness rule.
 
 ## The seam that has broken twice
 
