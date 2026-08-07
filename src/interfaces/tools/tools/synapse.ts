@@ -69,6 +69,26 @@ const FORBIDDEN_SQL_FUNCTIONS = [
   'glob', 'sniff_csv', 'attach', 'copy_from', 'install', 'load',
 ];
 
+/**
+ * The single source of truth for what `graph_query` accepts — a pure function so the tool and its
+ * test check the SAME rule. The test used to REPLICATE the guard, which is how the multi-statement
+ * hole (`SELECT 1; DROP TABLE nodes;` reaching the read-only DB) lived: the tool and the test drifted
+ * and neither covered it. `null` = allowed; otherwise the refusal reason.
+ */
+export function sqlGuardReason(sql: string): { code: string; message: string; suggestion: string } | null {
+  if (!sql || !sql.trim().toUpperCase().startsWith('SELECT')) {
+    return { code: 'FORBIDDEN_QUERY', message: 'Only SELECT statements are allowed.', suggestion: 'Rewrite your query as a SELECT statement.' };
+  }
+  if (/;\s*\S/.test(sql.trim())) {
+    return { code: 'FORBIDDEN_QUERY', message: 'Only a single SELECT statement is allowed — a second statement after `;` is refused.', suggestion: 'Send one SELECT at a time.' };
+  }
+  const forbidden = FORBIDDEN_SQL_FUNCTIONS.find(fn => new RegExp(`\\b${fn}\\s*\\(`, 'i').test(sql));
+  if (forbidden) {
+    return { code: 'FORBIDDEN_QUERY', message: `The function ${forbidden}() reads outside the vault and is not permitted.`, suggestion: 'Query the vault tables directly: nodes, edges, pulses, node_history, metadata, file_hashes.' };
+  }
+  return null;
+}
+
 export const synapseTools: Record<string, Tool> = {
 
   conducks_query: {
@@ -728,15 +748,8 @@ AFTER THIS: Use conducks_explain for deeper analysis of returned symbols.`,
       //
       // So the guard tests the CAPABILITY, not the shape of the string, and does it with an
       // allowlist: anything that is not a plain read of the vault's own tables is refused by name.
-      if (!sql || !sql.trim().toUpperCase().startsWith('SELECT')) {
-        return mcpErr('FORBIDDEN_QUERY', 'Only SELECT statements are allowed.', 'Rewrite your query as a SELECT statement.', false);
-      }
-      const forbidden = FORBIDDEN_SQL_FUNCTIONS.find(fn => new RegExp(`\\b${fn}\\s*\\(`, 'i').test(sql));
-      if (forbidden) {
-        return mcpErr('FORBIDDEN_QUERY',
-          `The function ${forbidden}() reads outside the vault and is not permitted.`,
-          'Query the vault tables directly: nodes, edges, pulses, node_history, metadata, file_hashes.', false);
-      }
+      const guardFail = sqlGuardReason(sql);
+      if (guardFail) return mcpErr(guardFail.code, guardFail.message, guardFail.suggestion, false);
 
       try {
         await ensureAnchor(customPath, true);

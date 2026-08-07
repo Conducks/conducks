@@ -131,8 +131,20 @@ describe('GovernanceService.statusFromVault — the same answer without the grap
     const root = mkRoot();
     const p = await seed(root, 1, 0);
     const service = svc(new ConducksAdjacencyList(), p);
-    // n * (n - 1) is 0 at one node: the formula divides by zero unless it is guarded.
     expect((await service.statusFromVault()).stats.density).toBe(0);
+    await p.close();
+  }, 60000);
+
+  it('reports density as RELATIONSHIPS PER SYMBOL (edges/nodes), not graph-theoretic', async () => {
+    // Found via the MCP surface: this returned 0.0006 (edges / n(n-1)) while the CLI returned the
+    // average-degree number under the SAME field name — 5,000x apart. Now aligned to edges/nodes,
+    // which is what the adjacency list, the resonance signature and the CLI all report.
+    const root = mkRoot();
+    const p = await seed(root, 4, 8);
+    const service = svc(new ConducksAdjacencyList(), p);
+    const d = (await service.statusFromVault()).stats.density;
+    expect(d).toBeCloseTo(2, 5);          // 8 edges / 4 nodes
+    expect(d).toBeGreaterThan(1);         // the rejected n(n-1) formula would give ~0.67 here
     await p.close();
   }, 60000);
 });

@@ -1469,3 +1469,26 @@ by construction.
 - Applies: before trusting "all gates green", note WHERE they ran. If CI is ever restored, the first
   thing to check is whether `analyze` needs `--yes` there: `confirmScope` refuses without a TTY for
   any scope above `ok` (ADR 0021), and the workflow invoked it bare.
+
+## rename counts only TEXTUAL references — containment edges name nothing
+- Gotcha: `renameSymbol` gathers edit sites from a symbol's upstream edges, and a containment edge
+  (`MEMBER_OF`, `CONTAINS`, `HAS_METHOD`, `HAS_PROPERTY`) is NOT one — a method points at its class by
+  MEMBER_OF, but the parent id is constructed, not typed anywhere (`linker-intra.ts`). Those edges
+  carry no line, so before the fix every one landed in `unlocated` and refused the rename: a class
+  with methods could never be renamed, because each of its own methods counted as an un-rewritable
+  reference to it (measured: `Hands` refused on 120 phantom refs).
+- Why: the failure looks like a safety refusal ("120 references carry no source line") and is
+  mistaken for the tool being careful, when it is the tool being wrong about what a reference is.
+- Applies: `STRUCTURAL_EDGE_TYPES` (`adjacency-list.ts`) is the set to skip anywhere you treat an
+  edge as "a place the name appears". Only CALLS/IMPORTS/EXTENDS/IMPLEMENTS/CONSTRUCTS/
+  TYPE_REFERENCE/ACCESSES textually name a symbol.
+
+## A test that REPLICATES its guard cannot catch a gap the copy shares
+- Gotcha: `sql-surface.test.ts` re-implemented the `graph_query` guard with a local `rejects()`
+  helper. The copy had no multi-statement rule, so `SELECT 1; DROP TABLE nodes;` was never tested —
+  it passed the real guard's prefix check and reached the read-only DB, caught only by the
+  connection mode. The test proved the copy safe, not the tool.
+- Why: a replicated guard drifts from the real one silently, and every case the copy omits is a case
+  nothing covers, in exactly the surface where "looks tested" is most dangerous.
+- Applies: a guard worth testing is worth EXPORTING (`sqlGuardReason`) so the tool and the test call
+  one function. If you find a test with a local copy of production logic, that copy is a liability.

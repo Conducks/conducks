@@ -1,5 +1,8 @@
 import fs from 'node:fs/promises';
-import { ConducksAdjacencyList, NodeId } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId, STRUCTURAL_EDGE_TYPES } from '@/lib/core/graph/adjacency-list.js';
+
+/** Containment edges (MEMBER_OF, CONTAINS, HAS_METHOD, HAS_PROPERTY) name no text, so they are not rename sites. */
+const STRUCTURAL = new Set<string>(STRUCTURAL_EDGE_TYPES);
 
 export interface RefactorResult {
   success: boolean;
@@ -78,8 +81,16 @@ export class GVREngine {
 
     // A reference the graph knows about but cannot place. Reported, never silently skipped — an
     // unedited call site is a broken build, and the user needs to know which one.
+    // CONTAINMENT IS NOT A REFERENCE. A method points at its class by MEMBER_OF, a class at its file
+    // by CONTAINS — the parent id is CONSTRUCTED, never a place the name is typed (see
+    // `linker-intra.ts`: "the parent id is constructed, not referenced"). These edges carry no line
+    // by design, so every one of them landed in `unlocated` and refused the rename — which meant a
+    // class with methods could NEVER be renamed, since each of its own methods counted as an
+    // un-rewritable reference to it. Skip them: only edges that TEXTUALLY name the symbol (CALLS,
+    // IMPORTS, EXTENDS, IMPLEMENTS, CONSTRUCTS, TYPE_REFERENCE, ACCESSES) are rename sites.
     const unlocated: string[] = [];
     for (const edge of graph.getNeighbors(symbolId, 'upstream')) {
+      if (STRUCTURAL.has(edge.type)) continue;
       const source = graph.getNode(edge.sourceId);
       if (!source?.properties?.filePath) continue;
       const line = (edge as any).properties?.line;
@@ -112,7 +123,10 @@ export class GVREngine {
         success: false,
         affectedFiles,
         unlocated,
-        message: `Refusing: ${unlocated.length} reference(s) to '${oldName}' carry no source line, so they cannot be rewritten and would be left behind.\n  ${unlocated.join('\n  ')}`,
+        // The list travels in `unlocated`; the message names the count and a few examples rather
+        // than repeating all of it — an MCP response duplicating 120 absolute paths in two fields
+        // is a token blowout, and the caller already has the full list beside this.
+        message: `Refusing: ${unlocated.length} reference(s) to '${oldName}' carry no source line, so they cannot be rewritten and would be left behind (see \`unlocated\`). First few:\n  ${unlocated.slice(0, 5).join('\n  ')}${unlocated.length > 5 ? `\n  … and ${unlocated.length - 5} more` : ''}`,
       };
     }
 

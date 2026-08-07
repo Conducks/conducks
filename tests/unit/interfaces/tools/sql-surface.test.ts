@@ -22,28 +22,50 @@ const FORBIDDEN = [
 ];
 const rejects = (sql: string) => FORBIDDEN.find(fn => new RegExp(`\\b${fn}\\s*\\(`, 'i').test(sql));
 
+import { sqlGuardReason } from '@/interfaces/tools/tools/synapse.js';
+
+// The tool's OWN guard, not a copy. The previous version of this file replicated the check with a
+// local `rejects()` — and the replica had no multi-statement rule, so `SELECT 1; DROP TABLE nodes;`
+// was never tested and reached the read-only DB in production. A test that copies the thing it
+// guards cannot catch a gap the copy also has.
+const reason = (sql: string) => sqlGuardReason(sql)?.message ?? null;
+
 describe('the graph_query SQL surface', () => {
   it('refuses the statement that was verified to read a local file', () => {
-    expect(rejects("SELECT * FROM read_text('/etc/hosts')")).toBe('read_text');
+    expect(reason("SELECT * FROM read_text('/etc/hosts')")).toMatch(/read_text/);
   });
 
   it('refuses an outbound fetch dressed as a SELECT', () => {
-    expect(rejects("SELECT * FROM read_csv_auto('http://169.254.169.254/latest/meta-data/')")).toBe('read_csv_auto');
+    expect(reason("SELECT * FROM read_csv_auto('http://169.254.169.254/latest/meta-data/')")).toMatch(/read_csv_auto/);
   });
 
   it('is not defeated by case or whitespace', () => {
-    expect(rejects("SELECT * FROM ReAd_TeXt ('/etc/passwd')")).toBe('read_text');
-    expect(rejects("select * from GLOB('/**')")).toBe('glob');
+    expect(reason("SELECT * FROM ReAd_TeXt ('/etc/passwd')")).toMatch(/read_text/);
+    expect(reason("select * from GLOB('/**')")).toMatch(/glob/);
+  });
+
+  it('REFUSES a second statement after a leading SELECT — the multi-statement hole', () => {
+    // Passed the prefix check and reached the read-only DB before this rule existed.
+    expect(reason('SELECT 1; DROP TABLE nodes;')).toMatch(/single SELECT|second statement/i);
+    expect(reason('SELECT 1; DELETE FROM edges')).toMatch(/single SELECT|second statement/i);
+  });
+
+  it('allows a bare trailing semicolon — one statement, terminated', () => {
+    expect(reason('SELECT count(*) FROM nodes;')).toBeNull();
+  });
+
+  it('refuses a non-SELECT outright', () => {
+    expect(reason('DELETE FROM nodes')).toMatch(/Only SELECT/);
+    expect(reason('WITH x AS (SELECT 1) DELETE FROM nodes')).toMatch(/Only SELECT/);
   });
 
   it('still allows ordinary analysis of the vault', () => {
-    expect(rejects('SELECT type, count(*) FROM edges GROUP BY 1')).toBeUndefined();
-    expect(rejects("SELECT id FROM nodes WHERE id LIKE 'lib::%'")).toBeUndefined();
-    expect(rejects('SELECT n.id FROM nodes n JOIN edges e ON e.targetId = n.id')).toBeUndefined();
+    expect(reason('SELECT type, count(*) FROM edges GROUP BY 1')).toBeNull();
+    expect(reason("SELECT id FROM nodes WHERE id LIKE 'lib::%'")).toBeNull();
+    expect(reason('SELECT n.id FROM nodes n JOIN edges e ON e.targetId = n.id')).toBeNull();
   });
 
   it('does not reject a column merely containing a forbidden word', () => {
-    // `glob` as a bare identifier is not a call — the regex requires the opening paren.
-    expect(rejects('SELECT glob FROM nodes')).toBeUndefined();
+    expect(reason('SELECT glob FROM nodes')).toBeNull();
   });
 });

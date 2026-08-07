@@ -479,10 +479,13 @@ export class GovernanceService {
       stats: {
         nodeCount: Number(counts?.nodes ?? 0),
         edgeCount: Number(counts?.edges ?? 0),
-        // `density` is derived from the two counts the graph already tracked; computing it here
-        // keeps the shape identical for every caller rather than making them branch on the source.
-        density: Number(counts?.nodes ?? 0) > 1
-          ? Number(counts?.edges ?? 0) / (Number(counts.nodes) * (Number(counts.nodes) - 1))
+        // `density` is RELATIONSHIPS PER SYMBOL (edges / nodes), the same metric every other caller
+        // reports — the adjacency list's `stats`, the resonance signature, and the CLI's
+        // "relationships/symbol" line. This used to compute graph-theoretic density
+        // (edges / n(n-1)), which is ~0.0006 for any real codebase and disagreed with the CLI's
+        // 3.28 under the same field name, so a caller reading both got two numbers 5,000x apart.
+        density: Number(counts?.nodes ?? 0) > 0
+          ? Number(counts?.edges ?? 0) / Number(counts.nodes)
           : 0,
       },
     };
