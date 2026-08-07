@@ -45,9 +45,12 @@ the original wording implied. Fix it for determinism, on its own schedule, and d
       saw the bare names — a real defect regardless of this one. `retargetEdge` on the adjacency list
       keeps both indexes consistent. MEASURED: 4,375 resolutions now visible in memory on scraper,
       and sofie's cold edge count moved 34,683 → 34,723.
-- [x] The handover binder is re-run after the linkers and induction (`rebindHandovers`), deduped by
-      edge id before persisting. Correct ordering on its own merit — the edges were already
-      PERSISTED at that point, only built earlier.
+- [-] The handover binder is re-run after the linkers and induction (`rebindHandovers`) — dropped because it was measured to match zero — deduped by
+      edge id before persisting — REMOVED 2026-08-07, because it was measured to do nothing.
+      Instrumented at the call site: `rebindMatched=0 rebindSkippedMissingEndpoint=0`, meaning the
+      second bind never reached even the endpoint check, while the inputs there are byte-identical
+      to a warm pulse (`assignResolved=4181/4182` both ways). A no-op that looks like a fix is worse
+      than the gap it pretends to close.
 - [x] Neither closed the gap: scraper cold still writes 6 handovers against 63. The hypothesis that
       target resolution was the limiting factor is REFUTED by measurement, twice.
 
@@ -80,12 +83,18 @@ the original wording implied. Fix it for determinism, on its own schedule, and d
 
 ## Phase 4 — the fix, now that the target is known
 
-- [ ] The binder must run against resolved assignment targets on a first pass. `rebindHandovers()`
-      already runs after `IntraLinker` and adds nothing, which says the resolutions reaching the
-      in-memory graph do not cover ASSIGNMENT edges — `IntraLinker` resolves call targets. Either
-      extend it to assignment edges, or move the handover bind to a point where the assignment
-      targets are known. Measure `beforeRebind`/`afterRebind` again after: the fix is proven when a
-      cold run reports 63.
+Four hypotheses are now refuted by measurement, each refutation narrowing the next: not resolution
+(`assignResolved=4181/4182` on a COLD run), not `metadata.original` (4031/4031 cold), not the shallow
+load, not the bind ORDER. What is left is the only thing that still differs at the first
+`resonate()` — the GRAPH IT RUNS ON. A warm pulse has just loaded everything the vault held,
+including previously induced `library_symbol` nodes; a cold pulse has not, and the binder drops any
+candidate pair whose endpoint is missing.
+
+- [ ] Count the endpoint drops on the FIRST bind, cold versus warm. If cold shows ~57 the cause is
+      settled, and the fix is to make a later bind actually SEE the induced nodes rather than merely
+      be scheduled after them.
+- [ ] Prove any fix the same way: a cold run reporting 63 handovers, and the three frozen subjects
+      unchanged.
 
 ## Phase 2b — an empty vault reports READY and SYNCHRONIZED
 

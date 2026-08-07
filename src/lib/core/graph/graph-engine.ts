@@ -136,24 +136,6 @@ export class ConducksGraph {
   }
 
   /**
-   * Re-run the handover binder once every RESOLVER has finished.
-   *
-   * `resonate()` has to run early — `updateRanks` needs gravity before the linkers touch the graph —
-   * but `bindPulseCircuits` matches a producing call to a consuming one BY TARGET, and at that point
-   * a cross-file target is still the bare name the parser saw. `IntraLinker` rebinds those names
-   * afterwards, so on a repository's FIRST analyze almost nothing matched: measured on the Python
-   * subject, 6 handover edges cold against 63 after a second pass, and the second pass only worked
-   * because the first had persisted resolved targets for it to read. Every other edge type was
-   * identical, so this one binder was the entire cold-start gap.
-   *
-   * Idempotent by id: an edge built in both passes carries the same id and collapses on insert, and
-   * the caller de-duplicates before persisting.
-   */
-  public rebindHandovers(): void {
-    this.bindPulseCircuits();
-  }
-
-  /**
    * Why the handover binder matched what it matched (todo49#P2).
    *
    * A first analyze writes fewer handovers than a second, and three explanations were plausible from
@@ -162,13 +144,19 @@ export class ConducksGraph {
    * text (`properties.original`) the match is keyed on. If `original` is what differs between a cold
    * and a warm graph, this says so in one number rather than another hypothesis.
    */
-  public handoverInputs(): { nodes: number; withProducer: number; withCalls: number; withBoth: number; callsWithOriginal: number; callsTotal: number } {
+  public handoverInputs(): { nodes: number; withProducer: number; withCalls: number; withBoth: number; callsWithOriginal: number; callsTotal: number; assignResolved: number; assignTotal: number } {
     let nodes = 0, withProducer = 0, withCalls = 0, withBoth = 0, callsWithOriginal = 0, callsTotal = 0;
+    let assignResolved = 0, assignTotal = 0;
     for (const node of this.graph.getAllNodes()) {
       nodes++;
       let producer = false, call = false;
       for (const e of this.graph.getNeighbors(node.id, 'downstream')) {
-        if (e.properties?.reason === 'assignment') producer = true;
+        if (e.properties?.reason === 'assignment') {
+          producer = true; assignTotal++;
+          // The number that decides it: a producer is indexed by `targetId.split('::').pop()`, so
+          // an UNRESOLVED target indexes pre-resolution text and matches nothing real.
+          if (String(e.targetId).includes('::')) assignResolved++;
+        }
         if (e.type === 'CALLS') {
           call = true; callsTotal++;
           if (e.properties?.original) callsWithOriginal++;
@@ -178,7 +166,7 @@ export class ConducksGraph {
       if (call) withCalls++;
       if (producer && call) withBoth++;
     }
-    return { nodes, withProducer, withCalls, withBoth, callsWithOriginal, callsTotal };
+    return { nodes, withProducer, withCalls, withBoth, callsWithOriginal, callsTotal, assignResolved, assignTotal };
   }
 
   /**

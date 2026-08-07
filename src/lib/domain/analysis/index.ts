@@ -371,18 +371,23 @@ export class AnalysisService {
     // `resonate()` ran. Without this a first-ever analyze wrote 6 of 63 handover edges on the Python
     // subject and nothing said so — the graph looked complete and `flows` answered from a tenth of
     // the data until someone happened to run `analyze --force`.
+    // MEASURED, and the measurement is why there is no second bind here. A `rebindHandovers()` was
+    // added at this point on the theory that the binder ran too early to see resolved targets. It
+    // matched ZERO — never reaching even the endpoint check — while the inputs here are
+    // byte-identical to a warm pulse (assignResolved=4181/4182 either way). The second bind did
+    // nothing and was removed rather than left as a comforting no-op. The real difference is made by
+    // the FIRST `resonate()`, whose graph on a warm run carries everything the vault already held
+    // (todo49#P4).
     if (process.env.CONDUCKS_HANDOVER_TRACE) {
       const i = this.graph.handoverInputs();
-      logger.info(`🛡️ [Handover inputs] nodes=${i.nodes} withProducer=${i.withProducer} withCalls=${i.withCalls} withBoth=${i.withBoth} callsWithOriginal=${i.callsWithOriginal}/${i.callsTotal}`);
+      logger.info(`🛡️ [Handover inputs] nodes=${i.nodes} withProducer=${i.withProducer} withCalls=${i.withCalls} withBoth=${i.withBoth} callsWithOriginal=${i.callsWithOriginal}/${i.callsTotal} assignResolved=${i.assignResolved}/${i.assignTotal}`);
     }
-    const beforeRebind = this.graph.lastResonanceEdges.length;
-    this.graph.rebindHandovers();
     if (process.env.CONDUCKS_HANDOVER_TRACE) {
       const g0 = this.graph.getGraph();
       const all = this.graph.lastResonanceEdges;
       const handovers = all.filter(e => e.type === 'PULSES_TO');
       const survives = handovers.filter(e => g0.hasNode(e.sourceId) && g0.hasNode(e.targetId));
-      logger.info(`🛡️ [Handover build] beforeRebind=${beforeRebind} afterRebind=${all.length} handovers=${handovers.length} endpointsResolve=${survives.length}`);
+      logger.info(`🛡️ [Handover build] built=${all.length} handovers=${handovers.length} endpointsResolve=${survives.length}`);
     }
 
     // De-duplicated by id: the same handover can be built in both passes, and the log below counts
