@@ -596,27 +596,25 @@ export class ConducksAdjacencyList {
    * Fetches neighbors in a specific direction.
    */
   /**
-   * Point an existing edge at a different target, keeping both indexes consistent.
+   * Find an edge BY ID and retarget it, delegating the index work to `rebindEdgeTarget`.
    *
-   * `IntraLinker` resolves bare cross-file targets and hands the caller a list of
-   * `{id, newTargetId}` — which used to be applied to the VAULT only. The in-memory graph kept the
-   * unresolved names, so every consumer running after the linker in the same pulse still saw them.
-   * That is why a repository's first analyze wrote 6 of 63 handover edges: the binder matches a
-   * producing call to a consuming one by target, and in memory those targets had not moved.
+   * `IntraLinker` returns resolutions as `{id, newTargetId}` — it has the id, not the edge object —
+   * and those were applied to the VAULT only, so the in-memory graph kept the unresolved names for
+   * every consumer running later in the same pulse.
    *
-   * Returns false when the edge is unknown, so a caller cannot mistake "not found" for "retargeted".
+   * This is a LOOKUP, deliberately not a second implementation: the index bookkeeping lives in
+   * `rebindEdgeTarget` and nowhere else. Written as a full copy first, which would have been the
+   * sixth duplicate of a predicate this codebase has been consolidating all week — caught because a
+   * module note still cited the original.
+   *
+   * Returns false when no edge carries that id, so a caller cannot read "not found" as "retargeted".
    */
   public retargetEdge(edgeId: string, newTargetId: NodeId): boolean {
     const id = edgeId.toLowerCase();
-    const target = newTargetId.toLowerCase();
     for (const [, outSet] of this.outEdges) {
       for (const edge of outSet) {
         if (edge.id !== id) continue;
-        if (edge.targetId === target) return true;
-        this.inEdges.get(edge.targetId)?.delete(edge);
-        edge.targetId = target;
-        if (!this.inEdges.has(target)) this.inEdges.set(target, new Set());
-        this.inEdges.get(target)!.add(edge);
+        this.rebindEdgeTarget(edge, newTargetId.toLowerCase());
         return true;
       }
     }

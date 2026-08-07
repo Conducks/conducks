@@ -12,8 +12,8 @@
     "src/lib/core/graph/http-service-linker.ts": "f273be0ff1d00903"
   },
   "docs/visuals/modules/core/graph.md": {
-    "src/lib/core/graph/adjacency-list.ts": "dbd61eb6c7894a0a",
-    "src/lib/core/graph/graph-engine.ts": "61ece46692643b17"
+    "src/lib/core/graph/adjacency-list.ts": "c547a15cad546963",
+    "src/lib/core/graph/graph-engine.ts": "34a250cd1714e0f1"
   },
   "docs/visuals/modules/core/parsing/grammar-registry.md": {
     "tests/unit/core/parsing/optional-native-binding.test.ts": "ba7f05e5a933f9f0"
@@ -42,7 +42,7 @@
     "src/types/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
-    "src/lib/core/persistence/persistence.ts": "9d949a6b3bdbb26f"
+    "src/lib/core/persistence/persistence.ts": "6c7f59cfb6e526c6"
   },
   "docs/visuals/modules/domain/analysis/coverage.md": {
     "src/lib/domain/analysis/coverage-bind.ts:50": "fdd480cd0bda4134",
@@ -50,14 +50,14 @@
     "src/lib/domain/analysis/coverage-bind.ts:56-58": "afff141974422bb2"
   },
   "docs/visuals/modules/domain/analysis/docs-grammar.md": {
-    "src/resources/skills/conducks-docs.md": "b74045e79506589f"
+    "src/resources/skills/conducks-docs.md": "2623cdf50fbb69a4"
   },
   "docs/visuals/modules/domain/analysis/orchestrator.md": {
     "src/lib/domain/analysis/orchestrator.ts": "a85591e3d22772ee",
     "src/lib/domain/analysis/micro-pulse.ts": "c0fd6f64c86d95a2"
   },
   "docs/visuals/modules/domain/analysis.md": {
-    "src/lib/domain/analysis/index.ts": "9b1bf60eb7d597e2"
+    "src/lib/domain/analysis/index.ts": "24812897d291d782"
   },
   "docs/visuals/modules/domain/evolution.md": {
     "src/lib/domain/evolution/dead-code.ts": "763c048c7689c916",
@@ -94,7 +94,7 @@
     "src/interfaces/cli/index.ts:203-204": "6bd5f2d873d60c4c",
     "src/lib/domain/analysis/micro-pulse.ts:68": "a2c2339691fc48fb",
     "src/lib/core/graph/adjacency-list.ts:318": "c8e0d39aa04bbdee",
-    "src/lib/core/graph/graph-engine.ts:322": "684888c0ebb17f37",
+    "src/lib/core/graph/graph-engine.ts:540-546": "9b881418639b3fea",
     "src/lib/core/graph/linker-intra.ts:141": "c9f0393fed4a61c8"
   },
   "docs/visuals/modules/domain/analysis/docs-board.md": {
