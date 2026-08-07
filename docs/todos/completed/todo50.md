@@ -66,10 +66,14 @@ every subsequent test looked like a new regression rather than the first look at
       boundary edges found. Run 'conducks analyze' first." for BOTH an unanalysed project and one
       with no third-party imports, so a true empty answer read as a tool failure and sent the user
       to repeat work already done. The two states are now told apart by the vault
-- [>] The three excluded from the sweep because they block — `mirror`, `watch`, `mcp` — need a
+- [x] The three excluded from the sweep because they block — `mirror`, `watch`, `mcp` — need a
       harness that starts them, asserts one request or event, and stops them. Excluded is not tested
-      — waits on a process-lifecycle harness: each needs starting, probing and killing reliably in
-      CI, and a test that leaks a server process is worse than the gap it closes
+      → BUILT (`blocking-commands.test.ts`), every process killed in a `finally`. `mcp` answers a
+      real JSON-RPC `initialize` and `tools/list` and offers its tool surface; `mirror` serves
+      `GET /api/synapse` with nodes in the payload, which is ADR 0054's defect staying fixed; `watch`
+      is verified HALF — it starts and reconciles what changed while it was off, and a file created
+      after start produced no observable reaction in 30 s. That half is todo51, filed rather than
+      asserted in either direction
 
 ## Phase 5 — the harness keeps what the walk learns
 - [x] `cli-smoke.mjs`: every fix becomes a check, subjects DISCOVERED not listed, an empty output can
