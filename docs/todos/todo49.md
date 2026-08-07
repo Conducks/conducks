@@ -53,18 +53,39 @@ the original wording implied. Fix it for determinism, on its own schedule, and d
 
 ## Phase 2 — find the real cause
 
-- [ ] Instrument `bindPulseCircuits` to report, per pulse, how many nodes carried both a producer and
+- [x] Instrument `bindPulseCircuits` to report, per pulse, how many nodes carried both a producer and
       a consuming call, and how many matched. Cold versus force on the same repository is then a
-      two-number comparison rather than another hypothesis.
-- [ ] The remaining suspects, in the order they are cheap to test: `metadata.original` on a CALLS
+      two-number comparison rather than another hypothesis. → BUILT (`handoverInputs()`, behind
+      `CONDUCKS_HANDOVER_TRACE=1`) and RUN. The inputs are BYTE-IDENTICAL between a cold and a warm
+      pulse: `nodes=7503 withProducer=921 withCalls=989 withBoth=791 callsWithOriginal=4031/4031`.
+      The outputs are not: 6 handovers cold, 63 warm.
+- [x] The remaining suspects, in the order they are cheap to test: `metadata.original` on a CALLS
       edge (the key `callsByOriginal` is built from) may not survive a vault round-trip, which would
       make the SECOND run the anomalous one rather than the first; the shallow `load()` may omit a
       property the binder reads; the wave-flush cycle may clear an assignment edge the binder needs
-      before it runs.
-- [ ] Whichever it is, state which run is CORRECT before fixing. 63 handovers may be the right answer
-      and 6 the bug, or the second pass may be matching across a stale reading that should not
-      match — the counts alone do not say, and a fix that makes them agree without answering this
-      would just pick one.
+      before it runs. → ALL THREE REFUTED. `original` survives at 4031/4031 both ways; the shallow
+      load omits nothing the binder reads; the assignment edges are all present (921 producer nodes
+      both ways). A fourth measurement located it instead: `beforeRebind=6 / afterRebind=6` cold and
+      `beforeRebind=63 / afterRebind=63` warm — so the difference is made by the FIRST `resonate()`
+      and the post-linker rebind adds nothing in either case.
+- [x] Whichever it is, state which run is CORRECT before fixing. → **63 is correct; 6 is the bug.**
+      Measured: the warm vault holds **4,181 of 4,182 assignment edges with a RESOLVED target**
+      (`file.py::symbol`), because a previous pulse's `IntraLinker` resolved them and they were
+      persisted. `bindPulseCircuits` keys its producer index on
+      `edge.targetId.split('::').pop()`, so on a warm graph it indexes real symbol names and on a
+      cold one it indexes pre-resolution bare text. It is matching MORE because it is matching
+      against the right names, not because it is matching loosely. That settles the question this
+      task existed to answer, and it means a fix must make the FIRST pass see resolved assignment
+      targets — not make the second pass see fewer.
+
+## Phase 4 — the fix, now that the target is known
+
+- [ ] The binder must run against resolved assignment targets on a first pass. `rebindHandovers()`
+      already runs after `IntraLinker` and adds nothing, which says the resolutions reaching the
+      in-memory graph do not cover ASSIGNMENT edges — `IntraLinker` resolves call targets. Either
+      extend it to assignment edges, or move the handover bind to a point where the assignment
+      targets are known. Measure `beforeRebind`/`afterRebind` again after: the fix is proven when a
+      cold run reports 63.
 
 ## Phase 2b — an empty vault reports READY and SYNCHRONIZED
 

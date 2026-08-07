@@ -154,6 +154,34 @@ export class ConducksGraph {
   }
 
   /**
+   * Why the handover binder matched what it matched (todo49#P2).
+   *
+   * A first analyze writes fewer handovers than a second, and three explanations were plausible from
+   * reading. This counts the INPUTS instead: how many nodes carried an assignment producer, how many
+   * carried calls, how many carried both — and of those, how many CALLS edges still know the source
+   * text (`properties.original`) the match is keyed on. If `original` is what differs between a cold
+   * and a warm graph, this says so in one number rather than another hypothesis.
+   */
+  public handoverInputs(): { nodes: number; withProducer: number; withCalls: number; withBoth: number; callsWithOriginal: number; callsTotal: number } {
+    let nodes = 0, withProducer = 0, withCalls = 0, withBoth = 0, callsWithOriginal = 0, callsTotal = 0;
+    for (const node of this.graph.getAllNodes()) {
+      nodes++;
+      let producer = false, call = false;
+      for (const e of this.graph.getNeighbors(node.id, 'downstream')) {
+        if (e.properties?.reason === 'assignment') producer = true;
+        if (e.type === 'CALLS') {
+          call = true; callsTotal++;
+          if (e.properties?.original) callsWithOriginal++;
+        }
+      }
+      if (producer) withProducer++;
+      if (call) withCalls++;
+      if (producer && call) withBoth++;
+    }
+    return { nodes, withProducer, withCalls, withBoth, callsWithOriginal, callsTotal };
+  }
+
+  /**
    * Conducks — Pulse Binding (Variable Handover)
    */
   private bindPulseCircuits(): void {
