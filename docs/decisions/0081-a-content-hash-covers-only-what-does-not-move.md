@@ -1,8 +1,8 @@
 # 0081 — a content hash covers only what does not move
-Status: Accepted
+Status: Superseded by 0035
+- Superseded by: todo48#P4 — this record decided WHICH COLUMNS a layer's content hash may cover. Commit layers were withdrawn on 2026-08-07 (see ADR 0035), taking `content-key.ts` and its test with them, so the question this answers no longer exists. The reasoning is kept because the mistake it prevents is general: hashing a volatile column (gravity, metadata) collapses sharing from 91.8% to 68.6% while looking correct
 - Date: 2026-08-01
 - Amends: 0035
-- Enforced by: tests/unit/core/persistence/content-key-columns.test.ts (the content key excludes every column measured volatile, and includes the stable ones — so a future column added to the wrong side fails the gate rather than quietly halving the dedup)
 
 ## Context
 

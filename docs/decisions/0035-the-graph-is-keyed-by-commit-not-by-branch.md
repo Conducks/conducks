@@ -2,7 +2,8 @@
 Status: Accepted
 - Amended by: 0081
 - Date: 2026-07-27
-- Enforced by: tests/unit/core/persistence/layer-storage.test.ts (content-addressed commit layers) and the branch guard in tests/unit/interfaces/cli (refusal when the vault describes another branch)
+- Enforced by: tests/unit/core/git/branch-guard.test.ts (the surviving half — a read command refuses a graph pulsed on another branch). The commit-layer half had `layer-storage.test.ts`; both the feature and its test were withdrawn — see the amendment above
+- Amended by: 0081, todo48#P4 — the COMMIT-LAYER half of this record was built, measured and WITHDRAWN on 2026-08-07: 454 lines across four modules, five schema tables and 95 test cases, with zero user-facing surface — no CLI command, no registry entry, no MCP tool, and no pulse ever wrote a layer. Deleted rather than carried. The BRANCH GUARD half — refusing to answer from a graph pulsed on another branch — is untouched, shipped and live in `chronicle.branchRefusal`
 
 ## Context
 
