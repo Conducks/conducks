@@ -12,7 +12,8 @@ next commit.
 | what breaks if X changes | `conducks impact X` |
 | X's dependency chain | `conducks trace X` |
 | test fill per function | `conducks coverage` |
-| entry points, hotspots | `conducks status --mode map` |
+| entry points | `conducks entry` |
+| hotspots | `conducks status` |
 
 Sections and subsections are numbered so anything can cite one rule: `conducks-docs §6.8`. **Add at
 the end of a section; never renumber** — a citation that silently points at the wrong rule is worse

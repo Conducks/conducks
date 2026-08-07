@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import chalk from "chalk";
+import { isTestNode } from "@/contracts/test-path.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 
 /**
@@ -15,6 +16,22 @@ export class StatusCommand implements ConducksCommand {
   public usage = "conducks status [--mode pulse|blueprint] [--pulse] [--blueprint] [--file <path>] [--json] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
+    // An UNKNOWN mode is an error, not a default. `--mode map` ran the health report and looked like
+    // it had worked — and `conducks-docs` shipped that exact spelling in its "entry points,
+    // hotspots" row, so the standard documented a mode nothing implemented and nothing said so.
+    // Same shape as the `*` inventory query that answered "no symbols found" for a documented
+    // feature, and as `--depth` silently defaulting on `impact`.
+    const MODES = new Set(['pulse', 'blueprint']);
+    const modeIdx = args.indexOf('--mode');
+    if (modeIdx !== -1) {
+      const mode = args[modeIdx + 1];
+      if (!mode || !MODES.has(mode)) {
+        console.error(`Error: unknown --mode "${mode ?? ''}". Valid modes: ${[...MODES].join(', ')}.`);
+        console.error(`       For entry points use 'conducks entry'; hotspots are in the default report.`);
+        process.exit(1);
+      }
+    }
+
     const isPulse = args.includes('--pulse') || (args.includes('--mode') && args[args.indexOf('--mode') + 1] === 'pulse');
     const fileArgIdx = args.indexOf('--file');
     const fileArg = fileArgIdx !== -1 ? args[fileArgIdx + 1] : null;
@@ -93,7 +110,7 @@ export class StatusCommand implements ConducksCommand {
       const graph = registry.query.graph.getGraph();
 
       const topGravity = Array.from(graph.getAllNodes())
-        .filter(n => !n.properties.isTest)
+        .filter(n => !isTestNode(n))   // path-derived: the parse-time flag does not survive the vault
         .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
         .slice(0, 5);
 
@@ -136,9 +153,13 @@ export class StatusCommand implements ConducksCommand {
       }
       console.log(`- ${chalk.yellow('Pulse')}:   ${chalk.cyan(pulseId)}${servedFrom === 'previous-pulse-snapshot' ? chalk.yellow(' (served from the previous pulse\'s snapshot — a write is in flight)') : ''}`);
 
+      // RELATIVE, like `impact` and `context` (ADR 0132): the absolute prefix was ~90 identical
+      // characters on every row, which is the part a reader has to skip to reach the answer.
+      const projectRoot = (registry.infrastructure.chronicle.getProjectDir() || process.cwd()).toLowerCase();
+      const rel = (p: string) => p.startsWith(projectRoot) ? p.slice(projectRoot.length + 1) : p;
       console.log(chalk.bold(`\n--- 🚀 Top Structural Hotspots ---`));
       topGravity.forEach((n, i) => {
-        console.log(`${i + 1}. ${chalk.magenta(n.id)} [Gravity: ${chalk.cyan((n.properties.rank || 0).toFixed(4))}]`);
+        console.log(`${i + 1}. ${chalk.magenta(rel(n.id))} [Gravity: ${chalk.cyan((n.properties.rank || 0).toFixed(4))}]`);
       });
       console.log();
     } finally {

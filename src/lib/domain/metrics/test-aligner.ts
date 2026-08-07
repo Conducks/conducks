@@ -1,4 +1,5 @@
 import { ConducksAdjacencyList, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { isTestNode } from "@/contracts/test-path.js";
 
 /**
  * Conducks — Test Aligner (Conducks) 🧪
@@ -13,12 +14,10 @@ export class TestAligner {
     const nodes = Array.from(graph.getAllNodes());
 
     // 1. Identify all nodes that belong to a test environment
-    const testRelevantNodes = nodes.filter((n: any) => {
-      const segments = n.id.split('/');
-      const isTestPath = segments.some((s: string) => s === 'tests' || s === '__tests__') || segments.some((s: string) => s.endsWith('.spec.ts') || s.endsWith('.test.ts'));
-      const isTest = n.properties.isTest || (n.properties.isGlobalNode && isTestPath);
-      return isTest;
-    }) as ConducksNode[];
+    // One predicate (`isTestNode`), because this used to carry its own — and the parse-time
+    // `properties.isTest` it preferred is absent from every vault-loaded node, so the local
+    // fallback was the only thing working and only for global nodes.
+    const testRelevantNodes = nodes.filter((n: any) => isTestNode(n)) as ConducksNode[];
 
     for (const startNode of testRelevantNodes) {
       const queue: [string, number][] = [[startNode.id, 0]];
@@ -40,7 +39,7 @@ export class TestAligner {
           if (!targetNode) continue;
 
           // 2. Mark production nodes with covering test file
-          if (!targetNode.properties.isTest) {
+          if (!isTestNode(targetNode)) {
             if (!targetNode.properties.coveredBy) {
               targetNode.properties.coveredBy = [];
             }

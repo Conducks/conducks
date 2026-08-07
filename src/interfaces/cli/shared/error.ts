@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { isTestNode } from "@/contracts/test-path.js";
 
 /**
  * The only capability this helper needs from the graph: name → candidate nodes.
@@ -98,11 +99,7 @@ export function resolveSymbol(input: string, graph: NameIndex): string {
   // `boundaries.test.ts::format`, a test file's local, over the real declaration. A test file
   // mentioning a name is not the same claim as a source file declaring it. Only when NO source
   // candidate exists may a test symbol win, so asking about a test helper still answers.
-  const isTestFile = (n: { properties?: unknown }) => {
-    const f = String((n.properties as any)?.filePath ?? '').toLowerCase();
-    return /(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
-  };
-  const fromSource = preferred.filter(n => !isTestFile(n));
+  const fromSource = preferred.filter(n => !isTestNode(n));
   const pool = fromSource.length > 0 ? fromSource : preferred;
 
   const best = pool.reduce((a, b) => {
