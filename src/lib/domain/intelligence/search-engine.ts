@@ -1,4 +1,8 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { isTestNode } from '@/contracts/test-path.js';
+
+/** A test file's weight when it competes with source for a slot (todo43). Demotion, never exclusion. */
+const TEST_WEIGHT = 0.4;
 
 /**
  * Conducks — Graph Search Engine
@@ -87,11 +91,8 @@ export class ConducksSearch {
     // only a node's own score and the wavefront put the energy back: symbols INSIDE a test file
     // matched, echoed onto their unit, and the unit outranked source again. Demotion, not
     // exclusion: a query for a test still finds it.
-    const demoted = (id: NodeId, raw: number): number => {
-      const p = (this.graph.getNode(id)?.properties ?? {}) as Record<string, unknown>;
-      const f = String(p.filePath ?? '').toLowerCase();
-      return /(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f) ? raw * 0.4 : raw;
-    };
+    const demoted = (id: NodeId, raw: number): number =>
+      isTestNode(this.graph.getNode(id)) ? raw * TEST_WEIGHT : raw;
     const byScore = (a: [NodeId, number], b: [NodeId, number]) =>
       demoted(b[0], b[1]) - demoted(a[0], a[1]);
     const entries = Array.from(results.entries());
@@ -128,7 +129,13 @@ export class ConducksSearch {
         return !CONTAINERS.has(String(n.properties.canonicalKind ?? ""));
       })
       .sort((a: ConducksNode, b: ConducksNode) => {
-        const gravity = (b.properties.rank ?? 0) - (a.properties.rank ?? 0);
+        // The SAME demotion the search path applies (todo43). The inventory had its own ordering and
+        // therefore its own answer: `query "*"` opened with a test file on the Python subject while
+        // `query "<name>"` demoted the same file — one rule, two behaviours, decided by which
+        // question was asked. Demotion, not exclusion: an inventory that hides a repo's tests is
+        // lying about what the repo contains.
+        const weigh = (n: ConducksNode) => (n.properties.rank ?? 0) * (isTestNode(n) ? TEST_WEIGHT : 1);
+        const gravity = weigh(b) - weigh(a);
         if (gravity !== 0) return gravity;
         // Stable, readable tie-break: rank is 0 for everything until `resonate` has run.
         return String(a.properties.name).localeCompare(String(b.properties.name));

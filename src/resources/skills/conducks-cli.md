@@ -61,7 +61,8 @@ and the bare board for a single repo. `--root-only` on either command restores t
   - `conducks query "*"` is the INVENTORY: every symbol by structural gravity, heaviest first, for reading a codebase top-down instead of searching a name you already know
 - `conducks explain <id>` — 6-signal risk breakdown · `conducks context <id> [--json]`
 - `conducks impact <id> [upstream|downstream] [--tree]` — blast radius · `conducks trace <id> [--flow]` · `conducks flows`
-- `conducks entry` — real entry points · `conducks list` — all nodes · `conducks cohesion <id1> <id2>`
+- `conducks entry` — real entry points · `conducks query "*"` — every symbol, heaviest first · `conducks cohesion <id1> <id2>`
+- `conducks list` — the anchored workspace and any FEDERATED projects linked to it (not a symbol list)
 - `conducks entropy <id>` — authorship entropy · `conducks fallback` — suspicious fallback patterns
 - `conducks prune` — dead code: ORPHAN, UNUSED_EXPORT, STALE_IMPORT
   - advisory, and it deliberately under-reports. Verify by SYMBOL, never by import path, before deleting anything
