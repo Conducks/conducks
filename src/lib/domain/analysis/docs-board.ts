@@ -547,7 +547,14 @@ function linkDecisions(board: DocsBoard): void {
     // both (below); this field did not, so the two disagreed about the same question and `agentView`
     // filtered on the wrong one.
     d.buildState = !d.builtBy.length
-      ? (d.enforcedBy ? "proven" : d.resolvedBy?.length ? "resolved" : "unlinked")
+      ? (d.enforcedBy ? "proven"
+        : d.resolvedBy?.length ? "resolved"
+        // A SUPERSEDED record's build question belongs to its successor, exactly as a resolved
+        // one's does. This case lived only in the `unlinked` LIST's filter, so the field reported
+        // "unlinked" for a record nothing is owed on — the same field-versus-list split this
+        // computation was consolidated to end, reappearing one case later.
+        : /^superseded/i.test(String(d.state ?? "")) ? "superseded"
+        : "unlinked")
       : finished ? (d.enforcedBy ? "proven" : "claimed")
       : d.builtBy.some((p: { done: number }) => p.done) ? "partial" : "unbuilt";
     d.openPhases = open.map((p: { addr: string }) => p.addr);
@@ -670,9 +677,9 @@ function hygiene(board: DocsBoard): void {
   // the field said 141 unlinked while this list said none. One definition, in `linkDecisions`;
   // this filter now only adds the `superseded` exemption, which is about the ADR's STATUS rather
   // than its evidence.
-  board.unlinked = board.decisions
-    .filter(d => d.buildState === "unlinked" && !/^superseded$/i.test(d.state || ""))
-    .map(d => d.id);
+  // PURELY derived now. The superseded exemption moved into `buildState` where the other two
+  // (`proven`, `resolved`) already live, so this filter re-decides nothing.
+  board.unlinked = board.decisions.filter(d => d.buildState === "unlinked").map(d => d.id);
 }
 
 function mergeLint(board: DocsBoard, file: string, type: DocType, errs: string[]): void {

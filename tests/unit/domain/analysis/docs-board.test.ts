@@ -522,3 +522,20 @@ describe('buildState survives a todo being closed (one definition, not two)', ()
     expect(board.unlinked).toEqual(['0001']);
   });
 });
+
+describe('a superseded ADR is not "unlinked" — the field and the list agree there too', () => {
+  // The split this pins reappeared one case after being fixed: `proven` and `resolved` were moved
+  // into buildState, while the superseded exemption stayed behind in the LIST's filter. So a
+  // superseded record reported buildState "unlinked" (nothing proves it was built) while the list
+  // correctly held nothing — two answers to one question, again.
+  it('reports superseded, and the list stays empty', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'conducks-sup-'));
+    mkdirSync(path.join(root, 'docs', 'decisions'), { recursive: true });
+    writeFileSync(path.join(root, 'docs', 'decisions', '0001-a.md'),
+      '# 0001 — a decision\nStatus: Superseded by 0002\n- Date: 2026-01-01\n\n## Context\nx\n\n## Decision\ny\n\n## Consequences\nz\n');
+    const board = buildBoard(root);
+    rmSync(root, { recursive: true, force: true });
+    expect(board.decisions[0].buildState).toBe('superseded');
+    expect(board.unlinked).toEqual([]);
+  });
+});
