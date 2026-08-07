@@ -10,7 +10,8 @@
 // A check asserts the FIX, not just that the command exited 0. "It ran" is what every one of these
 // defects already did.
 import { execFileSync } from 'node:child_process';
-import { readdirSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -109,7 +110,32 @@ const CHECKS = [
   },
 ];
 
+// Checks that are about the TOOL rather than about a subject — run once, not per project.
+const GLOBAL_CHECKS = [
+  {
+    cmd: 'analyze <empty dir>',
+    run: () => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'conducks-empty-'));
+      try { return run(dir, ['analyze', '--yes']); } finally { rmSync(dir, { recursive: true, force: true }); }
+    },
+    checks: [
+      ['a root with no source EXITS non-zero', r => r.code !== 0],
+      ['and says nothing was analyzed, not "100% resonance"', r =>
+        /nothing was analyzed/i.test(r.out) && !/100% resonance/i.test(r.out)],
+    ],
+  },
+];
+
 let failed = 0, passed = 0;
+for (const spec of GLOBAL_CHECKS) {
+  const r = spec.run();
+  for (const [label, assert] of spec.checks) {
+    let ok = false;
+    try { ok = assert(r); } catch { ok = false; }
+    ok ? passed++ : failed++;
+    console.log(`  ${ok ? '✓' : '✗'} ${spec.cmd} — ${label}`);
+  }
+}
 for (const subject of SUBJECTS) {
   console.log(`\n=== ${subject.name}`);
   for (const spec of CHECKS) {
@@ -122,5 +148,11 @@ for (const subject of SUBJECTS) {
     }
   }
 }
-console.log(`\n${passed} passed, ${failed} failed  (${SUBJECTS.length} subject(s) × ${CHECKS.reduce((n, c) => n + c.checks.length, 0)} checks)`);
+const perSubject = CHECKS.reduce((n, c) => n + c.checks.length, 0);
+const globals = GLOBAL_CHECKS.reduce((n, c) => n + c.checks.length, 0);
+// `analyze`'s heavy regressions — idempotence, node/edge drift, non-ASCII recovery — are NOT
+// duplicated here: `npm run bench:health --compare` runs a real analyze against every frozen
+// subject and diffs its baseline, and the non-ASCII case is pinned by an integration test. This
+// file holds the checks that are cheap and would otherwise go unwatched.
+console.log(`\n${passed} passed, ${failed} failed  (${SUBJECTS.length} subject(s) × ${perSubject} + ${globals} global)`);
 process.exit(failed > 0 ? 1 : 0);
