@@ -525,11 +525,10 @@
   <div class="callout">
     <strong>Corrupted reverse index.</strong> <code class="anchor">adjacency-list.ts:318</code> provides
     <code>rebindEdgeTarget</code>, whose own comment says it is "essential for neural binding".
-    <code>bindNeuralCircuits</code> does not call it — <code class="anchor">graph-engine.ts:540-546</code> assigned
+    <code>bindNeuralCircuits</code> once did not call it — it assigned
     <code>edge.targetId</code> directly, leaving <code>inEdges</code> filed under the old target. After
     binding, <code>impact</code> asks "who calls this" and misses exactly the edges that were just
-    repaired. <code>IntraLinker</code> does the same operation correctly at
-    <code class="anchor">linker-intra.ts:141</code>. Now routed through <code>rebindEdgeTarget</code>; both
+    repaired. <code>IntraLinker</code> does the same operation correctly. Now routed through <code class="anchor">graph-engine.ts:590</code>&#39;s <code>rebindEdgeTarget</code> call; both
     assertions in the enforcing test were confirmed red against the bare assignment first.
     <span class="st fx">fixed</span> <span class="src">ADR 0045</span>
   </div>

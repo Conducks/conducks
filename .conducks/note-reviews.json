@@ -13,7 +13,7 @@
   },
   "docs/visuals/modules/core/graph.md": {
     "src/lib/core/graph/adjacency-list.ts": "c547a15cad546963",
-    "src/lib/core/graph/graph-engine.ts": "34a250cd1714e0f1"
+    "src/lib/core/graph/graph-engine.ts": "7572253790d95778"
   },
   "docs/visuals/modules/core/parsing/grammar-registry.md": {
     "tests/unit/core/parsing/optional-native-binding.test.ts": "ba7f05e5a933f9f0"
@@ -57,7 +57,7 @@
     "src/lib/domain/analysis/micro-pulse.ts": "c0fd6f64c86d95a2"
   },
   "docs/visuals/modules/domain/analysis.md": {
-    "src/lib/domain/analysis/index.ts": "24812897d291d782"
+    "src/lib/domain/analysis/index.ts": "22354d5b48f59686"
   },
   "docs/visuals/modules/domain/evolution.md": {
     "src/lib/domain/evolution/dead-code.ts": "763c048c7689c916",
@@ -92,11 +92,10 @@
     "src/interfaces/cli/index.ts:203-204": "6bd5f2d873d60c4c",
     "src/lib/domain/analysis/micro-pulse.ts:68": "a2c2339691fc48fb",
     "src/lib/core/graph/adjacency-list.ts:318": "c8e0d39aa04bbdee",
-    "src/lib/core/graph/graph-engine.ts:540-546": "9b881418639b3fea",
-    "src/lib/core/graph/linker-intra.ts:141": "c9f0393fed4a61c8"
+    "src/lib/core/graph/graph-engine.ts:590": "e14ef5d22d885a03"
   },
   "docs/visuals/modules/domain/analysis/docs-board.md": {
-    "src/lib/domain/analysis/docs-board.ts": "a4ffc1bb1face345",
+    "src/lib/domain/analysis/docs-board.ts": "8b9a599ab9ee1693",
     "src/lib/domain/analysis/docs-watcher.ts": "d4ace5f451c7fbc2",
     "src/lib/domain/analysis/module-hash.ts": "2f5aa06e1a7b8e79"
   }
