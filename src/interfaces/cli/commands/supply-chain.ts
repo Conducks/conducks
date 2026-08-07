@@ -31,8 +31,20 @@ export class SupplyChainCommand implements ConducksCommand {
     const useJson = args.includes("--json");
 
     if (summary.length === 0) {
-      if (useJson) { process.stdout.write(JSON.stringify({ origins: [], packages: [], advisories: { available: false } }, null, 2) + '\n'); return; }
-      console.log(`\x1b[33m⚠️  No boundary edges found. Run 'conducks analyze' first.\x1b[0m`);
+      // TWO different states used to print one sentence. "No boundary edges" is the honest answer
+      // for a project with no third-party imports — telling that user to run `analyze` sends them to
+      // repeat work they already did, and reads as a tool failure rather than a true empty answer.
+      // An UNANALYSED project is a different case and still gets the instruction. The graph itself
+      // is what tells them apart: a vault with nodes has been analyzed.
+      const [{ n }] = await persistence.query<{ n: number }>('SELECT count(*)::INT AS n FROM nodes');
+      const analysed = Number(n) > 0;
+      if (useJson) {
+        process.stdout.write(JSON.stringify({ origins: [], packages: [], analysed, advisories: { available: false } }, null, 2) + '\n');
+        return;
+      }
+      console.log(analysed
+        ? `  ·  No third-party dependencies — every import in this project resolves inside it.\n     That is the answer, not a missing analysis.`
+        : `\x1b[33m⚠️  No boundary edges, and this project has not been analyzed. Run 'conducks analyze' first.\x1b[0m`);
       return;
     }
 

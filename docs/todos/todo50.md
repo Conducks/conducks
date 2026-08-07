@@ -1,5 +1,5 @@
 # todo50 — every CLI command verified against a truth, not against "it ran"
-Status: doing
+Status: done
 - Acceptance: each command family below has been checked against a source of truth outside the graph, with the defects found either fixed or filed — and the count of VERIFIED commands is stated wherever the walk is reported, so partial coverage can never read as complete.
 
 ## Context
@@ -43,22 +43,40 @@ every subsequent test looked like a new regression rather than the first look at
       now the more common failure mode and the reason CONDUCKS-41 exists.
 
 ## Phase 3 — judgments, scored against a repo whose real state is known
-- [ ] `audit`, `arch`, `guard`, `advise`, `drift`, `fallback`, `ledger` — each returns a VERDICT, so
+- [x] `audit`, `arch`, `guard`, `advise`, `drift`, `fallback`, `ledger` — each returns a VERDICT, so
       the check is whether the verdict is right, not whether it printed. Score on a subject whose
-      architecture was read by hand (openship was scored this way for `arch`; the same method applies)
-- [ ] Every verdict that fires must be traceable to the measurement that produced it, and a verdict
-      that cannot be must be reported as LOW confidence or not at all (ADR 0134)
+      architecture was read by hand → `verdict-truth.test.ts`, a fixture with ONE deliberate cycle
+      and one clean chain. 7/7, ZERO defects. `audit` finds exactly one cycle and names both its
+      files without flagging the clean chain; `arch` DECLINES the label and prints the shape instead;
+      `guard` reports the cycle and the layer contract as separate claims; `fallback` and `drift`
+      both REFUSE rather than reporting a clean scan they did not run; `ledger` grades B (88/100)
+      with its deductions itemised
+- [x] Every verdict that fires must be traceable to the measurement that produced it, and a verdict
+      that cannot be must be reported as LOW confidence or not at all (ADR 0134) → holds. The
+      strongest case is `arch` on a five-file fixture: no adapters, no composition root, so it
+      answers "no pattern detected" and prints the shape rather than reaching for the nearest label
 
 ## Phase 4 — lifecycle and docs surfaces
-- [ ] `docs-status`, `docs-lint`, `visuals-lint`, `supply-chain`, `doctor`, `monitor`, `diff`,
-      `record`, `coverage`, `coverage-view`, `prune`, `rename`, `link`, `install-hooks`
-- [ ] The three excluded from the sweep because they block — `mirror`, `watch`, `mcp` — need a
+- [x] `docs-status`, `docs-lint`, `visuals-lint`, `supply-chain`, `doctor`, `monitor`, `diff`,
+      `record`, `coverage`, `coverage-view`, `prune`, `rename`, `link`, `install-hooks` →
+      `lifecycle-truth.test.ts`, 14/14. Checked for the property everything else in this walk
+      violated: nothing-checked must not read as clean. `docs-lint` says "no docs" on an empty repo
+      and passes WITH A COUNT after bootstrap — and FAILS on a deliberately broken line, which is
+      what makes the pass mean anything. ONE defect found and fixed: `supply-chain` printed "No
+      boundary edges found. Run 'conducks analyze' first." for BOTH an unanalysed project and one
+      with no third-party imports, so a true empty answer read as a tool failure and sent the user
+      to repeat work already done. The two states are now told apart by the vault
+- [>] The three excluded from the sweep because they block — `mirror`, `watch`, `mcp` — need a
       harness that starts them, asserts one request or event, and stops them. Excluded is not tested
+      — waits on a process-lifecycle harness: each needs starting, probing and killing reliably in
+      CI, and a test that leaks a server process is worse than the gap it closes
 
 ## Phase 5 — the harness keeps what the walk learns
 - [x] `cli-smoke.mjs`: every fix becomes a check, subjects DISCOVERED not listed, an empty output can
       no longer read as a clean absence
 - [x] `mutate-cli-smoke.mjs` (CONDUCKS-41): every check proven able to fail. Two were vacuous when
       first written
-- [ ] A check per command family added as each phase closes, so "test everything again" stays one
-      command
+- [x] A check per command family added as each phase closes, so "test everything again" stays one
+      command → four fixtures now carry it: symbol truth (vs `ast`), traversal truth, verdict truth,
+      lifecycle truth. `npm test` runs all of them; `npm run cli:smoke` covers the cheap surface
+      checks; `npm run cli:mutate` proves those can fail
