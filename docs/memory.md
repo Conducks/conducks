@@ -1422,3 +1422,39 @@ by construction.
   `handleSubmit`, passed as an `onClick` prop, did not.
 - Applies: any time a kind looks merely cosmetic. Downstream steps filter on kind, and one of them
   deletes. Two arms on a tiny file answered in minutes what reading the pipeline did not. ADR 0136.
+
+## `properties.isTest` is set at parse time and does NOT survive the vault
+- Gotcha: the reflector computes `isTest` per file and writes it into node metadata; the persisted
+  `metadata` column carries no such key. So `properties.isTest` is `undefined` on every graph loaded
+  FROM the vault — which is every graph a read command sees — and a filter written against it is a
+  no-op that looks like a working filter. `status` ranked a Python test file as the repository's top
+  structural hotspot while filtering `!isTest`; `TestAligner` marked test nodes as covered-by-a-test.
+- Why: the flag is real in memory during a pulse and absent afterwards, so the same expression is
+  correct in one half of the codebase and dead in the other. Nothing errors — the answer is simply
+  wrong in a direction nobody looks at.
+- Applies: anywhere that asks "is this a test file". Use `isTestNode`/`isTestPath`
+  (`src/contracts/test-path.ts`), which derives it from the PATH, the one thing a loaded node always
+  carries. Five separate copies of that predicate existed before it was consolidated; a sixth is the
+  smell that this entry was not read.
+
+## git QUOTES a path containing a non-ASCII byte, and the quoted string opens nothing
+- Gotcha: `core.quotePath` defaults to true, so `git ls-files` returns `İstanbul.csv` as the literal
+  `"data/source/\304\260stanbul.csv"` — surrounding quotes and octal escapes included. Taken as a
+  path it opens nothing, so the file is dropped from the graph and reported as "skipped 1 unreadable
+  file", which is the honest half of a wrong answer.
+- Why: on the frozen Python subject it cost one CSV. In a repository naming source files in Turkish,
+  French or Chinese it is every symbol in them, absent from every answer, with a warning no reader
+  parses as "your code is missing".
+- Applies: every git invocation that returns PATHS. Pass `-c core.quotePath=false` per invocation
+  (never write it into the repository's config — conducks only reads the repos it analyzes).
+
+## An in-process vault handle between two CLI runs fails the next writer's lock
+- Gotcha: opening `SynapsePersistence` inside a test to read the graph takes a DuckDB lock that a
+  subsequent `conducks analyze` cannot acquire. The CLI then reports "[Vault Locked] Another process
+  is WRITING this vault", and the test reads as a broken FEATURE rather than a broken test.
+- Why: it looks exactly like the thing under test failing, and the error names a writer conflict that
+  the test author is not thinking about because they only read.
+- Applies: integration tests that interleave CLI runs with graph reads. Read THROUGH the CLI
+  (`runCli(['query', ...])`) instead, or open the vault only after the last CLI invocation. Note also
+  that `runCli` returns `{stdout, stderr, combined, status}` — not a string.
+

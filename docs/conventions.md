@@ -163,3 +163,17 @@ beaten the real docstring. Any measurement of "did we find it" carries a paired 
 what we found correct", and a metric with no denominator of truth is a count, not a score.
 Also: a number going DOWN is not automatically a regression. The TypeScript doc count fell by 13 when
 banners started being refused. Look at what left before calling it either way. ADR 0135.
+
+## CONDUCKS-41 — a check that has never failed may be incapable of failing
+- Rule: A check written AFTER the fix it guards is not trusted until it has been seen RED. Break the
+  thing it claims to protect, confirm that check — not merely some check — fails, then restore.
+  Applies to unit tests, gate assertions and any harness written alongside a fix.
+- Reason: MEASURED on a session's own work. Eleven checks were mutated; two were vacuous. "A scope
+  naming no file exits non-zero" ran in an EMPTY directory, so the empty-ROOT refusal produced the
+  non-zero exit whatever the scope logic did — deleting the scope refusal left it green. The
+  module-hash test asserted `ProjectMonitor.moduleHash === moduleHashOf`, which after the
+  consolidation compares a function to itself and cannot fail; making the hash ignore every file's
+  content left it green. Both were written the same hour as their fixes, both looked like coverage,
+  and neither could have caught a regression. CONDUCKS-39 makes a FINDING earn its record by being
+  run; this makes the CHECK earn its tick by being broken.
+

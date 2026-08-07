@@ -1,4 +1,4 @@
-# Handover — 2026-08-06
+# Handover — 2026-08-07
 Status: current
 
 ## Where it stands
@@ -7,13 +7,31 @@ Gates fully green: **1,598 tests / 199 suites**, typecheck 0, `guard` clean, `do
 source: 6,144 nodes, 22,469 edges. One branch, `main`, local == origin — the 16-branch backlog was
 merged and deleted, remote included.
 
-## The board is empty — "Nothing open. Every phase is finished."
+## The board is NOT empty — and that is the point
+todo48#P4 (layer-write activation), todo49 (a repository's first analyze builds a thinner graph than
+its second) and todo50 (the CLI verification walk) are open. The board WAS empty on 2026-08-06; a day
+of running the commands rather than reading them refilled it, which is the honest signal.
 Every todo through 47 is closed and in `completed/`. todo09's "blocked: offline" header was STALE —
 the vuln-surface task was built 2026-08-01 and the blocker found false the same day, but only the
 task line was updated and the header sat wrong for five days. Re-proven live and closed. todo31
 stays deliberately parked: three reopen-triggers as deferred-with-condition.
 
-## What this stretch built (read the ADRs, they carry the reasoning)
+## 2026-08-07 — the CLI walk, and what it says about "done"
+Three commands were verified against a truth (`status`, `list`/`query`, `analyze`) and produced
+THIRTEEN defects, every one of which ran without crashing beforehand. 36 of 39 invocations still run
+clean, and that bar is now known to prove almost nothing. State verified/unverified counts together;
+"the CLI works" is not yet a claim anyone can make (todo50).
+
+The defects worth carrying forward, all now in `memory.md` or a module note: a parse-time `isTest`
+flag that does not survive the vault (so a filter written against it is a no-op — five copies of that
+predicate existed), git quoting non-ASCII paths out of the graph entirely, a scoped pulse advancing
+the global freshness clock and consuming every out-of-scope change, and a first-ever analyze writing
+6 of 63 handover edges.
+
+Two of the checks written for those fixes were VACUOUS when mutated (CONDUCKS-41). The mutation
+runner is `npm run cli:mutate` and should be run against any new check.
+
+## What the earlier stretch built (read the ADRs, they carry the reasoning)
 - **The visuals pipeline** (ADR 0138–0142): anchors checked against the working tree; drift proven
   by re-running the repo's DECLARED generator (`conducks.json` → `visuals.generate`) with a restore
   contract; module notes moved INTO the pipeline (`docs/visuals/modules/<path>.md` is SOURCE,
