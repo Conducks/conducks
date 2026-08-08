@@ -1,8 +1,12 @@
 import { Tool } from "@/registry/tool-registry.js";
 import { registry } from "@/registry/index.js";
+import { acquireAnchor, releaseAnchor } from "@/interfaces/tools/shared/anchor.js";
 import path from "node:path";
 import fs from "fs-extra";
 import { fileURLToPath } from "node:url";
+
+/** Serialises tool calls — see the queue comment in the handler wrapper below. */
+let queue: Promise<void> = Promise.resolve();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +63,28 @@ export class ConducksRegistry {
         // We prioritize the 'path' argument from the tool call, then the environment, then CWD.
         const requestPath = args.path || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
         
+        // SERIALIZED, and this is a correctness fix rather than a throttle.
+        //
+        // JSON-RPC allows concurrent requests and agents batch tool calls, but everything below the
+        // handler is a module-level SINGLETON: one registry, one materialised graph, one vault
+        // handle. `registry.initialize` SWAPS the persistence object through `updatePersistence`, so
+        // a second call arriving mid-flight can replace — and then close — the handle the first one
+        // is still reading through. Measured over real stdio JSON-RPC before this line existed:
+        //   - four pipelined `conducks_impact` calls returned three `SYMBOL_NOT_FOUND` for a symbol
+        //     that demonstrably exists, because a caller raced past a graph load still in progress
+        //     and walked an empty graph — a WRONG ANSWER, not an error;
+        //   - eight mixed calls produced `Connection Error: Connection was never established or has
+        //     been closed already` and `Database was already closed`.
+        // Ref-counting the close is not enough on its own: it cannot make an object swap atomic.
+        //
+        // The cost is that tool calls no longer overlap. These are local reads, and a serialized
+        // right answer beats a parallel wrong one.
+        const turn = queue;
+        let release: () => void = () => {};
+        queue = new Promise<void>(r => { release = r; });
+        await turn;
+
+        acquireAnchor();
         try {
           // Conducks High-Fidelity Pivot: Re-anchor the structural synapse to the requested path.
           // The RegistryBootstrapper ensures this is a no-op if we are already anchored correctly.
@@ -71,7 +97,8 @@ export class ConducksRegistry {
         } finally {
           // 🛡️ [Vault Hardening] Always close the synapse connection after a tool call.
           // This prevents DB locking when the user tries to run CLI commands concurrently.
-          await (registry.infrastructure.persistence as any).close();
+          await releaseAnchor();
+          release();                       // hand the vault to the next queued tool call
         }
       };
     }

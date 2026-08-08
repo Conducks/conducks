@@ -1,7 +1,7 @@
 import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { execSync } from "node:child_process";
-import { ensureAnchor } from "../shared/anchor.js";
+import { ensureAnchor, releaseAnchor } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 
 /**
@@ -108,7 +108,7 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
         // MCP3: structured error
         return mcpErr('IMPACT_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -194,7 +194,7 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
         // MCP3: structured error
         return mcpErr('TRACE_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -294,7 +294,7 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
         // MCP3: structured error
         return mcpErr('DIFF_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -342,7 +342,7 @@ WARNING: This is a mutational tool. It modifies the source code.`,
         // MCP3: structured error
         return mcpErr('RENAME_FAILED', err.message, 'Check that the symbol exists and the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   }

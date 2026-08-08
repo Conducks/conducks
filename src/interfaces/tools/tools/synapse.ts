@@ -1,6 +1,6 @@
 import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
-import { ensureAnchor, resolveDocsRoot } from "../shared/anchor.js";
+import { ensureAnchor, releaseAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 
 /**
@@ -233,7 +233,7 @@ Returns:
         // MCP3: structured error
         return mcpErr('QUERY_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -331,7 +331,7 @@ Modes:
         // MCP3: structured error
         return mcpErr('STATUS_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -441,7 +441,7 @@ Modes:
         // MCP3: structured error
         return mcpErr('AUDIT_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -501,7 +501,7 @@ AFTER THIS: Use conducks_trace to see how data flows through this symbol.`,
         // MCP3: structured error
         return mcpErr('EXPLAIN_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -709,7 +709,7 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
         // MCP3: structured error
         return mcpErr('CONTEXT_FAILED', err.message, 'Check that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -770,7 +770,7 @@ AFTER THIS: Use conducks_explain for deeper analysis of returned symbols.`,
         // MCP3: structured error
         return mcpErr('QUERY_FAILED', err.message, 'Check your SQL syntax and that the project has been analyzed first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -830,7 +830,7 @@ Returns: list of flows, each with a name, entry symbol, and member count.`,
       } catch (err: any) {
         return mcpErr('FLOWS_FAILED', err.message, 'Run conducks analyze on the project first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -896,7 +896,7 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
       } catch (err: any) {
         return mcpErr('PRUNE_FAILED', err.message, 'Run conducks analyze on the project first.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   },
@@ -1043,7 +1043,7 @@ computed over the FULL bound set, only the \`functions\` list is capped. Raise \
       } catch (err: any) {
         return mcpErr('COVERAGE_FAILED', err.message, 'Run conducks analyze first, and pass a valid coverage-final.json.', true);
       } finally {
-        await (registry.infrastructure.persistence as any).close();
+        await releaseAnchor();
       }
     }
   }

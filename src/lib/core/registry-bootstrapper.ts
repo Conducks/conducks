@@ -37,15 +37,42 @@ export class RegistryBootstrapper {
   /** True while a graph load has been deferred and not yet run. */
   public get graphIsDeferred(): boolean { return this.pendingLoad !== null; }
 
+  /** The load that is currently running, so a second caller WAITS for it instead of racing past it. */
+  private loadInFlight: Promise<void> | null = null;
+
   /**
    * Materialise the graph if something deferred it. A no-op once loaded, so any number of callers
    * cost one load.
+   *
+   * CONCURRENCY. This used to clear `pendingLoad` and only then await the load, which is check-then-act:
+   * caller A took the pending load and nulled the field, and caller B — arriving while A was still
+   * materialising thousands of nodes — saw null, returned immediately believing the graph was ready,
+   * and walked an EMPTY one. It did not throw; it answered. Measured over real stdio JSON-RPC with
+   * four pipelined `conducks_impact` calls: three came back `SYMBOL_NOT_FOUND` for a symbol that
+   * demonstrably exists, because "no node matched" and "no nodes at all" are the same observation to
+   * every caller downstream. The comment above claimed "a no-op once loaded" while the code was a
+   * no-op once loading had STARTED — the invariant stated was not the one implemented.
+   *
+   * Now the in-flight promise is memoised and returned, so a concurrent caller awaits the same load.
+   * Still exactly one load; the difference is that the second caller waits for it rather than
+   * overtaking it.
    */
   public async ensureGraphLoaded(persistence: SynapsePersistence): Promise<void> {
+    // A load is already running — join it rather than proceeding on an unloaded graph.
+    if (this.loadInFlight) return this.loadInFlight;
+
     const pending = this.pendingLoad;
     if (!pending) return;
     this.pendingLoad = null;
-    await pending(persistence);
+
+    // On FAILURE the pending load is restored. Without this a load that threw left `pendingLoad`
+    // null forever, so every later caller took the "already loaded" path and answered from an empty
+    // graph — the same silent false-negative this fix exists to remove, just reached another way.
+    this.loadInFlight = pending(persistence)
+      .catch(err => { this.pendingLoad = pending; throw err; })
+      .finally(() => { this.loadInFlight = null; });
+
+    return this.loadInFlight;
   }
 
   /**

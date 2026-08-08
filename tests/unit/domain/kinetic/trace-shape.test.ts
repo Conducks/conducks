@@ -62,6 +62,10 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
 jest.unstable_mockModule('@/interfaces/tools/shared/anchor.js', () => ({
   ensureAnchor: jest.fn(async () => {}),
   resolveDocsRoot: jest.fn((p?: string) => p ?? PROJECT_ROOT),
+  // The real module gained these when tool calls were serialised; a mock missing an export fails
+  // the whole suite at import, not at the assertion.
+  releaseAnchor: jest.fn(async () => {}),
+  acquireAnchor: jest.fn(() => {}),
 }));
 
 const { kineticTools } = await import('@/interfaces/tools/tools/kinetic.js');

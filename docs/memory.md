@@ -1550,3 +1550,21 @@ by construction.
   reports "clean" the whole time — the denominator problem again, one level up.
 - Applies: when the gate flags a page, RE-DERIVE the line number by grepping for the symbol rather
   than re-stamping to silence it. A re-stamp without a re-read launders drift into "reviewed".
+
+## Pipelined MCP tool calls raced the singleton and returned WRONG answers
+- Gotcha: JSON-RPC allows concurrent requests and agents batch tool calls, but everything under a
+  handler is a module-level singleton — one registry, one materialised graph, one vault handle. Two
+  defects followed. (1) `ensureGraphLoaded` cleared `pendingLoad` BEFORE awaiting the load, so a
+  second caller saw null, believed the graph was ready, and walked an EMPTY one: four pipelined
+  `conducks_impact` calls returned three `SYMBOL_NOT_FOUND` for a symbol that exists. It did not
+  throw — it ANSWERED. (2) Every handler closed the shared vault in its own `finally`, so the first
+  to finish hung up on the rest (`Connection was never established or has been closed already`).
+- Why: "no node matched" and "no nodes at all" are the same observation to everything downstream, so
+  a load race becomes a confident false negative. Ref-counting the close was NOT enough — 
+  `registry.initialize` SWAPS the persistence object via `updatePersistence`, and no ref-count makes
+  an object swap atomic. Tool calls are now serialised at the one wrapper every tool passes through
+  (`hypertoon.ts`); the cost is no overlap, and a serialised right answer beats a parallel wrong one.
+- Applies: test concurrency by PIPELINING real JSON-RPC — every unit test mocked the handler, and a
+  mocked handler has no shared singleton to corrupt, so none of this was visible. Also: a mock that
+  omits a newly added export fails the whole suite at import with 0 test failures — read "N suites
+  failed, 0 tests failed" as a module error, not a logic error.

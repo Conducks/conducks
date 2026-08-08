@@ -104,8 +104,46 @@ export async function ensureAnchor(
     await registry.initialize(readOnly, root);
   }
 
+  inFlight++;
+
   // Opt-OUT, deliberately. Forgetting to materialise a graph a tool walks is SILENT: the domain
   // services hold their own reference from construction, so they see an empty graph and report zero
   // nodes with no error. A tool must be PROVEN to touch no graph before it passes false.
   if (needsGraph) await registry.infrastructure.ensureGraphLoaded();
+}
+
+/** Tool calls that have anchored and not yet released. Closing under a non-zero count kills live queries. */
+let inFlight = 0;
+
+/**
+ * Take a hold on the shared vault WITHOUT anchoring — for callers that release but never
+ * `ensureAnchor`, so acquire and release stay balanced.
+ *
+ * `hypertoon` wraps every tool handler and closes in its own `finally`, while the handler inside it
+ * also anchors and releases. Without this the pair is asymmetric — one increment, two decrements —
+ * and the count reaches zero while a sibling call is still reading, which is the exact bug the
+ * ref-count exists to prevent. It would have looked fixed and raced anyway.
+ */
+export function acquireAnchor(): void {
+  inFlight++;
+}
+
+/**
+ * Release this tool call's hold on the shared vault, closing it only when nothing else is using it.
+ *
+ * Every handler used to end with `persistence.close()` in its own `finally`. The registry — and so
+ * the connection — is a module-level SINGLETON shared by every concurrent call, so whichever call
+ * finished first closed the vault out from under the ones still querying it. Measured over real
+ * stdio JSON-RPC with eight pipelined calls: `conducks_query` and `conducks_explain` both returned
+ * `Connection Error: Connection was never established or has been closed already`, and the attached
+ * suggestion ("Check that the project has been analyzed first") pointed at the wrong cause entirely
+ * — the project was analyzed, another tool call had simply hung up the shared handle.
+ *
+ * JSON-RPC permits concurrent requests and agents batch tool calls, so this is the normal case
+ * rather than an exotic one.
+ */
+export async function releaseAnchor(): Promise<void> {
+  inFlight = Math.max(0, inFlight - 1);
+  if (inFlight > 0) return;                    // someone else is still reading — leave it open
+  await (registry.infrastructure as any).persistence?.close();
 }
