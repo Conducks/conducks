@@ -79,7 +79,9 @@ describe('phase 1 commands refuse rather than fabricate', () => {
   it('advise reports no container as a monolithic hub', () => {
     const { stdout, status } = runCli(['advise', '--json'], { cwd: repo, allowFail: true });
     expect(status).toBe(0);
-    for (const a of JSON.parse(stdout)) {
+    // `{status, checked, found}` since advise moved to `Verdict`: a bare array could not tell
+    // "examined thousands, found nothing" from "examined nothing".
+    for (const a of JSON.parse(stdout).found) {
       if (a.type !== 'HUB') continue;
       for (const n of a.nodes ?? []) {
         expect(String(n)).not.toMatch(/^(repository|directory|ecosystem|package)::/);

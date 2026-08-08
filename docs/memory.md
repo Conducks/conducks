@@ -1568,3 +1568,19 @@ by construction.
   mocked handler has no shared singleton to corrupt, so none of this was visible. Also: a mock that
   omits a newly added export fails the whole suite at import with 0 test failures — read "N suites
   failed, 0 tests failed" as a module error, not a logic error.
+
+## The empty-reads-as-clean class is now a TYPE, not a principle (ADR 0145)
+- Gotcha: ADR 0124 said "nothing to check is not a pass", was accepted, and was then violated eight
+  more times — 17 of 132 memory entries are this one defect, and 32 `length === 0` branches sit in
+  the CLI commands alone. A principle cannot bind dozens of independent render sites.
+- Why: a lint cannot catch it either. ADR 0089's build gate works because "a backtick in a template
+  literal" is an unambiguous syntactic fact; "this branch lies about emptiness" is not, and a fuzzy
+  gate that cries wolf gets switched off. So it lives where the COMPILER sees it:
+  `Verdict<T>` in `contracts/verdict.ts` — `clean` cannot be constructed without `examined`,
+  `nothing-to-check` is its own variant, and `renderVerdict` switches with no default (adding a
+  fourth variant fails the build with TS2366 — verified, not assumed).
+- Applies: `verdict()` checks the DENOMINATOR before the findings, because asking "were there
+  findings?" first is the inversion every instance made. `verdictToJson` always emits `checked`, even
+  0 — a machine reading `[]` cannot tell a real pass from an absent one and acts on it silently.
+  MIGRATED SO FAR: `advise` only. Still unmigrated: audit, prune, coverage, diff, supply-chain, arch,
+  context — say so rather than letting the ADR imply the sweep is done.
