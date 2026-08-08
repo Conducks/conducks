@@ -119,7 +119,18 @@ export class StatusCommand implements ConducksCommand {
       // (nodes written, edges lost) — it loads and looks fine but is silently broken. Flag it.
       const s = status.stats;
       const incomplete = s.nodeCount > 50 && s.density < 0.5;
-      const health = { incomplete, reason: incomplete ? `density ${s.density.toFixed(2)} with ${s.nodeCount} nodes — likely an interrupted analyze; re-run \`conducks analyze\`` : null };
+      // The EMPTY case was invisible to the check above: `nodeCount > 50` excludes it by
+      // construction, so a vault with nothing in it — after `conducks clean`, or before the first
+      // analyze — reported READY and SYNCHRONIZED with an empty hotspot list. Nothing-checked must
+      // not read as clean (ADR 0124), and an empty graph is the strongest form of nothing-checked.
+      const empty = s.nodeCount === 0;
+      const health = {
+        empty,
+        incomplete,
+        reason: empty
+          ? 'the vault holds no symbols — nothing has been analyzed yet; run `conducks analyze`'
+          : incomplete ? `density ${s.density.toFixed(2)} with ${s.nodeCount} nodes — likely an interrupted analyze; re-run \`conducks analyze\`` : null,
+      };
 
       if (useJson) {
         process.stdout.write(JSON.stringify({
@@ -142,11 +153,18 @@ export class StatusCommand implements ConducksCommand {
       console.log(`- Density: ${status.stats.density.toFixed(4)} relationships/symbol`);
       console.log(`- Status:  ${status.status.toUpperCase()}`);
 
-      if (incomplete) {
+      if (empty) {
+        console.log(`- ${chalk.yellow('Health')}:  ${chalk.red('⚠ EMPTY VAULT')} — ${health.reason}`);
+      } else if (incomplete) {
         console.log(`- ${chalk.yellow('Health')}:  ${chalk.red('⚠ INCOMPLETE PULSE')} — ${health.reason}`);
       }
 
-      if (status.staleness.stale) {
+      if (empty) {
+        // SYNCHRONIZED here would be a claim about nothing: with no symbols stored there is no
+        // analysis for HEAD to be ahead of, so "in sync" and "stale" are both meaningless rather
+        // than one of them being true.
+        console.log(`- ${chalk.yellow('Staleness')}: ${chalk.gray('n/a — nothing analyzed')}`);
+      } else if (status.staleness.stale) {
         console.log(`- ${chalk.yellow('Staleness')}: ${chalk.red('STALE')} (${status.staleness.commitsBehind} commits behind)`);
       } else {
         console.log(`- ${chalk.yellow('Staleness')}: ${chalk.green('SYNCHRONIZED')}`);
@@ -158,6 +176,11 @@ export class StatusCommand implements ConducksCommand {
       const projectRoot = (registry.infrastructure.chronicle.getProjectDir() || process.cwd()).toLowerCase();
       const rel = (p: string) => p.startsWith(projectRoot) ? p.slice(projectRoot.length + 1) : p;
       console.log(chalk.bold(`\n--- 🚀 Top Structural Hotspots ---`));
+      if (topGravity.length === 0) {
+        // A bare header over no rows reads as "no hotspots" — a finding — when the truth is that
+        // nothing was ranked. Same denominator honesty the rest of this command now carries.
+        console.log(chalk.gray(empty ? '(none — the vault is empty)' : '(none ranked)'));
+      }
       topGravity.forEach((n, i) => {
         console.log(`${i + 1}. ${chalk.magenta(rel(n.id))} [Gravity: ${chalk.cyan((n.properties.rank || 0).toFixed(4))}]`);
       });

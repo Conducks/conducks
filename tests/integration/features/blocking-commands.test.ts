@@ -102,28 +102,46 @@ describe('the commands that block', () => {
   }, 90000);
 
   /**
-   * WHAT THIS PROVES, AND WHAT IT DOES NOT — the honest split, because the second half is a finding
-   * rather than a passing test.
+   * `watch` proven in BOTH halves now — todo51 closed the second.
    *
-   * PROVEN: `watch` starts, initialises, and RECONCILES — it reports the files edited while nothing
-   * was watching, which is the half ADR 0036 added and the half a session actually depends on
-   * (`ignoreInitial: true` means the watcher is otherwise blind to everything before it started).
+   * RECONCILE (ADR 0036): it reports the files edited while nothing was watching — the half a session
+   * depends on, since `ignoreInitial: true` leaves the watcher otherwise blind to everything before
+   * it started.
    *
-   * NOT PROVEN: that a file created AFTER start produces a reaction. It was probed for 30s, with
-   * chokidar polling forced to rule out macOS FSEvents under /private/var/folders, and no
-   * `⚡ Change detected` line (watcher.ts:303) ever appeared. That is either a real defect or an
-   * environment limit this harness cannot separate, and it is filed as todo51 rather than asserted
-   * in either direction — a red test claiming a bug I have not proven is as wrong as a green one
-   * claiming a feature I have not checked.
+   * REACT-TO-NEW (todo51): a file created AFTER start produces a `⚡ Change detected` line naming it,
+   * with the new symbol resolved. This was the open finding: a new file is UNTRACKED, `git diff HEAD`
+   * prints nothing for it and exits 0, so the watcher's line-attribution produced no changed lines and
+   * threw nothing — the whole detection block was skipped and the file pulsed in SILENTLY. The fix maps
+   * the full file whenever the diff attributes no lines (`watcher.ts`), matching the not-a-git-repo
+   * fallback. Proven on the frozen subjects by hand and pinned here.
+   *
+   * Chokidar polling is forced (see withProcess) so the reaction path is exercised through a backend
+   * that works under /private/var/folders; the FSEvents backend itself is still out of scope.
    */
-  it('watch starts and reconciles what changed while it was off', async () => {
+  it('watch reconciles what changed while off, then reacts to a file created after start', async () => {
     const saw = await withProcess(['watch'], repo, async (_proc, out) => {
       const ready = await until(out, s => /Live Mirror Mode|Watcher/i.test(s), 25000);
       if (!ready) return `WATCHER_NEVER_READY::${out().slice(-400)}`;
       const reconciled = await until(out, s => /Caught up on \d+ changed and \d+ new/i.test(s), 20000);
-      return reconciled ? 'RECONCILED' : `NO_RECONCILE::${out().slice(-400)}`;
+      if (!reconciled) return `NO_RECONCILE::${out().slice(-400)}`;
+
+      // A file that did NOT exist when the watcher started — the untracked case todo51 was about.
+      writeFile(repo, 'src/newborn.ts', 'export function freshlyBorn(): number { return 42; }\n');
+      // The change lines carry ANSI colour codes (\x1b[0m sits between the label and the name), so
+      // strip them before matching rather than threading escapes through the regexes.
+      const clean = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+      // A wide window ON PURPOSE: this waits on a real polled file-event through a spawned CLI, and
+      // when the whole integration suite runs in parallel the watcher is CPU-starved and reacts late.
+      // The assertion still fails if the reaction never comes — the width only absorbs scheduling lag,
+      // it does not paper over a missing reaction.
+      const reacted = await until(
+        out,
+        s => /⚡ Change detected:.*newborn\.ts/.test(clean(s)) && /Modified symbol:\s*freshlyBorn/.test(clean(s)),
+        45000,
+      );
+      return reacted ? 'REACTED' : `NO_REACTION::${out().slice(-600)}`;
     });
 
-    expect(saw).toBe('RECONCILED');
+    expect(saw).toBe('REACTED');
   }, 120000);
 });

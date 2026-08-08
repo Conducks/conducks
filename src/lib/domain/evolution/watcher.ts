@@ -259,6 +259,18 @@ export class ConducksWatcher {
         logger.debug(`Git diff unavailable; full resonance for ${path.basename(filePath)}`);
       }
 
+      // A NEW file — created after `watch` started — is UNTRACKED, and `git diff HEAD -- <file>`
+      // prints nothing for an untracked path and exits 0, so the parse above produced no hunks and
+      // threw nothing: `changedLines` is empty. The hash gate already proved the content differs from
+      // what the graph holds, so an empty diff here means git could not attribute the change (untracked
+      // file, or content reverted to HEAD while the graph is stale), NOT that nothing changed. Map the
+      // whole file, exactly as the catch fallback does — otherwise the `⚡ Change detected` block below
+      // is skipped and a brand-new file pulses into the graph with no output at all (todo51).
+      if (changedLines.length === 0) {
+        const lineCount = source.split('\n').length;
+        for (let i = 1; i <= lineCount; i++) changedLines.push(i);
+      }
+
       // 2. Partial Structural Reflection
       // Conducks: Resolved Canonical Identity (v1.6.5)
       if (!filePath) return;

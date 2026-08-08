@@ -62,16 +62,16 @@
   "docs/visuals/modules/domain/evolution.md": {
     "src/lib/domain/evolution/dead-code.ts": "763c048c7689c916",
     "src/lib/domain/evolution/drift-engine.ts": "8b435801d446d048",
-    "src/lib/domain/evolution/watcher.ts": "a48a65e42a86a361"
+    "src/lib/domain/evolution/watcher.ts": "86e6375ac1bc69c3"
   },
   "docs/visuals/modules/domain/governance/sentinel.md": {
-    "src/lib/domain/governance/index.ts:266": "128b5c4d4f8f1e06",
+    "src/lib/domain/governance/index.ts:337": "96d2d06ba682de50",
     "config/sentinel.json": "152f1597f569c396",
     "src/interfaces/cli/commands/audit.ts:82-88": "6e779c6032f1433f",
     "src/registry/index.ts": "9c49c135d4b7d493"
   },
   "docs/visuals/modules/domain/governance.md": {
-    "src/lib/domain/governance/index.ts:106-158": "18aae9a4ef4e6086"
+    "src/lib/domain/governance/index.ts:141-212": "f47385aa4aa377d4"
   },
   "docs/visuals/modules/interfaces/cli.md": {
     "src/interfaces/cli/commands/mirror.ts:3": "436f0f19c8c54e3b"

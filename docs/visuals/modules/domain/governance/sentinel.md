@@ -24,7 +24,7 @@ contract guards conducks itself and nobody else.
 ## The layer contract lives and is enforced here
 
 `ALLOWED_DEPENDENCIES` (`sentinel-rules.ts`) encodes ADR 0005's downward-only stack, and the
-`layer_boundaries` condition (`governance/index.ts:266`) reports one violation per illegal
+`layer_boundaries` condition (`governance/index.ts:337`) reports one violation per illegal
 layer-pair. Layers are matched by path fragment and **order matters** — `/lib/core` precedes
 `/registry` so `lib/core/registry/` classifies as core, not composition.
 

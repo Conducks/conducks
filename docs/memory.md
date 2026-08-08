@@ -1492,3 +1492,61 @@ by construction.
   nothing covers, in exactly the surface where "looks tested" is most dangerous.
 - Applies: a guard worth testing is worth EXPORTING (`sqlGuardReason`) so the tool and the test call
   one function. If you find a test with a local copy of production logic, that copy is a liability.
+
+## `watch` reacted only to git-TRACKED files — new files pulsed in silently (todo51)
+- Gotcha: the pulse attributes changed lines with `git diff HEAD -- <file>`. For an UNTRACKED file
+  (every file created after `watch` starts) that prints nothing and exits 0 — no exception, so the
+  not-a-git-repo catch-fallback never fired. `changedLines` stayed empty, the `if (length > 0)`
+  guard skipped the whole `⚡ Change detected` block, and the file entered the graph with NO output.
+- Why: an empty git diff does NOT mean "no change" — the hash gate already proved the content differs
+  from the graph. It means git could not attribute lines (untracked, or reverted-to-HEAD while the
+  graph is stale). Fix (`watcher.ts`): if `changedLines` is empty after the parse, map the full file,
+  same policy the catch uses. Narrowed to "git attributed no lines", not removed.
+- Applies: any code that treats a clean `git diff` as "nothing happened" is blind to untracked paths.
+  A watcher's silence looks identical to a watcher that's working — prove reaction, not just startup.
+
+## `status: 'ready'` was a LITERAL — an empty vault reported healthy (todo49 P2b)
+- Gotcha: `status()` and `statusFromVault()` both returned the constant string `'ready'`, so the
+  verdict field was incapable of ever saying anything else. After `conducks clean` a 0-node vault
+  printed `Status: READY`, `Staleness: SYNCHRONIZED`, `Pulse: none` and a bare hotspot header — the
+  ADR 0124 family, nothing-checked reading as clean. The `incomplete` health check could not cover
+  it either: its `nodeCount > 50` guard excludes the empty case by construction.
+- Why: a field that is a literal looks like a computed verdict to every reader, including tests that
+  assert it. Both surfaces now call one shared `emptyOrReady(nodeCount)` — the CLI and MCP answering
+  differently under one field name is exactly how `density` drifted 5,000x.
+- Applies: grep for hardcoded verdict strings in any status/health payload. Also: `SYNCHRONIZED` on an
+  empty vault is a claim about nothing — with no symbols stored there is no analysis for HEAD to be
+  ahead of, so neither "in sync" nor "stale" is true and the honest answer is "n/a".
+
+## A benchmark that always runs `--force` over an existing vault measures the SECOND analyze
+- Gotcha: `bench:health` re-analyzed each frozen subject against a vault that was already there, so
+  every saved baseline described a rebuild — the run no user ever gets first. It was structurally
+  blind to the cold-start class of defect, which is why todo49's thinner-first-graph bug lived under
+  a green benchmark.
+- Why: the number was read as "what a new user gets" when it described the opposite.
+- Applies: `health.mjs --cold` deletes the vault first; results carry `coldStart` so a baseline says
+  which analyze it describes. Any harness that reuses derived state measures the warm path only —
+  state what it does NOT exercise, or make the cold path runnable.
+
+## Fixing a verdict in the domain does not fix it at the TOOL boundary
+- Gotcha: after `emptyOrReady` made the domain report `'empty'`, `conducks_status` still told agents
+  nothing — its payload sent `stats` and `staleness` and DROPPED `status` on all three modes. An agent
+  asking about an emptied vault got `nodeCount: 0` next to `"stale": false`, a positive claim of "in
+  sync", with no verdict at all. Worse than the CLI half, because a false negative an agent acts on
+  is silent.
+- Why: a correctly computed field that is discarded one layer up is indistinguishable from a field
+  that was never computed. The domain fix and the surface fix are two separate fixes.
+- Applies: after fixing any status/verdict value, GREP every payload that forwards it and check the
+  field is actually in the object literal. Drive the surface over real JSON-RPC — the unit tests
+  mocked `statusFromVault` without a `status` key, so nothing failed.
+
+## A stale doc anchor hides until something else edits the file
+- Gotcha: `visuals-lint` re-checks a reviewed claim when the cited file's span-hash changes. The
+  `layer_boundaries` claim cited `governance/index.ts:266` while the code sat at `:337` — ~57 lines
+  off BEFORE this session touched it, and the drift only surfaced because an unrelated edit to the
+  same file triggered the re-check. `governance.md`'s dangling-edge anchor was `:106-158` against a
+  real block at `:141-212`.
+- Why: hash-triggered review means an anchor can rot for months in a file nobody edits, and the gate
+  reports "clean" the whole time — the denominator problem again, one level up.
+- Applies: when the gate flags a page, RE-DERIVE the line number by grepping for the symbol rather
+  than re-stamping to silence it. A re-stamp without a re-read launders drift into "reviewed".

@@ -22,8 +22,18 @@
  *   node tools/benchmark/health.mjs                  every project, reanalyzing first
  *   node tools/benchmark/health.mjs --only scraper   one subject
  *   node tools/benchmark/health.mjs --no-analyze     reuse the vault that is already there
+ *   node tools/benchmark/health.mjs --cold           delete the vault first — measure a FIRST analyze
  *   node tools/benchmark/health.mjs --save           write tools/benchmark/baselines/<name>.json
  *   node tools/benchmark/health.mjs --compare        diff against the saved baseline, exit 1 on drift
+ *
+ * WHICH ANALYZE THE BASELINE DESCRIBES (todo49 Phase 3). By default this runs `--force` over a vault
+ * that already exists, so every saved baseline describes the SECOND analyze, not the first. That is
+ * the run no user ever gets first, and it is structurally blind to the cold-start class of defect —
+ * todo49 was exactly that: a first analyze produced fewer edges than a rebuild, and this harness
+ * could not have seen it. `--cold` removes the vault before analyzing so the first run is the one
+ * measured. Cold and warm now agree on all three subjects (todo49's fix), which is a property worth
+ * re-checking rather than assuming: run `--cold --compare` against a warm baseline and drift is a
+ * regression of that parity.
  */
 import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -44,6 +54,7 @@ const value = (n) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : null);
 
 const only = value('--only');
 const doAnalyze = !flag('--no-analyze');
+const cold = flag('--cold');
 const save = flag('--save');
 const compare = flag('--compare');
 
@@ -110,12 +121,21 @@ async function measure(project) {
   const result = { project: project.name, sha: head, language: project.language };
 
   if (doAnalyze) {
+    // A FIRST analyze, which the default path can never measure: without this the vault is always
+    // already there, so the baseline describes the second run and the cold-start class of defect
+    // (todo49) is invisible to this harness by construction. Safe on a frozen subject — the vault is
+    // derived, excluded from the dirty check above, and rebuilt by the analyze on the next line.
+    if (cold) fs.rmSync(path.join(dir, '.conducks'), { recursive: true, force: true });
+
     // --force, ALWAYS. Without it analyze reuses the vault when nothing changed, and on a subject
     // pinned by SHA nothing ever changes — so the timing collapses to the cost of deciding to skip.
     // Measured: scraper reported 932 ms incremental against 5,735 ms for the real work.
     const a = sh('analyze', ['.', '--yes', '--force'], dir);
     if (a.code !== 0) throw new Error(`${project.name}: analyze exited ${a.code}`);
     result.analyzeMs = a.ms;
+    // Recorded in the result so a saved baseline SAYS which analyze it describes, rather than the
+    // reader having to know how it was invoked.
+    result.coldStart = cold;
   }
 
   // ---- shape, straight out of the vault ----

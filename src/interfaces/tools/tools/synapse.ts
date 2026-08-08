@@ -281,7 +281,7 @@ Modes:
         if (mode === "map") {
           const hotspots = await registry.analyze.query.execute('hotspots', [10]);
           return mcpOk(
-            { stats: status.stats, staleness: status.staleness, hotspots },
+            { status: status.status, stats: status.stats, staleness: status.staleness, hotspots },
             { nodeCount: status.stats?.nodeCount, truncated: false }
           );
         }
@@ -296,6 +296,7 @@ Modes:
           const entryPoints = await registry.analyze.query.execute('entry_points', [5]);
           const audit = registry.audit.audit();
           return mcpOk({
+            status: status.status,
             stats: status.stats,
             staleness: status.staleness,
             hotspots,
@@ -315,7 +316,13 @@ Modes:
           });
         }
 
+        // `status` is CARRIED, on every mode above and here. The payload used to send `stats` and
+        // `staleness` and drop the verdict entirely, so an agent asking about an empty vault received
+        // `nodeCount: 0` next to `"stale": false` — a positive claim of "in sync" — with nothing
+        // saying the graph held nothing. That is worse than the CLI's old READY, because a false
+        // negative an agent acts on is silent. Same defect, second surface (todo49 Phase 2b).
         return mcpOk({
+          status: status.status,
           stats: status.stats,
           staleness: status.staleness,
           anchor: (registry.infrastructure as any).chronicle.getProjectDir()

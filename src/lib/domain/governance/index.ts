@@ -9,8 +9,22 @@ import path from "node:path";
 import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type SentinelRule } from "./sentinel-rules.js";
 
 /**
+ * The graph-level verdict, from the node count alone.
+ *
+ * A vault holding NOTHING must not report the same word as a healthy one (ADR 0124). Both `status()`
+ * and `statusFromVault()` used to return the string literal `'ready'`, so the field was incapable of
+ * saying anything else: after `conducks clean`, a 0-node vault printed `Status: READY`,
+ * `Staleness: SYNCHRONIZED`, `Pulse: none` and an empty hotspot list, and nothing anywhere said the
+ * graph was empty. Shared by both callers deliberately — the same field name answering differently
+ * on the CLI and MCP surfaces is how `density` drifted 5,000x.
+ */
+export function emptyOrReady(nodeCount: number): 'empty' | 'ready' {
+  return nodeCount === 0 ? 'empty' : 'ready';
+}
+
+/**
  * Conducks — Governance Domain Service
- * 
+ *
  * Logic for architectural auditing, advisory, and context generation.
  */
 export class GovernanceService {
@@ -465,7 +479,11 @@ export class GovernanceService {
     const isStale = Boolean(currentHead && lastCommit !== 'none' && currentHead !== lastCommit);
 
     return {
-      status: 'ready',
+      // COMPUTED, not the constant `'ready'` this used to return. A vault holding nothing reported
+      // READY and SYNCHRONIZED with an empty hotspot list, and nothing anywhere said the graph was
+      // empty — the ADR 0124 family, where nothing-checked reads as clean. `'ready'` was a literal
+      // in both this and `status()`, so the field could never have said anything else.
+      status: emptyOrReady(Number(counts?.nodes ?? 0)),
       projectName: path.basename(chronicle.getProjectDir() || 'unknown'),
       framework: byKey.get('framework') || 'generic',
       staleness: {
@@ -497,7 +515,9 @@ export class GovernanceService {
     const isStale = currentHead && lastCommit !== "none" && currentHead !== lastCommit;
     
     return {
-      status: "ready",
+      // Computed for the same reason as `statusFromVault` — the two must never disagree under one
+      // field name, which is exactly how `density` drifted 5,000x between the CLI and MCP.
+      status: emptyOrReady(this.graph.stats.nodeCount),
       projectName: path.basename(chronicle.getProjectDir() || "unknown"),
       framework: this.graph.getMetadata('framework') || "generic",
       staleness: {

@@ -119,14 +119,35 @@ candidate pair whose endpoint is missing.
 
 ## Phase 2b — an empty vault reports READY and SYNCHRONIZED
 
-- [ ] Found while restoring a subject after `conducks clean`: `status` on a vault with 0 nodes and no
+- [x] Found while restoring a subject after `conducks clean`: `status` on a vault with 0 nodes and no
       pulse printed `Status: READY`, `Staleness: SYNCHRONIZED`, `Pulse: none` and an empty hotspot
       list. Nothing anywhere said the graph was empty. Same family as the empty-root and empty-scope
       false cleans closed in analyze — a state with nothing in it must not read as a healthy one.
+      → FIXED. The cause was not a missing branch but a CONSTANT: `status()` and `statusFromVault()`
+      both returned the string literal `'ready'`, so the field could never have said anything else,
+      and the `incomplete` health check excluded the empty case by construction (`nodeCount > 50`).
+      Both now call one shared `emptyOrReady(nodeCount)` — shared deliberately, since the same field
+      name answering differently on the CLI and MCP surfaces is how `density` drifted 5,000x. The
+      human output gains `⚠ EMPTY VAULT`, replaces `SYNCHRONIZED` with `n/a — nothing analyzed` (a
+      vault with no symbols has no analysis for HEAD to be ahead of, so neither verdict is true), and
+      labels the bare hotspot header `(none — the vault is empty)` rather than letting it read as
+      "no hotspots found". Pinned by `tests/integration/features/empty-vault-truth.test.ts`, which
+      also pins `clean`'s real contract — it does NOT remove the vault despite "Nuclear Purge", and
+      nothing stated that before. Mutation-checked: restoring the `'ready'` literal turns the two
+      empty-case assertions RED while the three that do not test emptiness correctly survive.
 
 ## Phase 3 — the benchmark should have caught this
 
-- [ ] `bench:health` analyzes each subject with `--force` against an existing vault, so it has never
+- [x] `bench:health` analyzes each subject with `--force` against an existing vault, so it has never
       exercised a cold start and cannot see this class of defect. Add a cold-start run — or at
       minimum record that the baseline describes the SECOND analyze, not the first, so the number is
       not read as "what a new user gets".
+      → BUILT, not just recorded: `health.mjs --cold` removes the vault before analyzing, so the
+      FIRST analyze is the one measured. Safe on a frozen subject — the vault is derived, already
+      excluded from the dirty check, and rebuilt by the analyze that follows. The run records
+      `coldStart` in its result so a saved baseline SAYS which analyze it describes rather than
+      leaving the reader to know how it was invoked; the field is outside the `COMPARED` allowlist,
+      so it cannot create phantom drift. The header now states plainly that the default baseline
+      describes the second analyze. VERIFIED end to end: `--only scraper --cold --compare` rebuilt
+      from nothing and reported 5,294 / 17,342 — `vs baseline unchanged` — which re-proves todo49's
+      cold/warm parity through the harness that was structurally blind to it.

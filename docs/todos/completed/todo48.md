@@ -1,5 +1,5 @@
 # todo48 — three correctly-scoped leftovers from the audit close
-Status: todo
+Status: done
 - Acceptance: each item below is either built with its measurement, or dropped with a reason — none may close by being forgotten, which is how they were nearly lost inside todo25's finished tasks.
 - Builds: 0074, 0079
 

@@ -103,6 +103,59 @@ describe('conducks_status mode "manifest" — todo28#P1', () => {
   });
 });
 
+/**
+ * The verdict must reach the AGENT, on every mode (todo49 Phase 2b, second surface).
+ *
+ * FOUND by calling `conducks_status` over real stdio JSON-RPC against a vault emptied by
+ * `conducks clean`. The payload carried `stats` and `staleness` and DROPPED `status` entirely, so an
+ * agent received `nodeCount: 0` sitting next to `"stale": false` — a positive claim of "in sync" —
+ * with nothing anywhere saying the graph held nothing. Fixing the domain verdict alone would not
+ * have reached this: the field was computed correctly and then discarded at the tool boundary.
+ *
+ * Worse than the CLI half it mirrors, because a false negative an agent acts on is silent.
+ */
+describe('conducks_status forwards the graph verdict on every mode', () => {
+  beforeEach(() => {
+    statusFromVaultMock.mockClear();
+    statusMock.mockClear();
+    auditMock.mockClear();
+    executeMock.mockClear();
+  });
+
+  const emptyVault = () => {
+    statusFromVaultMock.mockImplementation(async () => ({
+      status: 'empty',
+      stats: { nodeCount: 0, edgeCount: 0 },
+      staleness: { stale: false },
+    }) as never);
+  };
+
+  const populated = () => {
+    statusFromVaultMock.mockImplementation(async () => ({
+      status: 'ready',
+      stats: { nodeCount: 3845, edgeCount: 9000 },
+      staleness: { stale: false },
+    }) as never);
+  };
+
+  for (const mode of ['health', 'map', 'manifest']) {
+    it(`mode "${mode}" reports an empty vault as empty rather than omitting the verdict`, async () => {
+      emptyVault();
+      const res: any = await synapseTools.conducks_status.handler({ mode });
+      expect(res.error).toBeUndefined();
+      expect(res.data.status).toBe('empty');
+      expect(res.data.stats.nodeCount).toBe(0);
+    });
+
+    it(`mode "${mode}" still reports a populated vault as ready`, async () => {
+      populated();
+      const res: any = await synapseTools.conducks_status.handler({ mode });
+      expect(res.data.status).toBe('ready');
+      expect(res.data.stats.nodeCount).toBe(3845);
+    });
+  }
+});
+
 describe('conducks_coverage — todo28#P2', () => {
   beforeEach(() => {
     coverageBindMock.mockClear();

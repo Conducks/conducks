@@ -120,11 +120,29 @@ describe('GovernanceService.statusFromVault — the same answer without the grap
   it('falls back to the graph when there is no vault to read', async () => {
     // No persistence at all — the in-memory-only case. Returning a zeroed status here would be
     // worse than the round trip it saves.
+    //
+    // The graph is POPULATED on purpose. This test used to run against an empty one and assert
+    // `nodeCount === 0`, which cannot tell "fell back to the graph" apart from "returned a zeroed
+    // status" — both produce zero, so it was vacuous for the exact thing its comment claims to
+    // guard. A non-zero count is the only observation that proves the fallback happened.
     const graph = new ConducksAdjacencyList();
+    for (let i = 0; i < 3; i++) {
+      graph.addNode({ id: `/r/f.ts::s${i}`, label: 'BEHAVIOR', properties: { name: `s${i}`, filePath: '/r/f.ts', canonicalKind: 'BEHAVIOR' } } as never);
+    }
     const service = new GovernanceService(graph, new ConducksAdvisor(), new ConducksSentinel());
     const fromVault = await service.statusFromVault();
+    expect(fromVault.stats.nodeCount).toBe(3);
     expect(fromVault.status).toBe('ready');
+  }, 60000);
+
+  it('an empty graph with no vault reports EMPTY, not the old constant READY', async () => {
+    // The case the assertion above used to cover by accident, now stated as its own claim: the
+    // verdict was the string literal `'ready'` in both `status()` and `statusFromVault()`, so a
+    // vault holding nothing reported the same word as a healthy one (todo49 Phase 2b, ADR 0124).
+    const service = new GovernanceService(new ConducksAdjacencyList(), new ConducksAdvisor(), new ConducksSentinel());
+    const fromVault = await service.statusFromVault();
     expect(fromVault.stats.nodeCount).toBe(0);
+    expect(fromVault.status).toBe('empty');
   }, 60000);
 
   it('reports density as 0 for a vault too small to have one', async () => {
