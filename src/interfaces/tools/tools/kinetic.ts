@@ -308,7 +308,9 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
     description: `Graph-Verified Renaming (Refactor). Safely renames a symbol across all structural references.
 
 WHEN TO USE: Renaming a core component during structural refactoring.
-AFTER THIS: Run conducks_analyze to refresh the structural resonance graph.
+AFTER THIS: Run 'conducks analyze' in the terminal to refresh the structural graph. There is no
+analyze TOOL — the MCP server holds a read-only vault by policy, so re-indexing is a CLI step. Until
+it runs, every other tool answers from a graph that still holds the OLD name.
 
 WARNING: This is a mutational tool. It modifies the source code.`,
     // MCP2: tool annotations — rename is destructive

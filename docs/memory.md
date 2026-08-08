@@ -1606,3 +1606,28 @@ by construction.
   never diverge. A language missing from one copy is invisible to that consumer, which then reports
   "nothing changed" rather than "not looked at" — the same class again.
 - Applies: `contracts/source-extensions.ts`. Add a language THERE and every consumer follows.
+
+## An out-of-enum argument was answered, not refused — on the TOOL surface only
+- Gotcha: `conducks_audit {mode:"nonsense"}` fell through every branch and ran `scan`, returning a
+  full plausible payload for a request never honoured. Worse, `conducks_prune {type:"BOGUS"}` filtered
+  by the unvalidated string and returned `{findings:[], summary:{ORPHAN:0,UNUSED_EXPORT:0,
+  STALE_IMPORT:0}, total:0}` — a confident clean bill of health for the whole codebase, from a TYPO,
+  indistinguishable from a genuinely clean project.
+- Why: the empty-reads-as-clean class reached through unvalidated INPUT rather than an empty vault.
+  And the CLI had already fixed exactly this for `status --mode map` ("an UNKNOWN mode is an error,
+  not a default") — the tool surface never got the fix. Same shape as `density`: corrected on one
+  surface while its twin survived on the other.
+- Applies: shared `enumErr(value, allowed, name)` in synapse.ts, exported so the test calls the REAL
+  rule. `undefined` passes (optional params keep their default); a wrong value, a non-string, or the
+  wrong case is refused with the valid values named.
+
+## A tool description told the agent to call a tool that does not exist
+- Gotcha: `conducks_rename` — DESTRUCTIVE — ended with "AFTER THIS: Run conducks_analyze to refresh
+  the structural resonance graph." There is no `conducks_analyze` tool. An agent that had just mutated
+  source was sent to a call that fails, leaving the graph stale and still holding the OLD name.
+  Re-indexing is a CLI step: the MCP server holds a read-only vault by policy.
+- Why: the "documented feature nothing implements" class — same as `--mode map` in the docs skill. A
+  description is a CONTRACT with the agent and nothing checked it against the registered surface.
+- Applies: `tool-names-are-real.test.ts` parses tool ids from the source that defines them and fails
+  on any `conducks_*` in a description or `resources/tools/*.md` that is not registered. It also
+  asserts the parse found ≥10 tools, so it cannot pass by scanning nothing.

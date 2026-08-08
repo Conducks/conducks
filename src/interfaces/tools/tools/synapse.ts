@@ -69,6 +69,38 @@ const FORBIDDEN_SQL_FUNCTIONS = [
   'glob', 'sniff_csv', 'attach', 'copy_from', 'install', 'load',
 ];
 
+/** The modes `conducks_audit` actually implements, and the values its schema advertises. */
+export const AUDIT_MODES = ['scan', 'advice', 'guard', 'archeology', 'fallback'] as const;
+/** The finding types `conducks_prune` can filter to, plus the unfiltered `all`. */
+export const PRUNE_TYPES = ['ORPHAN', 'UNUSED_EXPORT', 'STALE_IMPORT', 'all'] as const;
+
+/**
+ * Refuse an out-of-enum argument instead of answering something plausible.
+ *
+ * Two tools silently accepted anything. `conducks_audit` fell through every mode branch and ran
+ * `scan`, so a caller asking for one analysis received a different one with no indication. Worse,
+ * `conducks_prune` filtered its findings by an unvalidated string, so a TYPO produced
+ * `{findings: [], summary: {ORPHAN: 0, UNUSED_EXPORT: 0, STALE_IMPORT: 0}, total: 0}` — a confident
+ * clean bill of health for the entire codebase, indistinguishable from a genuinely clean project.
+ *
+ * `undefined` is allowed through: these parameters are optional and their handlers apply a documented
+ * default. It is a WRONG value, not a missing one, that is refused — the same rule the CLI adopted
+ * for `status --mode` ("an UNKNOWN mode is an error, not a default").
+ *
+ * Shared by both callers on purpose. Two copies of a validation rule is how the SQL guard's
+ * multi-statement hole survived: the tool and its test each held one, and neither covered it.
+ */
+export function enumErr(value: unknown, allowed: readonly string[], paramName: string) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && allowed.includes(value)) return null;
+  return mcpErr(
+    'INVALID_PARAM',
+    `${paramName} must be one of: ${allowed.join(', ')} — got ${JSON.stringify(value)}`,
+    `Pass ${paramName}=${allowed[0]} (or omit it for the default).`,
+    false,
+  );
+}
+
 /**
  * The single source of truth for what `graph_query` accepts — a pure function so the tool and its
  * test check the SAME rule. The test used to REPLICATE the guard, which is how the multi-statement
@@ -371,6 +403,13 @@ Modes:
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ mode, threshold, window, path: customPath }: any) => {
+      // An unknown mode fell through every branch below and ran `scan`, returning a full, plausible
+      // payload for a request that was never honoured — the caller asked for one analysis and
+      // silently received a different one. Same defect the CLI fixed for `status --mode map`
+      // ("an UNKNOWN mode is an error, not a default"); the tool surface never got that fix.
+      const badMode = enumErr(mode, AUDIT_MODES, 'mode');
+      if (badMode) return badMode;
+
       try {
         await ensureAnchor(customPath, true);
 
@@ -872,6 +911,13 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ type: filterType, limit, path: customPath }: any) => {
+      // An unknown `type` used to reach the filter below and match nothing, so the answer was
+      // `findings: []` with `summary: {ORPHAN: 0, UNUSED_EXPORT: 0, STALE_IMPORT: 0}, total: 0` — a
+      // confident clean bill of health for the whole codebase, produced by a TYPO. The agent has no
+      // way to tell that from a genuinely clean project.
+      const badType = enumErr(filterType, PRUNE_TYPES, 'type');
+      if (badType) return badType;
+
       try {
         await ensureAnchor(customPath, true);
         let findings: any[] = registry.explain.prune();
