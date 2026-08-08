@@ -1,3 +1,4 @@
+import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
 import { logger } from "@/lib/core/utils/logger.js";
 import { classifyFreshness } from "@/lib/core/persistence/freshness.js";
 import { writeWatcherMarker, clearWatcherMarker, HEARTBEAT_INTERVAL_MS } from "@/lib/domain/evolution/watcher-liveness.js";
@@ -47,11 +48,8 @@ interface WatcherOptions {
 /**
  * Conducks — Synapse Structural Monitor (Watcher)
  */
-/** Extensions the startup reconcile considers. Mirrors what the pulse actually parses. */
-const WATCHED_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java",
-  ".cs", ".cpp", ".cc", ".c", ".h", ".hpp", ".php", ".rb", ".swift",
-]);
+/** Extensions the startup reconcile considers — the one shared list (contracts/source-extensions.ts). */
+const WATCHED_EXTENSIONS = SOURCE_EXTENSIONS;
 
 export class ConducksWatcher {
   private watcher: FSWatcher | null = null;

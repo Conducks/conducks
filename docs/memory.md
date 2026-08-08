@@ -1584,3 +1584,25 @@ by construction.
   0 — a machine reading `[]` cannot tell a real pass from an absent one and acts on it silently.
   MIGRATED SO FAR: `advise` only. Still unmigrated: audit, prune, coverage, diff, supply-chain, arch,
   context — say so rather than letting the ADR imply the sweep is done.
+
+## `diff` was blind to untracked new files — the SAME git blind spot as `watch`
+- Gotcha: the PR risk engine collected changes with `git diff -U0 HEAD`, which reports nothing for an
+  UNTRACKED path. Measured: adding `src/payments.ts` with a `PaymentProcessor` class and two methods
+  produced "No structural changes detected in workspace." and exit 0 — from the command whose whole
+  job is saying what a change set risks. `git add` alone changed the answer.
+- Why: found the same day as the `watch` version of this (todo51), in a second place. ADR 0122 had
+  already fixed the STAGED half here (bare `git diff` shows unstaged only) and the new-file half
+  survived that fix — a partial fix to a blind spot reads as a closed one.
+- Applies: `git ls-files --others --exclude-standard` is the missing half of any git-based change
+  detector. Filter it to SOURCE_EXTENSIONS or the untracked set includes the `.conducks` vault itself
+  and a clean tree reports changes.
+
+## One list, not four: SOURCE_EXTENSIONS moved to contracts
+- Gotcha: the parseable-extension list existed three times verbatim — `analysis/module-hash.ts`,
+  `analysis/project-monitor.ts`, `evolution/watcher.ts` (as `WATCHED_EXTENSIONS`) — and `diff` was
+  about to add a fourth.
+- Why: merged while they were still byte-IDENTICAL, which is the only cheap moment. Copies that
+  already disagree require deciding which is right; copies that agree only require deciding they must
+  never diverge. A language missing from one copy is invisible to that consumer, which then reports
+  "nothing changed" rather than "not looked at" — the same class again.
+- Applies: `contracts/source-extensions.ts`. Add a language THERE and every consumer follows.

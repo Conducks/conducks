@@ -1,3 +1,4 @@
+import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
 import { readWatcherLiveness, type WatcherLiveness } from "@/lib/domain/evolution/watcher-liveness.js";
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import fs from "node:fs";
@@ -91,10 +92,7 @@ export interface ProjectReport {
 }
 
 /** Extensions the monitor hashes. Matching the graph exactly is not required — it needs a stable, cheap set. */
-const SOURCE_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".java",
-  ".cs", ".cpp", ".cc", ".c", ".h", ".hpp", ".php", ".rb", ".swift",
-]);
+
 
 export class ProjectMonitor {
   constructor(private readonly registry: ProjectRegistry = new ProjectRegistry()) {}

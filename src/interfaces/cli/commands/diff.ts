@@ -2,6 +2,8 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { execSync } from 'node:child_process';
 import path from 'node:path';
+import fs from 'node:fs';
+import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
@@ -67,6 +69,19 @@ export class DiffCommand implements ConducksCommand {
       }
     }
     const changes = this.parseDiff(diff);
+
+    // UNTRACKED files, which `git diff HEAD` cannot see — it diffs what git tracks, and a brand-new
+    // file is not tracked until it is added. ADR 0122 fixed the STAGED half of this blind spot (bare
+    // `git diff` showed unstaged only); the new-file half survived it.
+    //
+    // Measured: a new `src/payments.ts` holding a `PaymentProcessor` class with two methods produced
+    // "No structural changes detected in workspace." and exit 0 from the PR RISK ENGINE — the command
+    // whose entire job is to say what a change set puts at risk. `git add` alone changed the answer.
+    // Same root cause as the `watch` blind spot fixed in todo51: an empty `git diff` for an untracked
+    // path is not evidence that nothing changed.
+    //
+    // Whole-file, because an untracked file is entirely new — every line of it is an addition.
+    changes.push(...this.untrackedChanges());
 
     if (changes.length === 0) {
       console.log("No structural changes detected in workspace.");
@@ -236,6 +251,39 @@ export class DiffCommand implements ConducksCommand {
       removed.slice(0, 5).forEach(id => console.log(`  - ${label(id)}`));
     }
     console.log();
+  }
+
+  /**
+   * New files git does not track yet, as whole-file changes.
+   *
+   * `--exclude-standard` honours .gitignore, so build output and `node_modules` stay out — without it
+   * this would report every generated artifact as a structural change and the risk report would be
+   * unreadable. Failure is non-fatal: a repository where this cannot run still gets the tracked half,
+   * which is strictly what it got before this existed.
+   */
+  private untrackedChanges(): Array<{ file: string, lines: number[] }> {
+    try {
+      const out = execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8' });
+      const cwd = path.resolve(process.cwd());
+      return out.split('\n')
+        .map(p => p.trim())
+        .filter(Boolean)
+        .map(p => path.resolve(cwd, p))
+        .filter(abs => abs.startsWith(cwd + path.sep))          // same escape guard as parseDiff (S9)
+        // SOURCE only. Without this the untracked set includes the `.conducks` vault itself, editor
+        // scratch files and anything else not yet gitignored, and the risk report fills with paths
+        // the graph could never contain — measured: a clean tree reported changes purely because its
+        // own vault is untracked.
+        .filter(abs => SOURCE_EXTENSIONS.has(path.extname(abs)))
+        .filter(abs => { try { return fs.statSync(abs).isFile(); } catch { return false; } })
+        .map(abs => {
+          let lineCount = 1;
+          try { lineCount = fs.readFileSync(abs, 'utf-8').split('\n').length; } catch { /* unreadable: one line */ }
+          return { file: abs.toLowerCase(), lines: Array.from({ length: lineCount }, (_, i) => i + 1) };
+        });
+    } catch {
+      return [];
+    }
   }
 
   private parseDiff(diff: string): Array<{ file: string, lines: number[] }> {

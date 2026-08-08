@@ -333,6 +333,26 @@ export async function main() {
       // shape ADR 0115 fixed for `resonance`, here on the path every command falls through
       // (ADR 0116). The stack is still one flag away for whoever actually wants it.
       const message = err instanceof Error ? err.message : String(err);
+
+      // ONE condition, ONE answer (ADR 0145). A command that walks the graph on a vault holding
+      // nothing hits the unmaterialised-graph guard, and the guard's message is written for whoever
+      // is FIXING the call site — it names `getAllNodes`, `ensureGraphLoaded` and `todo21#P5`. Shown
+      // to a user it reads as the tool being broken, when the real answer is simply that nothing has
+      // been analyzed. Measured on an empty vault: `audit`, `prune`, `arch`, `flows` and `diff` all
+      // surfaced it verbatim.
+      //
+      // Translated HERE rather than in each command, because it is one shared condition with one
+      // correct answer, and the alternative is five near-identical guards that drift apart and that
+      // every future graph-walking command has to remember to add. The exit code stays 1: nothing
+      // analyzed is not a pass, and a script must not read it as one.
+      if (/is not materialised/.test(message)) {
+        console.error(`\x1b[33m⚠ [Conducks] Nothing to check — the structural graph is empty.\x1b[0m`);
+        console.error(`  '${commandId}' reads the graph, and this project has no symbols indexed yet.`);
+        console.error(`  Run \x1b[1mconducks analyze\x1b[0m first. (Use --verbose for the internal guard message.)`);
+        if (verbose) console.error(`\x1b[2m${message}\x1b[0m`);
+        process.exit(1);
+      }
+
       console.error(`\x1b[31m[Conducks CLI] Execution Error:\x1b[0m ${message}`);
       if (verbose && err instanceof Error && err.stack) console.error(`\x1b[2m${err.stack}\x1b[0m`);
       process.exit(1);

@@ -62,7 +62,7 @@
   "docs/visuals/modules/domain/evolution.md": {
     "src/lib/domain/evolution/dead-code.ts": "763c048c7689c916",
     "src/lib/domain/evolution/drift-engine.ts": "8b435801d446d048",
-    "src/lib/domain/evolution/watcher.ts": "86e6375ac1bc69c3"
+    "src/lib/domain/evolution/watcher.ts": "3dea9fac4e86205e"
   },
   "docs/visuals/modules/domain/governance/sentinel.md": {
     "src/lib/domain/governance/index.ts:337": "96d2d06ba682de50",
@@ -97,6 +97,6 @@
   "docs/visuals/modules/domain/analysis/docs-board.md": {
     "src/lib/domain/analysis/docs-board.ts": "8b9a599ab9ee1693",
     "src/lib/domain/analysis/docs-watcher.ts": "d4ace5f451c7fbc2",
-    "src/lib/domain/analysis/module-hash.ts": "2f5aa06e1a7b8e79"
+    "src/lib/domain/analysis/module-hash.ts": "f4cf36cf5f1d202e"
   }
 }
