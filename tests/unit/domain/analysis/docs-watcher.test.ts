@@ -61,11 +61,12 @@ describe('docs-watcher — re-lints on write, reports only', () => {
 
   it('debounces a burst into one re-lint — an editor writing twice is not two passes', async () => {
     const write = setup();
-    // A 500 ms debounce, not 120: the property under test is "a burst collapses to ONE pass", and
-    // with a short window a machine that stalls mid-burst splits the writes across two windows and
-    // legitimately pulses twice. The window has to comfortably contain the burst for the assertion to
-    // mean what it says.
-    watcher = new DocsWatcher(root, 500);
+    // A 2000 ms debounce. The property under test is "a burst collapses to ONE pass", so the window
+    // must comfortably contain the whole burst — otherwise a machine that stalls mid-loop splits the
+    // five writes across two windows and pulses twice, which is CORRECT behaviour failing the
+    // assertion. 120 ms flaked; 500 ms still failed once under full-suite load; 2000 ms leaves room
+    // for a slow write loop without weakening what is asserted.
+    watcher = new DocsWatcher(root, 2000);
     watcher.start();
     await watcher.whenReady();
 
@@ -81,8 +82,9 @@ describe('docs-watcher — re-lints on write, reports only', () => {
     expect(pulses).toBe(1);
 
     // And it must STAY one. This is the half the fixed sleep was actually testing, kept explicitly:
-    // a burst is one pass, not a trickle of several that happened to be caught mid-flight.
-    await new Promise(r => setTimeout(r, 800));
+    // a burst is one pass, not a trickle of several that happened to be caught mid-flight. A full
+    // debounce window plus slack, so a second pulse would have landed by now if one were coming.
+    await new Promise(r => setTimeout(r, 2500));
     expect(pulses).toBe(1);
   });
 

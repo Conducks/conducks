@@ -1976,3 +1976,32 @@ by construction.
   read the whole log. That is what isolated it here — a one-second settle before the write made it
   5-for-5, which pinned the window rather than the mechanism, and a standalone chokidar probe with the
   same options cleared chokidar itself 5-for-5.
+
+## `npm i -g` compiled DuckDB from source for 10+ minutes (todo56)
+- Gotcha: packing the real tarball and installing it into a clean prefix — rather than trusting the
+  repo, which already has `node_modules` — ran past ten minutes still compiling DuckDB. `duckdb`
+  installs via `node-pre-gyp install --fallback-to-build`: it downloads a binary for THIS Node's ABI
+  and compiles from source when none exists. Checked against `npm.duckdb.org` directly: Node 20/22/24
+  (ABI 115/127/137) return 200 for darwin-arm64 and linux-x64; Node 25 (ABI 141) returns 404.
+- Why: the install is fine on the Node versions people run and silently awful on whatever major
+  shipped most recently — and it recurs at EVERY Node major, because node-pre-gyp artifacts are
+  ABI-bound. Nearly filed as "the install is broken"; the ABI table is what turned a wrong headline
+  into the real one. A guessed prebuild URL 404'd on every ABI and would have "confirmed" the wrong
+  story — `npx node-pre-gyp reveal hosted_tarball` gives the URL the installer actually uses.
+- Applies: `scripts/check-duckdb-prebuild.mjs` runs as `preinstall` — the only moment before npm
+  fetches dependencies — and warns with the cost, the toolchain need and the way out, never failing
+  (ADR 0027's rule). `engines: node >=20`. The durable fix is `@duckdb/node-api`, which is NAPI and so
+  ABI-stable: todo56. NEVER test an install from inside the repo; pack the tarball.
+
+## The pairs gate: weak and enforced beats strong and aspirational (todo57)
+- Gotcha: "one owner per fact" was a habit, and habits lost four times in one day — `diff`, the docs
+  denominator, `resolveSymbolId`, the dead-code type list. The layer rule holds because a TEST enforces
+  it, so the pairs rule got one: a capability on both the CLI and MCP surface must reach at least one
+  shared `registry.*` accessor.
+- Why: the check is deliberately weak. A call-graph version would be stronger and would fail on
+  legitimate presentation differences, so it would be argued with and then disabled. One shared
+  accessor is trivially satisfiable by correct code and was violated by every defect above.
+- Applies: 11 of 12 pairs passed immediately. The twelfth, `context`, turned out to be two DIFFERENT
+  features under one name — CLI builds from `kinetic.getImpact`/`trace`/`lineReader`, MCP runs its own
+  BFS with a relevance formula. Granted as a documented exception with a reason and a todo, the way
+  `boundaries.test.ts` keeps its (empty) exception array, so granting the next one is a visible diff.

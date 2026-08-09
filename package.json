@@ -21,8 +21,10 @@
     "build",
     "config",
     "scripts/check-native-parser.mjs",
+    "scripts/check-duckdb-prebuild.mjs",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "scripts/check-duckdb-prebuild.d.mts"
   ],
   "scripts": {
     "build": "node scripts/check-query-backticks.mjs && rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/check-build-aliases.mjs",
@@ -44,7 +46,8 @@
     "check:queries": "node scripts/check-query-backticks.mjs",
     "postbuild": "node scripts/sync-skills-postbuild.mjs",
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
-    "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs"
+    "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
+    "preinstall": "node scripts/check-duckdb-prebuild.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.22.0",
@@ -97,5 +100,8 @@
   "homepage": "https://github.com/Conducks/conducks#readme",
   "bugs": {
     "url": "https://github.com/Conducks/conducks/issues"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
