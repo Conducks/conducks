@@ -2061,3 +2061,18 @@ by construction.
   wearing its clothes; the original todo blamed dynamic imports for all nine.
 - Applies: an unresolvable specifier should inflate the DANGLING count, not quietly make a symbol look
   dead — ADR 0070 says refuse to fabricate a target, and this is the other half of that rule.
+
+## A property asserted in a docstring and checked by nobody had rotted (todo59)
+- Gotcha: `health.mjs` states "Cold and warm now agree on all three subjects (todo49's fix)" and that
+  drift between them is a regression of that parity. Measured 2026-08-09 by deleting the vaults and
+  rebuilding: they do not agree. sofie 3440 dangling cold against 3146 warm (+294 unresolved),
+  orchestrator +157. Python is stable; both TypeScript subjects drift.
+- Why: `--compare` runs WARM by default, over a vault that already exists, and nothing passes `--cold`
+  — so the claim was never re-checked after being written. This is the same blind spot todo49 was
+  opened to close, reopened at a different level: the harness now CAN measure the first analyze and
+  simply is not asked to.
+- Applies: verified NOT caused by todo58's linker change, by reverting `linker-intra.ts` to the
+  previous commit and re-running cold — the gap is identical. Always check whether a regression you
+  just found is yours before writing it up; the answer changes the fix. Save a cold baseline so the
+  gap is a tracked number rather than an assertion, and remember that the FIRST analyze is the only
+  one a new user ever sees.
