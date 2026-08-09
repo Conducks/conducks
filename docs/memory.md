@@ -2005,3 +2005,17 @@ by construction.
   features under one name — CLI builds from `kinetic.getImpact`/`trace`/`lineReader`, MCP runs its own
   BFS with a relevance formula. Granted as a documented exception with a reason and a todo, the way
   `boundaries.test.ts` keeps its (empty) exception array, so granting the next one is a visible diff.
+
+## The unbounded field only showed up on someone else's repo (todo54 follow-up)
+- Gotcha: adding `Verdict` to `conducks_docs`'s health block shipped `found` — EVERY grammar finding —
+  with no cap. On conducks, which has zero violations, the field was empty and invisible. Driven
+  against a frozen benchmark subject (sofie, 200 governed docs, 30 violations) it was 8,820 bytes,
+  33% of the whole response, growing with the number of broken files.
+- Why: a payload measured on ONE repo is measured on that repo's data shape, not on the field's
+  behaviour. Both earlier size fixes (raw board, constraints) were calibrated on conducks and both
+  missed this, because conducks happens to be clean. A list is unbounded whether or not your own
+  project fills it.
+- Applies: `health.grammar.found` capped at 10 with `omitted` alongside; `grammarViolations` stays the
+  authoritative count and `docs-lint` remains the surface that prints them all. sofie 26,249 -> 19,307
+  bytes. Test payload shapes against a repo whose data is unlike yours — the frozen subjects exist for
+  exactly this and had never been pointed at the MCP surface.

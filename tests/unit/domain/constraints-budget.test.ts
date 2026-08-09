@@ -25,6 +25,41 @@ const board = (conventions: number, memory: number) => ({
   ],
 } as any);
 
+describe('the health verdict does not carry an unbounded findings list', () => {
+  // Governed docs MUST exist, or the verdict is `nothing-to-check` and `found` is empty by
+  // definition — which is the denominator rule working, not the cap.
+  const broken = (n: number) => ({
+    todos: [{ id: 'todo01', title: 't', state: 'done', phases: [] }],
+    decisions: [{ id: '0001', title: 'd', date: '2026-01-01' }],
+    other: [{ type: 'conventions', entries: [] }],
+    warns: [], unlinked: [], crossRefs: [],
+    lint: Array.from({ length: n }, (_, i) => ({
+      file: `docs/decisions/${i}.md`, type: 'decision',
+      errs: ['a fairly wordy grammar complaint that repeats per finding'],
+    })),
+  } as any);
+
+  it('caps the findings it ships and keeps the full count', () => {
+    // Found by driving a FOREIGN repo: on conducks (0 violations) `found` was invisible; on sofie it
+    // was 8,820 bytes — 33% of the response — because verdictToJson emits every finding.
+    const view: any = agentView(broken(60), 'board', 0);
+    expect(view.health.grammar.found.length).toBeLessThanOrEqual(10);
+    expect(view.health.grammarViolations).toBe(60);   // the COUNT is never truncated
+    expect(view.health.grammar.checked).toBeGreaterThan(0);
+  });
+
+  it('says how many it held back rather than trimming silently', () => {
+    const view: any = agentView(broken(60), 'board', 0);
+    expect(view.health.grammar.omitted).toBe(50);
+  });
+
+  it('ships every finding when there are few', () => {
+    const view: any = agentView(broken(3), 'board', 0);
+    expect(view.health.grammar.found).toHaveLength(3);
+    expect(view.health.grammar.omitted).toBeUndefined();
+  });
+});
+
 describe('the constraint set is bounded and says what it dropped', () => {
   it('keeps a small constraint set whole and reports nothing omitted', () => {
     const view: any = agentView(board(3, 3), 'all', 0);

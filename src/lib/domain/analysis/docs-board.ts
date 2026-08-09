@@ -60,6 +60,9 @@ export interface DocsBoard {
  */
 const CONSTRAINT_BYTES = { conventions: 6000, memory: 9000 };
 
+/** Grammar findings shipped in `health`. The COUNT is authoritative; `docs-lint` prints them all. */
+const HEALTH_FINDINGS_SHOWN = 10;
+
 const CROSS_REF = /(\(root\)|[A-Za-z][\w.\-/]*):(todo\d+(?:#P\d+)?|\d{4})\b/g;
 
 /**
@@ -138,11 +141,26 @@ export function agentView(board: DocsBoard, layer: "all" | "board" = "all", rece
     health: {
       // The denominator, so `grammarViolations: 0` can never again mean "there was nothing to
       // violate". Both CLI surfaces already said this; the tool did not (todo53#P1).
-      grammar: verdictToJson(verdict(
-        governedCount(board),
-        board.lint,
-        "this tree holds no governed docs — nothing was checked, which is not the same as clean. Create the tree with `conducks bootstrap-docs`",
-      )),
+      grammar: (() => {
+        // The verdict, with its findings list BOUNDED.
+        //
+        // `verdictToJson` emits every finding, and on conducks — which has zero grammar violations —
+        // that was invisible. Measured against a foreign repo (sofie, 200 governed docs): the health
+        // block was 8,820 bytes, 33% of the whole response, and it grows with the number of broken
+        // files. The COUNT is what a caller acts on (`grammarViolations`, never truncated); the list
+        // is a sample for orientation, and `docs-lint` is the surface that prints all of them.
+        const full = verdictToJson(verdict(
+          governedCount(board),
+          board.lint,
+          "this tree holds no governed docs — nothing was checked, which is not the same as clean. Create the tree with `conducks bootstrap-docs`",
+        ));
+        const shown = full.found.slice(0, HEALTH_FINDINGS_SHOWN);
+        return {
+          ...full,
+          found: shown,
+          ...(full.found.length > shown.length ? { omitted: full.found.length - shown.length } : {}),
+        };
+      })(),
       grammarViolations: board.lint.length,
       warnings: board.warns.reduce((a, w) => a + w.errs.length, 0),
       adrsWithNoBuildLink: board.unlinked,
