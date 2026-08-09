@@ -2019,3 +2019,19 @@ by construction.
   authoritative count and `docs-lint` remains the surface that prints them all. sofie 26,249 -> 19,307
   bytes. Test payload shapes against a repo whose data is unlike yours — the frozen subjects exist for
   exactly this and had never been pointed at the MCP surface.
+
+## First measurement of whether findings are TRUE, not just well-formed (todo58)
+- Gotcha: `await import('./x.js')` with destructuring is invisible to the linker, so live code is
+  reported dead. Measured on sofie: 25 dynamic-import sites reaching 28 symbols, 9 of which sit in
+  conducks' 172 findings — precision ~94.8%, and every error is that ONE mechanism rather than
+  scattered noise. `impact` has the same hole: `loadKernelPrompt` has three real callers and conducks
+  returns two.
+- Why: everything before this checked SHAPE — does the summary add up, does a junk enum refuse, is
+  `truncated` measured. Shape being right says nothing about the answer being right. Two of ten
+  spot-checks looked like conducks was wrong and it was correct both times (`Console`'s only "use" is
+  the word inside an `<h3>`; `MemoryEdge` is a different type of the same name imported from elsewhere)
+  — so the verification method matters as much as the finding, exactly as memory.md already recorded.
+- Applies: verify a finding against the claim it MAKES, on a codebase that is not your own. The frozen
+  benchmark subjects existed the whole time and had never been driven at the MCP surface. Recall
+  matters more in `impact` than precision does in `prune`: a missing caller means "what breaks if I
+  change this" omits something that breaks.

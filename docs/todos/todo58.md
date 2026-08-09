@@ -1,0 +1,76 @@
+# todo58 — the linker does not resolve `await import()`, so live code is reported dead
+Status: todo
+- Acceptance: a symbol destructured from a dynamic `await import(...)` and used is NOT reported by `prune`, and DOES appear in `impact --direction upstream` for its callee — measured on sofie, where 9 of 172 findings and 1 of 3 known callers are currently wrong.
+- Builds: 0026
+
+## Context
+
+First measurement of whether conducks' findings are TRUE, rather than well-formed. Done against a
+frozen benchmark subject (sofie) rather than conducks itself, on 2026-08-09, by taking findings and
+verifying each by hand with memory.md's method — the claim the finding makes, not "does the name
+appear".
+
+**Ten ORPHAN findings, checked one by one: nine correct, one wrong.** Two of the nine looked wrong at
+first and were not, which is the trap memory.md already records:
+
+| symbol | first impression | truth |
+|---|---|---|
+| `Console` | used in two files | the only hit is the word inside `<h3>Sandbox Console</h3>` — PROSE |
+| `MemoryEdge` | imported by three files | they import a DIFFERENT `MemoryEdge` from `../types.js` |
+| `readAgentRoutingPrompt` | used once | genuinely used — conducks is WRONG |
+
+The one real miss is a dynamic import:
+
+```ts
+// electron/main/index.ts:1315
+const { loadAgentSystemPrompt, loadKernelPrompt, readGlobalPrompt, readAgentRoutingPrompt,
+        agentPromptPath } = await import('../engine/executor/prompt-loader.js');
+return readAgentRoutingPrompt(agentName);            // :1319
+```
+
+**Blast radius, measured.** sofie holds 25 such destructuring sites reaching 28 distinct symbols. Nine
+of them are in conducks' 172 findings:
+
+| symbol | flagged as |
+|---|---|
+| `readAgentRoutingPrompt` | ORPHAN |
+| `TOOL_REGISTRARS`, `agentRoutingPath`, `computeEffectiveSignificance`, `globalPromptPath`, `kernelPromptPath` | UNUSED_EXPORT |
+| `registerBackgroundSessions` | STALE_IMPORT |
+| `LinuxAdapter`, `MacOSAdapter` | UNIMPORTED_MODULE |
+
+Two spot-checked to rule out name coincidence: `TOOL_REGISTRARS` is destructured from
+`await import('../plugins/tools/index.js')`; `MacOSAdapter` from `await import('./macos.js')` and then
+`new MacOSAdapter()`.
+
+So **precision is ~94.8% (163/172)**, and the errors are one mechanism, not scattered noise. The two
+`UNIMPORTED_MODULE` cases are the least harmful — that type is a QUESTION by design (ADR 0026), and
+"nothing STATICALLY imports this file" is literally true. The other seven are verdicts and are wrong.
+
+**`impact` has the same hole.** `loadKernelPrompt` has three real callers; conducks returns two and
+misses `electron/main/index.ts:1341`, again behind `await import()`. Recall matters more here than in
+`prune`: a missing caller means "what breaks if I change this" answers with a caller that does break.
+
+## Phase 1 — resolve the dynamic form
+
+- [ ] Teach the linker `const { a, b } = await import('./x.js')` and `import('./x.js').then(({a}) => …)`.
+      The specifier is a literal in every one of sofie's 25 sites, so this does not need to solve the
+      general computed-specifier case to be worth doing.
+- [ ] A computed specifier (`await import(someVar)`) cannot be resolved statically. Do NOT guess — record
+      it as unresolved so it lands in the dangling count rather than silently making a symbol look dead.
+- [ ] Re-measure on sofie: the nine findings above must drop out, and `loadKernelPrompt` must report
+      three upstream callers.
+
+## Phase 2 — make the measurement repeatable
+
+- [ ] This precision check was done by hand. Turn it into a scored fixture: a small project with known
+      dead and known live symbols, including dynamic imports, asserting precision AND recall.
+- [ ] The frozen subjects have never been driven at the MCP surface until today. Add a pass that runs
+      the tool surface against them, so payload shapes and finding quality are checked against data
+      that is not conducks' own.
+
+## Noted, not chased
+
+- [ ] `impact --direction upstream` on `loadKernelPrompt` also returns `uid`, a test helper defined at
+      `prompt-loader.test.ts:11` that does not call it — the two are used in the same test block. May be
+      the co-location-vs-dependency class todo38 addressed for `trace`/`context`, leaking into `impact`.
+      One observation is not a pattern; look again when Phase 1 re-measures.
