@@ -1582,8 +1582,9 @@ by construction.
 - Applies: `verdict()` checks the DENOMINATOR before the findings, because asking "were there
   findings?" first is the inversion every instance made. `verdictToJson` always emits `checked`, even
   0 — a machine reading `[]` cannot tell a real pass from an absent one and acts on it silently.
-  MIGRATED SO FAR: `advise` only. Still unmigrated: audit, prune, coverage, diff, supply-chain, arch,
-  context — say so rather than letting the ADR imply the sweep is done.
+  MIGRATED SO FAR: `advise`, and `coverage` (MCP) as of 2026-08-09 — it produced the predicted defect
+  during todo53's walk. Still unmigrated: audit, prune, diff, supply-chain, arch, context — say so
+  rather than letting the ADR imply the sweep is done.
 
 ## `diff` was blind to untracked new files — the SAME git blind spot as `watch`
 - Gotcha: the PR risk engine collected changes with `git diff -U0 HEAD`, which reports nothing for an
@@ -1631,3 +1632,347 @@ by construction.
 - Applies: `tool-names-are-real.test.ts` parses tool ids from the source that defines them and fails
   on any `conducks_*` in a description or `resources/tools/*.md` that is not registered. It also
   asserts the parse found ≥10 tools, so it cannot pass by scanning nothing.
+
+## An id containing `::` was accepted as a resolution without asking the graph (todo53#P1)
+- Gotcha: `resolveSymbolId` returned `symbol.toLowerCase()` for anything containing `::`, never
+  checking the node exists. Measured over stdio JSON-RPC against this repo's 6,144-node vault with the
+  invented id `nosuchfile.ts::totallyMadeUpSymbol`: `trace` -> `{steps: [], nodeCount: 0}`, `impact` ->
+  `{impact: []}`, `context` -> `{total_in_radius: 0}`, `explain` -> `{indexStaleness: false}` and NO
+  risk fields. Four confident nothings for a symbol that was never there — the honest answer to "what
+  breaks if I change X" when X does not exist is a refusal, and a typo'd id read as "nothing breaks".
+- Why: ADR 0145's denominator problem one level down, at the SYMBOL rather than the report. And the
+  rule lived in three copies (kinetic.ts, synapse.ts, plus a fourth inline one inside `conducks_context`),
+  which is how the hole survived: the same drift that kept the SQL guard's multi-statement hole alive.
+- Applies: one `resolveSymbolId` in `interfaces/tools/shared/resolve-symbol.ts`, returning a VERIFIED
+  id or null. No id-shaped fallback is needed for ids without `::` — the 58 ecosystem nodes
+  (`path.dirname`, `fs.readfilesync`) each store their id as their own `name`, so the name lookup
+  already reaches them. Pinned in `mcp-symbol-resolution.test.ts`.
+
+## `trace` returned steps that were not nodes, styled exactly like nodes (todo53#P1)
+- Gotcha: `graph.findnodesbyname` appears as a `trace` step on this repo. It is the target of 7 edges
+  and of ZERO rows in `nodes` — a dangling edge target, not a symbol. It rendered with its id echoed
+  back as its `name` and `kind: 'unknown'`, which reads as "a symbol whose kind was not computed", and
+  every tool it was fed back into refused it.
+- Why: `describe()` used `n?.properties?.name ?? id`, and a fallback that produces a PLAUSIBLE value
+  hides the absence it is standing in for. `unknown` as a data value is indistinguishable from a
+  missing field; the fact worth carrying is "this is not in the graph".
+- Applies: steps now carry `resolved: boolean` and `kind: 'UNRESOLVED'`. The call is real information
+  and is kept — labelled, not dropped. Grep any `?? id` / `?? 'unknown'` fallback in a payload an
+  agent will feed back to another tool.
+
+## `conducks_trace` substituted a mode instead of refusing one (todo53#P1)
+- Gotcha: `mode:"path"` with no `target` fell through to reachability and returned a downstream list
+  under a caller's request for a shortest path. `mode:"banana"` did the same. `enumErr` had existed
+  since todo28 but was wired into `audit` and `prune` only.
+- Why: a fix applied to the two tools where a defect was FOUND, rather than to every tool with the
+  same shape. The third instance of this exact pattern on this surface.
+- Applies: `TRACE_MODES` sits beside the handler that enforces it, and a mode that needs a companion
+  parameter validates that parameter's presence — a mode is not a preference to be defaulted away.
+
+## A bound declared in `inputSchema` is a comment — nothing enforced it (todo53#P1)
+- Gotcha: `conducks_context` publishes `radius` minimum 1 / maximum 10 and `max_tokens` 100..100000,
+  and validated neither. Measured over stdio JSON-RPC where the truthful answer is 74 nodes:
+  `radius: 0` -> `total_in_radius: 0, truncated: false` (an empty neighbourhood as a clean result);
+  `radius: "two"` -> `"radius": null` and 1923 nodes — the WIDEST possible walk — because
+  `Math.min("two", 10)` is NaN and every depth comparison against NaN is false, so the guard vanished;
+  `max_tokens: "lots"` -> no budget, since `tokensUsed + est > "lots"` is never true;
+  `include_atoms: "yes"` -> atoms excluded, because `=== true` reads a non-empty string as "no".
+- Why: `enumErr` (todo28) fixed this class for STRING enums and stopped there. Numbers and booleans
+  have exactly the same shape and were left to the schema, which the server never checks. A junk value
+  making a tool do MORE work than any legal value is the part worth remembering — the failure mode
+  isn't "returns nothing", it's "silently removes the limit".
+- Applies: `numErr(value, {min,max}, name)` and `boolErr(value, name)` beside `enumErr` in synapse.ts.
+  Neither coerces — guessing what `"two"` meant is how the silent substitution starts. Bounds live in
+  one constant that the inputSchema and the guard both read, so the published contract and the
+  enforced one cannot drift.
+
+## `flows` published a denominator that answered a different question (todo53#P1)
+- Gotcha: the payload carried `total` (every flow in the graph, 2,878 on this repo) and `shown`, but
+  the page was drawn from the flows passing `min_members` — 217 of them at `min_members: 10`. So
+  "20 of 2,878" was printed where "20 of 217" was true, and `total` did not move when the filter did.
+  `meta.truncated` was computed against the filtered set and was correct the whole time, which is why
+  nothing looked wrong.
+- Why: a count is only honest next to the question it answers. Two different denominators under one
+  roof, with only the wrong one published, is the ADR 0145 shape with a number instead of a verdict.
+- Applies: `flows` now returns `total` (all), `matching` (passed the filter — the set the page came
+  from) and `shown`. When a tool filters THEN paginates, the filtered count is the one a caller needs;
+  publishing the pre-filter total alone is worse than publishing neither.
+
+## `coverage` reported "0 dark" when NOTHING bound (todo53#P1)
+- Gotcha: a coverage report whose files match nothing in the graph returned
+  `{functions: [], summary: {total: 0, full: 0, dark: 0}, truncated: false}` — the same payload a
+  perfectly covered codebase produces. Measured with a hand-built `coverage-final.json` naming
+  `/nosuch/file.ts`: 927 graph functions were checked, none bound, and no field said so.
+- Why: `bindCoverage` walks the GRAPH's functions and marks each bound or not, so `results.length` is
+  the candidate set and `bound.length` is the answer. Only the second was published, and zero of it
+  read as good news. First surface off ADR 0145's unmigrated list, and it earned the migration by
+  producing the exact defect the ADR predicted.
+- Applies: `coverage` returns `Verdict` fields (`status`/`checked`/`why`) plus
+  `summary.considered` beside `summary.total`. When a tool JOINS two sets, publish both sizes — the
+  join's output alone cannot distinguish "they agreed on nothing" from "there was nothing to find".
+  A missing file and a malformed file were already honest; only the join was not.
+
+## `conducks_docs` reported health over a project with NO docs (todo53#P1)
+- Gotcha: a directory holding one `.ts` file and no `docs/` returned `{open: [], unlinkedWork: [],
+  health: {grammarViolations: 0, warnings: 0}}` — every field identical to a project whose docs are
+  complete and closed. Both CLI surfaces had ALREADY been fixed: `docs-lint` prints "nothing was
+  linted, which is not the same as clean" and exits 1, `docs-status` prints "grammar: nothing to check
+  — this tree holds no governed docs".
+- Why: the denominator `todos + decisions + other` was written out by hand in each of the two CLI
+  commands and nowhere else, so the tool had no shared rule to be right by. Third instance of
+  "corrected on the CLI, never carried to the tool surface" — after `density` (5,000x) and
+  `status --mode map`. When a fix lands on one surface, grep for the OTHER surface the same day.
+- Applies: `governedCount(board)` lives in `docs-board.ts` and all three call it; `health.grammar`
+  carries the Verdict (`nothing-to-check` / `clean` with `checked`). The CLI reaches it through
+  `registry.docs.governedCount` — a direct import is a `cli -> domain` edge and `boundaries.test.ts`
+  fails the build on it, which is how the first attempt was caught.
+
+## `conducks_diff` answered 0 while the CLI answered 7, on the same tree (todo53#P1)
+- Gotcha: measured on this repository at one moment with 15 changed files — `conducks diff` printed
+  "Analyzed 15 hunks. 7 symbols impacted"; `conducks_diff` returned `{impactedSymbols: [],
+  totalImpacted: 0}`. The tool did not share the CLI's engine, it held a PRIVATE COPY, and the copy
+  had three separate defects: `git diff -U0` with no `HEAD` (staged invisible — the ADR 0122 fix),
+  no `git ls-files --others` (untracked invisible — the 2026-08-08 fix), and a symbol matcher using
+  `lineStart + (complexity || 1)` as the end line. `complexity` is a cyclomatic count, so a function
+  spanning 10..90 was treated as ending at 11 and a change inside it matched nothing.
+- Why: TWO fixes had landed on the CLI and neither reached the copy. This is the fourth instance of
+  "corrected on one surface only" after `density`, `--mode map` and the docs denominator. A duplicate
+  implementation does not just risk drift — it silently absorbs every fix the other one receives.
+- Applies: `change-set.ts` holds `collectChanges` + `impactedSymbolIds`; both surfaces reach it via
+  `registry.analyze` (a direct import is `cli -> domain` / `mcp -> domain`, which `boundaries.test.ts`
+  fails the build on — it caught both attempts). A cyclomatic count is never a line span; ranges come
+  from `properties.range`, and a node without one is skipped rather than given an invented end.
+
+## An enum value that is advertised and implemented NOWHERE (todo53#P1)
+- Gotcha: `conducks_diff` published `mode: ["uncommitted", "historical", "drift"]`. The handler
+  branched on `"drift"` and let everything else fall through to the working-tree path, so
+  `mode:"historical"` returned an answer about uncommitted edits — byte-identical to
+  `mode:"uncommitted"`, verified by diffing the payloads. Not a wrong value silently accepted: a
+  DOCUMENTED value that never existed.
+- Why: worse than the `audit` unknown-mode bug, because a caller reading the schema has every reason
+  to trust it. The schema is a contract with the agent and nothing checked it against the branches.
+- Applies: `DIFF_MODES` now lists only what is implemented, and the schema spreads that same constant.
+  When a mode is real but needs parameters a tool does not take (pulse ids), say where it lives
+  instead of leaving the name in the enum.
+
+## `prune`'s summary did not add up to its own total (todo53)
+- Gotcha: measured on this repo — `summary {ORPHAN: 9, UNUSED_EXPORT: 70, STALE_IMPORT: 16}` = 95,
+  beside `total: 99`. The domain emits FIVE types; the MCP tool hard-coded three into its summary AND
+  into its `type` enum, so four `UNIMPORTED_MODULE` findings came back in the list, sat in no bucket,
+  and could not be filtered to. The gap was invisible: nothing looked wrong, the numbers just did not
+  reconcile, and only summing them showed it.
+- Why: a list that must be identical in three places (domain union, summary, enum), kept by memory in
+  each. Same shape as SOURCE_EXTENSIONS before it moved to contracts. Found by asking "is there
+  repeated code between CLI and MCP" — the audit question found a live wrong number, not just a
+  tidiness problem.
+- Applies: `contracts/dead-code-types.ts` holds `DEAD_CODE_TYPES`; the domain's `Finding.type`, the
+  summary and the enum all derive from it, so a sixth type reaches all three by construction. The
+  question/verdict split (`UNIMPORTED_MODULE` is a QUESTION) is named there too — the tool used to
+  list it beside real findings, which is the reading that gets a not-yet-wired capability deleted.
+  A summary that does not sum to its total is a test worth writing for every tool that has one.
+
+## `query` advertised a template it then refused (todo53#P1)
+- Gotcha: `mode:"template"` with no name lists the Oracle library — 22 entries on this repo, each with
+  a description and params. `ALLOWED_TEMPLATES` beside it was a hand-typed Set of 21. So
+  `type_coupling` was advertised in full and answered `UNKNOWN_TEMPLATE` when called, with a
+  suggestion reading "list available templates" — the list that had just advertised it. A closed loop
+  an agent cannot escape by following instructions.
+- Why: two lists for one fact, the fifth instance in this codebase after resolveSymbolId, the docs
+  denominator, the dead-code types and the change-set engine. Same family as the `conducks_analyze`
+  description bug, which `tool-names-are-real.test.ts` pins for TOOL names — nothing pinned TEMPLATE
+  names, because the guard and the library were never compared.
+- Applies: the allowlist is ASKED of the library (`listTemplates()`), not retyped — still a
+  pre-execution whitelist (S2), and now one that cannot go stale in either direction. When a guard
+  and a catalogue describe the same set, derive one from the other or write the test that diffs them.
+
+## `truncated: false` was a LITERAL in the most-used tool on the surface (todo53#P1)
+- Gotcha: `conducks_query` fuzzy mode returned `meta: {truncated: false}` written as a constant, so a
+  result set capped at `limit` claimed to be the whole answer. Measured: `limit: 2` against a repo with
+  far more matches reported `truncated: false`.
+- Why: the same literal-verdict shape as `status: 'ready'` (todo49) — a field that CANNOT say anything
+  else looks like a computed answer to every reader. Truncation must be MEASURED, and the cheap way is
+  to ask the store for one more row than the cap and report whether it came back.
+- Applies: `execute(..., cap + 1)` then `slice(0, cap)`; `truncated = probed.length > cap`. Grep any
+  `truncated:` that is a literal rather than a comparison.
+
+## `impact` echoed an invalid direction back as though it were real (todo53#P1)
+- Gotcha: `direction:"sideways"` was accepted, ran the DOWNSTREAM analysis (the domain treats anything
+  that is not "upstream" as downstream), and returned `"direction": "sideways"` in the payload. Not
+  merely a tolerated junk value — the answer NAMED the junk as the direction it had analysed, so a
+  caller reading the response back has written confirmation of an analysis that never happened.
+- Why: a two-valued parameter implemented as `if (x === 'upstream') … else …` has no unknown branch by
+  construction. Echoing the input into the output then launders the mistake into a fact.
+- Applies: `IMPACT_DIRECTIONS` + `enumErr`. When a payload echoes an input parameter, that parameter
+  must have been validated — echoing is a claim, not a courtesy. Same for `depth`, where 0, 99 and
+  "deep" all silently became 5.
+
+## An empty vault was a passing audit on four tools (todo53#P2)
+- Gotcha: driven against a real empty vault (analyzed, then `conducks clean`), `conducks_audit`
+  answered `{success: true, violations: [], totalViolations: 0, stats: {cycles: 0, orphans: 0}}` — an
+  architecture pass over zero symbols. `prune` reported no dead code for a repo with no code, and
+  `query` and `flows` returned empty lists indistinguishable from a genuine miss. The CLI has said this
+  properly since todo49 (`Status: EMPTY`, `Staleness: n/a — nothing analyzed`); these were the tools
+  nobody had ever driven with an empty vault.
+- Why: ADR 0124's sentence survives wherever no one has run the empty case. Eight of the twelve tools
+  were already right, which is why it stayed invisible — a partially-fixed class reads as a fixed one.
+- Applies: `shared/empty-vault.ts` returns the `nothing-to-check` payload, called by audit, prune,
+  query and flows. It reads `statusFromVault()`, NOT `status()`: the latter reads the in-memory graph,
+  and `query`'s filter and template modes deliberately never load it — the first version of this guard
+  reported "the vault holds no symbols" for a filter query against a 6,144-node vault. The suite caught
+  it. When a guard asks "is there anything here", make sure it asks the store the caller actually used.
+
+## `query` template mode ignored `limit` and called ten rows the whole answer (todo53#P2)
+- Gotcha: the handler called `execute(template, rawParams)` without the third `limit` argument, so
+  `QueryService` applied its own default of 10 to EVERY template. Measured: `limit: 50` and
+  `params: {limit: 50}` both returned exactly 10 rows — the caller's limit had no path to the query at
+  all — while `meta.truncated` was the literal `false`. Ten rows presented as the complete hotspot
+  list for a 6,144-node repo.
+- Why: two separate defects that hid each other. A parameter with no route to its destination looks
+  like a parameter that was applied, and a literal `truncated: false` removes the one field that would
+  have contradicted it.
+- Applies: the P2 sweep classified all 17 `truncated:` sites as MEASURED or LITERAL. Four literals are
+  true by construction (`trace` path, `status`, `audit`, `graph_query` — none of them cap anything) and
+  now carry a comment saying so; a literal that is correct should say WHY, or the next audit re-derives
+  it. Ask the store for cap+1 and compare — that is the whole technique.
+
+## A missing identifier param answered zero rows instead of refusing (todo54#P1)
+- Gotcha: `execute()` resolved a missing template param to `PARAM_DEFAULTS[p] ?? ''`, so
+  `blast_radius` with no `symbolId` ran `WHERE e.targetId = ''`, matched nothing, and reported
+  `nodeCount: 0` — "nothing breaks if you change this" for a question that named no symbol. Seven
+  templates carried the same hole. `minImporters` was the identical defect in numeric form and got
+  fixed a day earlier only because `CAST('' AS INTEGER)` CRASHES; the loud instance is always the one
+  that gets noticed, and the quiet ones sit beside it untouched.
+- Why: "no default means required" is the obvious rule and it is WRONG here — `find_by_name` passes
+  three empty strings on purpose for unscoped fuzzy search. The library encodes the distinction in the
+  SQL: `(CAST(? AS TEXT) = '' OR col = ?)` means empty = "any"; a bare `WHERE col = ?` means empty
+  matches nothing. Read the SQL; do not infer the contract from the defaults table.
+- Applies: `REQUIRED_PARAMS` = symbolId, targetId, structureId, unitId, namespaceIdPattern.
+
+## An entry count is not a size bound (todo54#P2)
+- Gotcha: `conducks_docs raw:true` returned 279,483 bytes with `truncated: false`. Capping entries per
+  list barely helped — measured, `limit: 3` was 9,770 bytes and `limit: 5` was 47,608, because a docs
+  entry is not a fixed-size row the way a coverage row is. The first fix reduced 279 KB to 200 KB and
+  looked like a fix.
+- Why: `coverage`'s 75-row default works because its rows are uniform. Copying the TECHNIQUE without
+  checking that assumption produces a bound that does not bind.
+- Applies: bound by BYTES (the `context` max_tokens technique), never cutting mid-entry, and CALIBRATE
+  against the rendered payload — the budget counts compact JSON while the response is pretty-printed,
+  so rendered runs ~1.5x the budget. Measured 10,000 -> 15,135 / 15,000 -> 22,693 / 20,000 -> 30,264;
+  default 15,000 to stay under ~25 KB.
+
+## The persistence swap that forced serialisation was self-inflicted (todo52)
+- Gotcha: ADR 0146 serialised every MCP tool call because `registry.initialize` swaps the persistence
+  object and "no ref-count makes an object swap atomic". Measured: the swap happened on EVERY call,
+  caused by us. `releaseAnchor()` closes the vault at the end of a call, and the bootstrapper's guard
+  was `if (isCurrentlyConnected && !rootChanged && !modeChanged) return` — so the next call found a
+  disconnected handle, fell through, and built a new one with nothing changed but our own close.
+  `anchor.ts` already stated the correct policy in a comment ("Disconnection is NOT a re-init trigger")
+  and the bootstrapper disagreed with it.
+- Why: the guard asked "is it connected?" when the question is "is it anchored where I need?". A
+  second defect hid behind the first: `rootChanged` compared `chronicle.getProjectDir()`, which says
+  where the REGISTRY is anchored, not where the HANDLE points — and the module placeholder is
+  `new SynapsePersistence(":memory:", true)`. Removing the connected-term exposed it immediately as
+  `[No Vault] :memory:` against an analyzed repo.
+- Applies: `persistence.anchoredAt` answers the right question. Cost of the swap alone, measured on
+  ADR 0128's probe with the queue still in place: 2,135 ms -> 489 ms for six calls.
+
+## `initialize()` cleared `pendingLoad` on calls that changed nothing (todo52)
+- Gotcha: `this.pendingLoad = null` sat at the TOP of `RegistryBootstrapper.initialize`, which runs on
+  every tool call. A call that changed nothing therefore clobbered an armed deferred load — and got
+  away with it only because the same call then fell through the re-init path and re-armed it. The
+  moment the re-init path stopped running for an unchanged anchor, the graph stayed deferred forever
+  and every tool answered SYMBOL_NOT_FOUND against an empty graph.
+- Why: two bugs cancelling. Fixing the visible one (the needless swap) made the hidden one fatal, which
+  is the normal shape when a defect is masked by another defect rather than by a guard.
+- Applies: `pendingLoad` is cleared only inside the re-anchor branch. With this AND the swap fixed, the
+  wrong-answer race from ADR 0146 no longer reproduces with the queue removed — only
+  `Database was already closed` remains, which is an ownership question about closing, not swapping.
+
+## A probe that cannot see the failure it exists to detect (todo52#P3)
+- Gotcha: `mcp-parallel.mjs` scored a call `ok` unless `r.error || r.result?.isError`. `mcpErr` returns
+  `{error: {...}}` INSIDE the tool payload and sets neither, so a false `SYMBOL_NOT_FOUND` — the exact
+  wrong answer the probe existed to catch — counted as a success. It also issued six copies of ONE
+  call, so it exercised a single code path.
+- Why: a measuring instrument needs its own mutation test. Verified by pointing the fixed probe at a
+  symbol that does not exist: `ok=2 failed=4` where the old test would have reported `ok=6`.
+- Applies: parse the payload, count an in-payload `error` as a failure, exit non-zero, and vary the
+  tools. Before trusting any probe's number, make it report a failure you know is there.
+
+## Three closers for one handle, and only one of them counted (todo52#P2)
+- Gotcha: a single MCP tool call passed through THREE independent closers — `hypertoon`'s wrapper, the
+  handler's own `ensureAnchor`/`releaseAnchor` pair, and `tool-registry`'s `finally`, which called
+  `persistence.close()` outright and ignored the ref-count entirely. With two calls in flight,
+  whichever finished first hung up the shared handle and the other returned `Database was already
+  closed`. This is what actually forced ADR 0146's queue — not the handle swap that ADR blamed.
+- Why: the ref-count lived in `interfaces/tools/shared/anchor.ts`, so only callers that happened to go
+  through the MCP anchor participated in it. A count that protects a shared object has to live WITH
+  the object, or code paths that never heard of it close underneath.
+- Applies: `registry.infrastructure.acquireVault/releaseVault`. It could not stay in the MCP layer —
+  the registry would have had to import interfaces to reach it and `boundaries.test.ts` fails that
+  edge, which is the architecture gate telling you where the concern belongs. Grep for `.close()` on
+  any shared handle and check every site goes through the count.
+
+## Mutation-test each fix separately, or you will credit the wrong one (todo52)
+- Gotcha: three fixes landed together and the obvious story — "the handle swap ADR 0146 named was the
+  race" — was wrong. Reverting each ONE AT A TIME against `mcp-concurrency.test.ts` gave the real map:
+  putting `pendingLoad = null` back at the top of `initialize()` reproduces the SYMBOL_NOT_FOUND wrong
+  answer; restoring `tool-registry`'s unconditional close reproduces the closed handle; reverting the
+  swap fix alone breaks NEITHER — it is caught only by the unit test, and its value is speed.
+- Why: a suite that passes after N changes tells you the set works, not which member matters. The ADR
+  amendment written before these mutations credited the swap fix and had to be corrected.
+- Applies: when several fixes land for one symptom, revert each singly and record which mutation
+  reproduces which failure. ADR 0147 carries that table.
+
+## "It flakes under load" was wrong — it failed 1 in 3 alone (todo55)
+- Gotcha: `watch reconciles what changed while off` carried a standing note saying it flakes under
+  full-suite CPU load and passes isolated, with the recorded remedy "move it to a serial jest project
+  rather than widening the window again". Measured on 2026-08-09 by simply running it alone four
+  times: it failed on the first attempt and roughly 1 in 3 overall, with nothing else running. Both
+  halves of the note were wrong, and the remedy would have hidden a real defect behind an isolation
+  change that does nothing.
+- Why: a flake explanation that is never TESTED becomes folklore, and the next person inherits it as
+  fact. The captured failing output is what settled it — watcher up, reconcile done, then silence: no
+  `⚡ Change detected` and no `[Watcher] unchanged, skipped`, so the event never arrived at all rather
+  than being filtered. That also disproved the hash-gate theory, because the gate logs when it skips.
+- Applies: before accepting "flaky under load", run it alone in a loop. And when a test spawns a real
+  process, capture its OUTPUT on failure — the absence of an expected log line is evidence about which
+  stage lost the work.
+
+## The default docs response was twice the size of the one we capped (todo54 follow-up)
+- Gotcha: after capping `conducks_docs raw:true` to ~23 KB, the DEFAULT (`layer: "all"`) response was
+  measured at 48,966 bytes — 96% of it the constraint set: 159 memory entries at 31,087 bytes and 41
+  conventions at 16,286. It grows every time a lesson is written down, so the act of recording memory
+  was inflating the payload every agent reads at session start.
+- Why: the cap was applied to the mode that ADVERTISED being large, and the default was never
+  measured. Fix the loud case, miss the quiet one — same shape as `minImporters` crashing while the
+  silent identifier params sat beside it.
+- Applies: per-list byte budgets (conventions and memory separately, so a long memory file cannot
+  crowd out the RULES), newest kept first since these files are appended to, and the omitted counts
+  plus the file to read shipped in the payload. 48,966 -> 18,058 bytes. Never drop a rule silently.
+
+## `watch` announced it was live before it was watching (todo55)
+- Gotcha: `watch` missed files created in the first moment after startup, ~1 run in 3. `start()`
+  returns as soon as chokidar is CONSTRUCTED, and the command then ran its startup reconcile and
+  printed "Live Mirror Mode active" — while the poller had not yet taken its baseline snapshot. A file
+  created in that gap was reported by nothing: `ignoreInitial: true` folded it into the initial state,
+  and the sweep that would have caught it had already finished. The banner claimed a liveness the
+  watcher did not have.
+- Why: the same blind spot todo51 fixed for untracked files, one layer up — a startup window instead
+  of a git limitation. Both present as silence, which is why a watcher must be proven to REACT rather
+  than merely to start.
+- Applies: `whenReady()` on the file watcher (the docs watcher already had one), awaited before the
+  reconcile AND before the banner. Anything created before ready is caught by the sweep; anything
+  after produces an event; there is no gap between them. Mutation-verified — removing the single
+  `await` brings the misses straight back, 4 of 6.
+
+## Do not diagnose a spawned process from inside jest (todo55)
+- Gotcha: instrumenting the watcher and counting debug lines from the test's captured output pointed
+  at the wrong culprit twice. A FAILING run waits out its 45-second window and flushes far more output
+  than a passing run that exits early, so the line COUNTS differ for reasons that have nothing to do
+  with the defect — passing runs showed zero ignore-checks and zero raw events, which looked like
+  evidence and was an artifact.
+- Why: the test harness adds its own timing and buffering between the process and the evidence.
+- Applies: reproduce by driving the BUILT CLI from a shell with all output redirected to a file, then
+  read the whole log. That is what isolated it here — a one-second settle before the write made it
+  5-for-5, which pinned the window rather than the mechanism, and a standalone chokidar probe with the
+  same options cleared chokidar itself 5-for-5.

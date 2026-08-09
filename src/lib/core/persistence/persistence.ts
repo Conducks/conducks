@@ -76,6 +76,18 @@ export class SynapsePersistence {
     return this.db !== null;
   }
 
+  /**
+   * The root this handle was built for.
+   *
+   * The bootstrapper used to decide "do I need a new handle?" from `chronicle.getProjectDir()`, which
+   * describes where the REGISTRY is anchored — not what this object opens. The module-level
+   * placeholder is `new SynapsePersistence(":memory:", true)`, so a handle pointing at `:memory:`
+   * could sit under a chronicle already anchored to a real repo and look correct (todo52).
+   */
+  public get anchoredAt(): string {
+    return this.vaultPath;
+  }
+
   /** The vault file every process agrees on. Readers open this; a pulse writes it. */
   private dbFile(): string {
     return path.join(path.resolve(this.vaultPath, '.conducks'), 'conducks-synapse.db');

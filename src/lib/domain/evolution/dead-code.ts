@@ -1,4 +1,7 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
+// The union used to be spelled out here AND retyped in `conducks_prune`'s summary and enum, which is
+// how two of the five went missing from both (todo53). One list, in contracts.
+import type { DeadCodeType } from '@/contracts/dead-code-types.js';
 
 export interface Finding {
   /**
@@ -14,7 +17,7 @@ export interface Finding {
    * The distinction is the FILE, not the symbol. A symbol unused inside a file that IS imported is
    * a real finding — the module is reachable and the symbol still is not.
    */
-  type: 'ORPHAN' | 'UNUSED_EXPORT' | 'UNREACHABLE_LOGIC' | 'STALE_IMPORT' | 'UNIMPORTED_MODULE';
+  type: DeadCodeType;
   symbol: string;
   file: string;
   message: string;

@@ -17,7 +17,8 @@ import { decide as decideArch } from "@/lib/domain/governance/arch-verdict.js";
 const DEFAULT_INTERFACE_FRAGMENTS = ['/interfaces/', '/adapters/', '/apps/', '/cli/', '/api/', '/web/'];
 import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
-import { buildBoard, agentView, buildTrees } from "@/lib/domain/analysis/docs-board.js";
+import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/analysis/docs-board.js";
+import { collectChanges, impactedSymbolIds } from "@/lib/domain/analysis/change-set.js";
 import { lintVisuals, collectVisualPages, buildStamps, staleStamps, type VisualsViolation, type ReviewStamps } from "@/lib/domain/analysis/visuals-lint.js";
 import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/analysis/visuals-drift.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
@@ -91,6 +92,9 @@ const graph = new ConducksGraph();
 
 // These will be firmed up during initializeRegistry() call.
 let persistence: SynapsePersistence = new SynapsePersistence(":memory:", true);
+
+/** Tool calls holding the shared vault open. Closing under a non-zero count kills live queries. */
+let vaultHolders = 0;
 let ignoreManager = new IgnoreManager(process.cwd());
 
 // 2. Bridge Layer (Registry Infrastructure)
@@ -226,6 +230,12 @@ export const registry = {
       return analysis.analyze(options);
     },
     resonate: (filePath: string) => microPulse.resonate(filePath),
+    // The working-tree change set and the symbols it lands on — one implementation, reached by both
+    // the `diff` CLI command and `conducks_diff`, which previously held drifting copies (todo53#P1).
+    // Exposed here because `cli -> domain` is a forbidden static import.
+    changeSet: (cwd: string) => collectChanges(cwd),
+    impactedSymbols: (nodes: Parameters<typeof impactedSymbolIds>[0], changes: Parameters<typeof impactedSymbolIds>[1]) =>
+      impactedSymbolIds(nodes, changes),
     get query() { return analysis.query; }
   },
   kinetic: {
@@ -302,6 +312,9 @@ export const registry = {
     // tree, and re-deriving each from disk would parse the whole monorepo a second time.
     viewOf: (board: Parameters<typeof agentView>[0], layer: "all" | "board" = "all", recent = 4) =>
       agentView(board, layer, recent),
+    // The denominator behind every claim a board makes. Exposed here rather than imported by the CLI
+    // directly, because `cli -> domain` is a forbidden static edge and the boundary test enforces it.
+    governedCount: (board: Parameters<typeof governedCount>[0]) => governedCount(board),
     // One watcher per process: `mirror` and `watch` both ask for it, neither owns it.
     get watcher() {
       docsWatcher ??= new DocsWatcher(chronicle.getProjectDir() || process.cwd());
@@ -468,6 +481,31 @@ export const registry = {
     createUpdateCheck: () => new UpdateCheck(),
   },
   infrastructure: {
+    /**
+     * Take a hold on the shared vault. It is closed only when the last holder releases it.
+     *
+     * The count lives HERE, with the object it protects, because there were three independent
+     * closers in a single tool call — `hypertoon`'s wrapper, the handler's own `ensureAnchor` pair,
+     * and `tool-registry`'s `finally`, which closed unconditionally and ignored the count entirely.
+     * Whichever call finished first hung up the handle and the others returned
+     * `Database was already closed` (ADR 0146, todo52#P2).
+     *
+     * It cannot live in `interfaces/tools/shared/anchor.ts`: the registry is composition and would
+     * have to import the MCP layer to reach it, which `boundaries.test.ts` refuses — correctly, since
+     * a vault hold is an infrastructure concern and MCP is merely one of its callers.
+     */
+    acquireVault: () => { vaultHolders++; },
+
+    /** Release this holder's claim, closing the vault only when nothing else is reading. */
+    releaseVault: async () => {
+      vaultHolders = Math.max(0, vaultHolders - 1);
+      if (vaultHolders > 0) return;
+      await persistence?.close();
+    },
+
+    /** How many holders the vault currently has — for tests and diagnostics. */
+    get vaultHolders() { return vaultHolders; },
+
     get graphEngine() {
       // A deferred graph reads as an EMPTY one, and every caller then reports zero nodes, zero
       // flows, symbol-not-found — with no error anywhere. That is CONDUCKS-13 at full size, and it

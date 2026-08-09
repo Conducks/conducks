@@ -18,10 +18,18 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
   registry: {
     initialize: jest.fn(async () => {}),
     infrastructure: {
+      // The empty-vault guard holds the vault while it queries (todo52#P2).
+      acquireVault: () => {},
+      releaseVault: async () => {},
       persistence: { query: queryMock, close: closeMock },
       chronicle: { getProjectDir: () => '/fake/root' },
     },
-    audit: { status: statusMock },
+    // The empty-vault guard (todo53#P2) reads the VAULT count, not the graph — filter mode never
+    // loads the graph, so this is the only source that can tell "empty project" from "not loaded".
+    audit: {
+      status: statusMock,
+      statusFromVault: async () => ({ stats: { nodeCount: 6144 }, staleness: { stale: false } }),
+    },
     // The REAL compiler, deliberately. This suite asserts that an invalid filter is refused
     // before any SQL reaches persistence — a stubbed compiler would decide that outcome itself
     // and the assertion would prove nothing. Only persistence is faked, because that is the

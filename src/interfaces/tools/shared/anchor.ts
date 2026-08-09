@@ -104,16 +104,13 @@ export async function ensureAnchor(
     await registry.initialize(readOnly, root);
   }
 
-  inFlight++;
+  registry.infrastructure.acquireVault();
 
   // Opt-OUT, deliberately. Forgetting to materialise a graph a tool walks is SILENT: the domain
   // services hold their own reference from construction, so they see an empty graph and report zero
   // nodes with no error. A tool must be PROVEN to touch no graph before it passes false.
   if (needsGraph) await registry.infrastructure.ensureGraphLoaded();
 }
-
-/** Tool calls that have anchored and not yet released. Closing under a non-zero count kills live queries. */
-let inFlight = 0;
 
 /**
  * Take a hold on the shared vault WITHOUT anchoring — for callers that release but never
@@ -125,7 +122,7 @@ let inFlight = 0;
  * ref-count exists to prevent. It would have looked fixed and raced anyway.
  */
 export function acquireAnchor(): void {
-  inFlight++;
+  registry.infrastructure.acquireVault();
 }
 
 /**
@@ -143,7 +140,5 @@ export function acquireAnchor(): void {
  * rather than an exotic one.
  */
 export async function releaseAnchor(): Promise<void> {
-  inFlight = Math.max(0, inFlight - 1);
-  if (inFlight > 0) return;                    // someone else is still reading — leave it open
-  await (registry.infrastructure as any).persistence?.close();
+  await registry.infrastructure.releaseVault();
 }

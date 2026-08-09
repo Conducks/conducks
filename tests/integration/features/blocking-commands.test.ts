@@ -29,7 +29,7 @@ async function withProcess<T>(
   // FSEvents path itself.
   const proc = spawn('node', [CLI, ...args], {
     cwd, stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, CHOKIDAR_USEPOLLING: '1', CHOKIDAR_INTERVAL: '250' },
+    env: { ...process.env, CHOKIDAR_USEPOLLING: '1', CHOKIDAR_INTERVAL: '250', DEBUG: process.env.WATCH_DEBUG ? '1' : '' },
   });
   let buffer = '';
   proc.stdout.on('data', d => { buffer += String(d); });

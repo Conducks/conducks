@@ -36,7 +36,7 @@ export class DocsLintCommand implements ConducksCommand {
       // documents that had content and reported the result as "governed docs", so a freshly
       // bootstrapped tree of three governed files reported two — and a file the standard governs
       // that the count cannot see is a file nobody notices going unchecked (ADR 0124).
-      const governed = board.todos.length + board.decisions.length + board.other.length;
+      const governed = registry.docs.governedCount(board);
       return { label, board, governed };
     });
     const violations = reports.reduce((n, r) => n + r.board.lint.length, 0);

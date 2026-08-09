@@ -1,7 +1,8 @@
 import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
-import { execSync } from "node:child_process";
 import { ensureAnchor, releaseAnchor } from "../shared/anchor.js";
+import { resolveSymbolId } from "../shared/resolve-symbol.js";
+import { enumErr, numErr } from "./synapse.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 
 /**
@@ -10,6 +11,25 @@ import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
  * These 4 tools form the behavioral and mutational core of the Conducks MCP suite.
  * They provide tracing, impact analysis, historical diffing, and graph-verified renaming.
  */
+
+// The enum `conducks_trace` publishes in its inputSchema — kept beside the handler that enforces it,
+// so the schema and the guard cannot drift. "execution" is the deprecated alias of "reachability"
+// (ADR 0066) and stays accepted.
+const TRACE_MODES = ["reachability", "execution", "path"] as const;
+
+// The directions `conducks_impact` publishes. An unknown one used to reach the domain, which treats
+// anything that is not "upstream" as downstream — so `direction:"sideways"` returned the DOWNSTREAM
+// answer and printed `"direction": "sideways"` back in the payload as though it were real (todo53#P1).
+const IMPACT_DIRECTIONS = ["upstream", "downstream"] as const;
+// Its declared depth bounds, enforced here rather than left in the schema.
+const IMPACT_DEPTH_BOUNDS = { min: 1, max: 10 };
+
+// The modes `conducks_diff` IMPLEMENTS. "historical" was advertised in the schema and implemented
+// nowhere: the handler branched on "drift" and let everything else fall through to the working-tree
+// path, so a caller asking for history received an answer about their uncommitted edits, byte for
+// byte identical to `mode:"uncommitted"` (todo53#P1). Pulse-to-pulse comparison is real but needs
+// base/head pulse ids this tool takes no parameters for — it lives on `conducks diff --base/--head`.
+const DIFF_MODES = ["uncommitted", "drift"] as const;
 
 // MCP6: validate symbol/nodeId param
 function validateSymbol(value: string, paramName: string = 'symbol') {
@@ -22,17 +42,6 @@ function validateSymbol(value: string, paramName: string = 'symbol') {
   return null;
 }
 
-// Resolve short name to full node ID; returns resolved ID string or null on failure
-function resolveSymbolId(symbol: string): string | null {
-  const graph = registry.infrastructure.graphEngine.getGraph();
-  if (symbol.includes('::')) return symbol.toLowerCase();
-  const matches = graph.findNodesByName(symbol);
-  if (matches.length === 0) return null;
-  const best = matches.reduce((a: any, b: any) =>
-    ((b.properties?.gravity ?? 0) > (a.properties?.gravity ?? 0) ? b : a)
-  );
-  return best.id as string;
-}
 
 export const kineticTools: Record<string, Tool> = {
 
@@ -63,9 +72,9 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
       type: "object",
       properties: {
         symbol: { type: "string", description: "The symbol graph ID to analyze." },
-        direction: { type: "string", enum: ["upstream", "downstream"], default: "upstream" },
+        direction: { type: "string", enum: [...IMPACT_DIRECTIONS], default: "upstream" },
         // MCP1: numeric bounds
-        depth: { type: "number", default: 5, minimum: 1, maximum: 10, description: "Max structural depth." },
+        depth: { type: "number", default: 5, minimum: IMPACT_DEPTH_BOUNDS.min, maximum: IMPACT_DEPTH_BOUNDS.max, description: "Max structural depth." },
         path: { type: "string", description: "Optional: The absolute project root." }
       },
       required: ["symbol"]
@@ -75,6 +84,11 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;
+
+      const badParam =
+        enumErr(direction, IMPACT_DIRECTIONS, 'direction') ??
+        numErr(depth, { min: IMPACT_DEPTH_BOUNDS.min, max: IMPACT_DEPTH_BOUNDS.max }, 'depth');
+      if (badParam) return badParam;
 
       try {
         await ensureAnchor(customPath);
@@ -153,6 +167,17 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;
 
+      // An unknown mode used to fall through to reachability — the same silent substitution already
+      // fixed in `audit` and `prune` (todo28), never wired here (todo53#P1).
+      const badMode = enumErr(mode, TRACE_MODES, 'mode');
+      if (badMode) return badMode;
+
+      // `mode:"path"` with no target ran reachability and returned a downstream list under a request
+      // for a shortest path. A missing target is a refusal, not a different question.
+      if (mode === "path" && !target) {
+        return mcpErr('INVALID_PARAM', 'mode="path" requires a target symbol', 'Pass target=<symbol>, or use mode="reachability" for downstream reach.', false);
+      }
+
       try {
         await ensureAnchor(customPath, true);
         const resolvedId = resolveSymbolId(symbol);
@@ -162,12 +187,17 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
         // second lookup (todo28#P4). Enrich every returned step with what `graph.getNode` already
         // knows, in this tool only.
         const graph = registry.infrastructure.graphEngine.getGraph();
+        // Some steps are DANGLING EDGE TARGETS, not nodes: `graph.findnodesbyname` is the target of
+        // 7 edges and of 0 rows in `nodes`. Those used to render as a step with the id echoed back as
+        // its `name` and `kind: 'unknown'` — indistinguishable at a glance from a real symbol, and
+        // refused by every tool it was fed back into. `resolved` says which it is (todo53#P1).
         const describe = (id: string) => {
           const n: any = graph.getNode(id);
           return {
             id,
+            resolved: !!n,
             name: n?.properties?.name ?? id,
-            kind: n?.label ?? 'unknown',
+            kind: n?.label ?? 'UNRESOLVED',
             file: n?.properties?.filePath ?? null,
             line: n?.properties?.range?.start?.line ?? null,
           };
@@ -180,6 +210,8 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
           const steps = pathResults.map(describe);
           return mcpOk(
             { steps, indexStaleness: registry.audit.status().staleness.stale },
+            // A shortest path is returned whole — `findPath` caps nothing, so this literal is true
+            // by construction rather than by assumption (todo53#P2 audit of every `truncated`).
             { nodeCount: steps.length, truncated: false }
           );
         }
@@ -219,12 +251,15 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["uncommitted", "historical", "drift"], default: "uncommitted" },
+        mode: { type: "string", enum: [...DIFF_MODES], default: "uncommitted", description: "uncommitted = staged, unstaged and untracked changes in the working tree. drift = structural evolution against the previous pulse. Pulse-to-pulse history is a CLI command (`conducks diff --base <pulse>`), not a mode here." },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ mode, path: customPath }: any) => {
+      const badMode = enumErr(mode, DIFF_MODES, 'mode');
+      if (badMode) return badMode;
+
       try {
         await ensureAnchor(customPath, true);
 
@@ -247,47 +282,35 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
           }, { nodeCount: deltas.length, truncated: result.deltas.length > 10 });
         }
 
-        // Parse git diff to find changed lines and map them to structural symbols
-        let rawDiff = "";
-        try {
-          const cwd = (registry.infrastructure as any).chronicle?.getProjectDir() || process.cwd();
-          rawDiff = execSync('git diff -U0', { encoding: 'utf-8', cwd });
-        } catch {
+        // The SAME engine the CLI's PR risk report uses. This block used to be a private copy that
+        // ran `git diff -U0` (no HEAD, so staged changes were invisible), never asked for untracked
+        // files, and ended each symbol at `lineStart + complexity` — a cyclomatic count read as a
+        // line span. Measured before the fix: 15 changed files in the tree, `totalImpacted: 0`, while
+        // the CLI reported 7 symbols against the same graph (todo53#P1).
+        const cwd = (registry.infrastructure as any).chronicle?.getProjectDir() || process.cwd();
+        const changes = registry.analyze.changeSet(cwd);
+        if (changes === null) {
           return mcpErr('GIT_DIFF_FAILED', 'Git diff failed — is this a git repository?', 'Ensure the project directory is a git repository.', false);
         }
-
-        if (!rawDiff.trim()) {
-          return mcpOk({ message: "No uncommitted structural changes detected.", indexStaleness: registry.audit.status().staleness.stale });
+        if (changes.length === 0) {
+          return mcpOk({ message: "No uncommitted structural changes detected.", changedFiles: 0, impactedSymbols: [], totalImpacted: 0, indexStaleness: registry.audit.status().staleness.stale });
         }
 
-        const currentGraph = registry.query.graph.getGraph();
-        const allNodes = Array.from(currentGraph.getAllNodes() as Iterable<any>);
-        const impactedSymbols: string[] = [];
-
-        let currentFile = "";
-        for (const line of rawDiff.split('\n')) {
-          if (line.startsWith('+++ b/')) {
-            currentFile = line.replace('+++ b/', '').toLowerCase();
-          } else if (line.startsWith('@@')) {
-            const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
-            if (match && currentFile) {
-              const start = parseInt(match[1], 10);
-              const count = parseInt(match[2] || '1', 10);
-              for (let i = 0; i < count; i++) {
-                const changedLine = start + i;
-                const hit = allNodes.find((n: any) =>
-                  (n.properties.file || n.properties.filePath || '').toLowerCase().endsWith(currentFile) &&
-                  n.properties.lineStart <= changedLine && n.properties.lineStart + (n.properties.complexity || 1) >= changedLine
-                );
-                if (hit && !impactedSymbols.includes(hit.id)) impactedSymbols.push(hit.id);
-              }
-            }
-          }
-        }
+        const impactedSymbols = registry.analyze.impactedSymbols(
+          registry.query.graph.getGraph().getAllNodes() as Iterable<any>,
+          changes,
+        );
 
         const symbols = impactedSymbols.slice(0, 15);
         return mcpOk(
-          { impactedSymbols: symbols, totalImpacted: impactedSymbols.length, indexStaleness: registry.audit.status().staleness.stale },
+          {
+            impactedSymbols: symbols,
+            totalImpacted: impactedSymbols.length,
+            // The denominator: symbols are drawn from these files, so "0 impacted" out of 15 changed
+            // files reads differently from "0 impacted" out of 0 (ADR 0145).
+            changedFiles: changes.length,
+            indexStaleness: registry.audit.status().staleness.stale,
+          },
           { nodeCount: symbols.length, truncated: impactedSymbols.length > 15 }
         );
       } catch (err: any) {

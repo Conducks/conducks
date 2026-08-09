@@ -1,7 +1,11 @@
 import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, releaseAnchor, resolveDocsRoot } from "../shared/anchor.js";
+import { resolveSymbolId } from "../shared/resolve-symbol.js";
+import { emptyVaultAnswer } from "../shared/empty-vault.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
+import { verdict, verdictToJson } from "@/contracts/verdict.js";
+import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from "@/contracts/dead-code-types.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
@@ -24,13 +28,55 @@ import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
  */
 const CONTEXT_CONTAINERS = new Set(['ECOSYSTEM', 'REPOSITORY', 'PACKAGE', 'NAMESPACE', 'DIRECTORY', 'UNIT']);
 
-const ALLOWED_TEMPLATES = new Set([
-  'find_usages', 'find_imports', 'unused_exports', 'dead_code', 'high_risk_dead_code',
-  'blast_radius', 'deep_impact', 'structural_siblings', 'symbols_in_structure', 'symbols_in_namespace',
-  'hotspots', 'entry_points', 'cross_namespace_coupling', 'cycles', 'layer_distribution',
-  'kinetic_hotspots', 'suspicious_fallbacks', 'class_health_rollup', 'high_risk_symbols',
-  'find_by_name', 'full_ancestry'
-]);
+// `conducks_context`'s declared numeric bounds. The inputSchema and the runtime guard both read
+// these, so the published contract and the enforced one cannot drift.
+const CONTEXT_RADIUS_BOUNDS = { min: 1, max: 10 };
+const CONTEXT_TOKEN_BOUNDS = { min: 100, max: 100000 };
+
+// `conducks_flows`. `min_members` publishes a floor and no ceiling, so it has none here either.
+const FLOWS_MIN_MEMBERS_BOUNDS = { min: 1 };
+const FLOWS_LIMIT_BOUNDS = { min: 1, max: 100 };
+
+// `conducks_coverage`. 75 rows measured at ~23.3 KB on this repo's 680-function baseline; 500 is the
+// published ceiling.
+const COVERAGE_LIMIT_BOUNDS = { min: 1, max: 500 };
+
+// `conducks_prune`, as published in its inputSchema.
+const PRUNE_LIMIT_BOUNDS = { min: 1, max: 200 };
+
+// `conducks_query`, as published in its inputSchema.
+const QUERY_LIMIT_BOUNDS = { min: 1, max: 500 };
+
+// `conducks_docs raw:true`. The unbounded raw board measured 279,483 bytes on this repo — roughly 11x
+// what an MCP response carries — with `truncated: false` and no cap of any kind (todo54#P2). 50 entries
+// per list is the default; the ceiling is generous because `raw` exists for callers who want the lot.
+const DOCS_RAW_LIMIT_BOUNDS = { min: 1, max: 500 };
+const DOCS_RAW_DEFAULT_LIMIT = 50;
+// An ENTRY COUNT is a poor proxy for response size here, and the measurement says so: on this repo
+// `limit: 3` is 9,770 bytes and `limit: 5` is 47,608 — a docs entry is not a fixed-size row the way a
+// coverage row is. So the real bound is bytes, the same technique `conducks_context` uses for its
+// token budget.
+//
+// The budget counts COMPACT entry JSON while the response is pretty-printed, so the rendered payload
+// runs about 1.5x the budget. Calibrated against the real thing rather than assumed — measured on this
+// repo: budget 10,000 -> 15,135 bytes rendered, 15,000 -> 22,693, 20,000 -> 30,264. 15,000 is the
+// largest that stays under the ~25 KB an MCP response carries.
+const DOCS_RAW_BYTE_BOUNDS = { min: 1000, max: 200000 };
+const DOCS_RAW_DEFAULT_BYTES = 15000;
+
+/**
+ * The templates the Oracle library actually holds — ASKED, never retyped.
+ *
+ * This was a hand-maintained Set of 21 names beside a library that had grown to 22. The extra one,
+ * `type_coupling`, was listed by `mode:"template"` discovery WITH a description and parameters, and
+ * then refused by this guard when called — and the refusal's suggestion said "list available
+ * templates", which is the list that had just advertised it (todo53#P1).
+ *
+ * Still a whitelist, and still checked before execution (S2): the set of templates that EXIST is a
+ * tighter bound than a copy of that set which is free to go stale in either direction.
+ */
+const allowedTemplates = (): Set<string> =>
+  new Set(((registry.analyze.query as any).listTemplates() as Array<{ id: string }>).map(t => t.id));
 
 // MCP6: validate symbol/nodeId param
 function validateSymbol(value: string, paramName: string = 'symbol') {
@@ -43,17 +89,6 @@ function validateSymbol(value: string, paramName: string = 'symbol') {
   return null;
 }
 
-// Resolve short name to full node ID; returns resolved ID string or null on failure
-function resolveSymbolId(symbol: string): string | null {
-  const graph = registry.infrastructure.graphEngine.getGraph();
-  if (symbol.includes('::')) return symbol.toLowerCase();
-  const matches = graph.findNodesByName(symbol);
-  if (matches.length === 0) return null;
-  const best = matches.reduce((a: any, b: any) =>
-    ((b.properties?.gravity ?? 0) > (a.properties?.gravity ?? 0) ? b : a)
-  );
-  return best.id as string;
-}
 
 /**
  * DuckDB functions that reach outside the vault (ADR 0047).
@@ -69,10 +104,29 @@ const FORBIDDEN_SQL_FUNCTIONS = [
   'glob', 'sniff_csv', 'attach', 'copy_from', 'install', 'load',
 ];
 
+/**
+ * The modes `conducks_status` implements.
+ *
+ * The last unguarded enum on the surface: `mode:"JUNK"` returned the HEALTH payload byte for byte,
+ * so a caller asking for `map` or `manifest` and mistyping it received a different analysis with no
+ * indication — the same defect as `audit`'s unknown mode, on the tool whose own history already
+ * includes `manifest` silently returning health's payload (todo28#P1, todo53#P2).
+ */
+export const STATUS_MODES = ['health', 'map', 'manifest', 'pulse'] as const;
 /** The modes `conducks_audit` actually implements, and the values its schema advertises. */
 export const AUDIT_MODES = ['scan', 'advice', 'guard', 'archeology', 'fallback'] as const;
-/** The finding types `conducks_prune` can filter to, plus the unfiltered `all`. */
-export const PRUNE_TYPES = ['ORPHAN', 'UNUSED_EXPORT', 'STALE_IMPORT', 'all'] as const;
+/** The modes `conducks_query` implements. */
+export const QUERY_MODES = ['fuzzy', 'template', 'filter'] as const;
+/** The layers `conducks_docs` publishes: threads + constraints, or threads alone. */
+export const DOCS_LAYERS = ['all', 'board'] as const;
+/**
+ * The finding types `conducks_prune` can filter to, plus the unfiltered `all`.
+ *
+ * Derived from the domain's list rather than retyped. It used to name three of five, so
+ * `UNREACHABLE_LOGIC` and `UNIMPORTED_MODULE` findings were returned but could not be filtered to
+ * and were counted in no summary bucket (todo53).
+ */
+export const PRUNE_TYPES = [...DEAD_CODE_TYPES, 'all'] as const;
 
 /**
  * Refuse an out-of-enum argument instead of answering something plausible.
@@ -97,6 +151,47 @@ export function enumErr(value: unknown, allowed: readonly string[], paramName: s
     'INVALID_PARAM',
     `${paramName} must be one of: ${allowed.join(', ')} — got ${JSON.stringify(value)}`,
     `Pass ${paramName}=${allowed[0]} (or omit it for the default).`,
+    false,
+  );
+}
+
+/**
+ * The same rule as `enumErr`, for the two domains it cannot cover: a number with declared bounds and
+ * a boolean.
+ *
+ * A bound written only in `inputSchema` is a comment. Nothing validates it at runtime, and measured
+ * on `conducks_context` (todo53#P1) the gap produced three different wrong answers from one tool:
+ * `radius: 0` (schema minimum 1) returned an empty neighbourhood as a clean result, `radius: "two"`
+ * made `Math.min("two", 10)` NaN — and since every comparison against NaN is false, the depth guard
+ * vanished and a junk value produced the WIDEST possible walk — and `include_atoms: "yes"` failed a
+ * `=== true` test, so a caller asking to include them got them excluded without a word.
+ *
+ * A coercion is not available here on purpose: guessing what `"two"` meant is how the silent
+ * substitution starts.
+ */
+export function numErr(value: unknown, bounds: { min: number; max?: number }, paramName: string) {
+  if (value === undefined || value === null) return null;
+  const inRange = typeof value === 'number' && Number.isFinite(value)
+    && value >= bounds.min && (bounds.max === undefined || value <= bounds.max);
+  if (inRange) return null;
+  // `max` is optional because not every bounded parameter declares one — `flows.min_members` publishes
+  // a minimum and no ceiling, and inventing one here would enforce a contract the tool never made.
+  const range = bounds.max === undefined ? `${bounds.min} or greater` : `between ${bounds.min} and ${bounds.max}`;
+  return mcpErr(
+    'INVALID_PARAM',
+    `${paramName} must be a number ${range} — got ${JSON.stringify(value)}`,
+    `Pass ${paramName} ${range} (or omit it for the default).`,
+    false,
+  );
+}
+
+export function boolErr(value: unknown, paramName: string) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'boolean') return null;
+  return mcpErr(
+    'INVALID_PARAM',
+    `${paramName} must be true or false — got ${JSON.stringify(value)}`,
+    `Pass ${paramName}=true or ${paramName}=false (or omit it for the default).`,
     false,
   );
 }
@@ -157,7 +252,7 @@ Returns:
       type: "object",
       properties: {
         q: { type: "string", description: "Symbol name, pattern, or search concept (for fuzzy mode)." },
-        mode: { type: "string", enum: ["fuzzy", "template", "filter"], default: "fuzzy", description: "Query modality." },
+        mode: { type: "string", enum: [...QUERY_MODES], default: "fuzzy", description: "Query modality." },
         template: { type: "string", description: "The named Oracle template to execute (for template mode)." },
         params: { type: "object", description: "Parameters for the Oracle template (as a JSON object)." },
         filter: {
@@ -180,12 +275,23 @@ Returns:
           }
         },
         // MCP1: numeric bounds
-        limit: { type: "number", default: 10, minimum: 1, maximum: 500, description: "Max results to return." },
+        limit: { type: "number", default: 10, minimum: QUERY_LIMIT_BOUNDS.min, maximum: QUERY_LIMIT_BOUNDS.max, description: "Max results to return." },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ q, mode, template, params, filter, limit, path: customPath }: any) => {
+      // `mode:"banana"` used to fall through to fuzzy, and `limit:"x"` reached DuckDB and came back
+      // as `Conversion Error: Could not convert string 'x' to INT64` under a QUERY_FAILED code
+      // (todo53#P1).
+      const emptyQuery = await emptyVaultAnswer();
+      if (emptyQuery) return mcpOk(emptyQuery, { nodeCount: 0 });
+
+      const badParam =
+        enumErr(mode, QUERY_MODES, 'mode') ??
+        numErr(limit, { min: QUERY_LIMIT_BOUNDS.min, max: QUERY_LIMIT_BOUNDS.max }, 'limit');
+      if (badParam) return badParam;
+
       try {
         // Only FUZZY mode walks the graph — it resolves names against in-memory nodes. `template`
         // and `filter` compile to SQL and read through persistence, so they must not pay the
@@ -224,17 +330,30 @@ Returns:
         // 2. [Mode: Template] Structural Analysis - Executes a named query
         if (mode === 'template' && template) {
           // S2: Whitelist check — reject unknown template names before SQL execution.
-          if (!ALLOWED_TEMPLATES.has(template)) {
+          if (!allowedTemplates().has(template)) {
             return mcpErr('UNKNOWN_TEMPLATE', `Unknown query template: ${template}`, 'Use conducks_query with mode="template" and no template param to list available templates.', false);
           }
           const rawParams = Array.isArray(params) ? params : (params ? Object.values(params) : []);
-          const results = await registry.analyze.query.execute(template as any, rawParams);
+          // `limit` was never forwarded, so `execute` applied its own default of 10 and EVERY template
+          // answer was capped at ten rows no matter what the caller asked for — while `truncated` was
+          // the literal `false`, calling those ten the whole answer. Measured: `limit: 50` and
+          // `params: {limit: 50}` both returned 10 (todo53#P2). One more than the cap, as in fuzzy, so
+          // truncation is measured rather than asserted.
+          const templateCap = limit ?? 10;
+          const probedRows = await registry.analyze.query.execute(template as any, rawParams, templateCap + 1);
+          const results = probedRows.slice(0, templateCap);
           // MCP7: pagination meta
-          return mcpOk({ template, symbols: results }, { nodeCount: results.length, truncated: false });
+          return mcpOk({ template, symbols: results }, { nodeCount: results.length, truncated: probedRows.length > templateCap });
         }
 
         // 3. [Mode: Fuzzy] Discovery - Default name/pattern search
-        const results = await registry.analyze.query.execute('find_by_name', [q || '', '', ''], limit || 10);
+        //
+        // One MORE than the cap, so truncation is MEASURED. `truncated: false` was hard-coded here,
+        // which meant a capped result set claimed to be the whole answer — the defect todo53#P2 sets
+        // out to find everywhere, sitting in the most-used tool on the surface.
+        const cap = limit ?? 10;
+        const probed = await registry.analyze.query.execute('find_by_name', [q || '', '', ''], cap + 1);
+        const results = probed.slice(0, cap);
 
         const standardize = (n: any) => ({
           id: n.id,
@@ -259,7 +378,7 @@ Returns:
         // MCP8: clean envelope, MCP7: meta
         return mcpOk(
           { q, symbols, indexStaleness: registry.audit.status().staleness.stale },
-          { nodeCount: symbols.length, truncated: false }
+          { nodeCount: symbols.length, truncated: probed.length > cap }
         );
       } catch (err: any) {
         // MCP3: structured error
@@ -295,13 +414,17 @@ Modes:
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["health", "map", "manifest", "pulse"], default: "health" },
+        mode: { type: "string", enum: [...STATUS_MODES], default: "health" },
         file: { type: "string", description: "The relative or absolute path of the file to pulse (for 'pulse' mode)." },
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ mode, file, path: customPath }: any) => {
+      // The last unguarded enum on the surface (todo53#P2): `mode:"JUNK"` returned health's payload
+      // byte for byte, so a mistyped `manifest` silently became a different analysis.
+      const badMode = enumErr(mode, STATUS_MODES, 'mode');
+      if (badMode) return badMode;
       try {
         // `pulse` re-parses a file and needs a graph to write into. `manifest` runs the same cycle
         // detection `conducks_audit` uses (registry.audit.audit() walks the in-memory graph), so it
@@ -407,6 +530,10 @@ Modes:
       // payload for a request that was never honoured — the caller asked for one analysis and
       // silently received a different one. Same defect the CLI fixed for `status --mode map`
       // ("an UNKNOWN mode is an error, not a default"); the tool surface never got that fix.
+      // ADR 0124: an empty vault is not a passing audit (todo53#P2).
+      const emptyAudit = await emptyVaultAnswer();
+      if (emptyAudit) return mcpOk(emptyAudit, { nodeCount: 0 });
+
       const badMode = enumErr(mode, AUDIT_MODES, 'mode');
       if (badMode) return badMode;
 
@@ -575,8 +702,8 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
       properties: {
         symbol: { type: "string", description: "The symbol graph ID to center the context on." },
         // MCP1: numeric bounds
-        radius: { type: "number", default: 2, minimum: 1, maximum: 10, description: "BFS depth radius." },
-        max_tokens: { type: "number", minimum: 100, maximum: 100000, description: "Optional: max estimated token budget. If omitted, uses default 8000." },
+        radius: { type: "number", default: 2, minimum: CONTEXT_RADIUS_BOUNDS.min, maximum: CONTEXT_RADIUS_BOUNDS.max, description: "BFS depth radius." },
+        max_tokens: { type: "number", minimum: CONTEXT_TOKEN_BOUNDS.min, maximum: CONTEXT_TOKEN_BOUNDS.max, description: "Optional: max estimated token budget. If omitted, uses default 8000." },
         path: { type: "string", description: "Optional: The absolute project root." },
         include_atoms: { type: "boolean", default: false, description: "Include ATOM nodes (local variables, fields) in the result. Off by default — they are rarely useful context and usually crowd out the symbols that are." }
       },
@@ -588,23 +715,26 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;
 
+      // The bounds below are the ones this tool's own inputSchema publishes. They were declared and
+      // never enforced, which is how `radius: "two"` walked the whole graph (todo53#P1).
+      const badParam =
+        numErr(radius, { min: CONTEXT_RADIUS_BOUNDS.min, max: CONTEXT_RADIUS_BOUNDS.max }, 'radius') ??
+        numErr(max_tokens, { min: CONTEXT_TOKEN_BOUNDS.min, max: CONTEXT_TOKEN_BOUNDS.max }, 'max_tokens') ??
+        boolErr(include_atoms, 'include_atoms');
+      if (badParam) return badParam;
+
       try {
         await ensureAnchor(customPath, true);
         const graph = registry.infrastructure.graphEngine.getGraph();
 
-        const maxDepth = Math.min(radius ?? 2, 10);
+        const maxDepth = radius ?? 2;
 
-        // Resolve short name to full node ID if needed
-        let startId = symbol.toLowerCase();
-        if (!startId.includes('::')) {
-          const matches = graph.findNodesByName(symbol);
-          if (matches.length === 0) {
-            return mcpErr('SYMBOL_NOT_FOUND', `No symbol matching "${symbol}"`, `Use conducks_query to find valid symbol IDs`, false);
-          }
-          const best = matches.reduce((a: any, b: any) =>
-            ((b.properties?.gravity ?? 0) > (a.properties?.gravity ?? 0) ? b : a)
-          );
-          startId = best.id;
+        // Resolve short name to full node ID — the shared rule, which VERIFIES the id exists. This
+        // used to be a fourth private copy that trusted any `::` string, so an invented id reported
+        // `total_in_radius: 0` instead of refusing (todo53#P1).
+        const startId = resolveSymbolId(symbol);
+        if (!startId) {
+          return mcpErr('SYMBOL_NOT_FOUND', `No symbol matching "${symbol}"`, `Use conducks_query to find valid symbol IDs`, false);
         }
 
         // MCP9: smart token ceiling
@@ -825,7 +955,9 @@ AFTER THIS: Use conducks_explain for deeper analysis of returned symbols.`,
 WHEN TO USE: Getting a bird's-eye view of what the system does. Finding which functions are called by a specific process or API handler.
 AFTER THIS: Use conducks_trace on a specific flow's entry symbol to see its full execution path.
 
-Returns: list of flows, each with a name, entry symbol, and member count.`,
+Returns: list of flows, each with a name, entry symbol, and member count — alongside three counts that
+answer different questions: "total" is every flow in the graph, "matching" is how many passed
+min_members (the set the page was drawn from), and "shown" is how many came back.`,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -834,22 +966,37 @@ Returns: list of flows, each with a name, entry symbol, and member count.`,
     inputSchema: {
       type: "object",
       properties: {
-        min_members: { type: "number", default: 2, minimum: 1, description: "Only return flows with at least this many symbols. Default 2 (filters noise)." },
-        limit: { type: "number", default: 20, minimum: 1, maximum: 100, description: "Max flows to return." },
+        min_members: { type: "number", default: 2, minimum: FLOWS_MIN_MEMBERS_BOUNDS.min, description: "Only return flows with at least this many symbols. Default 2 (filters noise)." },
+        limit: { type: "number", default: 20, minimum: FLOWS_LIMIT_BOUNDS.min, maximum: FLOWS_LIMIT_BOUNDS.max, description: "Max flows to return." },
         path: { type: "string", description: "Optional: absolute project root path." }
       }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ min_members, limit, path: customPath }: any) => {
+      // Both bounds are published in the inputSchema above and neither was checked, so
+      // `min_members: "two"` reported `shown: 0, truncated: false` against 2,878 flows (todo53#P1).
+      const emptyFlows = await emptyVaultAnswer();
+      if (emptyFlows) return mcpOk(emptyFlows, { nodeCount: 0 });
+
+      const badParam =
+        numErr(min_members, { min: FLOWS_MIN_MEMBERS_BOUNDS.min }, 'min_members') ??
+        numErr(limit, { min: FLOWS_LIMIT_BOUNDS.min, max: FLOWS_LIMIT_BOUNDS.max }, 'limit');
+      if (badParam) return badParam;
+
       try {
         await ensureAnchor(customPath, true);
         const processes = registry.kinetic.getProcesses();
-        const minSize = Math.max(1, min_members ?? 2);
-        const cap = Math.min(100, limit ?? 20);
+        const minSize = min_members ?? 2;
+        const cap = limit ?? 20;
 
         const graph = registry.infrastructure.graphEngine.getGraph();
-        const flows = Object.entries(processes)
-          .filter(([, members]) => (members as string[]).length >= minSize)
+        // The set `shown` is drawn from — reported as `matching` below. `total` counts every flow in
+        // the graph and so answers a different question; publishing only `total` left a caller unable
+        // to tell "20 of 2,878 flows" from "20 of the 24 that matched" (ADR 0145).
+        const matched = Object.entries(processes)
+          .filter(([, members]) => (members as string[]).length >= minSize);
+
+        const flows = matched
           .sort((a, b) => (b[1] as string[]).length - (a[1] as string[]).length)
           .slice(0, cap)
           .map(([name, members]) => {
@@ -863,8 +1010,8 @@ Returns: list of flows, each with a name, entry symbol, and member count.`,
           });
 
         return mcpOk(
-          { flows, total: Object.keys(processes).length, shown: flows.length },
-          { nodeCount: flows.length, truncated: flows.length < Object.keys(processes).filter(k => (processes[k] as string[]).length >= minSize).length }
+          { flows, total: Object.keys(processes).length, matching: matched.length, shown: flows.length },
+          { nodeCount: flows.length, truncated: flows.length < matched.length }
         );
       } catch (err: any) {
         return mcpErr('FLOWS_FAILED', err.message, 'Run conducks analyze on the project first.', true);
@@ -901,11 +1048,11 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
       properties: {
         type: {
           type: "string",
-          enum: ["ORPHAN", "UNUSED_EXPORT", "STALE_IMPORT", "all"],
+          enum: [...PRUNE_TYPES],
           default: "all",
           description: "Filter by finding type. Default returns all types."
         },
-        limit: { type: "number", default: 50, minimum: 1, maximum: 200, description: "Max findings to return." },
+        limit: { type: "number", default: 50, minimum: PRUNE_LIMIT_BOUNDS.min, maximum: PRUNE_LIMIT_BOUNDS.max, description: "Max findings to return." },
         path: { type: "string", description: "Optional: absolute project root path." }
       }
     },
@@ -915,8 +1062,13 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
       // `findings: []` with `summary: {ORPHAN: 0, UNUSED_EXPORT: 0, STALE_IMPORT: 0}, total: 0` — a
       // confident clean bill of health for the whole codebase, produced by a TYPO. The agent has no
       // way to tell that from a genuinely clean project.
+      const emptyPrune = await emptyVaultAnswer();
+      if (emptyPrune) return mcpOk(emptyPrune, { nodeCount: 0 });
+
       const badType = enumErr(filterType, PRUNE_TYPES, 'type');
       if (badType) return badType;
+      const badLimit = numErr(limit, { min: PRUNE_LIMIT_BOUNDS.min, max: PRUNE_LIMIT_BOUNDS.max }, 'limit');
+      if (badLimit) return badLimit;
 
       try {
         await ensureAnchor(customPath, true);
@@ -926,17 +1078,29 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
           findings = findings.filter((f: any) => f.type === filterType);
         }
 
-        const cap = Math.min(200, limit ?? 50);
+        const cap = limit ?? 50;
         const shown = findings.slice(0, cap);
 
-        const summary = {
-          ORPHAN: findings.filter((f: any) => f.type === 'ORPHAN').length,
-          UNUSED_EXPORT: findings.filter((f: any) => f.type === 'UNUSED_EXPORT').length,
-          STALE_IMPORT: findings.filter((f: any) => f.type === 'STALE_IMPORT').length,
-        };
+        // Every type, built FROM the list. Three were hard-coded here, so a summary of 95 sat beside
+        // a total of 99 and the missing four were invisible rather than wrong-looking (todo53).
+        const summary = Object.fromEntries(
+          DEAD_CODE_TYPES.map(t => [t, findings.filter((f: any) => f.type === t).length]),
+        ) as Record<string, number>;
+
+        // Questions are not verdicts. `UNIMPORTED_MODULE` means "nothing imports this FILE", which is
+        // as consistent with "not wired yet" as with "dead" — the CLI has always kept them apart and
+        // this surface listed them beside real findings, which is the reading that gets code deleted.
+        const questions = findings.filter((f: any) => DEAD_CODE_QUESTION_TYPES.includes(f.type)).length;
 
         return mcpOk(
-          { findings: shown, summary, total: findings.length, shown: shown.length },
+          {
+            findings: shown,
+            summary,
+            total: findings.length,
+            verdicts: findings.length - questions,
+            questions,
+            shown: shown.length,
+          },
           { nodeCount: shown.length, truncated: shown.length < findings.length }
         );
       } catch (err: any) {
@@ -979,21 +1143,61 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
       type: "object",
       properties: {
         path: { type: "string", description: "Optional: the project root." },
-        layer: { type: "string", enum: ["all", "board"], description: "all = threads + constraints (session start). board = open threads only." },
+        layer: { type: "string", enum: [...DOCS_LAYERS], description: "all = threads + constraints (session start). board = open threads only." },
         recent: { type: "number", description: "How many recent decisions to list (default 4, 0 for none). Derived from ADR dates — there is no progress file." },
         raw: { type: "boolean", description: "Return the full unprojected board (every doc, every entry). Large." },
+        max_bytes: { type: "number", default: DOCS_RAW_DEFAULT_BYTES, minimum: DOCS_RAW_BYTE_BOUNDS.min, maximum: DOCS_RAW_BYTE_BOUNDS.max, description: "raw mode only: response byte budget. Entry counts are a poor proxy for size here — a docs entry is not a fixed-size row." },
+        limit: { type: "number", default: DOCS_RAW_DEFAULT_LIMIT, minimum: DOCS_RAW_LIMIT_BOUNDS.min, maximum: DOCS_RAW_LIMIT_BOUNDS.max, description: "raw mode only: max entries per list. The raw board is otherwise unbounded and overruns the response budget." },
         scope: { type: "string", description: "Monorepo only. Omit for every tree (root + each unit). 'root' = the root tree alone. A unit path ('app', 'packages/core') = that unit alone." }
       }
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ path: customPath, layer, recent, raw, scope }: any) => {
+    handler: async ({ path: customPath, layer, recent, raw, scope, limit, max_bytes }: any) => {
+      // Every one of these was read with a silent fallback: `layer: "banana"` returned "all" because
+      // the branch was `layer === "board" ? … : "all"`, `raw: "yes"` switched the FULL board on
+      // because a non-empty string is truthy, and `recent: "four"` fell back to 4 via a `typeof`
+      // check. Confirmed by diffing whole payloads, not by reading the code (todo53#P1).
+      const badParam =
+        enumErr(layer, DOCS_LAYERS, 'layer') ??
+        boolErr(raw, 'raw') ??
+        numErr(recent, { min: 0 }, 'recent') ??
+        numErr(limit, { min: DOCS_RAW_LIMIT_BOUNDS.min, max: DOCS_RAW_LIMIT_BOUNDS.max }, 'limit') ??
+        numErr(max_bytes, { min: DOCS_RAW_BYTE_BOUNDS.min, max: DOCS_RAW_BYTE_BOUNDS.max }, 'max_bytes');
+      if (badParam) return badParam;
+
       try {
         // DOCS LAYER: markdown only. No anchor, no graph, no DuckDB — this answers on a folder that
         // was never analyzed, and takes no connection for another agent to queue behind.
         const root = resolveDocsRoot(customPath);
         const depth = typeof recent === "number" ? recent : 4;
+        // `raw` returns every entry of every doc and was UNBOUNDED — 279,483 bytes on this repo, with
+        // `truncated: false` (todo54#P2). Capped per list, and `rawTruncated` records whether anything
+        // was held back so `meta.truncated` is measured rather than asserted. The projected board is
+        // left alone: it is already compact by construction.
+        const rawCap = limit ?? DOCS_RAW_DEFAULT_LIMIT;
+        let byteBudget = max_bytes ?? DOCS_RAW_DEFAULT_BYTES;
+        let rawTruncated = false;
+        const capRaw = (board: any) => {
+          const capped: any = { ...board };
+          for (const key of ['todos', 'decisions', 'other', 'lint', 'warns', 'unlinked', 'crossRefs']) {
+            const list = board[key];
+            if (!Array.isArray(list)) continue;
+            const kept: unknown[] = [];
+            for (const entry of list.slice(0, rawCap)) {
+              const size = JSON.stringify(entry)?.length ?? 0;
+              // Never cut mid-entry: an entry either fits whole or is held back and reported.
+              if (kept.length > 0 && size > byteBudget) { rawTruncated = true; break; }
+              kept.push(entry);
+              byteBudget -= size;
+            }
+            if (kept.length < list.length) rawTruncated = true;
+            capped[key] = kept;
+          }
+          return capped;
+        };
+
         const project = (board: ReturnType<typeof registry.docs.trees>[number]["board"]) => raw
-          ? board
+          ? capRaw(board)
           : registry.docs.viewOf(board, layer === "board" ? "board" : "all", depth);
 
         // Every docs tree, ALWAYS, WITH both docs checks already applied (the merged lint is what
@@ -1026,7 +1230,7 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
           const count = raw
             ? (one as any).todos.length + (one as any).decisions.length
             : ((one as any).open as unknown[]).length + ((one as any).unlinkedWork as unknown[]).length;
-          return mcpOk(one, { nodeCount: count });
+          return mcpOk(one, { nodeCount: count, truncated: rawTruncated });
         }
 
         const byTree: Record<string, unknown> = {};
@@ -1038,7 +1242,7 @@ waiting, which decisions still have unbuilt parts" without opening every doc.`,
             ? (view as any).todos.length + (view as any).decisions.length
             : ((view as any).open as unknown[]).length + ((view as any).unlinkedWork as unknown[]).length;
         }
-        return mcpOk({ monorepo: true, trees: byTree }, { nodeCount });
+        return mcpOk({ monorepo: true, trees: byTree }, { nodeCount, truncated: rawTruncated });
       } catch (err: any) {
         return mcpErr('DOCS_FAILED', err.message, 'Check the docs/ folder follows the conducks-docs grammar.', true);
       }
@@ -1067,23 +1271,47 @@ computed over the FULL bound set, only the \`functions\` list is capped. Raise \
         coverage: { type: "string", description: "Path to an istanbul coverage-final.json." },
         // MCP1: numeric bounds. 75 measured at ~23.3 KB on this repo's own 680-function baseline
         // (213 KB unbounded) — comfortably under the ~25 KB an MCP response can carry.
-        limit: { type: "number", default: 75, minimum: 1, maximum: 500, description: "Max functions to return in the `functions` list." },
+        limit: { type: "number", default: 75, minimum: COVERAGE_LIMIT_BOUNDS.min, maximum: COVERAGE_LIMIT_BOUNDS.max, description: "Max functions to return in the `functions` list." },
         path: { type: "string", description: "Optional: the project root." }
       },
       required: ["coverage"]
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
     handler: async ({ coverage, limit, path: customPath }: any) => {
+      // Declared 1..500 and never enforced: `limit: "x"` made `Math.max(1, "x")` NaN, and
+      // `slice(0, NaN)` is empty — an empty page against 752 bound functions (todo53#P1).
+      const badLimit = numErr(limit, { min: COVERAGE_LIMIT_BOUNDS.min, max: COVERAGE_LIMIT_BOUNDS.max }, 'limit');
+      if (badLimit) return badLimit;
+
       try {
         await ensureAnchor(customPath, true);
         const results = await registry.coverage.bind(coverage);
         const bound = results.filter((r: any) => r.bound);
         const full = bound.filter((r: any) => r.pct >= 99).length;
-        const dark = bound.filter((r: any) => r.pct === 0).length;
-        const cap = Math.min(500, Math.max(1, limit ?? 75));
+        const darkFunctions = bound.filter((r: any) => r.pct === 0);
+        const cap = limit ?? 75;
         const shown = bound.slice(0, cap);
+
+        // ADR 0145, applied to the surface this walk caught it on. A coverage report naming only
+        // symbols the graph has never seen used to answer `{total: 0, dark: 0}` — the same payload a
+        // perfectly covered codebase produces. The denominator is the BOUND functions: dark ones are
+        // the findings, and zero bound is `nothing-to-check`, never a pass.
+        const v = verdict(
+          bound.length,
+          darkFunctions,
+          `${results.length} function(s) in the graph were checked against the coverage report and NONE matched a file in it — the report was most likely produced from a different tree, or the graph needs \`conducks analyze\``,
+        );
+
         return mcpOk(
-          { functions: shown, summary: { total: bound.length, full, dark } },
+          {
+            ...verdictToJson(v),
+            functions: shown,
+            // Two different counts. `bindCoverage` walks the GRAPH's functions and marks each one
+            // bound or not, so `considered` is how many were offered to the report and `total` is how
+            // many the report actually covered. They differ exactly when the report and the graph
+            // disagree — the case that used to be invisible behind `{total: 0, dark: 0}`.
+            summary: { considered: results.length, total: bound.length, full, dark: darkFunctions.length },
+          },
           { nodeCount: shown.length, truncated: shown.length < bound.length }
         );
       } catch (err: any) {

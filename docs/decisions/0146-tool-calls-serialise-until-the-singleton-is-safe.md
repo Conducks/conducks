@@ -1,5 +1,6 @@
 # 0146 — tool calls serialise, until the singleton is safe to share
-Status: Accepted
+Status: Superseded by 0147
+- Superseded by: 0147
 - Builds: 0128, 0040, 0072
 - Amends: 0128
 - Date: 2026-08-08
@@ -86,3 +87,41 @@ The serialisation is a sledgehammer standing in for two narrower fixes, and it s
 - The MCP surface has produced a defect on every occasion it has been driven adversarially. The
   remaining unwalked tools and modes are carried by `todo53` rather than left as an assumption that
   the surface is fine.
+
+## Superseded by 0147 (2026-08-09)
+
+The queue is gone and the diagnosis in this ADR was wrong about WHICH race forced it. ADR 0147 carries
+the evidence, the two actual causes, and the mutations that reproduce each. What this ADR got right
+and 0147 keeps: a serialized right answer beats a parallel wrong one — the queue was the correct call
+on the evidence available, and came out only once each race was closed at its source.
+
+## Amended 2026-08-09 (todo52), superseded by the section above — kept for the record
+
+This ADR is kept Accepted: tool calls still serialise. But two of its premises were measured and are
+narrower than stated.
+
+**The persistence swap was ours.** This ADR treats `registry.initialize`'s swap as an inherent hazard
+of a shared singleton. It was not inherent — it happened on EVERY call because `releaseAnchor()`
+closes the vault at the end of one, and the bootstrapper's guard read
+`if (isCurrentlyConnected && !rootChanged && !modeChanged) return`. A disconnected handle therefore
+fell through and was replaced with nothing changed but our own close. The handle is now replaced only
+on a real root or mode change, and `rootChanged` asks the HANDLE where it points
+(`persistence.anchoredAt`) rather than asking the chronicle where the registry is anchored — the
+module-level `new SynapsePersistence(":memory:", true)` placeholder could otherwise sit under a
+correctly-anchored chronicle and be reused.
+
+**One of the two races is closed at its source.** With the swap gone and one further defect fixed —
+`initialize()` cleared `pendingLoad` at the top of every call, so a call that changed nothing clobbered
+an armed deferred load — the `SYMBOL_NOT_FOUND`-for-a-symbol-that-exists failure no longer reproduces
+with the queue removed. That was the serious half of this ADR: a wrong answer rather than an error.
+
+**What still requires the queue** is the close, not the swap: `Database was already closed`, which
+persists with `releaseAnchor()`'s close suppressed, so there are other closers. Who may close the
+shared handle and when is an ownership question todo52#P2 carries, and until it is answered a
+serialized right answer still beats a parallel wrong one.
+
+**The cost figure in this ADR is stale.** ADR 0128's probe, corrected to read tool payloads and to
+drive six DIFFERENT tools, now reports **489 ms** where this ADR recorded 2,135 ms — a ~4.4x
+improvement from removing the per-call swap alone, with the queue still in place. The probe also could
+not previously see a tool-level refusal at all (this ADR says so itself); it now can, and is
+mutation-verified against a symbol that does not exist.

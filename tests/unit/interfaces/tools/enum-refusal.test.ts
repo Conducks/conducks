@@ -50,7 +50,9 @@ describe('enumErr — a wrong value is refused, a missing one defaults', () => {
   it('refuses an unknown prune type rather than reporting zero dead code', () => {
     const err: any = enumErr('BOGUS', PRUNE_TYPES, 'type');
     expect(err).not.toBeNull();
-    expect(err.error.message).toMatch(/ORPHAN, UNUSED_EXPORT, STALE_IMPORT, all/);
+    // Asserted against PRUNE_TYPES itself, not a retyped copy of it. The copy that used to live here
+    // named three of the five types and went stale the moment the list grew (todo53).
+    expect(err.error.message).toContain(PRUNE_TYPES.join(', '));
   });
 
   it('is not retryable — guessing again will not help', () => {

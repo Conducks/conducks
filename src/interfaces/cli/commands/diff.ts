@@ -1,9 +1,5 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { execSync } from 'node:child_process';
-import path from 'node:path';
-import fs from 'node:fs';
-import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**
@@ -49,59 +45,26 @@ export class DiffCommand implements ConducksCommand {
 
     if (!useJson) console.log(`\n\x1b[1m--- 🛡️ Conducks PR Risk Engine ---\x1b[0m`);
 
-    // 1. Get changed hunks from Git.
+    // 1. Get the change set — staged, unstaged and untracked — from the SHARED engine.
     //
-    // `git diff HEAD`, not `git diff`. The bare form shows UNSTAGED changes only, so a change set
-    // that had been fully `git add`-ed reported "No structural changes detected in workspace" —
-    // while this command's own description says "staged/unstaged". The reading a user wants before
-    // committing is everything not yet in HEAD (ADR 0122).
-    let diff = "";
-    try {
-      diff = execSync('git diff -U0 HEAD', { encoding: 'utf-8' });
-    } catch (e) {
-      // Before the first commit there is no HEAD to diff against; fall back to the worktree form
-      // rather than reporting "not a git repository", which would be a wrong diagnosis.
-      try {
-        diff = execSync('git diff -U0', { encoding: 'utf-8' });
-      } catch {
-        console.error("Error: Git diff failed. Is this a git repository?");
-        process.exit(1);
-      }
+    // This was inline here, and `conducks_diff` held a second copy that received neither the
+    // ADR 0122 staged fix nor the 2026-08-08 untracked fix and reported 0 impacted symbols against a
+    // tree with 15 changed files. One implementation now, in `change-set.ts` (todo53#P1).
+    const changes = registry.analyze.changeSet(process.cwd());
+    if (changes === null) {
+      console.error("Error: Git diff failed. Is this a git repository?");
+      process.exit(1);
     }
-    const changes = this.parseDiff(diff);
-
-    // UNTRACKED files, which `git diff HEAD` cannot see — it diffs what git tracks, and a brand-new
-    // file is not tracked until it is added. ADR 0122 fixed the STAGED half of this blind spot (bare
-    // `git diff` showed unstaged only); the new-file half survived it.
-    //
-    // Measured: a new `src/payments.ts` holding a `PaymentProcessor` class with two methods produced
-    // "No structural changes detected in workspace." and exit 0 from the PR RISK ENGINE — the command
-    // whose entire job is to say what a change set puts at risk. `git add` alone changed the answer.
-    // Same root cause as the `watch` blind spot fixed in todo51: an empty `git diff` for an untracked
-    // path is not evidence that nothing changed.
-    //
-    // Whole-file, because an untracked file is entirely new — every line of it is an addition.
-    changes.push(...this.untrackedChanges());
 
     if (changes.length === 0) {
       console.log("No structural changes detected in workspace.");
       return;
     }
 
-    const impactedSymbols = new Set<string>();
-
-    // 2. Map Hunks to Symbols
-    for (const change of changes) {
-      const nodes = Array.from(registry.query.graph.getGraph().getAllNodes() as Iterable<any>)
-        .filter(n => n.properties.filePath === change.file);
-
-      for (const line of change.lines) {
-        const symbol = nodes.find(n => n.properties.range &&
-          line >= n.properties.range.start.line &&
-          line <= n.properties.range.end.line);
-        if (symbol) impactedSymbols.add(symbol.id);
-      }
-    }
+    const impactedSymbols = new Set(registry.analyze.impactedSymbols(
+      registry.query.graph.getGraph().getAllNodes() as Iterable<any>,
+      changes,
+    ));
 
     if (impactedSymbols.size === 0) {
       console.log("Changes do not impact any indexed structural symbols.");
@@ -251,70 +214,5 @@ export class DiffCommand implements ConducksCommand {
       removed.slice(0, 5).forEach(id => console.log(`  - ${label(id)}`));
     }
     console.log();
-  }
-
-  /**
-   * New files git does not track yet, as whole-file changes.
-   *
-   * `--exclude-standard` honours .gitignore, so build output and `node_modules` stay out — without it
-   * this would report every generated artifact as a structural change and the risk report would be
-   * unreadable. Failure is non-fatal: a repository where this cannot run still gets the tracked half,
-   * which is strictly what it got before this existed.
-   */
-  private untrackedChanges(): Array<{ file: string, lines: number[] }> {
-    try {
-      const out = execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8' });
-      const cwd = path.resolve(process.cwd());
-      return out.split('\n')
-        .map(p => p.trim())
-        .filter(Boolean)
-        .map(p => path.resolve(cwd, p))
-        .filter(abs => abs.startsWith(cwd + path.sep))          // same escape guard as parseDiff (S9)
-        // SOURCE only. Without this the untracked set includes the `.conducks` vault itself, editor
-        // scratch files and anything else not yet gitignored, and the risk report fills with paths
-        // the graph could never contain — measured: a clean tree reported changes purely because its
-        // own vault is untracked.
-        .filter(abs => SOURCE_EXTENSIONS.has(path.extname(abs)))
-        .filter(abs => { try { return fs.statSync(abs).isFile(); } catch { return false; } })
-        .map(abs => {
-          let lineCount = 1;
-          try { lineCount = fs.readFileSync(abs, 'utf-8').split('\n').length; } catch { /* unreadable: one line */ }
-          return { file: abs.toLowerCase(), lines: Array.from({ length: lineCount }, (_, i) => i + 1) };
-        });
-    } catch {
-      return [];
-    }
-  }
-
-  private parseDiff(diff: string): Array<{ file: string, lines: number[] }> {
-    const changes: Array<{ file: string, lines: number[] }> = [];
-    let currentFile = '';
-    const lines = diff.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('+++ b/')) {
-        const userPath = line.replace('+++ b/', '');
-        const resolved = path.resolve(process.cwd(), userPath);
-        const cwd = path.resolve(process.cwd());
-        // S9: Reject paths that escape the repository root.
-        if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
-          console.error(`Error: path '${userPath}' is outside repository root`);
-          process.exit(1);
-        }
-        currentFile = resolved.toLowerCase();
-        changes.push({ file: currentFile, lines: [] });
-      } else if (line.startsWith('@@')) {
-        const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
-        if (match && currentFile) {
-          const start = parseInt(match[1], 10);
-          const count = parseInt(match[2] || '1', 10);
-          const last = changes[changes.length - 1];
-          for (let i = 0; i < count; i++) {
-            last.lines.push(start + i);
-          }
-        }
-      }
-    }
-    return changes.filter(c => c.lines.length > 0);
   }
 }

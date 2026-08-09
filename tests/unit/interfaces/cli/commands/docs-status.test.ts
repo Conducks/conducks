@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DocsStatusCommand } from '@/interfaces/cli/commands/docs-status.js';
 import { DocsLintCommand } from '@/interfaces/cli/commands/docs-lint.js';
-import { buildBoard, buildTrees } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard, buildTrees, governedCount } from '@/lib/domain/analysis/docs-board.js';
 
 // A working `registry.docs.board` stand-in — the pre-fix `docs-status` reads it directly, so the
 // stub must behave like the real thing rather than throw, or a failure here would just be a crash,
@@ -16,6 +16,9 @@ const fakeRegistry = {
   docs: {
     board: (r?: string) => buildBoard(r as string),
     trees: (r?: string, o?: { rootOnly?: boolean }) => buildTrees(r as string, o),
+    // The real registry exposes this so the CLI need not import the domain directly; a mock missing
+    // it fails both commands at the call, not at an assertion.
+    governedCount,
   },
 } as never;
 

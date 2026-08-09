@@ -15,10 +15,42 @@ const PARAM_DEFAULTS: Record<string, number | string> = {
   minRisk: 0,
   minComplexity: 1,
   minConfidence: 0,
+  // `type_coupling` declares this and the table did not carry it, so an omitted value fell through to
+  // `''` and DuckDB answered `Could not convert string '' to INT32` from `HAVING importerCount >=
+  // CAST(? AS INTEGER)` — a raw database error surfaced to an agent as QUERY_FAILED (todo53#P1).
+  // 1 matches the permissive convention of the other floors here (minRisk 0, minComplexity 1).
+  minImporters: 1,
   maxDepth: 5,
   depth: 5,
   limit: 10,
 };
+
+/**
+ * Params with NO meaningful empty value — an identifier compared directly in the SQL.
+ *
+ * `blast_radius` called with no `symbolId` used to answer `nodeCount: 0`: `WHERE e.targetId = ''`
+ * matches nothing, so "you named no symbol" and "nothing depends on this symbol" produced the same
+ * result (todo54#P1, ADR 0145). `minImporters` was the same defect in numeric form and was noticed
+ * first only because `CAST('' AS INTEGER)` crashes rather than answering quietly.
+ *
+ * Read out of each template's SQL, NOT inferred from `PARAM_DEFAULTS`. The library uses two shapes,
+ * and only the second is required:
+ *
+ *   optional   AND (CAST(? AS TEXT) = '' OR e.type = CAST(? AS TEXT))    empty means "any"
+ *   required   WHERE e.targetId = ?                                      empty matches nothing
+ *
+ * So `edgeType`, `canonicalKind` and `namespaceId` stay out — they carry the empty guard — and so does
+ * `query`, whose empty `LIKE '%%'` matches everything and is exactly what unscoped fuzzy search relies
+ * on. A blanket "no default means required" rule would have broken `find_by_name`, which passes three
+ * empty strings on purpose.
+ */
+export const REQUIRED_PARAMS: ReadonlySet<string> = new Set([
+  'symbolId',            // find_usages, blast_radius, deep_impact, structural_siblings, full_ancestry
+  'targetId',            // find_imports          — WHERE e.targetId = ?
+  'structureId',         // symbols_in_structure  — WHERE structureId = ?
+  'unitId',              // class_health_rollup   — WHERE unitId = ?
+  'namespaceIdPattern',  // symbols_in_namespace  — WHERE namespaceId LIKE ?
+]);
 
 export class QueryService {
   /**
@@ -512,6 +544,14 @@ export class QueryService {
       if (seen.has(p)) return seen.get(p);
       const val = sanitizedUserParams.shift();
       const resolved = val === undefined || val === '' ? (PARAM_DEFAULTS[p] ?? '') : val;
+      // An identifier that resolved to nothing is a REFUSAL, not a query. Running it returns zero
+      // rows, which reads exactly like a real "nothing found" (todo54#P1).
+      if (resolved === '' && REQUIRED_PARAMS.has(p)) {
+        throw new Error(
+          `Template '${templateId}' requires the '${p}' parameter — it was not supplied. ` +
+          `Running it without one would return zero rows, which is not the same as finding nothing.`,
+        );
+      }
       seen.set(p, resolved);
       return resolved;
     });

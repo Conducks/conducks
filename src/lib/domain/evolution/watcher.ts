@@ -104,6 +104,8 @@ export class ConducksWatcher {
    * Starts the Synapse Monitor.
    */
   /** Refreshes the liveness marker while this watcher runs. Null when stopped. */
+  private readyPromise?: Promise<void>;
+  private resolveReady?: () => void;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
 
   public start(): void {
@@ -118,6 +120,18 @@ export class ConducksWatcher {
       persistent: true,
       ignoreInitial: true,
     });
+
+    // READY is a real signal and must be awaited before anyone claims the watcher is live.
+    //
+    // `start()` returns as soon as chokidar is constructed, and the CLI then printed "Live Mirror Mode
+    // active" — but with `usePolling` the poller has not yet taken its baseline snapshot. A file
+    // created in that gap is recorded as part of the initial state (`ignoreInitial: true`) and NEVER
+    // reported: the startup reconcile has already run, so nothing catches it either. Measured as a
+    // ~1-in-3 miss in `blocking-commands.test.ts`, which writes the moment the banner appears; a
+    // one-second settle made it 5-for-5, which is what pinned the window rather than the mechanism
+    // (todo55).
+    this.readyPromise = new Promise<void>(resolve => { this.resolveReady = resolve; });
+    this.watcher.on("ready", () => { this.resolveReady?.(); });
 
     this.watcher
       .on("add", (filePath: string) => { logger.debug(`watch add: ${filePath}`); this.handlePulseEvent("add", filePath); })
@@ -142,6 +156,17 @@ export class ConducksWatcher {
   /**
    * Initializes the proprietary beam engine.
    */
+  /**
+   * Resolves when the file watcher has established its baseline and is genuinely watching.
+   *
+   * Callers must await this before announcing the watcher is live, and before running the startup
+   * reconcile — a reconcile that finishes BEFORE the baseline leaves a window in which a new file is
+   * neither reported as an event nor caught by the sweep (todo55).
+   */
+  public whenReady(): Promise<void> {
+    return this.readyPromise ?? Promise.resolve();
+  }
+
   public async init(): Promise<void> {
     if (this.isInitialized) return;
     // No parser bootstrap needed: the native binding has no static init() — that was the

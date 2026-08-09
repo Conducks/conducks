@@ -20,6 +20,7 @@ import {
 } from "@/lib/domain/analysis/docs-grammar.js";
 import { resolveDocsTrees } from "@/lib/domain/analysis/service-docs.js";
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
+import { verdict, verdictToJson } from "@/contracts/verdict.js";
 
 export interface DocsBoard {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,7 +54,25 @@ export interface DocsBoard {
  * else. The tree label is the service path as conducks prints it (`app`, `packages/core`) or
  * `(root)`.
  */
+/**
+ * Byte budgets for the constraint set shipped by `layer: "all"`. Split per list so a long memory file
+ * cannot crowd out the conventions, which are RULES rather than lessons.
+ */
+const CONSTRAINT_BYTES = { conventions: 6000, memory: 9000 };
+
 const CROSS_REF = /(\(root\)|[A-Za-z][\w.\-/]*):(todo\d+(?:#P\d+)?|\d{4})\b/g;
+
+/**
+ * How many governed docs this board was built from — the denominator behind every claim it makes.
+ *
+ * `docs-status` and `docs-lint` each wrote this sum out by hand, and `conducks_docs` never wrote it
+ * at all, which is why the tool reported `grammarViolations: 0` for a directory with no `docs/`
+ * whatsoever — the identical payload a fully-closed docs tree produces (todo53#P1, ADR 0124). Three
+ * sites, one rule, and the surface that had no copy is the one that got it wrong.
+ */
+export function governedCount(board: DocsBoard): number {
+  return board.todos.length + board.decisions.length + board.other.length;
+}
 
 /**
  * The agent-facing projection: open threads, rooted at the decisions that own them, plus the
@@ -94,15 +113,36 @@ export function agentView(board: DocsBoard, layer: "all" | "board" = "all", rece
     }))
     .filter(t => t.phases.length);
 
+  // PARKED: not done, but with no open phase left — a record deferred with named reopen-triggers.
+  //
+  // `unlinkedWork` above keeps only todos with an OPEN phase, and the "`Status: todo` but every task
+  // is closed" hygiene warning deliberately exempts deferred records, so a parked todo appeared on
+  // NEITHER surface. `todo31` sat that way for weeks: `Status: todo`, three `[>]` triggers, invisible
+  // to the board that exists to stop exactly this. It is not open work and is not counted as such —
+  // it gets its own line, so the board can say the record exists and what it waits on.
+  const parked = board.todos
+    .filter(t => !/^done$/i.test(t.state || ""))
+    .filter(t => !(t.phases as PhaseLike[]).some(p => p.state !== "done" && !p.builds.length))
+    .filter(t => (t as { deferred?: number }).deferred)
+    .map(t => ({ todo: t.id, title: t.title, file: t.file, state: t.state, deferred: (t as { deferred?: number }).deferred }));
+
   const handover = board.other.find(o => o.type === "handover");
   const view: Record<string, unknown> = {
     open, unlinkedWork,
+    ...(parked.length ? { parked } : {}),
     // Derived, never authored: what shipped is already carried by dated ADRs and closed todos, so
     // `progress.md` was retired rather than parsed (ADR 0024). Depth is the caller's choice.
     recent: [...board.decisions]
       .filter(d => d.date).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, Math.max(0, recentCount))
       .map(d => `${d.date} · ADR ${d.id} — ${d.title}`),
     health: {
+      // The denominator, so `grammarViolations: 0` can never again mean "there was nothing to
+      // violate". Both CLI surfaces already said this; the tool did not (todo53#P1).
+      grammar: verdictToJson(verdict(
+        governedCount(board),
+        board.lint,
+        "this tree holds no governed docs — nothing was checked, which is not the same as clean. Create the tree with `conducks bootstrap-docs`",
+      )),
       grammarViolations: board.lint.length,
       warnings: board.warns.reduce((a, w) => a + w.errs.length, 0),
       adrsWithNoBuildLink: board.unlinked,
@@ -118,10 +158,50 @@ export function agentView(board: DocsBoard, layer: "all" | "board" = "all", rece
     const entries = (type: string, keys: string[]) =>
       (board.other.find(o => o.type === type)?.entries ?? [])
         .map((e: Record<string, string>) => `${e.name} — ${keys.map(k => e[k]).find(Boolean) ?? ""}`.trim());
+
+    const conventions = entries("conventions", ["Rule"]);
+    const memory = entries("memory", ["Gotcha"]);
+
+    // BOUNDED, and it says what it dropped.
+    //
+    // Measured on this repo before the cap: the default response was 48,966 bytes and 47,488 of them
+    // were this block — 159 memory entries at 31,087 bytes and 41 conventions at 16,286. That is twice
+    // the size of the raw board todo54 capped, on the layer that is the DEFAULT, and it grows every
+    // time a lesson is written down. `coverage` documents ~25 KB as what an MCP response carries.
+    //
+    // NEWEST first, because these files are appended to and a gotcha recorded today is likelier to bite
+    // than one from months ago. Silently dropping them is not an option — the omitted counts and the
+    // file to read are part of the payload, since a truncated rule set that does not say so is exactly
+    // the lie this codebase keeps paying for (ADR 0124).
+    const budget = { conventions: CONSTRAINT_BYTES.conventions, memory: CONSTRAINT_BYTES.memory };
+    const takeNewest = (list: string[], bytes: number) => {
+      const kept: string[] = [];
+      let used = 0;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const size = list[i].length + 4;
+        if (kept.length > 0 && used + size > bytes) break;
+        kept.unshift(list[i]);
+        used += size;
+      }
+      return kept;
+    };
+
+    const keptConventions = takeNewest(conventions, budget.conventions);
+    const keptMemory = takeNewest(memory, budget.memory);
+    const omittedConventions = conventions.length - keptConventions.length;
+    const omittedMemory = memory.length - keptMemory.length;
+
     view.constraints = {
-      conventions: entries("conventions", ["Rule"]),
-      memory: entries("memory", ["Gotcha"]),
+      conventions: keptConventions,
+      memory: keptMemory,
       note: "Rules and gotchas only. Reasons, features and architecture: open the file.",
+      ...(omittedConventions || omittedMemory ? {
+        omitted: {
+          conventions: omittedConventions,
+          memory: omittedMemory,
+          why: "the newest are kept and the rest held back to stay inside the response budget — read docs/conventions.md and docs/memory.md in full for the older entries",
+        },
+      } : {}),
     };
   }
   return view;

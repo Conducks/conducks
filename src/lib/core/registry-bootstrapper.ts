@@ -243,8 +243,6 @@ export class RegistryBootstrapper {
   ): Promise<void> {
     traceMemory('bootstrapper entry (modules loaded)');
     const { readOnly, root, lazy } = options;
-    // A previous root's deferred load must never survive into this one.
-    this.pendingLoad = null;
     const { graph, persistence, ignoreManager, federation, updatePersistence, updateIgnoreManager } = context;
 
     if (!this.isGrammarInitialized) {
@@ -284,12 +282,50 @@ export class RegistryBootstrapper {
 
     logger.boot(`🛡️ [Conducks Bootstrapper] Anchoring structural synapse at: ${effectiveRoot}`);
     const isCurrentlyConnected = persistence.isConnected();
-    const rootChanged = chronicle.getProjectDir() !== effectiveRoot;
+    // Ask the HANDLE where it points, not the chronicle. `chronicle.getProjectDir()` says where the
+    // registry is anchored, which is not the same question: the module-level placeholder is
+    // `new SynapsePersistence(":memory:", true)`, so a `:memory:` handle under a chronicle already
+    // anchored to a real repo answered "root unchanged" and was reused — measured as
+    // `[No Vault] :memory: has no .conducks/` from a tool call against an analyzed repo (todo52).
+    // The old `!isCurrentlyConnected` term hid this: the placeholder is disconnected, so it was
+    // replaced for the wrong reason and the wrong question was never noticed.
+    const handleRoot = (persistence as any).anchoredAt;
+    const rootChanged = chronicle.getProjectDir() !== effectiveRoot
+      || (typeof handleRoot === 'string' && handleRoot !== effectiveRoot);
     const modeChanged = (persistence as any).readOnly !== readOnly;
 
-    if (isCurrentlyConnected && !rootChanged && !modeChanged) return;
+    // Same root, same mode: there is NOTHING to do, connected or not.
+    //
+    // `isCurrentlyConnected` used to be part of this test, which sent every post-`releaseAnchor()`
+    // call down the re-init path. That did two harmful things: it swapped the handle (the race
+    // ADR 0146 serialised against), and it fell through to the tail, which calls
+    // `graph.getGraph().markDeferred()` — re-deferring an ALREADY MATERIALISED graph on every single
+    // call and re-arming `pendingLoad`. After the first boot, `!rootChanged && !modeChanged` can only
+    // mean "already set up", because a fresh process starts on the `:memory:` placeholder and so
+    // always sees `rootChanged` once (todo52).
+    if (!rootChanged && !modeChanged) return;
 
-    if (rootChanged || modeChanged || !isCurrentlyConnected) {
+    // A CLOSED handle is not a reason to build a new one — only a changed root or mode is.
+    //
+    // `releaseAnchor()` closes the vault at the end of every tool call, deliberately, so the user can
+    // run CLI commands against the same DuckDB file. With `!isCurrentlyConnected` in this condition,
+    // the NEXT call found a disconnected handle and swapped it: `updatePersistence(new
+    // SynapsePersistence(...))` on EVERY call, in the steady state, with nothing changed but our own
+    // close. Measured in `persistence-handle-owner.test.ts` — one swap per call, zero from the anchor.
+    //
+    // That swap is precisely the hazard ADR 0146 serialised every tool call to avoid ("no ref-count
+    // makes an object swap atomic"), so the queue was paying ~8x to defend against a race this line
+    // was manufacturing. `anchor.ts` already stated the right policy — "Disconnection is NOT a re-init
+    // trigger — the lazy connection reopens on next query" — and `SynapsePersistence.query()` does
+    // reopen via `ensureVaultOpen()`. The bootstrapper simply disagreed with it (todo52).
+    if (rootChanged || modeChanged) {
+      // A previous root's deferred load must never survive into this one. Nulled HERE rather than at
+      // the top of this method: the top runs on every call, and a call that changes nothing used to
+      // clobber an armed `pendingLoad` and then re-arm it further down. Once the re-anchor path stops
+      // running for an unchanged anchor, that re-arm is gone — so clearing it unconditionally would
+      // leave the graph deferred forever and every tool would answer SYMBOL_NOT_FOUND against an
+      // empty graph. Measured exactly that way while removing the queue (todo52).
+      this.pendingLoad = null;
       if (isCurrentlyConnected) await persistence.close();
       
       if (rootChanged) {

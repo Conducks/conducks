@@ -40,11 +40,13 @@ export class DocsStatusCommand implements ConducksCommand {
       return;
     }
 
-    for (const { label, board } of trees) this.renderTree(label, trees.length > 1, board, showAll);
+    for (const { label, board } of trees) this.renderTree(label, trees.length > 1, board, showAll, registry.docs.governedCount(board));
   }
 
   /** Renders ONE docs tree. `labelled` is false for a single-repo project, where a header is noise. */
-  private renderTree(label: string, labelled: boolean, board: ReturnType<Registry["docs"]["board"]>, showAll: boolean): void {
+  // `governed` is passed in rather than computed here: the count lives in the domain and
+  // `cli -> domain` is a forbidden static import, enforced by the boundary test.
+  private renderTree(label: string, labelled: boolean, board: ReturnType<Registry["docs"]["board"]>, showAll: boolean, governed: number): void {
     console.log(chalk.bold(labelled ? `\n--- 📄 Conducks Docs Status — ${label} ---\n` : "\n--- 📄 Conducks Docs Status ---\n"));
 
     // `3/4 · 1 deferred` (ADR 0034) — deferred already left the `p.done/p.total` denominator, so
@@ -97,6 +99,25 @@ export class DocsStatusCommand implements ConducksCommand {
 
     if (!owing.length && !unlinked.length) console.log(chalk.green("  Nothing open. Every phase is finished.\n"));
 
+    // PARKED records, stated even when nothing is open. A todo deferred with reopen-triggers has no
+    // open phase, so the loop above skips it and "Nothing open" printed over the top of it — which is
+    // how `todo31` stayed invisible for weeks while claiming `Status: todo` (todo31, 2026-08-09).
+    const parked = board.todos
+      .filter(t => !/^done$/i.test(String(t.state || "")))
+      .filter(t => !t.phases.some((p: { state: string; builds: unknown[] }) => p.state !== "done" && !p.builds.length))
+      .filter(t => t.deferred);
+    if (parked.length) {
+      // The STATUS is printed, not assumed: `todo16` is `blocked` (waiting on a command only Said can
+      // run) and `todo31` is `todo` (deferred with triggers). Both were equally invisible; calling
+      // them both "parked" would trade one wrong impression for another.
+      console.log(chalk.dim(`  Not open, not finished — no phase left to do, and not in completed/`));
+      for (const t of parked) {
+        const state = String(t.state || "todo").toLowerCase();
+        console.log(`  ${chalk.bold(t.id)}  ${String(t.title).replace(/^\S+\s*—\s*/, "").slice(0, 40).padEnd(41)} ${chalk.dim(state.padEnd(8))} ${chalk.dim(t.deferred + " deferred")}`);
+      }
+      console.log();
+    }
+
     if (showAll) {
       console.log(chalk.bold("  All decisions"));
       for (const d of [...board.decisions].sort((a, b) => (a.id > b.id ? 1 : -1))) {
@@ -143,7 +164,6 @@ export class DocsStatusCommand implements ConducksCommand {
     } else {
       // "clean ✓" over an empty tree said a project with no docs at all had healthy ones. The
       // denominator is what separates the two, and this line had none (ADR 0124).
-      const governed = board.todos.length + board.decisions.length + board.other.length;
       console.log(governed === 0
         ? chalk.yellow("\n  grammar: nothing to check — this tree holds no governed docs.")
         : chalk.dim(`\n  grammar: clean ✓ (${governed} governed docs)`));

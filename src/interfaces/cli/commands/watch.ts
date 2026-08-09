@@ -79,12 +79,23 @@ export class WatchCommand implements ConducksCommand {
     console.log('[Watch] Step 5: calling watcher.start()...');
     watcher.start();
 
+    // WAIT for the watcher to actually be watching before doing anything else.
+    //
+    // `start()` returns as soon as chokidar is constructed; with polling the baseline snapshot lands
+    // later. Without this await, the reconcile below ran and the banner printed while the poller was
+    // still blind, so a file created in that gap was reported by NOTHING — not as an event
+    // (`ignoreInitial: true` folded it into the initial state) and not by the sweep (which had already
+    // finished). Measured at ~1 miss in 3 in `blocking-commands.test.ts`, which writes the instant the
+    // banner appears (todo55).
+    await watcher.whenReady();
+
     // Catch up on everything edited while nothing was watching (ADR 0036, todo21#P3).
     //
     // chokidar starts with `ignoreInitial: true`, so before this the watcher saw events from the
     // moment it started and NOTHING before — a session begun after an editing spree was silently
-    // behind until the next full `analyze`. AFTER start(), deliberately: a reconcile that ran first
-    // would leave a window where a file edited during the catch-up produced no event at all.
+    // behind until the next full `analyze`. AFTER start() AND after ready, deliberately: reconciling
+    // first would leave the same window from the other side, where a file edited during the catch-up
+    // produced no event at all.
     const discovered = await registry.infrastructure.chronicle.discoverFiles();
     const caught = await watcher.reconcileOnStart(discovered);
     if (caught.changed + caught.added > 0) {

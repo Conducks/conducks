@@ -132,6 +132,14 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
       return cached.response;
     }
 
+    // Take a REF-COUNTED hold, rather than closing unconditionally below.
+    //
+    // This `finally` used to call `persistence.close()` outright, ignoring the ref-count that
+    // `anchor.ts` maintains — so with two calls in flight, whichever finished first hung up the shared
+    // handle and the other returned `Database was already closed`. It is the third closer in a single
+    // tool call (this one, `hypertoon`'s wrapper, and the handler's own `ensureAnchor` pair), and the
+    // only one that was not counted (todo52#P2).
+    registry.infrastructure.acquireVault();
     try {
       // Conducks Lazy Resonance: Initialize only for the duration of the request
       const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
@@ -152,8 +160,8 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
     } catch (err) {
       return errorResponse(errorMessage(err));
     } finally {
-      // Release the structural lock to allow parallel analysis
-      await registry.infrastructure.persistence.close();
+      // Closes only when nothing else is reading — same policy every other tool-path closer follows.
+      await registry.infrastructure.releaseVault();
     }
   }
 

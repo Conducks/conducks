@@ -35,17 +35,51 @@ const send = (id, method, params) => new Promise(res => {
 await send(1, 'initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'probe', version: '1' } });
 srv.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
 
+// SIX DIFFERENT TOOLS, not six copies of one call.
+//
+// The original probe issued six identical `conducks_explain` requests, so it exercised a single code
+// path — and the failures found on 2026-08-08 needed different tools in flight together (todo52#P3).
+// `IntraLinker` is a symbol this repo genuinely holds, so any "not found" here is a real defect.
+const SYMBOL = process.env.PROBE_SYMBOL || 'IntraLinker';
+const CALLS = [
+  { name: 'conducks_explain', arguments: { symbol: SYMBOL } },
+  { name: 'conducks_impact',  arguments: { symbol: SYMBOL } },
+  { name: 'conducks_trace',   arguments: { symbol: SYMBOL } },
+  { name: 'conducks_context', arguments: { symbol: SYMBOL } },
+  { name: 'conducks_status',  arguments: {} },
+  { name: 'conducks_query',   arguments: { q: SYMBOL } },
+];
+
 const t0 = Date.now();
-const results = await Promise.all([2,3,4,5,6,7].map(id =>
-  send(id, 'tools/call', { name: 'conducks_explain', arguments: { symbol: 'IntraLinker' } })));
+const results = await Promise.all(CALLS.map((c, i) => send(i + 2, 'tools/call', c)));
 const ms = Date.now() - t0;
 
+/**
+ * A tool-level refusal is a FAILURE, and the old test could not see one.
+ *
+ * `r.error || r.result?.isError` catches transport failures only. `mcpErr` returns `{error: {...}}`
+ * INSIDE the tool payload and sets neither, so a false `SYMBOL_NOT_FOUND` — precisely the wrong
+ * answer this probe exists to detect — was counted as `ok`. The probe could not judge the fix it was
+ * meant to measure (ADR 0146's own "why the probe did not catch this", todo52#P3).
+ */
+const failureOf = (r) => {
+  if (r.error) return JSON.stringify(r.error);
+  if (r.result?.isError) return JSON.stringify(r.result);
+  const text = r.result?.content?.map(c => c.text).filter(Boolean).join('\n') ?? '';
+  let payload;
+  try { payload = JSON.parse(text); } catch { return null; }   // not JSON: nothing to judge
+  if (payload?.error) return `${payload.error.code}: ${payload.error.message}`;
+  return null;
+};
+
 let ok = 0, err = 0;
-for (const r of results) {
-  const isErr = r.error || r.result?.isError;
-  if (isErr) { err++; console.log('  FAILED:', JSON.stringify(r.error ?? r.result?.content?.[0]?.text ?? '').slice(0, 120)); }
+results.forEach((r, i) => {
+  const failure = failureOf(r);
+  if (failure) { err++; console.log(`  FAILED ${CALLS[i].name}:`, failure.slice(0, 140)); }
   else ok++;
-}
-console.log(`  6 concurrent calls on ONE server: ok=${ok} failed=${err} in ${ms} ms`);
+});
+console.log(`  ${CALLS.length} concurrent calls on ONE server: ok=${ok} failed=${err} in ${ms} ms`);
+console.log(`  baseline: 274 ms concurrent (ADR 0128) / 2,135 ms serialised (ADR 0146)`);
+if (err > 0) process.exitCode = 1;
 srv.kill();
 process.exit(0);

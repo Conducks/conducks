@@ -70,9 +70,15 @@ constraint has to be visible to the compiler, not to a regex.
 - `advise --json` is a BREAKING shape change: `{status, checked, found}` rather than a bare array.
   Deliberate — the bare array carried the ambiguity this ADR exists to remove. Its one consumer
   (`phase1-commands.test.ts`) is updated.
-- Remaining report surfaces are not yet migrated: `audit`, `prune`, `coverage`, `diff`,
-  `supply-chain`, `arch`, `context`. They are stated as UNMIGRATED rather than left to be assumed
-  done — this ADR would otherwise commit the error it describes.
+- Remaining report surfaces are not yet migrated: `audit`, `prune`, `diff`, `supply-chain`, `arch`,
+  `context`. They are stated as UNMIGRATED rather than left to be assumed done — this ADR would
+  otherwise commit the error it describes.
+- `coverage` (MCP) was on that list and is now migrated, on 2026-08-09 during todo53's walk. It earned
+  the fix by producing exactly the defect predicted here: a coverage report matching nothing in the
+  graph answered `{functions: [], summary: {total: 0, full: 0, dark: 0}}` — byte-identical to what a
+  perfectly covered codebase returns. It now answers `status: nothing-to-check` with `why` naming the
+  927 graph functions that were checked and matched none. This entry is edited rather than appended to
+  because a list of what is still owed is only useful if it is current.
 - Two test rules stand alongside the type, since a type cannot reach the verification half: a new
   check must be seen RED before its fix, and a test must never re-implement the thing it tests
   (export the real function and call it).
