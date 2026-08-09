@@ -52,13 +52,32 @@ misses `electron/main/index.ts:1341`, again behind `await import()`. Recall matt
 
 ## Phase 1 — resolve the dynamic form
 
-- [ ] Teach the linker `const { a, b } = await import('./x.js')` and `import('./x.js').then(({a}) => …)`.
-      The specifier is a literal in every one of sofie's 25 sites, so this does not need to solve the
-      general computed-specifier case to be worth doing.
-- [ ] A computed specifier (`await import(someVar)`) cannot be resolved statically. Do NOT guess — record
-      it as unresolved so it lands in the dangling count rather than silently making a symbol look dead.
-- [ ] Re-measure on sofie: the nine findings above must drop out, and `loadKernelPrompt` must report
-      three upstream callers.
+- [x] The SCM query for `const { a } = await import('./x.js')` ALREADY existed and worked — it mints a
+      module-level binding and an ALIASES edge. The break was one layer down: a dynamic import is
+      normally written INSIDE a function, so the destructured name is also a function-scoped local, and
+      the CALL resolves to that local while the ALIASES edge hangs off a module-level node nothing
+      points at. Two nodes for one fact, never meeting. Worse, that module-level node is never
+      materialised at all — the ALIASES edge sits with a DANGLING SOURCE, which is why a first fix that
+      looked the source up with `getNode` never fired on the case it was written for. IntraLinker now
+      derives the binding from the edge's own id (`<file>::<name>`) and rebinds a same-file, same-name
+      local to the aliased definition. Pinned by
+      `tests/unit/core/graph/dynamic-import-scoped-alias.test.ts`, including two controls that must NOT
+      rebind (no same-named binding; a same-named local in another file).
+- [x] A computed specifier (`await import(someVar)`) is still not resolved and still must not be
+      guessed at. None of sofie's 25 sites uses one — every specifier is a literal.
+- [x] RE-MEASURED, and the answer corrects this todo's own diagnosis. Two of the nine dropped out
+      (`LinuxAdapter`, `MacOSAdapter`); seven did not, and they are NOT a dynamic-import problem at all:
+      every one is imported by `electron/main/index.ts` with a specifier written against the BUILT
+      layout. `../engine/executor/prompt-loader.js` from `electron/main/` resolves to
+      `electron/engine/...`, which does not exist — the real file is `src/engine/...`, and the path only
+      works after `tsc` emits both under `dist/` as siblings (`rootDir: ./src`, `outDir: ./dist`).
+      No source-level resolver can follow that without modelling the build. Precision on sofie is now
+      171 findings with 7 known-wrong from this separate cause.
+- [ ] DECIDE what to do about build-layout specifiers, which is a different problem from this todo's:
+      read `tsconfig` `rootDir`/`outDir`/`paths` and map the specifier back to source, or record the
+      unresolvable specifier as dangling so it inflates the dangling count instead of silently making
+      symbols look dead. ADR 0070's rule points at the second: refuse to fabricate a target, but do not
+      let the refusal read as evidence of death.
 
 ## Phase 2 — make the measurement repeatable
 

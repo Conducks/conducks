@@ -2035,3 +2035,29 @@ by construction.
   benchmark subjects existed the whole time and had never been driven at the MCP surface. Recall
   matters more in `impact` than precision does in `prune`: a missing caller means "what breaks if I
   change this" omits something that breaks.
+
+## The dynamic-import query worked; the CALL landed on a function-scoped local (todo58)
+- Gotcha: `const { x } = await import('./y.js')` had a working SCM query all along — it mints a
+  module-level binding and an ALIASES edge. But a dynamic import is normally written INSIDE a function,
+  so the destructured name is ALSO a function-scoped local, and the call resolves to THAT. Two nodes
+  for one fact, never meeting: the alias hangs off a node nothing calls, the call lands on a local that
+  defines nothing, and the real definition ends up with zero callers.
+- Why: the module-level binding is never materialised — the ALIASES edge sits with a DANGLING SOURCE.
+  A first fix looked that source up with `getNode` and therefore never fired on the exact case it was
+  written for, while its unit test passed on a fixture where the node existed. The end-to-end repro is
+  what caught it; the fixture agreed with the code instead of with reality.
+- Applies: IntraLinker derives the binding from the ALIASES edge's own id (`<file>::<name>`) and
+  rebinds a same-file, same-name local to the aliased definition. When a fixture and a live repro
+  disagree, the repro is right — build both.
+
+## A specifier can be written against the BUILT layout, not the source tree (todo58)
+- Gotcha: after fixing the dynamic-import rebind, 7 of sofie's 9 false positives remained — and they
+  were never a dynamic-import problem. `electron/main/index.ts` imports
+  `'../engine/executor/prompt-loader.js'`, which in the SOURCE tree resolves to `electron/engine/...`
+  and does not exist. The real file is `src/engine/...`; the path only works after `tsc` emits both
+  under `dist/` as siblings (`rootDir: ./src`, `outDir: ./dist`).
+- Why: a static resolver reading source cannot follow a path that is only true post-build, and the
+  failure is silent — the symbol simply looks unreferenced. Fixing one cause revealed the second was
+  wearing its clothes; the original todo blamed dynamic imports for all nine.
+- Applies: an unresolvable specifier should inflate the DANGLING count, not quietly make a symbol look
+  dead — ADR 0070 says refuse to fabricate a target, and this is the other half of that rule.

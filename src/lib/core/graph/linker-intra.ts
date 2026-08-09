@@ -662,6 +662,61 @@ export class IntraLinker {
       }
     }
 
+    // ── 3b. A dynamic import inside a function: the call landed on the LOCAL ───
+    //
+    // `const { x } = await import('./y.js')` mints a module-level binding with an ALIASES edge (the
+    // SCM query has done this since ADR 0071's family). But a dynamic import is normally written
+    // INSIDE a function, so the destructured name is ALSO a function-scoped local — and the call
+    // resolves to that. Two nodes for one fact: the alias hangs off a node nothing calls, the call
+    // lands on a local that defines nothing, and the real definition ends up with no callers at all.
+    //
+    // Measured on the sofie subject (todo58): 9 of 172 `prune` findings wrong by this one mechanism,
+    // and `impact` returned two of three real callers for `loadKernelPrompt`.
+    //
+    // The rebind is a READ, not a guess. The local and the binding sit in the SAME FILE and carry the
+    // SAME bare name, and the binding states outright what it aliases. A local with no same-named
+    // binding in its file is left exactly where it is — nothing declares what it refers to.
+    // Built from every ALIASES edge, INCLUDING ones whose source node no longer exists.
+    //
+    // Measured on the repro: the binding `main.ts::readroutingprompt` is never materialised as a
+    // node — only the function-scoped ATOM is — so the ALIASES edge sits there with a dangling
+    // SOURCE. A first version of this looked the source up with `getNode` and therefore never fired
+    // on the very case it was written for. The id carries what is needed: it is `<file>::<name>`.
+    const aliasTargets = new Map<string, string>();
+    for (const e of graph.getAllEdges()) {
+      if (e.type !== 'ALIASES' || !graph.hasNode(e.targetId)) continue;
+      const id = String(e.sourceId).toLowerCase();
+      const sep = id.lastIndexOf('::');
+      if (sep === -1) continue;
+      const file = id.slice(0, sep);
+      const name = id.slice(sep + 2);
+      if (name.includes('.')) continue;              // already scoped: not a module-level binding
+      if (!aliasTargets.has(`${file}::${name}`)) aliasTargets.set(`${file}::${name}`, e.targetId);
+    }
+
+    if (aliasTargets.size > 0) {
+      const bindingByFileAndName = aliasTargets;
+
+      for (const edge of graph.getAllEdges()) {
+        if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type) || edge.type === 'ALIASES') continue;
+        const local = graph.getNode(edge.targetId);
+        // Only a LOCAL — a scoped member of an enclosing symbol, which is the shape a destructure
+        // inside a function produces. A module-level node is already the binding itself.
+        if (!local || String(local.properties?.canonicalKind) !== 'ATOM') continue;
+        const id = String(local.id);
+        const sep = id.lastIndexOf('::');
+        if (sep === -1 || id.indexOf('.', sep) === -1) continue;
+
+        const file = (local.properties?.filePath as string | undefined)?.toLowerCase();
+        const name = (local.properties?.name as string | undefined)?.toLowerCase();
+        if (!file || !name) continue;
+        const definition = bindingByFileAndName.get(`${file}::${name}`);
+        if (!definition || definition === edge.targetId) continue;
+        graph.rebindEdgeTarget(edge, definition);
+        resolved.push({ id: edge.id, newTargetId: definition });
+      }
+    }
+
     // ── 4. Follow ALIASES chains past the first hop ──────────────────────────
     for (const { id, newTargetId } of this.collapseAliasChains(graph)) {
       resolved.push({ id, newTargetId });
