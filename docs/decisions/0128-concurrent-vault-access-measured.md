@@ -3,6 +3,7 @@
 Status: Accepted
 - Date: 2026-08-03
 - Builds: 0040
+- Amended by: 0146 (the measurement holds for non-pipelined calls; PIPELINED calls raced the shared registry and returned wrong answers, so tool calls now serialise — at ~8x the cost recorded here)
 - Enforced by: tools/mcp-parallel.mjs (six tool calls on one shared MCP server) — a probe rather than a suite test, because it asserts a performance property that a CI machine cannot hold steady
 
 ## Context

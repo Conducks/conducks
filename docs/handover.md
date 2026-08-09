@@ -1,65 +1,87 @@
-# Handover — 2026-08-07
+# Handover — 2026-08-08
 Status: current
 
 ## Where it stands
-Gates fully green: **1,598 tests / 199 suites**, typecheck 0, `guard` clean, `docs-lint` 182,
-`visuals-lint` clean (59 anchors, 22 pages, 58 review stamps), `audit` green. Vault on its own
-source: 6,144 nodes, 22,469 edges. One branch, `main`, local == origin — the 16-branch backlog was
-merged and deleted, remote included.
+Gates green: **1,670 tests / 213 suites**, `cli:smoke` 28/28, typecheck 0, `guard` clean (risk 0.022),
+`docs-lint` 178, `visuals-lint` clean (57 anchors, 22 pages, 56 review stamps). One branch, `main`.
+All three frozen subjects `unchanged` vs baseline.
 
-## The board is NOT empty — and that is the point
-todo48#P4 (layer-write activation), todo49 (a repository's first analyze builds a thinner graph than
-its second) and todo50 (the CLI verification walk) are open. The board WAS empty on 2026-08-06; a day
-of running the commands rather than reading them refilled it, which is the honest signal.
-Every todo through 47 is closed and in `completed/`. todo09's "blocked: offline" header was STALE —
-the vuln-surface task was built 2026-08-01 and the blocker found false the same day, but only the
-task line was updated and the header sat wrong for five days. Re-proven live and closed. todo31
-stays deliberately parked: three reopen-triggers as deferred-with-condition.
+## The board has three open items, and that is honest
+`todo16` (npm publish — Said's command to run), `todo52` (give the persistence handle an owner so tool
+calls can overlap again) and `todo53` (finish walking the MCP surface). `todo31` stays deliberately
+parked with its reopen-triggers. Everything through `todo51` is closed and in `completed/`.
 
-## 2026-08-07 — the CLI walk, and what it says about "done"
-Three commands were verified against a truth (`status`, `list`/`query`, `analyze`) and produced
-THIRTEEN defects, every one of which ran without crashing beforehand. 36 of 39 invocations still run
-clean, and that bar is now known to prove almost nothing. State verified/unverified counts together;
-"the CLI works" is not yet a claim anyone can make (todo50).
+`todo48`, `todo49` and `todo50` closed on 2026-08-08; `todo51` with them.
 
-The defects worth carrying forward, all now in `memory.md` or a module note: a parse-time `isTest`
-flag that does not survive the vault (so a filter written against it is a no-op — five copies of that
-predicate existed), git quoting non-ASCII paths out of the graph entirely, a scoped pulse advancing
-the global freshness clock and consuming every out-of-scope change, and a first-ever analyze writing
-6 of 63 handover edges.
+## 2026-08-08 — the agent-facing surface, and what it cost
+The CLI walk had been the whole story. Pointing the same method at the MCP surface — driving tools the
+way an agent does rather than reading them — produced **eight defects in eight attempts**. Every one of
+them returned a payload beforehand, which is the bar that keeps proving worthless.
 
-Two of the checks written for those fixes were VACUOUS when mutated (CONDUCKS-41). The mutation
-runner is `npm run cli:mutate` and should be run against any new check.
+The two that matter most, because both produce WRONG ANSWERS rather than errors:
+- **Pipelined calls raced the shared registry.** `ensureGraphLoaded` cleared `pendingLoad` before
+  awaiting the load, so a second caller walked an empty graph and reported `SYMBOL_NOT_FOUND` for
+  symbols that exist. It did not throw — it answered. ADR 0146.
+- **`conducks_prune` with an unknown `type`** returned `{ORPHAN: 0, UNUSED_EXPORT: 0, STALE_IMPORT: 0,
+  total: 0}` — a clean bill of health for the whole codebase, from a typo.
 
-## What the earlier stretch built (read the ADRs, they carry the reasoning)
-- **The visuals pipeline** (ADR 0138–0142): anchors checked against the working tree; drift proven
-  by re-running the repo's DECLARED generator (`conducks.json` → `visuals.generate`) with a restore
-  contract; module notes moved INTO the pipeline (`docs/visuals/modules/<path>.md` is SOURCE,
-  `docs/modules/` is gone from the standard); review stamps hash the exact cited span so "the code
-  under this claim changed" flags a short precise re-read list; the stamp's meaning is protected
-  (per-page `--stamp <page>`, committed store, resolved-span keys, structured `Provenance:` marker).
-- **conducks arch** finished ADR 0134's program: doors, composition root, layer direction,
-  per-service monorepo verdicts, and cluster SHAPE (fan-in/out, hub share, density).
-- **Adoption is one command**: `conducks setup` installs skills, MCP, registry, ignore file AND the
-  pre-commit gates (`install-hooks`, todo46); skills re-sync on every build (postbuild), so the
-  installed copy can never lag the source.
-- **trace/context tell dependency from co-location** (todo38): a step ENTERED by MEMBER_OF is never
-  reported, but the walk still crosses containers so unit-scoped imports keep working; `context`
-  now opens with the symbol's callers and their call-site lines.
-- **The id re-case was decided AGAINST by measurement** (todo32): 38% of ids would change to fix 2
-  live collisions whose damage was already fixed by value-wins. Recorded in the closed todo.
+Also fixed: `watch` was blind to files created after it started (`git diff HEAD` prints nothing for an
+untracked path — todo51), `diff` had the SAME blind spot in the PR risk engine, `status` reported an
+empty vault as `READY`/`SYNCHRONIZED` (`status: 'ready'` was a string LITERAL in both status functions),
+the MCP payload dropped that verdict entirely, and `conducks_rename` told the agent to run
+`conducks_analyze`, a tool that does not exist.
+
+## The recurring class, now enforced rather than written down
+17 of 132 memory entries were ONE defect: nothing examined reported as a negative finding. ADR 0124
+stated the rule in prose and it was violated eight more times, because a principle cannot bind dozens
+of independent render sites and a grep cannot tell a lying branch from an honest one.
+
+ADR 0145 moves it to the compiler. `Verdict<T>` in `contracts/verdict.ts`: `clean` cannot be
+constructed without `examined`, `nothing-to-check` is its own variant, and `renderVerdict` switches
+with no default — adding a fourth variant fails the build (verified by adding one, TS2366).
+**Migrated: `advise` only.** The others turned out not to need it — their empty case was already a loud
+refusal, now translated at the single CLI error boundary instead of leaking the internal guard.
+
+## Known cost, recorded rather than silent
+Serialising tool calls (ADR 0146) made ADR 0128's own probe go **274 ms → 2,135 ms, ~8×**, on six
+concurrent calls. Accepted because the alternative is a confidently wrong answer, and carried by
+`todo52` so it is not mistaken for the end state. The graph-load fix stands on its own; only the
+persistence-handle ownership still needs the queue.
 
 ## Traps for the next session
 - Frozen benchmark subjects (`test-projects/{scraper,orchestrator,sofie}`) take NO commits, ever.
-  `tools/benchmark/health.mjs --compare` is the drift gate; analyze always `--force`.
+  `tools/benchmark/health.mjs --compare` is the drift gate; analyze always `--force`. `--cold` now
+  exists and measures the FIRST analyze — the default baseline describes the second.
+- **A check written after its fix must be seen RED first** (`npm run cli:mutate`). Every fix this
+  session was mutation-verified, and two earlier checks were vacuous when mutated.
+- **A test must never re-implement what it tests.** The SQL guard's multi-statement hole survived in
+  both the guard and its replica. Export the real function and call it — `sqlGuardReason`, `enumErr`.
+- **A mocked handler has no shared singleton to corrupt**, which is why every unit test passed while
+  pipelined calls were returning wrong answers. Concurrency needs the real server over stdio.
+- `tools/mcp-parallel.mjs` counts a call `ok` when neither `r.error` nor `result.isError` is set —
+  `mcpErr` sets NEITHER, so it cannot see a tool-level wrong answer. Do not read it as correctness.
 - The stamp gate WILL flag your edits: touching a file cited by a module note prints a re-read flag.
-  That is it working — re-read the claim, then `visuals-lint --stamp <page>`. Do not bulk-stamp.
-- sofie (the live repo, `assistant/sofie`) migrated to the visuals-module pipeline and its `claude`
-  branch sits ~94 commits ahead of origin, unpushed by decision — Said's call, not an oversight.
-- `.conducks/note-reviews.json` is COMMITTED (the one carve-out from the ignored vault dir). Treat
-  a PR that re-stamps many claims as an assertion someone actually re-read them.
+  That is it working — re-read, then `visuals-lint --stamp <page>`. Do not bulk-stamp. Twice this
+  session the flagged anchor had genuinely drifted (one by ~57 lines, hidden until an unrelated edit
+  changed the file's hash).
+- `blocking-commands.test.ts` spawns real servers and polls; it flakes under full-suite CPU load and
+  passes isolated. If it recurs, move it to a serial jest project rather than widening the window again.
+- sofie (`assistant/sofie`) sits ~96 commits ahead of origin, unpushed by decision — Said's call.
+- `.conducks/note-reviews.json` is COMMITTED (the one carve-out from the ignored vault dir).
+
+## What the earlier stretch built (read the ADRs, they carry the reasoning)
+- **The visuals pipeline** (ADR 0138–0142): anchors checked against the working tree; drift proven by
+  re-running the repo's DECLARED generator with a restore contract; module notes are SOURCE at
+  `docs/visuals/modules/<path>.md`; review stamps hash the exact cited span.
+- **conducks arch** finished ADR 0134's program: doors, composition root, layer direction, per-service
+  monorepo verdicts, cluster shape.
+- **Adoption is one command**: `conducks setup` installs skills, MCP, registry, ignore file and the
+  pre-commit gates; skills re-sync on every build.
+- **trace/context tell dependency from co-location** (todo38); `context` opens with the symbol's
+  callers and their call-site lines.
+- **The id re-case was decided AGAINST by measurement** (todo32).
 
 ## If you pick something up
-The natural next pieces of work, none urgent: the deferred canvas→note link map in sofie (a curated
-mapping of 25 blocks to the notes they cover), raising the DERIVED-header warn to an error once every
-adopter's templates carry it, and the sofie branch push whenever Said wants it.
+`todo53` is the highest-value: the MCP surface has yielded a defect every single time it has been
+driven, and roughly half of it is still unwalked. `todo52` buys back the 8×. The deferred canvas→note
+link map in sofie and the DERIVED-header warn→error raise remain, neither urgent.
