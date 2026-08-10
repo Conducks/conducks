@@ -2076,3 +2076,18 @@ by construction.
   just found is yours before writing it up; the answer changes the fix. Save a cold baseline so the
   gap is a tracked number rather than an assertion, and remember that the FIRST analyze is the only
   one a new user ever sees.
+
+## Attribute an intermittent failure by MECHANISM, not by run counts (todo60)
+- Gotcha: `reader-snapshot` failed twice in ad-hoc runs on a feature branch and zero times in five
+  full-suite runs on `main`. That reads like "the branch broke it" and is worthless evidence — a defect
+  firing ~2 in 10 is invisible in five runs, and five green runs on either side prove nothing. Chasing
+  a rate would have cost an hour of dice-rolling.
+- Why: the code answered in minutes what the counter could not. The branch's entire `persistence.ts`
+  diff is a read-only getter; no line touches snapshot or `.reader` handling; and the test spawns
+  SEPARATE PROCESSES, so an in-process ref-count cannot reach it. Three checks, one conclusion, no
+  statistics. I had also called it "pre-existing" from a single run whose failure was a DIFFERENT test
+  — a pattern-matched grep answered a question I had not actually asked.
+- Applies: when an intermittent failure needs attributing, read the diff and the test's process model
+  first. Run counts only help once the mechanism is ruled in. And when scripting a check, print WHAT
+  failed rather than grepping for the name you already suspect — the grep confirms your hypothesis
+  instead of testing it.
