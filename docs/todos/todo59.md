@@ -49,6 +49,19 @@ path rather than at persistence or the graph core.
       MORE edges (34,929 vs 34,760) and FEWER dangling (3,146 vs 3,440), so it is not simply pruning
       harder — both numbers move, in opposite directions, and that pair needs explaining before any
       fix.
+      TRACED SO FAR, not yet resolved: `sweepUnresolvedGuesses` (persistence.ts:1073) deletes a
+      dangling edge when `isUniversalMemberCall(symbol)`, and that function SHOULD match every one of
+      the 179 — `store.has` gives dot=5, `slice(6)` = `has`, which is in `UNIVERSAL_MEMBERS`. So the
+      sweep's RULE is not the difference; the question is why those rows survive it on a first analyze.
+      The strong candidate is ORDERING: the sweep is a single pass at the end of `analyze`
+      (`analysis/index.ts` ~L439, after `pruneTaxonomy`), so anything that becomes dangling after it
+      runs — or lands in `edges` after its SELECT — survives until the NEXT analyze sweeps again. Warm
+      IS that second sweep. If that holds, the fix is convergence in one analyze (sweep after all
+      writes, or iterate to a fixed point), NOT a rule change.
+      DO NOT change `isUniversalMemberCall` or the removable filter on this evidence: the rule already
+      matches, and this path deletes edges in bulk — a wrong widening here is how the dangling rate
+      came to read 1.15% when it was 14.62% (ADR 0096). Confirm the ordering theory first by logging
+      the sweep's row count against the final `edges` count on a cold run.
 - [ ] Suspect first: anything resolved against nodes that only exist once the whole tree has been
       reflected. IntraLinker runs per-pass, so a reference to a file analyzed LATER in the first sweep
       has nothing to bind to, while a rebuild sees a complete graph from the start.
