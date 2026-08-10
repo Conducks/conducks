@@ -22,7 +22,7 @@ Audited all 12 pairs on 2026-08-10 by reading each MCP `inputSchema` against eac
 | `prune` | `type`, `limit` | CLI cannot filter to a finding type at all |
 | `context` | `radius`, `max_tokens`, `include_atoms` | CLI takes only a symbol |
 | `flows` | `min_members`, `limit` | CLI takes neither |
-| `audit` | `scan`/`advice`/`guard`/`archeology` modes, `threshold` | CLI exposes `--fallback` and `--history` only |
+| ~~`audit`~~ | **NOT A GAP — this row was wrong** | see below |
 | `coverage` | `limit` | |
 | `status` | vocabularies DIFFER | MCP `health\|map\|manifest\|pulse`; CLI `pulse\|blueprint` |
 | `rename` | safety INVERTED | MCP `dryRun` opt-in; CLI `--confirm` opt-out |
@@ -65,7 +65,26 @@ shape fixed on the MCP side in todo53, still live on the CLI.
 - [x] `flows` takes `--min-members <n>` and `--limit <n>`; the floor was hard-coded at 2 with no cap.
       VERIFIED AS A MIRROR on sofie at three thresholds — min-members 2/5/10 gives 1126/635/376 from
       both surfaces.
-- [ ] `audit`: expose the full mode set and `--threshold`.
+- [x] `audit` needed NOTHING. The first audit compared PARAMETER LISTS and concluded the CLI was
+      missing four modes; comparing CAPABILITIES shows every one already has a CLI home, just under
+      different command names:
+
+      | MCP mode | CLI |
+      |---|---|
+      | `scan` | `conducks audit` |
+      | `advice` | `conducks advise` |
+      | `guard` | `conducks guard` |
+      | `archeology` | `conducks audit --history=<n>` |
+      | `fallback` | `conducks audit --fallback` |
+
+      `threshold` exists too — `conducks guard --threshold=N`, calling the same `registry.audit.guard`
+      with the same 0.1 default. Verified live: at 0.1 both report risk 0.0804 and pass; at 0.001 both
+      report the same risk and flag the breach.
+
+      The mirror rule is about CAPABILITY, not command shape. Adding `--mode` to `conducks audit` as an
+      alias for three commands that already exist would be surface for its own sake, so it is
+      deliberately not done. The lesson is in the method: compare what a user can ASK, not what the
+      argument parsers look like.
 - [x] `coverage` takes `--limit <n>`, capping only the LIST — the summary counts still describe the
       full bound set (750 functions), the same split the tool makes between `functions` and `summary`,
       and the CLI says how many it held back.

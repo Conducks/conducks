@@ -2154,3 +2154,17 @@ by construction.
   analysed upstream, in a command whose own `--depth` refuses a bad value with a comment explaining
   why. One rule, two arguments, applied to one of them. Fixed; a flag is still not treated as a
   direction. todo61 carries the remaining gaps.
+
+## Comparing parameter lists is not comparing capabilities (todo61)
+- Gotcha: the paired-surface audit read each MCP `inputSchema` against each CLI's declared `usage` and
+  reported `audit` as missing four modes and a threshold. Comparing what a user can ASK shows every one
+  already has a CLI home under a different command name — `advice` is `conducks advise`, `guard` is
+  `conducks guard`, `archeology` is `conducks audit --history=<n>` — and `--threshold=N` exists on
+  `guard`, calling the same `registry.audit.guard` with the same 0.1 default. Verified live: both
+  surfaces report risk 0.0804 and flip at the same threshold.
+- Why: one surface groups five things under one tool while the other spreads them across three
+  commands. A parser-shaped comparison sees absence; a capability-shaped one sees a different layout.
+  Four of the nine rows in that first audit table were solid, and this one was noise.
+- Applies: state the gap as a QUESTION a user cannot ask, not as a flag that is missing. And do not
+  add an alias flag to make two surfaces look alike — `conducks audit --mode guard` would be surface
+  for its own sake when `conducks guard` already exists.
