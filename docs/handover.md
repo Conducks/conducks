@@ -1,14 +1,62 @@
-# Handover — 2026-08-09
+# Handover — 2026-08-10
 Status: current
 
 ## Where it stands
-Gates green: **1,766 tests / 223 suites**, `cli:smoke` 28/28, typecheck 0, `guard` clean (risk 0.022),
-`docs-lint` 180 governed docs. One branch, `main`. All three frozen subjects `unchanged` vs baseline.
+Gates green: **1,813 tests / 232 suites**, typecheck 0, `docs-lint` 187 governed docs, `visuals-lint`
+clean (62 anchors, 60 review stamps). All three frozen subjects `unchanged` vs baseline.
+
+Work sits on branch `mcp-surface-walk-and-concurrency`, 22 commits ahead of `main`, nothing pushed.
+
+**`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at 239s and 1,813.
+Use the gate before a commit; do not use it to chase a failure.
+
+## 2026-08-10 — the two surfaces must answer the same question
+
+ADR **0148**: every MCP tool is a CLI command, not the reverse, and where both exist they mirror —
+same input, same ANSWER, differing only in rendering. Twelve capabilities live on both surfaces and
+nothing had ever said what their relationship was, so they drifted silently.
+
+Closed: `trace` gained `--mode`/`--target` (its `path` mode was unreachable from the CLI), `prune`
+gained `--type`/`--limit`, `flows` gained `--min-members`/`--limit`, `coverage` gained `--limit`, and
+`impact`'s CLI stopped reading an unknown direction as upstream. Each verified against sofie rather
+than asserted — `prune --type ORPHAN` gives 17 from both surfaces, `flows --min-members 2/5/10` gives
+1126/635/376 from both.
+
+**The find that mattered most: `conducks_rename` wrote to disk by default.** Its schema declares
+`dryRun: { default: true }`, but a JSON Schema default is documentation — the server does not inject it
+— so an omitted value reached a parameter defaulted to `false` one layer down. The only destructive
+tool on the surface mutated source while advertising that it would not, and the CLI had always been
+safe. Anything other than an explicit `dryRun: false` is now a dry run.
+
+`audit` was reported as a gap and was not: comparing parameter lists against `usage` strings sees
+absence where comparing CAPABILITIES sees a different layout (`advice` is `conducks advise`). State a
+gap as a question a user cannot ask.
+
+## The laptop stops overheating, and here is why it did
+
+`analyze` sizes its worker pool at `os.cpus().length - 1` — 11 workers on a 12-core machine — and the
+suite spawns `analyze` many times. Measured on sofie: 11 workers analyzes in 20s, 4 in 23s. A 15%
+wall-clock cost for a third of the load, so tests now cap it at 4 (`tests/helpers/cap-workers.mjs`,
+`CONDUCKS_WORKERS` overrides).
+
+The bigger half was behavioural and it was mine: ~25 full-suite runs at 4 minutes each to chase one
+flake, which also produced a WRONG conclusion along the way. `npm run test:fast` exists so the inner
+loop is 26s. See AGENT_RULES.
 
 ## The board is EMPTY, and here is what that does and does not mean
-`docs-status` reads "Nothing open. Every phase is finished." `todo52`, `todo53` and `todo54` all closed
-on 2026-08-09. What is left is not tracked as open work, deliberately, and none of it is invisible by
-accident:
+That sentence was true on 2026-08-09 and is not now — six todos are open, all of them filed FROM
+measurements taken after the board said it was empty:
+
+- `todo56` — `npm i -g` compiles DuckDB from source on a Node major with no prebuild (10+ min, needs a
+  toolchain). **Land this before publishing** or new-Node users meet that first.
+- `todo57` / `todo61` — `context` is two features under one name; needs the BFS extracted to the domain.
+- `todo58` — build-layout specifiers: an unresolvable path should inflate DANGLING, not read as dead.
+- `todo59` — cold/warm parity: the 294-edge gap is fixed, a ±5-edge residue is not.
+- `todo60` — two intermittent tests; the assertions now print their values, so the next natural failure
+  diagnoses itself.
+- `todo61` — the mirror rule: five gaps closed, `status` and `diff` need a decision.
+
+And the ones that are not tracked as open work:
 
 - `todo16` — npm publish. Everything gating it is green; the publish itself is Said's command to run.
 - `todo31` — parked with reopen-triggers. NOTE: its `Status:` is `todo` with zero unchecked tasks, so

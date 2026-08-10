@@ -33,6 +33,27 @@ Each command implements the `ConducksCommand` contract and receives the wired re
 exists to type the handler, so TypeScript erases it — which is why the registry's fan-in looked like
 a hub overload and was not (see [registry](../registry.md)). This is the intended shape.
 
+## Every MCP tool is a CLI command, and they mirror
+
+ADR 0148. The rule is one-directional: `mirror`, `setup` and `install-hooks` have no agent audience and
+stay CLI-only, but an agent must never be able to ask something a person cannot — the CLI is where a
+person checks what the agent did.
+
+"Mirror" means the same input yields the same ANSWER, not that the argument parsers look alike.
+`--json` is the comparison point, because it is this surface's machine output and should carry the
+same data the tool returns. Rendering differs by design: `context` prints source lines here and a token
+budget there.
+
+Enforced by `tests/architecture/paired-surfaces.test.ts`, deliberately weakly — one shared
+`registry.*` accessor per pair. A call-graph version would fail on legitimate presentation differences
+and get switched off; every defect this rule was written for violates the weak form anyway.
+
+**Judge capability, not parameter lists.** The first audit compared `inputSchema` properties against
+`usage` strings and reported `audit` as missing four modes; every one already had a CLI home under a
+different command name (`conducks advise`, `conducks guard`). One surface grouping five things under
+one tool while this one spreads them across three commands is a layout difference, not drift.
+
+
 ## Output is a product surface
 
 These commands are the primary way a human or an agent meets conducks, so a false finding is more

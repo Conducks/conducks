@@ -1,7 +1,7 @@
 # todo61 — every MCP capability must exist on the CLI, and answer the same
 Status: todo
 - Acceptance: for all 12 paired capabilities, every MCP parameter has a CLI equivalent, the enum vocabularies match, and driving both on the same input yields the same ANSWER SET — differing only in rendering. Proven by an equivalence test, not by inspection.
-- Builds: 0005
+- Builds: 0148, 0005
 
 ## Context
 
