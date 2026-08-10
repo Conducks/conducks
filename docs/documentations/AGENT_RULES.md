@@ -75,3 +75,10 @@ machine hot, and it buys very little: measured on sofie (10.5k nodes), 11 worker
   than running the suite twenty times. Diagnosing a flake this way once cost an hour of wall time and
   produced a wrong conclusion; a targeted probe answered it in ten runs of five seconds.
 - Reach for the full suite as a GATE — before a commit, after a change lands — not as an inner loop.
+- `npm run test:fast` IS the inner loop: **26s against the gate's 239s**, 1,143 of the 1,813 tests. It
+  parallelises and drops the per-file worker recycling, and pays for that by skipping the suites that
+  need either constraint — anything loading tree-sitter grammars or driving a real vault.
+  The excluded set is a PATH RULE, not a file list: which grammar suite fails depends on scheduling
+  (whichever lands second in a process), so a list would go stale silently while looking like it still
+  protected something. If your failure is in an excluded path, use `npm test` — a diagnostic tool that
+  quietly skips your test is worse than no tool.

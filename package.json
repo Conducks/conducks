@@ -47,7 +47,8 @@
     "postbuild": "node scripts/sync-skills-postbuild.mjs",
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
-    "preinstall": "node scripts/check-duckdb-prebuild.mjs"
+    "preinstall": "node scripts/check-duckdb-prebuild.mjs",
+    "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.22.0",
