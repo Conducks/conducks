@@ -66,7 +66,16 @@ const startPulse = async (root: string, signal: string): Promise<ChildProcess> =
 };
 
 const release = (signal: string) => fs.writeFileSync(signal, 'x');
-const waitExit = (child: ChildProcess) => new Promise<void>(r => child.on('close', () => r()));
+/**
+ * Wait for the child and RETURN ITS EXIT CODE, rather than discarding it.
+ *
+ * This used to resolve on `close` and ignore the code entirely, so a probe that died — its own
+ * `main().catch` exits 9 — looked identical to one that finished. The snapshot assertion below then
+ * failed with "expected false, received true", which reads as a cleanup defect in conducks when the
+ * truth was that the child never got to its close (todo60).
+ */
+const waitExit = (child: ChildProcess) =>
+  new Promise<number>(r => child.on('close', (code) => r(code ?? 0)));
 
 afterEach(async () => {
   for (const c of children.splice(0)) { if (c.exitCode === null) c.kill('SIGKILL'); }
@@ -182,7 +191,10 @@ describe('reader snapshot — a pulse never fails a read', () => {
     expect(fs.existsSync(snapshotFile(root))).toBe(true);
 
     release(signal);
-    await waitExit(pulse);
+    // Assert the child SUCCEEDED before asserting what it left behind. A crashed probe cannot say
+    // anything about whether the snapshot is retired, and letting it try produces a failure that
+    // names the wrong culprit.
+    expect(await waitExit(pulse)).toBe(0);
 
     expect(fs.existsSync(snapshotFile(root))).toBe(false);
   }, 180000);

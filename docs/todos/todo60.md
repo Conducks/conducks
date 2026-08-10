@@ -1,4 +1,4 @@
-# todo60 — `reader-snapshot` fails intermittently, and the snapshot file is the suspect
+# todo60 — two intermittent tests: `reader-snapshot` and the docs-watcher debounce
 Status: todo
 - Acceptance: `reader-snapshot.test.ts` passes 20 consecutive full-suite runs, or the race is named and the test asserts the real invariant instead of a file's existence at one instant.
 - Builds: 0096
@@ -45,11 +45,41 @@ another process's cleanup, not about the invariant the suite name states ("a pul
 read"). Under load, an exited process's unlink may not have landed — or may be delayed by the OS
 rather than by conducks — and the test would fail while the property it exists to protect still holds.
 
-## Phase 1 — reproduce and attribute
+## The docs-watcher debounce case — claimed fixed twice, and was not
 
-- [ ] Reproduce with the failure captured, not just the name: on failure, print whether the `.reader`
-      file exists, its mtime, and whether the pulse process actually exited zero. One captured failure
-      is worth more than another twenty green runs.
+Separate test, same session, and worth recording because the FIX METHOD was wrong twice.
+
+`docs-watcher › debounces a burst into one re-lint` asserted that five writes produce EXACTLY ONE
+re-lint. That is not load-independent: the write loop can straddle any debounce window on a busy
+machine, and the watcher then fires twice — correct behaviour failing the test.
+
+It was met twice by widening the window — 120 ms, then 500 ms, then 2000 ms — and each time declared
+fixed on a handful of green runs. It failed again at 2000 ms during a six-suite run. Widening is
+unfalsifiable: there is always a slower machine.
+
+Now it asserts what the debounce is FOR: `1 <= pulses < 5`. Without a debounce, five writes give five
+re-lints, so the assertion still fails on a genuinely broken one, and a burst collapsing to one OR two
+passes because both are collapse.
+
+- [x] Assertion rewritten to the contract rather than to a timing instant; window back down to 300 ms.
+- [ ] NOT yet proven. 16 runs green in isolation after the change, but the failure rate before it was
+      roughly 1 in 8, and — the part that matters — no failure was ever captured WITH ITS VALUE. It is
+      unknown whether the old failures were `pulses: 0` (debounce had not fired) or `pulses: 5+`
+      (no collapse at all), and those are different bugs. Capture one before closing this.
+
+## Phase 1 — reproduce and attribute (reader-snapshot)
+
+- [x] CAUSE FOUND without needing a captured failure, because the cleanup is synchronous:
+      `close()` retires the snapshot with `fs.rmSync`, so a "late unlink" is impossible — a surviving
+      snapshot can only mean `close()` never ran. Two harness defects allowed exactly that:
+      `vault-probe.ts`'s `main().catch` ends with `process.exit(9)`, which does not unwind, so a throw
+      anywhere between `beginPulse()` and `close()` (the 20 s `waitFor`, a `save()` under load) leaked
+      the session with the snapshot on disk; and the parent's `waitExit` resolved on `close` while
+      DISCARDING the exit code, so a dead child was indistinguishable from a finished one. The test
+      then failed on `expect(existsSync(snapshot)).toBe(false)` — naming conducks for a child crash.
+      Fixed: the probe closes in a `finally`, and the test asserts the child exited 0 BEFORE asserting
+      what it left behind. The snapshot assertion itself is unchanged, so a genuine cleanup failure
+      still fails.
 - [ ] Determine whether the unlink is missing or merely LATE. If late, the test is asserting on an
       instant it has no right to; if missing, the cleanup path has a real hole and 2x disk survives the
       pulse, which is what the test title cares about.

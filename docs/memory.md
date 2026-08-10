@@ -2091,3 +2091,19 @@ by construction.
   first. Run counts only help once the mechanism is ruled in. And when scripting a check, print WHAT
   failed rather than grepping for the name you already suspect — the grep confirms your hypothesis
   instead of testing it.
+
+## I called a flake "fixed" on a sample too small to say so — twice (todo60)
+- Gotcha: the docs-watcher debounce case failed at a measured rate near 1 in 8. I widened its window
+  (120 -> 500 ms), saw 3 green runs, called it fixed; it failed again. Widened again (500 -> 2000 ms),
+  saw 4 green runs, called it fixed; it failed again under a six-suite run. Three green runs cannot
+  distinguish a fixed 1-in-8 defect from an unfixed one — the arithmetic was available before each
+  claim and I did not do it.
+- Why: widening a timing window is unfalsifiable — there is always a slower machine — so it produces
+  green runs whether or not it addressed anything. That is the shape of a fix that cannot be wrong,
+  which is the same reason it cannot be right. The assertion was the problem: "five writes produce
+  EXACTLY one re-lint" fails when a slow write loop straddles the window and the watcher correctly
+  fires twice.
+- Applies: assert the CONTRACT (`1 <= pulses < 5` — a burst collapses) rather than a timing instant.
+  And before claiming an intermittent is fixed, compute how many green runs the measured rate demands:
+  at 1 in 8, three runs is noise. Capture a failure WITH ITS VALUE first — for this one I still do not
+  know whether the old failures were `pulses: 0` or `pulses: 5`, and those are different bugs.

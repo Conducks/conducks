@@ -42,20 +42,30 @@ async function main(): Promise<void> {
     // A write session that holds the vault for as long as a real analyze would, so the parent can
     // fire a read at it while the lock is held.
     const p = new SynapsePersistence(root, false);
-    await p.beginPulse();
-    await p.run(`INSERT INTO nodes (id, pulseId, name, file, canonicalKind)
+    // ALWAYS close the session, however this mode ends.
+    //
+    // `main().catch` below exits 9 without unwinding, so a throw anywhere between here and the close
+    // — `waitFor`'s 20s timeout, a `save()` failure under load — left the write session open and the
+    // reader snapshot on disk. The parent then failed on `expect(existsSync(snapshot)).toBe(false)`,
+    // which reads as "conducks did not clean up" when the truth was "the child died". A real pulse
+    // closes in a finally; this probe now does too (todo60).
+    try {
+      await p.beginPulse();
+      await p.run(`INSERT INTO nodes (id, pulseId, name, file, canonicalKind)
                  SELECT 'mid'||i, 'pulse-mid', 'mid'||i, '/repo/mid.ts', 'UNIT' FROM range(11) t(i)`);
-    fs.writeFileSync(`${signal}.holding`, 'x');   // the vault is now locked by this process
-    await waitFor(signal);                        // parent has finished its read
-    // The smallest thing save() reads off a graph: a target pulse id, a metadata map and stats.
-    const meta = new Map<string, string>([['lastAnalyzedCommit', 'abc123']]);
-    await p.save({
+      fs.writeFileSync(`${signal}.holding`, 'x');   // the vault is now locked by this process
+      await waitFor(signal);                        // parent has finished its read
+      // The smallest thing save() reads off a graph: a target pulse id, a metadata map and stats.
+      const meta = new Map<string, string>([['lastAnalyzedCommit', 'abc123']]);
+      await p.save({
       getMetadata: (k: string) => (k === 'targetPulseId' ? 'pulse-mid' : meta.get(k)),
       getAllMetadata: () => meta,
       stats: { nodeCount: 511, edgeCount: 0 },
-    });
-    await p.close();
-    console.log('PULSE_DONE');
+      });
+      console.log('PULSE_DONE');
+    } finally {
+      await p.close();
+    }
     return;
   }
 
