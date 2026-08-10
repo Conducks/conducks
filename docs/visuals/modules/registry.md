@@ -24,6 +24,21 @@ hub. Do not split it on
 fan-in evidence, and be suspicious of any future coupling metric here that has not excluded type
 imports (ADR 0016).
 
+## The vault hold lives here, with the object it protects
+
+`acquireVault` / `releaseVault` ref-count who is reading the shared DuckDB handle; it closes only when
+the last holder releases. That count sits on the registry rather than in the MCP layer because a single
+tool call passed through THREE independent closers — `hypertoon`'s wrapper, the handler's own
+`ensureAnchor`/`releaseAnchor` pair, and `tool-registry`'s `finally`, which closed outright and ignored
+the count. With two calls in flight, whichever finished first hung up on the other (todo52, ADR 0147).
+
+It could not stay in `interfaces/tools/shared/anchor.ts`: composition would have to import the MCP layer
+to reach it, and `boundaries.test.ts` refuses that edge — correctly, since a vault hold is an
+infrastructure concern and MCP is one of its callers.
+
+`changeSet`/`impactedSymbols` and `governedCount` are exposed here for the same reason: the CLI must not
+import the domain directly, so a fact both surfaces need is reached through the registry.
+
 ## Dynamic access is invisible to static analysis
 
 Services are reached through property chains (`registry.evolution.watcher`), so the getters have no

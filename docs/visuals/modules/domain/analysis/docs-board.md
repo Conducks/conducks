@@ -84,6 +84,36 @@ Two things the tests forced, both real:
   as "the file you edited". It is not — it is whatever landed last. The pulse now carries every file
   in the window, and `filePath` is explicitly just the newest of them, for display.
 
+## The denominator, and the two lists that had none
+
+`governedCount(board)` is the number of governed docs a board was built from — the denominator behind
+every claim it makes. It lives here because `docs-status` and `docs-lint` each wrote that sum out by
+hand and `conducks_docs` never wrote it at all, so the TOOL reported `grammarViolations: 0` for a
+directory with no `docs/` whatsoever: the identical payload a fully-closed tree produces (todo53).
+`health.grammar` now carries a `Verdict` — `nothing-to-check` on an empty tree, `clean` with `checked`
+on a real one.
+
+Two lists in the projection are BOUNDED, and both bounds were found by measurement rather than
+foresight:
+
+- **constraints** were 96% of a 48,966-byte default response — 159 memory entries and 41 conventions,
+  growing every time a lesson is written down. Per-list byte budgets, newest kept first (these files
+  are appended to), with the omitted counts and the file to read shipped in the payload. Never drop a
+  rule silently.
+- **`health.grammar.found`** shipped every lint finding. On conducks, which has zero violations, that
+  field is empty and invisible; on a foreign subject with 30 violations it was 8,820 bytes, a third of
+  the response. Capped at 10 with `omitted` alongside — `grammarViolations` stays authoritative and
+  `docs-lint` prints them all.
+
+A payload measured on ONE repo is measured on that repo's data shape.
+
+## A parked todo is stated, not hidden
+
+`unlinkedWork` keeps only todos with an OPEN phase, and the "every task is closed" hygiene warning
+deliberately exempts deferred records — so a todo parked with reopen-triggers appeared on NEITHER
+surface. `parked` lists them with their real `Status:`, because two records were invisible that way and
+one of them claimed `todo` while showing up nowhere.
+
 ## The module hash lives in one file, and that is the whole point
 
 A reviewed module note is compared against `moduleHashOf` (`analysis/module-hash.ts`). That function

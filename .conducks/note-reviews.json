@@ -7,7 +7,7 @@
   "docs/visuals/modules/core/graph/linkers.md": {
     "src/lib/core/graph/import-resolver.ts": "d980d8d58f996b34",
     "src/lib/core/graph/linker.ts": "6cf999987af77464",
-    "src/lib/core/graph/linker-intra.ts": "9823ff66dce694d6",
+    "src/lib/core/graph/linker-intra.ts": "b4b7e1a7acb378ae",
     "src/lib/core/graph/linker-federated.ts": "d5f43a3ff5351a39",
     "src/lib/core/graph/http-service-linker.ts": "f273be0ff1d00903"
   },
@@ -42,7 +42,7 @@
     "src/types/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
-    "src/lib/core/persistence/persistence.ts": "4f0fb5e400f2fc60"
+    "src/lib/core/persistence/persistence.ts": "f2bb99811ba52a75"
   },
   "docs/visuals/modules/domain/analysis/coverage.md": {
     "src/lib/domain/analysis/coverage-bind.ts:50": "fdd480cd0bda4134",
@@ -57,18 +57,19 @@
     "src/lib/domain/analysis/micro-pulse.ts": "c0fd6f64c86d95a2"
   },
   "docs/visuals/modules/domain/analysis.md": {
-    "src/lib/domain/analysis/index.ts": "22354d5b48f59686"
+    "src/lib/domain/analysis/index.ts": "afd9f83050018770"
   },
   "docs/visuals/modules/domain/evolution.md": {
-    "src/lib/domain/evolution/dead-code.ts": "763c048c7689c916",
+    "src/lib/domain/evolution/dead-code.ts": "c4f4ba43028f793e",
     "src/lib/domain/evolution/drift-engine.ts": "8b435801d446d048",
-    "src/lib/domain/evolution/watcher.ts": "3dea9fac4e86205e"
+    "src/lib/domain/evolution/watcher.ts": "927e87f0228287db",
+    "src/contracts/dead-code-types.ts": "a2749f7611fced39"
   },
   "docs/visuals/modules/domain/governance/sentinel.md": {
     "src/lib/domain/governance/index.ts:337": "96d2d06ba682de50",
     "config/sentinel.json": "152f1597f569c396",
     "src/interfaces/cli/commands/audit.ts:82-88": "6e779c6032f1433f",
-    "src/registry/index.ts": "9c49c135d4b7d493"
+    "src/registry/index.ts": "ceef8d5c8659983c"
   },
   "docs/visuals/modules/domain/governance.md": {
     "src/lib/domain/governance/index.ts:141-212": "f47385aa4aa377d4"
@@ -79,11 +80,14 @@
   "docs/visuals/modules/interfaces/tools.md": {
     "src/lib/domain/analysis/fallback-detector.ts": "e0dc1f11d5ab8e7b",
     "src/lib/core/utils/logger.ts": "7519dac9e71a4fd5",
-    "src/interfaces/tools/tools/kinetic.ts:267": "e9779bad9f399276",
-    "tests/unit/domain/stale-import.test.ts": "3aeb7ac01fe2ce3b"
+    "src/interfaces/tools/tools/kinetic.ts:267": "a50c2097e1c4d840",
+    "tests/unit/domain/stale-import.test.ts": "3aeb7ac01fe2ce3b",
+    "src/interfaces/tools/shared/resolve-symbol.ts": "efb4b5c325c1af5b",
+    "src/interfaces/tools/shared/empty-vault.ts": "e2e9ba0a58ceb671"
   },
   "docs/visuals/modules/registry.md": {
-    "src/registry/index.ts": "9c49c135d4b7d493"
+    "src/registry/index.ts": "ceef8d5c8659983c",
+    "src/interfaces/tools/shared/anchor.ts": "18c31582d5f50217"
   },
   "docs/visuals/system-trace.html": {
     "src/lib/domain/analysis/conducks-core.ts:58": "a8100dcb07ab26b4",
@@ -95,7 +99,7 @@
     "src/lib/core/graph/graph-engine.ts:590": "e14ef5d22d885a03"
   },
   "docs/visuals/modules/domain/analysis/docs-board.md": {
-    "src/lib/domain/analysis/docs-board.ts": "8b9a599ab9ee1693",
+    "src/lib/domain/analysis/docs-board.ts": "4e05815bbe72338f",
     "src/lib/domain/analysis/docs-watcher.ts": "d4ace5f451c7fbc2",
     "src/lib/domain/analysis/module-hash.ts": "f4cf36cf5f1d202e"
   }

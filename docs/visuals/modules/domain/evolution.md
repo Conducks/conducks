@@ -45,11 +45,35 @@ is dropping the `export` keyword, not deleting the symbol.
 The 5 remaining false positives are all dynamic dispatch: four registry getters reached via DI
 property chains, and a browser entry point. That profile is expected and acceptable.
 
-**The cheap way to audit a finding** — `grep -rn "\bSym\b" src tests scripts` excluding its defining
-file. Zero occurrences means nothing *could* reference it, so it cannot be a broken-edge false
-positive regardless of which edges are missing. Do this before believing any orphan claim, including
-ones written in these docs: a prior note retracted `DynamicToolLoader` as live via a re-export that
-no longer exists.
+**Auditing a finding by name-grep is WRONG and has been wrong four separate times.** A bare
+`grep -rn "\bSym\b"` counts prose, comments, test mocks and same-named symbols in other files. Two of
+ten spot-checks on sofie looked like conducks was wrong and it was correct both times: `Console`'s only
+"use" was the word inside an `<h3>Sandbox Console</h3>` heading, and `MemoryEdge` was imported by three
+files that all take a DIFFERENT `MemoryEdge` from a types module of their own. Zero occurrences is still meaningful;
+any non-zero count is not.
+
+Audit against the claim the finding MAKES — for an ORPHAN, "is this symbol IMPORTED or CALLED anywhere
+outside its own file", scoped to source extensions and excluding build output.
+
+## Precision on a FOREIGN codebase, measured
+
+The numbers above are conducks auditing itself. Driven at a frozen benchmark subject (sofie, 10.5k
+nodes) on 2026-08-09: **172 findings, ~94.8% precision**, and every error came from ONE mechanism
+rather than scattered noise — symbols reached only through `await import()`.
+
+That mechanism has two halves and only one is fixed. A dynamic import written inside a function is now
+resolved (todo58, see `core/graph/linkers`). The remaining seven are specifiers written against the
+BUILT layout: an electron entry point imports a parent-relative path that, in the SOURCE tree, resolves
+to a directory which does not exist — the real file lives under the source root, and the path only
+works once the compiler has emitted both as siblings in the output directory. No source-level resolver follows that without
+modelling the build, and an unresolvable specifier should inflate the DANGLING count rather than
+quietly make a symbol look dead (ADR 0070).
+
+**The finding types are one list**, in `contracts/dead-code-types.ts`: ORPHAN, UNUSED_EXPORT,
+UNREACHABLE_LOGIC, STALE_IMPORT, UNIMPORTED_MODULE. The MCP tool used to hard-code three of them into
+its summary and its enum, so `summary` totalled 95 against a stated `total` of 99 and two types were
+unreachable by any filter (todo53). `UNIMPORTED_MODULE` is a QUESTION, not a verdict, and both
+surfaces now say so.
 
 ## Why dead-code got better for free
 

@@ -27,6 +27,20 @@ Adequate while the question set is known.
 `fallback-detector` reports where analysis degraded; `gateway-service` is the live vault-watch feed
 behind the Mirror dashboard, constructed by the `mirror` CLI command and consumed by the web server.
 
+## The pulse links, inducts, then links AGAIN
+
+The order inside `analyze` matters and is not obvious. `IntraLinker` runs once the whole graph is in
+memory, then virtual/external induction materialises nodes for references that pointed outside the
+project, then the linker runs a SECOND time against those new nodes.
+
+Without that second pass the first analyze on a fresh vault resolves fewer references than a rebuild
+of the same code — the induced nodes did not exist when linking happened, and on a warm vault they
+only appear to work because they survived from the previous pulse. Measured on sofie: 7,531
+resolutions cold against 7,994 warm, dangling 3,440 against 3,146 (todo59).
+
+Not a reorder — induction READS the dangling set that linking produces, so inducting first would
+starve it.
+
 ## Why the split between the parts is where it is
 
 One pass cannot resolve a cross-file reference, because the target may not be parsed yet. That single

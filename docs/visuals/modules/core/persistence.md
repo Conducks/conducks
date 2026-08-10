@@ -24,6 +24,20 @@ from ADR 0035 is the half that protects an answer — the branch guard in `chron
 which refuses to answer from a graph pulsed on another branch. `freshness.ts` is unaffected and
 remains the shared watch/monitor staleness rule.
 
+## The handle knows where it points, and the bootstrapper must ask IT
+
+`SynapsePersistence` exposes `anchoredAt` — the root it was constructed for. That exists because the
+bootstrapper used to decide "do I need a new handle?" from `chronicle.getProjectDir()`, which says
+where the REGISTRY is anchored and not what this object opens. The module-level placeholder is
+`new SynapsePersistence(":memory:", true)`, so a `:memory:` handle could sit under a chronicle already
+anchored to a real repo and read as correct — surfacing as `[No Vault] :memory:` against an analyzed
+project (todo52).
+
+Related and easy to get wrong: a CLOSED handle is not a reason to build a new one. `close()` is called
+at the end of every tool call so the CLI can use the same file, and `query()` reopens lazily through
+`ensureVaultOpen()`. Treating disconnection as a re-init trigger swapped the object on EVERY call —
+which is the swap ADR 0146 serialised the whole MCP surface to protect against.
+
 ## The seam that has broken twice
 
 An in-memory `ConducksEdge` carries its data on `.properties` and `.confidence`. There is no

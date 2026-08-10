@@ -44,6 +44,29 @@ written, this belongs there and should leave a pointer here.)
 that look entirely current. Anything reporting counts should be read as "as of the last pulse", and
 structural conclusions want a clean re-analyze behind them.
 
+## Driven end to end, and what that found
+
+The whole surface was walked over real stdio JSON-RPC — every registered tool, every value of every
+enum — and produced **25 defects**, each behind a payload that looked fine (todo53). The shapes worth
+carrying:
+
+- **An id containing `::` was accepted without asking the graph.** An invented symbol made `trace`,
+  `impact`, `explain` and `context` each answer with a confident nothing. One `resolveSymbolId` in
+  `shared/resolve-symbol.ts` now returns a VERIFIED id or null.
+- **A bound declared in `inputSchema` is a comment.** `radius: "two"` made `Math.min` NaN, which removed
+  the depth guard entirely and produced the WIDEST possible walk from a junk value. `numErr`/`boolErr`
+  join `enumErr`, and bounds live in one constant the schema and the guard both read.
+- **`truncated` was a literal in two places.** Fuzzy and template mode both called a capped result the
+  whole answer; template also ignored `limit` outright, so every template answer was ten rows whatever
+  the caller asked. Both now request cap+1 and MEASURE.
+- **An empty vault is not a pass.** `audit`, `prune`, `query` and `flows` reported clean results over
+  zero symbols until `shared/empty-vault.ts` gave them a `nothing-to-check` answer.
+- **A step that is not a node says so.** `trace` returned dangling edge targets styled exactly like
+  symbols; they now carry `resolved: false` and `kind: UNRESOLVED`.
+
+Tool calls no longer serialise. ADR 0146's queue is gone (ADR 0147) once both races behind it were
+closed at their source.
+
 ## Entry point caveat
 
 Importing the server entry starts the process as a side effect, so tests must not import it

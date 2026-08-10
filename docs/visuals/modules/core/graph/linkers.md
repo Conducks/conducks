@@ -23,6 +23,37 @@ each path aliases, including a getter whose body returns one, and the linker wal
 COMPUTES its value records the path with no type — wired, but unresolvable — which dead-code reads
 and the resolver refuses.
 
+## A dynamic import is a binding the call cannot see
+
+a destructured `await import(...)` of a sibling module mints a module-level binding with an ALIASES edge — but a
+dynamic import is normally written INSIDE a function, so the destructured name is also a
+function-scoped local and the CALL lands on THAT. Two nodes for one fact, never meeting: the alias
+hangs off a node nothing points at, the call points at a local that defines nothing, and the real
+definition ends up with zero callers, which `prune` reports as dead code.
+
+Worse, that module-level binding is never materialised — the ALIASES edge sits with a DANGLING
+SOURCE. A fix that looks the source up with `getNode` therefore never fires on the case it was
+written for. `linker-intra` derives the binding from the edge's own id (`<file>::<name>`) and rebinds
+a same-file, same-name local to the aliased definition (todo58).
+
+The rebind is a READ of the file's own syntax, not a guess: local and binding sit in the same file
+under the same bare name, and the binding states what it aliases. A local with no same-named binding
+is left alone.
+
+## Linking runs TWICE, because induction creates nodes the first pass cannot see
+
+`IntraLinker` runs before virtual/external induction, and again after it. On a warm vault the induced
+nodes survive from the previous pulse so the first pass finds them; on a COLD vault they do not exist
+yet and every reference landing on one dangles until the next analyze — which made a user's FIRST
+analyze measurably worse than a rebuild of the same code.
+
+Measured on the sofie subject: cold resolved 7,531 references against warm's 7,994, dangling 3,440
+against 3,146. Replaying the linker alone over the cold vault — no re-parse, no re-induction —
+recovered exactly the difference, which is what proved the cause before anything was changed (todo59).
+
+It is a second PASS rather than a reorder: induction reads the dangling set that linking produces, so
+inducting first would starve it.
+
 ## Fuzzy matching is the risk, `sameFamily` is the guard
 
 Resolution degrades gracefully: exact path, then extension inference, then index files, then a fuzzy

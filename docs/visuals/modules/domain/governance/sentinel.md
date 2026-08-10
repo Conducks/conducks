@@ -43,6 +43,13 @@ here even though cycle detection ignores it (ADR 0016). On foreign repos `layerO
 for paths matching no conducks fragment, so the rule is silent rather than noisy; per-project layer
 config is deliberately not built.
 
+**Still load-bearing, and it proved so on 2026-08-09.** `boundaries.test.ts` blocked three separate
+attempts in one session — `cli -> domain` twice and `mcp -> domain` once, each an attempt to reach a
+newly-shared function directly — and then `composition -> mcp` when the fix over-corrected and put a
+vault ref-count in the MCP layer. Every refusal was right, and each one named where the shared code
+actually belonged: the registry. A gate that only ever passes teaches nothing; this one redirected the
+design four times (todo52, todo53).
+
 Three encoded edges are wider than ADR 0005's prose: `cli → web` (the `mirror` launcher),
 `cli → mcp` (the `conducks mcp` launcher — added 2026-07-25, same shape), and `web → domain`/`core`.
 The ADR says interfaces import composition; the table is what runs.
