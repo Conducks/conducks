@@ -46,7 +46,12 @@ shape fixed on the MCP side in todo53, still live on the CLI.
       `beta` as the symbol.
       VERIFIED AS A MIRROR on sofie: `watchKernelPrompt -> loadKernelPrompt` returns the same two steps
       from both surfaces. `--flow` stays CLI-only, which the rule permits.
-- [ ] `prune`: add `--type <TYPE>` and `--limit <n>`, validated against `DEAD_CODE_TYPES`.
+- [x] `prune` takes `--type <TYPE>` and `--limit <n>`. The type list is read from
+      `contracts/dead-code-types.ts` — the same constant the tool's enum spreads — so a sixth type
+      reaches both surfaces at once rather than being remembered into one. `all` means no filter, as on
+      the tool, and a limit that does not parse is refused rather than defaulted.
+      VERIFIED AS A MIRROR on sofie: ORPHAN 17/17, STALE_IMPORT 20/20, UNIMPORTED_MODULE 35/35, and
+      both surfaces refuse `BOGUS` with the same vocabulary.
 - [ ] `context`: add `--radius`, `--max-tokens`, `--include-atoms` with the published bounds.
 - [ ] `flows`: add `--min-members` and `--limit`.
 - [ ] `audit`: expose the full mode set and `--threshold`.

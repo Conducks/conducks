@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
+import { DEAD_CODE_TYPES } from "@/contracts/dead-code-types.js";
 
 /**
  * Conducks — Prune Command
@@ -8,11 +9,42 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class PruneCommand implements ConducksCommand {
   public id = "prune";
   public description = "Identify unused exports and dead code";
-  public usage = "conducks prune [--json]";
+  public usage = "conducks prune [--type <TYPE>] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
+    // MIRROR THE TOOL. `conducks_prune` filters by finding type and caps the list; the CLI took only
+    // `--json`, so "show me the stale imports" was answerable from one surface only (todo61).
+    //
+    // The type list comes from `contracts/dead-code-types.ts` — the same constant the tool's enum
+    // spreads — so a sixth type reaches both surfaces at once instead of being remembered into one.
+    // The tool used to hard-code three of five and its summary totalled 95 against a stated 99
+    // (todo53); retyping the list here would reintroduce exactly that.
+    const ALLOWED = [...DEAD_CODE_TYPES, 'all'];
+    const typeAt = args.indexOf('--type');
+    const filterType = typeAt > -1 ? args[typeAt + 1] : undefined;
+    if (filterType !== undefined && !ALLOWED.includes(filterType as never)) {
+      console.error(`Error: --type must be one of: ${ALLOWED.join(', ')} — got "${filterType ?? ''}".`);
+      process.exit(1);
+    }
+
+    // A limit that does not parse is an error, not a silent default — the rule `impact --depth` and
+    // `trace --limit` already follow. A flag that reads as obeyed and is not is worse than no flag.
+    const limitAt = args.indexOf('--limit');
+    let limit: number | undefined;
+    if (limitAt > -1) {
+      limit = Number(args[limitAt + 1]);
+      if (!Number.isInteger(limit) || limit < 1) {
+        console.error(`Error: --limit needs a positive integer, got "${args[limitAt + 1] ?? ''}".`);
+        process.exit(1);
+      }
+    }
+
     await syncGraph(registry);
-    const findings = registry.explain.prune();
+    let findings = registry.explain.prune();
+    if (filterType && filterType !== 'all') {
+      findings = findings.filter((f: { type: string }) => f.type === filterType);
+    }
+    if (limit !== undefined) findings = findings.slice(0, limit);
 
     // `--json`, because a dead-code list is something a script acts on. Twelve of the fifteen read
     // commands offered it and `prune`, `trace` and `audit` did not — precisely the three whose
