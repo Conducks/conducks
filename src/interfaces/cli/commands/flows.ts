@@ -8,18 +8,37 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 export class FlowsCommand implements ConducksCommand {
   public id = "flows";
   public description = "List behavioral processes across the Synapse";
-  public usage = "conducks flows [--json]";
+  public usage = "conducks flows [--min-members <n>] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const useJson = args.includes('--json');
+
+    // MIRROR THE TOOL. `conducks_flows` takes min_members and limit; the CLI hard-coded a floor of 2
+    // and no cap, so "flows with at least five members" was answerable from one surface only
+    // (todo61). Both values are refused rather than defaulted when they do not parse — the rule
+    // `impact --depth`, `trace --limit` and `prune --limit` already follow.
+    const num = (flag: string, min: number): number | undefined => {
+      const at = args.indexOf(flag);
+      if (at === -1) return undefined;
+      const v = Number(args[at + 1]);
+      if (!Number.isInteger(v) || v < min) {
+        console.error(`Error: ${flag} needs an integer ${min} or greater, got "${args[at + 1] ?? ''}".`);
+        process.exit(1);
+      }
+      return v;
+    };
+    const minMembers = num('--min-members', 1) ?? 2;
+    const limit = num('--limit', 1);
+
     await syncGraph(registry);
 
     const processes = registry.kinetic.getProcesses();
     // A flow of ONE symbol is not a flow, and hiding it silently meant a project whose flows were
     // all single-member printed a heading and nothing — indistinguishable from having none. The
     // count of what was hidden is stated instead (ADR 0115).
-    const shown = Object.entries(processes).filter(([, m]) => (m as string[]).length >= 2);
-    const hidden = Object.keys(processes).length - shown.length;
+    const matching = Object.entries(processes).filter(([, m]) => (m as string[]).length >= minMembers);
+    const shown = limit === undefined ? matching : matching.slice(0, limit);
+    const hidden = Object.keys(processes).length - matching.length;
 
     if (useJson) {
       process.stdout.write(JSON.stringify(

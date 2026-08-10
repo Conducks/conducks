@@ -52,10 +52,23 @@ shape fixed on the MCP side in todo53, still live on the CLI.
       the tool, and a limit that does not parse is refused rather than defaulted.
       VERIFIED AS A MIRROR on sofie: ORPHAN 17/17, STALE_IMPORT 20/20, UNIMPORTED_MODULE 35/35, and
       both surfaces refuse `BOGUS` with the same vocabulary.
-- [ ] `context`: add `--radius`, `--max-tokens`, `--include-atoms` with the published bounds.
-- [ ] `flows`: add `--min-members` and `--limit`.
+- [ ] `context` is NOT a flag gap, and adding those flags would make it worse. The two surfaces answer
+      different questions: the CLI gives a directional flow trace (callers at depth 1 filtered to CALLS,
+      the downstream chain, and SOURCE LINES via `source.lineReader`), while the tool runs a scored BFS
+      over a radius with a token budget, excluding ATOMs and containers (ADR 0103). `--radius` has no
+      meaning in the CLI's algorithm, so the flag would read as obeyed and do nothing — the exact shape
+      this whole todo exists to remove.
+      THE FIX IS AN EXTRACTION: the tool's ~130-line BFS and scoring must move into the domain, reached
+      through the registry by both surfaces, and the CLI gains `--mode flow|neighbourhood` — keeping its
+      own flow trace, which the one-directional rule permits, while making the tool's capability
+      reachable. That is a three-layer change and is deliberately not bundled with the flag additions.
+- [x] `flows` takes `--min-members <n>` and `--limit <n>`; the floor was hard-coded at 2 with no cap.
+      VERIFIED AS A MIRROR on sofie at three thresholds — min-members 2/5/10 gives 1126/635/376 from
+      both surfaces.
 - [ ] `audit`: expose the full mode set and `--threshold`.
-- [ ] `coverage`: add `--limit`.
+- [x] `coverage` takes `--limit <n>`, capping only the LIST — the summary counts still describe the
+      full bound set (750 functions), the same split the tool makes between `functions` and `summary`,
+      and the CLI says how many it held back.
 - [ ] `status`: RECONCILE the vocabularies rather than adding to either — decide one set of mode names
       and make both surfaces speak it. This is the only gap that is a naming decision rather than a
       missing flag.

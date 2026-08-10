@@ -18,7 +18,7 @@ import chalk from "chalk";
 export class CoverageCommand implements ConducksCommand {
   public id = "coverage";
   public description = "Overlay istanbul/c8 coverage onto the graph — see which functions light up";
-  public usage = "conducks coverage <coverage-final.json> [--json] [--all] [--save-baseline] [--vs-baseline] [path]";
+  public usage = "conducks coverage <coverage-final.json> [--limit <n>] [--json] [--all] [--save-baseline] [--vs-baseline] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     // The coverage report is the FIRST positional, whatever it is named. Selecting it by
@@ -29,6 +29,19 @@ export class CoverageCommand implements ConducksCommand {
     const covPath = args.filter(a => !a.startsWith("-"))[0];
     const useJson = args.includes("--json");
     const showAll = args.includes("--all"); // include DARK nodes (default: hide pure-dark noise)
+
+    // MIRROR THE TOOL. `conducks_coverage` caps its function list with `limit` (default 75, measured
+    // at ~23 KB on a 680-function baseline); the CLI listed everything. A limit that does not parse is
+    // refused rather than defaulted, the rule the other paired commands follow (todo61).
+    const limitAt = args.indexOf('--limit');
+    let rowLimit: number | undefined;
+    if (limitAt > -1) {
+      rowLimit = Number(args[limitAt + 1]);
+      if (!Number.isInteger(rowLimit) || rowLimit < 1) {
+        console.error(chalk.red(`Error: --limit needs a positive integer, got "${args[limitAt + 1] ?? ''}".`));
+        process.exit(1);
+      }
+    }
     const saveBaselineFlag = args.includes("--save-baseline");
     const vsBaseline = args.includes("--vs-baseline");
 
@@ -140,7 +153,13 @@ export class CoverageCommand implements ConducksCommand {
       } else if (rows.length === 0) {
         console.log(chalk.yellow(`  Every bound function is dark — pass --all to list them.`));
       }
-      for (const r of rows) {
+      // The cap is applied HERE, after the summary counts are computed, so the numbers below still
+      // describe the FULL bound set — the same split the tool makes between `functions` and `summary`.
+      const listed = rowLimit === undefined ? rows : rows.slice(0, rowLimit);
+      if (listed.length < rows.length) {
+        console.log(chalk.dim(`  (showing ${listed.length} of ${rows.length} — raise it with --limit <n>)`));
+      }
+      for (const r of listed) {
         const filled = Math.round(r.pct / 10);
         const bar = chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(10 - filled));
         const label = r.pct >= 99 ? chalk.green("FULL") : r.pct === 0 ? chalk.gray("DARK") : chalk.yellow("PART");
