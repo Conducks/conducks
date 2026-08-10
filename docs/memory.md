@@ -2107,3 +2107,17 @@ by construction.
   And before claiming an intermittent is fixed, compute how many green runs the measured rate demands:
   at 1 in 8, three runs is noise. Capture a failure WITH ITS VALUE first — for this one I still do not
   know whether the old failures were `pulses: 0` or `pulses: 5`, and those are different bugs.
+
+## A targeted reproducer that FAILS to reproduce is still a result (todo60)
+- Gotcha: chasing the docs-watcher debounce flake, the single test was looped under 1,138% CPU load
+  (14 busy processes) — 10 of 10 green. The OLD `toBe(1)` assertion was then restored under the same
+  load and also went 10 of 10. CPU starvation does not trigger it.
+- Why: that kills the theory every previous "fix" rested on — "a slow write loop straddles the debounce
+  window" — which is what justified widening 120 -> 500 -> 2000 ms. The window was never the mechanism,
+  so the widening was treating a symptom that was not there. The trigger belongs to full-suite
+  conditions: filesystem/inode pressure from other suites' temp dirs, concurrent chokidar instances, or
+  the per-file worker recycling.
+- Applies: a targeted reproducer is cheap (seconds per run against ~4 minutes for the suite) and a
+  NEGATIVE result from one is evidence, not wasted time — it removed a wrong model that had already
+  cost two false "fixed" claims. Also: assertions that print the value (`toBeLessThan`, not a boolean)
+  mean the next natural failure diagnoses itself, so stop paying for runs once the test can speak.

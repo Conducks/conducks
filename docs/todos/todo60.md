@@ -62,10 +62,20 @@ re-lints, so the assertion still fails on a genuinely broken one, and a burst co
 passes because both are collapse.
 
 - [x] Assertion rewritten to the contract rather than to a timing instant; window back down to 300 ms.
-- [ ] NOT yet proven. 16 runs green in isolation after the change, but the failure rate before it was
-      roughly 1 in 8, and — the part that matters — no failure was ever captured WITH ITS VALUE. It is
-      unknown whether the old failures were `pulses: 0` (debounce had not fired) or `pulses: 5+`
-      (no collapse at all), and those are different bugs. Capture one before closing this.
+- [x] Tried to capture the value with a TARGETED reproducer instead of more full-suite runs: the single
+      test looped under 1,138% CPU load (14 busy processes on this machine). It did not reproduce —
+      10 of 10 green. Then the OLD `toBe(1)` assertion was restored temporarily and run under the same
+      load: also 10 of 10 green.
+      **That is a negative result worth keeping.** CPU starvation does NOT trigger it, so the theory
+      the window-widening was based on — "a slow write loop straddles the debounce window" — is
+      unsupported. Whatever the trigger is, it belongs to full-suite conditions and not to CPU
+      contention: the obvious remaining candidates are filesystem and inode pressure from other suites'
+      temp directories, chokidar instances from other tests running concurrently, and the per-file
+      worker recycling (`workerIdleMemoryLimit: '1KB'`).
+- [ ] No further hunting needed to LEARN the value. The current assertions print it on failure —
+      `toBeGreaterThanOrEqual(1)` reports `Received: 0` and `toBeLessThan(5)` reports `Received: 5` —
+      so the next natural full-suite failure names which bug it is without any extra instrumentation.
+      Wait for that rather than paying for more runs.
 
 ## Phase 1 — reproduce and attribute (reader-snapshot)
 
