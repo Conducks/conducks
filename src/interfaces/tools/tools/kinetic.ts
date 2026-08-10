@@ -2,7 +2,7 @@ import { Tool } from "@/contracts/types.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, releaseAnchor } from "../shared/anchor.js";
 import { resolveSymbolId } from "../shared/resolve-symbol.js";
-import { enumErr, numErr } from "./synapse.js";
+import { enumErr, numErr, boolErr } from "./synapse.js";
 import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
 
 /**
@@ -358,11 +358,31 @@ WARNING: This is a mutational tool. It modifies the source code.`,
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;
 
+      // A NON-BOOLEAN is refused before anything else. `dryRun: "no"` is truthy and would have been
+      // read as a dry run, which is safe by luck rather than by rule — and the opposite string would
+      // not be.
+      const badDryRun = boolErr(dryRun, 'dryRun');
+      if (badDryRun) return badDryRun;
+
+      // DRY RUN UNLESS EXPLICITLY TOLD OTHERWISE.
+      //
+      // The inputSchema declares `default: true`, but a JSON Schema default is DOCUMENTATION — the MCP
+      // server does not inject it — so an omitted `dryRun` arrived as `undefined`, and the domain
+      // signature is `rename(symbolId, newName, dryRun: boolean = false)`. Undefined became FALSE, and
+      // the only destructive tool on this surface mutated source files by default while advertising
+      // that it would not.
+      //
+      // The CLI has always been safe (`--confirm` to write), so the two surfaces held OPPOSITE defaults
+      // for a destructive operation — which is how a caller moving between them destroys work
+      // (todo61). Anything other than an explicit `false` is a dry run; a caller that means to write
+      // says so.
+      const isDryRun = dryRun !== false;
+
       try {
         await ensureAnchor(customPath, true); // GVR is memory-safe and FS-verified. NO write lock needed for DNA.
         const resolvedId = resolveSymbolId(symbol) ?? symbol;
-        const result = await registry.rename.rename(resolvedId, newName, dryRun);
-        return mcpOk({ result, dryRun });
+        const result = await registry.rename.rename(resolvedId, newName, isDryRun);
+        return mcpOk({ result, dryRun: isDryRun });
       } catch (err: any) {
         // MCP3: structured error
         return mcpErr('RENAME_FAILED', err.message, 'Check that the symbol exists and the project has been analyzed first.', true);

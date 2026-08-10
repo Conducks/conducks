@@ -91,8 +91,17 @@ shape fixed on the MCP side in todo53, still live on the CLI.
 - [ ] `status`: RECONCILE the vocabularies rather than adding to either — decide one set of mode names
       and make both surfaces speak it. This is the only gap that is a naming decision rather than a
       missing flag.
-- [ ] `rename`: settle the safety direction. Opt-in `--dry-run` and opt-out `--confirm` are opposite
-      defaults for a DESTRUCTIVE command, and a caller moving between surfaces will get it wrong.
+- [x] `rename` — and this was worse than a mismatched default. The tool's inputSchema declares
+      `dryRun: { default: true }`, but a JSON Schema default is DOCUMENTATION: the MCP server does not
+      inject it, so an omitted `dryRun` arrived as `undefined`, and the domain signature is
+      `rename(symbolId, newName, dryRun: boolean = false)`. Undefined became FALSE. **The only
+      destructive tool on the surface mutated source files by default while advertising that it would
+      not**, and the CLI had always been safe — so the two surfaces held OPPOSITE defaults for a
+      destructive operation.
+      Fixed: anything other than an explicit `dryRun: false` is a dry run, and a non-boolean is refused
+      rather than guessed at. Verified on a real file — called without `dryRun`, the file's hash is
+      unchanged and the original name is still present; called with `dryRun: false` it writes; the CLI
+      still requires `--confirm`.
 - [ ] `diff`: decide whether pulse-compare belongs on the tool and `drift` on the CLI, or whether they
       stay deliberately different and the pairs gate grants an exception with a reason.
 

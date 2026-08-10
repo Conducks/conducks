@@ -2168,3 +2168,18 @@ by construction.
 - Applies: state the gap as a QUESTION a user cannot ask, not as a flag that is missing. And do not
   add an alias flag to make two surfaces look alike — `conducks audit --mode guard` would be surface
   for its own sake when `conducks guard` already exists.
+
+## A JSON Schema `default` is documentation, and the destructive tool relied on it (todo61)
+- Gotcha: `conducks_rename`'s inputSchema declares `dryRun: { type: "boolean", default: true }`. The
+  MCP server does NOT inject schema defaults, so an omitted `dryRun` reaches the handler as
+  `undefined` — and the domain signature is `rename(symbolId, newName, dryRun: boolean = false)`.
+  Undefined became false. The only destructive tool on the surface WROTE TO DISK by default while its
+  own schema promised a dry run, and the CLI had always defaulted the other way.
+- Why: the same class as the unenforced numeric bounds (todo53) — a value declared in the schema and
+  never applied at runtime — but on the one operation where being wrong destroys work. Two surfaces
+  holding opposite defaults for a destructive command is how someone moving between them loses code.
+- Applies: `dryRun !== false` — anything other than an explicit false is a dry run, and a non-boolean
+  is refused rather than read for truthiness (`"no"` is truthy, so it was safe by luck, and the
+  opposite string would not have been). Verified against a real file rather than a mock: hash
+  unchanged when omitted, written when `dryRun: false`. Grep any schema `default:` and ask whether
+  the handler applies it.
