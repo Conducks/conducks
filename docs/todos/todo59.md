@@ -37,9 +37,18 @@ path rather than at persistence or the graph core.
 
 ## Phase 1 — find where the second pass gains what the first cannot
 
-- [ ] Diff the two graphs directly rather than the summary numbers: analyze cold, dump the dangling
-      edge set, analyze again, dump it again, and look at what the 294 have in common. Kind, file,
-      cross-file vs intra-file, and whether the target exists at all on the first pass.
+- [x] DIFFED on sofie. The gap is one shape, not a spread: of the edges dangling cold and not warm,
+      **179 of 179 are `CALLS`**, and every one is a method call on a LOCAL VALUE — `store.has`,
+      `freq.set`, `edgesbytarget.set`, `pushhandlers.add`, `d.getmonth`. No other edge type appears.
+- [x] The targets do NOT exist as nodes in EITHER run. `store.has`, `freq.set` and `d.getmonth` are
+      absent from the warm graph too. So the warm run is not resolving them better — it is disposing of
+      them differently, which rules out the obvious "a rebuild sees a complete graph" theory this todo
+      opened with. The analyze log's own line is the thread to pull:
+      `Dropped N universal-member call(s) on local values; KEPT M unresolved reference(s)`.
+- [ ] Find why that drop/keep decision differs between the first and second analyze. Warm ends with
+      MORE edges (34,929 vs 34,760) and FEWER dangling (3,146 vs 3,440), so it is not simply pruning
+      harder — both numbers move, in opposite directions, and that pair needs explaining before any
+      fix.
 - [ ] Suspect first: anything resolved against nodes that only exist once the whole tree has been
       reflected. IntraLinker runs per-pass, so a reference to a file analyzed LATER in the first sweep
       has nothing to bind to, while a rebuild sees a complete graph from the start.
