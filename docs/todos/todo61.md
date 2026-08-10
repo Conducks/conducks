@@ -1,0 +1,71 @@
+# todo61 — every MCP capability must exist on the CLI, and answer the same
+Status: todo
+- Acceptance: for all 12 paired capabilities, every MCP parameter has a CLI equivalent, the enum vocabularies match, and driving both on the same input yields the same ANSWER SET — differing only in rendering. Proven by an equivalence test, not by inspection.
+- Builds: 0005
+
+## Context
+
+The rule, stated 2026-08-10: **not every CLI command is an MCP tool, but every MCP tool IS a CLI
+command, and where both exist they mirror** — same input, same answer, differing only in how it is
+rendered.
+
+`tests/architecture/paired-surfaces.test.ts` currently enforces something much weaker: that both
+surfaces reach at least one shared `registry.*` accessor. That would pass two implementations sharing
+one helper and diverging everywhere after, which is close to what `context` actually is.
+
+Audited all 12 pairs on 2026-08-10 by reading each MCP `inputSchema` against each CLI's declared
+`usage`. The gaps are not incidental:
+
+| pair | MCP has, CLI lacks | note |
+|---|---|---|
+| `trace` | `target`, `mode` | the whole `path` mode is unreachable from the CLI |
+| `prune` | `type`, `limit` | CLI cannot filter to a finding type at all |
+| `context` | `radius`, `max_tokens`, `include_atoms` | CLI takes only a symbol |
+| `flows` | `min_members`, `limit` | CLI takes neither |
+| `audit` | `scan`/`advice`/`guard`/`archeology` modes, `threshold` | CLI exposes `--fallback` and `--history` only |
+| `coverage` | `limit` | |
+| `status` | vocabularies DIFFER | MCP `health\|map\|manifest\|pulse`; CLI `pulse\|blueprint` |
+| `rename` | safety INVERTED | MCP `dryRun` opt-in; CLI `--confirm` opt-out |
+| `diff` | different features | CLI has `--base/--head` pulse compare; MCP has `drift`. Neither has the other |
+
+`explain`, `impact` and `query` are close to aligned already.
+
+**A live defect found by the audit**: `impact`'s CLI reads
+`const direction = (args[1] === "downstream" ? "downstream" : "upstream")`, so any unknown value —
+`sideways`, a typo, a stray flag — silently answers upstream. That is the exact silent-substitution
+shape fixed on the MCP side in todo53, still live on the CLI.
+
+## Phase 1 — close the capability gaps
+
+- [ ] Fix `impact`'s CLI direction first: an unknown value must refuse, not default. Smallest change,
+      and it is a wrong answer today.
+- [ ] `trace`: add `--target <symbol>` and `--mode reachability|path`, refusing an unknown mode and
+      refusing `path` without a target — the same rules the tool now enforces.
+- [ ] `prune`: add `--type <TYPE>` and `--limit <n>`, validated against `DEAD_CODE_TYPES`.
+- [ ] `context`: add `--radius`, `--max-tokens`, `--include-atoms` with the published bounds.
+- [ ] `flows`: add `--min-members` and `--limit`.
+- [ ] `audit`: expose the full mode set and `--threshold`.
+- [ ] `coverage`: add `--limit`.
+- [ ] `status`: RECONCILE the vocabularies rather than adding to either — decide one set of mode names
+      and make both surfaces speak it. This is the only gap that is a naming decision rather than a
+      missing flag.
+- [ ] `rename`: settle the safety direction. Opt-in `--dry-run` and opt-out `--confirm` are opposite
+      defaults for a DESTRUCTIVE command, and a caller moving between surfaces will get it wrong.
+- [ ] `diff`: decide whether pulse-compare belongs on the tool and `drift` on the CLI, or whether they
+      stay deliberately different and the pairs gate grants an exception with a reason.
+
+## Phase 2 — enforce it, since inspection rots
+
+- [ ] Strengthen `paired-surfaces.test.ts` from "shares one registry accessor" to "reaches the same
+      domain function". The current check is too weak to catch divergence and says so in its own
+      comment.
+- [ ] Add an EQUIVALENCE test: drive both surfaces on the same input and assert the answer sets match.
+      Rendering differs by design — the CLI returns source lines for `context`, the tool returns a
+      token budget — so compare the ids/findings, not the payloads.
+- [ ] `--json` on the CLI is the honest comparison point: it is the CLI's machine surface and should be
+      the same data the tool returns.
+
+## Not in scope
+
+- Adding MCP tools for CLI-only commands. The rule is one-directional: every MCP tool is a CLI
+  command, not the reverse. `mirror`, `setup`, `install-hooks` and the rest stay CLI-only.

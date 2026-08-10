@@ -2137,3 +2137,20 @@ by construction.
 - Applies: the first analyze is the only run a new user ever sees, so its numbers are the product's
   first impression. Fix by ordering — induct before linking, or link again after induction — never by
   widening the sweep, which bulk-deletes edges and is not the mechanism (ADR 0096).
+
+## Every MCP tool is a CLI command, and where both exist they MIRROR (todo61)
+- Gotcha: audited all 12 paired capabilities by reading each MCP `inputSchema` against each CLI's
+  declared `usage`. The CLI cannot reach `trace --mode path` at all, cannot filter `prune` by type,
+  and takes none of `context`'s radius/max_tokens/include_atoms. `status` uses a DIFFERENT mode
+  vocabulary on each side (`health|map|manifest|pulse` vs `pulse|blueprint`), and `rename` inverts its
+  safety default (`dryRun` opt-in on the tool, `--confirm` opt-out on the CLI) — for a DESTRUCTIVE
+  command, which is how someone moving between surfaces gets it wrong.
+- Why: the pairs gate only asserts both surfaces share one `registry.*` accessor, which two
+  implementations can satisfy while diverging everywhere after. The rule is stronger: same input, same
+  ANSWER, differing only in rendering — and `--json` is the honest comparison point because it is the
+  CLI's machine surface.
+- Applies: the audit also found a live wrong answer the gate could never catch —
+  `conducks impact <sym> sideways` read `args[1] === "downstream" ? … : "upstream"` and silently
+  analysed upstream, in a command whose own `--depth` refuses a bad value with a comment explaining
+  why. One rule, two arguments, applied to one of them. Fixed; a flag is still not treated as a
+  direction. todo61 carries the remaining gaps.

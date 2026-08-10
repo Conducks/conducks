@@ -14,7 +14,22 @@ export class ImpactCommand implements ConducksCommand {
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const symbolId = args[0];
-    const direction = (args[1] === "downstream" ? "downstream" : "upstream") as "upstream" | "downstream";
+
+    // An unknown direction is an ERROR, not a silent default — the same rule `--depth` below already
+    // follows, and for the same reason. This read `args[1] === "downstream" ? "downstream" : "upstream"`,
+    // so `sideways`, a typo, or anything else answered UPSTREAM while looking obeyed. The MCP side
+    // refuses it (todo53); the CLI answering a different question for the same input is exactly what
+    // the mirror rule forbids (todo61).
+    //
+    // A flag is not a direction: `conducks impact sym --json` must keep working, so only a
+    // non-flag second argument is validated.
+    const DIRECTIONS = ["upstream", "downstream"] as const;
+    const given = args[1];
+    if (given !== undefined && !given.startsWith('-') && !DIRECTIONS.includes(given as never)) {
+      console.error(`Error: direction must be one of: ${DIRECTIONS.join(', ')} — got "${given}".`);
+      process.exit(1);
+    }
+    const direction = (given === "downstream" ? "downstream" : "upstream") as "upstream" | "downstream";
     const useJson = args.includes('--json');
     const useTree = args.includes('--tree');
     // The engine has taken a depth all along (default 5); the CLI never passed it, and the vs-grep
