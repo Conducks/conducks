@@ -37,10 +37,15 @@ shape fixed on the MCP side in todo53, still live on the CLI.
 
 ## Phase 1 — close the capability gaps
 
-- [ ] Fix `impact`'s CLI direction first: an unknown value must refuse, not default. Smallest change,
-      and it is a wrong answer today.
-- [ ] `trace`: add `--target <symbol>` and `--mode reachability|path`, refusing an unknown mode and
-      refusing `path` without a target — the same rules the tool now enforces.
+- [x] `impact`'s CLI direction refuses an unknown value and names it. A flag is still not treated as a
+      direction, and an omitted direction still defaults to upstream.
+- [x] `trace` takes `--mode reachability|execution|path` and `--target <symbol>`, with the tool's
+      refusals: an unknown mode is an error, and `path` without a target is refused rather than answered
+      with reachability. `execution` stays accepted as ADR 0066's deprecated alias. The symbol picker
+      now skips EVERY flag's value, not just `--limit`'s, or `trace alpha --target beta` would have read
+      `beta` as the symbol.
+      VERIFIED AS A MIRROR on sofie: `watchKernelPrompt -> loadKernelPrompt` returns the same two steps
+      from both surfaces. `--flow` stays CLI-only, which the rule permits.
 - [ ] `prune`: add `--type <TYPE>` and `--limit <n>`, validated against `DEAD_CODE_TYPES`.
 - [ ] `context`: add `--radius`, `--max-tokens`, `--include-atoms` with the published bounds.
 - [ ] `flows`: add `--min-members` and `--limit`.
