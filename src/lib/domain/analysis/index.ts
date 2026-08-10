@@ -363,6 +363,32 @@ export class AnalysisService {
     // 4.5 [Conducks Virtual Induction] 🏺
     await this.induceVirtualLibraries(this.graph.getGraph(), pulseId);
 
+    // 4.5b LINK AGAIN, because induction just created nodes the first pass could not see.
+    //
+    // IntraLinker runs above, BEFORE induction materialises the external/virtual nodes. On a warm
+    // vault those nodes survive from the previous pulse, so the first pass finds them and everything
+    // resolves; on a COLD vault they do not exist yet, and every reference that would land on one
+    // dangles until the next analyze. That is the whole cold/warm gap, and it means the first analyze
+    // — the only run a new user ever sees — is measurably worse than a rebuild of the same code.
+    //
+    // Measured on sofie (todo59): cold resolved 7,531 references against warm's 7,994, and dangling
+    // was 3,440 against 3,146. PROVEN rather than inferred: replaying IntraLinker alone over the cold
+    // vault — no re-parse, no re-induction — resolved 356 more and took dangling to exactly 3,146,
+    // the warm number to the edge.
+    //
+    // A second pass, not a reorder: induction reads the dangling set that linking produces, so
+    // inducting first would starve it. Two theories were disproved on the way and are recorded in
+    // todo59 so they are not retried — the sweep leaves no residue (a second sweep deletes 0), and
+    // "a rebuild sees a complete graph" is false (the targets are not nodes in either run).
+    const postInduction = intraLinker.resolve(this.graph.getGraph());
+    if (postInduction.length > 0) {
+      await this.persistence.updateEdgeTargets(postInduction);
+      const gi = this.graph.getGraph();
+      let applied = 0;
+      for (const r of postInduction) if (gi.retargetEdge(r.id, r.newTargetId)) applied++;
+      logger.info(`🛡️ [IntraLinker] Re-linked ${postInduction.length} reference(s) against induced nodes (${applied} applied in memory).`);
+    }
+
     // Doc -> code links, derived from the grammar the docs already use (ADR 0058).
     await this.deriveDocGovernance(pulseId, targetRoot);
 

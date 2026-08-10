@@ -60,12 +60,23 @@ path rather than at persistence or the graph core.
       happens, so every reference that would land on one dangles; on a warm vault they survive from the
       previous pulse and the linker finds them. That is exactly the shape of the 179 leftover CALLS —
       `store.has`, `d.getmonth`, `freq.set` — whose receivers resolve to induced ecosystem nodes.
-- [ ] FIX: make the first analyze converge. Either induct external references BEFORE IntraLinker, or
-      run IntraLinker again after induction. The second is smaller and is what the warm run effectively
-      does today, one pulse late. Do NOT widen the sweep — it deletes edges in bulk and is not the
-      mechanism (ADR 0096).
-- [ ] Re-measure after the fix: cold and warm must both report the same IntraLinker count, and
-      `--cold --compare` must be clean.
+- [x] PROVEN before fixing, not inferred: replaying IntraLinker ALONE over the cold vault — no
+      re-parse, no re-induction — resolved 356 more references and took dangling from 3,440 to exactly
+      3,146, the warm number to the edge. That isolates induction order as the cause; the second
+      analyze's re-parsing is irrelevant.
+- [x] FIXED by a second link pass after induction (`analysis/index.ts` 4.5b), not a reorder — induction
+      READS the dangling set that linking produces, so inducting first would starve it. Cold analyze on
+      sofie now logs `Re-linked 525 reference(s) against induced nodes` and reports KEPT 3,146 against
+      the previous 3,440, with 34,929 edges against 34,760 — both the warm figures.
+- [x] RE-MEASURED. The dangling gap is closed on both TypeScript subjects: cold now hits the warm
+      dangling figure exactly (sofie 3,146/34,929; orchestrator 1,887). Warm is untouched — all three
+      `vs baseline unchanged`. Suite green, 228 suites / 1,789 tests.
+- [ ] A RESIDUE REMAINS, an order of magnitude smaller and a different shape: cold still differs from
+      warm by ±5 edges (orchestrator 23,791 -> 23,786) and ±1 node (sofie 10,543 -> 10,544, with
+      `located` 7,806 -> 7,807). The 294/157 dangling gap this todo opened with is gone; this is not
+      that. Decide whether one more pass converges it or whether it is a genuine first-vs-second
+      difference (a node that only exists once something has been induced), and either fix it or save a
+      COLD baseline so the residue is tracked rather than rediscovered.
 - [x] SUPERSEDED THEORY, kept so it is not retried: "the sweep is a single pass at the end of analyze,
       so anything dangling after it survives until the next analyze sweeps again." Disproved by the
       second-sweep measurement above (deleted=0).
