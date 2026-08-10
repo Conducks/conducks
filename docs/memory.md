@@ -2121,3 +2121,19 @@ by construction.
   NEGATIVE result from one is evidence, not wasted time — it removed a wrong model that had already
   cost two false "fixed" claims. Also: assertions that print the value (`toBeLessThan`, not a boolean)
   mean the next natural failure diagnoses itself, so stop paying for runs once the test can speak.
+
+## The first analyze links BEFORE external induction, so 463 references dangle (todo59)
+- Gotcha: a cold analyze resolves fewer references than a rebuild of the same code. Measured on sofie:
+  IntraLinker resolves 7,531 cold against 7,994 warm — 463 fewer — and the dangling count is 3,440
+  against 3,146. The leftovers are all CALLS on local values (`store.has`, `d.getmonth`, `freq.set`)
+  whose receivers resolve to INDUCED ecosystem nodes.
+- Why: external/virtual node induction runs AFTER IntraLinker. On a cold vault those nodes do not exist
+  when linking happens, so anything landing on one dangles; on a warm vault they survive from the
+  previous pulse and the linker finds them. The warm run is not smarter — it is reading last pulse's
+  induction. Two earlier theories were wrong and both were disproved by measurement rather than
+  argument: "a rebuild sees a complete graph" (the targets do not exist as nodes in either run) and
+  "the sweep leaves residue for a later pass" (running `sweepUnresolvedGuesses` a second time on the
+  cold vault deletes 0).
+- Applies: the first analyze is the only run a new user ever sees, so its numbers are the product's
+  first impression. Fix by ordering — induct before linking, or link again after induction — never by
+  widening the sweep, which bulk-deletes edges and is not the mechanism (ADR 0096).

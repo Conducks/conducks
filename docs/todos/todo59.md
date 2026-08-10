@@ -45,7 +45,31 @@ path rather than at persistence or the graph core.
       them differently, which rules out the obvious "a rebuild sees a complete graph" theory this todo
       opened with. The analyze log's own line is the thread to pull:
       `Dropped N universal-member call(s) on local values; KEPT M unresolved reference(s)`.
-- [ ] Find why that drop/keep decision differs between the first and second analyze. Warm ends with
+- [x] ANSWERED, and the sweep is not involved at all. Running `sweepUnresolvedGuesses()` a SECOND time
+      against the cold vault, without re-analyzing, deletes **0** — so the ordering theory below is
+      wrong and the sweep is not leaving residue for a later pass to collect.
+      The difference is in LINKING, and the pipeline logs say so directly:
+
+      | pass | IntraLinker resolutions | external induction |
+      |---|---|---|
+      | cold | 7,531 | `326 new external reference(s)` |
+      | warm | 7,994 | `0 new, 360 re-stamped` |
+
+      **463 more references resolve on the second analyze**, and the reason is ORDER: external/virtual
+      node induction runs AFTER IntraLinker. On a cold vault those nodes do not exist when linking
+      happens, so every reference that would land on one dangles; on a warm vault they survive from the
+      previous pulse and the linker finds them. That is exactly the shape of the 179 leftover CALLS —
+      `store.has`, `d.getmonth`, `freq.set` — whose receivers resolve to induced ecosystem nodes.
+- [ ] FIX: make the first analyze converge. Either induct external references BEFORE IntraLinker, or
+      run IntraLinker again after induction. The second is smaller and is what the warm run effectively
+      does today, one pulse late. Do NOT widen the sweep — it deletes edges in bulk and is not the
+      mechanism (ADR 0096).
+- [ ] Re-measure after the fix: cold and warm must both report the same IntraLinker count, and
+      `--cold --compare` must be clean.
+- [x] SUPERSEDED THEORY, kept so it is not retried: "the sweep is a single pass at the end of analyze,
+      so anything dangling after it survives until the next analyze sweeps again." Disproved by the
+      second-sweep measurement above (deleted=0).
+- [ ] Original phrasing, now known wrong: Warm ends with
       MORE edges (34,929 vs 34,760) and FEWER dangling (3,146 vs 3,440), so it is not simply pruning
       harder — both numbers move, in opposite directions, and that pair needs explaining before any
       fix.
