@@ -34,6 +34,8 @@ export default {
 					},
 				],
 			},
+			// Cap analyze's worker pool for the whole run — see tests/helpers/cap-workers.mjs.
+			setupFiles: ['<rootDir>/tests/helpers/cap-workers.mjs'],
 			testMatch: ['**/tests/**/*.test.ts'],
 			testPathIgnorePatterns: [
 				'<rootDir>/tests/persistence/',

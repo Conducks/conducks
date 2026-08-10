@@ -60,3 +60,18 @@ Return, in prose:
 5. **Out-of-lane findings** — as applyable specs
 
 No code dumps. The orchestrator reads your reasoning and inspects the diff itself.
+
+## Do not cook the laptop
+
+`analyze` sizes its worker pool at `os.cpus().length - 1` — 11 workers on a 12-core machine — and the
+test suite spawns `analyze` many times over. Twelve cores saturated for minutes is what makes the
+machine hot, and it buys very little: measured on sofie (10.5k nodes), 11 workers analyzes in 20s and
+4 workers in 23s. A 15% wall-clock cost for roughly a third of the load.
+
+- `CONDUCKS_WORKERS` caps the pool. Tests set it to 4 automatically (`tests/helpers/cap-workers.mjs`);
+  an explicit value always wins, so a benchmark can still ask for full width.
+- **Do not use the full suite as a reproduction harness.** It is ~4 minutes and runs everything. To
+  chase one failing test, loop THAT test — and if it is load-dependent, add load deliberately rather
+  than running the suite twenty times. Diagnosing a flake this way once cost an hour of wall time and
+  produced a wrong conclusion; a targeted probe answered it in ten runs of five seconds.
+- Reach for the full suite as a GATE — before a commit, after a change lands — not as an inner loop.
