@@ -88,9 +88,21 @@ describe('the commands that block', () => {
 
   it('mirror serves the wave over HTTP and binds LOOPBACK by default', async () => {
     const body = await withProcess(['mirror'], repo, async (_proc, out) => {
-      const up = await until(out, s => /localhost:\d+|127\.0\.0\.1:\d+|Dashboard|listening/i.test(s), 25000);
+      // WAIT FOR THE BOUND ADDRESS, and take the port FROM IT (todo60#P3).
+      //
+      // This used to accept `/Dashboard/i` as readiness — and `mirror.ts` prints "Initializing
+      // Visual Dashboard..." BEFORE it binds, so the predicate passed immediately. The port was then
+      // read from whatever the output happened to contain, falling back to a guessed 3333, and the
+      // fetch went to a port nothing was listening on yet. The server also increments on EADDRINUSE,
+      // so 3333 can be wrong outright rather than merely early.
+      //
+      // MEASURED over five clean full-suite runs with nothing else on the machine: 2 failures, both
+      // here, both `HTTP_OK::false::TypeError: fetch failed`. One signal that carries the port is
+      // both the readiness condition and the address — there is nothing left to guess.
+      const ready = /Dashboard:\s*http:\/\/localhost:(\d{4,5})/i;
+      const up = await until(out, s => ready.test(s), 25000);
       if (!up) return `SERVER_NEVER_REPORTED_READY::${out()}`;
-      const port = (out().match(/:(\d{4,5})\b/) ?? [])[1] ?? '3333';
+      const port = (out().match(ready) ?? [])[1]!;
       const res = await fetch(`http://127.0.0.1:${port}/api/synapse`).catch(e => ({ ok: false, text: async () => String(e) }) as any);
       return `HTTP_OK::${res.ok}::${(await res.text()).slice(0, 400)}`;
     });

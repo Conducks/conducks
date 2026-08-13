@@ -105,12 +105,27 @@ passes because both are collapse.
 - [ ] Then 20 consecutive full-suite runs. The observed rate is roughly 2 in 10, so 20 clean runs is
       the bar that means something.
 
-## Phase 3 — a THIRD intermittent, seen 2026-08-11
+## Phase 3 — measured clean, and it is one test
 
-- [ ] `tests/integration/features/rename-safety.test.ts` failed in 2 of 6 full-suite runs on 2026-08-11 and passes in isolation every time. The two failures were at DIFFERENT lines — `:84` and `:67` — which argues against one specific assertion and for the suite's setup racing something. Both runs reported TWO failing suites and the second was never captured: `npm test | tail` rolls it off, so capture to a file (`npm test > run.log 2>&1; grep -E '^(FAIL|Tests:)' run.log`) and name it before touching anything. A flake identified from one observation is a guess
-- [ ] A capture attempt on 2026-08-13 produced a CONTAMINATED result and it is recorded so nobody re-derives it: `kinetic.test.ts` failed 4 tests with `Cannot find module .../build/src/lib/core/utils/mem-trace.js`, which looks exactly like a harness race and is not one. `npm run build` starts with `rm -rf build`, and it was run BY HAND while the suite was running. **Never build, analyze or restore a source file while `npm test` is in flight** — the child CLIs the integration suites spawn read `build/` live
-- [ ] That failure also refutes the parallel-rebuild theory it suggests: `jest.config.js` sets `maxWorkers: 1` precisely because DuckDB is single-writer, so two suites cannot rebuild over each other. Any real explanation has to work under serial execution
-- [ ] Three back-to-back runs on 2026-08-13, captured to files: **fail / pass / fail**, and the two failures are in two MORE suites — `kinetic.test.ts` (4 tests) and `blocking-commands.test.ts` (1). With `rename-safety` that is FOUR distinct suites, every one of them an integration suite that spawns child processes. Both failures are suspect as measurements: run 1 was contaminated by a hand-run `npm run build`, and during run 3 the same shell was invoking `docs-lint`/`docs-status`, which is CPU load beside a test that fetches over HTTP with a timeout. The clean run passed
-- [ ] Run 3's case is `mirror serves the wave over HTTP and binds LOOPBACK by default`: `HTTP_OK::false::TypeError: fetch failed` while `SERVER_NEVER_REPORTED_READY` did NOT fire — so the server announced itself and the socket still refused the connection. That is a ready-vs-listening gap or a port collision, not a slow machine, and it is a different case from the reaction one in the same file that todo55 already settled
-- [ ] MEASURE IT PROPERLY BEFORE THEORISING FURTHER: an idle machine, nothing else running in any shell, N consecutive captured runs, and a note of which suite fails each time. Every observation so far has been taken while something else was happening, which is why four suites look implicated and none is understood
-- [ ] Do NOT attribute it to the alias fix (todo62) without evidence, tempting as the timing is. That change adds binding nodes, and `rename` walks the graph — but this suite passed 235/235 twice on the same build, so the counts cannot carry an attribution any more than they could in Phase 1
+Every earlier observation was taken while something else was running, which is why four suites looked
+implicated and none was understood. Re-run with an idle machine and a clean tree, five consecutive
+full runs captured to files:
+
+| run | result |
+|---|---|
+| 1, 2, 3 | pass, 1,838/1,838 |
+| 4, 5 | **fail — one test, the same one both times** |
+
+- [x] NAMED: `blocking-commands.test.ts › mirror serves the wave over HTTP and binds LOOPBACK by default`, failing `HTTP_OK::false::TypeError: fetch failed` in both. `rename-safety` and `kinetic` did NOT recur in 5 clean runs; the `kinetic` failure is separately known to have been contaminated by a hand-run `npm run build`, and `rename-safety` has no clean observation at all
+- [x] MECHANISM, proven rather than argued. `mirror.ts:14` prints "Initializing Visual Dashboard..." BEFORE the server binds, and the test accepted `/Dashboard/i` as readiness — so it proceeded immediately. The port was then read from whatever the output happened to hold, falling back to a GUESSED 3333, and the fetch hit a port nothing was listening on. `mirror-server.ts` also increments on `EADDRINUSE`, so 3333 can be wrong outright rather than merely early. Verified by running both predicates against the two lines: the old one accepts the pre-bind line, the new one rejects it and extracts the real port from the bound address
+- [x] FIXED by making one signal serve as both the readiness condition and the address — `Dashboard: http://localhost:(\d{4,5})` — with no fallback. A guessed default is what turned "not ready yet" into "fetch a stranger's port"
+- [x] VERIFIED, and with the right instrument. Five more FULL-SUITE runs was the wrong tool once the flake had a name: the suite costs ~240s because `maxWorkers: 1` serialises it (DuckDB is single-writer) and `workerIdleMemoryLimit: '1KB'` recycles the worker per file (the tree-sitter addon serves one wrapper per process). **The one suite costs 3 seconds** — 80x cheaper — so the loop runs there
+- [x] The cheap instrument was VALIDATED before being trusted: reverting the predicate and running the suite alone reproduced the failure **1 in 15**, same `HTTP_OK::false::TypeError: fetch failed`. It does reproduce in isolation, so the loop measures the real thing
+- [x] The rate is LOWER alone than under load — 1/15 (7%) isolated against 2/5 (40%) in the full suite — which is consistent with a timing race that a busy machine widens. Worth knowing before anyone reads an isolated green run as conclusive
+- [x] **0 failures in 60 isolated runs** with the fix. Against a 7% base rate that is P(all green) ~1.3% if nothing had changed
+
+## What this phase cost, and the rule that comes out of it
+
+- [x] Nine observations across the day named FOUR suites and explained none, because every one was taken while a build, a test loop or a CLI call was running in another shell. Two were provably contaminated: one analyze produced an EMPTY graph because `npm run build` had wiped `build/` under it, and the empty result read as a finding rather than as garbage
+- [x] The measurement that worked took 22 minutes of doing nothing else. That is the whole method: an idle machine, a clean tree, runs captured to files, and the failing suite named from the file rather than from a terminal tail that had already rolled
+- [x] But 22 minutes was only right for FINDING it. Once a flake is named, the full suite is the wrong instrument — 240s against 3s for the suite that holds it. Validate the cheap one against the known failure first (it reproduced 1 in 15), then loop it enough times for the base rate to mean something. Chasing a named flake through full-suite runs is the habit AGENT_RULES already warns about, arrived at from the other direction

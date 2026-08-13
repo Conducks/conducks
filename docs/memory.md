@@ -514,6 +514,23 @@ by construction.
   not the flag. The real gap here turned out to be the MACHINE SURFACE — `conducks drift` had no
   `--json`, so no equivalence check was possible — which is a much smaller and more useful fix. — todo61
 
+## A readiness signal that does not carry the address is not readiness
+- Gotcha: `blocking-commands.test.ts` waited for `/Dashboard/i` before fetching the mirror's HTTP
+  endpoint, and `mirror.ts` prints "Initializing Visual Dashboard..." BEFORE it binds. The test
+  proceeded immediately, took the port from whatever the output happened to hold, fell back to a
+  GUESSED 3333, and fetched a port nothing was listening on — `TypeError: fetch failed`, in 2 of 5
+  clean full-suite runs.
+- Why: the predicate and the address were two separate reads of the same output, so nothing forced
+  them to agree. A default port made it worse: without the fallback the test would have failed loudly
+  on a missing port instead of quietly querying a stranger's. `mirror-server.ts` increments on
+  EADDRINUSE, so 3333 is not merely early, it can be wrong outright.
+- Applies: wait for the signal that CARRIES what you are about to use, and take the value from that
+  same match — one regex, no fallback. This generalises past ports: any "wait, then read separately"
+  pair can satisfy the wait with a line the read cannot serve.
+  And measure a NAMED flake in the suite that holds it, not the full run: 3s against 240s here, 80x.
+  Validate the cheap instrument against the known failure first — reverting the fix reproduced it 1 in
+  15 alone against 2 in 5 under full-suite load, so isolation is a weaker signal but a real one. — todo60
+
 ## Two symbols can share one id, because ids are lowercased
 - Gotcha: a linker fix that rebound a call to a same-named local rebound **37 edges on the python
   subject** that it should not have — `pathlib::Path` onto a local variable `path`, `graph.py::Node`
