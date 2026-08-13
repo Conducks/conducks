@@ -44,8 +44,8 @@ So neither is simply the better one. Picking is the work.
       44 shared names out of 2,407 against 83 is not two renderings of one answer.
 - [x] The CLI side has a defect the static gate could not see: **2,407 entries for one symbol is a dump, not context.** 247 of them are kind `node` — unresolved placeholders — plus 196 UNIT and 19 ECOSYSTEM, none of which answers "what is around this symbol". Whatever is decided below, the CLI's breadth is a bug on its own and the MCP side already excludes exactly these classes (ADR 0103, todo28#P4)
 - [x] Both sprawl through the registry hub, differently: the MCP-only names include `tool`, `execute`, `syncGraph`, `watchSynapse` — reached because `registry` is a STRUCTURE every path crosses. A shared implementation inherits that problem rather than solving it, so hub exclusion belongs in whatever lands
-- [ ] Decide: one shared domain function with a presentation difference (source lines for the CLI,
-      token budget for the tool), or two names that stop implying agreement.
+- [x] NOT AN OPEN DECISION — ADR 0148 already made it, and this todo predates reading it that way. The mirror rule says "the same input produces the same ANSWER, differing only in rendering", and it names this exact case in its own text: "Rendering differs by design: `context` returns source lines on the CLI and a token budget on the tool." That is option one, stated by an accepted record. The measurement above only removes the last reason to argue: the CLI's answer is not a defensible alternative to unify TOWARD, since 247 of its 2,407 entries are unresolved placeholders
+- [ ] So the remaining work is mechanical, not deliberative: extract the scored BFS into the domain, keep the CLI's source lines and the tool's token budget as rendering, and both surfaces reach it through the registry
 - [ ] If unified: the shared function goes in the domain and both surfaces reach it through the
       registry — `cli -> domain` and `mcp -> domain` are forbidden static edges and `boundaries.test.ts`
       enforces it, as it did three times on 2026-08-09.

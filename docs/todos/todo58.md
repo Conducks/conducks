@@ -73,7 +73,8 @@ misses `electron/main/index.ts:1341`, again behind `await import()`. Recall matt
       works after `tsc` emits both under `dist/` as siblings (`rootDir: ./src`, `outDir: ./dist`).
       No source-level resolver can follow that without modelling the build. Precision on sofie is now
       171 findings with 7 known-wrong from this separate cause.
-- [ ] DECIDE what to do about build-layout specifiers, which is a different problem from this todo's:
+- [x] The DECISION is already made by precedent, and this task overstated how open it was. ADR 0070 settled the identical question for aliases: when resolution finds nothing, "return undefined immediately — do not fall through", because the fallback fabricated a target and 106 importers landed on the same wrong file. A build-layout specifier is the same shape — a specifier no source-level resolver can satisfy — so it refuses and is recorded as dangling. Reading `tsconfig` rootDir/outDir would be modelling the build, which is the guessing ADR 0070 removed, in a more elaborate form
+- [ ] Build it: an unresolvable build-layout specifier inflates DANGLING rather than silently making symbols look dead. Original framing kept below for the detail it carries:
       read `tsconfig` `rootDir`/`outDir`/`paths` and map the specifier back to source, or record the
       unresolvable specifier as dangling so it inflates the dangling count instead of silently making
       symbols look dead. ADR 0070's rule points at the second: refuse to fabricate a target, but do not

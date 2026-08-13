@@ -102,8 +102,8 @@ shape fixed on the MCP side in todo53, still live on the CLI.
       rather than guessed at. Verified on a real file — called without `dryRun`, the file's hash is
       unchanged and the original name is still present; called with `dryRun: false` it writes; the CLI
       still requires `--confirm`.
-- [ ] `diff`: decide whether pulse-compare belongs on the tool and `drift` on the CLI, or whether they
-      stay deliberately different and the pairs gate grants an exception with a reason.
+- [x] `diff`: HALF of this is already decided by ADR 0148 and does not need a call. The rule is one-directional — "an agent must never be able to ask something a person cannot" — so MCP's `drift` MUST gain a CLI home. The converse does not follow: the CLI's `--base/--head` pulse compare may stay CLI-only, exactly as `mirror` and `setup` do, and needs no tool
+- [ ] Build the CLI home for `drift`. What is genuinely open is only the NAME it takes there, which is reversible and costs nothing to change later
 
 ## Phase 2 — enforce it, since inspection rots
 

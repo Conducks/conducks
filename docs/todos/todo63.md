@@ -50,5 +50,6 @@ fail in: acting on it breaks the build.
 
 ## Phase 2 — the recall half, which is a taxonomy question
 
-- [ ] An exported value nobody imports is deleted by `pruneTaxonomy` before `prune` can see it, so reporting it means keeping such nodes alive — a change to what the graph STORES (ADR 0013), not to what `prune` reads. DECIDE whether an exported-but-unreferenced value is worth a node, weighing it against the ~72% ATOM flood that edge-gating exists to prevent
+- [x] The weighing is DONE and it is not close. MEASURED by counting `export const` VALUE declarations never named in any import: **conducks 21** (of 6,469 nodes, 0.32%), **sofie 49**. The ATOM flood edge-gating exists to prevent was ~5,000 -> ~1,400 nodes, a 72% cut. 0.3% is three orders of magnitude away from that, so the reason to refuse does not apply here
+- [ ] Build it: keep an exported value node when it is exported, even with no non-structural edge. The same hazard already exists for exported FUNCTIONS, which `prune` reports today — a library's public constant with no internal importer will read as dead exactly like its public function does, which is consistent rather than new
 - [ ] Whatever is decided, the fixture's `KNOWN_WRONG.deadButNotFlagged` entry moves or disappears — it fails if this is silently fixed, which is the point of it
