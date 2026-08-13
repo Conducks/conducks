@@ -1398,10 +1398,23 @@ export class SynapsePersistence {
     const STRUCTURAL = `('MEMBER_OF','CONTAINS','HAS_METHOD','HAS_PROPERTY')`;
 
     // 1. Freeze the drop set BEFORE mutating edges — the ATOM edge test reads the current edge set.
+    //
+    // An EXPORTED value is spared even with no reference edge (todo63#P2). Its use is invisible to
+    // the graph — a bare read produces no edge — so the edge gate cannot tell an exported constant
+    // nobody imports from one used everywhere, and it was deleting both. `prune` then had nothing to
+    // report and an exported-but-dead value could never be found.
+    //
+    // This is the one exception to the gate and it is bounded, which is why it is safe: MEASURED by
+    // counting `export const` VALUE declarations never named in any import, it is 21 nodes on
+    // conducks (0.32% of 6,469) and 49 on sofie. The ATOM flood the gate exists to stop was ~5,000
+    // -> ~1,400, a 72% cut, so this is three orders of magnitude away from re-creating it. A
+    // non-exported local with no edges is still cut, which is the bulk of them.
     await this.run(`CREATE OR REPLACE TEMP TABLE _pruned AS
       SELECT id, parentId FROM nodes n
       WHERE n.canonicalKind = 'DATA'
-         OR (n.canonicalKind = 'ATOM' AND NOT EXISTS (
+         OR (n.canonicalKind = 'ATOM'
+             AND COALESCE(n.dna->>'$.isExported', 'false') <> 'true'
+             AND NOT EXISTS (
                SELECT 1 FROM edges e
                WHERE (e.sourceId = n.id OR e.targetId = n.id)
                  AND e.type NOT IN ${STRUCTURAL}))`);

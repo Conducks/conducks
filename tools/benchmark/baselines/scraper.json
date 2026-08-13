@@ -2,7 +2,7 @@
   "project": "scraper",
   "sha": "8e558ca",
   "language": "python",
-  "analyzeMs": 7082,
+  "analyzeMs": 7540,
   "coldStart": false,
   "nodes": 5294,
   "units": 273,
@@ -33,47 +33,47 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 843,
+      "ms": 876,
       "bytes": 576
     },
     "audit": {
       "code": 1,
-      "ms": 537,
+      "ms": 560,
       "bytes": 801
     },
     "entry": {
       "code": 0,
-      "ms": 827,
+      "ms": 844,
       "bytes": 1151
     },
     "prune": {
       "code": 0,
-      "ms": 980,
+      "ms": 1004,
       "bytes": 33779
     },
     "flows": {
       "code": 0,
-      "ms": 911,
+      "ms": 929,
       "bytes": 399012
     },
     "ledger": {
       "code": 0,
-      "ms": 972,
+      "ms": 1002,
       "bytes": 465
     },
     "supply-chain": {
       "code": 0,
-      "ms": 1018,
+      "ms": 723,
       "bytes": 8045
     },
     "advise": {
       "code": 0,
-      "ms": 996,
+      "ms": 922,
       "bytes": 16408
     },
     "query": {
       "code": 0,
-      "ms": 1047,
+      "ms": 993,
       "bytes": 1223
     }
   },

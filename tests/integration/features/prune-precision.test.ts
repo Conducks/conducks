@@ -30,25 +30,25 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 /** The whole point: truth is declared here, in the test, not read back out of the tool. */
 const TRUTH = {
   /** Exported, imported by nobody, called by nobody. Deleting it changes nothing. */
-  dead: ['deadFunction'],
+  dead: ['deadFunction', 'deadConstant'],
   /** Reachable. Each one is reached by a DIFFERENT mechanism, named in the fixture below. */
   live: ['staticallyUsed', 'dynamicallyUsed', 'constructedDynamically', 'barrelUsed', 'usedConstant'],
 };
 
 /**
- * MEASURED and still wrong, tracked here rather than asserted away (todo63 Phase 2).
+ * Empty, and kept as a named group rather than deleted (todo63).
  *
- * This group started with TWO entries and is down to one, which is the group working as intended:
- * `usedConstant` was reported `STALE_IMPORT` while being used, and that half is FIXED — it now sits
- * in `TRUTH.live` above and is scored like anything else.
+ * It held two entries. `usedConstant` was reported STALE_IMPORT while being used — fixed by removing
+ * `variable` from PRUNABLE_BINDING_KINDS. `deadConstant` was missed entirely, because `pruneTaxonomy`
+ * deleted the node before `prune` could see it — fixed by sparing an EXPORTED value from the ATOM
+ * edge gate. Both now sit in `TRUTH` above and are scored like everything else.
  *
- * What remains is the recall half, and it is a different cause: an exported value nobody imports has
- * no node left by the time `prune` runs, because `pruneTaxonomy` cuts an ATOM carrying no
- * non-structural edge (ADR 0013). There is nothing to flag, so `prune` cannot flag it. Fixing that
- * means keeping value nodes alive, which is a taxonomy decision and not a `prune` one.
+ * The group stays because the assertion below fails when it is WRONG in either direction, and an
+ * empty list is the strongest form of that: any future symbol that lands here fails the build rather
+ * than being quietly absorbed into a percentage.
  */
 const KNOWN_WRONG = {
-  deadButNotFlagged: ['deadConstant'],
+  deadButNotFlagged: [] as string[],
   liveButFlagged: [] as string[],
 };
 
@@ -152,10 +152,9 @@ export function usesOne(): number { return staticallyUsed(); }
     expect(flagged.has('constructedDynamically')).toBe(false);
   });
 
-  it('holds the const-value gap at exactly its measured size — no wider, and no silently fixed', () => {
-    // Fails if the gap GROWS (a new symbol falls in) and fails if it SHRINKS (the fix landed and this
-    // list is now a lie). Either way somebody reads it, which is the only way a known-wrong list stays
-    // honest — see todo63.
+  it('has no known-wrong symbols left, and fails if one reappears', () => {
+    // Both former entries are fixed (todo63) and now scored in TRUTH. This asserts the group is still
+    // empty: a regression that reintroduces either failure lands here rather than in a percentage.
     const stillMissed = KNOWN_WRONG.deadButNotFlagged.filter(s => !flagged.has(s));
     const stillWronglyFlagged = KNOWN_WRONG.liveButFlagged.filter(s => flagged.has(s));
 

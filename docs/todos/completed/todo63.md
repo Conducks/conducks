@@ -1,5 +1,5 @@
 # todo63 — an exported const VALUE is wrong in both directions: unused ones are missed, used ones are flagged
-Status: todo
+Status: done
 - Acceptance: in `tests/integration/features/prune-precision.test.ts` the two const-value symbols move out of `KNOWN_WRONG` and into `TRUTH`, and the scored assertion passes with them counted.
 
 ## Context
@@ -51,5 +51,9 @@ fail in: acting on it breaks the build.
 ## Phase 2 — the recall half, which is a taxonomy question
 
 - [x] The weighing is DONE and it is not close. MEASURED by counting `export const` VALUE declarations never named in any import: **conducks 21** (of 6,469 nodes, 0.32%), **sofie 49**. The ATOM flood edge-gating exists to prevent was ~5,000 -> ~1,400 nodes, a 72% cut. 0.3% is three orders of magnitude away from that, so the reason to refuse does not apply here
-- [ ] Build it: keep an exported value node when it is exported, even with no non-structural edge. The same hazard already exists for exported FUNCTIONS, which `prune` reports today — a library's public constant with no internal importer will read as dead exactly like its public function does, which is consistent rather than new
+- [x] BUILT. `pruneTaxonomy`'s ATOM edge gate now spares a node whose `dna.isExported` is true. `dna->>'$.isExported'` is the discriminator, confirmed from the write log: an exported const carries `isExported: true`, a file-private one `false`, and `visibility` is `public` for both so it could not have served
+- [x] MEASURED on the frozen subjects rather than predicted. orchestrator **6,662 -> 6,715 nodes (+53, 0.80%)**, sofie **10,545 -> 10,567 (+22, 0.21%)**, scraper unchanged — python is the control, it has no `export const`. The estimate from grepping declarations was 21/49; the real numbers are smaller, so the bound in Phase 2's reasoning held with room to spare
+- [x] No new dangling: the count is IDENTICAL on both TypeScript subjects (1,876 and 3,146) and the added edges are the kept nodes' own MEMBER_OF. `located` stays 100%. So the cost is nodes, not broken references
+- [x] The fixture's `KNOWN_WRONG` group is now EMPTY and kept as an empty named list, so any future symbol landing there fails the build instead of being absorbed into a percentage. `deadConstant` is scored as ordinary truth and reported `UNUSED_EXPORT`
+- [x] The hazard this shares with exported FUNCTIONS is unchanged and accepted: a library's public constant with no internal importer reads as dead exactly like its public function does. Consistent, not new
 - [ ] Whatever is decided, the fixture's `KNOWN_WRONG.deadButNotFlagged` entry moves or disappears — it fails if this is silently fixed, which is the point of it

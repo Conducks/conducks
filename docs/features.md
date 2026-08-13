@@ -134,7 +134,7 @@
 - Intent: Text-based renames miss references and over-match unrelated ones; verifying against the call graph first means the edit set is the one the graph can defend.
 
 ## Dead Code Detection — `conducks prune`
-- Purpose: Flag exported symbols that no proven edge reaches, as review candidates — excluding entry points and test fixtures. `STALE_IMPORT` deliberately does NOT cover plain VALUE imports (a constant, an object, a table): a bare value read produces no edge, so their use is invisible and reporting them was wrong more often than right (todo63, sofie 20 → 10 findings).
+- Purpose: Flag exported symbols that no proven edge reaches, as review candidates — excluding entry points and test fixtures. Exported VALUES are covered in one direction only, and deliberately: an exported constant nobody imports IS reported, because the graph now keeps its node, but a value IMPORT is never reported stale, because a bare read produces no edge and its use is invisible (todo63; reporting them was wrong more often than right — sofie 20 → 10 findings).
 - Intent: "Nothing calls this" is normally a guess; this makes it a checkable claim you can start from. It reports candidates for a human to confirm, never a delete list. It under-reports on purpose — a missed dead symbol costs a review pass, a wrong one costs a user their build, and `prune` is scored on both directions at once (`tests/integration/features/prune-precision.test.ts`) rather than on how much it finds.
 
 ## Supply-Chain Surface — `conducks supply-chain`
