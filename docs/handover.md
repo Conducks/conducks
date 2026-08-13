@@ -6,7 +6,7 @@ Gates green: **1,838 tests / 238 suites**, typecheck 0, `docs-lint` 185 governed
 clean (62 anchors, 60 review stamps), architecture 5/5, declared-deps clean. All three frozen subjects
 `unchanged` vs baseline — RE-SAVED twice today (todo63, todo64), warm and cold.
 
-**Closed today: todo56, todo57, todo59, todo61, todo62, todo63, todo64.** ADR 0148's twelve pairs are
+**Closed today: todo56, todo57, todo59, todo60#P3, todo61, todo62, todo63, todo64.** ADR 0148's twelve pairs are
 all mirrored and `paired-surfaces` has no granted exceptions left.
 
 todo61 closed with ONE acceptance clause deliberately unmet, written into the record rather than
@@ -17,7 +17,10 @@ matching them would mean changing what each returns. Every field is reachable fr
 requires. The mapping table is in the todo.
 
 What remains:
-- **todo60** — the flake. Needs an idle machine more than it needs a decision.
+- **todo60#P1/P2** — the `reader-snapshot` unlink. Its Phase 3 flake is FIXED (below); these two are
+  a separate, older case in the same file.
+- **todo65** — the suite is serial for CPU reasons, not for a DuckDB lock, and half the wall clock is
+  available. Measured, not fixed.
 - **todo58#P1** and **todo16 (publish)** — genuinely yours.
 
 **The suite is not reliably green and nobody knows why.** Across nine runs today: `rename-safety`
@@ -72,6 +75,28 @@ All six corrected. Doctor now reports `Parse path: NONE` as a failure, mutation-
 DuckDB problem — the musl DuckDB binding resolves fine. The remedy doctor prints is measured, not
 guessed: `apk add build-base python3` then `CXXFLAGS="-std=c++20" npm i -g conducks` → all 13
 grammars, real graph. Decide whether Alpine-without-a-toolchain is a supported story before publishing.
+
+## 2026-08-13 — the flake had one cause, and the suite is serial for the wrong stated reason
+
+**todo60#P3 closed.** Measured on an idle machine: five full runs, three green, two failing the SAME
+test — `blocking-commands › mirror serves the wave over HTTP`. Every earlier observation had been
+taken while a build or CLI was running in another shell, which is why FOUR suites had looked
+implicated and none was understood.
+
+`mirror.ts` prints "Initializing Visual Dashboard..." BEFORE it binds, and the test accepted
+`/Dashboard/i` as readiness — so it fetched a port nothing was listening on, from a guessed default of
+3333. One signal now serves as both the readiness condition and the address, with no fallback.
+
+**Verified with the right instrument, which the first attempt got wrong.** Five more full runs is 20
+minutes; the suite holding the flake costs 3 seconds. The cheap loop was validated before being
+trusted — reverting the fix reproduced the failure 1 in 15 alone — and the fixed version is 0 in 60.
+Note the rate is lower alone (7%) than under full-suite load (40%): a busy machine widens the race.
+
+**todo65, filed not fixed.** `jest.config.js` said the suite is serial because "tests share fixture
+vaults" and they do not — every suite gets its own mkdtemp'd repo. The real blocker is CPU contention:
+each jest worker spawns a CLI running its own 4-worker analyze pool, so the helper's 90s timeout fires
+on an analyze that SUCCEEDED. Measured: serial 248s green, 2 workers 133s with one failure, 4 workers
+150s with three — 4 being slower than 2 is contention, not a lock. Half the wall clock is available.
 
 ## 2026-08-13 — todo57: `context` is one feature again
 
