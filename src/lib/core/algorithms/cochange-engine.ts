@@ -46,49 +46,46 @@ export class CoChangeEngine {
 
     // 2. Vectorized Analysis via DuckDB
     // We create a temporary table for this pulse's co-change analysis
-    return new Promise((resolve, reject) => {
-      db.exec("CREATE TEMPORARY TABLE IF NOT EXISTS commit_history (hash VARCHAR, filePath VARCHAR)", (err: any) => {
-        if (err) return reject(err);
-        
-        // Batch insert (Simplified for this version)
-        const stmt = db.prepare("INSERT INTO commit_history VALUES (?, ?)");
-        for (const data of commitData) {
-          stmt.run(data.hash, data.filePath);
-        }
-        stmt.finalize();
+    await db.run("CREATE TEMPORARY TABLE IF NOT EXISTS commit_history (hash VARCHAR, filePath VARCHAR)");
 
-        // 3. Matrix Multi: Find Co-Occurrence
-        const sql = `
-          SELECT a.filePath as fA, b.filePath as fB, count(*) as count
-          FROM commit_history a
-          JOIN commit_history b ON a.hash = b.hash
-          WHERE a.filePath < b.filePath
-          GROUP BY a.filePath, b.filePath
-          HAVING count > 3
-          ORDER BY count DESC
-          LIMIT 100
-        `;
+    // Batch insert (Simplified for this version)
+    const stmt = await db.prepare("INSERT INTO commit_history VALUES (?, ?)");
+    try {
+      for (const data of commitData) {
+        stmt.bind([data.hash, data.filePath]);
+        await stmt.run();
+      }
+    } finally {
+      stmt.destroySync();
+    }
 
-        db.all(sql, (err: any, rows: any[]) => {
-          if (err) return reject(err);
-          
-          const hiddenCoupling = [];
-          for (const row of rows) {
-            // Check if there is a structural edge in the graph
-            const hasEdge = graph.getNeighborsByFilePath(row.fA, 'downstream').some((n) => n.targetPath === row.fB) ||
-                            graph.getNeighborsByFilePath(row.fB, 'downstream').some((n) => n.targetPath === row.fA);
+    // 3. Matrix Multi: Find Co-Occurrence
+    const sql = `
+      SELECT a.filePath as fA, b.filePath as fB, count(*) as count
+      FROM commit_history a
+      JOIN commit_history b ON a.hash = b.hash
+      WHERE a.filePath < b.filePath
+      GROUP BY a.filePath, b.filePath
+      HAVING count > 3
+      ORDER BY count DESC
+      LIMIT 100
+    `;
 
-            if (!hasEdge) {
-              hiddenCoupling.push({
-                fileA: row.fA,
-                fileB: row.fB,
-                confidence: Math.min(Number(row.count) / 10, 1.0) // Simple confidence heuristic
-              });
-            }
-          }
-          resolve(hiddenCoupling);
+    const rows: any[] = (await db.runAndReadAll(sql)).getRowObjectsJS();
+    const hiddenCoupling = [];
+    for (const row of rows) {
+      // Check if there is a structural edge in the graph
+      const hasEdge = graph.getNeighborsByFilePath(row.fA, 'downstream').some((n) => n.targetPath === row.fB) ||
+                      graph.getNeighborsByFilePath(row.fB, 'downstream').some((n) => n.targetPath === row.fA);
+
+      if (!hasEdge) {
+        hiddenCoupling.push({
+          fileA: row.fA,
+          fileB: row.fB,
+          confidence: Math.min(Number(row.count) / 10, 1.0) // Simple confidence heuristic
         });
-      });
-    });
+      }
+    }
+    return hiddenCoupling;
   }
 }

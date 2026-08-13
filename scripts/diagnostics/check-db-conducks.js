@@ -1,17 +1,14 @@
 /** @format */
 
-import duckdb from 'duckdb';
+import { openVault } from '../../tools/lib/vault.mjs';
 import path from 'node:path';
 
 async function runChecks() {
 	const dbPath = path.join(process.cwd(), '.conducks', 'conducks-synapse.db');
 	console.log(`Opening DB at: ${dbPath}`);
-	const db = new duckdb.Database(dbPath);
+	const db = await openVault(dbPath);
 
-	const all = (sql, params = []) =>
-		new Promise((res, rej) =>
-			db.all(sql, ...params, (err, rows) => (err ? rej(err) : res(rows))),
-		);
+	const all = (sql, params = []) => db.all(sql, params);
 
 	try {
 		const total = await all('SELECT COUNT(*) as count FROM nodes');

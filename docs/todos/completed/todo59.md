@@ -1,5 +1,5 @@
 # todo59 — cold and warm analyze no longer agree, and the harness says they do
-Status: todo
+Status: done
 - Acceptance: `health.mjs --cold --compare` reports `unchanged` on all three subjects, or the docstring's parity claim is replaced with the measured truth and a cold baseline is saved so the gap is tracked instead of asserted.
 - Builds: 0128
 
@@ -71,16 +71,11 @@ path rather than at persistence or the graph core.
 - [x] RE-MEASURED. The dangling gap is closed on both TypeScript subjects: cold now hits the warm
       dangling figure exactly (sofie 3,146/34,929; orchestrator 1,887). Warm is untouched — all three
       `vs baseline unchanged`. Suite green, 228 suites / 1,789 tests.
-- [ ] A RESIDUE REMAINS, an order of magnitude smaller and a different shape: cold still differs from
-      warm by ±5 edges (orchestrator 23,791 -> 23,786) and ±1 node (sofie 10,543 -> 10,544, with
-      `located` 7,806 -> 7,807). The 294/157 dangling gap this todo opened with is gone; this is not
-      that. Decide whether one more pass converges it or whether it is a genuine first-vs-second
-      difference (a node that only exists once something has been induced), and either fix it or save a
-      COLD baseline so the residue is tracked rather than rediscovered.
+- [x] A RESIDUE REMAINS, an order of magnitude smaller and a different shape: cold still differs from warm by ±5 edges and ±1 node. The 294/157 dangling gap this todo opened with is gone; this is not that. DECIDED — tracked, not chased: it is recorded in a cold baseline (Phase 2) rather than converged. Re-measured 2026-08-11 at the current SHAs it is orchestrator 5 edges (23,819 warm / 23,814 cold) and sofie 1 node the other way (10,545 / 10,546). Two runs of a `--force` analyze differing by five edges out of 23,819 is not a defect anyone can act on, and one more link pass would be a guess at a mechanism nobody has isolated — a tracked number will say if it ever grows
 - [x] SUPERSEDED THEORY, kept so it is not retried: "the sweep is a single pass at the end of analyze,
       so anything dangling after it survives until the next analyze sweeps again." Disproved by the
       second-sweep measurement above (deleted=0).
-- [ ] Original phrasing, now known wrong: Warm ends with
+- [-] Original phrasing, now known wrong — dropped: the ordering theory it sets out was disproved by the second-sweep measurement (deleted=0) and the real cause is induction order, both recorded above. Kept as text so the theory is not retried; the task itself is not owed. Warm ends with
       MORE edges (34,929 vs 34,760) and FEWER dangling (3,146 vs 3,440), so it is not simply pruning
       harder — both numbers move, in opposite directions, and that pair needs explaining before any
       fix.
@@ -97,18 +92,28 @@ path rather than at persistence or the graph core.
       matches, and this path deletes edges in bulk — a wrong widening here is how the dangling rate
       came to read 1.15% when it was 14.62% (ADR 0096). Confirm the ordering theory first by logging
       the sweep's row count against the final `edges` count on a cold run.
-- [ ] Suspect first: anything resolved against nodes that only exist once the whole tree has been
-      reflected. IntraLinker runs per-pass, so a reference to a file analyzed LATER in the first sweep
-      has nothing to bind to, while a rebuild sees a complete graph from the start.
-- [ ] Confirm the direction: is the warm run RIGHT and the cold run under-resolving, or is the warm run
-      over-binding to nodes a real first-run would not have? `located` is 100% in both, so this is
-      about edges, not symbols.
+- [-] Suspect first: anything resolved against nodes that only exist once the whole tree has been reflected — dropped as SUPERSEDED, and it was nearly right: the answer is induction order, not reflection order. The nodes that did not exist yet are the INDUCED external/virtual ones, and the linker ran before them. Recorded rather than deleted because the near-miss is instructive — "a rebuild sees a complete graph" is the theory the measurement ruled out
+- [x] Confirm the direction: ANSWERED — the cold run was UNDER-resolving, not the warm run over-binding. Proven by replaying IntraLinker alone over the cold vault, which reached the warm number exactly (3,440 -> 3,146) without re-parsing or inducting anything. Had warm been over-binding, a replay could not have converged on it
 
 ## Phase 2 — make the property enforced rather than claimed
 
-- [ ] Save a COLD baseline alongside the warm one, so `--cold --compare` has something honest to
-      compare against and the gap becomes a tracked number rather than a surprise.
-- [ ] Run `--cold --compare` in whatever gate runs the benchmark. A property asserted in a docstring
-      and checked by nobody is how this one rotted.
-- [ ] Correct the docstring either way. Right now it tells the next reader that parity holds, which is
-      the one thing the measurement rules out.
+- [x] Cold baselines saved as `<name>.cold.json` beside the warm `<name>.json`. Both modes wrote the SAME file before this, so `--cold --save` silently overwrote the warm baseline with cold numbers and `--cold --compare` diffed a first analyze against a second — reporting the residue as DRIFT on every run, which is how a real difference gets trained into noise
+- [x] Comparing across modes is REFUSED, not diffed: the baseline records `coldStart` and a mismatch prints `REFUSED — cold file holds a warm run` with the fix. Mutation-verified by copying the warm baseline over the cold filename
+- [x] The residue is now a stored number instead of a rediscovery: orchestrator **5 edges** (23,819 warm / 23,814 cold), sofie **1 node** the other way (10,545 warm / 10,546 cold). `--cold --compare` reports `unchanged` against its own baseline
+- [x] Docstring corrected. It claimed "cold and warm now agree on all three subjects" — asserted in prose, checked by nobody, and false for an unknown stretch. It now states the fixed gap, the remaining residue, and the two-baseline rule
+- [-] Run `--cold --compare` in whatever gate runs the benchmark — dropped: there is no gate that runs `health.mjs`. `npm run benchmark` is `measure-pulse.mjs`, a different harness, and wiring a new 40s three-subject cold run into the suite is a decision about gate cost, not part of this todo. The baselines above are what make it a one-command check when someone wants it
+
+## Phase 3 — what the re-baselining caught, unrelated to cold/warm
+
+The warm baselines had to be re-saved, and the diff was not noise. It is the todo62 alias fix
+measured on frozen subjects, which is the first independent confirmation of it:
+
+| orchestrator | before | after |
+|---|---|---|
+| orphans | 23 | **0** |
+| violations | 25 | **2** |
+| nodes | 6,639 | 6,662 |
+| dangling | 1,887 | 1,876 |
+
+- [x] All 23 orphan nodes on orchestrator were the dangling-alias artifacts todo62 fixed — a binding node deleted by its own mis-named edge shows up here as an orphan, and the benchmark had been carrying them as the subject's shape since before anyone looked. sofie moved the same way (orphans 20 → 18). scraper is unchanged, which is the control: python has no destructured dynamic imports
+- [x] Baselines re-saved on all three subjects, warm and cold, at the same SHAs

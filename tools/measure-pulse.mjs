@@ -24,7 +24,7 @@
  * is gated by the file-hash check and measures almost nothing.
  */
 import { spawn } from 'node:child_process';
-import duckdb from 'duckdb';
+import { openVault } from './lib/vault.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,17 +71,22 @@ function parseUsage(stderr) {
   return null;   // caller refuses to invent a number
 }
 
-const vaultCounts = (root) => new Promise(resolve => {
+const vaultCounts = async (root) => {
   const file = path.join(root, '.conducks', 'conducks-synapse.db');
-  if (!fs.existsSync(file)) return resolve(null);
-  const db = new duckdb.Database(file, { access_mode: 'READ_ONLY' }, err => {
-    if (err) return resolve(null);
-    db.all('SELECT (SELECT count(*) FROM nodes) n, (SELECT count(*) FROM edges) e', (e, rows) => {
-      db.close();
-      resolve(e ? null : { nodes: Number(rows[0].n), edges: Number(rows[0].e) });
-    });
-  });
-});
+  if (!fs.existsSync(file)) return null;
+  // null on ANY failure, as before: a missing or locked vault means "no counts to report", which
+  // this harness prints as a blank rather than failing the run.
+  let db = null;
+  try {
+    db = await openVault(file);
+    const rows = await db.all('SELECT (SELECT count(*) FROM nodes) n, (SELECT count(*) FROM edges) e');
+    return { nodes: Number(rows[0].n), edges: Number(rows[0].e) };
+  } catch {
+    return null;
+  } finally {
+    db?.close();
+  }
+};
 
 const median = xs => {
   const s = [...xs].sort((a, b) => a - b);

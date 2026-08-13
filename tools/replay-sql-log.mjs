@@ -24,7 +24,7 @@
  * the ORIGINALLY failing statement still fails with the SAME error text. A loose "did anything
  * fail" oracle shrank to a one-statement set that reproduced nothing of interest, twice.
  */
-import duckdb from 'duckdb';
+import { openVault } from './lib/vault.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,8 +38,7 @@ const shrink = flags.includes('--shrink');
 const forced = (flags.find(f => f.startsWith('--keep='))?.slice(7) ?? '')
   .split(',').filter(Boolean).map(Number);
 
-const run = (db, sql, params) => new Promise((res, rej) =>
-  db.run(sql, ...params, err => (err ? rej(err) : res())));
+const run = (db, sql, params) => db.run(sql, params);
 
 /** ROLLBACK is dropped: the log ends with the pulse aborting, and we want the raw first failure. */
 const statements = fs.readFileSync(logPath, 'utf8').trim().split('\n')
@@ -50,7 +49,8 @@ async function replay(indices) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-replay-'));
   const dbPath = path.join(dir, 'vault.db');
   fs.copyFileSync(vaultPath, dbPath);
-  const db = new duckdb.Database(dbPath);
+  // READ-WRITE: this replays a pulse's writes against a throwaway copy, which is the whole point.
+  const db = await openVault(dbPath, { readOnly: false });
   let failure = null;
   for (const i of indices) {
     try {
@@ -60,7 +60,7 @@ async function replay(indices) {
       break;
     }
   }
-  await new Promise(r => db.close(r));
+  db.close();
   fs.rmSync(dir, { recursive: true, force: true });
   return failure;
 }

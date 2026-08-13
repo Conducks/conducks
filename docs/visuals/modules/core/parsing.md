@@ -43,8 +43,10 @@ parsing.
 
 **Failures here are silent, not loud.** A bad query pattern, a mismatched grammar ABI, an
 undersized parse buffer, a capture with no enclosing node — none of them throw. They degrade: fewer
-nodes, missing edges, or a whole language dropping to the regex fallback while the command still
-exits 0. Four distinct features have shipped keyed off data this module never produced.
+nodes or missing edges while the command still exits 0. Four distinct features have shipped keyed off
+data this module never produced. (Whole-language drops to a regex fallback WERE part of this list
+until ADR 0089 deleted that fallback; a language that cannot be read is now a reported ParseFailure.
+The quieter degrades above are the ones that remain.)
 
 So the verification habit is fixed: after any change here, run a clean `analyze` and compare node
 and edge counts against the previous run. Counts holding steady is the signal that nothing silently

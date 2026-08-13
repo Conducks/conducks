@@ -104,3 +104,8 @@ passes because both are collapse.
       reason: a fixed instant is not an assertion about behaviour.
 - [ ] Then 20 consecutive full-suite runs. The observed rate is roughly 2 in 10, so 20 clean runs is
       the bar that means something.
+
+## Phase 3 — a THIRD intermittent, seen 2026-08-11
+
+- [ ] `tests/integration/features/rename-safety.test.ts` failed in 2 of 6 full-suite runs on 2026-08-11 and passes in isolation every time. The two failures were at DIFFERENT lines — `:84` and `:67` — which argues against one specific assertion and for the suite's setup racing something. Both runs reported TWO failing suites and the second was never captured: `npm test | tail` rolls it off, so capture to a file (`npm test > run.log 2>&1; grep -E '^(FAIL|Tests:)' run.log`) and name it before touching anything. A flake identified from one observation is a guess
+- [ ] Do NOT attribute it to the alias fix (todo62) without evidence, tempting as the timing is. That change adds binding nodes, and `rename` walks the graph — but this suite passed 235/235 twice on the same build, so the counts cannot carry an attribution any more than they could in Phase 1

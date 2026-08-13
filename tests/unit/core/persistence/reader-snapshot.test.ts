@@ -155,15 +155,20 @@ describe('reader snapshot — a pulse never fails a read', () => {
     // Plant a REAL write-ahead log under the snapshot's name, the way a crashed or older writer
     // would leave one. A fabricated file would only prove DuckDB rejects garbage; this is a log
     // DuckDB will genuinely try to replay.
+    //
+    // Copied BEFORE close, and that ordering is the whole trick. The log is on disk from the moment
+    // the INSERT commits, but a clean `close()` CHECKPOINTS it into the database and unlinks it — so
+    // taking the copy afterwards finds nothing. A stale log is by definition what an UNclean exit
+    // leaves behind, and copying mid-session is how to obtain one without killing a process.
     const donor = mkRoot();
     const dp = new SynapsePersistence(donor, false);
     await dp.query('SELECT 1');
     await dp.run(`INSERT INTO nodes (id, pulseId, name, file, canonicalKind)
                   SELECT 'd'||i, 'p', 'd'||i, '/d.ts', 'UNIT' FROM range(50) t(i)`);
-    await dp.close();     // no CHECKPOINT: the rows are still in the log
     const donorWal = `${vaultFile(donor)}.wal`;
     expect(fs.existsSync(donorWal)).toBe(true);
     fs.copyFileSync(donorWal, `${snapshotFile(root)}.wal`);
+    await dp.close();
 
     const signal = path.join(root, 'go');
     const pulse = await startPulse(root, signal);

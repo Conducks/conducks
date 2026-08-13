@@ -1,20 +1,13 @@
-import duckdb from 'duckdb';
 import path from 'path';
+import { openVault } from '../../tools/lib/vault.mjs';
 
 const dbPath = path.resolve('../test-projects/scraper/.conducks/conducks-synapse.db');
-const db = new duckdb.Database(dbPath);
+const db = await openVault(dbPath);
 
 console.log("Querying nodes...");
 
-db.all("SELECT canonicalRank, canonicalKind, count(*) as c FROM nodes GROUP BY canonicalRank, canonicalKind ORDER BY canonicalRank", (err, res) => {
-  if (err) console.error(err);
-  else console.table(res);
-});
+console.table(await db.all("SELECT canonicalRank, canonicalKind, count(*) as c FROM nodes GROUP BY canonicalRank, canonicalKind ORDER BY canonicalRank"));
 
-db.all("SELECT id, name, canonicalKind, canonicalRank FROM nodes WHERE canonicalRank = 3 LIMIT 5", (err, res) => {
-  if (err) console.error(err);
-  else {
-    console.log("Samples of rank 3:");
-    console.table(res);
-  }
-});
+console.log("Samples of rank 3:");
+console.table(await db.all("SELECT id, name, canonicalKind, canonicalRank FROM nodes WHERE canonicalRank = 3 LIMIT 5"));
+db.close();

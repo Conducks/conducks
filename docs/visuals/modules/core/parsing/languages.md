@@ -19,9 +19,10 @@ in todo10.
 
 ## The all-or-nothing trap — read before editing any `queries.ts`
 
-A tree-sitter query compiles as a unit. **One unrecognized node type fails the whole query**, and the
-language silently drops to the Gnosis regex fallback: file-level nodes only, no edges, no error. The
-symptom is a quiet drop in counts, and every symbol in that language starts looking orphaned.
+A tree-sitter query compiles as a unit. **One unrecognized node type fails the whole query**, and
+every file in that language is then unreadable. Since ADR 0089 that is a reported `ParseFailure`
+rather than a silent drop to the regex fallback — but the counts still fall, and the older habit of
+reading a drop as "that language has fewer symbols" is the one to unlearn.
 
 It has happened at least four times — Go `method_spec` → `method_elem`, Rust
 `constrained_type_parameter` removed in 0.24, TSX `jsx_attribute`, and assorted 0.25 renames. Grammar
@@ -43,8 +44,8 @@ the enclosing node never runs. This is why the graph has **zero EXTENDS/IMPLEMEN
 true today; a vault edge census shows no heritage edge of either type. The heritage patterns are
 syntactically correct and hit when probed, but every one of them is standalone
 (`typescript/queries.ts:30-32`, `python/queries.ts:22-23`, and the same shape in go, rust, java,
-javascript), while the handler is gated on an enclosing node: `else if (cName === 'heritage' && node)`
-(`parsing/reflector.ts:1003`). Ruby is the only language whose heritage pattern carries a definition
+javascript), while the handler is gated on an enclosing node — `&& node`, now on a three-way capture
+test that also takes `heritage_extends`/`heritage_implements` (`parsing/reflector.ts:1011`). Ruby is the only language whose heritage pattern carries a definition
 capture (`@isHeritage`), and so the only one that could reach the handler at all. Fix tracked in
 todo11. **Pattern a capture together with
 the definition it belongs to when its handler needs one.**

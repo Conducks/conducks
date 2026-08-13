@@ -22,6 +22,16 @@
  * Self-contained on purpose — upstream will not run conducks. It needs only `duckdb` and creates
  * its own vault in a temp directory.
  *
+ * THIS FILE DELIBERATELY STILL IMPORTS `duckdb`, which conducks no longer depends on (ADR 0149 moved
+ * the vault to `@duckdb/node-api`). It is a bug report ABOUT that package, so porting it to the NAPI
+ * driver would change what it reproduces and make it worthless as a report. Install the package
+ * ad hoc to run it:
+ *
+ *   npm i --no-save duckdb@1.4.4 && node repro.mjs
+ *
+ * It is the one file `scripts/check-declared-deps.mjs` cannot vouch for, and the reason that gate is
+ * scoped to shipped code plus the tooling that runs against this repo's own vault.
+ *
  *   node repro.mjs
  *
  * Exits 0 and prints REPRODUCED when the bug fires, 1 and NOT REPRODUCED when it does not.

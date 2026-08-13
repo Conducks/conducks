@@ -23,7 +23,16 @@ There is no seam isolating one language or one capture kind from another, and th
 
 - Verify with a **clean pulse**, not a unit test alone. `analyze` is incremental, so a re-run on an
   unchanged repo can show no difference while the logic is broken.
-- Watch node counts. A silent drop means a query failed and the language fell back to Gnosis.
+- Watch node counts. A silent drop means a query failed and that language went unread — since ADR 0089
+  there is no regex fallback, so what follows a broken query is a reported `ParseFailure` and a graph
+  missing every symbol in that language.
+
+**A relationship's endpoint name must produce the id the node writer stores.** The two are decided in
+different places — `saveNodes` scopes a binding to its enclosing function (`<file>::main2.doit`) while
+a processor handed a bare name yields `<file>::doit` — and a mismatch does not error, does not read as
+a broken link, and DELETES the node: `pruneTaxonomy` counts a node referenced only when an edge's
+endpoint IS that node. `scopePrefix` in the definition branch is the shape to match (todo62,
+CONDUCKS-28).
 
 ## Type-only classification (ADR 0016)
 

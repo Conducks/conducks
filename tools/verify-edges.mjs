@@ -19,7 +19,7 @@
  *
  * Usage: node tools/verify-edges.mjs <path-to-vault.db> [--type CALLS] [--show 10]
  */
-import duckdb from 'duckdb';
+import { openVault } from './lib/vault.mjs';
 import fs from 'node:fs';
 
 const VAULT = process.argv[2];
@@ -27,9 +27,8 @@ const only = process.argv.includes('--type') ? process.argv[process.argv.indexOf
 const show = process.argv.includes('--show') ? Number(process.argv[process.argv.indexOf('--show') + 1]) : 5;
 if (!VAULT) { console.error('usage: verify-edges.mjs <vault.db> [--type T] [--show N]'); process.exit(2); }
 
-const db = new duckdb.Database(VAULT, duckdb.OPEN_READONLY);
-const conn = db.connect();
-const q = (sql) => new Promise((res, rej) => conn.all(sql, (e, r) => e ? rej(e) : res(r)));
+const conn = await openVault(VAULT);
+const q = (sql) => conn.all(sql);
 
 const cache = new Map();
 const read = (f) => {

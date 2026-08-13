@@ -2,8 +2,8 @@
   "project": "scraper",
   "sha": "8e558ca",
   "language": "python",
-  "analyzeMs": 7082,
-  "coldStart": false,
+  "analyzeMs": 6661,
+  "coldStart": true,
   "nodes": 5294,
   "units": 273,
   "edges": 17342,
@@ -33,48 +33,48 @@
   "smoke": {
     "status": {
       "code": 0,
-      "ms": 843,
+      "ms": 797,
       "bytes": 576
     },
     "audit": {
       "code": 1,
-      "ms": 537,
+      "ms": 514,
       "bytes": 801
     },
     "entry": {
       "code": 0,
-      "ms": 827,
+      "ms": 788,
       "bytes": 1151
     },
     "prune": {
       "code": 0,
-      "ms": 980,
+      "ms": 931,
       "bytes": 33779
     },
     "flows": {
       "code": 0,
-      "ms": 911,
-      "bytes": 399012
+      "ms": 849,
+      "bytes": 395636
     },
     "ledger": {
       "code": 0,
-      "ms": 972,
+      "ms": 927,
       "bytes": 465
     },
     "supply-chain": {
       "code": 0,
-      "ms": 1018,
+      "ms": 824,
       "bytes": 8045
     },
     "advise": {
       "code": 0,
-      "ms": 996,
+      "ms": 876,
       "bytes": 16408
     },
     "query": {
       "code": 0,
-      "ms": 1047,
-      "bytes": 1223
+      "ms": 1050,
+      "bytes": 1471
     }
   },
   "smokeFailures": []

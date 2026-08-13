@@ -13,17 +13,11 @@ async function dumpDb() {
     return;
   }
   
-  db.all("SELECT id, pulseId, complexity FROM nodes", (err: any, rows: any[]) => {
-    if (err) return console.error(err);
-    console.log("--- NODES TABLE ---");
-    console.table(rows);
-  });
-  
-  db.all("SELECT id, timestamp FROM pulses", (err: any, rows: any[]) => {
-    if (err) return console.error(err);
-    console.log("--- PULSES TABLE ---");
-    console.table(rows);
-  });
+  console.log("--- NODES TABLE ---");
+  console.table((await db.runAndReadAll("SELECT id, pulseId, complexity FROM nodes")).getRowObjectsJS());
+
+  console.log("--- PULSES TABLE ---");
+  console.table((await db.runAndReadAll("SELECT id, timestamp FROM pulses")).getRowObjectsJS());
 }
 
 dumpDb().catch(console.error);

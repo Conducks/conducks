@@ -1,10 +1,8 @@
-import duckdb from 'duckdb';
 import path from 'path';
+import { openVault } from '../../tools/lib/vault.mjs';
 
 const dbPath = path.resolve('../test-projects/scraper/.conducks/conducks-synapse.db');
-const db = new duckdb.Database(dbPath);
+const db = await openVault(dbPath);
 
-db.all("SELECT id, name, canonicalKind, parentId FROM nodes WHERE name LIKE '%explore%' LIMIT 20", (err, res) => {
-  if (err) console.error(err);
-  else console.table(res);
-});
+console.table(await db.all("SELECT id, name, canonicalKind, parentId FROM nodes WHERE name LIKE '%explore%' LIMIT 20"));
+db.close();

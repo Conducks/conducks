@@ -67,6 +67,13 @@ DuckDB rolls it back on next open and the previous good graph survives. Backstop
 density < 0.5 on 50+ nodes as an incomplete pulse. Only one read-write connection may be open at a
 time — the CLI holds read-write, the MCP server read-only; two writers deadlock.
 
+The driver is `@duckdb/node-api`, NAPI rather than ABI-bound (ADR 0149), and two of its behaviours are
+load-bearing here. The **instance** owns the file lock and the connection only borrows it, so
+`close()` closes both — closing the connection alone leaves the vault locked and `compact()` renames a
+file this process still holds open. And a clean close now CHECKPOINTS the write-ahead log away, so a
+`.wal` sitting beside the vault is the signature of a CRASH and nothing else, which is what ADR 0037
+and ADR 0040 always meant by a stale log.
+
 ## Adding a field that survives a load takes SIX edits, and missing one is silent
 
 A value written onto a node reaches the vault only if every place below knows about it. This has now

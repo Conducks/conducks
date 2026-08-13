@@ -33,7 +33,11 @@ export class GrammarRegistry {
    * `tree-sitter` is an OPTIONAL dependency: its core package ships no prebuilds, so it compiles
    * from source at install time and is simply absent on a machine without a C++ toolchain. A static
    * import would crash module load there, so every runtime use goes through here and a missing
-   * binding degrades to the Gnosis regex extractor instead. See ADR 0027.
+   * binding is reported by `isNativeAvailable()` instead of throwing. See ADR 0027.
+   *
+   * A missing binding does NOT degrade — ADR 0089 deleted the regex fallback, so it is the whole
+   * parse path. `analyze` checks `isNativeAvailable()` once and refuses up front rather than failing
+   * per file; this loader's only job is to make absence askable instead of fatal at import.
    */
   private loadNative(): any | undefined {
     if (this.nativeParser) return this.nativeParser;

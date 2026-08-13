@@ -12,20 +12,16 @@ async function verify() {
     return;
   }
   
-  const pulseRows: any[] = await new Promise((res) => 
-    db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => res(rows || []))
-  );
+  const pulseRows: any[] = (await db.runAndReadAll("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1")).getRowObjectsJS();
   const latestPulseId = pulseRows[0]?.id;
   
   console.log(`\n--- 🧬 Structural Resurrection Diagnostic (${latestPulseId}) ---`);
 
   // 1. Verify Shadow Elimination (FederatedLinker)
-  const linkerNodes: any[] = await new Promise((res) => {
-    db.all(`
-      SELECT id, file, canonicalKind FROM nodes 
+  const linkerNodes: any[] = (await db.runAndReadAll(`
+      SELECT id, file, canonicalKind FROM nodes
       WHERE pulseId = ? AND name = 'FederatedLinker'
-    `, [latestPulseId], (err: any, rows: any[]) => res(rows || []));
-  });
+    `, [latestPulseId])).getRowObjectsJS();
 
   console.log(`\n[Discovery] Found ${linkerNodes.length} nodes for 'FederatedLinker':`);
   linkerNodes.forEach(n => console.log(`  - [${n.canonicalKind}] ${n.id}`));
@@ -39,13 +35,11 @@ async function verify() {
   // 2. Verify Functional Connectivity (Blast Radius)
   const targetId = linkerNodes.find(n => n.file.includes('linker-federated.ts'))?.id;
   if (targetId) {
-    const edges: any[] = await new Promise((res) => {
-      db.all(`
-        SELECT sourceId, type FROM edges 
+    const edges: any[] = (await db.runAndReadAll(`
+        SELECT sourceId, type FROM edges
         WHERE targetId = ? AND pulseId = ?
         AND type IN ('CALLS', 'IMPORTS', 'CONSTRUCTS', 'TYPE_REFERENCE')
-      `, [targetId, latestPulseId], (err: any, rows: any[]) => res(rows || []));
-    });
+      `, [targetId, latestPulseId])).getRowObjectsJS();
 
     console.log(`\n[Connectivity] Found ${edges.length} incoming functional edges for the origin:`);
     edges.forEach(e => {

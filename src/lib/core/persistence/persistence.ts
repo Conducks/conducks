@@ -6,7 +6,7 @@ import path from "node:path";
 import { chronicle } from "../git/chronicle-interface.js";
 import { logger } from "../../core/utils/logger.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
-import duckdb from "duckdb";
+import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { traceMemory } from "@/lib/core/utils/mem-trace.js";
 import type { ConducksComponent } from "../../../contracts/types.js";
 
@@ -21,7 +21,11 @@ import type { ConducksComponent } from "../../../contracts/types.js";
 
 export class SynapsePersistence {
   private static instance: SynapsePersistence;
-  private db: duckdb.Database | null = null;
+  private db: DuckDBConnection | null = null;
+  // The instance owns the FILE LOCK; the connection only borrows it. Closing the connection alone
+  // leaves the vault locked, which breaks compact()'s close-then-rename and every reader after it —
+  // so both are held here and both are closed in close().
+  private instance: DuckDBInstance | null = null;
   private registry = new SynapseRegistry<ConducksComponent>();
   private lazy: boolean = true;
   private readOnly: boolean = false;
@@ -108,17 +112,26 @@ export class SynapsePersistence {
   }
 
   /** Open one specific file into `this.db`. Split out so the snapshot fallback reuses it verbatim. */
-  private openAt(filePath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const db = new duckdb.Database(filePath, { access_mode: this.readOnly ? 'READ_ONLY' : 'READ_WRITE' }, (err) => {
-        if (err) return reject(err);
-        this.db = db;
-        this.initializeSchema().then(() => resolve()).catch(reject);
-      });
+  private async openAt(filePath: string): Promise<void> {
+    const instance = await DuckDBInstance.create(filePath, {
+      access_mode: this.readOnly ? 'READ_ONLY' : 'READ_WRITE',
     });
+    this.instance = instance;
+    try {
+      this.db = await instance.connect();
+      await this.initializeSchema();
+    } catch (err) {
+      // A failure AFTER the instance exists still holds the file lock, and the retry loop above only
+      // clears `db` — so the snapshot fallback would then open against a vault this process itself
+      // is still holding. Hand the lock back before letting the error out.
+      this.db = null;
+      this.instance = null;
+      try { instance.closeSync(); } catch { /* already gone */ }
+      throw err;
+    }
   }
 
-  private async ensureVaultOpen(): Promise<duckdb.Database> {
+  private async ensureVaultOpen(): Promise<DuckDBConnection> {
     if (this.db) return this.db;
 
     const vaultDir = path.resolve(this.vaultPath, '.conducks');
@@ -291,7 +304,7 @@ export class SynapsePersistence {
 
   private async initializeSchema(): Promise<void> {
     if (this.readOnly) return; // 🛡️ [Conducks Gating] Skip schema initialization in read-only mode.
-    const run = (sql: string) => new Promise<void>((r, j) => this.db!.run(sql, (e: duckdb.DuckDbError | null) => e ? j(e) : r()));
+    const run = async (sql: string) => { await this.db!.run(sql); };
 
     const nodesSql = `CREATE TABLE IF NOT EXISTS nodes (
       id VARCHAR PRIMARY KEY,
@@ -850,19 +863,23 @@ export class SynapsePersistence {
       fs.appendFileSync(process.env.CONDUCKS_SQL_LOG, JSON.stringify({ sql, params }) + '\n');
     }
     const db = await this.ensureVaultOpen();
-    return await new Promise((res, rej) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db.run(sql, ...(params as any[]), (err: duckdb.DuckDbError | null) => err ? rej(err) : res());
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await db.run(sql, params as any[]);
   }
 
   public async query<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {
     const db = await this.ensureVaultOpen();
-    return new Promise((res, rej) => {
+    try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db.all(sql, ...(params as any[]), (err: duckdb.DuckDbError | null, rows: duckdb.TableData) =>
-        err ? rej(SynapsePersistence.explainQueryFailure(err)) : res(rows as unknown as T[]));
-    });
+      const reader = await db.runAndReadAll(sql, params as any[]);
+      // `getRowObjectsJS`, not `getRowObjects`: the latter hands back DuckDB value wrappers
+      // (`DuckDBTimestampValue` and friends) where the callback driver handed back JS natives.
+      // MEASURED against the old driver on this repo's own vault — same columns, same types
+      // (BIGINT stays a BigInt in both), same values.
+      return reader.getRowObjectsJS() as unknown as T[];
+    } catch (err) {
+      throw SynapsePersistence.explainQueryFailure(err);
+    }
   }
 
   /**
@@ -879,8 +896,8 @@ export class SynapsePersistence {
    * every other driver error passes through untouched, because guessing at causes is how a wrong
    * diagnosis gets printed with confidence.
    */
-  private static explainQueryFailure(err: duckdb.DuckDbError): Error {
-    const message = String(err?.message ?? err);
+  private static explainQueryFailure(err: unknown): Error {
+    const message = String((err as { message?: string })?.message ?? err);
     const missingColumn = /Referenced column "([^"]+)" not found/i.exec(message);
     if (missingColumn) {
       return new Error(
@@ -977,7 +994,7 @@ export class SynapsePersistence {
     if (!changed.length) return;
 
     try {
-      const exec = (sql: string) => new Promise<void>((r, j) => db.exec(sql, (e: duckdb.DuckDbError | null) => e ? j(e) : r()));
+      const exec = async (sql: string) => { await db.run(sql); };
       const owned = !this.inPulse;
       if (owned) await exec("BEGIN TRANSACTION");
       // Batched, not one statement per node. Inside the pulse DuckDB charges per statement, and
@@ -1003,7 +1020,7 @@ export class SynapsePersistence {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     try {
-      const exec = (sql: string) => new Promise<void>((r, j) => db.exec(sql, (e: duckdb.DuckDbError | null) => e ? j(e) : r()));
+      const exec = async (sql: string) => { await db.run(sql); };
       const owned = !this.inPulse;
       if (owned) await exec("BEGIN TRANSACTION");
       // PER-ROW ON PURPOSE, and the only survivor of the todo22#P8 sweep. Batching this into
@@ -1019,11 +1036,15 @@ export class SynapsePersistence {
       // edge is no longer a guess. Without this, ADR 0046's 0.4 stuck to edges the linker had
       // since resolved, so the column understated them — a new inaccuracy introduced by the fix
       // for the old one.
-      const stmt = db.prepare(`UPDATE edges SET targetId = ?, confidence = CASE WHEN confidence < 0.6 THEN 0.85 ELSE confidence END WHERE id = ?`);
-      for (const entry of rebinds) {
-        await new Promise<void>((r, j) => stmt.run(entry.newTargetId.toLowerCase(), entry.id, (e: Error | null) => e ? j(e) : r()));
+      const stmt = await db.prepare(`UPDATE edges SET targetId = ?, confidence = CASE WHEN confidence < 0.6 THEN 0.85 ELSE confidence END WHERE id = ?`);
+      try {
+        for (const entry of rebinds) {
+          stmt.bind([entry.newTargetId.toLowerCase(), entry.id]);
+          await stmt.run();
+        }
+      } finally {
+        stmt.destroySync();
       }
-      stmt.finalize();
       if (owned) await exec("COMMIT");
     } catch (fail) {
       if (!this.inPulse) { try { await this.run('ROLLBACK'); } catch {} }
@@ -1443,7 +1464,7 @@ export class SynapsePersistence {
     };
   }
 
-  public async getRawConnection(): Promise<duckdb.Database> {
+  public async getRawConnection(): Promise<DuckDBConnection> {
     return await this.ensureVaultOpen();
   }
 
@@ -1730,23 +1751,20 @@ export class SynapsePersistence {
       fs.rmSync(this.snapshotFile(), { force: true });
       fs.rmSync(`${this.snapshotFile()}.wal`, { force: true });
     }
+    // Connection first, then the instance that owns the file lock. Closing only the connection
+    // leaves the vault locked, and compact() renames over a file it still holds.
+    //
+    // No 5s timeout race any more: the old driver's close took a callback that could never fire, and
+    // the timer guarding it kept the event loop alive for the full 5s on every command that opened a
+    // vault (`conducks query` answered at 451ms and exited at 5.5s). `closeSync` cannot hang, so both
+    // the race and the bug it introduced are gone.
     if (this.db) {
-      const closePromise = new Promise<void>((resolve, reject) => {
-        this.db!.close((err) => {
-          if (err) return reject(err);
-          this.db = null;
-          resolve();
-        });
-      });
-      // The timer MUST be cleared when the close wins the race. `Promise.race` settles on the first
-      // promise, but a pending setTimeout keeps Node's event loop alive until it fires — so an
-      // instant, successful close still held the process open for the full 5 seconds. Every command
-      // that opened a vault paid it: `conducks query` printed its answer at 451ms and exited at 5.5s.
-      let timer: NodeJS.Timeout;
-      const timeout = new Promise<void>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('DB close timed out after 5s')), 5000);
-      });
-      return Promise.race([closePromise, timeout]).finally(() => clearTimeout(timer));
+      this.db.closeSync();
+      this.db = null;
+    }
+    if (this.instance) {
+      this.instance.closeSync();
+      this.instance = null;
     }
   }
 }

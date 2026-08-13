@@ -23,7 +23,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import duckdb from 'duckdb';
+import { openVault } from '../lib/vault.mjs';
 import ts from 'typescript';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -101,11 +101,11 @@ for (const project of CONFIG.projects) {
   if (only && project.name !== only) continue;
   const dir = path.join(ROOT, project.name);
 
-  const db = new duckdb.Database(path.join(dir, '.conducks/conducks-synapse.db'), duckdb.OPEN_READONLY).connect();
-  const rows = await new Promise((res, rej) => db.all(
+  const db = await openVault(path.join(dir, '.conducks/conducks-synapse.db'));
+  const rows = await db.all(
     `SELECT file, lineStart, coalesce(doc,'') AS doc FROM nodes
-      WHERE canonicalKind IN ('BEHAVIOR','STRUCTURE') AND file NOT LIKE 'external://%'`,
-    (e, r) => e ? rej(e) : res(r)));
+      WHERE canonicalKind IN ('BEHAVIOR','STRUCTURE') AND file NOT LIKE 'external://%'`);
+  db.close();
 
   const vault = new Map();
   for (const r of rows) vault.set(`${String(r.file).toLowerCase()}:${Number(r.lineStart)}`, String(r.doc));

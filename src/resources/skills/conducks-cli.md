@@ -82,5 +82,7 @@ and the bare board for a single repo. `--root-only` on either command restores t
 ## Two things that surprise people
 - **A running `analyze` locks the vault.** Every graph-reading command FAILS while a pulse writes — it
   does not queue, and the error says so. The docs layer keeps working throughout. Wait and retry.
-- **Native parsing is optional.** If the `tree-sitter` binding could not build, conducks still analyzes
-  through the Gnosis regex extractor at lower fidelity. `conducks doctor` tells you which you are on.
+- **Native parsing is optional to INSTALL, required to ANALYZE.** The `tree-sitter` binding compiles
+  from source, so it is absent wherever there is no C++ toolchain — the CLI still installs and its
+  docs commands still work, but `analyze` refuses, because there is no second parse path and writing
+  an empty graph that looks real is worse. `conducks doctor` says which state you are in.

@@ -21,7 +21,7 @@
   "docs/visuals/modules/core/parsing/languages.md": {
     "src/lib/core/parsing/languages/typescript/queries.ts:30-32": "3db55f89df1bd55e",
     "src/lib/core/parsing/languages/python/queries.ts:22-23": "521204228ac94c16",
-    "src/lib/core/parsing/reflector.ts:1003": "7dfc0ef7544241ff"
+    "src/lib/core/parsing/reflector.ts:1011": "7dfc0ef7544241ff"
   },
   "docs/visuals/modules/core/parsing/processors.md": {
     "src/lib/core/parsing/processors/import.ts": "a0a3365315cca775",
@@ -31,7 +31,7 @@
     "src/lib/core/parsing/processors/flow.ts": "bf9e2649c0ac706b"
   },
   "docs/visuals/modules/core/parsing/reflector.md": {
-    "src/lib/core/parsing/reflector.ts": "b4aff66b4e2fa5cf"
+    "src/lib/core/parsing/reflector.ts": "2ff81af8984e9134"
   },
   "docs/visuals/modules/core/parsing/taxonomy.md": {
     "src/lib/core/parsing/taxonomy.ts": "dcea21bd98d38f64",
@@ -42,7 +42,7 @@
     "src/types/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
-    "src/lib/core/persistence/persistence.ts": "f2bb99811ba52a75"
+    "src/lib/core/persistence/persistence.ts": "42cb5c23b8302590"
   },
   "docs/visuals/modules/domain/analysis/coverage.md": {
     "src/lib/domain/analysis/coverage-bind.ts:50": "fdd480cd0bda4134",
@@ -60,7 +60,7 @@
     "src/lib/domain/analysis/index.ts": "afd9f83050018770"
   },
   "docs/visuals/modules/domain/evolution.md": {
-    "src/lib/domain/evolution/dead-code.ts": "c4f4ba43028f793e",
+    "src/lib/domain/evolution/dead-code.ts": "6bf41d3e118a9dfe",
     "src/lib/domain/evolution/drift-engine.ts": "8b435801d446d048",
     "src/lib/domain/evolution/watcher.ts": "927e87f0228287db",
     "src/contracts/dead-code-types.ts": "a2749f7611fced39"

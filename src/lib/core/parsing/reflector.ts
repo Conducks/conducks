@@ -973,7 +973,15 @@ export class ConducksReflector {
               const spec = src ? src.replace(/^['"]|['"]$/g, '') : null;
               const target = spec ? this.imports.resolve(spec, file.path, allPaths, provider, context) : null;
               if (typeof target === 'string') {
-                this.bindings.processAlias(node.name, `${target.toLowerCase()}::${node.name.toLowerCase()}`, spectrum, currentMatchRow + 1);
+                // SCOPED, matching `scopedId` above — the alias edge must name the node this match
+                // is minting, and that node's id carries its enclosing scope. Passing the bare name
+                // built `<file>::doit` for a node stored as `<file>::main2.doit`, so the edge
+                // referenced nothing: the ATOM edge-gate then saw an unreferenced binding and pruned
+                // it, and prune's own cleanup did not match the edge either, leaving a confident
+                // edge pointing at a node that no longer existed (todo62). A module-level re-export
+                // has no scope, so this is the identity there — which is why the 57 healthy alias
+                // edges never showed the bug.
+                this.bindings.processAlias(`${scopePrefix}${node.name}`, `${target.toLowerCase()}::${node.name.toLowerCase()}`, spectrum, currentMatchRow + 1);
               }
             }
 
@@ -1022,7 +1030,13 @@ export class ConducksReflector {
           // An external dependency resolves to a descriptor, not a path — leave those bare, since
           // there is no project file to qualify against.
           const resolvedPath = typeof resolved === 'string' ? resolved.toLowerCase() : null;
-          this.bindings.processAlias(node.name, resolvedPath ? `${resolvedPath}::${cText.toLowerCase()}` : cText, spectrum, currentMatchRow + 1);
+          // SCOPED for the same reason as the un-renamed branch above (todo62): the node minted for
+          // this binding carries its enclosing scope in its id, so an alias edge built from the bare
+          // name points at an id nothing stores. `const { helper: doIt } = await import(...)` inside
+          // `main2` stores `<file>::main2.doit` and used to emit the edge from `<file>::doit`.
+          const aliasScope = getScopeAt(currentMatchRow, node.name);
+          const aliasSourceName = aliasScope ? `${aliasScope}.${node.name}` : node.name;
+          this.bindings.processAlias(aliasSourceName, resolvedPath ? `${resolvedPath}::${cText.toLowerCase()}` : cText, spectrum, currentMatchRow + 1);
 
           // Register the binding as well, so a CALL through the local name lands on the original.
           // The import branch above does this for `import { A as B }`; a DESTRUCTURED DYNAMIC import

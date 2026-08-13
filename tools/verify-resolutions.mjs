@@ -7,12 +7,11 @@
  *   2. does the target file really declare `<member>` inside `class <Type>` (or is it inherited) ?
  * A resolution failing either is a WRONG edge, not a missing one.
  */
-import duckdb from 'duckdb';
+import { openVault } from './lib/vault.mjs';
 import fs from 'node:fs';
 
-const db = new duckdb.Database(process.argv[2], duckdb.OPEN_READONLY);
-const c = db.connect();
-const q = s => new Promise((r, j) => c.all(s, (e, x) => e ? j(e) : r(x)));
+const c = await openVault(process.argv[2]);
+const q = s => c.all(s);
 
 // Every edge whose target is a class MEMBER — the shape the two new rules produce.
 const edges = await q(`

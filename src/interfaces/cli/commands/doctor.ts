@@ -30,16 +30,21 @@ export class DoctorCommand implements ConducksCommand {
 
     // 2. DuckDB loadable
     try {
-      await import('duckdb');
+      await import('@duckdb/node-api');
       ok('DuckDB loadable');
     } catch (_) {
-      fail('DuckDB not loadable — run: npm install duckdb');
+      fail('DuckDB not loadable — run: npm install @duckdb/node-api');
     }
 
-    // 3. Which parse path is live.
+    // 3. Which parse path is live — and there is only ONE.
     // The native binding is an OPTIONAL dependency (ADR 0027): `tree-sitter` ships no prebuilds, so
-    // it compiles at install time and is absent wherever there is no C++ toolchain. Conducks still
-    // analyzes there, through the Gnosis regex extractor — at lower fidelity. Say which one is running.
+    // it compiles at install time and is absent wherever there is no C++ toolchain. This used to say
+    // the Gnosis regex extractor covered that, and it did until ADR 0089 DELETED the fallback —
+    // native tree-sitter is now the only parse path, and `analyze` refuses outright without it
+    // (orchestrator.ts, "Refusing to write a graph rather than writing an empty one that looks real").
+    // MEASURED on alpine/musl, where the binding cannot build: doctor promised "Analysis still works,
+    // at lower fidelity" and the very next `conducks analyze` refused. A doctor that reports a
+    // working environment as working when it does not is worse than no doctor.
     if (registry.infrastructure.isNativeGrammarAvailable()) {
       const languages = [
         'typescript', 'tsx', 'javascript', 'python', 'go', 'rust',
@@ -51,13 +56,14 @@ export class DoctorCommand implements ConducksCommand {
         ok(`Parse path: native tree-sitter, all ${languages.length} grammars induced`);
       } else {
         warn(`Parse path: native tree-sitter, ${languages.length - missing.length}/${languages.length} grammars induced`);
-        warn(`  Gnosis regex fallback covers: ${missing.join(', ')}`);
+        warn(`  Not induced: ${missing.join(', ')} — files in those languages are REPORTED UNREAD, not degraded (ADR 0089)`);
       }
     } else {
-      warn('Parse path: Gnosis regex fallback — the native tree-sitter binding did not load');
-      warn('  Analysis still works, at lower fidelity. For full fidelity install a C++ toolchain');
-      warn('  (macOS: xcode-select --install · Debian: apt install build-essential · Windows:');
-      warn('  VS Build Tools), then reinstall conducks.');
+      fail('Parse path: NONE — the native tree-sitter binding did not load, so `analyze` cannot run');
+      fail('  There is no regex fallback (ADR 0089): conducks refuses to write a graph rather than');
+      fail('  write an empty one that looks real. Install a C++ toolchain (macOS: xcode-select');
+      fail('  --install · Debian: apt install build-essential · Alpine: apk add build-base python3 ·');
+      fail('  Windows: VS Build Tools), then reinstall conducks. On Node 23+: CXXFLAGS="-std=c++20" npm install');
     }
 
     // 4. git available

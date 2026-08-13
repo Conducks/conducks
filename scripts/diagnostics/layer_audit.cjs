@@ -1,4 +1,3 @@
-const duckdb = require('duckdb');
 const path = require('node:path');
 
 async function runLayerAudit() {
@@ -6,10 +5,11 @@ async function runLayerAudit() {
   const dbPath = path.resolve(targetDir, ".conducks/conducks-synapse.db");
   console.log(`🔍 Auditing Database at: ${dbPath}\n`);
   
-  const db = new duckdb.Database(dbPath);
-  const con = db.connect();
+  const { openVault } = await import('../../tools/lib/vault.mjs');
+  const db = await openVault(dbPath);
+  const con = db;
 
-  const query = (sql) => new Promise((res, rej) => con.all(sql, (err, result) => err ? rej(err) : res(result)));
+  const query = (sql) => con.all(sql);
   
   try {
     // 1. Get Latest Pulse

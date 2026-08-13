@@ -1,16 +1,14 @@
 /** @format */
 
-import duckdb from 'duckdb';
+import { openVault } from '../tools/lib/vault.mjs';
 import path from 'node:path';
 
 const dbPath =
 	process.argv[2] || path.join(process.cwd(), 'data', 'conducks-synapse.db');
-const db = new duckdb.Database(dbPath);
+const db = await openVault(dbPath);
 
 function all(db, sql, params = []) {
-	return new Promise((res, rej) =>
-		db.all(sql, ...params, (err, rows) => (err ? rej(err) : res(rows))),
-	);
+	return db.all(sql, params);
 }
 
 async function main() {

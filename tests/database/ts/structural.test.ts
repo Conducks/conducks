@@ -28,6 +28,21 @@ describe('Synapse Structural Layer Audit', () => {
   let db: any;
   let latestPulseId: string;
 
+  /**
+   * Every read here reported `rows || []` on error and carried on, so a query that failed read as an
+   * empty result — a census of nothing, or zero dangling edges. That tolerance is kept deliberately
+   * (this suite audits a live vault it does not own), but the error is now printed rather than
+   * dropped, so a silent empty answer cannot be mistaken for a clean one.
+   */
+  const rows = async (sql: string, params: unknown[] = []): Promise<any[]> => {
+    try {
+      return (await db.runAndReadAll(sql, params)).getRowObjectsJS();
+    } catch (err) {
+      console.error('[Audit DB Error]', err);
+      return [];
+    }
+  };
+
   beforeAll(async () => {
     if (!vaultPresent) {
       console.warn(
@@ -49,12 +64,7 @@ describe('Synapse Structural Layer Audit', () => {
       throw new Error("❌ Structural Synapse is LOCKED or not initialized. Skipping Database Integrity Audit.");
     }
 
-    const pulseRows: any[] = await new Promise((res) =>
-      db.all("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1", (err: any, rows: any[]) => {
-        if (err) console.error('[Audit DB Error]', err);
-        res(rows || []);
-      })
-    );
+    const pulseRows = await rows("SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1");
 
     latestPulseId = pulseRows[0]?.id;
 
@@ -69,16 +79,41 @@ describe('Synapse Structural Layer Audit', () => {
     if (persistence) await persistence.close();
   });
 
-  maybeIt('should have 100% Referential Integrity', async () => {
-    const dangling: any[] = await new Promise((res) => {
-      db.all(`
-        SELECT * FROM edges 
-        WHERE pulseId = ? 
-        AND (sourceId NOT IN (SELECT id FROM nodes WHERE pulseId = ?) 
-             OR targetId NOT IN (SELECT id FROM nodes WHERE pulseId = ?))
-      `, [latestPulseId, latestPulseId, latestPulseId], (err: any, rows: any[]) => res(rows || []));
-    });
-    expect(dangling.length).toBe(0);
+  /**
+   * Referential integrity, as the graph actually defines it.
+   *
+   * This assertion used to read `dangling.length === 0` and was VACUOUS: it passed its parameters as
+   * an array to a driver that wanted them spread, the resulting error was swallowed by the old
+   * `rows || []` wrapper, and the empty array read as "nothing dangles". It had never checked
+   * anything. Porting the driver (todo56) surfaced the real answer — 552 — and three separate
+   * reasons the original query was the wrong question:
+   *
+   *   1. It partitioned by `pulseId`. Analyze is INCREMENTAL: only re-analyzed files are re-stamped,
+   *      so a healthy vault holds nodes under several pulse ids and every edge into an untouched
+   *      file looks dangling. MEASURED: 71 such edges, every one of whose targets existed under the
+   *      previous pulse. Existence in `nodes` is the real question, not co-membership of a pulse.
+   *   2. PULSES_TO and GOVERNS point at pulses and docs, which are not node rows at all — 439 of the
+   *      552. An edge is not broken for pointing at the kind of thing it is meant to point at.
+   *   3. Unresolved references are KEPT ON PURPOSE at confidence 0.4 (ADR 0046) — the analyzer says
+   *      so on every run ("KEPT 1043 unresolved reference(s)"). A reference conducks could not place
+   *      is a fact about the code, not a broken edge, and asserting it away would delete the signal.
+   *
+   * What is left after those three is the claim worth enforcing: an edge that says it KNOWS its
+   * endpoints must have them. There is no carve-out. There was one for ALIASES — 3 edges at
+   * confidence 1.0 whose source id nothing stored — and todo62 removed the cause rather than the
+   * assertion: the alias edge was built from the bare local name while the node it names is stored
+   * with its enclosing scope (`<file>::doit` against `<file>::main2.doit`), so it referenced nothing,
+   * the ATOM edge-gate pruned the binding as unreferenced, and the edge outlived its own node.
+   */
+  maybeIt('every confident structural edge has both endpoints in the graph', async () => {
+    const dangling = await rows(`
+        SELECT type, sourceId, targetId FROM edges
+        WHERE (sourceId NOT IN (SELECT id FROM nodes) OR targetId NOT IN (SELECT id FROM nodes))
+          AND type NOT IN ('PULSES_TO', 'GOVERNS')
+          AND confidence >= 0.6
+      `);
+
+    expect(dangling).toEqual([]);
   });
 
   /**
@@ -88,8 +123,7 @@ describe('Synapse Structural Layer Audit', () => {
   maybeIt('should perform a Functional Layer-by-Layer Census', async () => {
     const functionalTypes = "'CALLS', 'USES', 'IMPORTS', 'IMPLEMENTS', 'EXTENDS', 'TYPE_REFERENCE', 'CONSTRUCTS'";
     
-    const census: any[] = await new Promise((res) => {
-      db.all(`
+    const census = await rows(`
         SELECT canonicalKind, canonicalRank, count(*) as total,
                SUM(CASE WHEN id NOT IN (SELECT sourceId FROM edges WHERE pulseId = '${latestPulseId}' AND type IN (${functionalTypes})) 
                         AND id NOT IN (SELECT targetId FROM edges WHERE pulseId = '${latestPulseId}' AND type IN (${functionalTypes})) 
@@ -98,11 +132,7 @@ describe('Synapse Structural Layer Audit', () => {
         WHERE pulseId = '${latestPulseId}'
         GROUP BY canonicalKind, canonicalRank
         ORDER BY canonicalRank ASC
-      `, (err: any, rows: any[]) => {
-        if (err) console.error('[Census Error]', err);
-        res(rows || []);
-      });
-    });
+      `);
 
     console.log(`\n--- 📊 Functional Layer Census (${latestPulseId}) ---`);
     console.table(census.map(c => {
@@ -121,9 +151,8 @@ describe('Synapse Structural Layer Audit', () => {
    * Shadow Check: Detection of duplicate symbols (Binding Failures)
    */
   maybeIt('should identify Shadow Symbols (Duplicate Binding Failures)', async () => {
-    const shadows: any[] = await new Promise((res) => {
-      db.all(`
-        SELECT name, count(*) as dupe_count, 
+    const shadows = await rows(`
+        SELECT name, count(*) as dupe_count,
                string_agg(DISTINCT file, ', ') as files
         FROM nodes 
         WHERE pulseId = ? 
@@ -133,8 +162,7 @@ describe('Synapse Structural Layer Audit', () => {
         HAVING count(*) > 5
         ORDER BY dupe_count DESC
         LIMIT 10
-      `, [latestPulseId], (err: any, rows: any[]) => res(rows || []));
-    });
+      `, [latestPulseId]);
 
     if (shadows.length > 0) {
       console.warn(`\n⚠️  [Structural Sin] Found ${shadows.length} Shadow Symbols (Binding Failures).`);
@@ -150,16 +178,14 @@ describe('Synapse Structural Layer Audit', () => {
 
   maybeIt('should list Functional Orphan Hit-List', async () => {
     const functionalTypes = "'CALLS', 'USES', 'IMPORTS', 'IMPLEMENTS', 'EXTENDS', 'TYPE_REFERENCE', 'CONSTRUCTS'";
-    const hitList: any[] = await new Promise((res) => {
-      db.all(`
-        SELECT id, canonicalKind FROM nodes 
+    const hitList = await rows(`
+        SELECT id, canonicalKind FROM nodes
         WHERE pulseId = '${latestPulseId}' 
         AND canonicalKind IN ('STRUCTURE', 'BEHAVIOR')
         AND id NOT IN (SELECT sourceId FROM edges WHERE pulseId = '${latestPulseId}' AND type IN (${functionalTypes})) 
         AND id NOT IN (SELECT targetId FROM edges WHERE pulseId = '${latestPulseId}' AND type IN (${functionalTypes}))
         LIMIT 15
-      `, (errSnapshot: any, rowsSnapshot: any[]) => res(rowsSnapshot || []));
-    });
+      `);
 
     if (hitList.length > 0) {
       console.warn(`\n⚠️  [Structural Sin] Top Functional Orphans:`);

@@ -494,9 +494,79 @@ by construction.
   inside the module cannot protect it. Only `import type` (erased) or a lazy `require` inside a
   function is safe. The 12 grammar packages DO ship prebuilds for 6 platforms — only the core compiles.
 - Applies: every use of the binding goes through `GrammarRegistry.loadNative()`; ask
-  `grammars.isNativeAvailable()` rather than assuming. Absent binding → Gnosis regex extractor, measured
-  at 25 nodes/32 edges against native's 26/27 on the same two-file fixture. Pinned by
+  `grammars.isNativeAvailable()` rather than assuming. Absent binding → NO parse path at all: ADR 0089
+  deleted the regex extractor, so `analyze` refuses once, up front. (The 25 nodes/32 edges the fallback
+  measured against native's 26/27 are historical — that path no longer exists.) Pinned by
   `tests/unit/core/parsing/optional-native-binding.test.ts`, which fails on any value import. — ADR 0027
+
+## A hand-built fixture keeps proving a code path the parser stopped producing
+- Gotcha: `IntraLinker` block 3b was todo58's fix for a destructured dynamic import. todo62 then
+  changed the shape it reads — alias ids are now SCOPED, and 3b skips scoped names on purpose — so the
+  input it was written for no longer exists. MEASURED by starving its map and running everything:
+  **1,827 of 1,829 tests still pass**, and both failures are in `dynamic-import-scoped-alias.test.ts`,
+  which builds the pre-fix graph BY HAND. Real parses resolve without it, function-scoped and
+  module-level alike.
+- Why: CONDUCKS-28 one level up. A fixture that constructs the graph itself freezes the producer's
+  shape at the moment it was written, so it goes on agreeing with the code it guards long after the
+  producer has moved. Nothing fails; the path just stops being reachable, and its test still reports
+  as coverage.
+- Applies: when a change alters an ID SHAPE or an edge's endpoints, starve the consumer that reads
+  the old shape and run the suite. If only its own hand-built test fails, that path is unreachable —
+  that is the measurement, not a guess. Prefer a fixture that drives a REAL parse
+  (`tests/integration/features/prune-precision.test.ts` is the pattern) over one that hand-builds a
+  `ConducksAdjacencyList`. — todo64
+
+## A dependency swap breaks the tooling nobody tests, and the gate that checked it looked clean
+- Gotcha: dropping `duckdb` broke **26 files** under `tools/` and `scripts/` that imported it
+  directly — including `npm run benchmark` and `health.mjs`, the harness the frozen-subject baselines
+  come from. The declared-dependency gate written in the same session reported `build/ clean` the
+  whole time, because it scanned `build/src` only and matched `.js` alone.
+- Why: dev tooling has no test coverage by construction — it is what you reach for WHILE debugging,
+  so it fails at the moment you need it and never before. And a gate scoped narrower than the problem
+  it was written for reads exactly like a passing gate. The same session produced both the bug and a
+  check that could not see it.
+- Applies: the gate now scans `tools/` and `scripts/` too, and `.mjs`/`.cjs` as well as `.js`
+  (CONDUCKS-42). devDependencies count as declared THERE and nowhere else — `doc-truth.mjs` imports
+  `typescript` legitimately, the same import in `build/` would be a broken publish.
+  `tools/lib/vault.mjs` is now the one way tooling opens a vault, so the next driver change is one
+  edit rather than 26. `tools/upstream-duckdb-repro/` is excluded on purpose: it is a bug report ABOUT
+  `duckdb` and must keep importing it (`npm i --no-save duckdb` to run it). — todo56
+
+## An edge built from the wrong id shape DELETES its own node, silently
+- Gotcha: `processAlias` emitted an ALIASES edge from `<file>::doit` while the binding node it names
+  is stored as `<file>::main2.doit` — scoped to the enclosing function. Nothing errors. The node is
+  then deleted BY the mismatch: `pruneTaxonomy` keeps an ATOM only if some edge's endpoint IS that
+  node, and this edge's endpoint was a different string, so the binding read as unreferenced. Prune's
+  cleanup deletes edges touching a dropped id and did not match either, so a confidence-1.0 edge
+  outlived its node. Three of them, in this repository.
+- Why: the failure runs BACKWARDS from the intuition. The instinct is "the node went missing, so the
+  edge dangles"; what actually happened is "the edge was misnamed, therefore the node was deleted".
+  A module-level re-export has no scope, so the two ids coincide and 57 of 60 alias edges were always
+  healthy — the bug lived only in the scoped minority, which is why it survived every gate.
+- Applies: `CONDUCKS_SQL_LOG=<file>` is what settled it, after three rounds of plausible and wrong
+  reasoning about which deleter ran. It records the real INSERT with the real id; the node's id and
+  the edge's endpoint sat side by side in one log line. Reach for it before theorising about what the
+  pulse wrote. Rule now in CONDUCKS-28; pinned by
+  `tests/unit/core/parsing/alias-edge-names-its-node.test.ts`. — todo62
+
+## `doctor` promised a fallback that ADR 0089 had deleted
+- Gotcha: on alpine/musl, where `tree-sitter` cannot build, `conducks doctor` printed "Parse path:
+  Gnosis regex fallback — Analysis still works, at lower fidelity" and the very next `conducks analyze`
+  refused with "no file can be read structurally". Both lines shipped, nine days apart, and the second
+  one is the true one.
+- Why: ADR 0089 deleted the regex fallback, and the PROMOTION never happened — the ADR was written and
+  the living files that repeat its subject were not touched. Six of them still described the fallback
+  as current: `doctor`, `features.md`, `conventions.md` (CONDUCKS-27), this file, the `conducks-cli`
+  skill that ships into every repo, and two module notes. Nothing catches this: a deleted capability
+  leaves no failing test behind, and prose that describes it keeps passing every gate there is.
+- Applies: when an ADR DELETES something, grep the deleted thing's NAME across `src` and `docs` in the
+  same turn and fix every living mention — `docs-lint` cannot see a claim that is merely false. Past
+  tense in a comment ("used to fall back to") is fine and should be left; it is the present-tense
+  promise that misleads. Found by installing on a platform where the optional dependency genuinely
+  cannot build, which is the only way this surfaces. The remedy doctor now prints is MEASURED, not
+  guessed — on node:24-alpine, `apk add build-base python3` then
+  `CXXFLAGS="-std=c++20" npm i -g conducks` gives all 13 grammars and a real graph. Never print a fix
+  you have not run; the whole entry above is what happens when advice outlives its subject.
 
 ## The mirror's Docs panel has NO automated coverage, deliberately
 - Gotcha: `loadDocs()` in `src/resources/mirror/ui.js` builds the panel with raw DOM calls, and nothing
@@ -1988,10 +2058,27 @@ by construction.
   ABI-bound. Nearly filed as "the install is broken"; the ABI table is what turned a wrong headline
   into the real one. A guessed prebuild URL 404'd on every ABI and would have "confirmed" the wrong
   story — `npx node-pre-gyp reveal hosted_tarball` gives the URL the installer actually uses.
-- Applies: `scripts/check-duckdb-prebuild.mjs` runs as `preinstall` — the only moment before npm
-  fetches dependencies — and warns with the cost, the toolchain need and the way out, never failing
-  (ADR 0027's rule). `engines: node >=20`. The durable fix is `@duckdb/node-api`, which is NAPI and so
-  ABI-stable: todo56. NEVER test an install from inside the repo; pack the tarball.
+- Applies: FIXED — the driver is `@duckdb/node-api`, which is NAPI and so ABI-stable (ADR 0149); the
+  same measurement now reads **43 seconds** on Node 25 with no compiler. The `preinstall` warning and
+  its ABI table are deleted, because a warning about a compile that can no longer happen is worse than
+  none. `engines: node >=20`. NEVER test an install from inside the repo; pack the tarball.
+
+## A transitively-supplied package is not a dependency, and the repo cannot see the difference
+- Gotcha: dropping `duckdb` broke `conducks` for every real installer and nothing in the repo noticed.
+  `minimatch` and `chalk` were imported by shipped code and declared in package.json nowhere — they had
+  been arriving through `duckdb` -> node-pre-gyp -> glob. Removing that one dependency took them with
+  it. The full suite stayed green, because the repo's own `node_modules` still had both through
+  devDependencies. Only the packed-tarball install failed:
+  `Cannot find package 'minimatch' imported from build/src/lib/core/parsing/ignore-manager.js`.
+- Why: this is the class of bug that is invisible everywhere the authors look and fatal everywhere the
+  users install, and no amount of testing INSIDE the repo can see it — the repo is the one environment
+  where the undeclared package is always present. It also has nothing to do with the dependency that
+  was removed: any dependency changing its OWN tree does the same thing, silently, on their schedule.
+- Applies: `scripts/check-declared-deps.mjs` runs at postbuild and fails on any package imported by
+  `build/` and not declared (CONDUCKS-42). Match imports in STATEMENT position only — the first draft
+  read prose in comments as imports and reported `stable`, `mod`, `clean` and `disconnected` as missing
+  packages. When adding a real exception, say why it is safe: `node-gyp-build` is allowed because it
+  ships with the optional tree-sitter binding and is reached only behind a try/catch.
 
 ## The pairs gate: weak and enforced beats strong and aspirational (todo57)
 - Gotcha: "one owner per fact" was a habit, and habits lost four times in one day — `diff`, the docs

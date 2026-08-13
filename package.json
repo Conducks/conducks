@@ -21,13 +21,11 @@
     "build",
     "config",
     "scripts/check-native-parser.mjs",
-    "scripts/check-duckdb-prebuild.mjs",
     "LICENSE",
-    "README.md",
-    "scripts/check-duckdb-prebuild.d.mts"
+    "README.md"
   ],
   "scripts": {
-    "build": "node scripts/check-query-backticks.mjs && rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/check-build-aliases.mjs",
+    "build": "node scripts/check-query-backticks.mjs && rm -rf build && tsc && tsc-alias && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/check-build-aliases.mjs && node scripts/check-declared-deps.mjs",
     "postinstall": "node scripts/check-native-parser.mjs",
     "start": "node ./build/src/interfaces/cli/index.js mirror",
     "demo": "npm run build && npm run start",
@@ -47,19 +45,20 @@
     "postbuild": "node scripts/sync-skills-postbuild.mjs",
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
-    "preinstall": "node scripts/check-duckdb-prebuild.mjs",
     "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js"
   },
   "dependencies": {
+    "@duckdb/node-api": "^1.5.5-r.3",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "@toon-format/cli": "^1.0.0",
     "@toon-format/toon": "^1.0.0",
+    "chalk": "^4.1.2",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
-    "duckdb": "^1.4.4",
     "express": "^4.18.2",
     "fs-extra": "^11.3.2",
     "marked": "^5.1.2",
+    "minimatch": "^9.0.9",
     "slugify": "^1.6.6"
   },
   "optionalDependencies": {

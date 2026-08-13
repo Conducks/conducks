@@ -105,10 +105,11 @@
 - Reason: the skills load in every repository conducks touches, and an internal record number is unopenable there — a citation the reader cannot follow reads as authority without evidence. Five skills said the same thing five ways, so an agent paid for the framing five times to reach five short probe lists. — ADR 0025
 
 ## CONDUCKS-27 — A dependency that may be absent is never reached by a static import
-- Rule: anything in `optionalDependencies` — today `tree-sitter` and the 12 `tree-sitter-*` grammars — is reached only by `import type` (erased at compile) or by a lazy `require` inside a function, wrapped in `try/catch`, behind a cached loader. One loader per optional package: `GrammarRegistry.loadNative()` is the only place that touches the binding, and `isNativeAvailable()` is how callers ask. Absence is a supported state with a defined degrade (native → Gnosis regex extractor), never an error path. `tests/unit/core/parsing/optional-native-binding.test.ts` fails the build on any value import of a `tree-sitter*` package.
-- Reason: ESM resolves every static import before the first line of a module executes, so a `try/catch` inside the module cannot protect it — an absent optional dep kills the process at load with `ERR_MODULE_NOT_FOUND`, before the fallback that exists to handle it can run. And on the machines where this fires, the test suite that would have caught it cannot run either. It held by accident for a long time: `Parser` happened to appear only in type positions in 12 files, so `tsc` erased those imports; one `new Parser()` would have turned a graceful degrade into a dead CLI. — ADR 0027
+- Rule: anything in `optionalDependencies` — today `tree-sitter` and the 12 `tree-sitter-*` grammars — is reached only by `import type` (erased at compile) or by a lazy `require` inside a function, wrapped in `try/catch`, behind a cached loader. One loader per optional package: `GrammarRegistry.loadNative()` is the only place that touches the binding, and `isNativeAvailable()` is how callers ask. Absence must never crash module LOAD; what it costs at RUN time is a separate question, and for `tree-sitter` the answer since ADR 0089 is that there is no fallback — `analyze` refuses once, up front, with a named error, and `doctor` reports `Parse path: NONE`. This rule requires the graceful load, not a graceful degrade. `tests/unit/core/parsing/optional-native-binding.test.ts` fails the build on any value import of a `tree-sitter*` package.
+- Reason: ESM resolves every static import before the first line of a module executes, so a `try/catch` inside the module cannot protect it — an absent optional dep kills the process at load with `ERR_MODULE_NOT_FOUND`, before the handling that exists for it can run. The difference matters: dying at load takes the WHOLE CLI, including the docs commands and the `doctor` that would have explained it. And on the machines where this fires, the test suite that would have caught it cannot run either. It held by accident for a long time: `Parser` happened to appear only in type positions in 12 files, so `tsc` erased those imports; one `new Parser()` would have turned a graceful degrade into a dead CLI. — ADR 0027
 
 ## CONDUCKS-28 — A hand-built graph fixture uses the producer's node-id shape
+- Rule (extended, todo62): this binds EMITTED EDGES too, not only fixtures. Whatever names an edge endpoint must produce the id the node writer stores — including its enclosing scope, where the node carries one. An edge naming an id nothing stores does not error and does not appear as a broken link: `pruneTaxonomy`'s ATOM gate counts a node referenced only when an edge's endpoint IS that node, so the node is deleted as unused, and prune's own edge cleanup does not match the edge either. What is left is a confident edge whose node no longer exists. MEASURED: `processAlias` built `<file>::doit` for a binding stored as `<file>::main2.doit`, and 3 such edges sat in this repository behind an audit that could not see them.
 - Rule: any test constructing a `ConducksAdjacencyList` by hand builds ids the way the pulse builds them — `repository::<name>`, `directory::<abs-path>`, `<file>::unit`, `<file>::<symbol>` — never a bare file path as an id. A file path reaches the graph through `getNeighborsByFilePath()` (`adjacency-list.ts:346`) or by filtering `properties.filePath`, never by being passed to `getNeighbors()`. When a test needs both, assert the translation, not the coincidence.
 - Reason: `NodeId` is a type alias for `string`, so the compiler accepts a file path everywhere an id belongs and the mistake survives to runtime as an empty result rather than an error. `daac.test.ts` was green for months over a module that returns one cluster per file on every real graph, because its fixture set `id` equal to `filePath` — the single arrangement in which the broken lookup resolves. A fixture written from the same misunderstanding as the code agrees with the code, and agreement reads as a pass. — ADR 0028
 
@@ -177,3 +178,33 @@ banners started being refused. Look at what left before calling it either way. A
   and neither could have caught a regression. CONDUCKS-39 makes a FINDING earn its record by being
   run; this makes the CHECK earn its tick by being broken.
 
+## CONDUCKS-42 — a package that is imported is a package that is declared
+- Rule: Every package `build/` imports appears in `dependencies` or `optionalDependencies`. Never rely
+  on one arriving through another dependency's tree. A genuine exception is allowed only in the
+  `ALLOWED` list of `scripts/check-declared-deps.mjs` and only with its reason written beside it.
+- Reason: `minimatch` and `chalk` were imported by shipped code and declared nowhere, riding in
+  through `duckdb` -> node-pre-gyp -> glob. Swapping that one dependency out took them with it, the
+  repo's suite stayed green — the repo has them via devDependencies — and every real install died on
+  `Cannot find package 'minimatch'`. A transitive package is not a promise: it disappears whenever the
+  dependency carrying it changes its own tree, which is nobody's fault and comes with no warning. The
+  repo is the one environment where the missing package is always present, so no test run inside it
+  can see this. Enforced at postbuild, where a broken publish is still cheap.
+
+
+## CONDUCKS-43 — dev tooling opens a vault through one helper, never its own driver call
+- This is CONDUCKS-5 ("direct DuckDB calls are forbidden outside the persistence layer") extended to
+  the one place it was never enforced. `tools/` and `scripts/` are outside `src/` and cannot reach the
+  TypeScript persistence layer before a build, so they had no compliant option and 26 of them wrote
+  their own driver call. The helper is that option; the rule is the same rule.
+- Rule: anything under `tools/` or `scripts/` that reads a vault imports `openVault` from
+  `tools/lib/vault.mjs`. No script constructs a DuckDB instance or connection itself. Read-only is the
+  default and a writer must ask for it (`{ readOnly: false }`); a reader that takes the write lock
+  fails against any repo with `conducks mcp` attached, which is whenever the tool is in use. The one
+  exception is `tools/upstream-duckdb-repro/`, which is a bug report ABOUT the old driver and must
+  keep importing it.
+- Reason: the vault driver moved from `duckdb` to `@duckdb/node-api` (ADR 0149) and **26 files broke
+  at once**, because each had hand-rolled `new duckdb.Database(...)` plus its own promisified `all`.
+  Among them were `npm run benchmark` and `health.mjs`, the harness the frozen-subject baselines come
+  from. None of them is covered by a test — dev tooling is what you reach for WHILE debugging, so it
+  fails at the moment you need it and never before. One helper makes the next driver change one edit.
+  — todo56

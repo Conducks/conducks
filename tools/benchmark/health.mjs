@@ -31,15 +31,23 @@
  * the run no user ever gets first, and it is structurally blind to the cold-start class of defect —
  * todo49 was exactly that: a first analyze produced fewer edges than a rebuild, and this harness
  * could not have seen it. `--cold` removes the vault before analyzing so the first run is the one
- * measured. Cold and warm now agree on all three subjects (todo49's fix), which is a property worth
- * re-checking rather than assuming: run `--cold --compare` against a warm baseline and drift is a
- * regression of that parity.
+ * measured.
+ *
+ * COLD AND WARM DO NOT FULLY AGREE, and this file used to say they did (todo59). The claim was
+ * "cold and warm now agree on all three subjects", asserted in prose and checked by nobody, and it
+ * had been false for an unknown stretch: measured 2026-08-09, sofie was +294 dangling cold and
+ * orchestrator +157. That gap is FIXED (a second link pass after induction), but a small residue
+ * remains — a handful of edges and a node or two, tracked as a number rather than asserted away.
+ *
+ * So the two modes keep SEPARATE baselines: `<name>.json` is warm, `<name>.cold.json` is cold, and
+ * comparing one against the other is refused rather than reported as drift. `--cold --compare` is
+ * then a real regression check on the first-analyze path, which is the only run a new user ever sees.
  */
 import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import duckdb from 'duckdb';
+import { openVault } from '../lib/vault.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -102,7 +110,7 @@ const sh = (cmd, args, cwd) => {
   return { code, out, ms: Number((process.hrtime.bigint() - started) / 1_000_000n) };
 };
 
-const query = (db, sql) => new Promise((res, rej) => db.all(sql, (e, r) => (e ? rej(e) : res(r))));
+const query = (db, sql) => db.all(sql);
 
 /** Ratio printed as a percentage, but the caller always carries the count beside it. */
 const rate = (n, d) => (d === 0 ? null : Number(((n / d) * 100).toFixed(2)));
@@ -140,7 +148,7 @@ async function measure(project) {
 
   // ---- shape, straight out of the vault ----
   const vault = path.join(dir, '.conducks/conducks-synapse.db');
-  const db = new duckdb.Database(vault, duckdb.OPEN_READONLY).connect();
+  const db = await openVault(vault);
 
   const [counts] = await query(db, `
     SELECT
@@ -192,6 +200,10 @@ async function measure(project) {
   }
   result.smokeFailures = Object.entries(result.smoke).filter(([c, r]) => crashed(c, r.code)).map(([c]) => c);
 
+  // Close before returning: the INSTANCE holds the vault's single-writer lock, and this harness
+  // measures several subjects in one process. Leaving it open made the next subject's analyze wait.
+  db.close();
+
   return result;
 }
 
@@ -236,10 +248,27 @@ for (const project of chosen) {
   if (r.dangling) console.log(`  dangling        ${r.dangling.count}/${r.dangling.of} (${r.dangling.pct}%)   cycles ${r.cycles}  orphans ${r.orphans}  violations ${r.violations}`);
   console.log(`  smoke           ${Object.keys(r.smoke).length - r.smokeFailures.length}/${Object.keys(r.smoke).length} survived${r.smokeFailures.length ? `  CRASHED: ${r.smokeFailures.join(', ')}` : ''}`);
 
-  const file = path.join(BASELINES, `${r.project}.json`);
+  // A COLD baseline is a different file, and that is the whole of todo59 Phase 2. Both modes used to
+  // write `<name>.json`, so `--cold --save` silently OVERWROTE the warm baseline with cold numbers
+  // and `--cold --compare` diffed a first analyze against a second one — reporting the cold/warm
+  // residue as DRIFT on every run, which is how a real difference gets trained into noise.
+  const file = path.join(BASELINES, `${r.project}${cold ? '.cold' : ''}.json`);
   if (compare) {
-    if (!fs.existsSync(file)) { console.log('  no baseline saved — run with --save'); continue; }
-    const d = diff(r, JSON.parse(fs.readFileSync(file, 'utf8')));
+    if (!fs.existsSync(file)) {
+      console.log(`  no ${cold ? 'COLD ' : ''}baseline saved — run with ${cold ? '--cold --save' : '--save'}`);
+      continue;
+    }
+    const before = JSON.parse(fs.readFileSync(file, 'utf8'));
+    // Guard the guard. A baseline written before this split carries no `coldStart` field, and
+    // comparing across modes is exactly the mistake this change exists to prevent — so it is refused
+    // with the fix in the message rather than diffed into a misleading number.
+    if (Boolean(before.coldStart) !== cold) {
+      drifted = true;
+      console.log(`  vs baseline     REFUSED — ${file.endsWith('.cold.json') ? 'cold' : 'warm'} file holds a ` +
+        `${before.coldStart ? 'cold' : 'warm'} run and this is a ${cold ? 'cold' : 'warm'} one. Re-save it.`);
+      continue;
+    }
+    const d = diff(r, before);
     if (d.length === 0) console.log('  vs baseline     unchanged');
     else { drifted = true; console.log('  vs baseline     DRIFT'); d.forEach(l => console.log(`      ${l}`)); }
   }
