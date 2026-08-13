@@ -52,7 +52,8 @@ shape fixed on the MCP side in todo53, still live on the CLI.
       the tool, and a limit that does not parse is refused rather than defaulted.
       VERIFIED AS A MIRROR on sofie: ORPHAN 17/17, STALE_IMPORT 20/20, UNIMPORTED_MODULE 35/35, and
       both surfaces refuse `BOGUS` with the same vocabulary.
-- [ ] `context` is NOT a flag gap, and adding those flags would make it worse. The two surfaces answer
+- [x] DONE by todo57, WITH ONE DEVIATION FROM WHAT THIS TASK PRESCRIBED, recorded because it is a real choice and not an oversight. The extraction happened as described — the BFS is `registry.kinetic.context` and both surfaces reach it. But the CLI did NOT gain `--mode flow|neighbourhood`: the flow trace was REPLACED rather than kept beside the neighbourhood. Keeping it would have preserved the thing this todo exists to remove — one name answering two questions — and the measurement said it was not worth preserving: 2,407 entries of which 247 were unresolved `node` placeholders and 196 whole files. What survived from it is the `Called by:` section and the source lines, as rendering. Original reasoning below, still accurate about the problem:
+- [x] `context` is NOT a flag gap, and adding those flags would make it worse. The two surfaces answer
       different questions: the CLI gives a directional flow trace (callers at depth 1 filtered to CALLS,
       the downstream chain, and SOURCE LINES via `source.lineReader`), while the tool runs a scored BFS
       over a radius with a token budget, excluding ATOMs and containers (ADR 0103). `--radius` has no

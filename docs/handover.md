@@ -2,13 +2,18 @@
 Status: current
 
 ## Where it stands
-Gates green: **1,837 tests / 238 suites**, typecheck 0, `docs-lint` 186 governed docs, `visuals-lint`
+Gates green: **1,838 tests / 238 suites**, typecheck 0, `docs-lint` 185 governed docs, `visuals-lint`
 clean (62 anchors, 60 review stamps), architecture 5/5, declared-deps clean. All three frozen subjects
 `unchanged` vs baseline — RE-SAVED twice today (todo63, todo64), warm and cold.
 
-**Closed today: todo56, todo59, todo62, todo63, todo64.** todo61 is all but done. What is left is
-todo57 (the BFS extraction), todo60 (needs an idle machine), and two decisions that are genuinely
-yours — todo58#P1 and the publish.
+**Closed today: todo56, todo57, todo59, todo62, todo63, todo64.** ADR 0148's twelve pairs are all
+mirrored and `paired-surfaces` has no granted exceptions left.
+
+What remains:
+- **todo60** — the flake. Needs an idle machine more than it needs a decision.
+- **todo61**, one task: the `status` vocabulary (MCP `health|map|manifest|pulse` against CLI
+  `pulse|blueprint`). A naming call, low stakes, reversible.
+- **todo58#P1** and **todo16 (publish)** — genuinely yours.
 
 **The suite is not reliably green and nobody knows why.** Across nine runs today: `rename-safety`
 (twice, two different lines), `kinetic` (4 tests), `blocking-commands` (1) — FOUR distinct suites,
@@ -62,6 +67,24 @@ All six corrected. Doctor now reports `Parse path: NONE` as a failure, mutation-
 DuckDB problem — the musl DuckDB binding resolves fine. The remedy doctor prints is measured, not
 guessed: `apk add build-base python3` then `CXXFLAGS="-std=c++20" npm i -g conducks` → all 13
 grammars, real graph. Decide whether Alpine-without-a-toolchain is a supported story before publishing.
+
+## 2026-08-13 — todo57: `context` is one feature again
+
+The last of ADR 0148's twelve pairs. The scored BFS moved to
+`src/lib/domain/kinetic/context.ts` and both surfaces reach it through `registry.kinetic.context`.
+Measured before: **2,407 CLI entries against the tool's 83, sharing 44 names** — 247 of the CLI's were
+unresolved `node` placeholders and 196 were whole files, so the flow trace was replaced rather than
+kept beside the neighbourhood.
+
+The tool's output is **byte-identical** to baselines captured before the change, on three parameter
+shapes. The CLI answers from the same list, cut at a different place, and keeps two things as
+rendering: source lines, and the `Called by:` section — dropping the latter was a real regression that
+`traversal-truth` caught, since the neighbourhood contains callers but does not label them.
+
+**A limitation worth carrying:** the equivalence test compares the surfaces to EACH OTHER, so it
+cannot catch a change to the shared answer — mutating the sort or the ATOM filter moves both and it
+stays green. `context-shape.test.ts` pins the answer itself, which is why its registry mock delegates
+to the real analyzer instead of returning canned nodes.
 
 ## 2026-08-13 — todo61: a duplicate door caught before it shipped, and a real denominator bug
 
