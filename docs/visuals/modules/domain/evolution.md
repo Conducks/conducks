@@ -19,10 +19,18 @@ to an automatic fix.
 **Deferred / not built:** raising `STALE_IMPORT` recall past its deliberate floor. The finding fires
 since 2026-07-25 (`findStaleImports` — for a year it was gated on raw tree-sitter node types that
 labels never carry, then blocked on missing inheritance edges; todo11 closed both). It reports only
-on affirmative absence across every evidence class and currently yields 1 finding vs tsc's 75 —
-a strict subset with zero false positives. The recall gap is a query-coverage problem, not detector
-logic, and un-excluding type targets before the type-position captures exist would re-create the
-measured 36-false-positive flood (todo14).
+on affirmative absence across every evidence class. The recall gap is a query-coverage problem, not
+detector logic, and un-excluding type targets before the type-position captures exist would re-create
+the measured 36-false-positive flood (todo14).
+
+**"Zero false positives" was the claim here and it was wrong** (todo63, 2026-08-11). It held on
+conducks itself — 1 finding — and was never checked against a subject with a different style. On
+sofie it produced 20, and every one whose target was a plain VALUE was suspect: three spot-checked
+were all false, including a constant used three times in the very file whose import was called stale.
+Cause: a bare value read produces no edge, so "no evidence of use" was read as evidence of no use.
+`variable` is now excluded from `PRUNABLE_BINDING_KINDS`, taking sofie to 10. The floor is therefore
+LOWER than it was on purpose — a genuinely stale value import is no longer reported at all, which is
+this module's own rule applied honestly: a missed dead import is acceptable and a wrong one is not.
 
 ## Prune must under-report, and here is the proof
 

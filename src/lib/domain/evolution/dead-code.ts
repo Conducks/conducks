@@ -297,9 +297,23 @@ export class DeadCodeAnalyzer {
    * tests/unit/core/type-position-targets.test.ts), and the re-validation against
    * `tsc --noUnusedLocals` was re-run on a fresh pulse before shipping the wider set.
    */
+  // `variable` is ABSENT on purpose (todo63). It is the only kind here whose use can be completely
+  // invisible to the graph: a plain value read — `return usedValue`, `= CONFIG`, `for (const x of
+  // TABLE)` — produces no relationship at all, so "no evidence of use" is not evidence of no use.
+  // MEASURED: `import { usedValue, usedFn }` where only `usedFn` is called reported `usedValue` as a
+  // STALE_IMPORT — a verdict telling the user to delete an import their code needs. The import-site
+  // calibration below exists for exactly this blind spot but is keyed per (file, specifier), so ANY
+  // used sibling from the same module lifts it; splitting the import into two statements does not
+  // help, because they merge into one record.
+  //
+  // A const arrow function is `function`, not `variable` (measured), so callable exports keep their
+  // coverage. What this costs is the genuinely-stale value import, which is no longer reported at
+  // all — accepted deliberately, per this analyzer's own rule: a missed dead import is acceptable
+  // and a wrong one is not. Restoring that recall means making a bare identifier read produce an
+  // edge, which is a parser change across every language and is NOT what this set is for.
   private static readonly PRUNABLE_BINDING_KINDS = new Set<string>([
     'function', 'class', 'struct', 'method',
-    'interface', 'enum', 'variable', 'field', 'property',
+    'interface', 'enum', 'field', 'property',
   ]);
 
   /**

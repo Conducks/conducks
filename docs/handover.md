@@ -1,14 +1,159 @@
-# Handover — 2026-08-10
+# Handover — 2026-08-11
 Status: current
 
 ## Where it stands
-Gates green: **1,813 tests / 232 suites**, typecheck 0, `docs-lint` 187 governed docs, `visuals-lint`
-clean (62 anchors, 60 review stamps). All three frozen subjects `unchanged` vs baseline.
+Gates green: **1,830 tests / 236 suites**, typecheck 0, `docs-lint` 188 governed docs, `visuals-lint`
+clean (62 anchors, 60 review stamps), architecture 5/5, declared-deps clean. All three frozen subjects
+`unchanged` vs baseline — RE-SAVED today, warm and cold, see below for why.
 
-Work sits on branch `mcp-surface-walk-and-concurrency`, 22 commits ahead of `main`, nothing pushed.
+**Two full-suite runs in six failed** (`rename-safety`, at two different lines, plus a second suite never captured); the
+other four were clean on the same build. Do not read a green run as settled — todo60 Phase 3.
 
-**`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at 239s and 1,813.
+Work sits on branch `mcp-surface-walk-and-concurrency`, 23 commits ahead of `main`, nothing pushed.
+The driver swap below is UNCOMMITTED at the time of writing.
+
+**`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
+
+## 2026-08-10 — the install stops compiling DuckDB, and what that uncovered
+
+ADR **0149**: the vault driver is `@duckdb/node-api` (NAPI, one binary for every Node) instead of
+`duckdb` (node-pre-gyp, one binary per ABI). `npm i -g` from a packed tarball went from **past ten
+minutes still compiling** to **39s** with no compiler invoked. **todo56 is CLOSED** (`completed/`).
+
+Verified on four triples, each a clean-prefix tarball install plus a real `analyze` — darwin-arm64
+39s, linux-arm64 38s, linux-arm64-musl 38s, linux-x64 47s (emulated, via Docker).
+
+The port was NOT one file, as the todo had assumed — `getRawConnection()` hands the driver's
+connection to five callers. Row shape was verified unchanged by diffing both drivers against this
+repo's own vault before anything was rewritten. `close()` lost its 5-second timeout race (the new
+close cannot hang) and now checkpoints the WAL away, so a stale `.wal` is strictly a crash signature.
+
+**The tarball install caught a publish blocker no test could have.** `minimatch` and `chalk` were
+imported by shipped code and declared nowhere — they arrived through `duckdb` → node-pre-gyp → glob,
+and dropping that dependency took them with it. The suite stayed green throughout, because the repo
+has both via devDependencies. `scripts/check-declared-deps.mjs` now fails the build on any undeclared
+import (CONDUCKS-42). **Publishing before this was landed would have shipped a broken package.**
+
+Two things this uncovered that were true before and invisible:
+
+- The suite's referential-integrity assertion had **never checked anything** — it passed params in the
+  shape the old driver did not take, the error was swallowed, and `[]` read as "0 dangling". Rewritten;
+  three of the four things it reported turned out to be the QUERY being wrong (it partitioned by
+  `pulseId`, but analyze is incremental). What survived became **todo62 — now closed, see below**.
+- `persistence.ts.m`, a stale 919-line copy of the persistence layer, is deleted (todo56#P3).
+
+**And the musl install found a nine-day-old lie.** On alpine, where `tree-sitter` cannot build,
+`doctor` printed "Parse path: Gnosis regex fallback — Analysis still works, at lower fidelity" and the
+very next `analyze` refused. ADR **0089 deleted that fallback** and the promotion never happened: six
+living files still described it as current — `doctor`, `features.md` (a whole capability entry),
+CONDUCKS-27, `memory.md`, the `conducks-cli` skill that ships into every repo, and two module notes.
+All six corrected. Doctor now reports `Parse path: NONE` as a failure, mutation-verified.
+
+**Conducks installs on musl and cannot analyze on it without a toolchain.** That is not new and not a
+DuckDB problem — the musl DuckDB binding resolves fine. The remedy doctor prints is measured, not
+guessed: `apk add build-base python3` then `CXXFLAGS="-std=c++20" npm i -g conducks` → all 13
+grammars, real graph. Decide whether Alpine-without-a-toolchain is a supported story before publishing.
+
+## 2026-08-11 — prune stopped telling users to delete imports their code needs
+
+**todo63 Phase 0 + 1.** The const-value defect the new fixture found is TWO causes, not one, and the
+single-cause theory in the todo is refuted — fixing either half leaves the other exactly where it was.
+
+- **False positive:** a bare value read (`return usedValue`) produces NO edge, so the used-set never
+  sees it. The analyzer HAS a guard for that blind spot, but it is keyed per (file, specifier) — so
+  any used sibling from the same module lifts it. Splitting the import into two statements does not
+  help; they merge into one record.
+- **Recall miss:** entirely separate. An exported value nobody imports has no NODE at all —
+  `pruneTaxonomy` cut it (ADR 0013). Nothing to flag. Left open as todo63 Phase 2, because reporting
+  it is a taxonomy decision about what the graph stores, not a `prune` change.
+
+Fixed by removing `variable` from `PRUNABLE_BINDING_KINDS` — one consumer, one line. Decided by the
+analyzer's OWN written rule, not preference: *"a missed dead import is acceptable and a wrong one is
+not"*. A const arrow function is `function`, not `variable` (measured), so callable coverage is intact.
+
+**MEASURED on sofie: 171 findings → 161, `STALE_IMPORT` 20 → 10.** Three of the ten removed were
+checked against the source and all three are confirmed false positives — `ALL_ROLES` used three times
+in the file that imports it, `STATE_COLOR` used as an index, `OWNER_KEY` used as a call argument.
+The cost is real and asserted explicitly in the fixture: a genuinely stale VALUE import is now never
+reported. Trading it back is a visible choice, not an accident.
+
+## 2026-08-11 — the prune precision check is a fixture now, and it found two things
+
+**todo58#P2 done.** `tests/integration/features/prune-precision.test.ts` replaces a by-hand
+measurement (172 findings verified one at a time, ~94.8% precision, unrepeatable) with a project
+whose truth is DECLARED in the test. Scored on precision AND recall together, because either alone is
+gameable. Four live symbols, four different mechanisms — static import, destructured dynamic import,
+dynamic import then `new`, barrel re-export. Mutation-verified.
+
+**It found a defect on its first run — todo63.** Exported const VALUES are wrong in BOTH directions:
+an unused one is MISSED, and a used one is flagged `STALE_IMPORT`. Functions and classes are fine,
+including an arrow function on a const, so it is the value and not the declaration form. The false
+positive is the bad half — `STALE_IMPORT` is a verdict telling the user to delete an import their
+code needs. Held in the fixture's `KNOWN_WRONG` group, which fails if the gap grows OR is silently
+fixed.
+
+**And a second thing — todo64.** `IntraLinker` block 3b (todo58's own fix) is now unreachable. todo62
+made alias ids scoped, and 3b skips scoped names by design, so block 3a covers the case instead.
+MEASURED by starving 3b: **1,827 of 1,829 tests still pass**, and both failures are in
+`dynamic-import-scoped-alias.test.ts` — which hand-builds the pre-fix graph. Real parses resolve
+without it, function-scoped and module-level alike. Not deleted: shadowing and other languages need
+checking first.
+
+## 2026-08-11 — todo59 closed, and the re-baselining confirmed todo62 independently
+
+**todo59 closed.** Cold and warm now keep SEPARATE baselines — `<name>.cold.json` beside
+`<name>.json`. Both modes wrote the same file before, so `--cold --save` silently overwrote the warm
+baseline and `--cold --compare` diffed a first analyze against a second, reporting the residue as
+DRIFT every run. Comparing across modes is now REFUSED (mutation-verified), and the residue is a
+stored number instead of a rediscovery: **orchestrator 5 edges, sofie 1 node**. The docstring's
+"cold and warm now agree" claim — asserted in prose, checked by nobody — is replaced with the truth.
+
+**The warm baselines had to be re-saved, and the diff was not noise.** It is the todo62 alias fix
+measured on frozen subjects, which nothing else could have shown:
+
+| orchestrator | before | after |
+|---|---|---|
+| orphans | **23** | **0** |
+| violations | 25 | 2 |
+| nodes | 6,639 | 6,662 |
+
+Every one of those 23 orphans was a binding node deleted by its own mis-named edge. scraper (python)
+is unchanged — the control, since it has no destructured dynamic imports.
+
+**And the driver swap had broken 26 files nobody tests.** `tools/` and `scripts/` imported `duckdb`
+directly — including `npm run benchmark` and `health.mjs` itself — while the gate written the same
+session reported `build/ clean`, because it scanned `build/src` only and matched `.js` alone. All 26
+ported behind one helper (`tools/lib/vault.mjs`); the gate now covers `tools/`, `scripts/`, `.mjs`
+and `.cjs`, allows devDependencies for tooling only, and ignores `require(...)` written inside a
+comment. `tools/upstream-duckdb-repro/` still imports `duckdb` ON PURPOSE — it is a bug report about
+that package.
+
+**A THIRD intermittent test appeared:** `rename-safety.test.ts:84` failed in one full-suite run of
+three and passes in isolation. That run reported two failing suites and only one was captured before
+the output rolled. Filed as todo60 Phase 3, explicitly NOT attributed to the alias fix — 235/235
+passed twice on the same build, so the counts cannot carry an attribution.
+
+## 2026-08-11 — todo62: the edge was misnamed, therefore the node was deleted
+
+**Closed.** The three surviving dangling edges were NOT re-exports — that first reading was wrong, and
+the correction is the point. They are destructured dynamic imports
+(`const { X } = await import(...)`), and the failure runs backwards from the intuition:
+
+`processAlias` built the edge from the bare local name (`<file>::doit`) while the binding node is
+stored scoped to its enclosing function (`<file>::main2.doit`). `pruneTaxonomy`'s ATOM gate keeps a
+node only when an edge's endpoint IS that node — so the mismatch made the binding read as
+unreferenced and **the edge's own misnaming is what deleted its node**. Prune's edge cleanup then
+missed the edge for the same reason. A module-level re-export has no scope, the two ids coincide, and
+57 of 60 alias edges were always healthy — which is why only the scoped minority was ever broken.
+
+Fixed at both call sites in `reflector.ts`. Measured after a full re-analyze: dangling confident
+structural edges **3 → 0**, alias edges still 60, the 1,044 deliberately-unresolved untouched. The
+structural test's carve-out is gone — it asserts `[]`. Rule promoted into CONDUCKS-28.
+
+**`CONDUCKS_SQL_LOG` is what ended it.** Three rounds of plausible reasoning about which deleter ran
+were all wrong; the write log put the node's id and the edge's endpoint side by side in one line. Use
+it before theorising about what a pulse wrote.
 
 ## 2026-08-10 — the two surfaces must answer the same question
 
@@ -44,21 +189,27 @@ flake, which also produced a WRONG conclusion along the way. `npm run test:fast`
 loop is 26s. See AGENT_RULES.
 
 ## The board is EMPTY, and here is what that does and does not mean
-That sentence was true on 2026-08-09 and is not now — six todos are open, all of them filed FROM
+That sentence was true on 2026-08-09 and is not now. Six todos are open, and every one was filed FROM
 measurements taken after the board said it was empty:
 
-- `todo56` — `npm i -g` compiles DuckDB from source on a Node major with no prebuild (10+ min, needs a
-  toolchain). **Land this before publishing** or new-Node users meet that first.
+- (closed today) `todo56` — the install. See above; four platforms measured.
 - `todo57` / `todo61` — `context` is two features under one name; needs the BFS extracted to the domain.
 - `todo58` — build-layout specifiers: an unresolvable path should inflate DANGLING, not read as dead.
-- `todo59` — cold/warm parity: the 294-edge gap is fixed, a ±5-edge residue is not.
-- `todo60` — two intermittent tests; the assertions now print their values, so the next natural failure
-  diagnoses itself.
+- (closed today) `todo59` — cold/warm parity. Residue tracked in a cold baseline, not chased.
+- `todo60` — now THREE intermittent tests; the assertions print their values, so the next natural
+  failure diagnoses itself.
 - `todo61` — the mirror rule: five gaps closed, `status` and `diff` need a decision.
+- `todo63` — the false-positive half is FIXED (above); Phase 2 remains, and it is a taxonomy
+  decision: should an exported-but-unreferenced value keep a node at all?
+- `todo64` — `IntraLinker` block 3b is unreachable since todo62; only its hand-built fixture proves it.
+- (closed today) `todo62` — the alias id-shape bug. See above.
+  call, not work: is a barrel re-export a symbol or a relationship?
 
 And the ones that are not tracked as open work:
 
 - `todo16` — npm publish. Everything gating it is green; the publish itself is Said's command to run.
+  Note what changed today: the package it would have published was BROKEN (undeclared `minimatch` and
+  `chalk`), and the repo could not see it. Pack and install the tarball before publishing, every time.
 - `todo31` — parked with reopen-triggers. NOTE: its `Status:` is `todo` with zero unchecked tasks, so
   the board cannot show it. That is a real blind spot in the grammar, flagged twice and not yet
   resolved — a file that says "todo" and appears nowhere.

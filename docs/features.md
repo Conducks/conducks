@@ -134,8 +134,8 @@
 - Intent: Text-based renames miss references and over-match unrelated ones; verifying against the call graph first means the edit set is the one the graph can defend.
 
 ## Dead Code Detection — `conducks prune`
-- Purpose: Flag exported symbols that no proven edge reaches, as review candidates — excluding entry points and test fixtures.
-- Intent: "Nothing calls this" is normally a guess; this makes it a checkable claim you can start from. It reports candidates for a human to confirm, never a delete list.
+- Purpose: Flag exported symbols that no proven edge reaches, as review candidates — excluding entry points and test fixtures. `STALE_IMPORT` deliberately does NOT cover plain VALUE imports (a constant, an object, a table): a bare value read produces no edge, so their use is invisible and reporting them was wrong more often than right (todo63, sofie 20 → 10 findings).
+- Intent: "Nothing calls this" is normally a guess; this makes it a checkable claim you can start from. It reports candidates for a human to confirm, never a delete list. It under-reports on purpose — a missed dead symbol costs a review pass, a wrong one costs a user their build, and `prune` is scored on both directions at once (`tests/integration/features/prune-precision.test.ts`) rather than on how much it finds.
 
 ## Supply-Chain Surface — `conducks supply-chain`
 - Purpose: Report the dependency surface — stdlib vs third-party edges, packages ranked by how many files import them, versions joined live from the manifest, and packages imported but never declared.
@@ -207,11 +207,11 @@
 
 ## Environment & Vault Check — `conducks doctor`
 - Purpose: Verify the machine can actually run conducks — Node version, the DuckDB binding, WHICH parse path is live and how many grammars induced — and report whether a vault exists, how old its last pulse is, and whether a newer release exists.
-- Intent: Most "conducks is broken" reports are environment, not logic. One command that names the failing prerequisite is cheaper than reading a stack trace. Since the native bindings are optional, the parse path is now a fact the user cannot infer — a silent fallback looks identical to a working install until symbol counts are questioned.
+- Intent: Most "conducks is broken" reports are environment, not logic. One command that names the failing prerequisite is cheaper than reading a stack trace. Since the native binding is optional and is the ONLY parse path, whether it loaded decides whether `analyze` can run at all — so doctor reports that as a failure, not a warning.
 
-## Degraded Parsing Without a Toolchain — automatic, reported by `conducks doctor`
-- Purpose: Analyze a codebase even where the native `tree-sitter` bindings could not be built, by falling through to the Gnosis regex extractor per file.
-- Intent: `npm i -g conducks` must work on a machine with no C++ toolchain, and the core `tree-sitter` package ships no prebuilds — so the bindings are optional and their absence has to be a supported state, not a crash. Lower fidelity is a worse answer; a dead CLI is no answer.
+## Installing Without a Toolchain — `npm i -g conducks`, reported by `conducks doctor`
+- Purpose: Install and run the CLI on a machine with no C++ toolchain. The vault binding is NAPI and always prebuilt (ADR 0149); the native `tree-sitter` binding compiles from source and is optional, so its absence never crashes the process at load — every use goes through one lazy loader.
+- Intent: `npm i -g conducks` must not need a compiler. What absence costs is stated rather than hidden: without the binding there is NO parse path — ADR 0089 deleted the regex fallback — so `analyze` refuses with a named error and `doctor` reports `Parse path: NONE`. This entry used to promise degraded analysis; that capability no longer exists, and the promise outlived it by nine days until an alpine/musl install was measured.
 
 ## Deferred Graph Load — every read path
 - Purpose: The structural graph materialises when something walks it, not when a process starts. A docs-only MCP session holds 92 MB instead of 435 MB; `conducks_status` holds 104 MB.

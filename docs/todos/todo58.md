@@ -81,8 +81,8 @@ misses `electron/main/index.ts:1341`, again behind `await import()`. Recall matt
 
 ## Phase 2 — make the measurement repeatable
 
-- [ ] This precision check was done by hand. Turn it into a scored fixture: a small project with known
-      dead and known live symbols, including dynamic imports, asserting precision AND recall.
+- [x] DONE — `tests/integration/features/prune-precision.test.ts`. A project whose truth is DECLARED in the test, scored on precision AND recall together (either alone is gameable: flag nothing, or flag everything). Four live symbols reached by four different mechanisms — static import, destructured dynamic import, dynamic import then `new`, and a barrel re-export — plus a genuinely dead one. Mutation-verified: starving the linker's alias map fails it
+- [x] It found a defect on its first run, which is the point of declaring truth rather than reading it back: exported const VALUES are wrong in BOTH directions — an unused one is missed, and a used one is flagged `STALE_IMPORT`, a verdict telling the user to delete an import their code needs. Held in the fixture's `KNOWN_WRONG` group so the headline score stays honest and the gap can neither grow nor silently vanish. Filed as todo63
 - [ ] The frozen subjects have never been driven at the MCP surface until today. Add a pass that runs
       the tool surface against them, so payload shapes and finding quality are checked against data
       that is not conducks' own.
