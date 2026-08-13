@@ -499,6 +499,23 @@ by construction.
   measured against native's 26/27 are historical — that path no longer exists.) Pinned by
   `tests/unit/core/parsing/optional-native-binding.test.ts`, which fails on any value import. — ADR 0027
 
+## A contaminated measurement does not look contaminated — it looks like a finding
+- Gotcha: three wrong conclusions in one day, all from measurements taken while something else was
+  running. `npm run build` opens with `rm -rf build`, and the integration suites spawn child CLIs that
+  read `build/` live — so a hand-run build during a suite produced `Cannot find module
+  .../mem-trace.js`, which reads exactly like a harness race. Worse, a starve-and-compare on a
+  fixture returned an EMPTY graph for the same reason, and an empty result read as "starving this
+  deleted the edges" — the opposite of the truth, written into a todo and a handover before it was
+  caught.
+- Why: a contaminated run fails in the shape of an interesting result. There is no marker that says
+  "this number is garbage", so it competes on equal footing with a real one and usually wins, because
+  it is the one that arrived while a theory was being tested.
+- Applies: take no measurement while a build, a test loop or another CLI is in flight — check first.
+  And prefer INSTRUMENTING the suspect to starving it: starving answers "did the outcome change",
+  which invites a causal reading, while a `process.env`-guarded log at the mutation site answers "did
+  this code run, and on what". Instrumenting `IntraLinker` block 3b took one line and exonerated it in
+  a single run, after two starve experiments had accused it of opposite things. — todo64
+
 ## A hand-built fixture keeps proving a code path the parser stopped producing
 - Gotcha: `IntraLinker` block 3b was todo58's fix for a destructured dynamic import. todo62 changed
   the shape it reads — alias ids are now SCOPED, and 3b skips scoped names on purpose. Starving its

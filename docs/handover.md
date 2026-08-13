@@ -75,12 +75,16 @@ The CLI side has a defect the static gate could not see: **2,407 entries for one
 247 of them unresolved `node` placeholders. The decision in todo57#P1 is still yours, but the CLI's
 breadth is a bug regardless of which way it goes.
 
-**todo64's headline was WRONG and is corrected.** Block 3b is not dead code — starving it deletes the
-edges for a renamed STATIC import (`import { A as B }` … `B()`). Every fixture that produced the
-"unreachable" reading held a dynamic import and none held a renamed static one. What 3b really has is
-a wrong-edge bug: a local declaration that SHADOWS a renamed import gets rebound to the import.
-**A green suite while a path is starved proves the SUITE does not cover it, never that the path is
-unused.**
+**todo64 has now carried TWO wrong headlines, and the second was mine correcting the first.** It said
+block 3b was unreachable dead code; then, after a starve appeared to delete a renamed-static-import
+edge, that 3b was load-bearing. Re-measured with nothing else running, **starving 3b changes nothing**
+on that fixture, and 3b instrumented to log every rebind logs NOTHING. The second measurement had
+been contaminated — a full-suite loop was running and `npm run build` had wiped `build/` under it, so
+the analyze produced an empty graph that read as "the edges disappeared".
+
+The DEFECT is real and reproduced cleanly twice: a local declaration that shadows a renamed import is
+recorded as calling the import. 3b is not its cause and the cause is not yet identified — todo64
+Phase 0 names the next two candidates and says to instrument them rather than starve them.
 
 **One flake capture was contaminated, by me.** `kinetic.test.ts` failed with
 `Cannot find module .../build/src/lib/core/utils/mem-trace.js` — which reads as a harness race and is

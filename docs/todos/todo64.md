@@ -1,30 +1,33 @@
-# todo64 — a local that shadows a renamed import is rebound to the import, producing a wrong edge
+# todo64 — a local that shadows a renamed import is recorded as calling the import
 Status: todo
 - Acceptance: a function-scoped declaration that shadows a renamed import resolves to ITSELF, while a call through the renamed import still resolves to the real definition — both asserted against a REAL parse, not a hand-built graph.
 
 ## Context
 
-**This todo was filed with the wrong headline and the correction is the useful part.** It first said
-`IntraLinker` block 3b was UNREACHABLE dead code, on the strength of starving its map and watching
-1,827 of 1,829 tests still pass — the only failures being in the one test that hand-builds the
-pre-fix graph. That measurement was real and the conclusion drawn from it was wrong: every fixture
-used to reach it contained a destructured DYNAMIC import, and none contained a renamed STATIC one.
+**This record has carried two wrong headlines. Both are kept, because the way they were reached is
+the most useful thing in it.**
 
-MEASURED on a two-file fixture with `import { realTarget as shadowed }`:
+1. *"`IntraLinker` block 3b is unreachable dead code."* Reached by starving 3b's map and watching
+   1,827 of 1,829 tests pass, the only failures being in the one test that hand-builds the pre-fix
+   graph. The measurement was clean; the conclusion did not follow. A green suite while a path is
+   starved proves the SUITE does not cover it, never that the path is unused.
+2. *"3b is load-bearing — starving it deletes the edges for a renamed static import."* Reached by
+   starving 3b and seeing both edges vanish from the fixture. **That run was contaminated**: a
+   full-suite loop was running in another shell and `npm run build` had just wiped `build/` under it,
+   so the analyze produced nothing. The empty result read exactly like a meaningful one.
+
+Re-measured cleanly, nothing else in flight:
 
 | | 3b live | 3b starved |
 |---|---|---|
-| `usesImport` -> `lib.ts::realTarget` | present | **gone** |
-| `usesLocal` -> `lib.ts::realTarget` | present | gone |
+| `usesImport` -> `lib.ts::realTarget` | present | **present** |
+| `usesLocal` -> `lib.ts::realTarget` | present | **present** |
 
-So 3b is load-bearing: it is what resolves a call made through a RENAMED STATIC import
-(`import { A as B }` … `B()`), which is ADR 0085's case. Deleting it would silently drop those edges,
-and nothing in the suite would have said so — `renamed-binding.test.ts` drives the reflector, not the
-linker, so it cannot see this. That gap is why the wrong conclusion survived a full-suite check.
+and 3b, instrumented to log every rebind it performs, logs **nothing** on this fixture. So 3b neither
+causes the defect below nor resolves the renamed-import call. It is exonerated, and what it does
+carry is still unestablished.
 
-## The actual defect
-
-The second row of that table is a WRONG EDGE, and it is confidently wrong:
+## The defect, which is real and reproduced cleanly twice
 
 ```ts
 import { realTarget as shadowed } from './lib.js';
@@ -35,29 +38,23 @@ export function usesLocal(): number {
 }
 ```
 
-3b rebinds any edge whose target is a scope-local ATOM to the module-level alias of the same bare
-name in that file. It cannot tell the two cases apart:
+The graph records `usesLocal -> lib.ts::realTarget`. It is a wrong edge at full confidence, and wrong
+edges are the worst class this codebase produces (ADR 0095): `impact` answers with a caller that does
+not call, `prune` sees a use that is not one, and nothing counts it.
 
-- the local IS the imported binding seen from inside a function — rebinding is correct
-- the local is an INDEPENDENT declaration that shadows the import — rebinding is wrong
+The two cases are distinguishable in the graph, which is what makes a fix plausible — MEASURED on the
+fixture, the genuine local IS a node (`main.ts::usesLocal.shadowed`, BEHAVIOR/function, L4) while the
+reference-induced one is not a node at all. Scope information exists; something is resolving by name
+without consulting it.
 
-Before todo62 those were indistinguishable, because a destructured dynamic import minted an unscoped
-module-level alias plus a scoped local, exactly like a shadow. Since todo62 the dynamic case emits a
-SCOPED alias id that matches its node, and 3b is MEASURABLY no longer needed for it — the scored
-fixture and a module-level dynamic import both resolve with 3b starved.
+## Phase 0 — find the component that binds by name, before changing any of them
 
-**Which block picks it up instead is an INFERENCE, not a measurement.** Block 3a (the "pure alias"
-follow) is the obvious candidate and the reasoning is that the alias source is now a real node with an
-outgoing ALIASES edge, which is exactly what 3a walks. Nobody has starved 3a to confirm it. Flagged
-because this todo's first headline came from precisely this kind of unverified step, and the same
-mistake twice in one record would be careless.
+- [ ] Identify what actually produces the edge. 3b is ruled out by instrumentation; the next candidates are `context.registerLocalBinding` (ADR 0085 registers a renamed binding per FILE, and a per-file key cannot express a scope) and IntraLinker's own name lookup. Instrument each the way 3b was instrumented — a one-line `process.env`-guarded log at the mutation site, then a clean analyze — rather than reading the code and inferring
+- [ ] Only then decide where the scope check belongs. `linker-intra.ts` already documents "INNERMOST SCOPE FIRST — a local declaration shadows a module-level one of the same name" for its dot-path receiver lookup, so the rule exists in the file and is simply not applied on this path
+- [ ] Measure the blast radius on a frozen subject before and after: how many edges change, and does sofie's dangling/orphan count move? A shadowed import is uncommon in application code and this may be a handful of edges — which is worth knowing before spending a linker change on it
+- [ ] The regression test runs a REAL `analyze` (`tests/integration/features/prune-precision.test.ts` is the pattern). `dynamic-import-scoped-alias.test.ts` hand-builds its graph, which is why it went on agreeing with the code for nine days after the parser stopped emitting that shape
 
-Wrong edges are the worst class this codebase produces (ADR 0095): `impact` answers with a caller
-that does not call, `prune` sees a use that is not one, and nothing counts it.
+## Measurement discipline this record cost
 
-## Phase 0 — decide the discriminator before touching the rebind
-
-- [ ] Establish what distinguishes a local that IS the binding from a local that SHADOWS it, at the graph level. A genuine declaration has its own definition site; the destructured binding's "declaration" is the import itself. If the reflector already records that difference, the rebind gains a condition; if it does not, this needs a capture before it needs a linker change
-- [ ] Confirm the blast radius on a frozen subject before and after: how many rebinds does 3b perform on sofie, and how many survive the discriminator? A rebind count that barely moves means the shadow case is rare and the fix is cheap; a large drop means static aliases are being resolved through it constantly and the change needs its own measurement
-- [ ] Confirm which block actually resolves the dynamic case now, by starving 3a the way 3b was starved. The claim above is reasoned, not measured, and the cost of being wrong is a "fix" aimed at the wrong block
-- [ ] Whatever lands, it is asserted against a REAL parse. `dynamic-import-scoped-alias.test.ts` hand-builds its graph and therefore froze the producer's shape at the moment it was written — it agreed with the code for nine days after the parser stopped emitting that shape. The shadowing case above belongs in a fixture that runs `analyze`
+- [ ] Nothing else may run while a measurement is taken — no build, no test loop, no CLI in another shell. Two of the wrong conclusions above came from a contaminated vault, and a contaminated result does not look contaminated: it looks like a finding
+- [ ] Prefer instrumenting the suspect over starving it. Starving answers "does the outcome change", which invites a causal reading; a log at the mutation site answers "did this code run, and on what", which is the question actually being asked
