@@ -53,8 +53,23 @@ Both levers were changed and measured, and the result is the useful part:
       it worked), so contention grows across consecutive runs. Something is not being cleaned up
       between runs, and that is a lead worth following before touching `maxWorkers` again
 
-## Phase 1 — identify the resource before tuning anything
+## Phase 1 — the death signal is named, the sender is not
 
-- [ ] Find what dies. The failing CLI produces no output at all: capture its exit signal rather than its stdout, and check whether it is OOM, EMFILE, or a SIGKILL from something else. `ulimit -n` against the number of concurrent vaults is the first thing to rule out
-- [ ] Explain why consecutive runs get SLOWER (127s then 189s then 182s). Leftover processes, unreleased vault handles or temp directories not cleaned between runs would all do it, and all are checkable between two runs with `lsof` and a temp-dir count
-- [ ] Only then raise `maxWorkers`, and prove it over at least 5 consecutive runs rather than one. The measurement above cost one green run and three red ones; the green one alone would have been wrong
+Instrumented `runCli` to report WHY a child died rather than printing its empty output. That one change
+turned an afternoon of guessing into a fact:
+
+```
+CLI failed (analyze --yes) [signal=SIGTERM]: (no output — the process was killed before it wrote anything)
+```
+
+- [x] **SIGTERM, not SIGKILL** — which rules out the two obvious suspects. `spawnSync`'s own timeout uses `killSignal: 'SIGKILL'`, and so does the OS out-of-memory killer. Something is asking these processes to shut down politely
+- [x] RULED OUT — the per-command timeout. Raised 90s -> 240s; the SIGTERMs continued
+- [x] RULED OUT — jest's per-file worker recycling. Setting `workerIdleMemoryLimit` from `1KB` to `512MB` left SIGTERMs at 1, 3 and 1 across three runs, so recycling is not the sender. **And it must stay at `1KB` regardless**: without it ~19 parsing suites fail with `Cannot read properties of undefined (reading 'tree')`, exactly the one-wrapper-per-process constraint its comment predicts
+- [x] RULED OUT — the DuckDB lock. Every failing suite builds its own `mkdtemp` project, so they cannot contend; two conducks projects contend no more than two git repos contend on each other's `index.lock`
+- [ ] FIND THE SENDER. What remains: jest's own teardown of a worker for a reason other than the memory limit, a process-group signal reaching children, or something in the CLI's own worker pool. The instrumentation is in place, so the next parallel run names it rather than showing an empty string
+- [ ] A SEPARATE LEAD, seen twice: the FIRST serial run after a parallel experiment fails and the second passes, clean. Something is not cleaned up between runs — leftover processes, unreleased vault handles or temp directories. Check `lsof` and a temp-dir count between two runs before touching `maxWorkers` again
+
+## What is settled
+
+- [x] `maxWorkers: 1` for now, and this is a PAUSE not an abandonment: the feature is wanted, the diagnosis is half done, and a suite that fails most runs blocks every other piece of work. The instrumentation stays in either way — it is what named SIGTERM
+- [x] The `runCli` timeout stays at 240s. It was firing on commands that had SUCCEEDED, converting a busy machine into a test failure, and that is wrong at any worker count

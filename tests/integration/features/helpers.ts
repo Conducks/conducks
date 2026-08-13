@@ -103,7 +103,23 @@ export function runCli(
   const stderr = res.stderr || '';
   const status = res.status ?? 1;
   if (status !== 0 && !opts.allowFail) {
-    throw new Error(`CLI failed (${args.join(' ')}): ${stderr || stdout}`);
+    // SAY WHY IT DIED (todo65). A killed child returns status null with EMPTY stdout and stderr, so
+    // this used to throw `CLI failed (analyze --yes): ` with nothing after the colon — which is how
+    // the parallel failures looked like a mystery for an afternoon. `signal` distinguishes SIGKILL
+    // (the OS or a timeout killed it) from a real non-zero exit, and `res.error` carries ENOENT,
+    // EMFILE and the spawn-level failures that never reach stderr at all.
+    const why = [
+      res.signal ? `signal=${res.signal}` : `status=${status}`,
+      res.error ? `error=${(res.error as NodeJS.ErrnoException).code ?? res.error.message}` : '',
+    ].filter(Boolean).join(' ');
+    throw new Error(`CLI failed (${args.join(' ')}) [${why}]: ${stderr || stdout || '(no output — the process was killed before it wrote anything)'}`);
+  }
+  // A command that FAILED but was allowed to is the harder case to diagnose: the test asserts on its
+  // output, sees "", and reports a content mismatch — with no hint that the process never ran. Say
+  // so on stderr, where it lands in the run log without changing what the test sees.
+  if (status !== 0 && opts.allowFail && !stdout && !stderr) {
+    const why = res.signal ? `signal=${res.signal}` : `status=${status}`;
+    console.error(`[runCli] ${args.join(' ')} produced NO output [${why}] — the process died before writing`);
   }
   return { stdout, stderr, combined: stdout + stderr, status };
 }
