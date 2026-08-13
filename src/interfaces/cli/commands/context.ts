@@ -4,94 +4,129 @@ import { syncGraph, closePersistence } from "@/interfaces/cli/shared/context.js"
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 
 /**
- * Conducks — Context (Trace) Command
+ * Conducks — Context Command
+ *
+ * ONE answer, two renderings (todo57, ADR 0148). This command used to walk its own directional flow
+ * trace while `conducks_context` ran a scored BFS — same question, two implementations, one name.
+ * MEASURED on `resolveSymbolId` before the change: **2,407 entries against the tool's 83, sharing 44
+ * names.** Of the CLI's 2,407, 247 were unresolved `node` placeholders and 196 were whole files, so
+ * it was not a richer answer, it was a dump of everything reachable.
+ *
+ * Both now call `registry.kinetic.context`. What is kept from the old command is the part ADR 0148
+ * calls rendering and names explicitly — SOURCE LINES, which the tool does not return and which are
+ * the reason to read this in a terminal at all.
  */
 export class ContextCommand implements ConducksCommand {
   public id = "context";
-  public description = "View symbol relationships and technical flows";
-  public usage = "conducks context <symbolId> [--json]";
+  public description = "View the scored neighbourhood around a symbol";
+  public usage = "conducks context <symbolId> [--radius <n>] [--include-atoms] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const useJson = args.includes('--json');
-    const symbolId = args.find(a => !a.startsWith('--'));
+    const includeAtoms = args.includes('--include-atoms');
+
+    const numeric = (flag: string, fallback: number): number | null => {
+      const at = args.indexOf(flag);
+      if (at === -1) return fallback;
+      const raw = args[at + 1];
+      const n = Number(raw);
+      // An unparseable bound is an ERROR, not a silent fallback to the default: `impact` read an
+      // unknown direction as upstream and answered a question nobody asked (todo53).
+      if (!raw || raw.startsWith('-') || !Number.isFinite(n) || n <= 0) {
+        console.error(`Error: ${flag} needs a positive number — got "${raw ?? ''}".`);
+        return null;
+      }
+      return n;
+    };
+
+    const radius = numeric('--radius', 2);
+    if (radius === null) { process.exitCode = 1; return; }
+    const limit = numeric('--limit', 30);
+    if (limit === null) { process.exitCode = 1; return; }
+
+    // `indexOf` returns -1 when the flag is ABSENT, and -1 + 1 is 0 — which marked argument zero,
+    // the symbol itself, as a flag's value and made every invocation without flags report "provide a
+    // symbol ID". Guard each index rather than adding one to it blind (the shape `trace.ts` uses).
+    const radiusAt = args.indexOf('--radius');
+    const limitAt = args.indexOf('--limit');
+    const flagValues = new Set([
+      radiusAt > -1 ? radiusAt + 1 : -1,
+      limitAt > -1 ? limitAt + 1 : -1,
+    ]);
+    const symbolId = args.find((a, i) => !a.startsWith('--') && !flagValues.has(i));
     if (!symbolId) {
-      console.error("Error: Please provide a symbol ID (filePath::name) to trace.");
-      process.exit(1);
+      console.error("Error: Please provide a symbol ID (filePath::name).");
+      process.exitCode = 1;
+      return;
     }
 
     try {
       await syncGraph(registry);
       const g = registry.query.graph.getGraph();
       const resolvedId = resolveSymbol(symbolId, g);
-      const steps = registry.kinetic.trace(resolvedId);
-      // The OTHER half of a symbol's context (todo38#P2). `context fetchUser` answered with six
-      // steps of containment and never named `main`, its only caller — because it only ever walked
-      // downstream. Direct callers ARE context; a reader deciding whether a change is safe needs
-      // both directions, and `impact` already computes the upstream half.
-      const callers = registry.kinetic.getImpact(resolvedId, 'upstream', 1).affectedNodes
-        .filter((n: any) => n.path.length > 0 && n.path[n.path.length - 1] === 'CALLS');
 
-      if (steps.length === 0 && callers.length === 0) {
-        if (useJson) {
-          process.stdout.write(JSON.stringify({ symbolId: resolvedId, callers: [], steps: [] }, null, 2) + '\n');
-          return;
-        }
-        console.error(`❌ No flows found for: ${resolvedId}`);
-        process.exit(1);
-      }
+      const scored = registry.kinetic.context(resolvedId, { radius, includeAtoms });
+      const shown = scored.slice(0, limit);
 
       if (useJson) {
+        // The tool's fields, so `--json` and the tool carry the same data (ADR 0148). The BOUND is
+        // stated rather than implied: `total_in_radius` against what was shown is the denominator
+        // that makes a short list readable as short rather than as empty (ADR 0091/0145).
         process.stdout.write(JSON.stringify({
-          symbolId: resolvedId,
-          callers: callers.map((c: any) => ({
-            id: c.id, name: c.name, filePath: c.filePath, line: c.line, lines: c.lines,
-          })),
-          steps: steps.map((id: string, i: number) => {
-            const node = g.getNode(id);
-            return {
-              order: i + 1,
-              id,
-              label: node?.label || 'node',
-              name: node?.properties?.name || id,
-              filePath: node?.properties?.filePath || null,
-            };
-          }),
+          symbol: resolvedId,
+          radius,
+          total_in_radius: scored.length,
+          nodes: shown,
+          truncated: scored.length > shown.length,
         }, null, 2) + '\n');
         return;
       }
 
-      // RELATIVE path and the DECLARATION LINE at each step (ADR 0132, todo39#P3). The absolute
-      // path was ~90 characters of identical prefix on every row; the line is what lets a reader
-      // follow the chain without opening each file in turn.
+      if (scored.length === 0) {
+        console.log(`No neighbourhood found for ${resolvedId} within radius ${radius}.`);
+        return;
+      }
+
       const reader = registry.source.lineReader();
       const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
       const rel = (p: string) =>
         p && p.toLowerCase().startsWith(projectRoot.toLowerCase()) ? p.slice(projectRoot.length + 1) : p;
 
-      console.log(`--- Technical Flow Trace: ${rel(resolvedId)} ---`);
+      console.log(`--- Context: ${rel(resolvedId)} (radius ${radius}) ---`);
+
+      // CALLERS, NAMED AS SUCH — kept from the pre-todo57 command because todo38#P2 put it there for
+      // a reason: `context fetchUser` once answered with six steps of containment and never named
+      // `main`, its only caller. The scored neighbourhood CONTAINS callers (the BFS walks upstream
+      // too) but does not label them, and "who calls this" is the first question a reader has.
+      //
+      // This is rendering, not a second answer: it re-labels part of the same neighbourhood using
+      // `getImpact`, which is why it does not belong in the shared domain function.
+      const callers = registry.kinetic.getImpact(resolvedId, 'upstream', 1).affectedNodes
+        .filter((n: any) => n.path.length > 0 && n.path[n.path.length - 1] === 'CALLS');
       if (callers.length > 0) {
         console.log(`  Called by:`);
         for (const c of callers) {
           const at = c.filePath !== 'unknown' ? `${rel(c.filePath)}${c.line ? `:${c.line}` : ''}` : 'unknown';
           console.log(`    ← ${c.name} (${at})`);
         }
-        console.log(`  Depends on:`);
+        console.log(`  In radius:`);
       }
-      steps.forEach((id: string, i: number) => {
-        const node = g.getNode(id);
-        const file = String(node?.properties?.filePath || '');
-        const line = Number((node?.properties as any)?.range?.start?.line ?? (node?.properties as any)?.lineStart ?? 0) || 0;
-        const at = file ? `${rel(file)}${line ? `:${line}` : ''}` : 'unknown';
-        console.log(`  ${i + 1}. ${node?.label || 'node'} ${node?.properties?.name || id} (${at})`);
-        if (file && line) {
-          const src = reader.read(file, line);
-          if (src.text) console.log(`        ${src.text}`);
+      for (const n of shown) {
+        const file = String(n.file || '');
+        const at = file ? `${rel(file)}${n.line ? `:${n.line}` : ''}` : 'unknown';
+        console.log(`  ${n.relevance_score.toFixed(4)}  ${String(n.kind).padEnd(10)} ${n.name}  (${at})`);
+        // THE reason to read this in a terminal: the declaration itself, under its row.
+        if (file && n.line) {
+          const src = reader.read(file, n.line);
+          if (src.text) console.log(`        ${src.text.trim()}`);
         }
-      });
+      }
+      if (scored.length > shown.length) {
+        console.log(`  … ${scored.length - shown.length} more of ${scored.length} in radius (raise --limit).`);
+      }
     } finally {
       // Ensure the DuckDB connection is ALWAYS closed to prevent EMFILE/leaks
       await closePersistence(registry);
     }
   }
 }
-

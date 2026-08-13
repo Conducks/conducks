@@ -69,7 +69,7 @@
     "src/lib/domain/governance/index.ts:337": "96d2d06ba682de50",
     "config/sentinel.json": "152f1597f569c396",
     "src/interfaces/cli/commands/audit.ts:82-88": "6e779c6032f1433f",
-    "src/registry/index.ts": "ceef8d5c8659983c"
+    "src/registry/index.ts": "2ee7c9112d5fbc8d"
   },
   "docs/visuals/modules/domain/governance.md": {
     "src/lib/domain/governance/index.ts:141-212": "f47385aa4aa377d4"
@@ -86,7 +86,7 @@
     "src/interfaces/tools/shared/empty-vault.ts": "e2e9ba0a58ceb671"
   },
   "docs/visuals/modules/registry.md": {
-    "src/registry/index.ts": "ceef8d5c8659983c",
+    "src/registry/index.ts": "2ee7c9112d5fbc8d",
     "src/interfaces/tools/shared/anchor.ts": "18c31582d5f50217"
   },
   "docs/visuals/system-trace.html": {

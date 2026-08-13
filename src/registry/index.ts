@@ -244,6 +244,10 @@ export const registry = {
     getImpact: (symbolId: string, direction: 'upstream'|'downstream' = 'upstream', depth: number = 5) =>
       kinetic.getImpact(symbolId, direction, depth),
     flow: (symbolId: string) => kinetic.flow(symbolId),
+    // todo57: ONE context implementation. The CLI renders it with source lines, the tool spends a
+    // token budget on it — both reach it here, which is what `paired-surfaces` requires.
+    context: (symbolId: string, options?: { radius?: number; includeAtoms?: boolean }) =>
+      kinetic.context(symbolId, options),
     getProcesses: () => kinetic.getProcesses()
   },
   query: {

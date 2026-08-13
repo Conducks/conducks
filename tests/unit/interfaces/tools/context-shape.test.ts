@@ -31,6 +31,7 @@
  */
 import { describe, it, expect, jest } from '@jest/globals';
 import { CanonicalKind, CanonicalRank } from '@/lib/core/parsing/taxonomy.js';
+import { ContextAnalyzer } from '@/lib/domain/kinetic/context.js';
 
 const PROJECT_ROOT = '/fake/root';
 
@@ -114,6 +115,15 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
       graphEngine: { getGraph: () => mockGraph },
     },
     audit: { status: () => ({ staleness: { stale: false } }) },
+    // Delegates to the REAL analyzer rather than returning canned nodes. todo57 moved the scored BFS
+    // out of the tool and into the domain, and a mock returning a fixed list would turn every
+    // assertion below — ATOM exclusion, canonicalRank weighting, the diminishing-returns cutoff —
+    // into a test of the mock. The tool keeps only its byte budget, which is what the cutoff cases
+    // still exercise here.
+    kinetic: {
+      context: (symbolId: string, options?: { radius?: number; includeAtoms?: boolean }) =>
+        new ContextAnalyzer(mockGraph as never).neighbourhood(symbolId, options),
+    },
   },
 }));
 

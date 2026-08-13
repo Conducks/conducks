@@ -85,7 +85,11 @@
 - Purpose: Answer "what breaks if I touch this" before the edit, with a risk band and the affected symbols ordered by structural distance.
 - Intent: Lets a reader judge the cost of a change without already knowing the codebase. Depth is a cumulative edge-weight budget, not a hop count, so a chain of cheap inheritance edges reaches further than a chain of imports.
 
-## Execution & Data Flow Tracing — `conducks context <symbol>`, `conducks trace <symbol> --flow`, `conducks flows`
+## Symbol Neighbourhood — `conducks context <symbol> [--radius <n>] [--include-atoms] [--limit <n>]`, MCP `conducks_context`
+- Purpose: The scored neighbourhood around a symbol — what is near it, ranked by `confidence x 1/(depth+1) x 1/(canonicalRank+1)`, with the callers named first and the declaration line under each row. Containers and ATOMs are excluded by default because a folder outranking every function in it buries the answer (ADR 0103).
+- Intent: ONE implementation behind both surfaces (todo57). These were two different features under one name until 2026-08-13 — a flow trace against a scored BFS, sharing 44 names out of 2,407 against 83 on the same symbol. The tool spends a token budget on the answer and the CLI spends a line count; that difference is rendering, the answer is not.
+
+## Execution & Data Flow Tracing — `conducks trace <symbol> --flow`, `conducks flows`
 - Purpose: Group symbols into named execution units and follow where a value comes from and where it ends up.
 - Intent: Reconstructing a pipeline by reading call sites one at a time does not scale; this answers "where does this data come from" as a single question.
 

@@ -156,6 +156,31 @@ export function addedLater(): number { return 4; }
     expect(cli.every(x => x.match === 'direct' || x.match === 'echo')).toBe(true);
   }, 180000);
 
+  it('context returns the same scored neighbourhood through both doors', () => {
+    // The pair that was GRANTED AN EXCEPTION until todo57, because the two were genuinely different
+    // features: a directional flow trace against a scored BFS. Measured then — 2,407 entries against
+    // 83, sharing 44 names. Both call `registry.kinetic.context` now.
+    //
+    // The BOUNDS still differ and that is the design: the tool spends a token budget, the CLI takes a
+    // line count. So the shared answer is the SCORED SET and its denominator, and the tool's list must
+    // be a prefix of the CLI's — same order, same scores, cut at a different place.
+    const cli = JSON.parse(runCli(['context', 'usedFn', '--json', '--limit', '200'], { cwd: repo }).stdout);
+    const tool = mcp(repo, 'conducks_context', { symbol: 'usedFn' }).data;
+
+    expect(cli.total_in_radius).toBe(tool.total_in_radius);
+    expect(cli.total_in_radius).toBeGreaterThan(0);
+
+    const cliIds = cli.nodes.map((n: any) => n.id);
+    const toolIds = tool.nodes.map((n: any) => n.id);
+    expect(toolIds.length).toBeGreaterThan(0);
+    expect(toolIds.every((id: string, i: number) => cliIds[i] === id)).toBe(true);
+
+    // Scores are the ANSWER, not rendering: a surface that re-ranked would order a reader's attention
+    // differently while reporting the same set.
+    const byId = new Map(cli.nodes.map((n: any) => [n.id, n.relevance_score]));
+    for (const n of tool.nodes) expect(byId.get(n.id)).toBe(n.relevance_score);
+  }, 180000);
+
   it('an unknown enum value is refused by BOTH, with the SAME vocabulary', () => {
     // `prune --type` is a genuinely shared enum, which `diff` is not: the tool's `mode` maps to two
     // different CLI COMMANDS (`diff` and `drift`), so it has no CLI flag to compare against and

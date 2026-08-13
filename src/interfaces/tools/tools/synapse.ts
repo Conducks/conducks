@@ -751,85 +751,16 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
         const shortenId = (fullId: string): string =>
           projectRoot ? fullId.split(projectRoot + '/').join('') : fullId;
 
-        // BFS: collect all nodes within radius, tracking depth and best edge weight
-        type NodeEntry = { nodeId: string; depth: number; edgeWeight: number };
-        const visited = new Map<string, NodeEntry>(); // nodeId -> best entry
-        const queue: NodeEntry[] = [{ nodeId: startId, depth: 0, edgeWeight: 1.0 }];
-        visited.set(startId, { nodeId: startId, depth: 0, edgeWeight: 1.0 });
+        // THE ANSWER comes from the domain now (todo57) — one scored BFS, reached through the
+        // registry by both surfaces. What stays here is this tool's own bound: a byte budget, which
+        // ADR 0148 names as rendering ("a token budget on the tool"). The CLI takes the same list and
+        // spends a line count on it instead.
+        const scoredNodes = registry.kinetic.context(startId, { radius: maxDepth, includeAtoms });
+        const scored = scoredNodes.map(n => ({
+          ...n,
+          tokenEstimate: Math.ceil(JSON.stringify({ ...n, short_id: shortenId(n.id) }).length / 4),
+        }));
 
-        while (queue.length > 0) {
-          const current = queue.shift()!;
-          if (current.depth >= maxDepth) continue;
-
-          // Traverse both directions to capture full local neighborhood
-          for (const dir of ['downstream', 'upstream'] as const) {
-            for (const edge of graph.getNeighbors(current.nodeId, dir)) {
-              const neighborId = dir === 'downstream' ? edge.targetId : edge.sourceId;
-              if (!visited.has(neighborId)) {
-                const entry: NodeEntry = {
-                  nodeId: neighborId,
-                  depth: current.depth + 1,
-                  edgeWeight: edge.confidence ?? 1.0
-                };
-                visited.set(neighborId, entry);
-                queue.push(entry);
-              }
-            }
-          }
-        }
-
-        // Remove the anchor node itself from results
-        visited.delete(startId);
-
-        // MCP9: Score using confidence × (1/(depth+1)) × (1/(rank+1))
-        type ScoredNode = NodeEntry & { node: any; relevance_score: number; tokenEstimate: number };
-        const scored: ScoredNode[] = [];
-
-        for (const entry of visited.values()) {
-          const node = graph.getNode(entry.nodeId);
-          if (!node) continue;
-          // todo28#P4: exclude ATOMs (locals/fields) by default — 51% of the graph is ATOM and they
-          // were crowding out the symbols a caller actually wants. include_atoms:true opts back in.
-          if (!includeAtoms && node.properties?.canonicalKind === 'ATOM') continue;
-          // CONTAINERS are excluded, and this is the larger half of the same problem ATOM exclusion
-          // was built to solve (ADR 0103).
-          //
-          // `rankWeight = 1/(canonicalRank+1)` says "lower rank number is worth more", and the low
-          // numbers on this ladder are the CONTAINERS: DIRECTORY 4, UNIT 5, against BEHAVIOR 8. So
-          // the formula ranked a folder above every function in it. Measured on the oracle fixture,
-          // `conducks_context logAudit` returned, in this order: audit.ts, caller1..6.ts, lib/,
-          // domain/, and only THEN the six functions that actually call it. Nine of fifteen results
-          // were files and folders, all of them above the answer.
-          //
-          // An agent asking for context around a symbol is already holding the file path. The same
-          // reasoning is written down in `search-engine.ts`'s inventory — "an inventory answering
-          // ECOSYSTEM, REPOSITORY and DIRECTORY before a single function would bury the answer under
-          // the folder tree the user is already looking at" — and it was never applied here.
-          if (CONTEXT_CONTAINERS.has(String(node.properties?.canonicalKind ?? ''))) continue;
-          // todo28#P4: this used to read node.properties.rank — the live PageRank importance value,
-          // not the taxonomy rank the "lower rank number => higher weight" comment describes. Every
-          // node has some small PageRank float, so that term barely separated ATOM from BEHAVIOR from
-          // STRUCTURE at all, and could even score a leaf variable above the function holding it.
-          // canonicalRank (STRUCTURE 7, BEHAVIOR 8, ATOM 9 …) is the field the formula was meant to use.
-          const rankWeight = 1 / ((node.properties?.canonicalRank ?? 4) + 1);
-          const relevance_score = (entry.edgeWeight ?? 0.5) * (1 / (entry.depth + 1)) * rankWeight;
-          const item = {
-            id: node.id,
-            short_id: shortenId(node.id),
-            name: node.properties.name,
-            kind: node.properties.canonicalKind,
-            rank: node.properties.canonicalRank,
-            file: node.properties.filePath,
-            line: node.properties?.range?.start?.line ?? null,
-            depth: entry.depth,
-            relevance_score: parseFloat(relevance_score.toFixed(4))
-          };
-          const tokenEstimate = Math.ceil(JSON.stringify(item).length / 4);
-          scored.push({ ...entry, node, relevance_score, tokenEstimate });
-        }
-
-        // Sort highest score first
-        scored.sort((a, b) => b.relevance_score - a.relevance_score);
 
         // MCP9: smart budget application — never cut mid-item, stop on diminishing returns
         const topScore = scored.length > 0 ? scored[0].relevance_score : 0;
@@ -857,15 +788,18 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
             break;
           }
           items.push({
-            id: s.node.id,
-            short_id: shortenId(s.node.id),
-            name: s.node.properties.name,
-            kind: s.node.properties.canonicalKind,
-            rank: s.node.properties.canonicalRank,
-            file: s.node.properties.filePath,
-            line: s.node.properties?.range?.start?.line ?? null,
+            id: s.id,
+            // `short_id` is display-only and stays HERE: it strips this project's root, which is an
+            // interface concern the domain has no business knowing. `id` is the full id and is what
+            // must be fed back into trace/impact/explain/context.
+            short_id: shortenId(s.id),
+            name: s.name,
+            kind: s.kind,
+            rank: s.rank,
+            file: s.file,
+            line: s.line,
             depth: s.depth,
-            relevance_score: parseFloat(s.relevance_score.toFixed(4))
+            relevance_score: s.relevance_score,
           });
           tokensUsed += s.tokenEstimate;
         }

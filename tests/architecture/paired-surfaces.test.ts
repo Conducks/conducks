@@ -36,14 +36,14 @@ const TOOLS_DIR = path.join(SRC, 'interfaces/tools/tools');
  * the same discipline `boundaries.test.ts` uses for its (still empty) exception array.
  */
 const GRANTED: ReadonlyArray<{ pair: string; why: string }> = [
-  {
-    pair: 'context',
-    why:
-      'Measured 2026-08-09: these are two different features wearing one name. The CLI builds context ' +
-      'from kinetic.getImpact + kinetic.trace + source.lineReader; the MCP tool runs its own BFS over ' +
-      'graphEngine with a relevance formula (ADR 0103). Unifying them is a decision about which answer ' +
-      'is RIGHT, not a mechanical extraction, so it is recorded rather than forced. todo57.',
-  },
+  // EMPTY, and it stays declared so that granting one is a visible diff — the discipline
+  // `boundaries.test.ts` uses for its own (still empty) exception array.
+  //
+  // `context` was the one entry. It was not drift but two different features under one name: a
+  // directional flow trace with source lines against a scored BFS with a token budget. todo57
+  // extracted the BFS into `registry.kinetic.context`, both surfaces call it, and the CLI keeps
+  // source lines as the rendering ADR 0148 names. Measured before: 2,407 entries against 83, sharing
+  // 44 names. Measured after: identical `total_in_radius`, the tool's list a prefix of the CLI's.
 ];
 
 const accessors = (text: string): Set<string> => {

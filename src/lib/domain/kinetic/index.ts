@@ -2,6 +2,7 @@ import { TraceAnalyzer } from "./trace.js";
 import { BlastRadiusAnalyzer } from "./impact.js";
 import { ConducksFlowEngine } from "./flow-engine.js";
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
+import { ContextAnalyzer, type ContextNode, type ContextOptions } from './context.js';
 
 /**
  * Conducks — Kinetic Domain Service
@@ -10,13 +11,24 @@ import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.j
  */
 export class KineticService {
   private traceAnalyzer: TraceAnalyzer;
+  private contextAnalyzer: ContextAnalyzer;
   private impactAnalyzer: BlastRadiusAnalyzer;
   private flowEngine: ConducksFlowEngine;
 
   constructor(private graph: ConducksAdjacencyList) {
     this.traceAnalyzer = new TraceAnalyzer(graph);
+    this.contextAnalyzer = new ContextAnalyzer(graph);
     this.impactAnalyzer = new BlastRadiusAnalyzer();
     this.flowEngine = new ConducksFlowEngine(graph);
+  }
+
+  /**
+   * The scored neighbourhood around a symbol — the ONE implementation both surfaces reach (todo57).
+   * Returns every scored candidate; the caller bounds it, because a token budget and a line count are
+   * different bounds on the same answer.
+   */
+  public context(symbolId: string, options?: ContextOptions): ContextNode[] {
+    return this.contextAnalyzer.neighbourhood(symbolId, options);
   }
 
   /**

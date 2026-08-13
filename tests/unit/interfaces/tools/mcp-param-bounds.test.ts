@@ -21,6 +21,7 @@
  * `boolErr` sit beside it so a bound is written once and enforced where it is declared.
  */
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { ContextAnalyzer } from '@/lib/domain/kinetic/context.js';
 
 const PROJECT_ROOT = '/fake/root';
 const ROOT_ID = `${PROJECT_ROOT}/src/core.ts::corefn`;
@@ -77,7 +78,13 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
     // (todo53#P2) reads this and would otherwise short-circuit every case.
     audit: { status: () => ({ staleness: { stale: false } }),
              statusFromVault: async () => ({ stats: { nodeCount: 6144 }, staleness: { stale: false } }) },
-    kinetic: { getProcesses: () => processes },
+    kinetic: {
+      getProcesses: () => processes,
+      // Delegates to the REAL analyzer (todo57 moved the scored BFS into the domain); a canned list
+      // would make the bounds this suite checks meaningless.
+      context: (symbolId: string, options?: { radius?: number; includeAtoms?: boolean }) =>
+        new ContextAnalyzer(mockGraph as never).neighbourhood(symbolId, options),
+    },
   },
 }));
 
