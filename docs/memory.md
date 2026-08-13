@@ -514,6 +514,21 @@ by construction.
   not the flag. The real gap here turned out to be the MACHINE SURFACE — `conducks drift` had no
   `--json`, so no equivalence check was possible — which is a much smaller and more useful fix. — todo61
 
+## Two symbols can share one id, because ids are lowercased
+- Gotcha: a linker fix that rebound a call to a same-named local rebound **37 edges on the python
+  subject** that it should not have — `pathlib::Path` onto a local variable `path`, `graph.py::Node`
+  onto a local `node`. Ids are lowercased for APFS (CONDUCKS-4), so an imported CLASS and a local
+  VARIABLE differing only in case are one id. The fix looked correct on a TypeScript fixture and was
+  silently wrong on every `Path`, `Node`, `Store` in the codebase.
+- Why: the lowercasing is invisible at the point of comparison. Two ids match, the code concludes the
+  symbols are the same, and nothing in the shape says one was written `Path` and the other `path`.
+  The names as WRITTEN survive on the node (`properties.name`) and on the edge
+  (`properties.original`) — compare those when identity matters, never the id alone.
+- Applies: any id comparison that decides IDENTITY rather than lookup needs the case-sensitive name
+  beside it. Found by instrumenting the rebind and reading the 37 lines it printed, which is also the
+  lesson: a change that moves numbers on a subject you expected to be untouched has not been
+  understood yet. — todo64
+
 ## A contaminated measurement does not look contaminated — it looks like a finding
 - Gotcha: three wrong conclusions in one day, all from measurements taken while something else was
   running. `npm run build` opens with `rm -rf build`, and the integration suites spawn child CLIs that

@@ -717,6 +717,64 @@ export class IntraLinker {
       }
     }
 
+    // ── 3c. A LOCAL DECLARATION SHADOWS AN IMPORT OF THE SAME NAME ───────────
+    //
+    // `context.localBindings` is keyed by NAME PER FILE and has no notion of scope, so
+    // `import { realTarget as shadowed }` makes every `shadowed()` in that file resolve to
+    // `lib.ts::realTarget` — including one inside a function that declares its own `const shadowed`.
+    // MEASURED by instrumenting the call processor (todo64): the same lookup fired twice on a
+    // two-function fixture, correctly for the call through the import and wrongly for the call to
+    // the local. A wrong edge at full confidence is the worst thing this graph produces (ADR 0095):
+    // `impact` answers with a caller that does not call and nothing counts it.
+    //
+    // The discriminator is EXISTENCE, not a heuristic. The edge carries the local name it was written
+    // with in `properties.original`, and a genuine declaration mints a scoped node — so
+    // `<file>::<scope>.<original>` exists for the shadowing case and does not for the import case.
+    // Measured on that fixture: `main.ts::usesLocal.shadowed` is a node, `main.ts::usesImport.shadowed`
+    // is not. ADR 0085's renamed-import resolution is untouched for exactly that reason.
+    for (const edge of graph.getAllEdges()) {
+      if (edge.type !== 'CALLS' && edge.type !== 'CONSTRUCTS') continue;
+      const original = (edge.properties as Record<string, unknown> | undefined)?.original;
+      if (typeof original !== 'string' || !original) continue;
+
+      const source = String(edge.sourceId);
+      const sep = source.lastIndexOf('::');
+      if (sep === -1) continue;
+      const scope = source.slice(sep + 2);
+      if (!scope || scope === 'unit') continue;              // module level has no inner scope to shadow
+
+      const localId = `${source.slice(0, sep)}::${scope}.${original}`.toLowerCase();
+      if (localId === String(edge.targetId).toLowerCase()) continue;
+      const local = graph.getNode(localId);
+      if (!local) continue;                                  // nothing declares it here — the import stands
+
+      // CASE-SENSITIVE, and this is not fussiness. Ids are lowercased for APFS (CONDUCKS-4), so
+      // `Path` imported from pathlib and a local variable `path` share one id shape. The first cut of
+      // this block matched on the lowered id and rebound 37 edges on the python subject — including
+      // `pathlib::Path` onto a local `path`, and `graph.py::Node` onto a local `node`. Those are
+      // DIFFERENT symbols that only collide after lowering, and rebinding them is the wrong-edge
+      // defect this block exists to remove, reintroduced from the other side.
+      //
+      // The names as WRITTEN are kept: the edge carries `properties.original` and the node carries
+      // `properties.name`, both case-preserving. A real shadow declares the same identifier, so the
+      // two match exactly; `Path` against `path` does not.
+      if (String(local.properties?.name ?? '') !== original) continue;
+
+      // A DESTRUCTURED IMPORT BINDING is also a scoped node with a matching name, and it must NOT
+      // win: `const { dynamicallyUsed } = await import('./lib.js')` IS the import, not a declaration
+      // shadowing one, so the call correctly targets the original definition. todo62 made that
+      // binding a real scoped node, which is exactly what made it indistinguishable here by shape.
+      //
+      // It carries an outgoing ALIASES edge naming what it aliases; a genuine local declaration does
+      // not. Caught by the prune-precision fixture, which reported three live symbols as dead the
+      // first time this block ran without the check.
+      const isAliasBinding = graph.getNeighbors(localId, 'downstream', 'ALIASES').length > 0;
+      if (isAliasBinding) continue;
+
+      graph.rebindEdgeTarget(edge, localId);
+      resolved.push({ id: edge.id, newTargetId: localId });
+    }
+
     // ── 4. Follow ALIASES chains past the first hop ──────────────────────────
     for (const { id, newTargetId } of this.collapseAliasChains(graph)) {
       resolved.push({ id, newTargetId });
