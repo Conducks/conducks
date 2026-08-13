@@ -10,8 +10,19 @@ const moduleNameMapper = {
 };
 
 export default {
-	// DuckDB is single-writer; tests share fixture vaults, so parallel
-	// workers collide on the DB lock. Force serial execution.
+	// Serial, and the REASON here was wrong until it was measured (todo65).
+	//
+	// It said "tests share fixture vaults, so parallel workers collide on the DB lock". They do not
+	// share: `helpers.ts` gives every suite its own mkdtemp'd repo. The real blocker is CPU
+	// contention. Each jest worker spawns a CLI that runs its own 4-worker analyze pool, so 4 jest
+	// workers is 16 processes on 12 cores, and the helper's 90s per-command timeout fires — the
+	// analyze SUCCEEDS and is then SIGKILLed, which reads as a test failure.
+	//
+	// MEASURED on this machine: serial 248s green; --maxWorkers=2 133s with 1 suite failing;
+	// --maxWorkers=4 150s with 3 failing (slower than 2, which is contention). So roughly HALF the
+	// wall clock is available here once the per-command timeout and the nested worker pool are
+	// reconciled. Left serial until then, because a suite that fails 1 in N is worth less than a
+	// slow one.
 	maxWorkers: 1,
 	// The tree-sitter native addon serves ONE JS-wrapper instance per process. Four suites now load
 	// grammars (java/php/swift extraction + type-only-imports); the second one in the same process
