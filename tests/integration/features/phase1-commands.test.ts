@@ -66,10 +66,19 @@ describe('phase 1 commands refuse rather than fabricate', () => {
     expect(combined).not.toMatch(/DUCKDB_NODEJS_ERROR|Binder Error/);
   }, 120000);
 
-  it('flows offers machine-readable output', () => {
+  it('flows offers machine-readable output, and it carries its denominator', () => {
     const { stdout, status } = runCli(['flows', '--json'], { cwd: repo, allowFail: true });
     expect(status).toBe(0);
-    expect(Array.isArray(JSON.parse(stdout))).toBe(true);
+
+    // This asserted `Array.isArray` and the payload WAS a bare array, which meant `[]` said both
+    // "no flows here" and "4 exist and none matched" — the rendered path had always distinguished
+    // them and the MCP tool returned the counts. `--json` is the CLI's machine surface and carries
+    // the same data the tool does now (ADR 0148, todo61), so the shape is an object with counts.
+    const out = JSON.parse(stdout);
+    expect(Array.isArray(out.flows)).toBe(true);
+    expect(typeof out.total).toBe('number');
+    expect(typeof out.matching).toBe('number');
+    expect(typeof out.shown).toBe('number');
   }, 120000);
 
   /**

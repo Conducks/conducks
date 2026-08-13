@@ -41,8 +41,19 @@ export class FlowsCommand implements ConducksCommand {
     const hidden = Object.keys(processes).length - matching.length;
 
     if (useJson) {
-      process.stdout.write(JSON.stringify(
-        shown.map(([name, members]) => ({ name, symbols: members as string[] })), null, 2) + '\n');
+      // CARRY THE DENOMINATOR (ADR 0115/0145, CONDUCKS-37). This emitted a bare array, so `[]` meant
+      // both "this project has no flows" and "it has 4 and none of them matched" — the rendered path
+      // three lines below has always said which, and the MCP tool returns `{total, matching, shown}`.
+      // `--json` is the CLI's machine surface and should carry the same data the tool does
+      // (ADR 0148); dropping the count there is losing it exactly where a machine reads it.
+      // MEASURED on a 4-flow fixture: rendered said "4 single-symbol flow(s) were not shown", the
+      // tool said `total: 4, matching: 0`, and `--json` said `[]`.
+      process.stdout.write(JSON.stringify({
+        flows: shown.map(([name, members]) => ({ name, symbols: members as string[] })),
+        total: Object.keys(processes).length,
+        matching: matching.length,
+        shown: shown.length,
+      }, null, 2) + '\n');
       return;
     }
 

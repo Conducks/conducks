@@ -114,6 +114,48 @@ export function addedLater(): number { return 4; }
     expect(cli.deltas.length).toBeGreaterThan(0);
   }, 180000);
 
+  it('flows returns the same counts through both doors', () => {
+    // Found BY this test: the CLI emitted a bare array, so `[]` meant both "no flows" and "4 exist
+    // and none matched", while the tool returned `{total, matching, shown}` and the CLI's own
+    // RENDERED output said "4 single-symbol flow(s) were not shown". The denominator was present on
+    // every surface except the machine-readable one.
+    const cli = JSON.parse(runCli(['flows', '--json'], { cwd: repo }).stdout);
+    const tool = mcp(repo, 'conducks_flows').data;
+
+    expect(cli.total).toBe(tool.total);
+    expect(cli.matching).toBe(tool.matching);
+    expect(cli.shown).toBe(tool.shown);
+    expect(cli.flows.map((f: any) => f.name).sort()).toEqual(tool.flows.map((f: any) => f.name).sort());
+
+    // Guard the guard: with total 0 every equality above holds trivially.
+    expect(cli.total).toBeGreaterThan(0);
+  }, 180000);
+
+  it('query returns the same DIRECT matches through both doors, and labels the rest', () => {
+    // This caught a difference and the difference turned out to be DESIGNED, which is worth recording
+    // so nobody "fixes" it: the CLI returns direct matches PLUS echoes — callers of a match — while
+    // the tool returns direct matches only. `query usedFn` gives the CLI `usedFn`, `main` (its
+    // caller) and `main.ts` (its unit).
+    //
+    // That is not drift, because the CLI SAYS which is which: `--json` carries
+    // `match: "direct" | "echo"` and the rendered path prints a dim `echo` column. "An ECHO did not
+    // match the query — it is a caller of something that did." So the shared answer is the direct
+    // set, and the echoes are extra context a person gets in a terminal.
+    //
+    // ADR 0148 forbids an agent asking what a person cannot. This is the other direction, which the
+    // one-directional rule allows.
+    const cli = JSON.parse(runCli(['query', 'usedFn', '--json'], { cwd: repo }).stdout) as Array<{ name: string; match: string }>;
+    const tool = mcp(repo, 'conducks_query', { q: 'usedFn' }).data.symbols as Array<{ name: string }>;
+
+    const direct = cli.filter(x => x.match === 'direct').map(x => x.name).sort();
+    expect(tool.map(x => x.name).sort()).toEqual(direct);
+    expect(direct.length).toBeGreaterThan(0);
+
+    // The label is what makes the extra rows honest rather than noise, so its absence is a defect
+    // even though the direct sets would still match without it.
+    expect(cli.every(x => x.match === 'direct' || x.match === 'echo')).toBe(true);
+  }, 180000);
+
   it('an unknown enum value is refused by BOTH, with the SAME vocabulary', () => {
     // `prune --type` is a genuinely shared enum, which `diff` is not: the tool's `mode` maps to two
     // different CLI COMMANDS (`diff` and `drift`), so it has no CLI flag to compare against and

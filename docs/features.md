@@ -149,7 +149,7 @@
 - Purpose: Compare two points in history structurally — symbols added, removed, modified, plus deltas in complexity and gravity. With no arguments it scores the risk of the current working changes.
 - Intent: Reviewing a change by its lines misses shape changes; this reports what the change did to the structure.
 
-## Longitudinal Drift Analysis — `conducks drift [prevPulseId]`
+## Longitudinal Drift Analysis — `conducks drift [prevPulseId] [--json]`
 - Purpose: Track structural velocity and decay across many recorded pulses.
 - Intent: A single snapshot cannot show direction — this answers "is the architecture getting healthier or worse over time".
 

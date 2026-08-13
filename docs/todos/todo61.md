@@ -109,13 +109,13 @@ shape fixed on the MCP side in todo53, still live on the CLI.
 
 ## Phase 2 — enforce it, since inspection rots
 
-- [ ] Strengthen `paired-surfaces.test.ts` from "shares one registry accessor" to "reaches the same
-      domain function". The current check is too weak to catch divergence and says so in its own
-      comment.
+- [-] Strengthen `paired-surfaces.test.ts` to "reaches the same domain function" — DROPPED, and ADR 0148 already argued against it in writing: "A call-graph version would be stronger and would fail on legitimate presentation differences, so it would be argued with and then switched off." Two measurements this session say the same thing. `query` legitimately returns direct matches PLUS echoes where the tool returns direct only, and `drift` legitimately renders as text where the tool returns JSON — a call-graph gate would flag both and be wrong twice on its first run
+- [x] The STRONG check is the equivalence test instead, and it cannot false-fail on presentation because it compares ANSWERS on real data rather than call graphs. Five pairs covered, each mutation-verified. That is the strengthening this phase wanted; the static gate stays weak and enforced, which is the trade ADR 0148 made deliberately
+- [x] NOTED, not fixed: the static gate pairs a tool with a CLI file of the SAME NAME (`conducks_diff` -> `diff.ts`), so a capability living under a different command name is invisible to it — which is exactly how `conducks drift` was missed. The equivalence test does not share that blind spot, since it drives capabilities rather than files
 - [x] DONE — `tests/integration/features/surface-equivalence.test.ts`, driving the MCP side over real stdio JSON-RPC (the path an agent takes) rather than a mocked handler. Three cases: `prune`'s finding set, `diff --mode drift`'s status/summary/deltas/truncation, and an unknown mode being refused by BOTH with the SAME vocabulary
 - [x] It caught a real divergence while being written: the CLI reported truncation in its payload, the tool in `meta`. Same fact, different envelope — rendering, so it is compared ACROSS the envelopes. And it caught a vacuous version of itself: with one pulse `drift` answers INSUFFICIENT_DATA with zero deltas, so the delta comparison was `[]` against `[]` and stayed green when the CLI's limit was mutated from 10 to 3. The fixture pulses TWICE for that reason and asserts the status is not INSUFFICIENT_DATA, which is what makes the mutation fail as it should
-- [ ] `--json` on the CLI is the honest comparison point: it is the CLI's machine surface and should be
-      the same data the tool returns.
+- [x] ENFORCED, and it found two real gaps. `conducks drift` had no `--json` at all. `conducks flows --json` emitted a BARE ARRAY, so `[]` meant both "no flows" and "4 exist and none matched" — the denominator was on the rendered path and in the tool and missing from the one surface a machine reads (ADR 0115/0145, CONDUCKS-37). Both fixed; `flows --json` now returns `{flows, total, matching, shown}`, matching the tool field for field
+- [x] A third difference turned out to be DESIGNED and is recorded in the test so nobody "fixes" it: `query` returns direct matches plus ECHOES (callers of a match) where the tool returns direct only. The CLI labels them — `match: "direct" | "echo"` in `--json`, a dim `echo` column when rendered — so the shared answer is the direct set. ADR 0148 forbids an agent asking what a person cannot; this is the other direction, which the one-directional rule allows
 
 ## Not in scope
 
