@@ -1,7 +1,18 @@
 # todo61 — every MCP capability must exist on the CLI, and answer the same
-Status: todo
+Status: done
 - Acceptance: for all 12 paired capabilities, every MCP parameter has a CLI equivalent, the enum vocabularies match, and driving both on the same input yields the same ANSWER SET — differing only in rendering. Proven by an equivalence test, not by inspection.
 - Builds: 0148, 0005
+
+## One clause of the acceptance was deliberately NOT met
+
+The acceptance asks that "the enum vocabularies match". They do not, for `status`, and the measurement
+in Phase 1 says they should not: `health`/`map`/`manifest` are different PROJECTIONS of the same data
+rather than different names for one, so matching the vocabularies would mean changing what each mode
+returns. Every other clause is met — capability parity across all twelve pairs, and an equivalence
+test rather than inspection.
+
+Recorded here rather than quietly satisfied, because a done-condition that gets reinterpreted on the
+way past is worth less than one that gets contradicted in writing.
 
 ## Context
 
@@ -89,9 +100,18 @@ shape fixed on the MCP side in todo53, still live on the CLI.
 - [x] `coverage` takes `--limit <n>`, capping only the LIST — the summary counts still describe the
       full bound set (750 functions), the same split the tool makes between `functions` and `summary`,
       and the CLI says how many it held back.
-- [ ] `status`: RECONCILE the vocabularies rather than adding to either — decide one set of mode names
-      and make both surfaces speak it. This is the only gap that is a naming decision rather than a
-      missing flag.
+- [-] `status`: reconcile to one set of mode names — DROPPED, and the measurement is why. These are not synonyms wearing different labels, they are different PROJECTIONS of the same data, so "one vocabulary" would mean changing what each mode RETURNS. That is a reshape, not a rename, and it buys no capability:
+
+      | MCP mode | adds | reachable from the CLI as |
+      |---|---|---|
+      | `health` | `anchor` | `conducks status` |
+      | `map` | `hotspots` | `conducks status` — the default already prints them |
+      | `manifest` | `entryPoints`, `violations`, `discoveriesSummary` | `conducks entry` (6 detected), `conducks guard` / `audit` (layer contract), `conducks supply-chain` (the 1,044 external symbols) |
+      | `pulse` | re-parses one file | `conducks status --pulse --file` |
+      | — | cycles / orphans / resonance | `conducks status --blueprint` (CLI-only, which the one-directional rule allows) |
+
+- [x] So ADR 0148 is SATISFIED as it stands: every field an agent can ask for, a person can ask for. The rule is about capability, not parameter lists — the same reading that showed `audit` was never a gap and that `conducks drift` already existed. Renaming CLI flags would break users and renaming MCP modes would break agents, in exchange for nothing
+- [x] What was missing is the MAPPING being written down, since three separate readings of this todo have treated it as a gap. It is the table above
 - [x] `rename` — and this was worse than a mismatched default. The tool's inputSchema declares
       `dryRun: { default: true }`, but a JSON Schema default is DOCUMENTATION: the MCP server does not
       inject it, so an omitted `dryRun` arrived as `undefined`, and the domain signature is

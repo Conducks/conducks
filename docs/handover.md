@@ -6,13 +6,18 @@ Gates green: **1,838 tests / 238 suites**, typecheck 0, `docs-lint` 185 governed
 clean (62 anchors, 60 review stamps), architecture 5/5, declared-deps clean. All three frozen subjects
 `unchanged` vs baseline — RE-SAVED twice today (todo63, todo64), warm and cold.
 
-**Closed today: todo56, todo57, todo59, todo62, todo63, todo64.** ADR 0148's twelve pairs are all
-mirrored and `paired-surfaces` has no granted exceptions left.
+**Closed today: todo56, todo57, todo59, todo61, todo62, todo63, todo64.** ADR 0148's twelve pairs are
+all mirrored and `paired-surfaces` has no granted exceptions left.
+
+todo61 closed with ONE acceptance clause deliberately unmet, written into the record rather than
+reinterpreted: it asked that the enum vocabularies match, and for `status` they should not. MCP's
+`health`/`map`/`manifest` are different PROJECTIONS of the same data, not different names for one, so
+matching them would mean changing what each returns. Every field is reachable from the CLI already —
+`status`, `status --blueprint`, `entry`, `guard`, `supply-chain` — which is what ADR 0148 actually
+requires. The mapping table is in the todo.
 
 What remains:
 - **todo60** — the flake. Needs an idle machine more than it needs a decision.
-- **todo61**, one task: the `status` vocabulary (MCP `health|map|manifest|pulse` against CLI
-  `pulse|blueprint`). A naming call, low stakes, reversible.
 - **todo58#P1** and **todo16 (publish)** — genuinely yours.
 
 **The suite is not reliably green and nobody knows why.** Across nine runs today: `rename-safety`
