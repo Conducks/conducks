@@ -42,7 +42,7 @@
     "src/types/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
-    "src/lib/core/persistence/persistence.ts": "42cb5c23b8302590"
+    "src/lib/core/persistence/persistence.ts": "486d235b5c786e16"
   },
   "docs/visuals/modules/domain/analysis/coverage.md": {
     "src/lib/domain/analysis/coverage-bind.ts:50": "fdd480cd0bda4134",

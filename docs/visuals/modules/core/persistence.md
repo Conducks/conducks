@@ -56,9 +56,17 @@ test asserts the **full** save→load cycle. Treat any change here as high-risk 
 ## The taxonomy prune is authoritative
 
 The taxonomy enum declares 13 kinds; a persisted graph has 9. `pruneTaxonomy` deletes DATA outright
-and keeps an ATOM only if it carries a non-structural reference edge. Emission and the persisted
-graph disagree **by design** — do not "fix" the enum to match. To change what survives, edit
-`pruneTaxonomy`. Rationale in ADR 0012, decision in ADR 0013.
+and keeps an ATOM only if it carries a non-structural reference edge — **or if it is EXPORTED**
+(todo63). Emission and the persisted graph disagree **by design** — do not "fix" the enum to match.
+To change what survives, edit `pruneTaxonomy`. Rationale in ADR 0012, decision in ADR 0013.
+
+The export exception exists because a value's use can be completely invisible to the graph: a bare
+read produces no edge, so the gate could not tell an exported constant nobody imports from one used
+everywhere, and deleted both — leaving `prune` nothing to report. It is bounded and was measured
+before it landed: orchestrator +53 nodes (0.80%), sofie +22 (0.21%), scraper unchanged as the python
+control, and dangling counts identical on both TypeScript subjects. The flood the gate exists to stop
+was a 72% cut, so this is nowhere near re-creating it. A non-exported local with no edges is still
+cut, which is the bulk of them.
 
 ## Atomicity
 
