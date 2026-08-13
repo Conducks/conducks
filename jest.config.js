@@ -10,23 +10,26 @@ const moduleNameMapper = {
 };
 
 export default {
-	// Serial, and the REASON here was wrong until it was measured (todo65).
+	// PARALLEL, once the thing actually killing test processes was found (todo65).
 	//
-	// It said "tests share fixture vaults, so parallel workers collide on the DB lock". They do not
-	// share: `helpers.ts` gives every suite its own mkdtemp'd repo. The real blocker is CPU
-	// contention. Each jest worker spawns a CLI that runs its own 4-worker analyze pool, so 4 jest
-	// workers is 16 processes on 12 cores, and the helper's 90s per-command timeout fires — the
-	// analyze SUCCEEDS and is then SIGKILLed, which reads as a test failure.
+	// The reason recorded here for years was wrong: "tests share fixture vaults, so parallel workers
+	// collide on the DB lock". They do not share — `helpers.ts` gives every suite its own mkdtemp'd
+	// repo, so two suites contend no more than two git repositories contend on each other's
+	// `index.lock`.
 	//
-	// MEASURED, including an attempt to fix it that FAILED and is recorded so it is not retried
-	// blind (todo65). Serial 248s green. Raising the per-command timeout to 240s and halving the
-	// analyze pool gave 2 workers a 127s GREEN run — and then 3 of the next 3 runs failed, in five
-	// different suites, two of them slower than serial at 182s and 189s. One green run was luck.
+	// What actually happened: `conducks clean` matched processes by ENTRY POINT
+	// (`build/src/interfaces/cli/index.js`), which every conducks process on the machine shares, and
+	// SIGTERM'd all of them. Three suites run `clean`, so with two workers one suite's clean killed
+	// whatever the other had in flight. Serially that is invisible — nothing else is running.
 	//
-	// So the contention is real and is NOT just the timeout: at 4 workers the CLI produces EMPTY
-	// output, meaning processes are killed outright rather than losing a lock. Whatever the resource
-	// is, it has not been identified, and a suite that fails 1 in N is worth less than a slow one.
-	maxWorkers: 1,
+	// It cost an afternoon of wrong suspects (the per-command timeout, worker recycling, the DB lock)
+	// because a killed child reports EMPTY output. Instrumenting `runCli` to report `signal=SIGTERM`
+	// named it in one run: SIGTERM is neither the spawnSync timeout nor the OOM killer, both of which
+	// send SIGKILL.
+	//
+	// MEASURED after scoping `clean` to its own project: 3 consecutive full runs, 129s / 130s / 129s,
+	// 1,838 passing, ZERO SIGTERMs, against 248s serial.
+	maxWorkers: 2,
 	// The tree-sitter native addon serves ONE JS-wrapper instance per process. Four suites now load
 	// grammars (java/php/swift extraction + type-only-imports); the second one in the same process
 	// gets a wrapper whose tree.rootNode is undefined and fails at random. Recycling the worker

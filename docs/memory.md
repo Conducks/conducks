@@ -514,6 +514,20 @@ by construction.
   not the flag. The real gap here turned out to be the MACHINE SURFACE — `conducks drift` had no
   `--json`, so no equivalence check was possible — which is a much smaller and more useful fix. — todo61
 
+## A command that kills by process NAME kills other projects' processes
+- Gotcha: `conducks clean` ran `ps aux` and SIGTERM'd every process whose command line contained
+  `build/src/interfaces/cli/index.js`. That is the entry point EVERY conducks process shares, so
+  `clean` in one repository killed conducks running in another — a `watch`, an MCP server, an
+  `analyze` half way through writing its vault. Reproduced directly: a `watch` in a temp project died
+  the instant `clean` ran elsewhere.
+- Why: the identifying string is the INSTALL, not the project. Conducks is global like git and only
+  `.conducks/` is per project, so nothing in a command line distinguishes one project's process from
+  another's. The comment above the loop said "Surgical Process Eviction", and it was the opposite.
+  It also made the test suite unrunnable in parallel for what looked like four unrelated reasons.
+- Applies: scope any kill by the project a process BELONGS to, which is its CWD — `ps` does not
+  report that, so read it per candidate. And when the check cannot answer, leave the process alone: a
+  command that kills must treat "I could not tell" as "not mine". — todo65
+
 ## A readiness signal that does not carry the address is not readiness
 - Gotcha: `blocking-commands.test.ts` waited for `/Dashboard/i` before fetching the mirror's HTTP
   endpoint, and `mirror.ts` prints "Initializing Visual Dashboard..." BEFORE it binds. The test

@@ -1,5 +1,5 @@
 # todo65 — the suite could run in half the time, and the reason it does not was misdiagnosed
-Status: todo
+Status: done
 - Acceptance: `npm test` runs with more than one jest worker, green over 5 consecutive runs, and faster than the serial 248s baseline.
 
 ## Context
@@ -53,23 +53,21 @@ Both levers were changed and measured, and the result is the useful part:
       it worked), so contention grows across consecutive runs. Something is not being cleaned up
       between runs, and that is a lead worth following before touching `maxWorkers` again
 
-## Phase 1 — the death signal is named, the sender is not
+## Phase 1 — SOLVED, and the cause was a product bug rather than a test one
 
-Instrumented `runCli` to report WHY a child died rather than printing its empty output. That one change
-turned an afternoon of guessing into a fact:
+- [x] The sender is `conducks clean`. It ran `ps aux`, matched every process whose command line held `build/src/interfaces/cli/index.js` — the entry point EVERY conducks process on the machine shares — and SIGTERM'd all of them. Three suites run `clean`, so with two workers one suite's clean killed whatever another worker had in flight
+- [x] That explains every symptom the other theories could not: the victim differed each run (whoever was mid-command), even `status --help` died though it does no work, and it never happened serially because nothing else was running
+- [x] **It is a REAL product defect, not a test artifact.** `conducks clean` in one repository killed conducks in ANOTHER — a colleague's `watch`, an MCP server, an `analyze` half way through writing its vault. Reproduced directly: a `watch` started in a temp project was gone the instant `clean` ran here
+- [x] FIXED by scoping the eviction to the current project: each candidate's CWD is read and only processes under this project root are killed. A process whose CWD cannot be read is LEFT ALONE — this command kills things, so "I could not tell" must not resolve to "kill it"
+- [x] MEASURED: 3 consecutive full runs at `maxWorkers: 2` — **129s, 130s, 129s, 1,838 passing, ZERO SIGTERMs**, against 248s serial. Roughly half the wall clock, which is what this todo was opened for
 
-```
-CLI failed (analyze --yes) [signal=SIGTERM]: (no output — the process was killed before it wrote anything)
-```
+## What found it, after an afternoon of wrong suspects
 
-- [x] **SIGTERM, not SIGKILL** — which rules out the two obvious suspects. `spawnSync`'s own timeout uses `killSignal: 'SIGKILL'`, and so does the OS out-of-memory killer. Something is asking these processes to shut down politely
-- [x] RULED OUT — the per-command timeout. Raised 90s -> 240s; the SIGTERMs continued
-- [x] RULED OUT — jest's per-file worker recycling. Setting `workerIdleMemoryLimit` from `1KB` to `512MB` left SIGTERMs at 1, 3 and 1 across three runs, so recycling is not the sender. **And it must stay at `1KB` regardless**: without it ~19 parsing suites fail with `Cannot read properties of undefined (reading 'tree')`, exactly the one-wrapper-per-process constraint its comment predicts
-- [x] RULED OUT — the DuckDB lock. Every failing suite builds its own `mkdtemp` project, so they cannot contend; two conducks projects contend no more than two git repos contend on each other's `index.lock`
-- [ ] FIND THE SENDER. What remains: jest's own teardown of a worker for a reason other than the memory limit, a process-group signal reaching children, or something in the CLI's own worker pool. The instrumentation is in place, so the next parallel run names it rather than showing an empty string
-- [ ] A SEPARATE LEAD, seen twice: the FIRST serial run after a parallel experiment fails and the second passes, clean. Something is not cleaned up between runs — leftover processes, unreleased vault handles or temp directories. Check `lsof` and a temp-dir count between two runs before touching `maxWorkers` again
+- [x] Three candidates were ruled out by measurement and all three were wrong turns worth recording: the per-command timeout (raised to 240s, SIGTERMs continued), jest's per-file worker recycling (disabled entirely, SIGTERMs continued — and it must stay, without it ~19 parsing suites fail on the one-wrapper-per-process constraint), and the DuckDB lock (every failing suite builds its own project)
+- [x] What actually worked was INSTRUMENTATION, not reasoning. A killed child reports empty stdout and stderr, so the harness threw `CLI failed (analyze --yes): ` with nothing after the colon. Reporting `signal=` turned that into `signal=SIGTERM` in a single run — and SIGTERM immediately rules out both the spawnSync timeout and the OOM killer, which send SIGKILL
+- [x] The rule this leaves: when a process dies, make the harness say HOW before theorising about WHY. Empty output is not evidence of anything
 
-## What is settled
+## Phase 2 — hold it honestly
 
-- [x] `maxWorkers: 1` for now, and this is a PAUSE not an abandonment: the feature is wanted, the diagnosis is half done, and a suite that fails most runs blocks every other piece of work. The instrumentation stays in either way — it is what named SIGTERM
-- [x] The `runCli` timeout stays at 240s. It was firing on commands that had SUCCEEDED, converting a busy machine into a test failure, and that is wrong at any worker count
+- [ ] Three green runs is meaningful, not proof: before the fix parallel failed essentially every run, so three clean ones at zero SIGTERMs is a real signal. Watch for a SIGTERM in normal use before calling it settled
+- [ ] `--maxWorkers=4` is still untested against this fix. It failed before for reasons that may have been entirely `clean`; if so there is another halving available

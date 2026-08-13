@@ -230,8 +230,8 @@
 - Intent: It is a PULSE STEP and deliberately not a `conducks compact` command — a vault that only shrinks when someone remembers is a vault that grows, and the people worst affected never read the docs. A cheap `bloatRatio()` check (11 ms) gates the rewrite, so a healthy vault pays almost nothing, and the rewrite keeps its output only if it came out smaller. See ADR 0037.
 
 ## Vault Clean / Reset — `conducks clean`
-- Purpose: Drop the vault and clear stuck process locks so a fresh pulse can run.
-- Intent: Schema changes and lock contention need a clean-slate escape hatch rather than manual file surgery in `.conducks/`.
+- Purpose: Drop the vault and clear stuck process locks so a fresh pulse can run. Scoped to THIS project: a conducks process is evicted only when its working directory is under this project root, and one whose directory cannot be read is left alone.
+- Intent: Schema changes and lock contention need a clean-slate escape hatch rather than manual file surgery in `.conducks/`. The scoping is a correction, not a nicety — it matched processes by entry point, which every conducks install shares, so `clean` in one repository killed a `watch` or an in-flight `analyze` in another (todo65). A command that kills must treat "I cannot tell whose this is" as "not mine".
 
 ## CLI Help System — `conducks help`
 - Purpose: Present the commands grouped by what you are trying to do — discovery, landscape, behavioural, metrics, governance, historical, mutational, visual, system — with a worked example per group.

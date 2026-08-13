@@ -30,6 +30,7 @@ export class CleanCommand implements ConducksCommand {
     try {
       const myPid = process.pid;
       const myParentPid = process.ppid;
+      const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
       
       // Patterns that specifically identify a CONDUCKS background execution
       const targetPatterns = [
@@ -60,7 +61,33 @@ export class CleanCommand implements ConducksCommand {
         // Surgical Check: Does this process run a recognized Conducks entry point?
         const isConducks = targetPatterns.some(pattern => fullCmd.includes(pattern.toLowerCase()));
 
-        if (isConducks) {
+        // SCOPED TO THIS PROJECT, and that is a correctness fix rather than a nicety (todo65).
+        //
+        // The match above is on the ENTRY POINT — `build/src/interfaces/cli/index.js` — which every
+        // conducks process on the machine shares. So `conducks clean` in one repository killed
+        // conducks running in ANOTHER: a `watch` in a second project, a colleague's MCP server, an
+        // `analyze` half way through writing its vault. Reproduced directly: a `watch` started in a
+        // temp project was gone the moment `clean` ran here.
+        //
+        // It also made the test suite unrunnable in parallel. Three suites run `clean`, and with two
+        // jest workers one suite's clean killed whatever another worker had in flight — which is why
+        // the victim differed every run and why even `status --help`, a command that does no work,
+        // came back `signal=SIGTERM` (todo65 spent an afternoon on the wrong suspects for this).
+        //
+        // The project a process belongs to is its CWD, which `ps` does not report, so it is read per
+        // candidate. A process whose CWD cannot be read is LEFT ALONE: this command kills things, and
+        // "I could not tell" must not resolve to "kill it".
+        const belongsToThisProject = isConducks && (() => {
+          try {
+            const cwd = execSync(`lsof -a -d cwd -p ${pid} -Fn 2>/dev/null | grep '^n' | head -1`)
+              .toString().trim().slice(1);
+            return !!cwd && (cwd === projectRoot || cwd.startsWith(projectRoot + '/'));
+          } catch {
+            return false;
+          }
+        })();
+
+        if (belongsToThisProject) {
           victims.push(pid);
         }
       }
