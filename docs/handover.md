@@ -59,6 +59,23 @@ DuckDB problem — the musl DuckDB binding resolves fine. The remedy doctor prin
 guessed: `apk add build-base python3` then `CXXFLAGS="-std=c++20" npm i -g conducks` → all 13
 grammars, real graph. Decide whether Alpine-without-a-toolchain is a supported story before publishing.
 
+## 2026-08-13 — todo63 closed, and one of my "not blocked" calls was wrong
+
+**todo63 CLOSED.** The recall half is built: `pruneTaxonomy`'s ATOM edge gate now spares a node whose
+`dna.isExported` is true, so an exported constant nobody imports keeps its node and `prune` reports
+it. MEASURED on the frozen subjects — orchestrator 6,662 -> 6,715 nodes (+0.80%), sofie 10,545 ->
+10,567 (+0.21%), scraper unchanged as the python control. Dangling counts identical, `located` still
+100%: the cost is nodes, not broken references. Baselines re-saved warm and cold.
+
+**todo58#P1 is NOT unblocked, and saying it was is my mistake.** I claimed ADR 0070 already decided
+it — refuse and record as dangling. Two things were wrong. ADR 0070 forbids fabricating a target by
+COINCIDENCE (a basename match that sent 106 importers to a test file); reading a declared `tsconfig`
+`rootDir`/`outDir` is not that kind of guess. And the dangling option does not meet the acceptance
+anyway: the unresolved reference is ALREADY kept as a dangling edge at 0.4, and on sofie **all seven
+named symbols are still flagged**. The false verdicts sit on the TARGET file's symbols, and nothing
+links "this importer did not resolve" to "do not call that symbol dead". Only resolving the specifier
+removes them. It is a real decision again.
+
 ## 2026-08-13 — `context` measured, todo64 corrected, and a self-inflicted flake
 
 **todo57#P1 answered.** Both `context` surfaces driven on `resolveSymbolId`, same vault, same moment.
