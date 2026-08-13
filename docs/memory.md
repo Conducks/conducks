@@ -500,12 +500,12 @@ by construction.
   `tests/unit/core/parsing/optional-native-binding.test.ts`, which fails on any value import. — ADR 0027
 
 ## A hand-built fixture keeps proving a code path the parser stopped producing
-- Gotcha: `IntraLinker` block 3b was todo58's fix for a destructured dynamic import. todo62 then
-  changed the shape it reads — alias ids are now SCOPED, and 3b skips scoped names on purpose — so the
-  input it was written for no longer exists. MEASURED by starving its map and running everything:
-  **1,827 of 1,829 tests still pass**, and both failures are in `dynamic-import-scoped-alias.test.ts`,
-  which builds the pre-fix graph BY HAND. Real parses resolve without it, function-scoped and
-  module-level alike.
+- Gotcha: `IntraLinker` block 3b was todo58's fix for a destructured dynamic import. todo62 changed
+  the shape it reads — alias ids are now SCOPED, and 3b skips scoped names on purpose. Starving its
+  map left **1,827 of 1,829 tests passing**, both failures in `dynamic-import-scoped-alias.test.ts`,
+  which builds the pre-fix graph BY HAND. **That measurement was read as "3b is dead" and it is not**:
+  every fixture used to reach it held a destructured DYNAMIC import and none held a renamed STATIC
+  one. Starving 3b also deletes the edge for `import { A as B }` … `B()` — its real job (todo64).
 - Why: CONDUCKS-28 one level up. A fixture that constructs the graph itself freezes the producer's
   shape at the moment it was written, so it goes on agreeing with the code it guards long after the
   producer has moved. Nothing fails; the path just stops being reachable, and its test still reports
@@ -514,7 +514,9 @@ by construction.
   the old shape and run the suite. If only its own hand-built test fails, that path is unreachable —
   that is the measurement, not a guess. Prefer a fixture that drives a REAL parse
   (`tests/integration/features/prune-precision.test.ts` is the pattern) over one that hand-builds a
-  `ConducksAdjacencyList`. — todo64
+  `ConducksAdjacencyList`. And a suite that stays green while a path is starved proves the SUITE does
+  not cover it, never that the path is unused — the second claim needs a fixture built to exercise it,
+  which is the step that was skipped here. — todo64
 
 ## A dependency swap breaks the tooling nobody tests, and the gate that checked it looked clean
 - Gotcha: dropping `duckdb` broke **26 files** under `tools/` and `scripts/` that imported it

@@ -1,36 +1,63 @@
-# todo64 — the linker's dynamic-import rebind is unreachable, and only its own fixture still proves it
+# todo64 — a local that shadows a renamed import is rebound to the import, producing a wrong edge
 Status: todo
-- Acceptance: either block 3b is deleted and the whole suite still passes, or a REAL parsed input is found that needs it and `dynamic-import-scoped-alias.test.ts` is rewritten to produce that input rather than hand-building a graph.
+- Acceptance: a function-scoped declaration that shadows a renamed import resolves to ITSELF, while a call through the renamed import still resolves to the real definition — both asserted against a REAL parse, not a hand-built graph.
 
 ## Context
 
-`IntraLinker` block 3b (`linker-intra.ts`, "A dynamic import inside a function: the call landed on
-the LOCAL") was todo58's fix: a destructured dynamic import minted a MODULE-LEVEL binding with an
-ALIASES edge while the call resolved to a function-scoped local, so the two never met and live code
-read as dead.
+**This todo was filed with the wrong headline and the correction is the useful part.** It first said
+`IntraLinker` block 3b was UNREACHABLE dead code, on the strength of starving its map and watching
+1,827 of 1,829 tests still pass — the only failures being in the one test that hand-builds the
+pre-fix graph. That measurement was real and the conclusion drawn from it was wrong: every fixture
+used to reach it contained a destructured DYNAMIC import, and none contained a renamed STATIC one.
 
-todo62 changed the input it reads. The alias edge is now emitted against the id the binding node is
-actually stored under, which for a dynamic import inside a function is SCOPED (`<file>::main2.doit`).
-Block 3b skips those by design — `if (name.includes('.')) continue; // already scoped` — so the
-shape it was written for is no longer produced. Block 3a (the "pure alias" follow) now covers the
-case instead, because the alias source is a real node with an outgoing ALIASES edge.
+MEASURED on a two-file fixture with `import { realTarget as shadowed }`:
 
-MEASURED, by starving 3b's map and running everything:
+| | 3b live | 3b starved |
+|---|---|---|
+| `usesImport` -> `lib.ts::realTarget` | present | **gone** |
+| `usesLocal` -> `lib.ts::realTarget` | present | gone |
 
-| | result |
-|---|---|
-| full suite with 3b starved | **1,827 of 1,829 pass** |
-| the 2 failures | both in `dynamic-import-scoped-alias.test.ts`, which hand-builds the graph |
-| `prune-precision` scored fixture (real parse, function-scoped) | passes without 3b |
-| module-level `const { x } = await import(...)` (real parse) | resolves without 3b |
-| sofie / orchestrator baselines | unchanged by todo62 except the alias improvement already recorded |
+So 3b is load-bearing: it is what resolves a call made through a RENAMED STATIC import
+(`import { A as B }` … `B()`), which is ADR 0085's case. Deleting it would silently drop those edges,
+and nothing in the suite would have said so — `renamed-binding.test.ts` drives the reflector, not the
+linker, so it cannot see this. That gap is why the wrong conclusion survived a full-suite check.
 
-So the only thing keeping 3b covered is a fixture that constructs the pre-todo62 id shape by hand.
-That is CONDUCKS-28's trap one level up: the fixture and the code agree with each other and no longer
-agree with the parser.
+## The actual defect
 
-## Phase 0 — decide whether it is dead or merely unexercised here
+The second row of that table is a WRONG EDGE, and it is confidently wrong:
 
-- [ ] TypeScript is not the only producer. Check whether any other language's queries still emit an UNSCOPED module-level binding for a destructured dynamic import — if one does, 3b is live for that language and the answer is a fixture in that language, not a deletion
-- [ ] Check the case 3b names that the fixtures above may not cover: a dynamic import whose destructured name is ALSO declared as a same-named local elsewhere in the file. 3a follows an alias edge; it does not do 3b's same-file, same-name rebind, and the two are not obviously equivalent under shadowing
-- [ ] Only then delete or keep. If it is deleted, `dynamic-import-scoped-alias.test.ts` goes with it and its two controls move to the scored fixture, which drives a real parse
+```ts
+import { realTarget as shadowed } from './lib.js';
+
+export function usesLocal(): number {
+  const shadowed = () => 99;     // a genuine local declaration, shadowing the import
+  return shadowed();             // calls the LOCAL — conducks says it calls realTarget
+}
+```
+
+3b rebinds any edge whose target is a scope-local ATOM to the module-level alias of the same bare
+name in that file. It cannot tell the two cases apart:
+
+- the local IS the imported binding seen from inside a function — rebinding is correct
+- the local is an INDEPENDENT declaration that shadows the import — rebinding is wrong
+
+Before todo62 those were indistinguishable, because a destructured dynamic import minted an unscoped
+module-level alias plus a scoped local, exactly like a shadow. Since todo62 the dynamic case emits a
+SCOPED alias id that matches its node, and 3b is MEASURABLY no longer needed for it — the scored
+fixture and a module-level dynamic import both resolve with 3b starved.
+
+**Which block picks it up instead is an INFERENCE, not a measurement.** Block 3a (the "pure alias"
+follow) is the obvious candidate and the reasoning is that the alias source is now a real node with an
+outgoing ALIASES edge, which is exactly what 3a walks. Nobody has starved 3a to confirm it. Flagged
+because this todo's first headline came from precisely this kind of unverified step, and the same
+mistake twice in one record would be careless.
+
+Wrong edges are the worst class this codebase produces (ADR 0095): `impact` answers with a caller
+that does not call, `prune` sees a use that is not one, and nothing counts it.
+
+## Phase 0 — decide the discriminator before touching the rebind
+
+- [ ] Establish what distinguishes a local that IS the binding from a local that SHADOWS it, at the graph level. A genuine declaration has its own definition site; the destructured binding's "declaration" is the import itself. If the reflector already records that difference, the rebind gains a condition; if it does not, this needs a capture before it needs a linker change
+- [ ] Confirm the blast radius on a frozen subject before and after: how many rebinds does 3b perform on sofie, and how many survive the discriminator? A rebind count that barely moves means the shadow case is rare and the fix is cheap; a large drop means static aliases are being resolved through it constantly and the change needs its own measurement
+- [ ] Confirm which block actually resolves the dynamic case now, by starving 3a the way 3b was starved. The claim above is reasoned, not measured, and the cost of being wrong is a "fix" aimed at the wrong block
+- [ ] Whatever lands, it is asserted against a REAL parse. `dynamic-import-scoped-alias.test.ts` hand-builds its graph and therefore froze the producer's shape at the moment it was written — it agreed with the code for nine days after the parser stopped emitting that shape. The shadowing case above belongs in a fixture that runs `analyze`

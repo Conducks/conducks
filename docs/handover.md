@@ -1,4 +1,4 @@
-# Handover — 2026-08-11
+# Handover — 2026-08-13
 Status: current
 
 ## Where it stands
@@ -6,11 +6,15 @@ Gates green: **1,830 tests / 236 suites**, typecheck 0, `docs-lint` 188 governed
 clean (62 anchors, 60 review stamps), architecture 5/5, declared-deps clean. All three frozen subjects
 `unchanged` vs baseline — RE-SAVED today, warm and cold, see below for why.
 
-**Two full-suite runs in six failed** (`rename-safety`, at two different lines, plus a second suite never captured); the
-other four were clean on the same build. Do not read a green run as settled — todo60 Phase 3.
+**The suite is not reliably green and nobody knows why.** Across nine runs today: `rename-safety`
+(twice, two different lines), `kinetic` (4 tests), `blocking-commands` (1) — FOUR distinct suites,
+all integration, all spawning child processes. Two of the three captured runs were contaminated by
+work happening in another shell at the same time, so the rate is not trustworthy either.
+Do not read a green run as settled, and see todo60 Phase 3 for how to measure it properly.
 
-Work sits on branch `mcp-surface-walk-and-concurrency`, 23 commits ahead of `main`, nothing pushed.
-The driver swap below is UNCOMMITTED at the time of writing.
+Work sits on branch `mcp-surface-walk-and-concurrency`, **25 commits ahead of `main`, nothing
+pushed**. Everything below is committed: `feat(persistence): move the vault to a NAPI DuckDB driver`
+and `fix(prune): stop reporting a used value import as stale`.
 
 **`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
@@ -55,6 +59,43 @@ DuckDB problem — the musl DuckDB binding resolves fine. The remedy doctor prin
 guessed: `apk add build-base python3` then `CXXFLAGS="-std=c++20" npm i -g conducks` → all 13
 grammars, real graph. Decide whether Alpine-without-a-toolchain is a supported story before publishing.
 
+## 2026-08-13 — `context` measured, todo64 corrected, and a self-inflicted flake
+
+**todo57#P1 answered.** Both `context` surfaces driven on `resolveSymbolId`, same vault, same moment.
+They are not two renderings of one answer:
+
+| | CLI | MCP |
+|---|---|---|
+| entries | **2,407** | 83 (of 103 in radius 2) |
+| overlap by name | **44** | 44 |
+| kinds | ATOM 1052, BEHAVIOR 649, `node` 247, STRUCTURE 244, UNIT 196, ECOSYSTEM 19 | BEHAVIOR 78, STRUCTURE 5 |
+| source lines | yes | no |
+
+The CLI side has a defect the static gate could not see: **2,407 entries for one symbol is a dump**,
+247 of them unresolved `node` placeholders. The decision in todo57#P1 is still yours, but the CLI's
+breadth is a bug regardless of which way it goes.
+
+**todo64's headline was WRONG and is corrected.** Block 3b is not dead code — starving it deletes the
+edges for a renamed STATIC import (`import { A as B }` … `B()`). Every fixture that produced the
+"unreachable" reading held a dynamic import and none held a renamed static one. What 3b really has is
+a wrong-edge bug: a local declaration that SHADOWS a renamed import gets rebound to the import.
+**A green suite while a path is starved proves the SUITE does not cover it, never that the path is
+unused.**
+
+**One flake capture was contaminated, by me.** `kinetic.test.ts` failed with
+`Cannot find module .../build/src/lib/core/utils/mem-trace.js` — which reads as a harness race and is
+not one. `npm run build` opens with `rm -rf build`, and it was run by hand while the suite was in
+flight. It also refutes the theory it suggests: `maxWorkers: 1` makes the suite serial, so two suites
+cannot rebuild over each other. **Never build or restore a source file while `npm test` is running** —
+the integration suites spawn child CLIs that read `build/` live.
+
+Three captured runs followed: **fail / pass / fail**, in two more suites. Run 3 was
+`mirror serves the wave over HTTP` — `fetch failed` while the server HAD reported ready, so a
+ready-vs-listening gap or a port collision, not slowness. It was also taken while this shell was
+running `docs-lint`, which is exactly the kind of noise that makes a timing test meaningless. **Every
+observation of this flake so far was taken while something else was running.** That has to stop
+before any theory is worth writing down.
+
 ## 2026-08-11 — prune stopped telling users to delete imports their code needs
 
 **todo63 Phase 0 + 1.** The const-value defect the new fixture found is TWO causes, not one, and the
@@ -93,12 +134,20 @@ positive is the bad half — `STALE_IMPORT` is a verdict telling the user to del
 code needs. Held in the fixture's `KNOWN_WRONG` group, which fails if the gap grows OR is silently
 fixed.
 
-**And a second thing — todo64.** `IntraLinker` block 3b (todo58's own fix) is now unreachable. todo62
-made alias ids scoped, and 3b skips scoped names by design, so block 3a covers the case instead.
-MEASURED by starving 3b: **1,827 of 1,829 tests still pass**, and both failures are in
-`dynamic-import-scoped-alias.test.ts` — which hand-builds the pre-fix graph. Real parses resolve
-without it, function-scoped and module-level alike. Not deleted: shadowing and other languages need
-checking first.
+**And a second thing — todo64, whose first headline was WRONG.** `IntraLinker` block 3b was filed as
+unreachable dead code: starving it left 1,827 of 1,829 tests passing, both failures in the one test
+that hand-builds the pre-fix graph. Checking the shadowing case corrected it. 3b is LOAD-BEARING — it
+resolves calls through a renamed STATIC import (`import { A as B }` … `B()`), and starving it deletes
+those edges. Every fixture that reached the first conclusion held a dynamic import and none held a
+renamed static one.
+
+What 3b actually has is a WRONG-EDGE bug: a genuine local declaration that shadows a renamed import is
+rebound to the import, so `usesLocal` — which calls its own arrow function — is recorded as calling
+the imported definition. Confidently wrong, and nothing counts it. todo64 carries the repro.
+
+**A green suite while a path is starved proves the SUITE does not cover it, not that the path is
+unused.** That is the lesson, and it cost a wrong claim in three files before the shadowing fixture
+caught it.
 
 ## 2026-08-11 — todo59 closed, and the re-baselining confirmed todo62 independently
 
@@ -201,7 +250,8 @@ measurements taken after the board said it was empty:
 - `todo61` — the mirror rule: five gaps closed, `status` and `diff` need a decision.
 - `todo63` — the false-positive half is FIXED (above); Phase 2 remains, and it is a taxonomy
   decision: should an exported-but-unreferenced value keep a node at all?
-- `todo64` — `IntraLinker` block 3b is unreachable since todo62; only its hand-built fixture proves it.
+- `todo64` — `IntraLinker` block 3b rebinds a local that SHADOWS a renamed import to the import: a
+  wrong edge. It is load-bearing, not dead — an earlier note here said dead and was corrected.
 - (closed today) `todo62` — the alias id-shape bug. See above.
   call, not work: is a barrel re-export a symbol or a relationship?
 

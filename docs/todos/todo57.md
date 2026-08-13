@@ -30,8 +30,20 @@ So neither is simply the better one. Picking is the work.
 
 ## Phase 1 — decide, then unify
 
-- [ ] Drive both on the same symbol and record the two answers side by side. The gate found the split
-      statically; nobody has yet compared what they actually RETURN.
+- [x] DONE, on `resolveSymbolId` in this repository, both surfaces on the same vault at the same moment. They do not disagree at the margins — they answer different questions:
+
+      | | `conducks context` (CLI) | `conducks_context` (MCP) |
+      |---|---|---|
+      | entries returned | **2,407** | 83 (of 103 in radius 2) |
+      | overlap by name | **44** | 44 |
+      | kinds | ATOM 1052, BEHAVIOR 649, `node` 247, STRUCTURE 244, UNIT 196, ECOSYSTEM 19 | BEHAVIOR 78, STRUCTURE 5 |
+      | callers | 2, with call-site lines | not a section |
+      | source lines | yes | no |
+      | relevance score | none | per node |
+
+      44 shared names out of 2,407 against 83 is not two renderings of one answer.
+- [x] The CLI side has a defect the static gate could not see: **2,407 entries for one symbol is a dump, not context.** 247 of them are kind `node` — unresolved placeholders — plus 196 UNIT and 19 ECOSYSTEM, none of which answers "what is around this symbol". Whatever is decided below, the CLI's breadth is a bug on its own and the MCP side already excludes exactly these classes (ADR 0103, todo28#P4)
+- [x] Both sprawl through the registry hub, differently: the MCP-only names include `tool`, `execute`, `syncGraph`, `watchSynapse` — reached because `registry` is a STRUCTURE every path crosses. A shared implementation inherits that problem rather than solving it, so hub exclusion belongs in whatever lands
 - [ ] Decide: one shared domain function with a presentation difference (source lines for the CLI,
       token budget for the tool), or two names that stop implying agreement.
 - [ ] If unified: the shared function goes in the domain and both surfaces reach it through the
