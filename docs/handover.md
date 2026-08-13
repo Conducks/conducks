@@ -2,9 +2,13 @@
 Status: current
 
 ## Where it stands
-Gates green: **1,830 tests / 236 suites**, typecheck 0, `docs-lint` 188 governed docs, `visuals-lint`
+Gates green: **1,837 tests / 238 suites**, typecheck 0, `docs-lint` 186 governed docs, `visuals-lint`
 clean (62 anchors, 60 review stamps), architecture 5/5, declared-deps clean. All three frozen subjects
-`unchanged` vs baseline — RE-SAVED today, warm and cold, see below for why.
+`unchanged` vs baseline — RE-SAVED twice today (todo63, todo64), warm and cold.
+
+**Closed today: todo56, todo59, todo62, todo63, todo64.** todo61 is all but done. What is left is
+todo57 (the BFS extraction), todo60 (needs an idle machine), and two decisions that are genuinely
+yours — todo58#P1 and the publish.
 
 **The suite is not reliably green and nobody knows why.** Across nine runs today: `rename-safety`
 (twice, two different lines), `kinetic` (4 tests), `blocking-commands` (1) — FOUR distinct suites,
@@ -59,6 +63,27 @@ DuckDB problem — the musl DuckDB binding resolves fine. The remedy doctor prin
 guessed: `apk add build-base python3` then `CXXFLAGS="-std=c++20" npm i -g conducks` → all 13
 grammars, real graph. Decide whether Alpine-without-a-toolchain is a supported story before publishing.
 
+## 2026-08-13 — todo61: a duplicate door caught before it shipped, and a real denominator bug
+
+**`conducks flows --json` emitted a bare array**, so `[]` meant both "no flows here" and "4 exist and
+none matched". The denominator was in the rendered output and in the MCP tool and missing from the one
+surface a machine reads (ADR 0115/0145). It now returns `{flows, total, matching, shown}`.
+
+**I nearly shipped a second door onto `drift`.** todo61 said the CLI lacked it; `conducks drift`
+already existed, on the same `registry.evolution.compare()`, under a different COMMAND NAME. The gap
+came from comparing `diff`'s flags against `conducks_diff`'s parameters — the exact mistake ADR 0148
+records for `audit`. Reverted. What was actually missing was `--json` on `drift`.
+
+**The pairs gate was NOT strengthened, deliberately.** todo61#P2 asked for "reaches the same domain
+function"; ADR 0148 argued against that in writing, and two measurements agree — `query` legitimately
+returns echoes the tool does not, `drift` legitimately renders as text. A call-graph gate would have
+been wrong twice on its first run. The strong check is
+`tests/integration/features/surface-equivalence.test.ts`, which compares ANSWERS on real data over
+stdio JSON-RPC and cannot false-fail on rendering. Five pairs, each mutation-verified.
+
+Also noted: the static gate pairs a tool with a CLI file of the SAME NAME, so a capability under a
+different command name is invisible to it. That is how `drift` was missed.
+
 ## 2026-08-13 — todo63 closed, and one of my "not blocked" calls was wrong
 
 **todo63 CLOSED.** The recall half is built: `pruneTaxonomy`'s ATOM edge gate now spares a node whose
@@ -92,16 +117,21 @@ The CLI side has a defect the static gate could not see: **2,407 entries for one
 247 of them unresolved `node` placeholders. The decision in todo57#P1 is still yours, but the CLI's
 breadth is a bug regardless of which way it goes.
 
-**todo64 has now carried TWO wrong headlines, and the second was mine correcting the first.** It said
-block 3b was unreachable dead code; then, after a starve appeared to delete a renamed-static-import
-edge, that 3b was load-bearing. Re-measured with nothing else running, **starving 3b changes nothing**
-on that fixture, and 3b instrumented to log every rebind logs NOTHING. The second measurement had
-been contaminated — a full-suite loop was running and `npm run build` had wiped `build/` under it, so
-the analyze produced an empty graph that read as "the edges disappeared".
+**todo64 is CLOSED, after carrying two wrong headlines on the way.** It said block 3b was unreachable
+dead code; then, after a contaminated starve, that 3b was load-bearing. Both wrong — 3b instrumented
+logs no rebinds at all, and starving it changes nothing.
 
-The DEFECT is real and reproduced cleanly twice: a local declaration that shadows a renamed import is
-recorded as calling the import. 3b is not its cause and the cause is not yet identified — todo64
-Phase 0 names the next two candidates and says to instrument them rather than starve them.
+The real cause, found by instrumenting the call processor: `context.localBindings` is keyed by name
+per FILE with no scope, so `import { realTarget as shadowed }` made every `shadowed()` in the file
+resolve to the import, including inside a function declaring its own. Fixed as IntraLinker block 3c.
+It also corrects same-named locals across SIBLING functions — a python call in `_merkle_diff` was
+bound to `_render_markdown.walk`.
+
+**Two guards, each forced by a measurement catching the fix being wrong.** Ids are lowercased for
+APFS (CONDUCKS-4), so the first cut rebound 37 python edges — `pathlib::Path` onto a local `path` —
+reintroducing the same defect from the other side; names are compared case-sensitively now. And a
+destructured import binding is ALSO a scoped node with a matching name and must not win, which the
+prune-precision fixture caught by reporting three live symbols as dead.
 
 **One flake capture was contaminated, by me.** `kinetic.test.ts` failed with
 `Cannot find module .../build/src/lib/core/utils/mem-trace.js` — which reads as a harness race and is
