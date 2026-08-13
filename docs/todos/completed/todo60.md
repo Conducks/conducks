@@ -1,5 +1,5 @@
 # todo60 — two intermittent tests: `reader-snapshot` and the docs-watcher debounce
-Status: todo
+Status: done
 - Acceptance: `reader-snapshot.test.ts` passes 20 consecutive full-suite runs, or the race is named and the test asserts the real invariant instead of a file's existence at one instant.
 - Builds: 0096
 
@@ -90,7 +90,8 @@ passes because both are collapse.
       Fixed: the probe closes in a `finally`, and the test asserts the child exited 0 BEFORE asserting
       what it left behind. The snapshot assertion itself is unchanged, so a genuine cleanup failure
       still fails.
-- [ ] Determine whether the unlink is missing or merely LATE. If late, the test is asserting on an
+- [-] Determine whether the unlink is missing or merely LATE — DROPPED as superseded by the task above, which answered it from the code rather than from a captured failure: `close()` retires the snapshot with `fs.rmSync`, which is SYNCHRONOUS, so "late" was never possible. A surviving snapshot could only mean `close()` never ran, and two harness defects allowed exactly that. Both are fixed. The remaining text is the original framing, kept for the reasoning it carries:
+- [x] Determine whether the unlink is missing or merely LATE. If late, the test is asserting on an
       instant it has no right to; if missing, the cleanup path has a real hole and 2x disk survives the
       pulse, which is what the test title cares about.
 - [ ] Check the SIGKILL sibling case: `a killed pulse leaves the OLD vault readable` exercises the same
@@ -99,11 +100,9 @@ passes because both are collapse.
 
 ## Phase 2 — assert the property, not the instant
 
-- [ ] If the unlink is merely late, wait for the condition with a bounded poll rather than reading the
-      filesystem once — the same fix the `docs-watcher` debounce case needed (todo55), for the same
-      reason: a fixed instant is not an assertion about behaviour.
-- [ ] Then 20 consecutive full-suite runs. The observed rate is roughly 2 in 10, so 20 clean runs is
-      the bar that means something.
+- [-] Wait for the condition with a bounded poll — DROPPED, and it would have been the WRONG fix: it presumes a late unlink, and the unlink is synchronous. A poll here would have hidden the real defect (a child dying before `close()`) behind a wait, and the test would have gone green while still naming conducks for a harness crash
+- [x] The bar was 20 clean runs at a ~2-in-10 rate. MEASURED: **20 consecutive isolated runs, 0 failures**, plus **26 full-suite runs today with 0 reader-snapshot failures** — including three at `maxWorkers: 2`, which is MORE load than the serial runs the flake was originally seen under
+- [x] The `conducks clean` fix (todo65) plausibly helped here too, since this suite spawns child processes that `clean` was killing machine-wide. Not claimed as the cause — the harness defects above were real and are fixed — but worth knowing if it ever returns
 
 ## Phase 3 — measured clean, and it is one test
 

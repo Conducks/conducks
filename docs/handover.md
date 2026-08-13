@@ -16,12 +16,14 @@ matching them would mean changing what each returns. Every field is reachable fr
 `status`, `status --blueprint`, `entry`, `guard`, `supply-chain` — which is what ADR 0148 actually
 requires. The mapping table is in the todo.
 
+**The board is down to ONE open todo, and it is a decision, not work.**
+
 What remains:
-- **todo60#P1/P2** — the `reader-snapshot` unlink. Its Phase 3 flake is FIXED (below); these two are
-  a separate, older case in the same file.
-- **todo65** — the suite is serial for CPU reasons, not for a DuckDB lock, and half the wall clock is
-  available. Measured, not fixed.
-- **todo58#P1** and **todo16 (publish)** — genuinely yours.
+- **todo58#P1** and **todo16 (publish)** — genuinely yours, and the only things left.
+
+todo60 and todo65 both closed. The suite now runs at **`maxWorkers: 2`, 129s, 1,838 green** — half
+what it was — because `conducks clean` was killing conducks processes machine-wide, including in
+OTHER projects. That was a product bug the tests happened to expose.
 
 **The suite is not reliably green and nobody knows why.** Across nine runs today: `rename-safety`
 (twice, two different lines), `kinetic` (4 tests), `blocking-commands` (1) — FOUR distinct suites,
