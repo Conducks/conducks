@@ -77,6 +77,17 @@ export function commit(repo: string, message: string): void {
 // to read. That happened writing the coverage suite: `coverage-view --out --watch` swallowed the
 // flag as a filename and then watched, and the run had to be killed at ten minutes. A killed child
 // returns status null, which reads here as a non-zero exit — which is what a hang deserves.
+/**
+ * Generous ON PURPOSE (todo65). At 90s this fired on commands that had SUCCEEDED — the analyze
+ * printed its "Synapse Reflection" line and was then SIGKILLed because the machine was busy, which
+ * reads as a test failure and is how todo60's flake came to look like four different suites.
+ *
+ * The guard it exists to provide is against a command that never returns — a watch loop, a vault
+ * lock held forever — and those hang indefinitely, so a higher ceiling loses nothing. Slowness must
+ * not be convertible into failure.
+ */
+const DEFAULT_CLI_TIMEOUT_MS = 240000;
+
 export function runCli(
   args: string[],
   opts: { cwd: string; env?: NodeJS.ProcessEnv; allowFail?: boolean; timeout?: number } = { cwd: process.cwd() }
@@ -85,7 +96,7 @@ export function runCli(
     cwd: opts.cwd,
     env: { ...process.env, ...(opts.env || {}) },
     encoding: 'utf-8',
-    timeout: opts.timeout ?? 90000,
+    timeout: opts.timeout ?? DEFAULT_CLI_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   });
   const stdout = res.stdout || '';

@@ -18,11 +18,14 @@ export default {
 	// workers is 16 processes on 12 cores, and the helper's 90s per-command timeout fires — the
 	// analyze SUCCEEDS and is then SIGKILLed, which reads as a test failure.
 	//
-	// MEASURED on this machine: serial 248s green; --maxWorkers=2 133s with 1 suite failing;
-	// --maxWorkers=4 150s with 3 failing (slower than 2, which is contention). So roughly HALF the
-	// wall clock is available here once the per-command timeout and the nested worker pool are
-	// reconciled. Left serial until then, because a suite that fails 1 in N is worth less than a
-	// slow one.
+	// MEASURED, including an attempt to fix it that FAILED and is recorded so it is not retried
+	// blind (todo65). Serial 248s green. Raising the per-command timeout to 240s and halving the
+	// analyze pool gave 2 workers a 127s GREEN run — and then 3 of the next 3 runs failed, in five
+	// different suites, two of them slower than serial at 182s and 189s. One green run was luck.
+	//
+	// So the contention is real and is NOT just the timeout: at 4 workers the CLI produces EMPTY
+	// output, meaning processes are killed outright rather than losing a lock. Whatever the resource
+	// is, it has not been identified, and a suite that fails 1 in N is worth less than a slow one.
 	maxWorkers: 1,
 	// The tree-sitter native addon serves ONE JS-wrapper instance per process. Four suites now load
 	// grammars (java/php/swift extraction + type-only-imports); the second one in the same process

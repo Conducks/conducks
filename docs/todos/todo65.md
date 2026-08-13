@@ -27,14 +27,34 @@ worker spawns a CLI that runs its own analyze worker pool (capped at 4 in tests 
 `cap-workers.mjs`), so 4 jest workers is ~16 processes on 12 cores; one suite took 122s under that
 load against a 90s ceiling.
 
-## Phase 0 — reconcile the two pools before raising the worker count
+## Phase 0 — ATTEMPTED, and it failed. Do not retry this shape blind
 
-- [ ] Decide the total process budget rather than tuning each half blindly: jest workers x the analyze pool per CLI must fit the machine. `CONDUCKS_WORKERS` already exists as the lever on the second, and `cap-workers.mjs` sets it to 4 for tests
-- [ ] Establish whether the 90s `runCli` timeout is a real bound or a guard nobody sized. A timeout that fires on a SUCCEEDING command is not protecting anything, it is converting slowness into a false failure — and this is exactly how todo60's flake read as four different suites
-- [ ] Only then raise `maxWorkers`, and prove it the cheap way: the suites that failed under load (`kinetic`, `analyze-counts`, `context-tool`, `coverage-commands`) run in seconds on their own, so loop those rather than the full 248s suite
+Both levers were changed and measured, and the result is the useful part:
 
-## Not in scope
+- the per-command timeout, 90s -> 240s. That fix is CORRECT and is KEPT regardless: it was firing on
+  commands that had SUCCEEDED, converting a busy machine into a test failure, which is how todo60's
+  flake came to look like four different suites.
+- the analyze pool per CLI, 4 -> 2, so jest workers x pool fits 12 cores. Reverted with the rest.
 
-- The tree-sitter constraint, which is already solved differently: the native addon serves one JS
-  wrapper per process, and `workerIdleMemoryLimit: '1KB'` recycles the worker after every file. That
-  is orthogonal to how many workers run at once.
+| config | wall clock | result |
+|---|---|---|
+| serial | 248s | green |
+| 4 workers, both levers | 120s | 4 suites failed |
+| 2 workers, both levers | **127s** | **green** |
+| 2 workers, the next 3 runs | 127s, **189s**, **182s** | **3 of 3 FAILED**, five different suites |
+
+- [x] So the single green run was LUCK, and acting on it would have shipped a suite that fails most
+      runs. Repeating it is what caught that — the same discipline todo60 needed, arrived at again
+- [x] The timeout was NOT the whole cause. At 4 workers the CLI produces EMPTY output, which is a
+      process killed outright rather than one losing a lock or timing out. Whatever resource that is —
+      file descriptors, memory under `workerIdleMemoryLimit: '1KB'` recycling, something else — is
+      unidentified, and naming it is the real Phase 0
+- [x] Two of the failing runs were SLOWER than serial (189s, 182s against 248s serial but 127s when
+      it worked), so contention grows across consecutive runs. Something is not being cleaned up
+      between runs, and that is a lead worth following before touching `maxWorkers` again
+
+## Phase 1 — identify the resource before tuning anything
+
+- [ ] Find what dies. The failing CLI produces no output at all: capture its exit signal rather than its stdout, and check whether it is OOM, EMFILE, or a SIGKILL from something else. `ulimit -n` against the number of concurrent vaults is the first thing to rule out
+- [ ] Explain why consecutive runs get SLOWER (127s then 189s then 182s). Leftover processes, unreleased vault handles or temp directories not cleaned between runs would all do it, and all are checkable between two runs with `lsof` and a temp-dir count
+- [ ] Only then raise `maxWorkers`, and prove it over at least 5 consecutive runs rather than one. The measurement above cost one green run and three red ones; the green one alone would have been wrong
