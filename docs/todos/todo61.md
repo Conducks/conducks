@@ -26,7 +26,7 @@ Audited all 12 pairs on 2026-08-10 by reading each MCP `inputSchema` against eac
 | `coverage` | `limit` | |
 | `status` | vocabularies DIFFER | MCP `health\|map\|manifest\|pulse`; CLI `pulse\|blueprint` |
 | `rename` | safety INVERTED | MCP `dryRun` opt-in; CLI `--confirm` opt-out |
-| `diff` | different features | CLI has `--base/--head` pulse compare; MCP has `drift`. Neither has the other |
+| `diff` | NOT a gap — see Phase 1 | CLI has `--base/--head` pulse compare AND `conducks drift`; the tool's `drift` mode maps to the latter. Both askable from both surfaces |
 
 `explain`, `impact` and `query` are close to aligned already.
 
@@ -103,16 +103,17 @@ shape fixed on the MCP side in todo53, still live on the CLI.
       unchanged and the original name is still present; called with `dryRun: false` it writes; the CLI
       still requires `--confirm`.
 - [x] `diff`: HALF of this is already decided by ADR 0148 and does not need a call. The rule is one-directional — "an agent must never be able to ask something a person cannot" — so MCP's `drift` MUST gain a CLI home. The converse does not follow: the CLI's `--base/--head` pulse compare may stay CLI-only, exactly as `mirror` and `setup` do, and needs no tool
-- [ ] Build the CLI home for `drift`. What is genuinely open is only the NAME it takes there, which is reversible and costs nothing to change later
+- [x] THE GAP WAS NOT A GAP, and this todo's own line ("CLI has pulse-compare, MCP has drift. Neither has the other") was wrong. **`conducks drift` already existed**, on the same `registry.evolution.compare(prevPulseId)` the tool calls. It was missed because the comparison was `diff`'s flags against `conducks_diff`'s parameters — the capability lives under a different COMMAND NAME. That is precisely the mistake ADR 0148 records for `audit` ("`advice` is `conducks advise`"), repeated here
+- [x] I built `conducks diff --mode drift` before checking, and REVERTED it. A second door onto a capability that already has one is worse than the gap it was meant to close
+- [x] What was actually missing is the MACHINE SURFACE: `conducks drift` had no `--json`, so the two answers could only be compared by reading rendered text. ADR 0148 names `--json` as the honest comparison point, so `drift` now has it — the same fields the tool returns, including the truncation the tool reports in its `meta`, and the verdict's exit code preserved (ADR 0127)
 
 ## Phase 2 — enforce it, since inspection rots
 
 - [ ] Strengthen `paired-surfaces.test.ts` from "shares one registry accessor" to "reaches the same
       domain function". The current check is too weak to catch divergence and says so in its own
       comment.
-- [ ] Add an EQUIVALENCE test: drive both surfaces on the same input and assert the answer sets match.
-      Rendering differs by design — the CLI returns source lines for `context`, the tool returns a
-      token budget — so compare the ids/findings, not the payloads.
+- [x] DONE — `tests/integration/features/surface-equivalence.test.ts`, driving the MCP side over real stdio JSON-RPC (the path an agent takes) rather than a mocked handler. Three cases: `prune`'s finding set, `diff --mode drift`'s status/summary/deltas/truncation, and an unknown mode being refused by BOTH with the SAME vocabulary
+- [x] It caught a real divergence while being written: the CLI reported truncation in its payload, the tool in `meta`. Same fact, different envelope — rendering, so it is compared ACROSS the envelopes. And it caught a vacuous version of itself: with one pulse `drift` answers INSUFFICIENT_DATA with zero deltas, so the delta comparison was `[]` against `[]` and stayed green when the CLI's limit was mutated from 10 to 3. The fixture pulses TWICE for that reason and asserts the status is not INSUFFICIENT_DATA, which is what makes the mutation fail as it should
 - [ ] `--json` on the CLI is the honest comparison point: it is the CLI's machine surface and should be
       the same data the tool returns.
 

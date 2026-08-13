@@ -11,9 +11,17 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 export class DriftCommand implements ConducksCommand {
   public id = "drift";
   public description = "Analyze architectural drift between structural pulses";
-  public usage = "conducks drift [prevPulseId]";
+  public usage = "conducks drift [prevPulseId] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
+    // `--json` is the CLI's machine surface, and ADR 0148 makes it the honest comparison point with
+    // the tool: `conducks_diff { mode: "drift" }` reaches this same `registry.evolution.compare()`,
+    // and without `--json` there was no way to check the two answer the same thing except by reading
+    // rendered text. todo61 first mistook this for a MISSING CAPABILITY and nearly added a second
+    // door (`conducks diff --mode drift`) to a command that already existed — the exact error ADR
+    // 0148 warns about: compare what a user can ASK, not parameter lists. The gap was the machine
+    // surface, not the capability.
+    const useJson = args.includes('--json');
     // The dispatcher ALSO reads the first positional as the target root, so `conducks drift <path>`
     // used to pass the path in here as a pulse id — the run then reported "check that node_history
     // holds rows for pulse /private/tmp/...". A pulse id is `pulse_<ms>_<suffix>`; anything that
@@ -23,8 +31,30 @@ export class DriftCommand implements ConducksCommand {
     const prevPulseId = looksLikeAPath ? undefined : positional;
 
     try {
-      console.log(`\n\x1b[1m--- 🕵️‍♂️ Conducks Architectural Drift Analysis ---\x1b[0m`);
+      if (!useJson) console.log(`\n\x1b[1m--- 🕵️‍♂️ Conducks Architectural Drift Analysis ---\x1b[0m`);
       const result = await registry.evolution.compare(prevPulseId);
+
+      if (useJson) {
+        // The same fields the tool returns, including the truncation the tool reports in its `meta`.
+        // A bounded answer must say it is bounded on both surfaces (ADR 0091), and the tool caps
+        // deltas at 10 — so a CLI that quietly printed all of them would be a different ANSWER
+        // rather than a different rendering.
+        const LIMIT = 10;
+        process.stdout.write(JSON.stringify({
+          status: result.status,
+          message: result.message,
+          summary: result.summary,
+          moves: result.moves,
+          deltas: result.deltas.slice(0, LIMIT).map((d: any) => ({
+            id: d.id, name: d.name, file: d.file, velocity: d.velocity, isModified: d.isModified,
+          })),
+          truncated: result.deltas.length > LIMIT,
+        }, null, 2) + '\n');
+        // The exit code stays the verdict's, exactly as the rendered path sets it below: a
+        // comparison that could not be made is not a pass (ADR 0127).
+        if (result.status === 'INSUFFICIENT_DATA' || result.status === 'UNAVAILABLE') process.exitCode = 1;
+        return;
+      }
 
       // A VERDICT THAT WAS NOT REACHED IS NOT A PASS. `INSUFFICIENT_DATA` and `UNAVAILABLE` mean the
       // comparison could not be made — `conducks drift pulse_nope` printed "no drift verdict was

@@ -499,6 +499,21 @@ by construction.
   measured against native's 26/27 are historical — that path no longer exists.) Pinned by
   `tests/unit/core/parsing/optional-native-binding.test.ts`, which fails on any value import. — ADR 0027
 
+## A missing capability is usually a capability under another command name
+- Gotcha: todo61 recorded "MCP has `drift`, the CLI does not" and I built `conducks diff --mode drift`
+  to close it. **`conducks drift` already existed**, calling the same
+  `registry.evolution.compare(prevPulseId)`. The gap came from comparing the `diff` COMMAND's flags
+  against the `conducks_diff` TOOL's parameters, and the capability simply lives under a different
+  command name.
+- Why: ADR 0148 already recorded this exact failure for `audit` — "`advice` is `conducks advise`" —
+  and it happened again anyway, because a parameter-list comparison is easy to run and a capability
+  comparison needs someone to ask "can a person get this answer at all, by any route". The cost of
+  getting it wrong is a SECOND DOOR onto one capability, which is worse than the gap: now two paths
+  can drift from each other.
+- Applies: before building a mirror, run `conducks help` and grep the command list for the capability,
+  not the flag. The real gap here turned out to be the MACHINE SURFACE — `conducks drift` had no
+  `--json`, so no equivalence check was possible — which is a much smaller and more useful fix. — todo61
+
 ## A contaminated measurement does not look contaminated — it looks like a finding
 - Gotcha: three wrong conclusions in one day, all from measurements taken while something else was
   running. `npm run build` opens with `rm -rf build`, and the integration suites spawn child CLIs that
