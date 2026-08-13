@@ -7,7 +7,7 @@
   "docs/visuals/modules/core/graph/linkers.md": {
     "src/lib/core/graph/import-resolver.ts": "d980d8d58f996b34",
     "src/lib/core/graph/linker.ts": "6cf999987af77464",
-    "src/lib/core/graph/linker-intra.ts": "b4b7e1a7acb378ae",
+    "src/lib/core/graph/linker-intra.ts": "d348dffbc55dce74",
     "src/lib/core/graph/linker-federated.ts": "d5f43a3ff5351a39",
     "src/lib/core/graph/http-service-linker.ts": "f273be0ff1d00903"
   },

@@ -31,14 +31,25 @@ function-scoped local and the CALL lands on THAT. Two nodes for one fact, never 
 hangs off a node nothing points at, the call points at a local that defines nothing, and the real
 definition ends up with zero callers, which `prune` reports as dead code.
 
-Worse, that module-level binding is never materialised — the ALIASES edge sits with a DANGLING
-SOURCE. A fix that looks the source up with `getNode` therefore never fires on the case it was
-written for. `linker-intra` derives the binding from the edge's own id (`<file>::<name>`) and rebinds
-a same-file, same-name local to the aliased definition (todo58).
+That module-level binding used to be never materialised — the ALIASES edge sat with a DANGLING
+SOURCE, so a fix looking the source up with `getNode` never fired on the case it was written for.
+`linker-intra` block 3b therefore derives the binding from the edge's own id (`<file>::<name>`) and
+rebinds a same-file, same-name local to the aliased definition (todo58).
 
-The rebind is a READ of the file's own syntax, not a guess: local and binding sit in the same file
-under the same bare name, and the binding states what it aliases. A local with no same-named binding
-is left alone.
+**todo62 changed that input.** The alias edge is now emitted against the id its node is actually
+stored under, which for an import inside a function is SCOPED — so the dangling source is gone and 3b
+skips scoped names by design. Instrumented, 3b logs no rebinds at all on a two-function fixture; what
+it still carries has not been established, and starve experiments gave two OPPOSITE answers before
+one of them turned out to be a contaminated run.
+
+**And the rebind runs the other way too, as block 3c (todo64).** A local DECLARATION shadowing an
+import of the same name must win: `context.localBindings` is keyed by name per FILE with no scope, so
+`import { realTarget as shadowed }` made every `shadowed()` in the file resolve to the import. 3c
+rebinds such a call to `<file>::<scope>.<name>` when that node exists — decided by existence, with two
+guards that measurement forced. The names are compared CASE-SENSITIVELY, because ids are lowercased
+(CONDUCKS-4) and `pathlib::Path` against a local `path` is one id — matching on the id alone rebound
+37 python edges wrongly. And a node carrying an outgoing ALIASES edge is skipped, because a
+destructured import binding IS the import rather than a declaration shadowing one.
 
 ## Linking runs TWICE, because induction creates nodes the first pass cannot see
 
