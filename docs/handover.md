@@ -38,6 +38,42 @@ and `fix(prune): stop reporting a used value import as stale`.
 **`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
 
+## 2026-08-14 — dry-running the new benchmark found two more bugs, one of them 63% of a category
+
+A CLI benchmark now lives in `test-projects/_benchmark/` (README + shared task spec + one file per
+subject), to be executed by a fresh agent that verifies every claim against the SOURCE rather than
+recording output. Dry-running it first found **eight defects in the benchmark itself** — the worst
+being `CONDUCKS="node /path"` + `$CONDUCKS`, which cannot work in zsh (no word-splitting on an
+unquoted variable), so the executing agent would have failed on task one. Also: `timeout` is absent
+on macOS, unquoted `--include=*.py` dies to zsh globbing, `fallback` does not scan (it points at
+`audit --fallback`), `resonance` takes a path, `rename` defaults to a dry run and needs `--confirm`,
+and `audit`/`drift`/`fallback` all exit 1 BY DESIGN — which would have been logged as three crashes.
+
+It also found two real defects.
+
+**Python recorded no heritage edge for any class, ever.** `reflector.ts` gates its heritage branch on
+a co-captured node, so a `@heritage` capture with no `@name` beside it is dropped; the Python grammar
+captured only `@heritage`. TypeScript, TSX and JavaScript all co-capture `@name` for this exact
+reason and the JavaScript grammar says so in a comment. **MEASURED on the Python subject: 17 of 27
+`STALE_IMPORT` findings were base classes being inherited from** — `BaseExtractor` across 11 files,
+plus `BaseSpecialist`, `BaseMapper`, `BaseWriter`, `BaseLevel`. 63% of the category was wrong, and
+each one told the reader to delete an import whose class the next line inherits from. **After the fix:
+27 → 10, zero base-class false positives.**
+
+**`explain` and `entropy` rejected the id format `status` prints.** Both pre-checked absence with
+`findNodesByName(input)` — which matches a NAME — so every `path/file.ts::name` id was declared
+missing before the resolver that handles `::` ever ran. `impact`, `trace` and `context` accept that
+form; `status` emits it. Fixed by splitting `tryResolveSymbol` (returns null) out of `resolveSymbol`
+(exits): one resolution rule, two error policies, so both commands keep the wording their tests
+assert on. The id a command PRINTS must be an id its siblings ACCEPT.
+
+Both are the same family as the `trace` bug fixed earlier today, and all three came from ONE cause:
+a command resolving symbols its own way instead of through the shared helper.
+
+One near-miss worth recording: `sweep_global_metadata` looked like a false positive until line 66
+turned out to be inside a multi-line `from … import (…)`. It is genuinely stale, and prune was right.
+The benchmark warns its reader about exactly that trap, and I walked into it anyway.
+
 ## 2026-08-14 — the published package was half test files, and it carried other projects' names
 
 `npm pack` shipped **1,437 files, 741 of them `build/tests`** — 3.7MB of compiled test code against

@@ -29,8 +29,20 @@ export const PYTHON_QUERIES = `
   (function_definition name: (identifier) @name parameters: (parameters) @params return_type: (type)? @return_type) @isFunction
   
   ;; Heritage: class Child(Parent):
+  ;;
+  ;; @name IS REQUIRED HERE and was missing. reflector.ts gates the heritage branch on there being a
+  ;; co-captured node (the 'else if ((cName === heritage ...) && node)' guard), so a heritage capture
+  ;; with no @name beside it is DROPPED — Python produced no EXTENDS edge for any class, ever.
+  ;; The TypeScript, TSX and JavaScript grammars all co-capture @name for exactly this reason, and
+  ;; the JavaScript one carries a comment saying so.
+  ;;
+  ;; MEASURED on the Python subject: 17 of 27 STALE_IMPORT findings were base classes being
+  ;; inherited from — BaseExtractor in 11 files, plus BaseSpecialist, BaseMapper, BaseWriter and
+  ;; BaseLevel. 63% of the category was wrong, and each one told the reader to delete an import
+  ;; whose class the next line inherits from, which breaks the module on import.
   (class_definition
-    superclasses: (argument_list [(identifier) (attribute)] @heritage))
+    name: (identifier) @name
+    superclasses: (argument_list [(identifier) (attribute)] @heritage)) @isStruct
 
   ;; --- Type positions (todo10 Phase 4) ---
   ;; Every annotation position (typed_parameter, typed_default_parameter, variable annotation,

@@ -68,3 +68,45 @@ describe('resolveSymbol prefers source over test files', () => {
     expect(resolveSymbol('mkGitRepo', g as never)).toBe('/r/tests/helpers.test.ts::mkgitrepo');
   });
 });
+
+/**
+ * The id a command PRINTS must be an id its sibling commands ACCEPT.
+ *
+ * `status` prints the partial form `electron/main/index.ts::registeripchandlers`. `impact`, `trace`
+ * and `context` accept it. `explain` and `entropy` answered "not found in the Synapse" for it,
+ * because both pre-checked absence with `findNodesByName(input)` — which matches a NAME, and an id
+ * is not a name — so the resolver that handles `::` was never reached. They could not simply call
+ * `resolveSymbol`, since it exits with its own wording and their tests assert on theirs.
+ *
+ * `tryResolveSymbol` is that same resolution with `null` instead of an exit: one rule, two error
+ * policies. These tests pin BOTH halves — the id must resolve, and a real miss must still be a miss.
+ */
+describe('tryResolveSymbol resolves without exiting', () => {
+  const ID = '/repo/electron/main/index.ts::registeripchandlers';
+  const graph = {
+    getNode: (q: string) => (q === ID ? { id: ID } : undefined),
+    findNodesByName: (n: string) =>
+      n.toLowerCase() === 'registeripchandlers'
+        ? [{ id: ID, properties: { canonicalKind: 'BEHAVIOR', filePath: '/repo/electron/main/index.ts', gravity: 1 } }]
+        : [],
+  };
+
+  it('resolves a PARTIAL path::name id — the form status prints', async () => {
+    const { tryResolveSymbol } = await import('@/interfaces/cli/shared/error.js');
+    // Not a name, and not the full id either: the exact shape that used to be declared missing.
+    expect(tryResolveSymbol('electron/main/index.ts::registeripchandlers', graph as never)).toBe(ID);
+  });
+
+  it('resolves the bare name too', async () => {
+    const { tryResolveSymbol } = await import('@/interfaces/cli/shared/error.js');
+    expect(tryResolveSymbol('registerIpcHandlers', graph as never)).toBe(ID);
+  });
+
+  it('returns null for a genuine miss instead of exiting the process', async () => {
+    const { tryResolveSymbol } = await import('@/interfaces/cli/shared/error.js');
+    // If this exited, the test run itself would die — which is the point: `explain` and `entropy`
+    // need absence reported as a VALUE so they can print their own message.
+    expect(tryResolveSymbol('zzz_no_such_symbol', graph as never)).toBeNull();
+    expect(tryResolveSymbol('some/file.ts::zzz_no_such_symbol', graph as never)).toBeNull();
+  });
+});

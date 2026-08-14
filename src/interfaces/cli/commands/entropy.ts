@@ -1,7 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
-import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
+import { tryResolveSymbol } from "@/interfaces/cli/shared/error.js";
 
 /**
  * Conducks — Entropy Command
@@ -34,15 +34,22 @@ export class EntropyCommand implements ConducksCommand {
     const graph = registry.query.graph.getGraph();
 
     // Resolve like every other symbol command, and REFUSE what the graph does not hold.
+    //
+    // The absence check used to be `findNodesByName(symbolId).length === 0`, which matches a NAME —
+    // so every `path/file.ts::name` id failed it and was declared missing before the resolver that
+    // handles `::` ever ran. That is the exact form `status` prints, and `impact`/`trace`/`context`
+    // accept it. `tryResolveSymbol` answers null for a real miss, so this command keeps its own
+    // wording without pre-judging what counts as findable.
     let resolvedId = symbolId;
     if (!graph.getNode(symbolId)) {
-      if (graph.findNodesByName(symbolId).length === 0) {
+      const resolved = tryResolveSymbol(symbolId, graph);
+      if (resolved === null) {
         console.error(`\x1b[31mError: Symbol "${symbolId}" not found in the Synapse.\x1b[0m`);
         console.error(`Run: conducks query "${symbolId}" to find valid symbol IDs.`);
         process.exit(1);
         return;
       }
-      resolvedId = resolveSymbol(symbolId, graph);
+      resolvedId = resolved;
     }
 
     const res = await registry.explain.calculateEntropy(resolvedId) as any;

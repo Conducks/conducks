@@ -1,7 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import chalk from "chalk";
-import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
+import { tryResolveSymbol } from "@/interfaces/cli/shared/error.js";
 
 /**
  * Conducks — Explain Command (Signal Decomposition)
@@ -39,11 +39,17 @@ export class ExplainCommand implements ConducksCommand {
     // described the export statement. `resolveSymbol` prefers a declaration and is the same rule
     // `context`, `impact` and `rename` already use (ADR 0112).
     //
-    // Guarded on there BEING a match, because `resolveSymbol` reports a miss by exiting the process
-    // with its own wording — which would replace this command's "not found in the Synapse" message
-    // that callers and the suite depend on. Only ambiguity is delegated, never absence.
-    if (!node && graph.findNodesByName(symbolId!).length > 0) {
-      node = graph.getNode(resolveSymbol(symbolId!, graph));
+    // `tryResolveSymbol` returns null instead of exiting, so this command keeps its own "not found
+    // in the Synapse" wording (which its tests assert on) WITHOUT having to guard the call.
+    //
+    // The guard here used to be `findNodesByName(symbolId).length > 0`, and it silently excluded
+    // every `path/file.ts::name` id: `findNodesByName` matches a NAME, an id is not a name, so the
+    // resolver that handles `::` was never reached. MEASURED — `status` prints
+    // `electron/main/index.ts::registeripchandlers`, `impact`/`trace`/`context` accept it, and this
+    // command answered "not found" for a symbol plainly in the graph.
+    if (!node) {
+      const resolved = tryResolveSymbol(symbolId!, graph);
+      if (resolved) node = graph.getNode(resolved);
     }
 
     if (!node) {

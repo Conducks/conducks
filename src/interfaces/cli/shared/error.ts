@@ -29,6 +29,31 @@ export function cliWarn(message: string): void {
  * Exits with helpful error if no match found.
  */
 export function resolveSymbol(input: string, graph: NameIndex): string {
+  const resolved = tryResolveSymbol(input, graph);
+  if (resolved === null) {
+    cliError('SYMBOL_NOT_FOUND', `No symbol matching "${input}"`,
+      `Run: conducks query "${input}" to find valid symbol IDs`);
+  }
+  return resolved;
+}
+
+/**
+ * The same resolution, returning `null` instead of exiting.
+ *
+ * `explain` and `entropy` print their own "not found in the Synapse" wording, which their tests
+ * assert on, so they could not call `resolveSymbol` — it exits with different text. What they did
+ * instead was guard it behind `findNodesByName(input).length > 0`, and **that guard silently broke
+ * every `path/file.ts::name` id**: `findNodesByName` matches a NAME, an id is not a name, so it
+ * returned `[]`, the guard failed, and the resolver that DOES handle `::` was never reached.
+ *
+ * MEASURED: `status` prints `electron/main/index.ts::registeripchandlers` as the top hotspot;
+ * `impact`, `trace` and `context` accept it; `explain` and `entropy` answered "not found in the
+ * Synapse" for a symbol sitting in the graph. The id a command PRINTS must be an id its sibling
+ * commands ACCEPT.
+ *
+ * One resolution rule, two error policies — rather than a second copy of the rule that drifts.
+ */
+export function tryResolveSymbol(input: string, graph: NameIndex): string | null {
   if (input.includes('::')) {
     // Node ids are LOWERCASED on write (CONDUCKS-4, for APFS), so an id containing a real-cased
     // path — which is what a user copies out of their editor, and what every macOS temp dir has —
@@ -66,21 +91,12 @@ export function resolveSymbol(input: string, graph: NameIndex): string {
     if (named.length > 0) return named[0].id;
 
     const bare = input.slice(input.lastIndexOf('::') + 2);
-    if (!bare) {
-      cliError('SYMBOL_NOT_FOUND', `No symbol matching "${input}"`,
-        `Run: conducks query "${input}" to find valid symbol IDs`);
-    }
-    return resolveSymbol(bare, graph);
+    if (!bare) return null;
+    return tryResolveSymbol(bare, graph);
   }
 
   const matches = graph.findNodesByName(input);
-  if (matches.length === 0) {
-    cliError(
-      'SYMBOL_NOT_FOUND',
-      `No symbol matching "${input}"`,
-      `Run: conducks query "${input}" to find valid symbol IDs`
-    );
-  }
+  if (matches.length === 0) return null;
 
   // A DECLARATION beats a re-export of it.
   //
