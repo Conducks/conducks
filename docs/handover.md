@@ -41,8 +41,13 @@ independent one.
   `namespaceId` is always directory-derived (`reflector.ts:432`). Costs `impact`/`trace`/`context`;
   costs `prune` nothing, since ORPHAN correctly refuses to judge methods nested in a class.
 - Java's call capture drops the receiver (`Lib.alpha()` arrives as bare `alpha`); C# keeps it.
-- Python `self.method()` produces no caller edge — 22 call sites, `impact` finds the 1 whose receiver
-  is a typed parameter.
+- ~~Python `self.method()` produces no caller edge~~ — FIXED 2026-08-14. Two lines deep: `self.` was
+  never stripped the way `this.` is (and the strip's own comment says class self-calls resolve via
+  same-file lookup), AND the built-in check tested the UNSTRIPPED target, so `self` matched the
+  Python built-in list and the call bound to `GLOBAL::self` — one synthetic node absorbing every
+  intra-class call in the language. MEASURED on subject-c's Python daemon: `_drain_queue` 1 caller →
+  13, `_transcribe` and `_await_response` 0 → 11 each. Prune totals unchanged on all three subjects,
+  so the recall was not bought with precision.
 - ~~`update-check.test.ts` flaked~~ — CHASED AND FOUND, 2026-08-14. The file claimed "no test
   touches the network" and that was false: the TTL case falls through to the fetch, so every run of
   the unit suite made a live request to `api.github.com` with a 2-second timeout. `node:https` is

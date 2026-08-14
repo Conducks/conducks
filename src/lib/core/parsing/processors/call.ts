@@ -45,9 +45,24 @@ export class CallProcessor {
 
     // Conducks.6: Deterministic Symbol Resolution (The Great Binding)
     if (context && context.isResolutionMode()) {
-      // Strip this. prefix — class self-calls resolve via same-file IntraLinker lookup
-      const startsWithThis = target.toLowerCase().startsWith('this.');
-      const afterThis = startsWithThis ? target.toLowerCase().slice(5) : target.toLowerCase();
+      // Strip the IMPLICIT RECEIVER — class self-calls resolve via same-file IntraLinker lookup.
+      //
+      // Python spells it `self.` (and `cls.` on a classmethod), and neither was ever stripped, so
+      // `self.close()` never reached the lookup this comment describes. Worse, `self` is listed as a
+      // Python built-in, so the call fell through to the globals branch and bound to `GLOBAL::self`
+      // — one synthetic node absorbing every intra-class call in the language.
+      //
+      // MEASURED on the Electron subject's Python daemon: `_drain_queue` has 22 call sites and
+      // `impact` found ONE — the single call whose receiver is a typed parameter
+      // (`stdin_loop(daemon: VoiceDaemon)`). The other 21, all `self._drain_queue()`, contributed
+      // nothing. Three methods called only through `self.` reported zero callers.
+      //
+      // Language-scoped on purpose: `self` is a real browser global in JavaScript
+      // (`self.postMessage`), so stripping it there would throw away a genuine receiver.
+      const receiverPrefix = langId === 'python' ? /^(self|cls)\./ : /^this\./;
+      const lowered = target.toLowerCase();
+      const startsWithThis = receiverPrefix.test(lowered);
+      const afterThis = startsWithThis ? lowered.replace(receiverPrefix, '') : lowered;
       // Only `this.` comes off. `this.app.get(...)` keeps `app.get`, so the RECEIVER survives and
       // the typed-receiver rules can resolve it the way they resolve any other one — a class field
       // with a declared type is no harder than a local variable.
@@ -77,8 +92,14 @@ export class CallProcessor {
         targetId = `${resolvedPath}::${symbol}`;
       }
       // 2. Resolve Global Atmosphere (Built-ins like 'process', 'os')
-      else if (isBuiltIn(target, langId)) {
-        targetId = getGlobalId(target);
+      //
+      // Tested against the STRIPPED form when an implicit receiver came off, because the receiver
+      // itself is a keyword rather than a symbol. `self` is in the Python built-in list, so
+      // `self.close()` matched here on its receiver and bound to `GLOBAL::self` — the strip above
+      // had already produced `close`, and this line put the keyword back. One synthetic node was
+      // absorbing every intra-class call in the language.
+      else if (isBuiltIn(startsWithThis ? afterThis : target, langId)) {
+        targetId = getGlobalId(startsWithThis ? afterThis : target);
       }
       // 3. Fallback to Local/Naked Symbol (Will be qualified in graph ingestion)
       else {

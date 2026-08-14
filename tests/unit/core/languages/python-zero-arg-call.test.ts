@@ -102,19 +102,23 @@ class Service:
       .toEqual({ zeroArg: true, withArg: true });
   });
 
-  it('records a zero-argument call on an attribute at all — the (attribute) branch shares the fix', () => {
-    // `self.close()` is the (attribute) branch of the same pattern and shared the broken argument
-    // list, so it produced NOTHING before. It now produces an edge from the calling method.
+  it('resolves a `self.method()` call to the METHOD, not to the receiver', () => {
+    // This assertion is the inverse of what it said when written, and that was the point: it
+    // pinned the gap as current behaviour — target `self`, not `close` — with a note that the day
+    // the target carried the method, the test would fail and the claim would be rewritten
+    // deliberately. That day came in the same session; this is the rewrite.
     //
-    // Asserted on the SOURCE, not the target, because the target is `self` rather than `close`:
-    // an attribute call resolves to the RECEIVER and the method name is not carried. That is a
-    // separate gap in attribute-call resolution — pre-existing, not introduced here, and it means a
-    // method reached only as `self.method()` still has no incoming CALLS edge. Recorded as an
-    // assertion rather than a comment so it cannot be mistaken for covered: if the target ever does
-    // carry the method, this test fails and the claim gets rewritten deliberately.
+    // The gap was two lines deep. `self.` was never stripped the way `this.` is (the strip's own
+    // comment says class self-calls resolve via same-file lookup), AND the built-in check tested
+    // the UNSTRIPPED target — so `self` matched the Python built-in list and the call bound to
+    // `GLOBAL::self`, one synthetic node absorbing every intra-class call in the language.
+    //
+    // MEASURED on the Electron subject's Python daemon: `_drain_queue` went from 1 caller to 13,
+    // `_transcribe` and `_await_response` from 0 to 11 each. Prune's totals did not move, so the
+    // recall was not bought with precision.
     const attributeCall = result.callPairs.find((c) => c.source.toLowerCase().includes('shutdown'));
     expect(attributeCall).toBeDefined();
-    expect(attributeCall!.target.toLowerCase()).toContain('self');
-    expect(attributeCall!.target.toLowerCase()).not.toContain('close');
+    expect(attributeCall!.target.toLowerCase()).toContain('close');
+    expect(attributeCall!.target.toLowerCase()).not.toContain('global::self');
   });
 });
