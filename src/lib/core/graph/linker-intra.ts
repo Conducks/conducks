@@ -135,6 +135,47 @@ export class IntraLinker {
       logger.debug(`🛡️ [IntraLinker] Edge ${sourceUnitId} imports ${targetUnit}`);
     }
 
+    // ── 2a-bis. A DECLARED package makes its files mutually visible ─────────
+    //
+    // Java and C# have no import statement for a sibling in the same package: `package
+    // com.example.app;` in two files IS the statement that they can see each other, and
+    // `Lib.alpha()` needs nothing more. Every resolution block below is import-scoped, so with no
+    // import edge there was no candidate set at all — a call to a class in the same package resolved
+    // to nothing, and `impact` on a method that is plainly called reported 0 callers.
+    //
+    // Expressed as imports rather than as a new resolution block, because it IS the fact the import
+    // machinery already models: these units can see one another. 3a–3e then work unchanged.
+    //
+    // KEYED ON THE PACKAGE NODE, not on `namespaceId`. That field is DERIVED FROM THE DIRECTORY for
+    // every language (`reflector.ts` builds `directory::<path>`), so grouping by it would mean "same
+    // folder", and binding an unresolved name to any same-folder file is the coincidence ADR 0070
+    // refuses. A PACKAGE/NAMESPACE node is minted from a DECLARATION the source makes — `package
+    // com.example.app;`, `namespace Bench;` — and its name is that declared path. TypeScript and
+    // Python mint none, so neither is touched by this.
+    const packageMembers = new Map<string, string[]>();
+    for (const node of graph.getAllNodes()) {
+      const kind = String((node as any).properties?.canonicalKind ?? '');
+      if (kind !== 'PACKAGE' && kind !== 'NAMESPACE') continue;
+      const declared = String((node as any).properties?.name ?? '').toLowerCase();
+      const file = String((node as any).properties?.filePath ?? '').toLowerCase();
+      // The taxonomy legend carries PACKAGE/NAMESPACE rows with no file — they name the RUNG, not a
+      // declaration, and grouping them would put every file in one bucket.
+      if (!declared || !file || declared === kind.toLowerCase()) continue;
+      const unitId = `${file}::unit`;
+      const list = packageMembers.get(declared);
+      if (list) { if (!list.includes(unitId)) list.push(unitId); }
+      else packageMembers.set(declared, [unitId]);
+    }
+    for (const members of packageMembers.values()) {
+      if (members.length < 2) continue;
+      for (const unitId of members) {
+        const siblings = members.filter(m => m !== unitId);
+        const list = unitImports.get(unitId);
+        if (list) { for (const s of siblings) if (!list.includes(s)) list.push(s); }
+        else unitImports.set(unitId, [...siblings]);
+      }
+    }
+
     // ── 2b. One hop further, through barrels ────────────────────────────────
     //
     // A binding is routinely imported from a BARREL that does not define it: subject-b's

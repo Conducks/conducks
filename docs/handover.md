@@ -51,10 +51,20 @@ found four of today's bugs. `BASELINE-RUN-author.md` is my own run and does not 
 independent one.
 
 **Known open, with the mechanism already found:**
-- Java/C# same-package calls do not resolve, because the graph never records a DECLARED package —
-  `namespaceId` is always directory-derived (`reflector.ts:432`). Costs `impact`/`trace`/`context`;
-  costs `prune` nothing, since ORPHAN correctly refuses to judge methods nested in a class.
-- Java's call capture drops the receiver (`Lib.alpha()` arrives as bare `alpha`); C# keeps it.
+- ~~Java/C# same-package calls do not resolve~~ — FIXED 2026-08-15. My earlier claim that "the graph
+  never records a DECLARED package" was WRONG, and wrong because of the fixture: `package app;` is a
+  single identifier and the Java query captures `(scoped_identifier)`, so no PACKAGE node was minted
+  and I concluded none ever is. With a realistic dotted package the node exists —
+  `com/example/app/lib.java::com.example.app`, one per file, named for the declaration. Units are
+  now grouped by that node and made mutually visible, which is what the language rule already says.
+  Keyed on the PACKAGE/NAMESPACE node and NOT on `namespaceId`, which is directory-derived for every
+  language — grouping by that would mean "same folder" (ADR 0070's coincidence).
+  MEASURED: `impact alpha upstream` 0 → 1 in Java, `UsedFn` 0 → 1 in C#, with the dead sibling still
+  at 0. Reaches only the six grammars that mint declared package/namespace nodes (cpp, go, csharp,
+  java, php, rust); all three frozen subjects are byte-identical.
+- Java's call capture still drops the receiver (`Lib.alpha()` arrives as bare `alpha`); C# keeps it.
+  Harmless now that same-package units are in the candidate set, but it is why the Java target has
+  to resolve by bare name.
 - ~~Python `self.method()` produces no caller edge~~ — FIXED 2026-08-14. Two lines deep: `self.` was
   never stripped the way `this.` is (and the strip's own comment says class self-calls resolve via
   same-file lookup), AND the built-in check tested the UNSTRIPPED target, so `self` matched the
