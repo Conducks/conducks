@@ -43,7 +43,15 @@ independent one.
 - Java's call capture drops the receiver (`Lib.alpha()` arrives as bare `alpha`); C# keeps it.
 - Python `self.method()` produces no caller edge — 22 call sites, `impact` finds the 1 whose receiver
   is a typed parameter.
-- `update-check.test.ts` flaked once in a full run and passed twice after. Watch, do not chase yet.
+- ~~`update-check.test.ts` flaked~~ — CHASED AND FOUND, 2026-08-14. The file claimed "no test
+  touches the network" and that was false: the TTL case falls through to the fetch, so every run of
+  the unit suite made a live request to `api.github.com` with a 2-second timeout. `node:https` is
+  stubbed now, answering as OFFLINE — one of the two cases that test already names — and the stub
+  asserts it was reached, so the test cannot silently go back to using the real network.
+- `docs-watcher.test.ts` also flaked once. Timing-sensitive BY CONSTRUCTION: a real filesystem
+  watcher on a 50ms debounce with a 3s budget, and its own comments already record macOS delivery
+  ordering as a hazard. Left alone deliberately — it is testing a watcher, so some wall-clock
+  dependence is inherent. Watch it; if it recurs, the fix is a longer budget, not a stub.
 
 **A method note worth keeping:** three of six quick language fixtures written today produced
 confident FALSE conclusions until a real toolchain checked them — `rustc` and `ruby` caught all three
