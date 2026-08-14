@@ -191,6 +191,12 @@ export const TYPESCRIPT_QUERIES = `
   ;; AutomatedTask and PhaseRunResult were both reported STALE_IMPORT while the file annotates
   ;; with them, because this shape produced no type evidence at all.
   (array_type (generic_type name: (type_identifier) @pulse_type_target))
+  ;; A PARENTHESISED type, which the array form makes routine: (Role)[] wraps the identifier in a
+  ;; parenthesized_type, one level below where the two array patterns above reach. Found by running
+  ;; the benchmark against the monorepo subject — Role was reported STALE_IMPORT while line 43 of
+  ;; authz.ts annotates with it as ...roles: (Role)[]. Captured on its own rather than only under
+  ;; array_type, because a parenthesised type is legal in every type position.
+  (parenthesized_type (type_identifier) @pulse_type_target)
   (as_expression (type_identifier) @pulse_type_target)
   (type_predicate type: (type_identifier) @pulse_type_target)
   (union_type (type_identifier) @pulse_type_target)
@@ -249,6 +255,16 @@ export const TYPESCRIPT_QUERIES = `
   ;; --- Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps) ---
   ;; The value identifier is a USE of that symbol, not a call. Feeds the reference-as-value path.
   (pair value: (identifier) @ref_value)
+  ;; OBJECT SHORTHAND is the same fact with the key omitted: { handleBack } is a read of handleBack,
+  ;; and it is how every React hook returns its handlers and every context builds its value object.
+  ;; The pair form above has been captured since todo14; the shorthand never was.
+  ;; MEASURED on the monorepo subject: handleBack (returned at useonboardinglogic.ts:253) and
+  ;; openClient (waitlistcontext.tsx:56) were both reported ORPHAN while being handed to callers.
+  (object (shorthand_property_identifier) @ref_value)
+  ;; DEFAULT EXPORT names the symbol it re-publishes. export default Card is the whole reason a
+  ;; component file exists, and Card was reported ORPHAN with the export sitting on the next line
+  ;; (admin/src/components/ui/card/index.tsx:35). The named form export { X } was already covered.
+  (export_statement value: (identifier) @ref_value)
   
   ;; --- Kinesis (Execution Flow) ---
   (call_expression 

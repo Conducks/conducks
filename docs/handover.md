@@ -11,12 +11,26 @@ against, not the ones further down this file:
 
 | | subject-c | subject-a | orchestrator |
 | --- | --- | --- | --- |
-| ORPHAN | 17 | 18 | 98 |
-| UNUSED_EXPORT | 120 | – | 93 |
-| UNIMPORTED_MODULE | 11 | 44 | 67 |
-| STALE_IMPORT | 1 | 7 | 1 |
+| ORPHAN | 17 | 18 | 84 |
+| UNUSED_EXPORT | 120 | – | 96 |
+| UNIMPORTED_MODULE | 11 | 44 | 64 |
+| STALE_IMPORT | 1 | 7 | 0 |
 
 Every `STALE_IMPORT` above was checked against the source by hand and is a TRUE positive.
+
+A SECOND benchmark run found three more use-positions, all ordinary React/TypeScript: a parenthesised
+type (`...roles: (Role)[]`), object shorthand (`return { handleNext, handleBack }` — how every hook
+hands back its handlers), and a default export (`export default Card`, the reason a component file
+exists). The monorepo moved ORPHAN 98 → 84 and STALE_IMPORT 1 → 0, while UNUSED_EXPORT rose 93 → 96,
+which is RECALL: symbols previously hidden behind a false ORPHAN are now judged. The other two
+subjects did not move — these shapes are pervasive in a React monorepo and rare elsewhere.
+
+**A process failure worth recording:** the first reading of that run reported ORPHAN 98 → 9 and
+UNIMPORTED_MODULE 67 → 4. Both were wrong — a `cd` earlier in the same command had left the shell in
+the conducks repo, so `analyze` and `prune` ran against THIS project and I read its output as the
+subject's. It was caught by the numbers being impossible (edges moved by 1 while 89 orphans
+vanished) and by a finding naming `NodeId`, a symbol only this repository has. Always print `pwd`
+before trusting a measurement taken after a `cd`.
 
 **Eleven fixes today, and they collapse into three causes.**
 

@@ -42,6 +42,12 @@ const TRUTH = {
     // subject that had been reporting them all along. A tool that cannot read its own source is the
     // strongest available evidence that the gap was in the grammar and not in one project's style.
     'ThrownError', 'Intersected', 'Constrained',
+    // Three more, found by re-running the benchmark against the monorepo subject after the earlier
+    // fixes. All three are ordinary React/TypeScript, and each was reported dead:
+    //   `Role`        annotated as `...roles: (Role)[]`   — a parenthesised type
+    //   `handleBack`  returned as `{ handleNext, handleBack }` — object shorthand
+    //   `Card`        published by `export default Card`  — the reason the file exists
+    'ParenTyped', 'shorthandUsed', 'defaultExported',
   ],
 };
 
@@ -93,6 +99,9 @@ export interface Boxed<T> { value: T }
 export class ThrownError extends Error {}
 export interface Intersected { a: number }
 export interface Constrained { b: number }
+export interface ParenTyped { p: number }
+export function shorthandUsed(): number { return 10; }
+export function defaultExported(): number { return 11; }
 `);
 
     // A barrel, so one live symbol is reached through a re-export chain rather than directly.
@@ -156,6 +165,7 @@ export function usesOne(): number { return staticallyUsed(); }
 import {
   wiredInArray, wiredInTernary, Reason, Boxed,
   ThrownError, Intersected, Constrained,
+  ParenTyped, shorthandUsed,
   staticallyUsed,
 } from './lib.js';
 
@@ -183,6 +193,23 @@ export const merged: Intersected & { extra: string } = { a: 1, extra: 'x' };
 
 // 7. a CONDITIONAL type — reads the type it checks against
 export type Checks<T> = T extends Constrained ? true : false;
+
+// 8. a PARENTHESISED type inside an array — the identifier sits one level below array_type
+export function takesMany(...items: (ParenTyped)[]): number { return items.length; }
+
+// 9. OBJECT SHORTHAND — how every hook returns its handlers
+export const bundle = { shorthandUsed };
+`);
+    // 10. DEFAULT EXPORT — the symbol a component file exists to publish.
+    // `staticallyUsed` is imported and CALLED here for the same reason it is in `wiring.ts`: with
+    // nothing in the statement observed being used, import-site calibration skips it entirely and
+    // the assertion below can never fail. MEASURED — without this line the default-export case
+    // passed against a build that did not capture default exports at all.
+    writeFile(repo, 'src/default-export.ts', `
+import { defaultExported, staticallyUsed } from './lib.js';
+
+export const ping = staticallyUsed();
+export default defaultExported;
 `);
 
     commit(repo, 'init');
@@ -234,6 +261,9 @@ export type Checks<T> = T extends Constrained ? true : false;
       instanceofOperand: stale.has('ThrownError'),
       intersectionType: stale.has('Intersected'),
       conditionalType: stale.has('Constrained'),
+      parenthesisedType: stale.has('ParenTyped'),
+      objectShorthand: stale.has('shorthandUsed'),
+      defaultExport: stale.has('defaultExported'),
     }).toEqual({
       arrayLiteral: false,
       ternaryBranch: false,
@@ -242,6 +272,9 @@ export type Checks<T> = T extends Constrained ? true : false;
       instanceofOperand: false,
       intersectionType: false,
       conditionalType: false,
+      parenthesisedType: false,
+      objectShorthand: false,
+      defaultExport: false,
     });
   });
 

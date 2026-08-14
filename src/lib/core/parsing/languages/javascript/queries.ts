@@ -83,6 +83,16 @@ export const JAVASCRIPT_QUERIES = `
 
   ;; Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps)
   (pair value: (identifier) @ref_value)
+  ;; OBJECT SHORTHAND is the same fact with the key omitted: { handleBack } is a read of handleBack,
+  ;; and it is how every React hook returns its handlers and every context builds its value object.
+  ;; The pair form above has been captured since todo14; the shorthand never was.
+  ;; MEASURED on the monorepo subject: handleBack (returned at useonboardinglogic.ts:253) and
+  ;; openClient (waitlistcontext.tsx:56) were both reported ORPHAN while being handed to callers.
+  (object (shorthand_property_identifier) @ref_value)
+  ;; DEFAULT EXPORT names the symbol it re-publishes. export default Card is the whole reason a
+  ;; component file exists, and Card was reported ORPHAN with the export sitting on the next line
+  ;; (admin/src/components/ui/card/index.tsx:35). The named form export { X } was already covered.
+  (export_statement value: (identifier) @ref_value)
   ;; The same fact written two other ways: an entry in an ARRAY literal (registrar / middleware
   ;; chain) and a TERNARY branch. Both read the binding and neither produced evidence, which is what
   ;; made prune tell a 1,095-file Electron subject to delete six imports its boot needs.
