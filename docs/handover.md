@@ -1,12 +1,60 @@
-# Handover — 2026-08-13
+# Handover — 2026-08-14
 Status: current
 
 ## Where it stands
-Gates green: **1,838 tests / 238 suites**, typecheck 0, `docs-lint` 185 governed docs, `visuals-lint`
-clean (62 anchors, 60 review stamps), architecture 5/5, declared-deps clean. All three frozen subjects
-`unchanged` vs baseline — RE-SAVED twice today (todo63, todo64), warm and cold.
+Gates green: **1,857 tests / 242 suites**, typecheck 0, `docs-lint` 183 governed docs, `visuals-lint`
+clean (60 review stamps), `cli:smoke` 28/28 across all three frozen subjects, declared-deps clean.
+Branch `mcp-surface-walk-and-concurrency` pushed through `818bcf3`.
 
-**Closed today: todo56, todo57, todo59, todo60#P3, todo61, todo62, todo63, todo64.** ADR 0148's twelve pairs are
+**Prune, measured on the three subjects after today's fixes** — these are the numbers to compare
+against, not the ones further down this file:
+
+| | sofie | scraper | orchestrator |
+| --- | --- | --- | --- |
+| ORPHAN | 17 | 18 | 98 |
+| UNUSED_EXPORT | 120 | – | 93 |
+| UNIMPORTED_MODULE | 11 | 44 | 67 |
+| STALE_IMPORT | 1 | 7 | 1 |
+
+Every `STALE_IMPORT` above was checked against the source by hand and is a TRUE positive.
+
+**Eleven fixes today, and they collapse into three causes.**
+
+1. **A name used in a position no grammar captured** — ten shapes, one idea: array literal, ternary
+   branch, enum member read, array-of-generic, `instanceof`, intersection type, conditional type,
+   JSX `onClick={handler}`, Python member read, Python zero-argument call, Python class inheritance.
+2. **A command resolving symbols its own way** instead of through the shared helper — `trace`,
+   `explain`, `entropy`. All three are now on `resolveSymbol` / `tryResolveSymbol`, and no command
+   has its own resolution left.
+3. **`::` read as an id separator when it was Rust's path separator** — one bug, one fix.
+
+Plus three that stand alone: the package shipped its own test suite (741 of 1,437 files), `arch`
+printed a sentence with words missing, and `help` advertised flags `impact` rejects.
+
+**A CLI benchmark now exists** at `test-projects/_benchmark/`, to be run by a FRESH agent that checks
+every claim against source rather than recording output. It has already earned its keep: running it
+found four of today's bugs. `BASELINE-RUN-author.md` is my own run and does not substitute for an
+independent one.
+
+**Known open, with the mechanism already found:**
+- Java/C# same-package calls do not resolve, because the graph never records a DECLARED package —
+  `namespaceId` is always directory-derived (`reflector.ts:432`). Costs `impact`/`trace`/`context`;
+  costs `prune` nothing, since ORPHAN correctly refuses to judge methods nested in a class.
+- Java's call capture drops the receiver (`Lib.alpha()` arrives as bare `alpha`); C# keeps it.
+- Python `self.method()` produces no caller edge — 22 call sites, `impact` finds the 1 whose receiver
+  is a typed parameter.
+- `update-check.test.ts` flaked once in a full run and passed twice after. Watch, do not chase yet.
+
+**A method note worth keeping:** three of six quick language fixtures written today produced
+confident FALSE conclusions until a real toolchain checked them — `rustc` and `ruby` caught all three
+in seconds. Validate a language fixture with its own compiler before drawing any conclusion from it.
+
+## 2026-08-13 — where it stood the day before
+
+Kept as history. Where a line below is now false, the correction sits beside it — a handover that
+contradicts itself at the top and the bottom is worse than one that admits the change.
+
+**Closed 2026-08-13: todo56, todo57, todo59, todo60#P3, todo61, todo62, todo63, todo64.** ADR 0148's twelve pairs are
 all mirrored and `paired-surfaces` has no granted exceptions left.
 
 todo61 closed with ONE acceptance clause deliberately unmet, written into the record rather than
@@ -17,6 +65,8 @@ matching them would mean changing what each returns. Every field is reachable fr
 requires. The mapping table is in the todo.
 
 **The board is down to ONE open todo, and it is a decision, not work.**
+**CORRECTED 2026-08-14:** still true of the todo board, but not of the work — eight defects were
+found and fixed on 08-14 by running the tool against real projects, none of which had a todo.
 
 What remains:
 - **todo58#P1** and **todo16 (publish)** — genuinely yours, and the only things left.
@@ -25,17 +75,22 @@ todo60 and todo65 both closed. The suite now runs at **`maxWorkers: 2`, 129s, 1,
 what it was — because `conducks clean` was killing conducks processes machine-wide, including in
 OTHER projects. That was a product bug the tests happened to expose.
 
-**The suite is not reliably green and nobody knows why.** Across nine runs today: `rename-safety`
+**SOLVED 2026-08-14 — do not act on this paragraph.** The cause was `conducks clean` killing
+conducks processes machine-wide, including in other projects. The suite has since run green
+repeatedly at 1,857/242 in ~130s. Kept only to show what the flake looked like before it was found.
+
+~~The suite is not reliably green and nobody knows why.~~ Across nine runs today: `rename-safety`
 (twice, two different lines), `kinetic` (4 tests), `blocking-commands` (1) — FOUR distinct suites,
 all integration, all spawning child processes. Two of the three captured runs were contaminated by
 work happening in another shell at the same time, so the rate is not trustworthy either.
 Do not read a green run as settled, and see todo60 Phase 3 for how to measure it properly.
 
-Work sits on branch `mcp-surface-walk-and-concurrency`, **25 commits ahead of `main`, nothing
-pushed**. Everything below is committed: `feat(persistence): move the vault to a NAPI DuckDB driver`
+Work sits on branch `mcp-surface-walk-and-concurrency`. **CORRECTED 2026-08-14: pushed through
+`818bcf3`.** Everything below is committed: `feat(persistence): move the vault to a NAPI DuckDB driver`
 and `fix(prune): stop reporting a used value import as stale`.
 
-**`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
+**`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate — **~130s and
+1,857 as of 2026-08-14**, not the ~235s recorded here before `clean` was fixed.
 Use the gate before a commit; do not use it to chase a failure.
 
 ## 2026-08-14 — `::` meant two things, and three of my own language fixtures were wrong
