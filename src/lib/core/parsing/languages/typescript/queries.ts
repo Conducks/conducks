@@ -3,6 +3,8 @@
  * 
  * Captures Decorators, Interfaces, Type Aliases, and Heritage.
  */
+import { EC_VALUE_POSITIONS, TS_TYPE_POSITIONS } from '../ecmascript-positions.js';
+
 export const TYPESCRIPT_QUERIES = `
   ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
   (import_statement source: (string) @source) @isImport
@@ -177,36 +179,23 @@ export const TYPESCRIPT_QUERIES = `
   ;; A symbol used only here is erased by the compiler, so its import is not runtime coupling.
   ;; Without these captures the graph has no type-usage evidence at all and cannot tell a
   ;; type-only import from a real one.
-  (type_annotation (type_identifier) @pulse_type_target)
-  (type_annotation (generic_type name: (type_identifier) @pulse_type_target))
-  (type_arguments (type_identifier) @pulse_type_target)
   ;; todo14: type positions the above missed — each captures only its DIRECT type_identifier
   ;; children; nesting (Bar[] inside a union, Foo[] inside as) is covered by the sibling patterns.
-  (constraint (type_identifier) @pulse_type_target)
-  (type_arguments (generic_type name: (type_identifier) @pulse_type_target))
-  (array_type (type_identifier) @pulse_type_target)
   ;; An array OF a generic — PhaseRunResult<R>[], AutomatedTask<string>[]. The line above
   ;; captures only a DIRECT type_identifier child, so Plain[] was evidence and Boxed<T>[] was
   ;; not: the type_identifier sits one level deeper, under the generic_type. MEASURED on a subject —
   ;; AutomatedTask and PhaseRunResult were both reported STALE_IMPORT while the file annotates
   ;; with them, because this shape produced no type evidence at all.
-  (array_type (generic_type name: (type_identifier) @pulse_type_target))
   ;; A PARENTHESISED type, which the array form makes routine: (Role)[] wraps the identifier in a
   ;; parenthesized_type, one level below where the two array patterns above reach. Found by running
   ;; the benchmark against the monorepo subject — Role was reported STALE_IMPORT while line 43 of
   ;; authz.ts annotates with it as ...roles: (Role)[]. Captured on its own rather than only under
   ;; array_type, because a parenthesised type is legal in every type position.
-  (parenthesized_type (type_identifier) @pulse_type_target)
-  (as_expression (type_identifier) @pulse_type_target)
-  (type_predicate type: (type_identifier) @pulse_type_target)
-  (union_type (type_identifier) @pulse_type_target)
   ;; INTERSECTION is union's twin and was simply missing beside it — DriftResult in
   ;; Promise<DriftResult & {...}> produced no type evidence, so prune told this repository to delete
   ;; an import registry/index.ts annotates with. Measured on conducks itself.
-  (intersection_type (type_identifier) @pulse_type_target)
   ;; A CONDITIONAL type reads both the checked type and the one it is checked against
   ;; (T extends EdgeType ? ... : ...). graph-engine.ts uses EdgeType only this way.
-  (conditional_type (type_identifier) @pulse_type_target)
   
   ;; --- Cross-service HTTP (todo22#P15) ---
   ;; processRoute/processRequest in the reflector branch on @kinesis_route and @kinesis_request.
@@ -254,17 +243,14 @@ export const TYPESCRIPT_QUERIES = `
 
   ;; --- Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps) ---
   ;; The value identifier is a USE of that symbol, not a call. Feeds the reference-as-value path.
-  (pair value: (identifier) @ref_value)
   ;; OBJECT SHORTHAND is the same fact with the key omitted: { handleBack } is a read of handleBack,
   ;; and it is how every React hook returns its handlers and every context builds its value object.
   ;; The pair form above has been captured since todo14; the shorthand never was.
   ;; MEASURED on the monorepo subject: handleBack (returned at useonboardinglogic.ts:253) and
   ;; openClient (waitlistcontext.tsx:56) were both reported ORPHAN while being handed to callers.
-  (object (shorthand_property_identifier) @ref_value)
   ;; DEFAULT EXPORT names the symbol it re-publishes. export default Card is the whole reason a
   ;; component file exists, and Card was reported ORPHAN with the export sitting on the next line
   ;; (admin/src/components/ui/card/index.tsx:35). The named form export { X } was already covered.
-  (export_statement value: (identifier) @ref_value)
   
   ;; --- Kinesis (Execution Flow) ---
   (call_expression 
@@ -300,26 +286,21 @@ export const TYPESCRIPT_QUERIES = `
   ;; Value-uses invisible to call/assignment patterns (todo14 FP closure):
   ;; a local re-export is a USE of the binding; iterating a collection reads it.
   (export_statement (export_clause (export_specifier name: (identifier) @ref_value)))
-  (for_in_statement right: (identifier) @ref_value)
   ;; An identifier listed in an ARRAY literal is a use — the registrar-list / middleware-chain /
   ;; plugin-table shape (const registrars = [registerSafety, registerPrivacy]). The object-literal
   ;; twin above has been captured since todo14; the array form never was, so a symbol wired up this
   ;; way looked entirely unreferenced. MEASURED on a subject: six of its ten STALE_IMPORT findings were
   ;; registrars in one such array in src/app.ts — deleting any of them breaks the boot sequence.
-  (array (identifier) @ref_value)
   ;; A ternary BRANCH is a use for the same reason (flag ? undefined : registerEmbeddings). The
   ;; condition identifier is captured too and that is correct — reading a name to test it is a use.
-  (ternary_expression (identifier) @ref_value)
   ;; Reading a MEMBER off an imported binding is a use of that binding — an enum reached only as
   ;; FailoverReason.Timeout, a const table read as CONFIG.key, a namespace object. A member READ
   ;; produced no evidence at all: only a member CALL did, through the kinesis pattern, so x.y() was
   ;; visible and x.y was not. MEASURED on a subject: this was the last remaining STALE_IMPORT false
   ;; positive, and closing it cost 3% more edges and 0.9s on a 1,095-file subject.
-  (member_expression object: (identifier) @ref_value)
   ;; INSTANCEOF names a class as a value — the right operand is a bare identifier, so no member,
   ;; call or type pattern ever saw it. Measured on conducks itself: FilterValidationError is used
   ;; only as an instanceof operand and prune reported it stale.
-  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
 
   ;; --- const x = new Y() — the variable's TYPE, read from its own declaration (todo29#P3b) ---
   ;;
@@ -344,4 +325,6 @@ export const TYPESCRIPT_QUERIES = `
   (variable_declarator
     name: (identifier) @instance_name
     value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
+${EC_VALUE_POSITIONS}
+${TS_TYPE_POSITIONS}
 `;

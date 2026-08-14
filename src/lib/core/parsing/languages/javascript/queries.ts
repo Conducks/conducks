@@ -4,6 +4,8 @@
  * JavaScript-only variant: no TS-specific nodes (interface, type alias, declare,
  * type parameters, abstract classes, decorators). Adds CommonJS require() support.
  */
+import { EC_VALUE_POSITIONS } from '../ecmascript-positions.js';
+
 export const JAVASCRIPT_QUERIES = `
   ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
   (import_statement source: (string) @source) @isImport
@@ -82,27 +84,20 @@ export const JAVASCRIPT_QUERIES = `
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
 
   ;; Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps)
-  (pair value: (identifier) @ref_value)
   ;; OBJECT SHORTHAND is the same fact with the key omitted: { handleBack } is a read of handleBack,
   ;; and it is how every React hook returns its handlers and every context builds its value object.
   ;; The pair form above has been captured since todo14; the shorthand never was.
   ;; MEASURED on the monorepo subject: handleBack (returned at useonboardinglogic.ts:253) and
   ;; openClient (waitlistcontext.tsx:56) were both reported ORPHAN while being handed to callers.
-  (object (shorthand_property_identifier) @ref_value)
   ;; DEFAULT EXPORT names the symbol it re-publishes. export default Card is the whole reason a
   ;; component file exists, and Card was reported ORPHAN with the export sitting on the next line
   ;; (admin/src/components/ui/card/index.tsx:35). The named form export { X } was already covered.
-  (export_statement value: (identifier) @ref_value)
   ;; The same fact written two other ways: an entry in an ARRAY literal (registrar / middleware
   ;; chain) and a TERNARY branch. Both read the binding and neither produced evidence, which is what
   ;; made prune tell a 1,095-file Electron subject to delete six imports its boot needs.
-  (array (identifier) @ref_value)
-  (ternary_expression (identifier) @ref_value)
   ;; A member READ is a use of the object — only member CALLS were visible before, so a const table
   ;; or enum-like object reached as X.member produced no evidence at all.
-  (member_expression object: (identifier) @ref_value)
   ;; INSTANCEOF names a class as a value — a bare identifier no other pattern reaches.
-  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
 
   ;; --- Kinesis (Execution Flow) ---
   (call_expression
@@ -187,4 +182,5 @@ export const JAVASCRIPT_QUERIES = `
   (variable_declarator
     name: (identifier) @instance_name
     value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
+${EC_VALUE_POSITIONS}
 `;

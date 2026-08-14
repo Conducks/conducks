@@ -3,6 +3,8 @@
  *
  * Superset of TypeScript queries with JSX-specific node captures.
  */
+import { EC_VALUE_POSITIONS, TS_TYPE_POSITIONS } from '../ecmascript-positions.js';
+
 export const TSX_QUERIES = `
   ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
   (import_statement source: (string) @source) @isImport
@@ -119,34 +121,21 @@ export const TSX_QUERIES = `
     (extends_type_clause type: (_) @heritage_extends)) @isInterface
 
   ;; --- Type positions (ADR 0016) ---
-  (type_annotation (type_identifier) @pulse_type_target)
-  (type_annotation (generic_type name: (type_identifier) @pulse_type_target))
-  (type_arguments (type_identifier) @pulse_type_target)
   ;; todo14: type positions the above missed — each captures only its DIRECT type_identifier
   ;; children; nesting (Bar[] inside a union, Foo[] inside as) is covered by the sibling patterns.
-  (constraint (type_identifier) @pulse_type_target)
-  (type_arguments (generic_type name: (type_identifier) @pulse_type_target))
-  (array_type (type_identifier) @pulse_type_target)
   ;; An array OF a generic — the type_identifier sits under the generic_type, one level deeper than
   ;; the line above reaches, so Boxed<T>[] produced no type evidence while Plain[] did. Kept in
   ;; step with the TypeScript grammar, where a frozen subject measured the false positives closed.
-  (array_type (generic_type name: (type_identifier) @pulse_type_target))
   ;; A PARENTHESISED type, which the array form makes routine: (Role)[] wraps the identifier in a
   ;; parenthesized_type, one level below where the two array patterns above reach. Found by running
   ;; the benchmark against the monorepo subject — Role was reported STALE_IMPORT while line 43 of
   ;; authz.ts annotates with it as ...roles: (Role)[]. Captured on its own rather than only under
   ;; array_type, because a parenthesised type is legal in every type position.
-  (parenthesized_type (type_identifier) @pulse_type_target)
-  (as_expression (type_identifier) @pulse_type_target)
-  (type_predicate type: (type_identifier) @pulse_type_target)
-  (union_type (type_identifier) @pulse_type_target)
   ;; INTERSECTION is union's twin and was simply missing beside it — DriftResult in
   ;; Promise<DriftResult & {...}> produced no type evidence, so prune told this repository to delete
   ;; an import registry/index.ts annotates with. Measured on conducks itself.
-  (intersection_type (type_identifier) @pulse_type_target)
   ;; A CONDITIONAL type reads both the checked type and the one it is checked against
   ;; (T extends EdgeType ? ... : ...). graph-engine.ts uses EdgeType only this way.
-  (conditional_type (type_identifier) @pulse_type_target)
 
   ;; --- Cross-service HTTP (todo22#P15) ---
   ;; processRoute/processRequest in the reflector branch on @kinesis_route and @kinesis_request.
@@ -203,17 +192,14 @@ export const TSX_QUERIES = `
     value: (call_expression) @pulse_assignment_value)
 
   ;; Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps)
-  (pair value: (identifier) @ref_value)
   ;; OBJECT SHORTHAND is the same fact with the key omitted: { handleBack } is a read of handleBack,
   ;; and it is how every React hook returns its handlers and every context builds its value object.
   ;; The pair form above has been captured since todo14; the shorthand never was.
   ;; MEASURED on the monorepo subject: handleBack (returned at useonboardinglogic.ts:253) and
   ;; openClient (waitlistcontext.tsx:56) were both reported ORPHAN while being handed to callers.
-  (object (shorthand_property_identifier) @ref_value)
   ;; DEFAULT EXPORT names the symbol it re-publishes. export default Card is the whole reason a
   ;; component file exists, and Card was reported ORPHAN with the export sitting on the next line
   ;; (admin/src/components/ui/card/index.tsx:35). The named form export { X } was already covered.
-  (export_statement value: (identifier) @ref_value)
 
   ;; --- Kinesis (Execution Flow) ---
   (call_expression
@@ -243,12 +229,9 @@ export const TSX_QUERIES = `
   ;; Value-uses invisible to call/assignment patterns (todo14 FP closure):
   ;; a local re-export is a USE of the binding; iterating a collection reads it.
   (export_statement (export_clause (export_specifier name: (identifier) @ref_value)))
-  (for_in_statement right: (identifier) @ref_value)
   ;; Array-literal and ternary-branch uses, in step with the TypeScript grammar — a component list
   ;; (const panels = [ConsolePanel, GlobePanel]) and a conditional render target are both reads of
   ;; the binding, and neither produced any evidence before.
-  (array (identifier) @ref_value)
-  (ternary_expression (identifier) @ref_value)
   ;; A JSX EXPRESSION CONTAINER is how every React handler is wired: onClick={handleSave}. The
   ;; identifier sits in (jsx_attribute (jsx_expression (identifier))) and no other pattern reached
   ;; it, so a handler declared and then passed to a prop looked entirely unreferenced.
@@ -259,11 +242,9 @@ export const TSX_QUERIES = `
   (jsx_expression (identifier) @ref_value)
   ;; A member READ is a use of the object, same as the TypeScript grammar — only member CALLS were
   ;; visible before, so an enum or const table reached as X.member looked entirely unreferenced.
-  (member_expression object: (identifier) @ref_value)
   ;; INSTANCEOF names a class as a value — the right operand is a bare identifier, so no member,
   ;; call or type pattern ever saw it. Measured on conducks itself: FilterValidationError is used
   ;; only as an instanceof operand and prune reported it stale.
-  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
 
   ;; --- const x = new Y() — the variable's TYPE, read from its own declaration (todo29#P3b) ---
   ;;
@@ -288,4 +269,6 @@ export const TSX_QUERIES = `
   (variable_declarator
     name: (identifier) @instance_name
     value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
+${EC_VALUE_POSITIONS}
+${TS_TYPE_POSITIONS}
 `;

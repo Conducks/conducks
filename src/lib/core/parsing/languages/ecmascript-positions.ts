@@ -1,0 +1,74 @@
+/**
+ * Conducks — the ECMAScript-family USE POSITIONS, written once. 🏺
+ *
+ * `typescript`, `tsx` and `javascript` are one grammar family: tree-sitter-typescript exposes tsx as
+ * a second language over the same node types, and the JavaScript grammar shares every value-position
+ * node with both. Their queries were maintained as three hand-copied files, and the copying drifted:
+ *
+ *   - 7 value patterns were byte-identical across all three files.
+ *   - 12 type patterns were byte-identical across typescript and tsx.
+ *   - **JavaScript was missing `for_in_statement`** — `for (const k in TABLE)` is a read of `TABLE`
+ *     in JS exactly as it is in TypeScript, and the pattern simply never got copied across. Nothing
+ *     detected it, because nothing compared the three files.
+ *
+ * That last line is the argument for this file. Eleven use-positions were added across one session,
+ * each by editing two or three files by hand; a fix that fails to propagate is invisible, while a
+ * duplicated block that drifts is only found by diffing files nobody diffs.
+ *
+ * WHAT IS NOT SHARED, and why: the node NAMES differ outside this family. Python spells the same
+ * ideas `list` and `conditional_expression`, Rust uses `::` paths, Go has no ternary at all. Sharing
+ * across those would mean inventing an abstraction over tree-sitter node types — a second grammar
+ * language to maintain, for three consumers. The honest boundary is the family that genuinely shares
+ * node types, and that is these three.
+ *
+ * THE TRADE THIS MAKES: a mistake here reaches three languages at once, where a hand-copied mistake
+ * reached one. That is the right way round — `tests/unit/core/parsing/position-parity.test.ts` fails
+ * if a grammar in this family stops composing these blocks, so drift cannot come back, and the full
+ * suite plus three frozen subjects measure the blast radius of any change to them.
+ */
+
+/**
+ * A name READ in a value position. Every one of these is a USE, and each was added because a real
+ * project reported live code as dead without it.
+ *
+ * `member_expression` covers a member READ (`Reason.Timeout`); a member CALL was already visible
+ * through the kinesis patterns. `export_statement value:` is the DEFAULT export (`export default
+ * Card`) — the named form `export { X }` is a separate pattern in each file, because JavaScript's
+ * export clause node differs from TypeScript's.
+ */
+export const EC_VALUE_POSITIONS = `
+  ;; --- Value positions: a name READ is a use (shared, ecmascript-positions.ts) ---
+  (pair value: (identifier) @ref_value)
+  (object (shorthand_property_identifier) @ref_value)
+  (array (identifier) @ref_value)
+  (ternary_expression (identifier) @ref_value)
+  (member_expression object: (identifier) @ref_value)
+  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
+  (export_statement value: (identifier) @ref_value)
+  (for_in_statement right: (identifier) @ref_value)
+`;
+
+/**
+ * A name READ in a TYPE position. TypeScript and TSX only — JavaScript has no type syntax, and
+ * naming a node type that does not exist in a grammar makes the WHOLE query invalid, which silently
+ * drops every file of that language to the regex fallback (ADR 0089).
+ *
+ * Each entry anchors on its own parent rather than capturing `(type_identifier)` blanketly: a
+ * blanket capture also fires on a declaration's OWN name node and produces a self-referencing edge.
+ */
+export const TS_TYPE_POSITIONS = `
+  ;; --- Type positions, ADR 0016 (shared, ecmascript-positions.ts) ---
+  (type_annotation (type_identifier) @pulse_type_target)
+  (type_annotation (generic_type name: (type_identifier) @pulse_type_target))
+  (type_arguments (type_identifier) @pulse_type_target)
+  (type_arguments (generic_type name: (type_identifier) @pulse_type_target))
+  (constraint (type_identifier) @pulse_type_target)
+  (array_type (type_identifier) @pulse_type_target)
+  (array_type (generic_type name: (type_identifier) @pulse_type_target))
+  (parenthesized_type (type_identifier) @pulse_type_target)
+  (as_expression (type_identifier) @pulse_type_target)
+  (type_predicate type: (type_identifier) @pulse_type_target)
+  (union_type (type_identifier) @pulse_type_target)
+  (intersection_type (type_identifier) @pulse_type_target)
+  (conditional_type (type_identifier) @pulse_type_target)
+`;
