@@ -47,4 +47,34 @@ describe('help lists every command the CLI registers', () => {
     const missing = ids.filter(id => !new RegExp(`(^|\\s)${id}(\\s|$)`, 'm').test(output));
     expect(missing).toEqual([]);
   });
+
+  it('shows an EXAMPLE the tool would actually accept', async () => {
+    // The example advertised `conducks impact --symbol MyFunction --direction downstream` while
+    // `impact` takes POSITIONAL arguments and answers "Unknown flags for `impact`: --symbol,
+    // --direction". The first command the help taught anyone was one the tool refuses.
+    //
+    // Checked against the command's OWN `usage` string rather than a hardcoded expectation, so this
+    // keeps holding if `impact` ever does grow flags — the two move together or this fails.
+    const { HelpCommand } = await import('@/interfaces/cli/commands/help.js');
+    const { ImpactCommand } = await import('@/interfaces/cli/commands/impact.js');
+    const usage = new ImpactCommand().usage;
+
+    const lines: string[] = [];
+    const realLog = console.log;
+    console.log = (...a: unknown[]) => { lines.push(a.join(' ')); };
+    try {
+      await new HelpCommand([{ id: 'impact', description: 'd', usage, execute: async () => {} }] as never)
+        .execute([], {} as never);
+    } finally {
+      console.log = realLog;
+    }
+    const output = lines.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
+    const example = output.split('\n').find(l => l.trim().startsWith('Example:')) ?? '';
+    expect(example).toContain('conducks impact');
+
+    // Every `--flag` the example uses must appear in the command's usage string.
+    const flagsInExample = example.match(/--[a-z-]+/g) ?? [];
+    const unsupported = flagsInExample.filter(f => !usage.includes(f));
+    expect({ example: example.trim(), unsupported }).toEqual({ example: example.trim(), unsupported: [] });
+  });
 });

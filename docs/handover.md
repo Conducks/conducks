@@ -38,6 +38,41 @@ and `fix(prune): stop reporting a used value import as stale`.
 **`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
 
+## 2026-08-14 — the published package was half test files, and it carried other projects' names
+
+`npm pack` shipped **1,437 files, 741 of them `build/tests`** — 3.7MB of compiled test code against
+build/src's 4.3MB, in every install. `tsconfig.json` includes `tests/**` and `scripts/**` so
+`type-check` covers them, and `tsc` ran against that same project, so the tests were compiled and
+published. Nothing ever ran them from there: jest runs the TypeScript in `tests/` through ts-jest,
+and `scripts/check-build-aliases.mjs` already said in a comment that `build/tests` is never executed.
+
+Split into `tsconfig.build.json` (emit `src/**` only) from `tsconfig.json` (type-check everything).
+**Type-checking is NOT narrowed, and that was verified rather than assumed** — a deliberate type
+error added to a test file still fails `npm run type-check`. `rootDir` is pinned in the build project
+because tsc infers it from the input set: with only `src/**` included it emits straight into
+`build/`, moving every path the `bin` entry depends on.
+
+`removeComments` is on for the emitted JS. This repository's comments are unusually long and record
+what was MEASURED, naming the subjects — and tsc copies them verbatim into the tarball, so 15 shipped
+files named a private project. Comment-stripping removes the leak where it actually happens, which is
+the package, not `docs/` (docs have never been in `files`). `.d.ts` output is unaffected, so JSDoc a
+consumer reads on the types survives.
+
+**The rest of the leak was inside query TEMPLATE LITERALS, where `;;` comments are DATA and no
+compiler flag can reach them** — including comments added earlier the same day. Those subject names
+are now written as what was measured ("a 1,095-file Electron subject") instead of who it was measured
+on. `oracle` stays: it is conducks' own fixture. `orchestrator` stays where it means
+`AnalyzeOrchestrator`, this repository's own component.
+
+**MEASURED: 1,437 files → 678, 1.2MB → 435kB packed, 4.2MB → 1.8MB unpacked, and zero third-party
+project names in the shipped tree.** Verified by packing the tarball, installing it into a clean
+directory, and running `conducks help` and `conducks analyze` from the installed `bin`.
+
+Also fixed while there: `conducks help` advertised `impact --symbol X --direction downstream` and
+`impact` takes positional arguments, so the first command the help taught anyone was one the tool
+refuses with "Unknown flags". The new test checks the example against the command's OWN `usage`
+string, so the two cannot drift apart again.
+
 ## 2026-08-14 — a zero-argument Python call was invisible, and `trace` answered from a symbol it never found
 
 Two bugs, both found by asking which languages the prune fix below did NOT cover, and both bigger

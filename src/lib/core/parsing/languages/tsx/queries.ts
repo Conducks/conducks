@@ -129,7 +129,7 @@ export const TSX_QUERIES = `
   (array_type (type_identifier) @pulse_type_target)
   ;; An array OF a generic — the type_identifier sits under the generic_type, one level deeper than
   ;; the line above reaches, so Boxed<T>[] produced no type evidence while Plain[] did. Kept in
-  ;; step with the TypeScript grammar, where sofie measured the false positives this closes.
+  ;; step with the TypeScript grammar, where a frozen subject measured the false positives closed.
   (array_type (generic_type name: (type_identifier) @pulse_type_target))
   (as_expression (type_identifier) @pulse_type_target)
   (type_predicate type: (type_identifier) @pulse_type_target)
@@ -246,7 +246,7 @@ export const TSX_QUERIES = `
   ;; A CONSTRUCTS edge already exists for every new Y(), but its SOURCE is the enclosing scope, so
   ;; at module level it says "this FILE constructs a ServiceRegistry" and not "Registry IS one".
   ;; Without that link a later registry.get(...) has no way to reach ServiceRegistry.get, which
-  ;; is 192 of mentorseed's dangling edges.
+  ;; is 192 of one measured subject's dangling edges.
   ;;
   ;; This reads a DECLARATION, it does not infer: the type is written literally in the source. A
   ;; factory (X.getInstance()) is deliberately NOT matched — its return type is not stated here and

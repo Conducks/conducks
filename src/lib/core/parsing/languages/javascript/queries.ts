@@ -85,7 +85,7 @@ export const JAVASCRIPT_QUERIES = `
   (pair value: (identifier) @ref_value)
   ;; The same fact written two other ways: an entry in an ARRAY literal (registrar / middleware
   ;; chain) and a TERNARY branch. Both read the binding and neither produced evidence, which is what
-  ;; made prune tell sofie to delete six imports its boot sequence needs.
+  ;; made prune tell a 1,095-file Electron subject to delete six imports its boot needs.
   (array (identifier) @ref_value)
   (ternary_expression (identifier) @ref_value)
   ;; A member READ is a use of the object — only member CALLS were visible before, so a const table
@@ -163,7 +163,7 @@ export const JAVASCRIPT_QUERIES = `
   ;; A CONSTRUCTS edge already exists for every new Y(), but its SOURCE is the enclosing scope, so
   ;; at module level it says "this FILE constructs a ServiceRegistry" and not "Registry IS one".
   ;; Without that link a later registry.get(...) has no way to reach ServiceRegistry.get, which
-  ;; is 192 of mentorseed's dangling edges.
+  ;; is 192 of one measured subject's dangling edges.
   ;;
   ;; This reads a DECLARATION, it does not infer: the type is written literally in the source. A
   ;; factory (X.getInstance()) is deliberately NOT matched — its return type is not stated here and

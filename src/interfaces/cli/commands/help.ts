@@ -81,7 +81,11 @@ export class HelpCommand implements ConducksCommand {
     console.log(`\n \x1b[1mCONDUCKS — The Structural Intelligence Suite\x1b[0m 💎`);
     console.log(` \x1b[2mMaximum Fidelity Graph Engine for Professional Engineering\x1b[0m\n`);
     console.log(` \x1b[1mUsage:\x1b[0m conducks <command> [args] [options]`);
-    console.log(` \x1b[1mExample:\x1b[0m conducks impact --symbol MyFunction --direction downstream\n`);
+    // The example a reader tries FIRST has to be a command that runs. This advertised
+    // `impact --symbol X --direction downstream` and `impact` takes POSITIONAL arguments — it
+    // answers "Unknown flags for `impact`: --symbol, --direction", so the first thing the help
+    // taught anyone was a command the tool refuses.
+    console.log(` \x1b[1mExample:\x1b[0m conducks impact MyFunction downstream\n`);
 
     Object.entries(domains).forEach(([domain, { ids }]) => {
       console.log(` \x1b[36m\x1b[1m${domain}\x1b[0m`);

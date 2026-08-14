@@ -1,0 +1,34 @@
+{
+  // What SHIPS, as opposed to what is type-checked.
+  //
+  // `tsconfig.json` includes tests and scripts so `type-check` covers them, and `tsc` was run
+  // against it — so every test file was COMPILED INTO `build/tests` and then published: 741 of the
+  // 1,437 files in `npm pack` were tests, 3.7MB against build/src's 4.3MB. Nothing ever ran them
+  // from there (jest runs the TypeScript in `tests/` through ts-jest, and
+  // `scripts/check-build-aliases.mjs` already documents that build/tests is never executed), so it
+  // was dead weight in every install — and it carried test fixture source and comments naming other
+  // projects into a public package.
+  //
+  // Type-checking is NOT narrowed by this file. `npm run type-check` still uses `tsconfig.json`, so
+  // tests and scripts are checked exactly as before; this project only decides what tsc EMITS.
+  "extends": "./tsconfig.json",
+  // rootDir is PINNED because tsc infers it from the input set: with `src/**/*` as the only include
+  // it infers `src/` and emits straight into `build/`, so every path the build and the published
+  // `bin` depend on (`build/src/interfaces/cli/index.js`) moves. Stating it keeps the layout
+  // identical to the old whole-repo build; only the test and script trees stop being emitted.
+  "compilerOptions": {
+    "rootDir": ".",
+    // The emitted JS carries no comments. Two reasons, and the second is the load-bearing one:
+    //
+    //   - nobody reads `build/src`. The source is the source, and it is on GitHub.
+    //   - this repository's comments are unusually long and record what was MEASURED, naming the
+    //     subjects it was measured on. Those are private projects, and tsc copies every comment
+    //     into the published package verbatim — 15 shipped files named one of them. Stripping the
+    //     comments removes the leak at the point it actually happens, which is the tarball, not
+    //     the docs (docs/ has never been in `files`).
+    //
+    // `.d.ts` output is NOT affected by this flag, so JSDoc a consumer sees on the types survives.
+    "removeComments": true
+  },
+  "include": ["src/**/*"]
+}

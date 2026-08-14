@@ -187,7 +187,7 @@ export const TYPESCRIPT_QUERIES = `
   (array_type (type_identifier) @pulse_type_target)
   ;; An array OF a generic — PhaseRunResult<R>[], AutomatedTask<string>[]. The line above
   ;; captures only a DIRECT type_identifier child, so Plain[] was evidence and Boxed<T>[] was
-  ;; not: the type_identifier sits one level deeper, under the generic_type. MEASURED on sofie —
+  ;; not: the type_identifier sits one level deeper, under the generic_type. MEASURED on a subject —
   ;; AutomatedTask and PhaseRunResult were both reported STALE_IMPORT while the file annotates
   ;; with them, because this shape produced no type evidence at all.
   (array_type (generic_type name: (type_identifier) @pulse_type_target))
@@ -288,7 +288,7 @@ export const TYPESCRIPT_QUERIES = `
   ;; An identifier listed in an ARRAY literal is a use — the registrar-list / middleware-chain /
   ;; plugin-table shape (const registrars = [registerSafety, registerPrivacy]). The object-literal
   ;; twin above has been captured since todo14; the array form never was, so a symbol wired up this
-  ;; way looked entirely unreferenced. MEASURED on sofie: six of its ten STALE_IMPORT findings were
+  ;; way looked entirely unreferenced. MEASURED on a subject: six of its ten STALE_IMPORT findings were
   ;; registrars in one such array in src/app.ts — deleting any of them breaks the boot sequence.
   (array (identifier) @ref_value)
   ;; A ternary BRANCH is a use for the same reason (flag ? undefined : registerEmbeddings). The
@@ -297,7 +297,7 @@ export const TYPESCRIPT_QUERIES = `
   ;; Reading a MEMBER off an imported binding is a use of that binding — an enum reached only as
   ;; FailoverReason.Timeout, a const table read as CONFIG.key, a namespace object. A member READ
   ;; produced no evidence at all: only a member CALL did, through the kinesis pattern, so x.y() was
-  ;; visible and x.y was not. MEASURED on sofie: this was the last remaining STALE_IMPORT false
+  ;; visible and x.y was not. MEASURED on a subject: this was the last remaining STALE_IMPORT false
   ;; positive, and closing it cost 3% more edges and 0.9s on a 1,095-file subject.
   (member_expression object: (identifier) @ref_value)
   ;; INSTANCEOF names a class as a value — the right operand is a bare identifier, so no member,
@@ -310,7 +310,7 @@ export const TYPESCRIPT_QUERIES = `
   ;; A CONSTRUCTS edge already exists for every new Y(), but its SOURCE is the enclosing scope, so
   ;; at module level it says "this FILE constructs a ServiceRegistry" and not "Registry IS one".
   ;; Without that link a later registry.get(...) has no way to reach ServiceRegistry.get, which
-  ;; is 192 of mentorseed's dangling edges.
+  ;; is 192 of one measured subject's dangling edges.
   ;;
   ;; This reads a DECLARATION, it does not infer: the type is written literally in the source. A
   ;; factory (X.getInstance()) is deliberately NOT matched — its return type is not stated here and
