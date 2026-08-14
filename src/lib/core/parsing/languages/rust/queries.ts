@@ -12,6 +12,20 @@ export const RUST_QUERIES = `
     argument: (scoped_use_list
       path: (_) @source)) @isImport
 
+  ;; mod helper;  --  a MODULE DECLARATION is this file's statement about which other file belongs
+  ;; to it, and Rust guarantees where that file is: helper.rs or helper/mod.rs beside it. RustResolver
+  ;; has always known how to walk both ("Maps Rust 'use' and 'mod' declarations to file paths"), but
+  ;; nothing ever captured a mod_item, so half of the resolver was unreachable.
+  ;;
+  ;; Without the IMPORTS edge it produces, cross-file call resolution has nothing to walk: a call to
+  ;; helper::alpha() stayed pinned to a PHANTOM node named for the module path (helper::alpha) while
+  ;; the real declaration lived at helper.rs::alpha, so the two never met.
+  ;;
+  ;; MEASURED on a rustc-verified two-file crate where rustc reports only beta as never used:
+  ;; conducks reported BOTH alpha and beta as ORPHAN, and impact alpha upstream found 0 callers.
+  ;; This is a fact the source states, not an inference — mod helper; IS the declaration.
+  (mod_item name: (identifier) @source) @isImport
+
   ;; --- Atoms (L6: Persistence & State) ---
   (let_declaration pattern: (identifier) @name) @isVariable
   (const_item name: (identifier) @name) @isVariable

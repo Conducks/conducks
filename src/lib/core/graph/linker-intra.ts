@@ -450,8 +450,22 @@ export class IntraLinker {
         }
       }
 
-      // Skip already-resolved edges (fully qualified IDs always contain '::')
-      if (edge.targetId.includes('::')) continue;
+      // Skip already-resolved edges — but `::` alone does not prove one.
+      //
+      // A resolved id is `<filePath>::<symbol>`, and a file path carries a separator. A SYNTHESISED
+      // id (`taxonomy::l8`, `route::/users::get`, `lib::npm`, `global::self`) is named for what it
+      // is, and those namespaces are enumerated in CONSTRUCTED_NAMESPACES. Everything else that
+      // contains `::` is a LANGUAGE PATH EXPRESSION, not an id — Rust's `helper::alpha`, C++'s
+      // `ns::fn` — and skipping it here is why no resolution block ever saw it.
+      //
+      // MEASURED on a rustc-verified two-file crate: rustc reports only `beta` as never used, while
+      // conducks reported BOTH `alpha` and `beta` as ORPHAN and found 0 callers for `alpha`. The
+      // call edge existed; it pointed at a phantom `helper::alpha` node minted as an external
+      // package, because this line handed it back untouched and the induction pass then invented a
+      // target for it. One separator, two meanings.
+      const looksLikeId = edge.targetId.includes('/') || edge.targetId.includes('\\');
+      const constructedNs = IntraLinker.CONSTRUCTED_NAMESPACES.has(edge.targetId.split('::')[0].toLowerCase());
+      if (edge.targetId.includes('::') && (looksLikeId || constructedNs)) continue;
       if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type)) continue;
 
       const sourceNode = graph.getNode(edge.sourceId);
@@ -592,8 +606,20 @@ export class IntraLinker {
       // only. This binds real internal method calls while leaving external receivers (path.join,
       // results.filter — no in-graph method of that name in an imported unit) correctly dangling.
       // Import-scoping is the safety rail: a bare method name is never bound to an arbitrary global.
-      if (!resolvedId && bareName.includes('.')) {
-        const method = bareName.split('.').pop()!;
+      //
+      // `::` IS THE SAME SHAPE in a path-separated language. Rust calls arrive as `helper::alpha`,
+      // and the reasoning is identical: `mod helper;` is a declaration that helper.rs belongs to
+      // this file, so an IMPORTS edge already exists and the method segment can be resolved against
+      // it under the same import-scoping rail. Without this the call stayed pinned to a PHANTOM
+      // `helper::alpha` node while the declaration sat at `helper.rs::alpha`.
+      //
+      // Guarded on the target NOT being a node id: ids are `<file>::<symbol>` and carry a path
+      // separator, so `/repo/helper.rs::alpha` is left alone while `helper::alpha` is split.
+      // MEASURED on a rustc-verified crate: rustc reports only `beta` unused, conducks reported
+      // both `alpha` and `beta` as ORPHAN and found 0 callers for a function it can see being called.
+      const pathSeparated = bareName.includes('::') && !bareName.includes('/');
+      if (!resolvedId && (bareName.includes('.') || pathSeparated)) {
+        const method = bareName.split(pathSeparated ? '::' : '.').pop()!;
         if (method && method !== bareName) {
           resolvedId =
             unitSymbols.get(sourceUnitId)?.get(method) ??

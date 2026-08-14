@@ -38,6 +38,47 @@ and `fix(prune): stop reporting a used value import as stale`.
 **`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
 
+## 2026-08-14 — `::` meant two things, and three of my own language fixtures were wrong
+
+**The method was the bug.** Six quick per-language fixtures produced three false conclusions before
+any of them were validated by a compiler:
+
+- "Ruby is broken" — I wrote a paren-less `used_fn`; with `used_fn()` Ruby is correct.
+- "The first function in a file is dropped" — an artifact of `query`'s default limit. Refuted.
+- "Rust emits no behavioural edges" — my only call sat inside `println!(…)`, and a macro body is an
+  unparsed `token_tree`. Conducks was right to see nothing.
+
+Every language fixture is now validated by its own toolchain before any conclusion is drawn from it.
+`rustc` and `ruby` caught all three of those errors in seconds.
+
+**The real Rust defect, once the fixture was honest.** A resolved node id is `<filePath>::<symbol>`,
+so `IntraLinker` skipped every edge whose target contained `::` as already-resolved. Rust's PATH
+SEPARATOR is also `::`, so `helper::alpha()` was handed back untouched, and the external-induction
+pass then invented a phantom `helper::alpha` node for it (`external://helper/alpha`) — because the
+rule deciding "is this namespace local" only recognises `.ts` and `.js`. The call edge pointed at a
+node that was not the declaration, so the real function had no callers.
+
+MEASURED against rustc on a two-file crate where the compiler reports **only `beta`** as never used:
+conducks reported BOTH `alpha` and `beta` as ORPHAN, and `impact alpha upstream` found 0 callers.
+**After the fix: `beta` only, and `alpha` has 1 caller — conducks and rustc now agree.**
+
+Two halves. `mod helper;` is now captured as an import: `RustResolver` has always known how to map a
+module declaration to `helper.rs` or `helper/mod.rs` ("Maps Rust 'use' and 'mod' declarations to file
+paths"), but nothing ever captured a `mod_item`, so half of it was unreachable. And the skip now asks
+whether the target is really an id — a file path separator, or one of the enumerated
+`CONSTRUCTED_NAMESPACES` — instead of assuming `::` proves it.
+
+**All three frozen subjects are byte-identical after the change** (sofie 17/120/11/1, scraper
+44/18/7, orchestrator 67/98/93/1), so the fix reaches only `::`-path languages.
+
+**Java is NOT broken, and that was the other correction.** It reports nothing because
+`isModuleScoped` deliberately excludes symbols nested in a class: *"Nested symbols (locals, methods)
+cannot be reliably proven dead from the static graph, so orphan detection ignores them."* In Java
+nearly all code is methods-in-classes, so ORPHAN legitimately finds nothing — that is a refusal, not
+a miss. What IS still open for Java: a same-package call resolves to nothing, because the capture
+drops the receiver (`Lib.alpha()` arrives as bare `alpha`) and same-package files have no import edge
+to resolve against. That costs `impact`/`trace`/`context`, not prune.
+
 ## 2026-08-14 — running the benchmark end to end found two more invisible use-positions
 
 Executed the whole benchmark against all three subjects. Every claim checked against source rather
