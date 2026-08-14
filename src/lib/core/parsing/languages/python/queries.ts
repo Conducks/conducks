@@ -110,6 +110,20 @@ export const PYTHON_QUERIES = `
     ]
     right: (_) @pulse_assignment_value)
 
+  ;; --- Value positions: a name READ is a use (the @ref_value machinery) ---
+  ;;
+  ;; Python had NO value-position captures at all, so a binding reached in any of these ways looked
+  ;; entirely unreferenced. MEASURED on the Python subject: 3 of its 10 STALE_IMPORT findings were
+  ;; enums used only as EntryPoint.LEVEL_1_ONLY / InputType.URL_LIST — the import was called stale
+  ;; while the module branches on its members.
+  ;;
+  ;; The member READ is the one that mattered; a member CALL was already visible through the call
+  ;; pattern. The list and conditional forms are the same fact written two other ways, and mirror
+  ;; what the TypeScript grammar captures.
+  (attribute object: (identifier) @ref_value)
+  (list (identifier) @ref_value)
+  (conditional_expression (identifier) @ref_value)
+
   ;; --- Kinetic Flow (L6: Behavior & Logic) ---
   ;; (_)* NOT (_). A bare (_) requires the argument_list to contain at least ONE node, so a
   ;; ZERO-ARGUMENT call did not match this pattern at all and produced NO CALLS edge — start(),

@@ -38,6 +38,45 @@ and `fix(prune): stop reporting a used value import as stale`.
 **`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
 
+## 2026-08-14 — running the benchmark end to end found two more invisible use-positions
+
+Executed the whole benchmark against all three subjects. Every claim checked against source rather
+than read off the terminal. It found two more bugs of the SAME family as everything else today — a
+name READ in a position no grammar covered — plus one broken sentence.
+
+**A Python enum reached only through a member was invisible.** `EntryPoint.LEVEL_1_ONLY`,
+`InputType.URL_LIST`. Python carried **no value-position captures at all**; the `@ref_value` idea
+existed only in the TypeScript-family grammars. **3 of scraper's 10 `STALE_IMPORT` findings were
+this**, each telling the reader to delete an import the module branches on. Added member-read,
+list-element and conditional-branch captures. **10 → 7, and the 7 survivors are each verified true.**
+
+**A JSX handler was invisible.** `onAction={handleAction}`, `onClick={exportCSV}` — the identifier
+sits in `(jsx_attribute (jsx_expression (identifier)))` and nothing reached it, so the normal way of
+wiring a React handler made it look unreferenced. **28 of the monorepo's 126 ORPHAN findings.**
+Added `(jsx_expression (identifier) @ref_value)`. **126 → 98, zero JSX false positives**, and
+`UNIMPORTED_MODULE` fell on two subjects as the new edges connected modules (sofie 15 → 11,
+orchestrator 74 → 67).
+
+`arch` also printed **"No pattern detected. The shape, so the answer is still usable:"** — a sentence
+missing its own subject, on exactly the projects where the command has the least else to say.
+
+**What the run confirmed**, each verified in the source: `query` line numbers exact; `impact`'s
+caller real (`index.ts:2151`); `arch`'s bidirectional pair true in both directions; `context`'s
+printed declaration line exact; `ledger`'s orphan count equal to `prune`'s; `guard` and `drift`
+refusing rather than inventing a verdict; **all 9 previously-false symbols still absent**; sofie's
+single `STALE_IMPORT` verified true; **no Next.js route file reported as dead**.
+
+**Recorded and NOT fixed:** `self.method()` still produces no caller edge — `_drain_queue` has 22
+call sites and `impact` finds 1, the only one whose receiver is a typed parameter. Three methods
+called only via `self.` report zero callers. Prune does not turn that into a delete verdict here,
+because their file is `UNIMPORTED_MODULE` and ADR 0026 makes that a question — so the damage is to
+`impact`/`context`/`trace`, not to prune. Also: sofie's #2 and #3 hotspots are barrel re-export
+lines rather than declarations, `entry --json` returns a bare array with no denominator, and
+`context` ranks `external://global/*` builtins among real neighbours.
+
+The benchmark itself needed one correction: a second `analyze` on an unchanged project creates no
+second pulse (verified — one pulse after two runs), so `T-DRIFT-2` now edits a file on a copy first.
+
 ## 2026-08-14 — dry-running the new benchmark found two more bugs, one of them 63% of a category
 
 A CLI benchmark now lives in `test-projects/_benchmark/` (README + shared task spec + one file per

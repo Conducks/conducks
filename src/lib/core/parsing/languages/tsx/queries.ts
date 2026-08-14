@@ -233,6 +233,14 @@ export const TSX_QUERIES = `
   ;; the binding, and neither produced any evidence before.
   (array (identifier) @ref_value)
   (ternary_expression (identifier) @ref_value)
+  ;; A JSX EXPRESSION CONTAINER is how every React handler is wired: onClick={handleSave}. The
+  ;; identifier sits in (jsx_attribute (jsx_expression (identifier))) and no other pattern reached
+  ;; it, so a handler declared and then passed to a prop looked entirely unreferenced.
+  ;;
+  ;; MEASURED on the monorepo subject: 28 of its 126 ORPHAN findings were handlers referenced this
+  ;; way — handleAction at onAction={handleAction}, exportCSV at onClick={exportCSV}. In a React
+  ;; codebase this is not an edge case, it is how the components are joined together.
+  (jsx_expression (identifier) @ref_value)
   ;; A member READ is a use of the object, same as the TypeScript grammar — only member CALLS were
   ;; visible before, so an enum or const table reached as X.member looked entirely unreferenced.
   (member_expression object: (identifier) @ref_value)

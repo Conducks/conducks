@@ -51,7 +51,10 @@ export class ArchCommand implements ConducksCommand {
       // The honest miss. Naming the nearest label here is the confident-wrong answer the decision
       // table exists to refuse — an Electron main/preload/renderer split is a real shape with no
       // entry in the table, and saying so beats calling it a hexagon.
-      console.log(chalk.yellow('\nNo pattern detected. The shape, so the answer is still usable:'));
+      // The sentence was missing its own subject — it read "No pattern detected. The shape, so the
+      // answer is still usable:" on every project that matched no entry in the decision table,
+      // which is the one moment this command most needs to be understood.
+      console.log(chalk.yellow('\nNo pattern detected — the shape below is MEASURED, so the answer is still usable:'));
     }
 
     for (const v of report.verdicts) {
