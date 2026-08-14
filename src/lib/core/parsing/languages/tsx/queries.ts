@@ -127,9 +127,20 @@ export const TSX_QUERIES = `
   (constraint (type_identifier) @pulse_type_target)
   (type_arguments (generic_type name: (type_identifier) @pulse_type_target))
   (array_type (type_identifier) @pulse_type_target)
+  ;; An array OF a generic — the type_identifier sits under the generic_type, one level deeper than
+  ;; the line above reaches, so Boxed<T>[] produced no type evidence while Plain[] did. Kept in
+  ;; step with the TypeScript grammar, where sofie measured the false positives this closes.
+  (array_type (generic_type name: (type_identifier) @pulse_type_target))
   (as_expression (type_identifier) @pulse_type_target)
   (type_predicate type: (type_identifier) @pulse_type_target)
   (union_type (type_identifier) @pulse_type_target)
+  ;; INTERSECTION is union's twin and was simply missing beside it — DriftResult in
+  ;; Promise<DriftResult & {...}> produced no type evidence, so prune told this repository to delete
+  ;; an import registry/index.ts annotates with. Measured on conducks itself.
+  (intersection_type (type_identifier) @pulse_type_target)
+  ;; A CONDITIONAL type reads both the checked type and the one it is checked against
+  ;; (T extends EdgeType ? ... : ...). graph-engine.ts uses EdgeType only this way.
+  (conditional_type (type_identifier) @pulse_type_target)
 
   ;; --- Cross-service HTTP (todo22#P15) ---
   ;; processRoute/processRequest in the reflector branch on @kinesis_route and @kinesis_request.
@@ -217,6 +228,18 @@ export const TSX_QUERIES = `
   ;; a local re-export is a USE of the binding; iterating a collection reads it.
   (export_statement (export_clause (export_specifier name: (identifier) @ref_value)))
   (for_in_statement right: (identifier) @ref_value)
+  ;; Array-literal and ternary-branch uses, in step with the TypeScript grammar — a component list
+  ;; (const panels = [ConsolePanel, GlobePanel]) and a conditional render target are both reads of
+  ;; the binding, and neither produced any evidence before.
+  (array (identifier) @ref_value)
+  (ternary_expression (identifier) @ref_value)
+  ;; A member READ is a use of the object, same as the TypeScript grammar — only member CALLS were
+  ;; visible before, so an enum or const table reached as X.member looked entirely unreferenced.
+  (member_expression object: (identifier) @ref_value)
+  ;; INSTANCEOF names a class as a value — the right operand is a bare identifier, so no member,
+  ;; call or type pattern ever saw it. Measured on conducks itself: FilterValidationError is used
+  ;; only as an instanceof operand and prune reported it stale.
+  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
 
   ;; --- const x = new Y() — the variable's TYPE, read from its own declaration (todo29#P3b) ---
   ;;

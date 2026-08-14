@@ -38,6 +38,55 @@ and `fix(prune): stop reporting a used value import as stale`.
 **`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
 
+## 2026-08-14 — prune was wrong 9 times out of 10 on a real subject, and the cause was in the grammar
+
+Found by running the shipped build against the frozen sofie subject and checking every finding by
+hand. `STALE_IMPORT` reported 10; **9 were false, and each one tells the reader to delete an import
+the code needs.** The other categories held up — ORPHAN, UNUSED_EXPORT and UNIMPORTED_MODULE were
+right in every case checked, including the hard one (`AGENT_COLOR` is an unused export in one file
+while a DIFFERENT file declares its own local const of the same name, and prune did not confuse them).
+
+The cause is ONE missing idea expressed in seven syntaxes: **a binding read in a position no query
+covered produces no evidence at all**, and the analyzer reads absent evidence as proof of death.
+Not a weak signal — an absent one. The seven:
+
+| shape | example | measured on |
+| --- | --- | --- |
+| array-literal element | `[registerSafety, registerPrivacy]` | sofie (6 of the 9) |
+| ternary branch | `flag ? undefined : registerEmbeddings` | sofie |
+| enum member read | `FailoverReason.Timeout` | sofie |
+| array of a generic | `PhaseRunResult<R>[]` | sofie |
+| `instanceof` operand | `e instanceof FilterValidationError` | **conducks itself** |
+| intersection type | `Promise<DriftResult & {...}>` | **conducks itself** |
+| conditional type | `T extends EdgeType ? ... : ...` | **conducks itself** |
+
+The last three came from pointing the fixed build at THIS repository, which had been reporting them
+all along. A tool that misreads its own source is the strongest evidence available that the gap was
+in the grammar and not in one project's style.
+
+**The import-site calibration could not save any of them, and it is worth writing down why.** That
+guard skips a statement when nothing it brings in was seen being used. Every one of these files HAS
+observed uses — sofie's `app.ts` imports `registerSafety` while a sibling `import type { Safety }`
+from the same module is genuinely used as a type, and the two merge on (file, specifier). The blind
+spot is per-SHAPE, not per-file, so a guard keyed on the file can never cover it. That is why the fix
+belongs in the grammar and a second guard on top would not have worked.
+
+Fixed by adding the missing patterns to the typescript, tsx and javascript grammars, reusing the
+existing `@ref_value` and `@pulse_type_target` machinery — no new code paths. `intersection_type` was
+simply missing beside the `union_type` line that was already there.
+
+**MEASURED: sofie `STALE_IMPORT` 10 → 1, conducks itself 4 → 1. Both survivors verified true
+positives.** ORPHAN, UNUSED_EXPORT and UNIMPORTED_MODULE counts are unchanged on both, so the fix
+bought precision without trading recall elsewhere. Cost: +3% edges, analyze 19.1s → 20.0s on a
+1,095-file subject.
+
+**The regression test was VACUOUS when first written, and passed against the unfixed build.** All
+seven shapes lived in one import statement, so nothing in it produced evidence and the calibration
+guard suppressed the whole statement — the test proved the guard works, not the grammar. It needed a
+called sibling in the same statement to reproduce the real condition. Caught by mutation, which is the
+only reason it is worth anything; the fixture now fails on all seven shapes when the grammar is
+reverted (CONDUCKS-41).
+
 ## 2026-08-10 — the install stops compiling DuckDB, and what that uncovered
 
 ADR **0149**: the vault driver is `@duckdb/node-api` (NAPI, one binary for every Node) instead of

@@ -83,6 +83,16 @@ export const JAVASCRIPT_QUERIES = `
 
   ;; Reference-as-value in object literals: { key: someSymbol } (DI tables, command maps)
   (pair value: (identifier) @ref_value)
+  ;; The same fact written two other ways: an entry in an ARRAY literal (registrar / middleware
+  ;; chain) and a TERNARY branch. Both read the binding and neither produced evidence, which is what
+  ;; made prune tell sofie to delete six imports its boot sequence needs.
+  (array (identifier) @ref_value)
+  (ternary_expression (identifier) @ref_value)
+  ;; A member READ is a use of the object — only member CALLS were visible before, so a const table
+  ;; or enum-like object reached as X.member produced no evidence at all.
+  (member_expression object: (identifier) @ref_value)
+  ;; INSTANCEOF names a class as a value — a bare identifier no other pattern reaches.
+  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
 
   ;; --- Kinesis (Execution Flow) ---
   (call_expression

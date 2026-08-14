@@ -185,9 +185,22 @@ export const TYPESCRIPT_QUERIES = `
   (constraint (type_identifier) @pulse_type_target)
   (type_arguments (generic_type name: (type_identifier) @pulse_type_target))
   (array_type (type_identifier) @pulse_type_target)
+  ;; An array OF a generic — PhaseRunResult<R>[], AutomatedTask<string>[]. The line above
+  ;; captures only a DIRECT type_identifier child, so Plain[] was evidence and Boxed<T>[] was
+  ;; not: the type_identifier sits one level deeper, under the generic_type. MEASURED on sofie —
+  ;; AutomatedTask and PhaseRunResult were both reported STALE_IMPORT while the file annotates
+  ;; with them, because this shape produced no type evidence at all.
+  (array_type (generic_type name: (type_identifier) @pulse_type_target))
   (as_expression (type_identifier) @pulse_type_target)
   (type_predicate type: (type_identifier) @pulse_type_target)
   (union_type (type_identifier) @pulse_type_target)
+  ;; INTERSECTION is union's twin and was simply missing beside it — DriftResult in
+  ;; Promise<DriftResult & {...}> produced no type evidence, so prune told this repository to delete
+  ;; an import registry/index.ts annotates with. Measured on conducks itself.
+  (intersection_type (type_identifier) @pulse_type_target)
+  ;; A CONDITIONAL type reads both the checked type and the one it is checked against
+  ;; (T extends EdgeType ? ... : ...). graph-engine.ts uses EdgeType only this way.
+  (conditional_type (type_identifier) @pulse_type_target)
   
   ;; --- Cross-service HTTP (todo22#P15) ---
   ;; processRoute/processRequest in the reflector branch on @kinesis_route and @kinesis_request.
@@ -272,6 +285,25 @@ export const TYPESCRIPT_QUERIES = `
   ;; a local re-export is a USE of the binding; iterating a collection reads it.
   (export_statement (export_clause (export_specifier name: (identifier) @ref_value)))
   (for_in_statement right: (identifier) @ref_value)
+  ;; An identifier listed in an ARRAY literal is a use — the registrar-list / middleware-chain /
+  ;; plugin-table shape (const registrars = [registerSafety, registerPrivacy]). The object-literal
+  ;; twin above has been captured since todo14; the array form never was, so a symbol wired up this
+  ;; way looked entirely unreferenced. MEASURED on sofie: six of its ten STALE_IMPORT findings were
+  ;; registrars in one such array in src/app.ts — deleting any of them breaks the boot sequence.
+  (array (identifier) @ref_value)
+  ;; A ternary BRANCH is a use for the same reason (flag ? undefined : registerEmbeddings). The
+  ;; condition identifier is captured too and that is correct — reading a name to test it is a use.
+  (ternary_expression (identifier) @ref_value)
+  ;; Reading a MEMBER off an imported binding is a use of that binding — an enum reached only as
+  ;; FailoverReason.Timeout, a const table read as CONFIG.key, a namespace object. A member READ
+  ;; produced no evidence at all: only a member CALL did, through the kinesis pattern, so x.y() was
+  ;; visible and x.y was not. MEASURED on sofie: this was the last remaining STALE_IMPORT false
+  ;; positive, and closing it cost 3% more edges and 0.9s on a 1,095-file subject.
+  (member_expression object: (identifier) @ref_value)
+  ;; INSTANCEOF names a class as a value — the right operand is a bare identifier, so no member,
+  ;; call or type pattern ever saw it. Measured on conducks itself: FilterValidationError is used
+  ;; only as an instanceof operand and prune reported it stale.
+  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
 
   ;; --- const x = new Y() — the variable's TYPE, read from its own declaration (todo29#P3b) ---
   ;;

@@ -126,11 +126,26 @@ by construction.
   a strict subset, 0 false positives (was 1 before the todo14 type-position captures). The measured ungated variant produced 80 findings with 36 FALSE.
   Namespace/side-effect/default/unresolved imports are structurally invisible (no per-binding edge),
   never "missed".
-- Why: every residual false positive traced to missing type-position captures, not detector logic —
+- Why: every residual false positive traced to missing POSITION captures, not detector logic —
   recall was a query-coverage problem (todo14, closed), and prune must err toward under-reporting because a
   false "dead" is a deleted caller.
+- **CORRECTED 2026-08-14 — the "0 false positives" above was measured on a build that could not see
+  seven use-positions, so it was 0 of what it was able to check.** Re-measured against the same
+  repository: 4 findings, 3 FALSE (`FilterValidationError` used only as an `instanceof` operand,
+  `EdgeType` only in a conditional type, `DriftResult` only inside an intersection). On sofie it was
+  9 false out of 10. Both are now 100% precise after the grammar fix; the numbers to cite are those.
+- **The guard is per-FILE, the blind spot is per-SHAPE — this is why import-site calibration cannot
+  close a position gap.** Calibration skips a statement only when NOTHING it imports was seen used;
+  a file using one sibling normally (or a type sibling from the same specifier, which merges on
+  (file, specifier)) lifts it for every other binding. Adding another guard on top does not help.
+  A missing use-position must be fixed in the grammar.
 - Applies: `evolution/dead-code.ts` (`USAGE_EVIDENCE_EDGES`, `PRUNABLE_BINDING_KINDS`),
-  `tests/unit/domain/stale-import.test.ts`. Any recall change re-runs the tsc-subset validation.
+  `tests/unit/domain/stale-import.test.ts`, and
+  `tests/integration/features/prune-precision.test.ts` (all seven shapes, mutation-verified). Any
+  recall change re-runs the tsc-subset validation.
+- **A prune fixture needs a USED sibling in the same import statement or it proves nothing.** The
+  seven-shape test passed against the unfixed build until one was added: with no observed use in the
+  statement, calibration suppressed everything and the test was measuring the guard, not the grammar.
 ## The computed impact risk band never reaches a user
 - Gotcha: `BlastRadiusAnalyzer.analyzeImpact` returns `risk: 'LOW'|'MEDIUM'|'HIGH'|'CRITICAL'`
   (`kinetic/impact.ts:47`, from `getRiskLevel` at `impact.ts:58-63`, thresholds on `impactScore` — NOT

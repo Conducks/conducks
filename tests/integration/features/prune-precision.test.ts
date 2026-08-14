@@ -32,7 +32,17 @@ const TRUTH = {
   /** Exported, imported by nobody, called by nobody. Deleting it changes nothing. */
   dead: ['deadFunction', 'deadConstant'],
   /** Reachable. Each one is reached by a DIFFERENT mechanism, named in the fixture below. */
-  live: ['staticallyUsed', 'dynamicallyUsed', 'constructedDynamically', 'barrelUsed', 'usedConstant'],
+  live: [
+    'staticallyUsed', 'dynamicallyUsed', 'constructedDynamically', 'barrelUsed', 'usedConstant',
+    // Four shapes measured wrong on sofie, where nine of ten STALE_IMPORT findings were false and
+    // every one told the reader to delete an import the code needs. Each is reached by a syntax the
+    // grammar produced NO evidence for at all — not a weak signal, an absent one.
+    'wiredInArray', 'wiredInTernary', 'Reason', 'Boxed',
+    // Three more of the same class, found by running the fixed build against CONDUCKS ITSELF — the
+    // subject that had been reporting them all along. A tool that cannot read its own source is the
+    // strongest available evidence that the gap was in the grammar and not in one project's style.
+    'ThrownError', 'Intersected', 'Constrained',
+  ],
 };
 
 /**
@@ -74,6 +84,15 @@ export class constructedDynamically { run(): number { return 5; } }
 // used here — that case works, and including it would blur what the gap is about.
 export const deadConstant = 4;
 export const usedConstant = 7;
+
+// The four sofie shapes. Each is a normal way to write working code.
+export function wiredInArray(): number { return 8; }
+export function wiredInTernary(): number { return 9; }
+export enum Reason { Timeout = 'timeout' }
+export interface Boxed<T> { value: T }
+export class ThrownError extends Error {}
+export interface Intersected { a: number }
+export interface Constrained { b: number }
 `);
 
     // A barrel, so one live symbol is reached through a re-export chain rather than directly.
@@ -119,6 +138,53 @@ export function usesNeither(): number { return 0; }
 export function usesOne(): number { return staticallyUsed(); }
 `);
 
+    // A file whose every use is one of the four shapes that produced no evidence. It imports NOTHING
+    // it does not use, so any STALE_IMPORT here is wrong by construction.
+    //
+    // MEASURED on sofie before the grammar fix: all four were reported. Six registrars sat in an
+    // array exactly like `registrars` below and `prune` said to delete them — deleting any one
+    // breaks the boot sequence. The import-site calibration could not save them, because the file
+    // HAS observed uses; the blind spot is per-SHAPE, not per-file, which is why the fix belongs in
+    // the grammar and not in another guard on top of it.
+    // `staticallyUsed` is imported and CALLED on purpose, and the test is vacuous without it: the
+    // import-site calibration skips a statement when NOTHING it brings in was seen being used, so a
+    // file where all four shapes are invisible reports nothing at all and passes whether the grammar
+    // covers them or not. MEASURED — this fixture passed against the unfixed build until the called
+    // sibling was added. That sibling is not a convenience, it is the condition: sofie's `app.ts`
+    // had one (a type import from the same module), which is why the guard did not save it there.
+    writeFile(repo, 'src/wiring.ts', `
+import {
+  wiredInArray, wiredInTernary, Reason, Boxed,
+  ThrownError, Intersected, Constrained,
+  staticallyUsed,
+} from './lib.js';
+
+const enabled = true;
+
+export const lifted = staticallyUsed();
+
+// 1. an entry in an ARRAY literal — the registrar / middleware / plugin-table shape
+export const registrars = [wiredInArray];
+
+// 2. a TERNARY branch
+export const chosen = enabled ? wiredInTernary : undefined;
+
+// 3. an ENUM reached only through member access, never as a type annotation
+export function isTimeout(code: string): boolean { return code === Reason.Timeout; }
+
+// 4. an ARRAY OF A GENERIC — the type_identifier sits one level below the array_type
+export const boxes: Boxed<string>[] = [];
+
+// 5. INSTANCEOF — the class is named as a bare value operand
+export function isThrown(e: unknown): boolean { return e instanceof ThrownError; }
+
+// 6. an INTERSECTION type — union's twin, which was captured while this was not
+export const merged: Intersected & { extra: string } = { a: 1, extra: 'x' };
+
+// 7. a CONDITIONAL type — reads the type it checks against
+export type Checks<T> = T extends Constrained ? true : false;
+`);
+
     commit(repo, 'init');
     runCli(['analyze', '--yes'], { cwd: repo });
 
@@ -150,6 +216,33 @@ export function usesOne(): number { return staticallyUsed(); }
     // regress while the total still looked healthy.
     expect(flagged.has('dynamicallyUsed')).toBe(false);
     expect(flagged.has('constructedDynamically')).toBe(false);
+  });
+
+  it('does not call a binding stale because of HOW it is used — the four sofie shapes', () => {
+    // Called out on its own for the same reason the dynamic-import case is: these four regressed
+    // together (one missing grammar concept, four syntaxes) and a combined precision number would
+    // let any one of them come back while the total still looked healthy. Named individually so a
+    // failure says WHICH shape lost its evidence.
+    const stale = new Set(
+      allFindings.filter(f => f.type === 'STALE_IMPORT').map(f => f.symbol)
+    );
+    expect({
+      arrayLiteral: stale.has('wiredInArray'),
+      ternaryBranch: stale.has('wiredInTernary'),
+      enumMemberRead: stale.has('Reason'),
+      arrayOfGeneric: stale.has('Boxed'),
+      instanceofOperand: stale.has('ThrownError'),
+      intersectionType: stale.has('Intersected'),
+      conditionalType: stale.has('Constrained'),
+    }).toEqual({
+      arrayLiteral: false,
+      ternaryBranch: false,
+      enumMemberRead: false,
+      arrayOfGeneric: false,
+      instanceofOperand: false,
+      intersectionType: false,
+      conditionalType: false,
+    });
   });
 
   it('has no known-wrong symbols left, and fails if one reappears', () => {
