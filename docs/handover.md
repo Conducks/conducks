@@ -9,7 +9,7 @@ Branch `mcp-surface-walk-and-concurrency` pushed through `818bcf3`.
 **Prune, measured on the three subjects after today's fixes** — these are the numbers to compare
 against, not the ones further down this file:
 
-| | sofie | scraper | orchestrator |
+| | subject-c | subject-a | orchestrator |
 | --- | --- | --- | --- |
 | ORPHAN | 17 | 18 | 98 |
 | UNUSED_EXPORT | 120 | – | 93 |
@@ -123,7 +123,7 @@ paths"), but nothing ever captured a `mod_item`, so half of it was unreachable. 
 whether the target is really an id — a file path separator, or one of the enumerated
 `CONSTRUCTED_NAMESPACES` — instead of assuming `::` proves it.
 
-**All three frozen subjects are byte-identical after the change** (sofie 17/120/11/1, scraper
+**All three frozen subjects are byte-identical after the change** (subject-c 17/120/11/1, subject-a
 44/18/7, orchestrator 67/98/93/1), so the fix reaches only `::`-path languages.
 
 **Java is NOT broken, and that was the other correction.** It reports nothing because
@@ -142,7 +142,7 @@ name READ in a position no grammar covered — plus one broken sentence.
 
 **A Python enum reached only through a member was invisible.** `EntryPoint.LEVEL_1_ONLY`,
 `InputType.URL_LIST`. Python carried **no value-position captures at all**; the `@ref_value` idea
-existed only in the TypeScript-family grammars. **3 of scraper's 10 `STALE_IMPORT` findings were
+existed only in the TypeScript-family grammars. **3 of subject-a's 10 `STALE_IMPORT` findings were
 this**, each telling the reader to delete an import the module branches on. Added member-read,
 list-element and conditional-branch captures. **10 → 7, and the 7 survivors are each verified true.**
 
@@ -150,7 +150,7 @@ list-element and conditional-branch captures. **10 → 7, and the 7 survivors ar
 sits in `(jsx_attribute (jsx_expression (identifier)))` and nothing reached it, so the normal way of
 wiring a React handler made it look unreferenced. **28 of the monorepo's 126 ORPHAN findings.**
 Added `(jsx_expression (identifier) @ref_value)`. **126 → 98, zero JSX false positives**, and
-`UNIMPORTED_MODULE` fell on two subjects as the new edges connected modules (sofie 15 → 11,
+`UNIMPORTED_MODULE` fell on two subjects as the new edges connected modules (subject-c 15 → 11,
 orchestrator 74 → 67).
 
 `arch` also printed **"No pattern detected. The shape, so the answer is still usable:"** — a sentence
@@ -159,14 +159,14 @@ missing its own subject, on exactly the projects where the command has the least
 **What the run confirmed**, each verified in the source: `query` line numbers exact; `impact`'s
 caller real (`index.ts:2151`); `arch`'s bidirectional pair true in both directions; `context`'s
 printed declaration line exact; `ledger`'s orphan count equal to `prune`'s; `guard` and `drift`
-refusing rather than inventing a verdict; **all 9 previously-false symbols still absent**; sofie's
+refusing rather than inventing a verdict; **all 9 previously-false symbols still absent**; subject-c's
 single `STALE_IMPORT` verified true; **no Next.js route file reported as dead**.
 
 **Recorded and NOT fixed:** `self.method()` still produces no caller edge — `_drain_queue` has 22
 call sites and `impact` finds 1, the only one whose receiver is a typed parameter. Three methods
 called only via `self.` report zero callers. Prune does not turn that into a delete verdict here,
 because their file is `UNIMPORTED_MODULE` and ADR 0026 makes that a question — so the damage is to
-`impact`/`context`/`trace`, not to prune. Also: sofie's #2 and #3 hotspots are barrel re-export
+`impact`/`context`/`trace`, not to prune. Also: subject-c's #2 and #3 hotspots are barrel re-export
 lines rather than declarations, `entry --json` returns a bare array with no denominator, and
 `context` ranks `external://global/*` builtins among real neighbours.
 
@@ -255,7 +255,7 @@ list with a bare `(_)`, which requires at least ONE node in the list, so `start(
 and JavaScript already quantify with `(_)*`, and every other language captures the call target
 without constraining arguments. Measured cost on a two-file fixture: `prune` reported the import of a
 function called on the next line as `STALE_IMPORT`, and `trace` on the calling function returned zero
-steps. **On sofie, fixing it took `UNIMPORTED_MODULE` from 35 to 15** — two dozen Python symbols were
+steps. **On subject-c, fixing it took `UNIMPORTED_MODULE` from 35 to 15** — two dozen Python symbols were
 being called and the graph could not see it.
 
 **`trace` traced from the raw input when resolution missed.** It tried `getNode(input)`, then a
@@ -282,7 +282,7 @@ the command only accepts positional arguments.
 
 ## 2026-08-14 — prune was wrong 9 times out of 10 on a real subject, and the cause was in the grammar
 
-Found by running the shipped build against the frozen sofie subject and checking every finding by
+Found by running the shipped build against the frozen subject-c subject and checking every finding by
 hand. `STALE_IMPORT` reported 10; **9 were false, and each one tells the reader to delete an import
 the code needs.** The other categories held up — ORPHAN, UNUSED_EXPORT and UNIMPORTED_MODULE were
 right in every case checked, including the hard one (`AGENT_COLOR` is an unused export in one file
@@ -294,10 +294,10 @@ Not a weak signal — an absent one. The seven:
 
 | shape | example | measured on |
 | --- | --- | --- |
-| array-literal element | `[registerSafety, registerPrivacy]` | sofie (6 of the 9) |
-| ternary branch | `flag ? undefined : registerEmbeddings` | sofie |
-| enum member read | `FailoverReason.Timeout` | sofie |
-| array of a generic | `PhaseRunResult<R>[]` | sofie |
+| array-literal element | `[registerSafety, registerPrivacy]` | subject-c (6 of the 9) |
+| ternary branch | `flag ? undefined : registerEmbeddings` | subject-c |
+| enum member read | `FailoverReason.Timeout` | subject-c |
+| array of a generic | `PhaseRunResult<R>[]` | subject-c |
 | `instanceof` operand | `e instanceof FilterValidationError` | **conducks itself** |
 | intersection type | `Promise<DriftResult & {...}>` | **conducks itself** |
 | conditional type | `T extends EdgeType ? ... : ...` | **conducks itself** |
@@ -308,7 +308,7 @@ in the grammar and not in one project's style.
 
 **The import-site calibration could not save any of them, and it is worth writing down why.** That
 guard skips a statement when nothing it brings in was seen being used. Every one of these files HAS
-observed uses — sofie's `app.ts` imports `registerSafety` while a sibling `import type { Safety }`
+observed uses — subject-c's `app.ts` imports `registerSafety` while a sibling `import type { Safety }`
 from the same module is genuinely used as a type, and the two merge on (file, specifier). The blind
 spot is per-SHAPE, not per-file, so a guard keyed on the file can never cover it. That is why the fix
 belongs in the grammar and a second guard on top would not have worked.
@@ -317,7 +317,7 @@ Fixed by adding the missing patterns to the typescript, tsx and javascript gramm
 existing `@ref_value` and `@pulse_type_target` machinery — no new code paths. `intersection_type` was
 simply missing beside the `union_type` line that was already there.
 
-**MEASURED: sofie `STALE_IMPORT` 10 → 1, conducks itself 4 → 1. Both survivors verified true
+**MEASURED: subject-c `STALE_IMPORT` 10 → 1, conducks itself 4 → 1. Both survivors verified true
 positives.** ORPHAN, UNUSED_EXPORT and UNIMPORTED_MODULE counts are unchanged on both, so the fix
 bought precision without trading recall elsewhere. Cost: +3% edges, analyze 19.1s → 20.0s on a
 1,095-file subject.
@@ -434,15 +434,15 @@ different command name is invisible to it. That is how `drift` was missed.
 
 **todo63 CLOSED.** The recall half is built: `pruneTaxonomy`'s ATOM edge gate now spares a node whose
 `dna.isExported` is true, so an exported constant nobody imports keeps its node and `prune` reports
-it. MEASURED on the frozen subjects — orchestrator 6,662 -> 6,715 nodes (+0.80%), sofie 10,545 ->
-10,567 (+0.21%), scraper unchanged as the python control. Dangling counts identical, `located` still
+it. MEASURED on the frozen subjects — orchestrator 6,662 -> 6,715 nodes (+0.80%), subject-c 10,545 ->
+10,567 (+0.21%), subject-a unchanged as the python control. Dangling counts identical, `located` still
 100%: the cost is nodes, not broken references. Baselines re-saved warm and cold.
 
 **todo58#P1 is NOT unblocked, and saying it was is my mistake.** I claimed ADR 0070 already decided
 it — refuse and record as dangling. Two things were wrong. ADR 0070 forbids fabricating a target by
 COINCIDENCE (a basename match that sent 106 importers to a test file); reading a declared `tsconfig`
 `rootDir`/`outDir` is not that kind of guess. And the dangling option does not meet the acceptance
-anyway: the unresolved reference is ALREADY kept as a dangling edge at 0.4, and on sofie **all seven
+anyway: the unresolved reference is ALREADY kept as a dangling edge at 0.4, and on subject-c **all seven
 named symbols are still flagged**. The false verdicts sit on the TARGET file's symbols, and nothing
 links "this importer did not resolve" to "do not call that symbol dead". Only resolving the specifier
 removes them. It is a real decision again.
@@ -510,7 +510,7 @@ Fixed by removing `variable` from `PRUNABLE_BINDING_KINDS` — one consumer, one
 analyzer's OWN written rule, not preference: *"a missed dead import is acceptable and a wrong one is
 not"*. A const arrow function is `function`, not `variable` (measured), so callable coverage is intact.
 
-**MEASURED on sofie: 171 findings → 161, `STALE_IMPORT` 20 → 10.** Three of the ten removed were
+**MEASURED on subject-c: 171 findings → 161, `STALE_IMPORT` 20 → 10.** Three of the ten removed were
 checked against the source and all three are confirmed false positives — `ALL_ROLES` used three times
 in the file that imports it, `STATE_COLOR` used as an index, `OWNER_KEY` used as a call argument.
 The cost is real and asserted explicitly in the fixture: a genuinely stale VALUE import is now never
@@ -552,7 +552,7 @@ caught it.
 `<name>.json`. Both modes wrote the same file before, so `--cold --save` silently overwrote the warm
 baseline and `--cold --compare` diffed a first analyze against a second, reporting the residue as
 DRIFT every run. Comparing across modes is now REFUSED (mutation-verified), and the residue is a
-stored number instead of a rediscovery: **orchestrator 5 edges, sofie 1 node**. The docstring's
+stored number instead of a rediscovery: **orchestrator 5 edges, subject-c 1 node**. The docstring's
 "cold and warm now agree" claim — asserted in prose, checked by nobody — is replaced with the truth.
 
 **The warm baselines had to be re-saved, and the diff was not noise.** It is the todo62 alias fix
@@ -564,7 +564,7 @@ measured on frozen subjects, which nothing else could have shown:
 | violations | 25 | 2 |
 | nodes | 6,639 | 6,662 |
 
-Every one of those 23 orphans was a binding node deleted by its own mis-named edge. scraper (python)
+Every one of those 23 orphans was a binding node deleted by its own mis-named edge. subject-a (python)
 is unchanged — the control, since it has no destructured dynamic imports.
 
 **And the driver swap had broken 26 files nobody tests.** `tools/` and `scripts/` imported `duckdb`
@@ -609,7 +609,7 @@ nothing had ever said what their relationship was, so they drifted silently.
 
 Closed: `trace` gained `--mode`/`--target` (its `path` mode was unreachable from the CLI), `prune`
 gained `--type`/`--limit`, `flows` gained `--min-members`/`--limit`, `coverage` gained `--limit`, and
-`impact`'s CLI stopped reading an unknown direction as upstream. Each verified against sofie rather
+`impact`'s CLI stopped reading an unknown direction as upstream. Each verified against subject-c rather
 than asserted — `prune --type ORPHAN` gives 17 from both surfaces, `flows --min-members 2/5/10` gives
 1126/635/376 from both.
 
@@ -626,7 +626,7 @@ gap as a question a user cannot ask.
 ## The laptop stops overheating, and here is why it did
 
 `analyze` sizes its worker pool at `os.cpus().length - 1` — 11 workers on a 12-core machine — and the
-suite spawns `analyze` many times. Measured on sofie: 11 workers analyzes in 20s, 4 in 23s. A 15%
+suite spawns `analyze` many times. Measured on subject-c: 11 workers analyzes in 20s, 4 in 23s. A 15%
 wall-clock cost for a third of the load, so tests now cap it at 4 (`tests/helpers/cap-workers.mjs`,
 `CONDUCKS_WORKERS` overrides).
 
@@ -748,7 +748,7 @@ uncounted caused `Database was already closed`. The handle now has ONE owner —
   move it to a serial project; both were tried as theories and the measurement disproves them. The
   `docs-watcher` debounce case WAS a genuine test-timing bug (a fixed 600 ms sleep, asserting before
   the debounce fired) and is fixed — it now waits on the condition and then proves the count stays 1.
-- sofie (`assistant/sofie`) sits ~96 commits ahead of origin, unpushed by decision — Said's call.
+- subject-c (`assistant/subject-c`) sits ~96 commits ahead of origin, unpushed by decision — Said's call.
 - `.conducks/note-reviews.json` is COMMITTED (the one carve-out from the ignored vault dir).
 
 ## What the earlier stretch built (read the ADRs, they carry the reasoning)
@@ -766,4 +766,4 @@ uncounted caused `Database was already closed`. The handle now has ONE owner —
 ## If you pick something up
 `todo53` is the highest-value: the MCP surface has yielded a defect every single time it has been
 driven, and roughly half of it is still unwalked. `todo52` buys back the 8×. The deferred canvas→note
-link map in sofie and the DERIVED-header warn→error raise remain, neither urgent.
+link map in subject-c and the DERIVED-header warn→error raise remain, neither urgent.

@@ -5,7 +5,7 @@ import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
 /**
  * todo29#P3b — a call on a variable whose type is written on its declaration.
  *
- * Measured on mentorseed: `export const Registry = globalForRegistry.registry ?? new ServiceRegistry()`,
+ * Measured on subject-b: `export const Registry = globalForRegistry.registry ?? new ServiceRegistry()`,
  * then 192 call sites doing `Registry.get(...)`. The call processor resolves the RECEIVER — the
  * dangling target is `registry.ts::registry.get`, carrying the file that defines `Registry` — and
  * then stops, because the member belongs to `Registry`'s TYPE and nothing in the graph said what
@@ -14,7 +14,7 @@ import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
  * The reflector now records `instanceOf` from the declaration, and IntraLinker walks it. Two rails
  * keep it a READ rather than a guess (ADR 0070): the member node must already exist, and a factory
  * (`X.getInstance()`) records nothing, because its return type is not stated at the declaration.
- * That second half is why mentorseed's other 281 dangling calls — `db.query`, where `db` comes from
+ * That second half is why subject-b's other 281 dangling calls — `db.query`, where `db` comes from
  * `CoreDatabaseManager.getInstance()` — stay dangling until there is a real type checker.
  */
 
@@ -37,7 +37,7 @@ const importEdge = (graph: ConducksAdjacencyList, from: string, to: string) =>
 
 const REGISTRY_FILE = `${ROOT}/core/registry/registry.ts`;
 
-/** The mentorseed shape: instance and class in one file, called from another. */
+/** The subject-b shape: instance and class in one file, called from another. */
 const buildGraph = (opts: { instanceOf?: string | null; memberExists?: boolean } = {}) => {
   // `null` means "no type recorded". Passing `instanceOf: undefined` would hit the default below —
   // a destructuring default fires on an explicit undefined — and silently test the opposite case.

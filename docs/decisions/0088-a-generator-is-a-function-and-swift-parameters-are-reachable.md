@@ -57,7 +57,7 @@ Generators get their own pattern in all three JS-family files. The regex fallbac
 - An argument LABEL is kept with the name: `with b: String` records `"with b"`. Both are written, and
   the caller writes the label, so dropping either would misstate the call site.
 - MEASURED: conducks 4,765 nodes / 16,439 edges (up from 4,686 / 16,222 — generators are now in the
-  graph), dangling steady at 1.168%; mentorseed 6,534 / 20,221, 0.381%. Both still verify **100%**
+  graph), dangling steady at 1.168%; subject-b 6,534 / 20,221, 0.381%. Both still verify **100%**
   against source on member-call edges (1,182 and 1,312). 1,281 tests green.
 - Four mutations, each caught: removing the generator pattern, removing `@params_inline`, removing
   the inline type filter, and removing the Swift alias guard.

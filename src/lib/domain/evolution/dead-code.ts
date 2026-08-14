@@ -196,7 +196,7 @@ export class DeadCodeAnalyzer {
       // because nothing in the repo DEFINES them — which is true of every dependency and says
       // nothing: `node:path` was reported dead while being referenced 159 times (ADR 0092).
       //
-      // Measured before the fix: 20 of 41 orphan findings on conducks, and 31 on mentorseed, were
+      // Measured before the fix: 20 of 41 orphan findings on conducks, and 31 on subject-b, were
       // stdlib or package nodes. An unused dependency is a real and different question, and belongs
       // to `supply-chain`, which knows about manifests.
       const isExternal = String(node.properties.filePath || '').startsWith('external://');

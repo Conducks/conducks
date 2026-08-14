@@ -9,16 +9,16 @@ Status: Accepted
 ADR 0138 gave `visuals-lint` the anchor check: every `file:line`, `::symbol` and `NAME=value` a page
 claims is verified against the working tree. That closes one class of rot and cannot see the other:
 **a page whose anchors all still resolve while the picture no longer matches the data it was drawn
-from.** The reference consumer (`sofie`) hit exactly this before the gate existed — the generator
+from.** The reference consumer (`subject-c`) hit exactly this before the gate existed — the generator
 printed "ELK OK — 207 nodes" while the committed page still showed 117, and the build stayed green.
 
-sofie closed it locally with a 60-line `check.mjs`: re-render into scratch, byte-compare, restore.
+subject-c closed it locally with a 60-line `check.mjs`: re-render into scratch, byte-compare, restore.
 That works, but it lives in the consumer, so every repo that generates visuals must reinvent it, and
 the docs standard's own gate (`visuals-lint`) reports "clean" on a page that is provably stale — a
 gate that checks less than it appears to (ADR 0124).
 
 The blocker was never the check; it was that conducks cannot know HOW a repo draws its pictures. A
-generator is bespoke by nature — sofie's is `graph.mjs` + an ELK layout; another repo's could be
+generator is bespoke by nature — subject-c's is `graph.mjs` + an ELK layout; another repo's could be
 anything.
 
 ## Decision
@@ -45,7 +45,7 @@ declaration — printed, never silent, per ADR 0124).
 
 - The standard's gate is now the whole gate: one command answers both "do the anchors still resolve"
   and "were the pages re-drawn after the data changed", the same way `docs-lint` alone governs ADRs
-  and todos. sofie's `check.mjs` and its `visuals:check` script are deleted; its pre-commit hook
+  and todos. subject-c's `check.mjs` and its `visuals:check` script are deleted; its pre-commit hook
   calls only `conducks visuals-lint`.
 - Every commit that trips the drift check pays a full re-render. That is the price of proof; the
   consumer's hook already limits the gate to commits touching relevant paths.

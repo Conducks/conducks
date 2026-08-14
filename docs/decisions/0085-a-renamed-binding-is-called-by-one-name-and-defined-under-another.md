@@ -15,7 +15,7 @@ real call. So the resolutions were verified against the SOURCE instead of agains
 each member-call edge, does the target file really declare that member on that line, and does the
 call site really write `.<member>(`. The graph cannot be its own witness; asking it re-runs the rule.
 
-1,313 edges checked on mentorseed. One failed, and it was a genuine defect:
+1,313 edges checked on subject-b. One failed, and it was a genuine defect:
 
 ```ts
 const { POST: sendMessage } = await import('@/app/api/messages/send-safe/route');
@@ -54,9 +54,9 @@ Three changes, all reads of what the source states:
 
 ## Consequences
 
-- MEASURED on mentorseed: dangling **131 → 77**, rate **0.652% → 0.381%**, with edges GROWING
+- MEASURED on subject-b: dangling **131 → 77**, rate **0.652% → 0.381%**, with edges GROWING
   20,092 → 20,210. Against the start of the day: **695 / 3.459%**.
-- **Both subjects now verify 100% against source** — 1,312 member-call edges on mentorseed and 1,176
+- **Both subjects now verify 100% against source** — 1,312 member-call edges on subject-b and 1,176
   on conducks, every one of them declaring the member on the recorded line and writing the call at
   the call site. That is the first correctness number this project has ever had for resolution, and
   it is worth more than any dangling count.

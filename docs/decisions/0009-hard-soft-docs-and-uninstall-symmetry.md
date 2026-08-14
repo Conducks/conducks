@@ -7,11 +7,11 @@ Status: Accepted
 ## Context
 Two gaps surfaced after unifying the docs standard (ADR 0008):
 1. The parser used a fixed prose whitelist (`product|business|brand|design|process`) and fell back
-   to `unknown` for anything else. Real repos (sofie, mentorseed, mnema) carry project-specific soft
+   to `unknown` for anything else. Real repos (subject-c, subject-b, mnema) carry project-specific soft
    docs — `parity-audit/`, `hypothesis/`, `research/`, `coverage.md` — which wrongly read `unknown`.
    The governed core is the only *universal* documentation; the category folders are not global,
    just common examples. The whitelist privileged them without cause.
-2. `architecture.md` was modeled as a file only. Large projects (sofie already does this) need an
+2. `architecture.md` was modeled as a file only. Large projects (subject-c already does this) need an
    `architecture.md` overview PLUS an `architecture/` folder of per-subsystem detail + charts —
    architecture is file-OR-folder, the same index+detail shape as `decisions/` and `todos/`.
 3. `setup` installs the conducks-usage skills into `<workspace>/.claude/skills/`, but `uninstall`

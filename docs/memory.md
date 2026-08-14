@@ -3,7 +3,7 @@
 ## Removing the Ghost Local strip RAISED the dangling rate, and that is correct
 
 todo22#P7 removed a strip that degraded a fully-qualified target id to its bare last segment when
-the node was not resident in memory. Measured consequence on mentorseed: dangling went
+the node was not resident in memory. Measured consequence on subject-b: dangling went
 **0.501% -> 3.509%**, and on conducks 1.089% -> 1.676%.
 
 That is not a regression. Before, `<file>::db.query` became `db.query` and was then either
@@ -11,7 +11,7 @@ fuzzy-matched onto whatever shared that name — a WRONG edge — or swept as a 
 keeps its exact target and dangles honestly when the target does not exist.
 
 The bulk of what it exposed is one known shape: **member calls on a re-exported binding**
-(`db.query` x281, `registry.get` x192 on mentorseed). Neither bare form exists as a node, so the old
+(`db.query` x281, `registry.get` x192 on subject-b). Neither bare form exists as a node, so the old
 behaviour was not resolving them either. Closing them needs the graph to distinguish a re-export
 node from a definition node, which it does not carry (todo29#P3b).
 
@@ -132,7 +132,7 @@ by construction.
 - **CORRECTED 2026-08-14 — the "0 false positives" above was measured on a build that could not see
   seven use-positions, so it was 0 of what it was able to check.** Re-measured against the same
   repository: 4 findings, 3 FALSE (`FilterValidationError` used only as an `instanceof` operand,
-  `EdgeType` only in a conditional type, `DriftResult` only inside an intersection). On sofie it was
+  `EdgeType` only in a conditional type, `DriftResult` only inside an intersection). On subject-c it was
   9 false out of 10. Both are now 100% precise after the grammar fix; the numbers to cite are those.
 - **The guard is per-FILE, the blind spot is per-SHAPE — this is why import-site calibration cannot
   close a position gap.** Calibration skips a statement only when NOTHING it imports was seen used;
@@ -1216,10 +1216,10 @@ by construction.
   `insertBatched`'s existence probe, which does grow with table size (30 to 109 ms) and is still not
   the cost, because insert sat flat at 466 ms beside it.
 - Applies: a perf fixture needs REAL git history, and COPYING a project can silently remove it. The
-  real mentorseed has 325 commits; the scratch copy every earlier benchmark used had no `.git`, so
+  real subject-b has 325 commits; the scratch copy every earlier benchmark used had no `.git`, so
   kinetic values were absent and the stage that dominates a real pulse cost nothing there. With git
   restored the same project takes **73 s against 40 s** — a third of the pulse was invisible in every
-  mentorseed number quoted before this. Verify `git rev-list --count HEAD` in the fixture, not the
+  subject-b number quoted before this. Verify `git rev-list --count HEAD` in the fixture, not the
   original.
 
 ## A multi-row UPDATE on `edges` ALWAYS fails — one row per statement is the only form
@@ -1422,7 +1422,7 @@ by construction.
   happen to have seen — the enumeration is what goes stale.
 
 ## `results-baseline.txt` measures nothing — do not cite it
-- Gotcha: the file looks like a benchmark baseline and every number in it is void. Two of three subjects were the wrong tree, `nodes=0` read a vault path that never existed, `peak_cpu=0%` sampled the subshell rather than the work, and `mentorseed` varied between 139 s and 193 s across identical runs
+- Gotcha: the file looks like a benchmark baseline and every number in it is void. Two of three subjects were the wrong tree, `nodes=0` read a vault path that never existed, `peak_cpu=0%` sampled the subshell rather than the work, and `subject-b` varied between 139 s and 193 s across identical runs
 - Why: it was produced once by a harness that has since been fixed, and nothing in the file says so. A stale number with a plausible filename outranks a correct number nobody wrote down, which is how it kept being quoted
 - Applies: repository root; any performance claim about `analyze`. Current measured figures live in ADR 0060 (memory) and ADR 0061 (parse time), both with the run that produced them
 
@@ -1437,9 +1437,9 @@ by construction.
 - Applies: any test fixture with an options object and defaults. Use a distinct sentinel (`null`) for "deliberately absent", or omit the key entirely — never pass `undefined` and expect it to mean nothing
 
 ## `dna.returns` was the literal `'void'` for every function — and `params` still is
-- Gotcha: `reflector.ts` hardcoded `returns: 'void'` in the dna it builds, for every function in every language. 4,267 nodes on the mentorseed vault all claimed void, none of it measured, and `query-service.ts:215` exposes the field to users as though it were read from the source. FIXED 2026-08-01 for TypeScript and TSX (ADR 0084): the declared type is captured, and an undeclared one is `null` rather than `'void'`
+- Gotcha: `reflector.ts` hardcoded `returns: 'void'` in the dna it builds, for every function in every language. 4,267 nodes on the subject-b vault all claimed void, none of it measured, and `query-service.ts:215` exposes the field to users as though it were read from the source. FIXED 2026-08-01 for TypeScript and TSX (ADR 0084): the declared type is captured, and an undeclared one is `null` rather than `'void'`
 - Why it matters beyond the field: the wrong value AGREED with the wrong conclusion. `todo29` recorded factory-typed calls as needing a type checker, and the one place in the graph that would have contradicted it — the callee's declared return type — said `void`. A fabricated value does not merely lack information; it actively confirms whatever you already believed
-- FIXED for `params` too, later the same day (ADR 0086): name, declared type and optionality are read from the grammar's `pattern` field, including arrow functions assigned to a const. An empty array now MEANS "takes nothing" — 448/563 methods and 337/527 functions on mentorseed carry parameters, the rest are genuinely zero-argument
+- FIXED for `params` too, later the same day (ADR 0086): name, declared type and optionality are read from the grammar's `pattern` field, including arrow functions assigned to a const. An empty array now MEANS "takes nothing" — 448/563 methods and 337/527 functions on subject-b carry parameters, the rest are genuinely zero-argument
 - Applies: the two `gnosis` REGEX-FALLBACK branches still write `params: []` and `returns: 'void'`. That path has no AST, so nothing can be read — but the values are the same lie in a smaller place and should be null
 - Applies: JavaScript has no annotations and the other ten languages have no `@return_type` capture, so they record `null` — honest, where `'void'` was not
 
@@ -1457,7 +1457,7 @@ by construction.
 ## Nothing in this project counts a WRONG edge — verify resolutions against source, not the graph
 - Gotcha: every resolution number here counts what is MISSING (dangling). A wrong edge has both endpoints, carries confidence 0.85, and reads as a real call in every command. The suite, `audit` and the dangling count are all blind to it by construction — one was found on 2026-08-01 (`sendMessage` bound to `MessagingService.sendMessage`, a different function) on a day when all three were green and the count had just improved
 - Why the graph cannot check itself: asking the vault whether an edge is right re-runs the rule that produced it. The check has to read the FILES — for a member call, does the target file declare that member on the recorded line, and does the call site write `.<member>(`
-- Applies: `verify-resolutions.mjs` in the session scratchpad is the shape (it is NOT in the suite — it needs a vault and a real subject). Current score: 1,312/1,312 on mentorseed and 1,176/1,176 on conducks. Its three false alarms were all the CHECKER's: a UNIT node spans the file but records lineStart=1, a generic call is `.get<T>(`, and an optional call is `.f?.(`
+- Applies: `verify-resolutions.mjs` in the session scratchpad is the shape (it is NOT in the suite — it needs a vault and a real subject). Current score: 1,312/1,312 on subject-b and 1,176/1,176 on conducks. Its three false alarms were all the CHECKER's: a UNIT node spans the file but records lineStart=1, a generic call is `.get<T>(`, and an optional call is `.f?.(`
 
 ## A tree-sitter query naming two fields must use the GRAMMAR's field order, not alphabetical
 - Gotcha: `(method_declaration name: (identifier) @name type: (_) @return_type)` COMPILES and then throws `Query error of type TSQueryErrorStructure` when a match is created. Swap to `type: ... name: ...` — the order the grammar declares — and it works. Confirmed on tree-sitter-java and tree-sitter-c-sharp
@@ -2191,20 +2191,20 @@ by construction.
 ## The unbounded field only showed up on someone else's repo (todo54 follow-up)
 - Gotcha: adding `Verdict` to `conducks_docs`'s health block shipped `found` — EVERY grammar finding —
   with no cap. On conducks, which has zero violations, the field was empty and invisible. Driven
-  against a frozen benchmark subject (sofie, 200 governed docs, 30 violations) it was 8,820 bytes,
+  against a frozen benchmark subject (subject-c, 200 governed docs, 30 violations) it was 8,820 bytes,
   33% of the whole response, growing with the number of broken files.
 - Why: a payload measured on ONE repo is measured on that repo's data shape, not on the field's
   behaviour. Both earlier size fixes (raw board, constraints) were calibrated on conducks and both
   missed this, because conducks happens to be clean. A list is unbounded whether or not your own
   project fills it.
 - Applies: `health.grammar.found` capped at 10 with `omitted` alongside; `grammarViolations` stays the
-  authoritative count and `docs-lint` remains the surface that prints them all. sofie 26,249 -> 19,307
+  authoritative count and `docs-lint` remains the surface that prints them all. subject-c 26,249 -> 19,307
   bytes. Test payload shapes against a repo whose data is unlike yours — the frozen subjects exist for
   exactly this and had never been pointed at the MCP surface.
 
 ## First measurement of whether findings are TRUE, not just well-formed (todo58)
 - Gotcha: `await import('./x.js')` with destructuring is invisible to the linker, so live code is
-  reported dead. Measured on sofie: 25 dynamic-import sites reaching 28 symbols, 9 of which sit in
+  reported dead. Measured on subject-c: 25 dynamic-import sites reaching 28 symbols, 9 of which sit in
   conducks' 172 findings — precision ~94.8%, and every error is that ONE mechanism rather than
   scattered noise. `impact` has the same hole: `loadKernelPrompt` has three real callers and conducks
   returns two.
@@ -2233,7 +2233,7 @@ by construction.
   disagree, the repro is right — build both.
 
 ## A specifier can be written against the BUILT layout, not the source tree (todo58)
-- Gotcha: after fixing the dynamic-import rebind, 7 of sofie's 9 false positives remained — and they
+- Gotcha: after fixing the dynamic-import rebind, 7 of subject-c's 9 false positives remained — and they
   were never a dynamic-import problem. `electron/main/index.ts` imports
   `'../engine/executor/prompt-loader.js'`, which in the SOURCE tree resolves to `electron/engine/...`
   and does not exist. The real file is `src/engine/...`; the path only works after `tsc` emits both
@@ -2247,7 +2247,7 @@ by construction.
 ## A property asserted in a docstring and checked by nobody had rotted (todo59)
 - Gotcha: `health.mjs` states "Cold and warm now agree on all three subjects (todo49's fix)" and that
   drift between them is a regression of that parity. Measured 2026-08-09 by deleting the vaults and
-  rebuilding: they do not agree. sofie 3440 dangling cold against 3146 warm (+294 unresolved),
+  rebuilding: they do not agree. subject-c 3440 dangling cold against 3146 warm (+294 unresolved),
   orchestrator +157. Python is stable; both TypeScript subjects drift.
 - Why: `--compare` runs WARM by default, over a vault that already exists, and nothing passes `--cold`
   — so the claim was never re-checked after being written. This is the same blind spot todo49 was
@@ -2305,7 +2305,7 @@ by construction.
   mean the next natural failure diagnoses itself, so stop paying for runs once the test can speak.
 
 ## The first analyze links BEFORE external induction, so 463 references dangle (todo59)
-- Gotcha: a cold analyze resolves fewer references than a rebuild of the same code. Measured on sofie:
+- Gotcha: a cold analyze resolves fewer references than a rebuild of the same code. Measured on subject-c:
   IntraLinker resolves 7,531 cold against 7,994 warm — 463 fewer — and the dangling count is 3,440
   against 3,146. The leftovers are all CALLS on local values (`store.has`, `d.getmonth`, `freq.set`)
   whose receivers resolve to INDUCED ecosystem nodes.

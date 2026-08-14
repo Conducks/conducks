@@ -1218,7 +1218,7 @@ export class SynapsePersistence {
     // `scope` bounds the sweep to one subtree, and a SCOPED analyze must always pass it (ADR 0069).
     //
     // Without it this deletes every row not written by the current pulse — correct for a whole
-    // project, catastrophic for one service of a workspace. Measured on mentorseed the moment its
+    // project, catastrophic for one service of a workspace. Measured on subject-b the moment its
     // five services began sharing one vault: analyzing `app` wrote 3,022 app nodes and deleted all
     // 29 of `database`'s, because they carried an earlier pulseId. The vault ended up describing
     // whichever service was analyzed last, which is a worse failure than the split vaults this
@@ -1406,7 +1406,7 @@ export class SynapsePersistence {
     //
     // This is the one exception to the gate and it is bounded, which is why it is safe: MEASURED by
     // counting `export const` VALUE declarations never named in any import, it is 21 nodes on
-    // conducks (0.32% of 6,469) and 49 on sofie. The ATOM flood the gate exists to stop was ~5,000
+    // conducks (0.32% of 6,469) and 49 on subject-c. The ATOM flood the gate exists to stop was ~5,000
     // -> ~1,400, a 72% cut, so this is three orders of magnitude away from re-creating it. A
     // non-exported local with no edges is still cut, which is the bulk of them.
     await this.run(`CREATE OR REPLACE TEMP TABLE _pruned AS

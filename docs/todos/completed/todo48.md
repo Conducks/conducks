@@ -12,7 +12,7 @@ record is the difference between deferred and forgotten.
 ## Phase 1 — the wave cap has no override
 
 - [x] The 1,500-node wave cap (ADR 0079) truncates visibly and keeps the heaviest slice, but there
-      is no flag to raise it — measured on mentorseed: 2,321 eligible of 6,002, about a third of
+      is no flag to raise it — measured on subject-b: 2,321 eligible of 6,002, about a third of
       eligible nodes unreachable through that surface. Add `--wave-cap <n>` (validated positive
       integer, error not silent default), or record why a fixed cap is the contract.
       → BUILT on both surfaces, because the dashboard is driven by HTTP and the CLI only starts it:

@@ -23,7 +23,7 @@ CALLS, CONSTRUCTS, ACCESSES, IMPORTS and TYPE_REFERENCE. Coverage **7.1% → 64%
 | subject | edges | wrong | precision |
 |---|---|---|---|
 | conducks | 11,007 | 2 | **99.98%** |
-| mentorseed | 14,106 | 4 | **99.97%** |
+| subject-b | 14,106 | 4 | **99.97%** |
 
 Those figures are AFTER six rounds of correcting the checker. The first run read 21 and 65, and
 almost all of that difference was the checker, not the graph.
@@ -47,7 +47,7 @@ it cannot tell. Guessing in either direction makes the figure worse than not hav
   - an endpoint TARGET is evidenced by its PATH: `-> request::/api/logs::get` is supported by
     `fetch('/api/logs')`, and the last segment is an HTTP METHOD nobody writes as a callee;
   - a DESTRUCTURED dynamic rename (`const { POST: send } = await import(...)`) is the same case as
-    the static one and mentorseed's lifecycle tests use it throughout — **41** false alarms;
+    the static one and subject-b's lifecycle tests use it throughout — **41** false alarms;
   - a SYNTHETIC source node (a minted route or request) stands for an endpoint, not for a span of
     text, so its edges are unchecked rather than counted either way.
   Each was found by reading the flagged source rather than believing the count. **Six corrections to
@@ -58,7 +58,7 @@ it cannot tell. Guessing in either direction makes the figure worse than not hav
   INTERFACE's span. Every call the function makes is then attributed to a block of type declarations.
   Six files on conducks carry this shape. `memory.md` knew the collision existed; nobody had measured
   what it costs, which is the difference between a recorded trap and a known one.
-- **One real defect remains, and it is one file.** `refund/route.ts` on mentorseed records its unit
+- **One real defect remains, and it is one file.** `refund/route.ts` on subject-b records its unit
   span as lines 1–106 for a 112-line file, and `GET` as 62–77 when it calls `failure` at line 78 —
   so 4 edges are attributed outside the span that produced them. Measured across both subjects: 867
   of 868 unit spans reach end-of-file, so this is an anomaly rather than a pattern, and it is

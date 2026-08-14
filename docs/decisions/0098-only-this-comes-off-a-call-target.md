@@ -39,7 +39,7 @@ with every other `get` in the graph.
 
 - **Bare `get`, `set`, `has` and `values` are gone: 0 edges each**, from 31, 26, 16 and 12.
 - CALLS precision on conducks is **100.0%** (1 contradicted edge of 4,044 decided); overall 99.98%.
-  mentorseed unchanged at 99.98%, oracle A 14/14 and B 7/7, 1,284 tests green.
+  subject-b unchanged at 99.98%, oracle A 14/14 and B 7/7, 1,284 tests green.
 - **The dangling rate ROSE, 4.686% → 4.793%, and that is the fix working.** A bare `get` that
   resolved to an unrelated method counted as resolved; `app.get` that cannot resolve counts as
   unresolved. Trading a wrong edge for an honest dangler moves the rate the wrong way and the graph
@@ -49,7 +49,7 @@ with every other `get` in the graph.
   emission. A generic type PARAMETER (`<T>`) is declared by the signature it appears in, so a
   reference to one points at its own declaration. And a call to a PARAMETER of the enclosing function
   (`new Promise((resolve) => resolve(x))`) names that function's own argument.
-- MEASURED after all four: conducks **4.643%**, mentorseed **8.122%**. `super` and generic `T` are at
+- MEASURED after all four: conducks **4.643%**, subject-b **8.122%**. `super` and generic `T` are at
   ZERO. 24 `resolve`/`reject` edges survive, where the enclosing function is an inline arrow whose
   parameters are not recorded on any node — a smaller version of the same gap, left visible.
 - Precision holds at **99.98%** on both subjects, oracle A 14/14 and B 7/7, 1,284 tests green.

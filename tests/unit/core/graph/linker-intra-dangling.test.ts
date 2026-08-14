@@ -5,7 +5,7 @@ import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
 /**
  * todo29#P3b — the four dangling-edge families the ADR 0071 barrel fix left open.
  *
- * Every fixture below is the SHAPE measured in the mentorseed five-service vault
+ * Every fixture below is the SHAPE measured in the subject-b five-service vault
  * (`.conducks/conducks-synapse.db`, 6,002 nodes / 19,008 edges / 182 dangling edges), reduced to the
  * smallest graph that reproduces it. The ids are the real ones, lowercased the way the graph stores
  * them.
@@ -87,7 +87,7 @@ describe('GROUP 1 — a named import of an external symbol binds under its packa
    * '@heroicons/react/24/outline'`. The CONSTRUCTS emitter resolves what it renders
    * (`@heroicons/react/24/outline::arrowrightstartonrectangleicon`); the reference-as-value emitter
    * writes the BARE binding (`usersicon`) and dangles. An external import produces NO IMPORTS edge
-   * at all — 0 of mentorseed's 3,095 — so the import scope cannot see the package.
+   * at all — 0 of subject-b's 3,095 — so the import scope cannot see the package.
    *
    * The evidence used instead is the unit's OWN already-resolved edge naming that namespace.
    */

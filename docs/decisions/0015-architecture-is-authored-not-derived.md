@@ -16,7 +16,7 @@ That conflated two different things. The *wiring* of a module (which function ca
 graph, cycles) IS derivable and must be queried (`audit`/`impact`/`trace`), never written. But the
 *intent* of a module — why it exists, what layer it sits in, where its boundaries are, what design was
 deliberately deferred — is NOT derivable from code. It is authored intent, the exact thing docs are
-for. sofie's `docs/architecture/**/MODULE.md` are the model: hand-written module narratives holding
+for. subject-c's `docs/architecture/**/MODULE.md` are the model: hand-written module narratives holding
 responsibility, rationale, rejected alternatives, and not-built design debt — none of which any graph
 query can produce.
 
@@ -32,7 +32,7 @@ Split the two. Architecture docs are **authored**, never auto-generated:
   of truth; the global `~/.claude/skills/conducks-docs/SKILL.md` is synced from it.
 
 Rejected: (a) keep architecture banned — loses authored module intent that code can't carry. (b) make
-architecture a GOVERNED skeleton — module narratives are legitimately free-form (see sofie), a rigid
+architecture a GOVERNED skeleton — module narratives are legitimately free-form (see subject-c), a rigid
 skeleton would fight real content.
 
 ## Consequences

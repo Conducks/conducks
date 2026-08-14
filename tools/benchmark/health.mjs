@@ -35,7 +35,7 @@
  *
  * COLD AND WARM DO NOT FULLY AGREE, and this file used to say they did (todo59). The claim was
  * "cold and warm now agree on all three subjects", asserted in prose and checked by nobody, and it
- * had been false for an unknown stretch: measured 2026-08-09, sofie was +294 dangling cold and
+ * had been false for an unknown stretch: measured 2026-08-09, subject-c was +294 dangling cold and
  * orchestrator +157. That gap is FIXED (a second link pass after induction), but a small residue
  * remains — a handful of edges and a node or two, tracked as a number rather than asserted away.
  *

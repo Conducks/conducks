@@ -21,7 +21,7 @@ literal the chain needs. Both facts are written down; neither is modelled.
 ## Phase 0 — measured, and one piece already shipped
 
 - [x] MEASURED: 113 edges / 63 targets on conducks — `registry.infrastructure.graphengine.getgraph`,
-      `registry.audit.status`, `registry.infrastructure.chronicle.getprojectdir`. On mentorseed the
+      `registry.audit.status`, `registry.infrastructure.chronicle.getprojectdir`. On subject-b the
       same bucket is ONE edge, so this is a shape a composition root produces and an app does not
 - [x] SHIPPED: a getter's LAST return now counts, not only a single-statement body. A getter that
       guards or comments before returning a binding is still an alias, and requiring one statement
@@ -36,7 +36,7 @@ literal the chain needs. Both facts are written down; neither is modelled.
       function's parameter list, and a DELEGATING property (`status: () => governance.status()`)
       recorded as its callee. On conducks: deep chains **113 -> 59**, dangling **191 -> 143**
 - [x] REVERTED, then RESTORED — and the reason it looked like overfitting is the finding. Measured
-      against the OLD sweep it took mentorseed from 2 source-contradicted edges to 50. Measured again
+      against the OLD sweep it took subject-b from 2 source-contradicted edges to 50. Measured again
       after ADR 0096 replaced that sweep, the identical code reads **2**. The rules never introduced
       wrong edges; the confidence sweep was DELETING low-confidence danglers, so an edge these rules
       resolved escaped deletion, became visible, and was then judged by a checker that could not yet
@@ -48,7 +48,7 @@ literal the chain needs. Both facts are written down; neither is modelled.
       neither is the cause. The suspect named here — a type name not being unique across five
       services — was wrong, and naming it as a guess rather than a conclusion is why it cost nothing
 - [x] RE-MEASURED both subjects. conducks: deep chains **113 -> 59**, honest dangling
-      **7.350% -> 7.095%**. mentorseed: **10.766% -> 10.774%**, flat, with the graph larger.
+      **7.350% -> 7.095%**. subject-b: **10.766% -> 10.774%**, flat, with the graph larger.
       Precision **99.98% / 99.99%**, oracle A 14/14 and B 7/7, 1,284 tests green
 
 ## Phase 3 — the parameter's declared type (original plan, still open)
@@ -65,6 +65,6 @@ literal the chain needs. Both facts are written down; neither is modelled.
 - [-] Resolve `type X = typeof y` to the variable `y`, so a parameter typed `Registry` reaches the — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
       object literal whose paths ADR 0094 already records
 - [-] Uniqueness-gate it and refuse a chain where any hop is ambiguous, per ADR 0085 — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
-- [-] MEASURE on conducks and mentorseed: dangling, source-verified precision and orphan count — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
+- [-] MEASURE on conducks and subject-b: dangling, source-verified precision and orphan count — moved to todo42: this todo met its acceptance by a different route (new Y() tracking, 113 -> 59 deep chains); these were the original plan and are still owed, so they live where they are visible
       together, per ADR 0077 — a count that improves while a rate worsens is a denominator being
       destroyed

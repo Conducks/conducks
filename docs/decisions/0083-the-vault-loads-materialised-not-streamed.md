@@ -21,7 +21,7 @@ blocker was real but narrow.
 **Keep the arrays. Streaming is 2.4x worse, and so is the smaller fix.**
 
 The streamed version was built and it works — the premise was wrong, not the API. Peak RSS across a
-full mentorseed load (20,092 edges), sampled every 5 ms, three runs per arm:
+full subject-b load (20,092 edges), sampled every 5 ms, three runs per arm:
 
 | arm | peak RSS | peak heap | wall |
 |---|---|---|---|

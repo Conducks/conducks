@@ -737,7 +737,7 @@ export class ConducksReflector {
               // The DECLARED return type, or null when the source does not state one.
               //
               // This was the literal `'void'` for every function in every language — 4,267 nodes on
-              // the mentorseed vault all claiming to return void, none of them measured, and
+              // the subject-b vault all claiming to return void, none of them measured, and
               // `query-service.ts` reports it to users as if it were a fact. `null` is the honest
               // value for "not declared": an absent annotation is not a claim of void, and treating
               // the two as one is what made `getInstance(): CoreDatabaseManager` unreadable.
@@ -1125,7 +1125,7 @@ export class ConducksReflector {
           // A CONSTRUCTS edge already exists for the `new Y()`, but its SOURCE is the enclosing
           // SCOPE, so at module level it says "this file constructs a ServiceRegistry" and not
           // "Registry is one". Without the variable-to-type link a later `registry.get(...)` has no
-          // way to reach `ServiceRegistry.get` — 192 of mentorseed's dangling edges.
+          // way to reach `ServiceRegistry.get` — 192 of subject-b's dangling edges.
           //
           // Reads a DECLARATION rather than inferring: the type is written literally on the same
           // line. A factory (`X.getInstance()`) is deliberately not captured, because its return
@@ -1278,7 +1278,7 @@ export class ConducksReflector {
         sourceName: varName,
         // A BUILT-IN type points at its global id rather than dangling. `new Date()` makes the
         // variable a Date, which is true and worth recording — but Date is not a project node, so a
-        // bare name would be permanently unresolvable. Measured: 128 such edges on mentorseed (65
+        // bare name would be permanently unresolvable. Measured: 128 such edges on subject-b (65
         // Date, 22 Set, ...), which would have doubled the dangling rate to record nothing new.
         // Same treatment calls to built-ins already get.
         targetName: isBuiltIn(typeName, provider.langId) ? getGlobalId(typeName) : typeName,
@@ -1305,7 +1305,7 @@ export class ConducksReflector {
     //
     // Every other route pattern matches the EXPRESS shape — `app.get('/path', handler)`, a call
     // expression naming its own path. Next.js declares a route by FILE POSITION instead, so there is
-    // nothing for a query to match and 118 route files on mentorseed produced ZERO route nodes:
+    // nothing for a query to match and 118 route files on subject-b produced ZERO route nodes:
     // conducks could see who CALLED an endpoint and not who SERVED it, on the most common React
     // stack.
     //

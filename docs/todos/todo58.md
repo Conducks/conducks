@@ -1,12 +1,12 @@
 # todo58 — the linker does not resolve `await import()`, so live code is reported dead
 Status: todo
-- Acceptance: a symbol destructured from a dynamic `await import(...)` and used is NOT reported by `prune`, and DOES appear in `impact --direction upstream` for its callee — measured on sofie, where 9 of 172 findings and 1 of 3 known callers are currently wrong.
+- Acceptance: a symbol destructured from a dynamic `await import(...)` and used is NOT reported by `prune`, and DOES appear in `impact --direction upstream` for its callee — measured on subject-c, where 9 of 172 findings and 1 of 3 known callers are currently wrong.
 - Builds: 0026
 
 ## Context
 
 First measurement of whether conducks' findings are TRUE, rather than well-formed. Done against a
-frozen benchmark subject (sofie) rather than conducks itself, on 2026-08-09, by taking findings and
+frozen benchmark subject (subject-c) rather than conducks itself, on 2026-08-09, by taking findings and
 verifying each by hand with memory.md's method — the claim the finding makes, not "does the name
 appear".
 
@@ -28,7 +28,7 @@ const { loadAgentSystemPrompt, loadKernelPrompt, readGlobalPrompt, readAgentRout
 return readAgentRoutingPrompt(agentName);            // :1319
 ```
 
-**Blast radius, measured.** sofie holds 25 such destructuring sites reaching 28 distinct symbols. Nine
+**Blast radius, measured.** subject-c holds 25 such destructuring sites reaching 28 distinct symbols. Nine
 of them are in conducks' 172 findings:
 
 | symbol | flagged as |
@@ -64,17 +64,17 @@ misses `electron/main/index.ts:1341`, again behind `await import()`. Recall matt
       `tests/unit/core/graph/dynamic-import-scoped-alias.test.ts`, including two controls that must NOT
       rebind (no same-named binding; a same-named local in another file).
 - [x] A computed specifier (`await import(someVar)`) is still not resolved and still must not be
-      guessed at. None of sofie's 25 sites uses one — every specifier is a literal.
+      guessed at. None of subject-c's 25 sites uses one — every specifier is a literal.
 - [x] RE-MEASURED, and the answer corrects this todo's own diagnosis. Two of the nine dropped out
       (`LinuxAdapter`, `MacOSAdapter`); seven did not, and they are NOT a dynamic-import problem at all:
       every one is imported by `electron/main/index.ts` with a specifier written against the BUILT
       layout. `../engine/executor/prompt-loader.js` from `electron/main/` resolves to
       `electron/engine/...`, which does not exist — the real file is `src/engine/...`, and the path only
       works after `tsc` emits both under `dist/` as siblings (`rootDir: ./src`, `outDir: ./dist`).
-      No source-level resolver can follow that without modelling the build. Precision on sofie is now
+      No source-level resolver can follow that without modelling the build. Precision on subject-c is now
       171 findings with 7 known-wrong from this separate cause.
 - [-] "ADR 0070 already decides this, so record it as dangling" — DROPPED, and it was my error. Two things were wrong with it. First, ADR 0070 forbids fabricating a target by COINCIDENCE (a basename prefix-match that sent 106 importers to a test file); reading a declared `tsconfig` `rootDir`/`outDir` is not a guess of that kind, so the precedent does not rule it out. Second and decisive, the dangling option does not meet this todo's own acceptance — MEASURED below
-- [x] MEASURED, which is what settled it. A fixture reproducing the shape (`electron/main/index.ts` importing `../engine/loader.js`, where `electron/engine/` does not exist) shows the unresolved reference is ALREADY kept as a dangling `CALLS` edge at confidence 0.4 — "KEPT 1 unresolved reference(s)". Then on sofie itself, **all seven named symbols are still flagged**: `TOOL_REGISTRARS`, `agentRoutingPath`, `computeEffectiveSignificance`, `globalPromptPath`, `kernelPromptPath` as `UNUSED_EXPORT`, `registerBackgroundSessions` as `STALE_IMPORT`, `readAgentRoutingPrompt` as `ORPHAN`. (`LinuxAdapter`/`MacOSAdapter` remain gone, as the earlier re-measurement recorded.)
+- [x] MEASURED, which is what settled it. A fixture reproducing the shape (`electron/main/index.ts` importing `../engine/loader.js`, where `electron/engine/` does not exist) shows the unresolved reference is ALREADY kept as a dangling `CALLS` edge at confidence 0.4 — "KEPT 1 unresolved reference(s)". Then on subject-c itself, **all seven named symbols are still flagged**: `TOOL_REGISTRARS`, `agentRoutingPath`, `computeEffectiveSignificance`, `globalPromptPath`, `kernelPromptPath` as `UNUSED_EXPORT`, `registerBackgroundSessions` as `STALE_IMPORT`, `readAgentRoutingPrompt` as `ORPHAN`. (`LinuxAdapter`/`MacOSAdapter` remain gone, as the earlier re-measurement recorded.)
 - [x] So the two options are NOT equivalent and the choice is real. Keeping a dangling edge makes the failure visible in the dangling metric, but the false verdicts live on the TARGET file's symbols — nothing links "this importer could not be resolved" to "do not call that exported symbol dead". Only resolving the specifier removes them, and that means modelling the build layout
 ## Phase 2 — make the measurement repeatable
 

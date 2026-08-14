@@ -25,7 +25,7 @@ Status: done
 - [x] `conducks coverage-view <cov.json>` — self-contained HTML overlay (C6 minimal render), 86KB, 0 CDN
 - [x] `conducks coverage --save-baseline / --vs-baseline` — drift detection (C7), verified fires "addNode: was 86% → now 0% (BROKE)" on degraded input, 0 false positives on identical input
 - [x] `coverage-view --watch` — re-renders overlay on coverage-file change (C5 v1, test-driven feedback loop)
-- [-] C5 full: click through a running live app instrumented with a coverage stream — DROPPED: it is a separate project against a specific target app (e.g. mentorseed), not a conducks-core edit. Reopen it there, not here.
+- [-] C5 full: click through a running live app instrumented with a coverage stream — DROPPED: it is a separate project against a specific target app (e.g. subject-b), not a conducks-core edit. Reopen it there, not here.
 
 ## Phase 4 — Intent docs & acceptance (C4)
 - [-] C4 node-anchored intent docs standard (structure derived, intent authored, keyed to stable node id, dangling anchor → flag) — DROPPED: conducks-docs now anchors intent by PATH (docs/modules/<path>/MODULE.md mirrors the source), and drift is caught by the module-hash review in `conducks monitor`. Node-id anchoring would be a second mechanism for the same job.

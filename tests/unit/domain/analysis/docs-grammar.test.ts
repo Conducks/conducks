@@ -131,7 +131,7 @@ describe('docs-grammar — line-atomic values', () => {
  * only print `0/0 → (no open task)`. That reads as "nothing to do" whether the phase is finished, not
  * started, or written as prose — three different facts collapsed into one silent, wrong answer.
  *
- * Found on mentorseed, where three todos marked phases done with `[✅ DONE 2026-07-18]` in the heading
+ * Found on subject-b, where three todos marked phases done with `[✅ DONE 2026-07-18]` in the heading
  * and carried no tasks at all. Lint passed; the board showed 0/0 for 23 phases.
  */
 describe('docs-grammar — a phase must carry tasks', () => {

@@ -63,7 +63,7 @@ To change what survives, edit `pruneTaxonomy`. Rationale in ADR 0012, decision i
 The export exception exists because a value's use can be completely invisible to the graph: a bare
 read produces no edge, so the gate could not tell an exported constant nobody imports from one used
 everywhere, and deleted both — leaving `prune` nothing to report. It is bounded and was measured
-before it landed: orchestrator +53 nodes (0.80%), sofie +22 (0.21%), scraper unchanged as the python
+before it landed: orchestrator +53 nodes (0.80%), subject-c +22 (0.21%), subject-a unchanged as the python
 control, and dangling counts identical on both TypeScript subjects. The flood the gate exists to stop
 was a 72% cut, so this is nowhere near re-creating it. A non-exported local with no edges is still
 cut, which is the bulk of them.

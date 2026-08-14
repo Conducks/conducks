@@ -55,13 +55,13 @@ shape fixed on the MCP side in todo53, still live on the CLI.
       with reachability. `execution` stays accepted as ADR 0066's deprecated alias. The symbol picker
       now skips EVERY flag's value, not just `--limit`'s, or `trace alpha --target beta` would have read
       `beta` as the symbol.
-      VERIFIED AS A MIRROR on sofie: `watchKernelPrompt -> loadKernelPrompt` returns the same two steps
+      VERIFIED AS A MIRROR on subject-c: `watchKernelPrompt -> loadKernelPrompt` returns the same two steps
       from both surfaces. `--flow` stays CLI-only, which the rule permits.
 - [x] `prune` takes `--type <TYPE>` and `--limit <n>`. The type list is read from
       `contracts/dead-code-types.ts` — the same constant the tool's enum spreads — so a sixth type
       reaches both surfaces at once rather than being remembered into one. `all` means no filter, as on
       the tool, and a limit that does not parse is refused rather than defaulted.
-      VERIFIED AS A MIRROR on sofie: ORPHAN 17/17, STALE_IMPORT 20/20, UNIMPORTED_MODULE 35/35, and
+      VERIFIED AS A MIRROR on subject-c: ORPHAN 17/17, STALE_IMPORT 20/20, UNIMPORTED_MODULE 35/35, and
       both surfaces refuse `BOGUS` with the same vocabulary.
 - [x] DONE by todo57, WITH ONE DEVIATION FROM WHAT THIS TASK PRESCRIBED, recorded because it is a real choice and not an oversight. The extraction happened as described — the BFS is `registry.kinetic.context` and both surfaces reach it. But the CLI did NOT gain `--mode flow|neighbourhood`: the flow trace was REPLACED rather than kept beside the neighbourhood. Keeping it would have preserved the thing this todo exists to remove — one name answering two questions — and the measurement said it was not worth preserving: 2,407 entries of which 247 were unresolved `node` placeholders and 196 whole files. What survived from it is the `Called by:` section and the source lines, as rendering. Original reasoning below, still accurate about the problem:
 - [x] `context` is NOT a flag gap, and adding those flags would make it worse. The two surfaces answer
@@ -75,7 +75,7 @@ shape fixed on the MCP side in todo53, still live on the CLI.
       own flow trace, which the one-directional rule permits, while making the tool's capability
       reachable. That is a three-layer change and is deliberately not bundled with the flag additions.
 - [x] `flows` takes `--min-members <n>` and `--limit <n>`; the floor was hard-coded at 2 with no cap.
-      VERIFIED AS A MIRROR on sofie at three thresholds — min-members 2/5/10 gives 1126/635/376 from
+      VERIFIED AS A MIRROR on subject-c at three thresholds — min-members 2/5/10 gives 1126/635/376 from
       both surfaces.
 - [x] `audit` needed NOTHING. The first audit compared PARAMETER LISTS and concluded the CLI was
       missing four modes; comparing CAPABILITIES shows every one already has a CLI home, just under

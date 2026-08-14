@@ -65,7 +65,7 @@ No code dumps. The orchestrator reads your reasoning and inspects the diff itsel
 
 `analyze` sizes its worker pool at `os.cpus().length - 1` — 11 workers on a 12-core machine — and the
 test suite spawns `analyze` many times over. Twelve cores saturated for minutes is what makes the
-machine hot, and it buys very little: measured on sofie (10.5k nodes), 11 workers analyzes in 20s and
+machine hot, and it buys very little: measured on subject-c (10.5k nodes), 11 workers analyzes in 20s and
 4 workers in 23s. A 15% wall-clock cost for roughly a third of the load.
 
 - `CONDUCKS_WORKERS` caps the pool. Tests set it to 4 automatically (`tests/helpers/cap-workers.mjs`);

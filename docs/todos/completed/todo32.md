@@ -28,7 +28,7 @@ and its factory, or a class and its singleton.
       id, not the symbol part. Establish whether the symbol segment can preserve case without breaking
       the path matching the lowercase rule was introduced for → technically yes (the path segment could
       lowercase alone), but see the measurement below: the cost decides, not the feasibility
-- [x] MEASURE how many ids across conducks and mentorseed would change, and what reads an id as a
+- [x] MEASURE how many ids across conducks and subject-b would change, and what reads an id as a
       string — `rename`, the MCP tools and the layer tables all do → measured 2026-08-06 on conducks:
       **2,322 of 6,144 symbol ids (38%) carry uppercase** and would change; 54 source files hold
       `toLowerCase` call sites that read ids as strings. Against that churn, the vault holds exactly
@@ -44,7 +44,7 @@ and its factory, or a class and its singleton.
       yield, since those are the ones erased at runtime; a class or an enum is a value and keeps its
       claim
 - [x] MEASURED: conducks source-contradicted edges **21 -> 4** (precision 99.80% -> **99.96%**),
-      mentorseed **65 -> 43** (99.51% -> **99.68%**) with edges GROWING 13,633 -> 14,106. `mergeimpact`
+      subject-b **65 -> 43** (99.51% -> **99.68%**) with edges GROWING 13,633 -> 14,106. `mergeimpact`
       now reports lines 62-135, the function, instead of 35-46, the interface
 - [x] Oracle A 14/14 and B 7/7 unchanged, 1,284 tests green, `audit` green
 

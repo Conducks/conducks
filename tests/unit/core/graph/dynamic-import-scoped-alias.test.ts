@@ -10,7 +10,7 @@ import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
  * the import sits inside a function — which is the whole point of a dynamic import — the destructured
  * name is ALSO a function-scoped local, and the call resolves to THAT.
  *
- * Measured shape, reduced from a 22-node repro (and the same shape as sofie's
+ * Measured shape, reduced from a 22-node repro (and the same shape as subject-c's
  * `electron/main/index.ts:1315`, inside an `ipcMain.handle` callback):
  *
  *   main.ts::readroutingprompt          --ALIASES--> loader.ts::readroutingprompt   (nobody points here)
@@ -18,7 +18,7 @@ import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
  *
  * Two nodes for one fact, and they never meet. The alias hangs off a node nothing calls, and the call
  * lands on a local that defines nothing — so `loader.ts::readroutingprompt` has no callers and
- * `prune` reports live code as dead. Measured on sofie: 9 of 172 findings wrong by this one
+ * `prune` reports live code as dead. Measured on subject-c: 9 of 172 findings wrong by this one
  * mechanism, and `impact` returned 2 of 3 real callers for `loadKernelPrompt`.
  *
  * The rebind is a READ of the file's own syntax, not a guess: the local and the binding are in the

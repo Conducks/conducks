@@ -5,7 +5,7 @@
 // Twelve cores saturated for minutes at a time is what makes the laptop hot, and it buys almost
 // nothing here.
 //
-// Measured on sofie (10.5k nodes, 34.9k edges): 11 workers analyzes in 20s, 4 workers in 23s. A 15%
+// Measured on subject-c (10.5k nodes, 34.9k edges): 11 workers analyzes in 20s, 4 workers in 23s. A 15%
 // wall-clock cost for roughly a third of the parallel load. In a test run, where correctness is the
 // point and wall-clock already loses to jest's own serialisation, that is the right side of the trade.
 //

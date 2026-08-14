@@ -29,7 +29,7 @@ enclosing scope, so at module level it says "this file constructs a ServiceRegis
 "`Registry` is one".
 
 `todo29#P3b` recorded this as blocked on type inference. That was half right, and the half matters:
-two shapes make up 68% of mentorseed's dangling edges and they are not the same problem.
+two shapes make up 68% of subject-b's dangling edges and they are not the same problem.
 
 | shape | count | type stated where |
 |---|---|---|
@@ -68,7 +68,7 @@ the bare-name path never sees them.
 
 ## Consequences
 
-- MEASURED on mentorseed: dangling **695 → 477**, rate **3.459% → 2.374%**, 218 edges resolved
+- MEASURED on subject-b: dangling **695 → 477**, rate **3.459% → 2.374%**, 218 edges resolved
   against 39 nodes carrying a recorded type. conducks on itself is unchanged and `audit` is green.
 - `instance_of` is a real `nodes` column, migrated for existing vaults, and classified as CONTENT in
   `content-key.ts` — it is read off the declaration, so it can only change when the declaration text

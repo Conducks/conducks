@@ -11,7 +11,7 @@ import fs from "node:fs";
  * The managed part lives between two markers, so re-running replaces exactly our block and never
  * touches what a project put around it. A foreign hook is APPENDED to, never replaced — someone
  * else's gate is not ours to delete. A symlinked hook is left entirely alone (the target belongs to
- * the repo's own tooling — sofie's does), with a printed instruction instead of a surprise edit.
+ * the repo's own tooling — subject-c's does), with a printed instruction instead of a surprise edit.
  */
 
 const OPEN = "# >>> conducks gates (managed by `conducks install-hooks` — edits inside are overwritten) >>>";

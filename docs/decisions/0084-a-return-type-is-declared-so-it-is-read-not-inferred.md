@@ -10,7 +10,7 @@ Status: Accepted
 
 ADR 0082 decided that a type written on a declaration is READ and a type a function returns is NOT
 guessed, and put `const db = CoreDatabaseManager.getInstance()` on the wrong side of that line — 281
-dangling edges on mentorseed, recorded as needing a real type checker.
+dangling edges on subject-b, recorded as needing a real type checker.
 
 **It never needed one.** TypeScript makes you write the return type, and the source says:
 
@@ -21,7 +21,7 @@ public static getInstance(): CoreDatabaseManager { ... }
 The type is declared, one file away, in plain text. By ADR 0082's own rule it should have been read.
 What made it look unknowable was a defect nobody had looked at:
 
-| `dna.returns` on mentorseed | function nodes |
+| `dna.returns` on subject-b | function nodes |
 |---|---|
 | `"void"` | **4,267** |
 | null | 2,210 |
@@ -68,7 +68,7 @@ order is worse than one that always refuses, and it would have read as flakiness
 
 ## Consequences
 
-- MEASURED on mentorseed: dangling **373 → 131**, rate **1.856% → 0.652%**, against **695 / 3.459%**
+- MEASURED on subject-b: dangling **373 → 131**, rate **1.856% → 0.652%**, against **695 / 3.459%**
   at the start of the day. The 306 `db.query` calls now point at `BaseDatabaseManager.query:111` —
   verified as the method that actually runs, not merely at a node that exists.
 - conducks on itself: **226 → 193**, **1.401% → 1.190%**, with edges GROWING 16,127 → 16,222. The

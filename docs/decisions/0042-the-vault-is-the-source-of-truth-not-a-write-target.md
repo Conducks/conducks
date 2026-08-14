@@ -4,7 +4,7 @@ Status: Accepted
 - Resolved by: 0060 — the sizing this record decided was withdrawn after direct measurement; the projection discipline it introduced lives on in its successors, which carry the build links
 - Date: 2026-07-30
 
-0060 then withdrew what remained of the sizing. Measured twice on `mentorseed`, the reload this
+0060 then withdrew what remained of the sizing. Measured twice on `subject-b`, the reload this
 record is about costs 21-27 MB and the WHOLE read half is roughly 33 MB of a 686 MB peak — under 5%
 — so todo23's remaining phases were closed as void rather than deferred. The projection DISCIPLINE
 this record argues for survives and shipped; only its cost estimate is gone.

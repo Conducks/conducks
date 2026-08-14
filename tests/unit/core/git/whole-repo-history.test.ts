@@ -11,13 +11,13 @@
  * VERDICT: NOT equivalent. `getFileHistory` stays on the per-file `git log -- <path>` call.
  *
  * Proof, not assertion: 514 currently-tracked files in this repository (conducks) agreed between
- * the two methods, 0 disagreements. The SAME comparison against mentorseed
- * (/Users/saidmustafasaid/Documents/Gospel_Of_Technology/mentorseed, read-only, not analyzed)
+ * the two methods, 0 disagreements. The SAME comparison against subject-b
+ * (/Users/saidmustafasaid/Documents/Gospel_Of_Technology/subject-b, read-only, not analyzed)
  * found 2 disagreements out of 1034 tracked files: `.gitignore` and `admin/docs/architecture.md`.
  *
  * The `.gitignore` case, reproduced below with the real commit hashes: commits `71eff3806` and
  * `2e1a7bf67` are SIBLINGS — both parented on `ca940e934`, both carrying the byte-for-byte identical
- * diff to `.gitignore` (`+skills`), because mentorseed's history has a branch that was rebased and
+ * diff to `.gitignore` (`+skills`), because subject-b's history has a branch that was rebased and
  * landed twice under two different ref names (`feat/application-expiry-scheduler`, confirmed via
  * `git log --oneline --all --source`). `git log -- .gitignore` applies its default TREESAME
  * simplification and reports ONE of the two (22 commits total for the file). A repo-wide
@@ -86,8 +86,8 @@ describe('parseRepoWideHistory — sanity on a well-behaved fixture', () => {
   });
 });
 
-describe('repo-wide history vs per-file `git log -- <path>` — mentorseed .gitignore, real hashes', () => {
-  // Captured read-only from mentorseed on 2026-07-31, not modified. Two sibling commits, same
+describe('repo-wide history vs per-file `git log -- <path>` — subject-b .gitignore, real hashes', () => {
+  // Captured read-only from subject-b on 2026-07-31, not modified. Two sibling commits, same
   // parent `ca940e934...`, identical diff to .gitignore. Only the fixture-relevant slice of the
   // repo-wide pass is reproduced; the rest of the fixture is irrelevant to this file.
   const repoWideSlice = [
@@ -105,7 +105,7 @@ describe('repo-wide history vs per-file `git log -- <path>` — mentorseed .giti
   });
 
   it('disagrees with the real `git log -- .gitignore` on the same repository (22, not 23, tracked commits)', () => {
-    // `git log --format=%ae -- .gitignore` on mentorseed returns 22 lines: its default history
+    // `git log --format=%ae -- .gitignore` on subject-b returns 22 lines: its default history
     // simplification drops one of the two sibling commits as TREESAME-redundant. The repo-wide
     // parse of the SAME two commits (above) returns 2 for this pair alone, i.e. it does not
     // collapse them. This is the concrete, reproducible reason `getFileHistory` was NOT switched

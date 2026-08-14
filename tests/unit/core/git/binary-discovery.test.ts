@@ -6,7 +6,7 @@ import path from 'node:path';
 import { ChronicleInterface } from '@/lib/core/git/chronicle-interface.js';
 
 /**
- * Git discovery had NO extension filter, so every tracked file became a unit — measured on mentorseed,
+ * Git discovery had NO extension filter, so every tracked file became a unit — measured on subject-b,
  * 53 `.png` and `.svg` files were read as UTF-8 and given graph nodes. A binary blob carries no symbol:
  * it is noise in the graph, a wasted read each, and it skews any per-file ratio taken from the unit
  * count (1,041 "units" against 692 real code files).

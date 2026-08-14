@@ -6,7 +6,7 @@ Status: Accepted
 
 ## Context
 
-Run against `mentorseed/app` (a foreign Next.js repository, 474 units), conducks produced 470
+Run against `subject-b/app` (a foreign Next.js repository, 474 units), conducks produced 470
 dangling edge targets out of 10,933 edges — 4.3%, against conducks' own 1.7% on itself. 181 of those
 470 are `IMPORTS` edges, all of them the per-binding kind (`BIND::file->target::bindingName`); no
 plain whole-file `IMPORTS` edge dangled. 163 of the 181 name `@/core` (148) or `@/product` (15).
@@ -14,7 +14,7 @@ plain whole-file `IMPORTS` edge dangled. 163 of the 181 name `@/core` (148) or `
 The single worst target carried 106 references:
 
 ```
-/users/.../mentorseed/app/src/tests/unit/lib/registry.test.ts::registry
+/users/.../subject-b/app/src/tests/unit/lib/registry.test.ts::registry
 ```
 
 That file exists. It is `Registry.test.ts`, and it defines no symbol called `registry` — it is a
@@ -89,7 +89,7 @@ coincidence away from the same failure.
 
 ## Consequences
 
-Measured read-only against the `mentorseed/app` vault (`.conducks/conducks-synapse.db`), without
+Measured read-only against the `subject-b/app` vault (`.conducks/conducks-synapse.db`), without
 re-running `analyze` — that vault predates this fix and cannot be re-measured end-to-end from inside
 this task:
 
@@ -111,7 +111,7 @@ into step 4 and basename-matched an unrelated in-scope file. Same failure shape,
 point (step 4 reached from a bare specifier, not an alias), out of this record's scope. Reported, not
 fixed.
 
-Proven with unit tests, on a fixture that reproduces the exact mentorseed shape — an alias with no
+Proven with unit tests, on a fixture that reproduces the exact subject-b shape — an alias with no
 in-scope target, plus a decoy file whose basename coincidentally starts with the alias's last
 segment — alongside a second fixture pair (`@/components/foo` → `@/components/bar`, both in scope)
 that must keep resolving:
@@ -135,5 +135,5 @@ never see" family, in a different processor branch (step 2, not step 3b). No tod
 it surfaced only from reading this repository's vault during this task and this record is scoped to
 the alias path. The end-to-end effect of this fix on the field measurement (470 dangling / 10,933
 edges) is unverified here — this task ran under a rule barring `conducks analyze` on either repo
-while the orchestrator held both vaults; re-running `analyze` against `mentorseed/app` and re-counting
+while the orchestrator held both vaults; re-running `analyze` against `subject-b/app` and re-counting
 is the next step, owned by whoever picks this back up.

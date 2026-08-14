@@ -20,7 +20,7 @@ good answer. The hook belongs where the checks do.
 
 - [x] `conducks install-hooks [--force]` writes `.git/hooks/pre-commit` (or appends to an existing one behind a marked block, never silently replacing someone else's). → and an appended block goes BEFORE a trailing `exit 0`, or the gates would be dead code — pinned by test.
 - [x] The hook runs `docs-lint` and, when `docs/visuals/` exists, `visuals-lint` — each only when something relevant is staged, so an unrelated commit pays nothing. → both skip LOUDLY when the CLI is missing; a missing tool must not block a commit.
-- [x] Idempotent: re-running changes nothing. A foreign hook is left alone with a printed instruction, not overwritten. → refined: a foreign FILE is appended to behind markers (its lines run first, untouched); a foreign SYMLINK is left entirely alone — editing through the link would rewrite the repo's own tooling (sofie's is one).
+- [x] Idempotent: re-running changes nothing. A foreign hook is left alone with a printed instruction, not overwritten. → refined: a foreign FILE is appended to behind markers (its lines run first, untouched); a foreign SYMLINK is left entirely alone — editing through the link would rewrite the repo's own tooling (subject-c's is one).
 - [x] Not a git checkout, or no `.git/hooks` — exit 0 quietly. A tarball install must not fail.
 - [x] `conducks setup` calls it, so adoption is one command. → and skills now also re-sync on every conducks build (postbuild), closing the pull-only staleness of the installed copy.
 

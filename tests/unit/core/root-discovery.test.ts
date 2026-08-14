@@ -52,7 +52,7 @@ describe('isNeverAProjectRoot — one notion of "not a project"', () => {
 describe('discoverRoot — a DECLARED workspace outranks an inferred marker (ADR 0069)', () => {
 
   /**
-   * Measured on `mentorseed`, which declares five services in a root `conducks.json`. Analyzing
+   * Measured on `subject-b`, which declares five services in a root `conducks.json`. Analyzing
    * `app` anchored at `app` because it carries its own package.json; analyzing `database` — a
    * declared service with NO package.json — walked past the workspace and planted a second vault at
    * the repository root holding 40 nodes. One repository, several partial vaults, and the smallest
@@ -70,7 +70,7 @@ describe('discoverRoot — a DECLARED workspace outranks an inferred marker (ADR
   });
 
   it('anchors at the declared workspace for a service that has NO marker of its own', () => {
-    // `database` in mentorseed: a real declared service with no package.json. This is the case that
+    // `database` in subject-b: a real declared service with no package.json. This is the case that
     // produced the 40-node root vault.
     const ws = mkRoot();
     fs.writeFileSync(path.join(ws, 'conducks.json'), JSON.stringify({ services: ['database'] }));

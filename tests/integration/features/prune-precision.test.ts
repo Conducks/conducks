@@ -34,7 +34,7 @@ const TRUTH = {
   /** Reachable. Each one is reached by a DIFFERENT mechanism, named in the fixture below. */
   live: [
     'staticallyUsed', 'dynamicallyUsed', 'constructedDynamically', 'barrelUsed', 'usedConstant',
-    // Four shapes measured wrong on sofie, where nine of ten STALE_IMPORT findings were false and
+    // Four shapes measured wrong on subject-c, where nine of ten STALE_IMPORT findings were false and
     // every one told the reader to delete an import the code needs. Each is reached by a syntax the
     // grammar produced NO evidence for at all — not a weak signal, an absent one.
     'wiredInArray', 'wiredInTernary', 'Reason', 'Boxed',
@@ -85,7 +85,7 @@ export class constructedDynamically { run(): number { return 5; } }
 export const deadConstant = 4;
 export const usedConstant = 7;
 
-// The four sofie shapes. Each is a normal way to write working code.
+// The four subject-c shapes. Each is a normal way to write working code.
 export function wiredInArray(): number { return 8; }
 export function wiredInTernary(): number { return 9; }
 export enum Reason { Timeout = 'timeout' }
@@ -107,7 +107,7 @@ export { barrelUsed } from './barrel.js';
     // Every reach is a mechanism the hand measurement found conducks getting wrong or right:
     //   1. a plain static import and call
     //   2. a DESTRUCTURED DYNAMIC import, called — the mechanism that made live code read as dead
-    //   3. the same, then CONSTRUCTED — sofie's MacOSAdapter shape
+    //   3. the same, then CONSTRUCTED — subject-c's MacOSAdapter shape
     //   4. an import through a barrel re-export
     writeFile(repo, 'src/main.ts', `
 import { staticallyUsed, usedConstant } from './lib.js';
@@ -141,7 +141,7 @@ export function usesOne(): number { return staticallyUsed(); }
     // A file whose every use is one of the four shapes that produced no evidence. It imports NOTHING
     // it does not use, so any STALE_IMPORT here is wrong by construction.
     //
-    // MEASURED on sofie before the grammar fix: all four were reported. Six registrars sat in an
+    // MEASURED on subject-c before the grammar fix: all four were reported. Six registrars sat in an
     // array exactly like `registrars` below and `prune` said to delete them — deleting any one
     // breaks the boot sequence. The import-site calibration could not save them, because the file
     // HAS observed uses; the blind spot is per-SHAPE, not per-file, which is why the fix belongs in
@@ -150,7 +150,7 @@ export function usesOne(): number { return staticallyUsed(); }
     // import-site calibration skips a statement when NOTHING it brings in was seen being used, so a
     // file where all four shapes are invisible reports nothing at all and passes whether the grammar
     // covers them or not. MEASURED — this fixture passed against the unfixed build until the called
-    // sibling was added. That sibling is not a convenience, it is the condition: sofie's `app.ts`
+    // sibling was added. That sibling is not a convenience, it is the condition: subject-c's `app.ts`
     // had one (a type import from the same module), which is why the guard did not save it there.
     writeFile(repo, 'src/wiring.ts', `
 import {
@@ -212,13 +212,13 @@ export type Checks<T> = T extends Constrained ? true : false;
 
   it('reaches a symbol through a destructured dynamic import — the todo58 mechanism specifically', () => {
     // Called out on its own because it is the case the hand measurement found: seven of nine wrong
-    // findings on sofie were reached this way, and a combined precision number would let this
+    // findings on subject-c were reached this way, and a combined precision number would let this
     // regress while the total still looked healthy.
     expect(flagged.has('dynamicallyUsed')).toBe(false);
     expect(flagged.has('constructedDynamically')).toBe(false);
   });
 
-  it('does not call a binding stale because of HOW it is used — the four sofie shapes', () => {
+  it('does not call a binding stale because of HOW it is used — the four subject-c shapes', () => {
     // Called out on its own for the same reason the dynamic-import case is: these four regressed
     // together (one missing grammar concept, four syntaxes) and a combined precision number would
     // let any one of them come back while the total still looked healthy. Named individually so a

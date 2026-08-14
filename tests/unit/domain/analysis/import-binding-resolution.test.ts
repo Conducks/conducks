@@ -10,7 +10,7 @@ import { ConducksComponent } from '@/contracts/types.js';
 /**
  * ADR 0070 — an unresolvable `@/` alias must refuse, not guess by basename.
  *
- * Measured on a real foreign repository (mentorseed/app, 474 units): `import { registry } from
+ * Measured on a real foreign repository (subject-b/app, 474 units): `import { registry } from
  * '@/core/registry/Registry'` has no in-scope target — `@/core` maps (per that repo's tsconfig) to
  * a sibling PACKAGE outside the analyzed tree. `ImportProcessor.resolve()`'s alias branch (3b)
  * correctly found no suffix match, but fell through to the generic fuzzy fallback (step 4), which
@@ -32,7 +32,7 @@ describe('ImportProcessor — an unresolvable alias refuses instead of guessing'
     (proc as any).link(spec, '/proj/src/caller.ts', all);
 
   it('refuses an alias whose suffix does not exist in scope, even when a coincidental basename match exists', () => {
-    // Mirrors the mentorseed case exactly: '@/core/registry/Registry' has no file under a `core/`
+    // Mirrors the subject-b case exactly: '@/core/registry/Registry' has no file under a `core/`
     // tree in scope, but 'Registry.test.ts' is present and its basename starts with 'Registry' — the
     // old fuzzy fallback (step 4) would prefix-match onto it.
     const all = ['/proj/src/caller.ts', '/proj/src/tests/Registry.test.ts'];
@@ -88,7 +88,7 @@ describe('ReflectionPipeline — per-binding IMPORTS edges, before/after the ali
   };
 
   const files = () => [
-    // The mentorseed shape: an alias whose root maps outside this analysis's scope, plus an
+    // The subject-b shape: an alias whose root maps outside this analysis's scope, plus an
     // unrelated file present in-scope that coincidentally shares a basename prefix with the alias's
     // last segment.
     {

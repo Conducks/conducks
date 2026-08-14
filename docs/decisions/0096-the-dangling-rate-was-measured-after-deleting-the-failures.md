@@ -57,7 +57,7 @@ Every pulse now prints both numbers, so a single figure can never again be quote
 
 ## Consequences
 
-- **THE HONEST RATE, measured after the fix: conducks 7.35%, mentorseed 10.77%.** Against 1.15% and
+- **THE HONEST RATE, measured after the fix: conducks 7.35%, subject-b 10.77%.** Against 1.15% and
   0.49% as previously reported, and 14.62% with no sweep at all. That middle number is the real one:
   what conducks fails to resolve, with genuinely unresolvable built-ins removed and nothing else.
 - Source-verified precision is unchanged at **99.98% / 99.99%** and the oracle still reads 14/14, so
@@ -74,6 +74,6 @@ Every pulse now prints both numbers, so a single figure can never again be quote
 - **A first attempt at the resolution work it would enable was reverted.** Teaching the linker to
   resolve a receiver that is a typed PARAMETER, and a property that DELEGATES
   (`status: () => governance.status()`), took conducks' deep chains 113 -> 59 and dangling 191 -> 143
-  — and took mentorseed from 2 source-contradicted edges to 50. An improvement on the subject it was
+  — and took subject-b from 2 source-contradicted edges to 50. An improvement on the subject it was
   written against and a regression on the one it was not is the definition of overfitting, and it is
   parked in a stash rather than shipped. `todo34` carries the measurement.

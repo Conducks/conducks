@@ -8,7 +8,7 @@ import { essenceLens } from '@/lib/core/parsing/essence-lens.js';
  *
  * `registerExternalPackage()` had no production caller, so `isExternalPackage()` answered `false`
  * for everything and step 2 of the resolver was dead code that looked live. A bare specifier then
- * fell through to the basename fallback, and on mentorseed `next/headers` matched the project's own
+ * fell through to the basename fallback, and on subject-b `next/headers` matched the project's own
  * `packages/core/security/server/headers.ts` while `vitest/config` matched its `config.ts` — six
  * IMPORTS edges pointing at project files that have nothing to do with those packages.
  *
@@ -25,7 +25,7 @@ describe('a declared package never resolves by basename', () => {
   const resolve = (spec: string, all: string[], ctx?: AnalyzeContext) =>
     (proc as any).resolve(spec, '/proj/app/caller.ts', all, undefined, ctx);
 
-  // The exact mentorseed shape: the project owns a file whose basename is the package's subpath.
+  // The exact subject-b shape: the project owns a file whose basename is the package's subpath.
   const PROJECT = [
     '/proj/packages/core/security/server/headers.ts',
     '/proj/packages/core/config/server/config.ts',

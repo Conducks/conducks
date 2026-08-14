@@ -62,11 +62,11 @@ Three rules, each true of TypeScript rather than of this fixture:
   no signature captures. The unit test had used the unexported form and passed for weeks. This is
   the class of defect a fixture written in the shape of REAL code finds and a unit test does not.
 - **The overfitting guard, measured on two subjects nobody wrote for this fixture:** conducks
-  1,205/1,205 and mentorseed 1,314/1,314 member-call edges still verify 100% against SOURCE. That is
+  1,205/1,205 and subject-b 1,314/1,314 member-call edges still verify 100% against SOURCE. That is
   the number a bad fix would have broken, and it is why the fixture cannot be trusted alone —
   I wrote it, so passing it only proves I fixed what I already knew about.
 - **A rise in the dangling rate found a second defect.** The first version of rule 1 emitted 128
-  dangling CONSTRUCTS on mentorseed — 65 `Date`, 22 `Set`, then `RegExp`, `Map`, `FormData`. All
+  dangling CONSTRUCTS on subject-b — 65 `Date`, 22 `Set`, then `RegExp`, `Map`, `FormData`. All
   built-ins: `new Date()` genuinely makes the variable a Date, and Date is genuinely not a project
   node. Pointing built-in types at their global id — the treatment calls to built-ins already get —
   took the rate from 0.989% back to 0.556%. Visible only because the rate and the count were read

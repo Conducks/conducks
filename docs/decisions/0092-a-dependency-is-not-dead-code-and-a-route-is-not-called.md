@@ -22,7 +22,7 @@ is WRONG — those types are simply over-exported and never imported anywhere.
 **A dependency is not dead code.** Virtual induction mints a node for every external module and
 symbol, carrying an `external://` path. Nothing in the repo DEFINES `node:fs`, which is true of every
 dependency and says nothing — so `node:path` was reported as dead while being referenced 159 times.
-**20 of 41** orphan findings on conducks and **31** on mentorseed were stdlib or package nodes.
+**20 of 41** orphan findings on conducks and **31** on subject-b were stdlib or package nodes.
 
 **A route is served, not called.** `ROUTE::` and `REQUEST::` are synthesised nodes standing for an
 endpoint. Having no referrer is their normal state.
@@ -39,14 +39,14 @@ question, and belongs to `supply-chain`, which reads manifests and knows what wa
 ## Consequences
 
 - MEASURED on conducks: orphan findings **41 → 17**, and precision — checked symbol by symbol
-  against the source — **27% → 65%**. On mentorseed **201 → 155**. `UNUSED_EXPORT` is untouched at
+  against the source — **27% → 65%**. On subject-b **201 → 155**. `UNUSED_EXPORT` is untouched at
   61, as intended.
 - **The 6 remaining false positives are one KNOWN cause**, not a new one: `registry/index.ts`
   properties (`chronicle`, `watcher`, `logger`, `graphEngine`) reached through DI property chains,
   which `core/graph/linkers/MODULE.md` already records as unresolvable and explicitly accepts —
   "a handful of permanent orphan false positives, accepted rather than papered over with
   heuristics." The position was already taken; what was broken were the two category errors above.
-- mentorseed's remaining 155 are spread across `packages/core/*` — a shared package exporting more
+- subject-b's remaining 155 are spread across `packages/core/*` — a shared package exporting more
   than any one app consumes. That is the library-public-API case, and it is a property of the
   subject rather than a defect in the rule.
 - **This record exists as much for the method as the fix.** The first recommendation was made from a

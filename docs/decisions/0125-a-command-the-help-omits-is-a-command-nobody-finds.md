@@ -37,7 +37,7 @@ The test reads the command DIRECTORY, so adding a file is enough to be covered b
   each naming what it verified), `clean` (purges the vault to zero, leaves source untouched, and its
   description says exactly that), `monitor`, and `mcp` (`--sse` verified live on port 3001).
 - **`monitor` was nearly recorded as defective and is not.** It reported a branch mismatch naming a
-  branch belonging to no part of this project — which turned out to be `mentorseed`, a different
+  branch belonging to no part of this project — which turned out to be `subject-b`, a different
   registered root, correctly labelled with its own name and path. The header had been cut off by the
   command used to read the output. That is the fourth finding this session refuted by looking again,
   and the reason the rule is *verify before recording*.

@@ -41,7 +41,7 @@ treats the name as reachable; the resolver refuses it.
 ## Consequences
 
 - MEASURED on conducks: orphans **17 → 13**, dangling **1.273% → 1.148%**, source-verified member
-  calls **1,205 → 1,227 and still 100%**. On mentorseed: edges **20,518 → 21,193**, dangling
+  calls **1,205 → 1,227 and still 100%**. On subject-b: edges **20,518 → 21,193**, dangling
   **0.556% → 0.505%**, source-verified **1,314 → 1,365 and still 100%**.
 - **More edges resolved AND every one still correct** is the strongest evidence available that a rule
   is real rather than fitted to the fixture that motivated it.

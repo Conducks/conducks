@@ -112,7 +112,7 @@ export class AnalysisService {
       // That held while each project had its own vault and its own pulse timeline. It stops holding
       // the moment one workspace vault is shared across services: analyzing `database` stamps a
       // pulse at NOW, and `app`'s files — untouched since May, never analyzed into this vault — are
-      // then all older than it and read as clean. Measured on mentorseed: the app scope reported
+      // then all older than it and read as clean. Measured on subject-b: the app scope reported
       // "already at 100% resonance" against a vault holding 40 nodes, none of them app's.
       //
       // `file_hashes` is the honest record of what was actually analyzed, and the pulse already
@@ -154,7 +154,7 @@ export class AnalysisService {
     // gitignored, or dropped from the discovery surface is in neither list — and deleting a file makes
     // no OTHER file dirty, so the gate below returned "already at 100% resonance" and the dead symbols
     // survived every subsequent pulse. The graph kept answering with symbols from files that are gone.
-    // Measured on mentorseed: 53 image units persisted through a full `analyze --force`, and only a
+    // Measured on subject-b: 53 image units persisted through a full `analyze --force`, and only a
     // `clean` cleared them.
     //
     // Skipped for `--staged`, where discovery returns ONLY the staged files: reconciling against that
@@ -274,7 +274,7 @@ export class AnalysisService {
     // how todo23#P2 came to be scoped to the ranker and sized against a reload only the ranker
     // needed.
     //
-    // It stays, and ADR 0060 is why: measured twice on `mentorseed` (974 files, 9,910 nodes), the
+    // It stays, and ADR 0060 is why: measured twice on `subject-b` (974 files, 9,910 nodes), the
     // whole read half — this load, PageRank, the linkers and induction — is roughly 33 MB of a
     // 686 MB peak, under 5%. The +293 MB this was once thought to cost is not there. The peak is set
     // by the wave flushes on the write side. Anyone proposing to remove this has to beat 5%.
@@ -371,7 +371,7 @@ export class AnalysisService {
     // dangles until the next analyze. That is the whole cold/warm gap, and it means the first analyze
     // — the only run a new user ever sees — is measurably worse than a rebuild of the same code.
     //
-    // Measured on sofie (todo59): cold resolved 7,531 references against warm's 7,994, and dangling
+    // Measured on subject-c (todo59): cold resolved 7,531 references against warm's 7,994, and dangling
     // was 3,440 against 3,146. PROVEN rather than inferred: replaying IntraLinker alone over the cold
     // vault — no re-parse, no re-induction — resolved 356 more and took dangling to exactly 3,146,
     // the warm number to the edge.

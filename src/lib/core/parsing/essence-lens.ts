@@ -19,7 +19,7 @@ export class EssenceLens {
    * always no. `context.registerExternalPackage()` had no production caller at all.
    *
    * The cost of that was not a missing edge but a WRONG one. With step 2 dead, a bare specifier fell
-   * through to the basename fallback, and on mentorseed `next/headers` matched the project's OWN
+   * through to the basename fallback, and on subject-b `next/headers` matched the project's OWN
    * `packages/core/security/server/headers.ts` and `vitest/config` matched its `config.ts` — six
    * import edges pointing at project files that have nothing to do with those packages. ADR 0070
    * made this argument for aliases; this is the same failure one specifier-shape over.

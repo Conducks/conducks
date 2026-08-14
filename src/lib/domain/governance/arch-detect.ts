@@ -127,7 +127,7 @@ export function detectAdapters(graph: ConducksAdjacencyList, interfaceFragments:
   // precise. It is still fixed here, because 48 is a wrong ANSWER even when it is a harmless input.)
   const bySubsystem = new Map<string, Array<{ id: NodeId; file: string; incoming: number; outgoing: number }>>();
 
-  // A SYSTEM DOOR LIVES NEAR THE TOP OF THE TREE. Without a depth gate, sofie's calendar plugin —
+  // A SYSTEM DOOR LIVES NEAR THE TOP OF THE TREE. Without a depth gate, subject-c's calendar plugin —
   // `src/plugins/tools/calendar/adapters/` — matched the `/adapters/` fragment five directories
   // down and the whole repository was named "hexagonal" off one plugin's internal folder; at depth
   // 2 openship's dashboard still leaked `src/components/apps/` as a door. The gate is positional,

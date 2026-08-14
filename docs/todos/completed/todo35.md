@@ -29,7 +29,7 @@ Low confidence means "the call processor did not resolve this", not "this is a b
 - [x] Both counts reported: `Dropped N universal-member call(s); KEPT M unresolved reference(s) —
       those are references this analysis could not place`
 - [x] MEASURED. conducks: deletes **1,574**, keeps **1,166**, honest rate **7.35%** — against 1.15%
-      reported before and 14.62% with no sweep at all. mentorseed: deletes 827, keeps 2,548.
+      reported before and 14.62% with no sweep at all. subject-b: deletes 827, keeps 2,548.
       Source-verified precision unchanged at **99.98% / 99.99%**, oracle A 14/14, 1,284 tests green
 
 ## Phase 2 — re-baseline

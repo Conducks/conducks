@@ -9,13 +9,13 @@ import { grammars } from '@/lib/core/parsing/grammar-registry.js';
  *
  * `const registry = new ServiceRegistry()` states the variable's type on its own line. The reflector
  * records it as `instanceOf`, and IntraLinker uses it to bind `registry.get(...)` to
- * `ServiceRegistry.get` (see linker-typed-receiver.test.ts for that half). Measured on mentorseed:
+ * `ServiceRegistry.get` (see linker-typed-receiver.test.ts for that half). Measured on subject-b:
  * 218 dangling edges resolved, 695 -> 477.
  *
  * A query that COMPILES and matches NOTHING is the failure ADR 0071 records, and it is invisible
  * without a canary — the graph simply stays the same size. These pin each accepted form, and the
  * REFUSED one below is the more important half: a factory call states no type, so recording one
- * would be a guess (ADR 0070), which is why mentorseed's `db.query` family stays dangling.
+ * would be a guess (ADR 0070), which is why subject-b's `db.query` family stays dangling.
  */
 describe('a variable declared with new records its type', () => {
   const reflector = new ConducksReflector();
@@ -38,7 +38,7 @@ describe('a variable declared with new records its type', () => {
   });
 
   /**
-   * The mentorseed shape verbatim — a global-cache fallback, which is how a Next.js codebase keeps
+   * The subject-b shape verbatim — a global-cache fallback, which is how a Next.js codebase keeps
    * one instance across hot reloads. The type is on the RIGHT of the `??`, so the direct pattern
    * alone missed all 192 call sites.
    */
@@ -69,7 +69,7 @@ describe('a variable declared with new records its type', () => {
 
 /**
  * The DECLARED return type, which was the literal `'void'` for every function in every language
- * until 2026-08-01 — 4,267 nodes on the mentorseed vault all claiming void, none measured, and
+ * until 2026-08-01 — 4,267 nodes on the subject-b vault all claiming void, none measured, and
  * `conducks query` reporting it to users as a fact (ADR 0084).
  */
 describe('a function records the return type it declares', () => {

@@ -12,7 +12,7 @@ import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
  * ADR 0071 — a barrel re-export ("export { x as y } from './z'") must not leave the per-binding
  * IMPORTS edge dangling on downstream importers.
  *
- * Measured on the mentorseed monorepo vault: 180 of 193 dangling IMPORTS edges carry an `@/core`
+ * Measured on the subject-b monorepo vault: 180 of 193 dangling IMPORTS edges carry an `@/core`
  * alias whose FILE resolves correctly (ADR 0070's fix already applies) but whose per-binding target
  * does not exist. `reflection-pipeline.ts` builds that target as `<resolvedFile>::<bindingName>` —
  * e.g. `.../server/index.ts::db` for `import { db } from '@/core/database/server'` — but `db` is not
@@ -47,7 +47,7 @@ describe('Barrel re-export — the public binding a barrel republishes becomes a
     return registry;
   };
 
-  // Reproduces the exact mentorseed barrel shape: a rename ('coreDb as db') and a plain re-export
+  // Reproduces the exact subject-b barrel shape: a rename ('coreDb as db') and a plain re-export
   // ('pool') in the same statement, plus two downstream importers of the barrel.
   const files = () => [
     {

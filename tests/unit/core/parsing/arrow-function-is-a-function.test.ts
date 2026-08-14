@@ -9,7 +9,7 @@ import { grammars } from '@/lib/core/parsing/grammar-registry.js';
  *
  * `export const Button: React.FC = (props) => {...}` is how most of a React or Next.js codebase
  * declares its functions, and conducks recorded every one of them as `ATOM` — a variable. Measured on
- * the frozen subjects: 123 PascalCase atoms in orchestrator's `.tsx` files and 22 in sofie's, against
+ * the frozen subjects: 123 PascalCase atoms in orchestrator's `.tsx` files and 22 in subject-c's, against
  * 128 BEHAVIOR nodes across all 198 of orchestrator's `.tsx` files.
  *
  * That is not a labelling detail. `impact`, `prune`, `coverage` and `flows` all select on BEHAVIOR, so

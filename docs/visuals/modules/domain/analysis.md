@@ -35,7 +35,7 @@ project, then the linker runs a SECOND time against those new nodes.
 
 Without that second pass the first analyze on a fresh vault resolves fewer references than a rebuild
 of the same code — the induced nodes did not exist when linking happened, and on a warm vault they
-only appear to work because they survived from the previous pulse. Measured on sofie: 7,531
+only appear to work because they survived from the previous pulse. Measured on subject-c: 7,531
 resolutions cold against 7,994 warm, dangling 3,440 against 3,146 (todo59).
 
 Not a reorder — induction READS the dangling set that linking produces, so inducting first would

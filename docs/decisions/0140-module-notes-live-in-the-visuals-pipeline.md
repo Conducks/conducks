@@ -11,7 +11,7 @@ is hand-authored module memory — traps, measured refutations, withdrawn recomm
 nothing catches one going stale but a reader. The visuals pipeline (ADR 0138/0139) renders per-block
 detail pages from authored data, anchor-checked and drift-gated.
 
-Measured on the reference consumer (sofie): 96 MODULE.md files, 7,966 lines, and the best of them
+Measured on the reference consumer (subject-c): 96 MODULE.md files, 7,966 lines, and the best of them
 state the same facts as the generated detail pages — `TTS_DRAIN_SEC` appears in
 `modules/services/voice/MODULE.md` AND in `visuals/entry/daemon2.html`, where the visuals copy
 carries `daemon.py:169` anchors and is byte-proven against a fresh render. One fact, two places, and
@@ -45,7 +45,7 @@ Directory structure mirrors the module path: `src/lib/core/graph/` → `docs/vis
 
 ## Consequences
 
-- One per-module surface instead of two. The duplication class sofie exhibited cannot recur, because
+- One per-module surface instead of two. The duplication class subject-c exhibited cannot recur, because
   there is no second slot to copy a fact into.
 - Module notes gain the anchor gate they never had: a cited `file:line` that stops resolving now
   fails a commit instead of waiting for a reader.
@@ -53,7 +53,7 @@ Directory structure mirrors the module path: `src/lib/core/graph/` → `docs/vis
   existing repos keep working while they migrate.
 - Existing `docs/modules/` trees are legacy, tolerated by the grammar (still classified
   "architecture", never lint-flagged) but no longer part of the standard. conducks' own tree
-  migrates in this change; sofie's 96-note migration is todo47.
+  migrates in this change; subject-c's 96-note migration is todo47.
 - A human's navigation question — "what is this module, in context" — is now answered by the canvas
   and its click-through pages rather than a flat folder of 96 files.
 

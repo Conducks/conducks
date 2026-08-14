@@ -34,8 +34,8 @@ on the receiver.
 
 ## Consequences
 
-- MEASURED in two steps. Adding the language's own names: conducks **7.10% → 6.28%**, mentorseed
-  **10.77% → 8.86%**. Then resolving built-in receivers: conducks **→ 4.69%**, mentorseed
+- MEASURED in two steps. Adding the language's own names: conducks **7.10% → 6.28%**, subject-b
+  **10.77% → 8.86%**. Then resolving built-in receivers: conducks **→ 4.69%**, subject-b
   **→ 8.46%**. Both graphs LARGER
   (18,503 and 24,641 edges). Source-verified precision unchanged at **99.98%**, 1,284 tests green.
 - **The remaining backlog is now nearly all one shape**, and it is the shape this project decided to

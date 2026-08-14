@@ -9,12 +9,12 @@ MEASURED with the vaults deleted, then `--force` over the cold result:
 
 | subject | cold | after force | delta |
 |---|---|---|---|
-| scraper | 5,294 / 17,285 | 5,294 / 17,342 | +57 edges |
+| subject-a | 5,294 / 17,285 | 5,294 / 17,342 | +57 edges |
 | orchestrator | 6,647 / 23,701 | 6,647 / 23,797 | +96 edges |
-| sofie | 10,546 / 34,683 | 10,545 / 34,931 | −1 node, +248 edges |
+| subject-c | 10,546 / 34,683 | 10,545 / 34,931 | −1 node, +248 edges |
 
 Isolated to ONE edge type by diffing the composition on a copied subject: every other type is
-identical to the row, and `PULSES_TO` goes **6 → 63** on scraper. So the whole cold-start gap is the
+identical to the row, and `PULSES_TO` goes **6 → 63** on subject-a. So the whole cold-start gap is the
 handover binder, and the inputs it reads are not the difference — `reason='assignment'` edges are
 4,182 in both states.
 
@@ -43,15 +43,15 @@ the original wording implied. Fix it for determinism, on its own schedule, and d
 - [x] `IntraLinker`'s resolutions are applied to the IN-MEMORY graph, not only the vault. They were
       written with `updateEdgeTargets` alone, so every consumer running later in the same pulse still
       saw the bare names — a real defect regardless of this one. `retargetEdge` on the adjacency list
-      keeps both indexes consistent. MEASURED: 4,375 resolutions now visible in memory on scraper,
-      and sofie's cold edge count moved 34,683 → 34,723.
+      keeps both indexes consistent. MEASURED: 4,375 resolutions now visible in memory on subject-a,
+      and subject-c's cold edge count moved 34,683 → 34,723.
 - [-] The handover binder is re-run after the linkers and induction (`rebindHandovers`) — dropped because it was measured to match zero — deduped by
       edge id before persisting — REMOVED 2026-08-07, because it was measured to do nothing.
       Instrumented at the call site: `rebindMatched=0 rebindSkippedMissingEndpoint=0`, meaning the
       second bind never reached even the endpoint check, while the inputs there are byte-identical
       to a warm pulse (`assignResolved=4181/4182` both ways). A no-op that looks like a fix is worse
       than the gap it pretends to close.
-- [x] Neither closed the gap: scraper cold still writes 6 handovers against 63. The hypothesis that
+- [x] Neither closed the gap: subject-a cold still writes 6 handovers against 63. The hypothesis that
       target resolution was the limiting factor is REFUTED by measurement, twice.
 
 ## Phase 2 — find the real cause
@@ -105,8 +105,8 @@ candidate pair whose endpoint is missing.
 
       MEASURED after: a cold run on the Python subject writes **63 handovers and 5,294 / 17,342** —
       byte-identical to the warm answer, which was the pre-registered success criterion. All three
-      frozen subjects now analyze to their warm baselines from an empty vault: scraper
-      5,294/17,342, orchestrator 6,647/23,797, sofie 10,545/34,931. Suite 1,602, cli-smoke 28/28,
+      frozen subjects now analyze to their warm baselines from an empty vault: subject-a
+      5,294/17,342, orchestrator 6,647/23,797, subject-c 10,545/34,931. Suite 1,602, cli-smoke 28/28,
       guard clean.
 
       HONEST LIMIT on the regression test: `cold-start-parity.test.ts` does NOT reproduce this.
@@ -148,6 +148,6 @@ candidate pair whose endpoint is missing.
       `coldStart` in its result so a saved baseline SAYS which analyze it describes rather than
       leaving the reader to know how it was invoked; the field is outside the `COMPARED` allowlist,
       so it cannot create phantom drift. The header now states plainly that the default baseline
-      describes the second analyze. VERIFIED end to end: `--only scraper --cold --compare` rebuilt
+      describes the second analyze. VERIFIED end to end: `--only subject-a --cold --compare` rebuilt
       from nothing and reported 5,294 / 17,342 — `vs baseline unchanged` — which re-proves todo49's
       cold/warm parity through the harness that was structurally blind to it.

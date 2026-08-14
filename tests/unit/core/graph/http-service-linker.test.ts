@@ -9,10 +9,10 @@ import { HttpServiceLinker } from '@/lib/core/graph/http-service-linker.js';
  * A DOCUMENT THAT MENTIONS A URL IS NOT A CALLER.
  *
  * The linker scans raw file text for `http://<hostname>` and binds the hostname to a same-named
- * service node. On the frozen sofie subject that minted `docs/memory.md::unit -CALLS->
+ * service node. On the frozen subject-c subject that minted `docs/memory.md::unit -CALLS->
  * src/plugins/providers/said-server` — the memory doc DESCRIBES the server, in prose, and the edge
  * claimed the documentation calls it. Found by the first `verify-edges` run on the subjects
- * (todo44#P5): both wrong CALLS edges on sofie were markdown sources.
+ * (todo44#P5): both wrong CALLS edges on subject-c were markdown sources.
  *
  * Prose files are skipped by extension. Code stays scanned — the rule removes a false claim, not
  * the feature.

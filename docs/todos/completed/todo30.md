@@ -39,7 +39,7 @@ ADR 0092. The call edges dangle as well.
 
 - [x] Resolve `<file>::a.b.c.method` by walking each hop through the aliases above, reusing `declarationOf`/`memberOfType` rather than adding a parallel resolver
 - [x] Uniqueness-gate every hop, and refuse the whole chain if any hop is ambiguous — a partially-resolved chain that lands somewhere plausible is the wrong-edge failure ADR 0085 measured
-- [x] MEASURE on conducks and mentorseed: orphan count, dangling rate AND source-verified precision together, per ADR 0077
+- [x] MEASURE on conducks and subject-b: orphan count, dangling rate AND source-verified precision together, per ADR 0077
 
 ## Phase 3 — correct the record
 
@@ -54,7 +54,7 @@ records which identifier each property PATH aliases, and the linker walks the lo
 resolves, leaving the rest as the member. No new nodes, so `pruneTaxonomy` is untouched.
 
 MEASURED. conducks: orphan findings **17 -> 13**, dangling **1.273% -> 1.148%**, source-verified
-member calls **1,205 -> 1,227, still 100%**. mentorseed: edges **20,518 -> 21,193**, dangling
+member calls **1,205 -> 1,227, still 100%**. subject-b: edges **20,518 -> 21,193**, dangling
 **0.556% -> 0.505%**, source-verified **1,314 -> 1,365, still 100%**. More edges resolved AND every
 one of them still correct is the strongest available evidence that a rule is real rather than fitted.
 

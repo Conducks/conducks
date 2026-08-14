@@ -12,7 +12,7 @@ codebase declares its functions. Conducks recorded every one of them as `ATOM` â
 the grammar tags the node `@isVariable`, which is syntactically true and semantically wrong.
 
 Measured on the frozen subjects (ADR 0135): orchestrator has 198 `.tsx` files and carried **128**
-`BEHAVIOR` nodes across all of them, beside 123 PascalCase atoms. sofie carried 22.
+`BEHAVIOR` nodes across all of them, beside 123 PascalCase atoms. subject-c carried 22.
 
 This is not a labelling detail. `impact`, `prune`, `coverage` and `flows` all select on `BEHAVIOR`, so
 a React codebase was largely invisible to the four commands this project leads with. Nothing reported
@@ -44,8 +44,8 @@ Measured on the frozen subjects, `--force` on both sides:
 | subject | BEHAVIOR before | after | doc fidelity before | after |
 |---|---|---|---|---|
 | orchestrator | 1,493 | 1,836 | 88.5% | 95.6% |
-| sofie | 2,936 | 3,255 | 99.2% | 99.3% |
-| scraper | 1,117 | 1,117 | 99.2% | 99.2% |
+| subject-c | 2,936 | 3,255 | 99.2% | 99.3% |
+| subject-a | 1,117 | 1,117 | 99.2% | 99.2% |
 
 Python is unchanged, which is the expected result: it has no arrow-function form.
 

@@ -7,7 +7,7 @@ import type { ArchMeasurements } from '@/lib/domain/governance/arch-detect.js';
  *
  * The honesty cases are the point: a repository matching nothing gets "no pattern, here is the
  * shape" rather than the nearest label, and a shape matching two patterns reports both. Electron's
- * main/preload/renderer (the frozen sofie subject) is exactly the input where forcing "hexagonal"
+ * main/preload/renderer (the frozen subject-c subject) is exactly the input where forcing "hexagonal"
  * would be the confident-wrong answer this project keeps removing.
  */
 const base = (over: Partial<ArchMeasurements>): ArchMeasurements => ({
@@ -61,7 +61,7 @@ describe('the architecture decision table', () => {
     expect(r.verdicts.map(v => v.pattern)).toEqual(['layered monolith']);
   });
 
-  /** The sofie shape: no adapter convention matched — the shape IS the answer. */
+  /** The subject-c shape: no adapter convention matched — the shape IS the answer. */
   it('matches nothing and says so, with the shape still reported', () => {
     const r = decide(base({ layerEdges: [{ from: 'electron/main', to: 'src', count: 4 }] }));
     expect(r.verdicts).toEqual([]);

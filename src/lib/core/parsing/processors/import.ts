@@ -92,7 +92,7 @@ export class ImportProcessor {
     // This branch answers at PACKAGE level and is deliberately narrow, because package level is
     // coarser than what the graph already gets for free. Left to fall through, an unresolved
     // external specifier is induced as `lib::<pkg>::<symbol>` — a node per imported SYMBOL, which is
-    // what makes "who uses `useState`" answerable at all. MEASURED on mentorseed (974 units) when
+    // what makes "who uses `useState`" answerable at all. MEASURED on subject-b (974 units) when
     // this branch was first made to fire for every declared dependency: nodes 5,997 -> 3,182 and
     // edges 19,014 -> 6,179, because every named external import collapsed into one package link.
     // The dangling COUNT fell 194 -> 99 and looked like a win; the dangling RATE went 1.02% -> 1.60%
@@ -229,7 +229,7 @@ export class ImportProcessor {
     // edge is what `impact` and `trace` then walk.
     //
     // A DECLARED dependency never reaches the fallback at all. `next/headers` has basename `headers`
-    // and mentorseed owns a `packages/core/security/server/headers.ts`, so the fallback matched them
+    // and subject-b owns a `packages/core/security/server/headers.ts`, so the fallback matched them
     // and wrote an IMPORTS edge from a Next.js import to the project's own file — `vitest/config`
     // onto `config.ts` the same way. Six such edges, each one a WRONG edge rather than a missing
     // one, which is the trade ADR 0070 already refused for aliases: the manifest says this specifier

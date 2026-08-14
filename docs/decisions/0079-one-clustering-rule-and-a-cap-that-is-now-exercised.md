@@ -48,10 +48,10 @@ MEASURED on both subjects:
 | project | wave-eligible nodes | cap hit |
 |---|---|---|
 | conducks | 736 of 4,152 | no |
-| mentorseed | **2,321 of 6,002** | **yes** |
+| subject-b | **2,321 of 6,002** | **yes** |
 
 So the premise has expired: the truncation path is exercised, on a real five-service monorepo, where
-it drops roughly a third of the eligible nodes. mentorseed is the project the task said would be the
+it drops roughly a third of the eligible nodes. subject-b is the project the task said would be the
 measurement that corrects the number.
 
 The cap is kept, because what makes a cap acceptable is not its value but the two properties around
@@ -76,5 +76,5 @@ keeps the heaviest part, is a rendering decision.
   keeps the most connected slice. If a reader ever complains that the picture is missing something,
   the fix is to raise it with that complaint as the evidence.
 - **Not addressed:** whether a user can ask for the whole graph. There is no flag to override the
-  cap, and on mentorseed a third of the eligible nodes are unreachable through this surface. No todo
+  cap, and on subject-b a third of the eligible nodes are unreachable through this surface. No todo
   carries that yet.

@@ -14,7 +14,7 @@ import { grammars } from '@/lib/core/parsing/grammar-registry.js';
  * no node has. Two different failures came out of that, and the second is the reason this is a bug
  * rather than a gap:
  *
- *   - where nothing else owned the local name, the call DANGLED (77 edges on mentorseed);
+ *   - where nothing else owned the local name, the call DANGLED (77 edges on subject-b);
  *   - where something did, it bound to that unrelated export. Measured: a test calling a route's
  *     `POST` through the local name `sendMessage` was linked to `MessagingService.sendMessage`, a
  *     completely different function, at confidence 0.85.

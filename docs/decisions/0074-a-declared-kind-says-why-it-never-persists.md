@@ -18,11 +18,11 @@ that misreading.
 
 `taxonomy.ts` declares 13 `CanonicalKind` values. `SELECT DISTINCT canonicalKind FROM nodes`
 against this repo's own vault (`.conducks/conducks-synapse.db`) returns 9: ECOSYSTEM, REPOSITORY,
-PACKAGE, DIRECTORY, UNIT, INFRA, STRUCTURE, BEHAVIOR, ATOM. The same query against mentorseed's
+PACKAGE, DIRECTORY, UNIT, INFRA, STRUCTURE, BEHAVIOR, ATOM. The same query against subject-b's
 vault (974 units, 5 services, TS/TSX-heavy, opened read-only) returns 8 — the same 9 minus PACKAGE.
 
 The four kinds that persist in **neither** vault are NAMESPACE, STATEMENT, BRANCH and DATA. The
-second vault is what separates them from PACKAGE: PACKAGE's absence in mentorseed is explained by
+second vault is what separates them from PACKAGE: PACKAGE's absence in subject-b is explained by
 its language mix (no Go/Java/Rust/C++/C#/PHP source, and those are the only grammars that tag a
 node `@isPackage`) — present in one corpus, absent in another, a language-gated kind rather than an
 unreachable one. NAMESPACE/STATEMENT/BRANCH/DATA are absent from **both**, which rules that

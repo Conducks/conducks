@@ -5,7 +5,7 @@ import { nextRoutePath, nextRouteMethods, nextRoutes } from '@/lib/core/parsing/
  * Next.js app-router routes (todo29#P5).
  *
  * Every existing route pattern matches the EXPRESS shape — a call expression naming its own path.
- * Next.js declares a route by FILE POSITION, so no query can capture it. Measured on mentorseed:
+ * Next.js declares a route by FILE POSITION, so no query can capture it. Measured on subject-b:
  * 118 route files, ZERO route nodes — conducks saw who CALLED an endpoint and not who SERVED it,
  * on the most common React stack.
  */
@@ -37,7 +37,7 @@ describe('deriving a route path from a Next.js file position', () => {
   });
 
   /**
-   * A repository with SEVERAL apps — mentorseed has `app/src/app/...` and `admin/src/app/...` —
+   * A repository with SEVERAL apps — subject-b has `app/src/app/...` and `admin/src/app/...` —
    * must resolve each against its own root, which is why the scan starts at the LAST `app/`.
    */
   it('anchors at the last app/ segment in a multi-app repository', () => {

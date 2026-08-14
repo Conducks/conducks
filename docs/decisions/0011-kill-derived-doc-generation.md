@@ -9,7 +9,7 @@ Status: Accepted
 conducks generated a family of static structural docs — `ARCHITECTURE.md` (context-gen, auto-written
 after EVERY analyze), `BLUEPRINT.md` + `llms.txt` (blueprint; llms.txt was a near-duplicate),
 `.conducks/structural_mirror.md` (visualize) — and the conducks-docs standard called these "DERIVED"
-files. Reviewing the real output on two codebases (TargetedCV, sofie): the docs were low-signal and
+files. Reviewing the real output on two codebases (TargetedCV, subject-c): the docs were low-signal and
 self-contradictory. Writing structure to a static file is exactly the staleness conducks exists to
 kill — the moment code changes, the file is wrong. The value of conducks is the queryable graph
 (`.conducks/*`) plus the LIVE commands (audit, impact, trace, coverage, query, cycles/self-imports),
@@ -33,5 +33,5 @@ conducks shrinks to what earns its keep: an engine you query, not a doc factory.
 `ARCHITECTURE.md` at every analyze; no BLUEPRINT/llms.txt duplication; no 1400-node visualize
 hairball. Kept: `.conducks` graph, all live query commands, `mirror` (UI), authored docs +
 `docs-lint`/`docs-status` over them. Build green, 43/43 tests. Follow-up: delete the already-generated
-`architecture.md`/`BLUEPRINT.md`/`llms.txt` from TargetedCV + sofie, and rewrite the conducks-docs
+`architecture.md`/`BLUEPRINT.md`/`llms.txt` from TargetedCV + subject-c, and rewrite the conducks-docs
 skill to authored-only.

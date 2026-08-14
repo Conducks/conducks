@@ -8,7 +8,7 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
  *
  *   scraper       5,294 / 17,285  ->  5,294 / 17,342   (+57 edges)
  *   orchestrator  6,647 / 23,701  ->  6,647 / 23,797   (+96 edges)
- *   sofie        10,546 / 34,683  -> 10,545 / 34,931   (-1 node, +248 edges)
+ *   subject-c        10,546 / 34,683  -> 10,545 / 34,931   (-1 node, +248 edges)
  *
  * Node counts agree; edges do not. So anyone who analyzes a repository for the first time — which is
  * everyone, once — gets a graph missing edges, with nothing saying so, and only a second run fills

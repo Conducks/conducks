@@ -24,9 +24,9 @@ Three real projects were available, each already frozen and never to receive ano
 
 | subject | shape | why it is here |
 |---|---|---|
-| `scraper` | 167 Python files | the non-TypeScript grammar path, and the honest test of ADR 0133 |
+| `subject-a` | 167 Python files | the non-TypeScript grammar path, and the honest test of ADR 0133 |
 | `orchestrator` | 955 units, npm workspaces, Next.js | the phantom-node territory of ADR 0108 |
-| `sofie` | 1,095 units, Electron main/preload/renderer | a shape that is NOT hexagonal, so the decision table has something it must decline to name |
+| `subject-c` | 1,095 units, Electron main/preload/renderer | a shape that is NOT hexagonal, so the decision table has something it must decline to name |
 
 ## Decision
 
@@ -56,7 +56,7 @@ The first run found a defect that had survived a full command sweep, because eve
 have caught it was run on TypeScript.
 
 **Python docstrings were harvested and then thrown away.** The Python AST says 606 functions in
-`scraper` carry a docstring; conducks had attached 198. Modules: 69 carry one, conducks had attached
+`subject-a` carry a docstring; conducks had attached 198. Modules: 69 carry one, conducks had attached
 1. Instrumenting the join printed the cause immediately:
 
 ```
@@ -73,9 +73,9 @@ Measured after the fix, on the same frozen subjects:
 
 | subject | documented behaviors before | after |
 |---|---|---|
-| scraper | 198/1,117 (17.7%) | 632/1,117 (56.6%) |
+| subject-a | 198/1,117 (17.7%) | 632/1,117 (56.6%) |
 | orchestrator | 563/1,493 (37.7%) | 578/1,493 (38.7%) |
-| sofie | 916/2,936 (31.2%) | 988/2,936 (33.7%) |
+| subject-c | 916/2,936 (31.2%) | 988/2,936 (33.7%) |
 
 **Recall was scored first and would have been enough to declare victory.** Scoring the TEXT against
 the AST instead of counting attachments showed 17 FALSE attachments, each one a `# ------------` rule
@@ -98,7 +98,7 @@ The first attempt at the fix changed nothing, and the benchmark said so. It rank
 Ranking on `canonicalKind === 'ATOM'` is what works. Without an instrument that re-measures, that fix
 would have shipped as done.
 
-`scraper` re-analyzed twice from `--force` produced an identical graph, so the pipeline is
+`subject-a` re-analyzed twice from `--force` produced an identical graph, so the pipeline is
 reproducible on a fixed input. That was assumed and had never been checked.
 
 What this does NOT do: it does not check whether any individual answer is CORRECT. It measures shape,

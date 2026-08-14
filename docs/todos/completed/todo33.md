@@ -1,11 +1,11 @@
 # todo33 — prune's orphan precision on a multi-service subject
 Status: done
-- Acceptance: a sampled orphan check on mentorseed reaches the precision conducks already has, or each surviving class of false positive is named with its cause.
+- Acceptance: a sampled orphan check on subject-b reaches the precision conducks already has, or each surviving class of false positive is named with its cause.
 
 ## Context
 
 `prune` was measured on conducks and the result generalised (ADR 0092): 13 orphan findings, all 13
-true. mentorseed had **144 orphans and 118 unused exports** and had never been examined on its own
+true. subject-b had **144 orphans and 118 unused exports** and had never been examined on its own
 terms — the exact habit ADR 0093 and 0094 were written about.
 
 Sampled 18 orphans against source: **11 genuinely dead, 7 false positives.** conducks reads 13/13.
@@ -38,9 +38,9 @@ does not.
 - [x] The nested `interface` still mints a node in the AUGMENTING file, which nothing references
       because nothing should. Dead-code now skips it, reading the augmentation EDGE rather than
       taking a new column — the edge already carries `isAugmentation` and already persists
-- [x] RE-SAMPLED 18 orphans on mentorseed: **18/18 true**, zero false positives.
+- [x] RE-SAMPLED 18 orphans on subject-b: **18/18 true**, zero false positives.
       `ServiceTypeMap` no longer appears; orphan findings **144 -> 136**
-- [x] conducks holds at 13 orphans, source-verified precision **99.98%**; mentorseed **99.97%**.
+- [x] conducks holds at 13 orphans, source-verified precision **99.98%**; subject-b **99.97%**.
       1,284 tests green, `audit` green
 
 ## Phase 2 — the instrument, which was wrong FOUR times

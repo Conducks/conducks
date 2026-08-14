@@ -49,7 +49,7 @@ describe('enforcedByPaths', () => {
 /**
  * The monorepo case (todo29#P3). The old regex anchored on the bare `src/`|`tests/` prefix, so
  * `app/src/tests/unit/X.test.ts` matched STARTING MID-PATH as `src/tests/unit/X.test.ts` — a path
- * that resolves to nothing. Measured on mentorseed: 18 of 31 ADRs declaring `- Enforced by:` were
+ * that resolves to nothing. Measured on subject-b: 18 of 31 ADRs declaring `- Enforced by:` were
  * silently dropped, and GOVERNS derivation read 0 where the docs held 31 records.
  */
 describe('service-prefixed paths keep their prefix', () => {

@@ -6,7 +6,7 @@ Status: Accepted
 - Promoted: docs/architecture/modules/domain/governance/MODULE.md ("The one lesson this module keeps relearning"); docs/memory.md ("A cycle/hub finding is only as good as the edge types it counts")
 
 ## Context
-Running `conducks audit` on a real Next.js/TS monorepo (mycvpath/TargetedCV, 22k nodes) reported
+Running `conducks audit` on a real Next.js/TS monorepo (subject-d/TargetedCV, 22k nodes) reported
 49 circular dependencies — but ~46 were false. Two defects:
 1. The graph models a TS interface owning its fields (`HAS_PROPERTY`), a class owning its methods
    (`HAS_METHOD`), a member belonging to its file (`MEMBER_OF`), and a file containing a symbol

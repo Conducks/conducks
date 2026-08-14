@@ -45,7 +45,7 @@ wrong one, and only the second is invisible** (ADR 0085).
 
 ## Consequences
 
-- MEASURED on mentorseed: **448/563 methods, 337/527 functions and 101 arrow-function variables**
+- MEASURED on subject-b: **448/563 methods, 337/527 functions and 101 arrow-function variables**
   now carry their parameters. The rest are genuinely zero-argument — spot-checked
   (`export default function AuditPage()`), so an empty array now MEANS "takes nothing".
 - The uniqueness gate changed nothing on either subject: 77 dangling and 100% source-verified before

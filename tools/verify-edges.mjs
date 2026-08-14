@@ -142,7 +142,7 @@ const CHECKS = {
     if (new RegExp(`<\\s*[\\w.$]*\\b${name}\\b`, 'i').test(body)) return 'ok';
     // A RENAMED import is called by its LOCAL name, so the target's own name never appears at the
     // call site. Both spellings count — `import { POST as send }` and the destructured dynamic form
-    // `const { POST: send } = await import(...)`, which mentorseed's lifecycle tests use throughout.
+    // `const { POST: send } = await import(...)`, which subject-b's lifecycle tests use throughout.
     // The edge is right; ADR 0085 is what makes it right, and this checker cannot follow the rename
     // without re-resolving the import.
     const whole = read(row.sf) || '';

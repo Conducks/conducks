@@ -6,7 +6,7 @@ Status: Accepted
 
 ## Context
 
-conducks was pointed at a monorepo it had never seen — `mentorseed`, which declares five services in
+conducks was pointed at a monorepo it had never seen — `subject-b`, which declares five services in
 a `conducks.json` at its root and carries per-service `docs/` trees. Two things came out of it, and
 they are the same defect seen from opposite ends.
 
@@ -16,8 +16,8 @@ looking for the nearest marker: `.conducks`, then `.conducksignore`, then any of
 
 | analyzed | anchored at | vault | held |
 |---|---|---|---|
-| `mentorseed/app` | `mentorseed/app` | `app/.conducks` | 3,412 nodes |
-| `mentorseed/database` | `mentorseed` | `.conducks` | **40 nodes** |
+| `subject-b/app` | `subject-b/app` | `app/.conducks` | 3,412 nodes |
+| `subject-b/database` | `subject-b` | `.conducks` | **40 nodes** |
 
 `app` scoped correctly BY ACCIDENT — it happens to have its own `package.json`. `database` is a
 declared service with none, so the walk continued to the repository root and planted a vault there
@@ -56,9 +56,9 @@ declaration wins, `app/.conducks` stops being authoritative.
 
 | run | vault | analyzed |
 |---|---|---|
-| `analyze mentorseed/` | `mentorseed/.conducks` | all five services |
-| `analyze mentorseed/app` | `mentorseed/.conducks` | app only |
-| `analyze mentorseed/database` | `mentorseed/.conducks` | database only |
+| `analyze subject-b/` | `subject-b/.conducks` | all five services |
+| `analyze subject-b/app` | `subject-b/.conducks` | app only |
+| `analyze subject-b/database` | `subject-b/.conducks` | database only |
 
 A partial analysis must therefore purge only its own scope, not the vault.
 

@@ -40,7 +40,7 @@ describe('the health verdict does not carry an unbounded findings list', () => {
   } as any);
 
   it('caps the findings it ships and keeps the full count', () => {
-    // Found by driving a FOREIGN repo: on conducks (0 violations) `found` was invisible; on sofie it
+    // Found by driving a FOREIGN repo: on conducks (0 violations) `found` was invisible; on subject-c it
     // was 8,820 bytes — 33% of the response — because verdictToJson emits every finding.
     const view: any = agentView(broken(60), 'board', 0);
     expect(view.health.grammar.found.length).toBeLessThanOrEqual(10);

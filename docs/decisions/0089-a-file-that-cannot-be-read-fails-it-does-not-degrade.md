@@ -22,7 +22,7 @@ The reporting was equally silent at the other end. `orchestrator.ts` skipped a f
 bare `continue` — no count, no name, nothing. So even a real crash cost that file and said nothing.
 
 **It never fired on either measured subject.** Instrumenting all six sites and analyzing conducks and
-mentorseed produced zero hits. It was carrying no load and hiding the one thing worth knowing.
+subject-b produced zero hits. It was carrying no load and hiding the one thing worth knowing.
 
 ## Decision
 

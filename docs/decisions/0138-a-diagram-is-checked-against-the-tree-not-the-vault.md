@@ -15,7 +15,7 @@ That gap is not cosmetic. A diagram is a claim about code at a moment. Every `fi
 promise that decays silently — the reader has no way to tell a true anchor from one that pointed
 somewhere real six commits ago, and the more precise the drawing looks, the more it is trusted.
 
-Measured on a real consumer (`sofie`, `docs/visuals/`, 4 pages): **146 anchors, of which 121 were
+Measured on a real consumer (`subject-c`, `docs/visuals/`, 4 pages): **146 anchors, of which 121 were
 `file:line`, 25 bare, and only 5 `file::symbol`.** Of 43 distinct files cited, **16 did not resolve
 from the repository root** — not because the files were gone, but because they were written
 abbreviated (`daemon.py:131`, `dispatch.ts:405`). A human reads those fine. Nothing can check them.

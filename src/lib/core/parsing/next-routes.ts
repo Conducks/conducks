@@ -8,7 +8,7 @@ import path from "node:path";
  * `app/api/onboarding/step/route.ts` exporting `GET` and `POST`. No call expression names the path,
  * so there is nothing for a query to capture and the route is invisible.
  *
- * Measured on mentorseed: **118 route files, ZERO route nodes.** conducks could see who CALLED an
+ * Measured on subject-b: **118 route files, ZERO route nodes.** conducks could see who CALLED an
  * endpoint and not who SERVED it, on the most common React stack — the cross-service pair was
  * half-blind exactly where it would be used most.
  *
@@ -37,7 +37,7 @@ const ROUTE_BASENAMES = new Set(['route.ts', 'route.tsx', 'route.js', 'route.mjs
  *               a resolved one.
  *
  * The segment scan starts after the LAST `app/` or `src/app/`, so a repository with several apps —
- * `admin/src/app/...` and `app/src/app/...` on mentorseed — resolves each against its own root.
+ * `admin/src/app/...` and `app/src/app/...` on subject-b — resolves each against its own root.
  */
 export function nextRoutePath(filePath: string): string | null {
   const normalised = filePath.replace(/\\/g, '/');

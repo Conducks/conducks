@@ -39,9 +39,9 @@ one repo-wide `git log --format='%x00%H%x00%ae' --name-only` pass, parsed into t
 | repository | tracked files | agree | disagree |
 |---|---|---|---|
 | conducks (this repo, 11 merge commits) | 514 | 514 | **0** |
-| mentorseed (read-only, not analyzed, 6+ merge commits) | 1034 | 1032 | **2** |
+| subject-b (read-only, not analyzed, 6+ merge commits) | 1034 | 1032 | **2** |
 
-conducks alone would have looked like a clean pass. mentorseed did not.
+conducks alone would have looked like a clean pass. subject-b did not.
 
 **The two disagreements, traced to a cause, not left as a raw number:**
 

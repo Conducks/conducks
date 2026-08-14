@@ -96,7 +96,7 @@ export class IntraLinker {
       // `userrepository.create`. Keying by `name` alone therefore made the qualified form
       // unlookupable: step 3b could never match it, and step 3c fell back to the bare method
       // (`create`), which is generic enough to bind the wrong node or, more often, nothing.
-      // Measured on mentorseed: 10 `userrepository.*` edges dangled with the defining node present
+      // Measured on subject-b: 10 `userrepository.*` edges dangled with the defining node present
       // in the graph under exactly this id.
       const sep = node.id.indexOf('::');
       if (sep > 0) {
@@ -137,7 +137,7 @@ export class IntraLinker {
 
     // ── 2b. One hop further, through barrels ────────────────────────────────
     //
-    // A binding is routinely imported from a BARREL that does not define it: mentorseed's
+    // A binding is routinely imported from a BARREL that does not define it: subject-b's
     // `authService.ts` imports `userRepository` from `@/core/auth/server`, whose `index.ts`
     // re-exports it from `../repositories/user.repository`. Scoped to depth 1 the defining unit is
     // never in the candidate set — measured: 0 of the 10 `userrepository.*` targets are reachable at
@@ -164,7 +164,7 @@ export class IntraLinker {
 
     // ── 2c. External namespaces, and the symbols the graph attests under them ─
     //
-    // An external import emits NO `IMPORTS` edge at all (measured on mentorseed: 0 of 3,095 carry an
+    // An external import emits NO `IMPORTS` edge at all (measured on subject-b: 0 of 3,095 carry an
     // external origin), so the import scope above cannot see one. What the graph DOES hold is the
     // resolved half of the same import: the call/construct processors write
     // `@heroicons/react/24/outline::academiccapicon` because they consult the file's binding table,
@@ -263,7 +263,7 @@ export class IntraLinker {
       //
       // The call processor already resolved the RECEIVER — the target carries the file that defines
       // it — and then stopped, because the member belongs to the receiver's TYPE and nothing in the
-      // graph said what that type was. `instanceOf` now does (todo29#P3b). On mentorseed this one
+      // graph said what that type was. `instanceOf` now does (todo29#P3b). On subject-b this one
       // shape is 192 dangling edges from a single variable, plus `registry.register` / `registry.has`.
       //
       // It has to run HERE, above the `includes('::')` skip: the id is fully qualified, so the
@@ -413,7 +413,7 @@ export class IntraLinker {
         if (dot > 0) {
           const receiver = symbol.slice(0, dot);
           const member = symbol.slice(dot + 1);
-          // The receiver is often a RE-EXPORT of the declaration, not the declaration: mentorseed's
+          // The receiver is often a RE-EXPORT of the declaration, not the declaration: subject-b's
           // `db` is `export { coreDb as db }`, and `coreDb` is what carries the type. Walk the
           // ALIASES chain to the node that actually declares something, then read from THERE — and
           // resolve the type against THAT file, since the class is imported where it is used.
@@ -430,7 +430,7 @@ export class IntraLinker {
           const receiverProps = graph.getNode(declId)?.properties as any;
           // A direct `new Y()` states the type outright. A factory states it on the CALLEE — read
           // that method's DECLARED return type, which is written in the source exactly as often as
-          // a `new` is. `getInstance(): CoreDatabaseManager` is 281 dangling edges on mentorseed,
+          // a `new` is. `getInstance(): CoreDatabaseManager` is 281 dangling edges on subject-b,
           // and it was never inference: the annotation was there and nothing captured it.
           const typeName = (receiverProps?.instanceOf as string | undefined)
             ?? this.returnTypeOfCall(graph, receiverProps?.instanceOfCall as string | undefined, declFile, unitImports, unitSymbols);
@@ -696,7 +696,7 @@ export class IntraLinker {
     // resolves to that. Two nodes for one fact: the alias hangs off a node nothing calls, the call
     // lands on a local that defines nothing, and the real definition ends up with no callers at all.
     //
-    // Measured on the sofie subject (todo58): 9 of 172 `prune` findings wrong by this one mechanism,
+    // Measured on the subject-c subject (todo58): 9 of 172 `prune` findings wrong by this one mechanism,
     // and `impact` returned two of three real callers for `loadKernelPrompt`.
     //
     // The rebind is a READ, not a guess. The local and the binding sit in the SAME FILE and carry the
@@ -843,7 +843,7 @@ export class IntraLinker {
    * Walk an ALIASES chain to the definition it ultimately renames.
    *
    * `IntraLinker`'s main pass rebinds ONE hop, because `unitImports` only ever names files the
-   * CURRENT file imports (ADR 0071 states this and deliberately stops there). mentorseed has a real
+   * CURRENT file imports (ADR 0071 states this and deliberately stops there). subject-b has a real
    * two-hop chain: `server.ts` re-exports `db` from `database/server/index.ts`, which re-exports it
    * from `DatabaseManager.ts` under the name `coreDb`. After one hop `server.ts::db` points at the
    * MIDDLE barrel's node — a real node, so nothing dangles, but the semantic link stops short of the
@@ -927,7 +927,7 @@ export class IntraLinker {
    * The id of `member` on `typeName`, following EXTENDS when the type inherits it. Null if nothing
    * in the chain declares it.
    *
-   * Inheritance is not an extra: mentorseed's `CoreDatabaseManager extends BaseDatabaseManager`, and
+   * Inheritance is not an extra: subject-b's `CoreDatabaseManager extends BaseDatabaseManager`, and
    * `query` is declared on the PARENT — so 281 of the dangling edges resolve to a type that really
    * has the method and really does not declare it. Stopping at the first class would have refused
    * every one of them and looked like the safety rail working.

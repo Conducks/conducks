@@ -21,7 +21,7 @@ That number has now been wrong three times, and this record is the third correct
   words. Its lesson is written into the file: "shrinking one stage does not lower a peak another
   stage sets."
 
-Phase 2 was still carrying the original 293 MB. Measured on `mentorseed` — the subject the todo
+Phase 2 was still carrying the original 293 MB. Measured on `subject-b` — the subject the todo
 names, 326 commits, 974 files, 9,910 nodes — twice:
 
 | stage | run 1 | run 2 |
@@ -99,7 +99,7 @@ todo22 carries the same stale figure in an open task — "`persistence.load()` r
 graph for PageRank costs **230 MB**, the largest single step". It is corrected there rather than
 left to be found again. The largest single step is the wave-1 vault flush.
 
-The peak on `mentorseed` is 686 MB, against the 881 MB ADR 0043 recorded for this project. Those are
+The peak on `subject-b` is 686 MB, against the 881 MB ADR 0043 recorded for this project. Those are
 different subjects and are not comparable; what is comparable is the shape, and the shape is that
 the write half sets the peak in both.
 

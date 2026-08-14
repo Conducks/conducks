@@ -31,7 +31,7 @@ It does NOT short-circuit into an `external_dependency` result.
 
 That last sentence is the whole decision, and it was learned the expensive way twice. The comment
 above the external-package branch already records the first time: collapsing external imports to
-package level took mentorseed from 5,997 nodes to 3,182, with the dangling COUNT improving while
+package level took subject-b from 5,997 nodes to 3,182, with the dangling COUNT improving while
 the RATE worsened — the shape of a denominator being destroyed. Implementing this ADR by
 short-circuiting repeated it precisely: **5,062 nodes → 819** on the frozen Python subject, a
 graph collapse presented as a 4-point dangling improvement. The warning was written at the exact

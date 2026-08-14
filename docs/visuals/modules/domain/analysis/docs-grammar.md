@@ -11,7 +11,7 @@ per-type skeleton. It is the mechanism that keeps the conducks-docs standard fro
 todo has `Status:` and `## Phase N —`; it has no opinion about whether the content is any good.
 
 **Deferred / not built:** the grammar accepts a bare `Status:` line only. Other projects using this
-standard (sofie) write `**Status 2026-07-17:** …` — richer information in a form the linter rejects.
+standard (subject-c) write `**Status 2026-07-17:** …` — richer information in a form the linter rejects.
 Whether to loosen the check or conform the docs is unresolved.
 
 ## Why the standard is enforced by the tool that ships it

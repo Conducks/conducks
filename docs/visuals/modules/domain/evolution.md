@@ -25,10 +25,10 @@ the measured 36-false-positive flood (todo14).
 
 **"Zero false positives" was the claim here and it was wrong** (todo63, 2026-08-11). It held on
 conducks itself — 1 finding — and was never checked against a subject with a different style. On
-sofie it produced 20, and every one whose target was a plain VALUE was suspect: three spot-checked
+subject-c it produced 20, and every one whose target was a plain VALUE was suspect: three spot-checked
 were all false, including a constant used three times in the very file whose import was called stale.
 Cause: a bare value read produces no edge, so "no evidence of use" was read as evidence of no use.
-`variable` is now excluded from `PRUNABLE_BINDING_KINDS`, taking sofie to 10. The floor is therefore
+`variable` is now excluded from `PRUNABLE_BINDING_KINDS`, taking subject-c to 10. The floor is therefore
 LOWER than it was on purpose — a genuinely stale value import is no longer reported at all, which is
 this module's own rule applied honestly: a missed dead import is acceptable and a wrong one is not.
 
@@ -55,7 +55,7 @@ property chains, and a browser entry point. That profile is expected and accepta
 
 **Auditing a finding by name-grep is WRONG and has been wrong four separate times.** A bare
 `grep -rn "\bSym\b"` counts prose, comments, test mocks and same-named symbols in other files. Two of
-ten spot-checks on sofie looked like conducks was wrong and it was correct both times: `Console`'s only
+ten spot-checks on subject-c looked like conducks was wrong and it was correct both times: `Console`'s only
 "use" was the word inside an `<h3>Sandbox Console</h3>` heading, and `MemoryEdge` was imported by three
 files that all take a DIFFERENT `MemoryEdge` from a types module of their own. Zero occurrences is still meaningful;
 any non-zero count is not.
@@ -65,7 +65,7 @@ outside its own file", scoped to source extensions and excluding build output.
 
 ## Precision on a FOREIGN codebase, measured
 
-The numbers above are conducks auditing itself. Driven at a frozen benchmark subject (sofie, 10.5k
+The numbers above are conducks auditing itself. Driven at a frozen benchmark subject (subject-c, 10.5k
 nodes) on 2026-08-09: **172 findings, ~94.8% precision**, and every error came from ONE mechanism
 rather than scattered noise — symbols reached only through `await import()`.
 

@@ -11,7 +11,7 @@ Status: Accepted
 | subject | parse | whole pulse | share |
 |---|---|---|---|
 | conducks (498 files) | 53.6 s | 57 s | **94%** |
-| mentorseed (974 files) | 16 s | 21 s | 76% |
+| subject-b (974 files) | 16 s | 21 s | 76% |
 
 todo21 carries three open tasks about making this parallel — the worker pool runs its chunks
 sequentially, and skips workers entirely in the shipped binary. Before doing any of that, the stage
@@ -46,12 +46,12 @@ calls them back to back on every file, and nothing between them knows the other 
 
 Two earlier readings of this were wrong and are worth recording, because both looked like findings:
 
-- **"conducks files parse 6× slower than mentorseed files."** A probe artifact. The probe used the
+- **"conducks files parse 6× slower than subject-b files."** A probe artifact. The probe used the
   bootstrapped registry, which anchors `chronicle` on conducks, so `isInsideProject()` was false for
-  every mentorseed path and all three git calls returned early. The probe was measuring parse
+  every subject-b path and all three git calls returned early. The probe was measuring parse
   WITHOUT git and calling it a language difference. It accidentally produced the right control:
   19 ms/file without git against 168 ms/file with it.
-- **"conducks has more history, so git is slower there."** conducks has 294 commits and mentorseed
+- **"conducks has more history, so git is slower there."** conducks has 294 commits and subject-b
   has 326. A single `git log` costs 41 ms here and 18 ms there, which is repository object count,
   not history depth. The per-file cost is dominated by **process spawn**, not by git's work.
 

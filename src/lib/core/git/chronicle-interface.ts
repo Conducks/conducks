@@ -26,7 +26,7 @@ const NON_CODE_FILENAMES = ['Dockerfile', '.env'];
  * documents). And a denylist fails SAFE: an unknown extension is still analyzed, so a language added
  * later is never silently skipped, whereas a stale allowlist would drop it.
  *
- * Measured on mentorseed before this existed: 53 `.png` and `.svg` files were read as UTF-8 and given
+ * Measured on subject-b before this existed: 53 `.png` and `.svg` files were read as UTF-8 and given
  * graph nodes — noise in the graph, a wasted read each, and a skew in any per-file ratio taken from the
  * unit count (1,041 "units" against 692 actual code files).
  */

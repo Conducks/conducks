@@ -101,7 +101,7 @@
   in both directions, the tree-sitter all-or-nothing query trap, why the graph algorithms look
   circular and aren't, why the registry is not a hub, why prune must under-report, and the
   taxonomy's deliberate 13-vs-9 disagreement.
-- Deliberately NOT sofie's format. Sofie's MODULE.md carries a `## Symbol map` and a `## Features`
+- Deliberately NOT subject-c's format. subject-c's MODULE.md carries a `## Symbol map` and a `## Features`
   section — symbol maps are wiring (they rot; query them) and features duplicate features.md. Used
   the standard's Layer/Responsibility/Boundaries/Deferred shape instead, wiring-free.
 - Small modules (kinetic, metrics, intelligence, federation, manifest, visual, web) intentionally have
@@ -113,7 +113,7 @@
   with the installer's exact transform (`conducks-installer.getDynamicSkillTemplates`) and verified
   byte-identical — one source of truth, so any workspace `conducks setup` produces the same file.
 - Added a dedicated **Structuring `architecture/`** section to the standard, codifying what conducks
-  (20 files) and sofie (90) both do in practice but neither wrote down: a `README.md` index carrying
+  (20 files) and subject-c (90) both do in practice but neither wrote down: a `README.md` index carrying
   the project's own layer rules, `modules/<path mirroring src>/MODULE.md`, split-when-parts-differ
   with the parent as a link-only overview, nest as deep as the source, and `<part>/MODULE.md` as the
   default naming with `<name>.MODULE.md` allowed for a single file. States explicitly that a
@@ -288,7 +288,7 @@
   ARCHITECTURE.md after analyze; dropped status --manifest + MCP manifest mode; bootstrap-docs no
   longer scaffolds a derived architecture.md.
 - conducks-docs re-scoped to AUTHORED-only — structure is queried live (audit/impact/trace), never
-  written to a stale file. Build green, 43/43. Follow-up: purge generated docs from TargetedCV+sofie.
+  written to a stale file. Build green, 43/43. Follow-up: purge generated docs from TargetedCV+subject-c.
 
 ## 2026-07-18 · cycle-detection false-positive fix + ARCH-4 self-import (ADR 0010)
 - audit/guard/advisor now ignore STRUCTURAL_EDGE_TYPES (MEMBER_OF/CONTAINS/HAS_METHOD/HAS_PROPERTY)

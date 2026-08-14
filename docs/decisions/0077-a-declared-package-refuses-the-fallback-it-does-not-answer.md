@@ -17,7 +17,7 @@ told the answer.
 `@playwright/test` into `@playwright`, which is not a package, so a scoped package could never have
 matched even once the set was populated.
 
-With step 2 dead, a bare specifier fell through to step 4, the basename fallback. On mentorseed:
+With step 2 dead, a bare specifier fell through to step 4, the basename fallback. On subject-b:
 
 | specifier | matched | reality |
 |---|---|---|

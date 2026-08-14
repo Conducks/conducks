@@ -55,11 +55,11 @@ Measured on the frozen subjects (ADR 0135), before → after:
 
 | measure | before | after |
 |---|---|---|
-| scraper cross-file resolutions | 4,217 | 5,016 |
-| scraper unresolved references | 2,897 | 2,106 (17.4% → 12.6%) |
+| subject-a cross-file resolutions | 4,217 | 5,016 |
+| subject-a unresolved references | 2,897 | 2,106 (17.4% → 12.6%) |
 | `impact resolve_project_path` | 0 symbols | **11 symbols, 8 files, direct/indirect marked, source line per site** |
 | edge precision (source-verified) | 99.94% | 99.93% — +1,066 newly checkable edges, 1 new wrong |
-| orchestrator / sofie | — | byte-identical, the change is namespace-semantics-gated |
+| orchestrator / subject-c | — | byte-identical, the change is namespace-semantics-gated |
 
 **The fix made conducks see a REAL cycle it was blind to:** `foundation/__init__ → job_runner →
 logging_setup → foundation/__init__`, verified hop by hop in the source — and the authors knew, which

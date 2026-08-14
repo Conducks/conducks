@@ -15,12 +15,12 @@ Measured 2026-08-09: they do not agree.
 
 | subject | cold | warm | gap |
 |---|---|---|---|
-| sofie | 3440 dangling / 34,760 edges (9.90%) | 3146 / 34,929 (9.01%) | **+294 unresolved** |
+| subject-c | 3440 dangling / 34,760 edges (9.90%) | 3146 / 34,929 (9.01%) | **+294 unresolved** |
 | orchestrator | 2044 / 23,721 (8.62%) | 1887 / 23,791 (7.93%) | **+157 unresolved** |
-| scraper (python) | unchanged | unchanged | none |
+| subject-a (python) | unchanged | unchanged | none |
 
 **Not caused by todo58's linker fix.** Verified by reverting `linker-intra.ts` to the pre-fix commit,
-rebuilding and re-running cold: sofie still gives 3440 dangling. The gap predates it, and the parity
+rebuilding and re-running cold: subject-c still gives 3440 dangling. The gap predates it, and the parity
 claim in the docstring has been false for some unknown stretch.
 
 It is invisible in normal use because `--compare` runs warm by default, over a vault that already
@@ -28,16 +28,16 @@ exists. The harness only measures the second analyze unless `--cold` is passed, 
 the gates passes it — which is the exact blind spot todo49 was opened to close.
 
 **Why it matters beyond the harness.** The first analyze is the only one a new user ever sees before
-forming an opinion. On sofie that run resolves 294 fewer references than the rebuild of the same code:
+forming an opinion. On subject-c that run resolves 294 fewer references than the rebuild of the same code:
 a first impression measurably worse than the tool's actual capability, on the metric (`dangling`) that
 most directly reads as "this tool could not figure my codebase out".
 
-TypeScript only — scraper (python) is stable across both. That points at the TypeScript resolution
+TypeScript only — subject-a (python) is stable across both. That points at the TypeScript resolution
 path rather than at persistence or the graph core.
 
 ## Phase 1 — find where the second pass gains what the first cannot
 
-- [x] DIFFED on sofie. The gap is one shape, not a spread: of the edges dangling cold and not warm,
+- [x] DIFFED on subject-c. The gap is one shape, not a spread: of the edges dangling cold and not warm,
       **179 of 179 are `CALLS`**, and every one is a method call on a LOCAL VALUE — `store.has`,
       `freq.set`, `edgesbytarget.set`, `pushhandlers.add`, `d.getmonth`. No other edge type appears.
 - [x] The targets do NOT exist as nodes in EITHER run. `store.has`, `freq.set` and `d.getmonth` are
@@ -66,12 +66,12 @@ path rather than at persistence or the graph core.
       analyze's re-parsing is irrelevant.
 - [x] FIXED by a second link pass after induction (`analysis/index.ts` 4.5b), not a reorder — induction
       READS the dangling set that linking produces, so inducting first would starve it. Cold analyze on
-      sofie now logs `Re-linked 525 reference(s) against induced nodes` and reports KEPT 3,146 against
+      subject-c now logs `Re-linked 525 reference(s) against induced nodes` and reports KEPT 3,146 against
       the previous 3,440, with 34,929 edges against 34,760 — both the warm figures.
 - [x] RE-MEASURED. The dangling gap is closed on both TypeScript subjects: cold now hits the warm
-      dangling figure exactly (sofie 3,146/34,929; orchestrator 1,887). Warm is untouched — all three
+      dangling figure exactly (subject-c 3,146/34,929; orchestrator 1,887). Warm is untouched — all three
       `vs baseline unchanged`. Suite green, 228 suites / 1,789 tests.
-- [x] A RESIDUE REMAINS, an order of magnitude smaller and a different shape: cold still differs from warm by ±5 edges and ±1 node. The 294/157 dangling gap this todo opened with is gone; this is not that. DECIDED — tracked, not chased: it is recorded in a cold baseline (Phase 2) rather than converged. Re-measured 2026-08-11 at the current SHAs it is orchestrator 5 edges (23,819 warm / 23,814 cold) and sofie 1 node the other way (10,545 / 10,546). Two runs of a `--force` analyze differing by five edges out of 23,819 is not a defect anyone can act on, and one more link pass would be a guess at a mechanism nobody has isolated — a tracked number will say if it ever grows
+- [x] A RESIDUE REMAINS, an order of magnitude smaller and a different shape: cold still differs from warm by ±5 edges and ±1 node. The 294/157 dangling gap this todo opened with is gone; this is not that. DECIDED — tracked, not chased: it is recorded in a cold baseline (Phase 2) rather than converged. Re-measured 2026-08-11 at the current SHAs it is orchestrator 5 edges (23,819 warm / 23,814 cold) and subject-c 1 node the other way (10,545 / 10,546). Two runs of a `--force` analyze differing by five edges out of 23,819 is not a defect anyone can act on, and one more link pass would be a guess at a mechanism nobody has isolated — a tracked number will say if it ever grows
 - [x] SUPERSEDED THEORY, kept so it is not retried: "the sweep is a single pass at the end of analyze,
       so anything dangling after it survives until the next analyze sweeps again." Disproved by the
       second-sweep measurement above (deleted=0).
@@ -99,7 +99,7 @@ path rather than at persistence or the graph core.
 
 - [x] Cold baselines saved as `<name>.cold.json` beside the warm `<name>.json`. Both modes wrote the SAME file before this, so `--cold --save` silently overwrote the warm baseline with cold numbers and `--cold --compare` diffed a first analyze against a second — reporting the residue as DRIFT on every run, which is how a real difference gets trained into noise
 - [x] Comparing across modes is REFUSED, not diffed: the baseline records `coldStart` and a mismatch prints `REFUSED — cold file holds a warm run` with the fix. Mutation-verified by copying the warm baseline over the cold filename
-- [x] The residue is now a stored number instead of a rediscovery: orchestrator **5 edges** (23,819 warm / 23,814 cold), sofie **1 node** the other way (10,545 warm / 10,546 cold). `--cold --compare` reports `unchanged` against its own baseline
+- [x] The residue is now a stored number instead of a rediscovery: orchestrator **5 edges** (23,819 warm / 23,814 cold), subject-c **1 node** the other way (10,545 warm / 10,546 cold). `--cold --compare` reports `unchanged` against its own baseline
 - [x] Docstring corrected. It claimed "cold and warm now agree on all three subjects" — asserted in prose, checked by nobody, and false for an unknown stretch. It now states the fixed gap, the remaining residue, and the two-baseline rule
 - [-] Run `--cold --compare` in whatever gate runs the benchmark — dropped: there is no gate that runs `health.mjs`. `npm run benchmark` is `measure-pulse.mjs`, a different harness, and wiring a new 40s three-subject cold run into the suite is a decision about gate cost, not part of this todo. The baselines above are what make it a one-command check when someone wants it
 
@@ -115,5 +115,5 @@ measured on frozen subjects, which is the first independent confirmation of it:
 | nodes | 6,639 | 6,662 |
 | dangling | 1,887 | 1,876 |
 
-- [x] All 23 orphan nodes on orchestrator were the dangling-alias artifacts todo62 fixed — a binding node deleted by its own mis-named edge shows up here as an orphan, and the benchmark had been carrying them as the subject's shape since before anyone looked. sofie moved the same way (orphans 20 → 18). scraper is unchanged, which is the control: python has no destructured dynamic imports
+- [x] All 23 orphan nodes on orchestrator were the dangling-alias artifacts todo62 fixed — a binding node deleted by its own mis-named edge shows up here as an orphan, and the benchmark had been carrying them as the subject's shape since before anyone looked. subject-c moved the same way (orphans 20 → 18). subject-a is unchanged, which is the control: python has no destructured dynamic imports
 - [x] Baselines re-saved on all three subjects, warm and cold, at the same SHAs

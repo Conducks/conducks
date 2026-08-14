@@ -145,7 +145,7 @@ export function agentView(board: DocsBoard, layer: "all" | "board" = "all", rece
         // The verdict, with its findings list BOUNDED.
         //
         // `verdictToJson` emits every finding, and on conducks — which has zero grammar violations —
-        // that was invisible. Measured against a foreign repo (sofie, 200 governed docs): the health
+        // that was invisible. Measured against a foreign repo (subject-c, 200 governed docs): the health
         // block was 8,820 bytes, 33% of the whole response, and it grows with the number of broken
         // files. The COUNT is what a caller acts on (`grammarViolations`, never truncated); the list
         // is a sample for orientation, and `docs-lint` is the surface that prints all of them.
@@ -685,7 +685,7 @@ export function enforcedByPaths(value: string): string[] {
   // The path may carry SERVICE segments in front of `src/` or `tests/` — `app/src/...` on a
   // monorepo — and the old regex, anchored on the bare `src/` prefix with a word boundary, happily
   // started MID-PATH: `app/src/tests/unit/X.test.ts` matched as `src/tests/unit/X.test.ts`, which
-  // resolves to nothing. Measured on mentorseed: 18 of the 31 ADRs declaring `- Enforced by:` were
+  // resolves to nothing. Measured on subject-b: 18 of the 31 ADRs declaring `- Enforced by:` were
   // silently dropped that way, and GOVERNS derivation read 0 where the docs held 31 records
   // (todo29#P3). The lookbehind forbids starting right after a path character, and the optional
   // leading segments carry the service prefix into the capture.

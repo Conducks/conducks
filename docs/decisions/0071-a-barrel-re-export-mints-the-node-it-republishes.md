@@ -9,7 +9,7 @@ Status: Accepted
 ## Context
 
 ADR 0070 fixed the alias-resolution defect that made an unresolvable `@/` alias guess a wrong file by
-basename. Re-measuring the mentorseed monorepo vault (5 services, 974 units, `.conducks/conducks-
+basename. Re-measuring the subject-b monorepo vault (5 services, 974 units, `.conducks/conducks-
 synapse.db`, opened read-only) after that fix shows the alias-to-FILE resolution now works: 193
 `IMPORTS` edges still dangle, but every one resolves its specifier to a real, in-scope file. The
 defect is one layer deeper.
@@ -136,7 +136,7 @@ this is a real, present gap, not a hypothetical one.
 ## Consequences
 
 Proven with unit tests (`tests/unit/domain/analysis/reexport-resolution.test.ts`) on a fixture built to
-the exact mentorseed shape from this record's Context section — `coreDb as db` (renamed) and `pool`
+the exact subject-b shape from this record's Context section — `coreDb as db` (renamed) and `pool`
 (plain) re-exported from one `export { ... } from './DatabaseManager'` statement, plus two downstream
 importers:
 
@@ -161,14 +161,14 @@ re-export, and `IntraLinker`'s handling of a hand-built bare `ALIASES` edge — 
 they pin something real rather than something the fixture would pass regardless.
 
 `Open:` the end-to-end effect on the field measurement (193 dangling `IMPORTS` targets out of 18,673
-total edges, mentorseed's shared vault) is unverified here — this task ran under a rule barring
+total edges, subject-b's shared vault) is unverified here — this task ran under a rule barring
 `conducks analyze` on either repository while other work held both vaults. Read-only inspection of the
 193 dangling targets' owning files (`packages/core/database/server/index.ts`,
 `packages/core/server.ts`, `packages/core/auth/server/index.ts`, `admin/src/components/ui/card/
 index.tsx`, and others) confirms every one sampled is a plain `export { a, b as c } from './x'`
 statement of the shape this fix handles — 182 of the 193 by direct query, matching the field number
 quoted when this task was assigned — but the vault predates this fix and cannot be re-measured
-end-to-end from inside this task. Re-running `analyze` against mentorseed and re-counting dangling
+end-to-end from inside this task. Re-running `analyze` against subject-b and re-counting dangling
 `IMPORTS` edges is the next step. No todo carries this yet.
 
 `Open:` `export * from './x'` re-exports are a live, unmeasured gap this record explicitly does not

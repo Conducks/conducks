@@ -127,7 +127,7 @@ export class RegistryBootstrapper {
     // This has to be its own walk, not a reordered check inside the one below. The marker walk
     // returns at the FIRST directory carrying any marker, so a service with its own package.json
     // would still win before the workspace above it was ever looked at — which is precisely the bug:
-    // `mentorseed/app` anchored at `app`, while `mentorseed/database`, having no marker of its own,
+    // `subject-b/app` anchored at `app`, while `subject-b/database`, having no marker of its own,
     // walked up and planted a SECOND vault at the repository root holding 40 nodes. Same repo, two
     // vaults, neither seeing the monorepo.
     //

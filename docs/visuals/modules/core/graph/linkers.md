@@ -58,7 +58,7 @@ nodes survive from the previous pulse so the first pass finds them; on a COLD va
 yet and every reference landing on one dangles until the next analyze — which made a user's FIRST
 analyze measurably worse than a rebuild of the same code.
 
-Measured on the sofie subject: cold resolved 7,531 references against warm's 7,994, dangling 3,440
+Measured on the subject-c subject: cold resolved 7,531 references against warm's 7,994, dangling 3,440
 against 3,146. Replaying the linker alone over the cold vault — no re-parse, no re-induction —
 recovered exactly the difference, which is what proved the cause before anything was changed (todo59).
 
