@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from '@jest/globals';
+import { describe, it, expect, afterEach, jest } from '@jest/globals';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -6,6 +6,34 @@ import { DocsWatcher, type DocsPulse } from '@/lib/domain/analysis/docs-watcher.
 
 // The gate only ran when someone typed `docs-lint`, so a broken link survived until review. This
 // closes that window — and must do it without ever throwing at the author mid-save.
+
+/**
+ * JEST'S CAP MUST NOT UNDERCUT THE TEST'S OWN BOUND.
+ *
+ * These tests drive a REAL filesystem watcher, so each already carries a falsifiable bound of its
+ * own: `nextPulse` rejects after 3s, and the debounce case waits on a CONDITION with a 15s deadline
+ * plus a settle. Jest's default per-test cap is 5s, so that 15s deadline was UNREACHABLE — under
+ * load jest killed the test at 5s and reported `Exceeded timeout of 5000 ms`, which reads like a
+ * slow watcher and is actually a ceiling firing before the test could finish its own logic. Whoever
+ * hardened the waits (todo60) never raised the cap, so the hardening could not take effect.
+ *
+ * This is NOT the "widen the window" move the debounce case warns about below. That widens an
+ * ASSERTION's tolerance until it stops failing, which is unfalsifiable. This lifts an unrelated
+ * ceiling so the bound the test already declares is the one that decides the outcome.
+ *
+ * WHAT THIS DOES NOT FIX, measured rather than assumed: under a synthetic load of six processes each
+ * writing 200 files in a continuous loop, the watcher delivers NO event within 15s and the debounce
+ * case fails on its own deadline — with or without this change (2/4 vs 1/4 failures, same load). At
+ * that point the OS event queue is the limit, not the cap. That load is far harsher than the suite,
+ * whose real observed failure was always the 5000ms message.
+ *
+ * EVIDENCE: 8 consecutive full-suite runs green after this change, against roughly 3 failures in 12
+ * runs before it. Not proof — a 25% flake could clear 8 runs by luck about 1 time in 10 — so if it
+ * returns, the next move is NOT a bigger number. It is to stop depending on OS event delivery in a
+ * unit test, and that is a redesign, not a tweak.
+ */
+jest.setTimeout(30_000);
+
 describe('docs-watcher — re-lints on write, reports only', () => {
   let watcher: DocsWatcher | null = null;
   let root = '';

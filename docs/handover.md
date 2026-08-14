@@ -77,10 +77,17 @@ independent one.
   the unit suite made a live request to `api.github.com` with a 2-second timeout. `node:https` is
   stubbed now, answering as OFFLINE — one of the two cases that test already names — and the stub
   asserts it was reached, so the test cannot silently go back to using the real network.
-- `docs-watcher.test.ts` also flaked once. Timing-sensitive BY CONSTRUCTION: a real filesystem
-  watcher on a 50ms debounce with a 3s budget, and its own comments already record macOS delivery
-  ordering as a hazard. Left alone deliberately — it is testing a watcher, so some wall-clock
-  dependence is inherent. Watch it; if it recurs, the fix is a longer budget, not a stub.
+- ~~`docs-watcher.test.ts` also flaked~~ — DIAGNOSED AND MITIGATED 2026-08-15. It was not a slow
+  watcher. The tests were hardened under todo60 to wait on CONDITIONS with their own bounds (3s for
+  a pulse, a 15s deadline for the debounce case), but jest's default per-test cap is 5s, so the 15s
+  deadline was unreachable — jest killed the test first and reported `Exceeded timeout of 5000 ms`.
+  The waits were hardened; the cap never was. `jest.setTimeout(30_000)` lets the test's own bound
+  decide. **8 consecutive full-suite runs green, against ~3 failures in 12 before.**
+  Stated honestly: that is not proof (a 25% flake clears 8 runs about 1 time in 10), and under a
+  synthetic load of six processes writing 200 files in a loop the watcher delivers no event within
+  15s regardless of the cap — 2/4 failures with the change, 1/4 without, so at that point the OS
+  event queue is the limit. If it returns, the next move is NOT a bigger number; it is to stop
+  depending on OS event delivery inside a unit test.
 
 **A method note worth keeping:** three of six quick language fixtures written today produced
 confident FALSE conclusions until a real toolchain checked them — `rustc` and `ruby` caught all three
