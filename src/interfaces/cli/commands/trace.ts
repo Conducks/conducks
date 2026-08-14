@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
+import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 
 /**
  * Conducks — Trace (Lineage) Command
@@ -79,25 +80,27 @@ export class TraceCommand implements ConducksCommand {
 
     await syncGraph(registry);
 
-    let symbolId = symbolInput;
-    if (!registry.query.graph.getGraph().getNode(symbolInput)) {
-      const results = await registry.query.query(symbolInput, 1);
-      if (results.length > 0) {
-        symbolId = results[0].id;
-      }
-    }
+    // RESOLVE THE WAY EVERY OTHER COMMAND DOES. This used to try `getNode(input)` and then a
+    // one-result `query()`, and when both missed it kept the RAW INPUT and traced from it — so a
+    // symbol id no node is keyed by walked from nowhere and printed a heading with no steps under
+    // it. That reads as "this symbol depends on nothing", which is a WRONG ANSWER rather than a
+    // failure (ADR 0044: a walk that ran on nothing is not an empty result).
+    //
+    // MEASURED on a two-file Python fixture whose `run` calls `used_fn` over a direct CALLS edge:
+    // `trace pkg/main.py::run` printed nothing while `impact` on the same symbol reported the call,
+    // and passing the fully-qualified lowercased id to the same command returned six steps. The
+    // partial form is what `context`, `impact` and `explain` all accept and what the docs show.
+    //
+    // `resolveSymbol` also REFUSES loudly when the symbol truly does not exist, which is the half
+    // this command never had: silence and absence looked identical here.
+    const symbolId = resolveSymbol(symbolInput, registry.query.graph.getGraph());
 
     // PATH MODE — the shortest structural path to a target, the same answer `conducks_trace` gives.
     if (mode === 'path') {
-      let targetId = targetInput as string;
-      if (!registry.query.graph.getGraph().getNode(targetId)) {
-        const hits = await registry.query.query(targetId, 1);
-        if (hits.length === 0) {
-          console.error(`Error: no symbol matching "${targetId}".`);
-          process.exit(1);
-        }
-        targetId = hits[0].id;
-      }
+      // Same resolver for the TARGET, for the same reason: an unresolved target made `findPath`
+      // walk toward an id the graph does not hold and report "no structural path" — a claim about
+      // the code, from a lookup that never landed.
+      const targetId = resolveSymbol(targetInput as string, registry.query.graph.getGraph());
       const path = await registry.kinetic.findPath(symbolId, targetId);
       const steps = path.map((id: string) => {
         const n = registry.query.graph.getGraph().getNode(id);

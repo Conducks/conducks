@@ -38,6 +38,42 @@ and `fix(prune): stop reporting a used value import as stale`.
 **`npm run test:fast` is the inner loop — 26s, 1,143 tests.** `npm test` is the gate at ~235s and 1,830.
 Use the gate before a commit; do not use it to chase a failure.
 
+## 2026-08-14 — a zero-argument Python call was invisible, and `trace` answered from a symbol it never found
+
+Two bugs, both found by asking which languages the prune fix below did NOT cover, and both bigger
+than the thing that led to them.
+
+**Python recorded no CALLS edge for a zero-argument call.** The pattern constrained the argument
+list with a bare `(_)`, which requires at least ONE node in the list, so `start()`, `run()`,
+`self.close()` matched nothing at all. Python was the ONLY grammar with this shape — TypeScript, TSX
+and JavaScript already quantify with `(_)*`, and every other language captures the call target
+without constraining arguments. Measured cost on a two-file fixture: `prune` reported the import of a
+function called on the next line as `STALE_IMPORT`, and `trace` on the calling function returned zero
+steps. **On sofie, fixing it took `UNIMPORTED_MODULE` from 35 to 15** — two dozen Python symbols were
+being called and the graph could not see it.
+
+**`trace` traced from the raw input when resolution missed.** It tried `getNode(input)`, then a
+one-result `query()`, and when both missed it KEPT THE RAW STRING and walked from an id no node is
+keyed by — printing its heading with no steps under it. That reads as "this symbol depends on
+nothing", which is a wrong answer, not an empty one. Every other command uses the shared
+`resolveSymbol`, which also refuses loudly when a symbol genuinely does not exist; `trace` had
+neither half. MEASURED: `trace pkg/main.py::run` printed nothing while `impact` on the same symbol
+reported the call over a direct `["CALLS"]` path, and the same command handed the fully-qualified
+lowercased id returned six steps.
+
+**The exposure question is worth keeping.** `STALE_IMPORT` can only fire where a grammar emits
+per-binding IMPORTS edges, which needs an `@name` or `@named_import` capture inside an import
+pattern. Only typescript, tsx, javascript and python have one — java, go, rust, csharp, php, ruby,
+swift, c and cpp capture the module with `@source` alone and cannot produce the finding at all
+(verified on a Java fixture: zero findings). So the four exposed grammars are the whole surface, and
+all four are now covered.
+
+**Found but NOT fixed, recorded so it is not mistaken for covered:** a Python attribute call resolves
+to the RECEIVER, not the method — `self.close()` emits `shutdown -> GLOBAL::self` and `close` gets no
+incoming CALLS edge. Asserted in `python-zero-arg-call.test.ts` as current behaviour, so changing it
+is a deliberate act. Also, `conducks help` advertises `impact --symbol X --direction downstream` and
+the command only accepts positional arguments.
+
 ## 2026-08-14 — prune was wrong 9 times out of 10 on a real subject, and the cause was in the grammar
 
 Found by running the shipped build against the frozen sofie subject and checking every finding by

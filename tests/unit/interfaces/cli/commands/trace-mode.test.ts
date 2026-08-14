@@ -29,9 +29,16 @@ const nodes: Record<string, any> = {
 const trace = jest.fn(() => [B]);
 const findPath = jest.fn(async () => [A, B]);
 
+// `findNodesByName` is part of the graph contract `resolveSymbol` relies on, and this double did not
+// carry it — the command used to resolve with `getNode` plus a one-result `query()` and kept the raw
+// input when both missed, which is exactly the silent-empty-trace bug that made it use the shared
+// resolver instead. A double missing a method the real graph has does not prove the command works.
+const findNodesByName = (name: string) =>
+  Object.values(nodes).filter((n) => n.properties.name.toLowerCase() === name.toLowerCase());
+
 const registry = {
   query: {
-    graph: { getGraph: () => ({ getNode: (id: string) => nodes[id] ?? null }) },
+    graph: { getGraph: () => ({ getNode: (id: string) => nodes[id] ?? null, findNodesByName }) },
     query: jest.fn(async (q: string) => (q === 'alpha' ? [{ id: A }] : q === 'beta' ? [{ id: B }] : [])),
   },
   kinetic: { trace, findPath, flow: () => ({ steps: [] }) },
@@ -96,5 +103,29 @@ describe('conducks trace mirrors the tool: --mode and --target — todo61', () =
   it('does not mistake --target\'s VALUE for the symbol to trace', async () => {
     await run(['alpha', '--target', 'beta', '--mode', 'path', '--json']);
     expect(JSON.parse(out).symbolId).toBe(A);
+  });
+
+  it('traces from the RESOLVED id, never from the raw input string', async () => {
+    // The bug this replaces: when `getNode(input)` missed and the one-result `query()` found
+    // nothing, the raw input was kept and the walk started from an id no node is keyed by — so the
+    // command printed its heading with no steps under it, which reads as "this symbol depends on
+    // nothing" rather than "the symbol was never found".
+    //
+    // MEASURED on a two-file Python fixture whose `run` calls `used_fn` over a direct CALLS edge:
+    // `trace pkg/main.py::run` printed nothing, `impact` on the same symbol reported the call, and
+    // the same command handed the fully-qualified id returned six steps.
+    await run(['alpha', '--json']);
+    expect(JSON.parse(out).symbolId).toBe(A);
+    expect((trace.mock.calls[0] as unknown[])[0]).toBe(A);
+  });
+
+  it('REFUSES an unknown symbol instead of printing an empty trace', async () => {
+    await run(['no_such_symbol', '--json']);
+    expect(exit).toHaveBeenCalled();
+    expect(trace).not.toHaveBeenCalled();
+    // Silence and absence used to be identical here: an empty step list is what a real symbol with
+    // no dependencies looks like, so a lookup that never landed was indistinguishable from an
+    // answer (ADR 0044).
+    expect(out).toBe('');
   });
 });

@@ -99,9 +99,18 @@ export const PYTHON_QUERIES = `
     right: (_) @pulse_assignment_value)
 
   ;; --- Kinetic Flow (L6: Behavior & Logic) ---
-  (call 
+  ;; (_)* NOT (_). A bare (_) requires the argument_list to contain at least ONE node, so a
+  ;; ZERO-ARGUMENT call did not match this pattern at all and produced NO CALLS edge — start(),
+  ;; run(), self.close() were invisible to the whole graph, not merely to one analyzer. Python was
+  ;; the only grammar with this shape: TypeScript, TSX and JavaScript already quantify with (_)*,
+  ;; and every other language captures the call target without constraining arguments.
+  ;;
+  ;; MEASURED on a two-file fixture: main.py calls used_fn() and prune reported the import as
+  ;; STALE_IMPORT — telling the reader to delete an import whose function is called on the next
+  ;; line. trace on the calling function returned zero steps.
+  (call
     function: [(identifier) (attribute)] @kinesis_target
-    arguments: (argument_list (_) @kinesis_arg))
+    arguments: (argument_list (_)* @kinesis_arg))
   (raise_statement) @isKinetic
   (try_statement) @isKinetic
   (assert_statement) @isKinetic
