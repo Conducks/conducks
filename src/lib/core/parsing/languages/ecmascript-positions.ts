@@ -82,6 +82,34 @@ export const EC_VALUE_POSITIONS = `
 `;
 
 /**
+ * A DYNAMIC IMPORT IS AN IMPORT, whatever is done with the promise.
+ *
+ * The only dynamic form captured was `const { X } = await import('...')`, anchored on the
+ * variable_declarator — so the awaited, destructured shape was an import and every other shape was
+ * nothing at all. The one that matters is lazy component loading, which neither awaits nor
+ * destructures:
+ *
+ *   React.lazy(() => import('../plugins/core/approval/ApprovalInfoView'))
+ *
+ * MEASURED on subject-a: 13 plugin views, every one of them registered exactly this way in
+ * `renderer/src/lib/plugin-ui.ts`, were reported as UNIMPORTED_MODULE — "nothing imports this file"
+ * — while that file imports all 13 on consecutive lines. Probed against the real grammar: this
+ * pattern yields 17 matches in that file alone.
+ *
+ * Anchored on the CALL rather than on what surrounds it, because what surrounds it is the part that
+ * varies — awaited, returned from an arrow, handed to a router, chained with `.then`. The importing
+ * FILE is the fact all of those share.
+ *
+ * It fires a SECOND time on the awaited-destructured form above, whose own pattern also carries a
+ * `@source`. That is a duplicate raw specifier for one line, and the graph carries one edge per
+ * (source, target, type) — measured, not assumed: total edge count is unchanged on this repository.
+ */
+export const EC_DYNAMIC_IMPORT = `
+  ;; --- Dynamic import, any surrounding shape (shared, ecmascript-positions.ts) ---
+  (call_expression function: (import) arguments: (arguments (string) @source)) @isImport @dynamic_import
+`;
+
+/**
  * A DEFAULT PARAMETER VALUE names the thing it falls back to, and that is a use:
  *
  *   function registerMacosTools(registry: Registry, run: AppleScriptRunner = spawnOsascript)

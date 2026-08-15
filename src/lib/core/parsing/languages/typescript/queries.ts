@@ -3,7 +3,7 @@
  * 
  * Captures Decorators, Interfaces, Type Aliases, and Heritage.
  */
-import { EC_VALUE_POSITIONS, TS_PARAM_DEFAULTS, TS_TYPE_POSITIONS } from '../ecmascript-positions.js';
+import { EC_VALUE_POSITIONS, EC_DYNAMIC_IMPORT, TS_PARAM_DEFAULTS, TS_TYPE_POSITIONS } from '../ecmascript-positions.js';
 
 export const TYPESCRIPT_QUERIES = `
   ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
@@ -346,6 +346,7 @@ export const TYPESCRIPT_QUERIES = `
   (variable_declarator
     name: (identifier) @instance_name
     value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
+${EC_DYNAMIC_IMPORT}
 ${EC_VALUE_POSITIONS}
 ${TS_PARAM_DEFAULTS}
 ${TS_TYPE_POSITIONS}

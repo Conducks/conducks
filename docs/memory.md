@@ -2456,3 +2456,19 @@ by construction.
   only that nothing covered the behaviour — `prune-precision` now carries `deadApprovalGate`, which
   fails when the substring match comes back. Its counter-test `handler` passes either way, which is
   stated rather than hidden: it guards a future over-tightening, not this fix.
+
+## A dynamic import is an import whatever surrounds it, and half a fix is worse than none
+- Gotcha: the only dynamic form captured was `const { X } = await import('...')`, anchored on the
+  variable_declarator. The shape that matters in a real app awaits nothing and destructures nothing
+  — `React.lazy(() => import('./PluginView'))` — so 18 plugin components on subject-a were reported
+  UNIMPORTED_MODULE, "nothing imports this file", by a file that imports all 18 on consecutive
+  lines. Anchor on the CALL; what surrounds it is the part that varies.
+- Why: capturing the file alone made it WORSE. The module became reachable, so its symbols were
+  judged, and 18 questions turned into 18 confident ORPHAN verdicts. The second half — an unbound
+  dynamic import CONSUMES the target's `default`, which is React.lazy's actual contract — is what
+  makes it correct. Both halves were mutation-tested separately; each one disabled fails the fixture.
+- Applies: the edge must be a RESOLVABLE type. Emitted as DEPENDS_ON first, which the intra-linker
+  marks unresolvable ("a manifest entry, external by definition"), so it never rebound from
+  `<file>::default` and all 18 stayed ORPHAN — the fix looked wrong when only the edge type was.
+  ACCESSES works. Claim the DEFAULT only, never the namespace: `lazyNamedButDead` in
+  `prune-precision` is the counter-test that a named export of a lazily loaded module still dies.

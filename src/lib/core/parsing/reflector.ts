@@ -878,6 +878,48 @@ export class ConducksReflector {
                 }
               }
 
+              // A DYNAMIC IMPORT THAT BINDS NO NAME still CONSUMES something, and what it consumes
+              // is the target's DEFAULT:
+              //
+              //   React.lazy(() => import('../plugins/core/approval/ApprovalInfoView'))
+              //
+              // Recording only the file-level edge fixes the module question and creates a worse
+              // one: the file is now reachable, so its symbols are judged, and the default export
+              // nothing NAMES reads as ORPHAN. MEASURED on subject-a: 18 plugin components turned
+              // from UNIMPORTED_MODULE (a question) into ORPHAN (a confident verdict), all 18 wrong
+              // — a regression the export oracle cannot see, because a dynamic import names no
+              // symbol and the language service cannot find that consumer either.
+              //
+              // DEFAULT, not the whole namespace. Every one of those 18 files exports exactly one
+              // thing and it is the default; claiming the namespace would spare every named export
+              // of any lazily-loaded module, which is the laundering this file avoids elsewhere.
+              // The narrower claim is also the true one for `React.lazy`, whose contract IS
+              // `{ default: Component }`.
+              //
+              // Skipped when the same line already binds names (`const { X } = await import(...)`),
+              // because that form states exactly what it consumes and adding `default` on top would
+              // hide a genuinely dead default export.
+              const isDynamic = match.captures.some((c: any) => c.name === 'dynamic_import');
+              const bindsNames = match.captures.some((c: any) =>
+                c.name === CaptureTags.NAME || c.name === 'named_import' || c.name === 'default_import');
+              if (isDynamic && !bindsNames) {
+                const resolvedSpecifier = this.imports.resolve(specifier, file.path, allPaths, provider, context);
+                if (typeof resolvedSpecifier === 'string') {
+                  spectrum.relationships.push({
+                    sourceName: 'unit',
+                    targetName: `${resolvedSpecifier}::default`,
+                    // ACCESSES, not DEPENDS_ON. Both count as a reference in dead-code, but only a
+                    // RESOLVABLE type enters the intra-linker's loop, and `DEPENDS_ON` is marked
+                    // false there — "a package manifest entry, external by definition". Measured
+                    // with DEPENDS_ON first: the edge was emitted, never rebound from
+                    // `<file>::default` to the real symbol, and all 18 components stayed ORPHAN.
+                    type: 'ACCESSES' as any,
+                    confidence: 1.0,
+                    metadata: { specifier, isDynamicDefault: true, line: currentMatchRow + 1 },
+                  });
+                }
+              }
+
               for (let i = 0; i < match.captures.length; i++) {
                 const cap = match.captures[i];
                 // `@named_import` IS a binding capture (todo48#P3). Python spells it that way and

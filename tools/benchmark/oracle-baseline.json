@@ -17,8 +17,8 @@
   },
   "sofie::exports": {
     "oracle": 255,
-    "missed": 116,
-    "agreed": 139
+    "missed": 115,
+    "agreed": 140
   },
   "app::exports": {
     "oracle": 45,

@@ -4,7 +4,7 @@
  * JavaScript-only variant: no TS-specific nodes (interface, type alias, declare,
  * type parameters, abstract classes, decorators). Adds CommonJS require() support.
  */
-import { EC_VALUE_POSITIONS } from '../ecmascript-positions.js';
+import { EC_VALUE_POSITIONS, EC_DYNAMIC_IMPORT } from '../ecmascript-positions.js';
 
 export const JAVASCRIPT_QUERIES = `
   ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
@@ -182,6 +182,7 @@ export const JAVASCRIPT_QUERIES = `
   (variable_declarator
     name: (identifier) @instance_name
     value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
+${EC_DYNAMIC_IMPORT}
 ${EC_VALUE_POSITIONS}
 
   ;; A DEFAULT PARAMETER VALUE is a use. JavaScript spells this assignment_pattern, where

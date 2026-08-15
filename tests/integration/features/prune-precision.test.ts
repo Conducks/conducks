@@ -45,7 +45,11 @@ const TRUTH = {
     // sofie's 887 exported names were caught this way, 21 of orchestrator's 656, and tightening the
     // match to equality turned 18 of them into findings the compiler agrees with, with no new
     // contradiction. Silence is never EXTRA, so no oracle could have surfaced this.
-    'deadApprovalGate'],
+    'deadApprovalGate',
+    // The COUNTER-TEST for lazy loading: a NAMED export of a lazily imported module. The dynamic
+    // import states no symbol, so the only export it can justify is the default; sparing this one
+    // too would be the namespace laundering the fix deliberately refuses.
+    'lazyNamedButDead'],
   /** Reachable. Each one is reached by a DIFFERENT mechanism, named in the fixture below. */
   live: [
     'staticallyUsed', 'dynamicallyUsed', 'constructedDynamically', 'barrelUsed', 'usedConstant',
@@ -96,6 +100,12 @@ const TRUTH = {
     // it, and a framework would invoke it without importing it. It sits here because the assertion
     // this list drives is "not flagged", which is exactly the claim being made about it.
     'handler',
+    // A DEFAULT EXPORT REACHED ONLY BY A DYNAMIC IMPORT THAT BINDS NO NAME — `React.lazy(() =>
+    // import('./X'))`, the ordinary route- and plugin-splitting shape. Only the awaited,
+    // destructured form was captured, so the file read as UNIMPORTED_MODULE; capturing the file
+    // alone then turned it into a confident ORPHAN, which is worse. Both halves are needed, and
+    // this entry fails if either is removed. MEASURED on subject-a: 18 plugin components.
+    'lazyDefault',
   ],
 };
 
@@ -189,6 +199,16 @@ export default function sameNameDefault(): number { return 19 + staticallyUsed()
 export default function deadDefault(): number { return 18; }
 `);
 
+    // A LAZILY LOADED component, and the counter-test beside it. Only the DEFAULT is reached — the
+    // dynamic import binds no name, so nothing in the source states which symbol is consumed, and
+    // `React.lazy`'s contract says it is the default. `lazyNamedButDead` sits in the same file and
+    // must still be reported, or the fix would have spared every export of every lazily loaded
+    // module instead of the one it can actually justify.
+    writeFile(repo, 'src/lazy-view.ts', `
+export default function lazyDefault(): number { return 22; }
+export function lazyNamedButDead(): number { return 23; }
+`);
+
     // A barrel, so one live symbol is reached through a re-export chain rather than directly.
     writeFile(repo, 'src/barrel.ts', `
 export function barrelUsed(): number { return 6; }
@@ -212,6 +232,11 @@ import sameNameDefault from './same-name-default.js';
 // imported for its side effects only, so the FILE is reachable and its default export is judged as
 // a symbol rather than deferred as the UNIMPORTED_MODULE question
 import './dead-default.js';
+
+// A DYNAMIC IMPORT THAT BINDS NOTHING — the React.lazy shape, written without React so the fixture
+// keeps no dependency. Nothing is awaited and nothing is destructured, which is exactly why the old
+// capture (anchored on the variable_declarator of an awaited destructure) saw no import at all.
+export const lazyView = () => import('./lazy-view.js');
 
 export async function main(): Promise<number> {
   const a = staticallyUsed() + usedConstant;

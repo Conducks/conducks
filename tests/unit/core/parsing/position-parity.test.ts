@@ -37,6 +37,14 @@ describe('ECMAScript use-positions are shared, not copied', () => {
     expect({ missing }).toEqual({ missing: [] });
   });
 
+  it('every grammar in the family composes the shared DYNAMIC IMPORT capture', () => {
+    // `import('./X')` is one node type in all three grammars, and the shape that needs it — a lazy
+    // component load — is written the same way in each. A grammar that stops composing this reports
+    // every lazily loaded module as "nothing imports this file": measured, 18 on subject-a.
+    const missing = VALUE_FAMILY.filter(l => !read(`${l}/queries.ts`).includes('${EC_DYNAMIC_IMPORT}'));
+    expect({ missing }).toEqual({ missing: [] });
+  });
+
   it('the TypeScript-typed grammars compose the shared TYPE positions', () => {
     const missing = TYPE_FAMILY.filter(l => !read(`${l}/queries.ts`).includes('${TS_TYPE_POSITIONS}'));
     expect({ missing }).toEqual({ missing: [] });
