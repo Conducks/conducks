@@ -131,6 +131,49 @@ function oracleUnusedExports() {
   const program = service.getProgram();
   const checker = program.getTypeChecker();
 
+  // VERIFY A CONDUCKS FINDING DIRECTLY, instead of asking whether it appears in a set.
+  //
+  // EXTRA was computed as a set difference against the ENUMERATED EXPORTS, so any finding about a
+  // symbol the oracle never enumerated counted as a contradiction. Non-exported symbols are exactly
+  // that: `prune` judges them (ORPHAN is mostly about them) and `getExportsOfModule` never lists one.
+  // Measured, this manufactured contradictions out of nothing — `electronSafeStorage` is declared,
+  // exported nowhere and referenced nowhere, so conducks calling it dead is RIGHT, and it was being
+  // reported as a precision bug.
+  //
+  // The claim being tested depends on the verdict, so the check does too:
+  //   ORPHAN / UNIMPORTED_MODULE -> "never referenced" — ANY reference contradicts it
+  //   UNUSED_EXPORT             -> "no OTHER module consumes it" — only a reference from another
+  //                                file contradicts it
+  // Returns null when the symbol cannot be located at all, which is "unknown", not "contradicted".
+  function verifyFinding(relFile, symbolName, verdict) {
+    const abs = program.getSourceFiles()
+      .find(f => path.relative(projectDir, f.fileName).toLowerCase() === relFile.toLowerCase());
+    if (!abs) return null;
+    let nameNode = null;
+    const wanted = symbolName.toLowerCase();
+    const visit = (node) => {
+      if (nameNode) return;
+      const nm = node.name;
+      if (nm && typeof nm.getText === 'function' && nm.getText().toLowerCase() === wanted) { nameNode = nm; return; }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(abs, visit);
+    if (!nameNode) return null;
+    let refs;
+    try { refs = service.findReferences(abs.fileName, nameNode.getStart()); } catch { return null; }
+    if (!refs) return null;
+    const sameFileOnly = verdict === 'UNUSED_EXPORT';
+    for (const group of refs) {
+      for (const r of group.references) {
+        if (r.isDefinition) continue;
+        if (sameFileOnly && r.fileName === abs.fileName) continue;
+        if (r.fileName === abs.fileName && !sameFileOnly) return true;   // any reference at all
+        if (r.fileName !== abs.fileName) return true;
+      }
+    }
+    return false;
+  }
+
   const unused = new Map();
   const testers = new Map();   // exported, and only a test consumes it
   const examined = new Set();
@@ -181,7 +224,7 @@ function oracleUnusedExports() {
       }
     }
   }
-  return { unused, examined, testers };
+  return { unused, examined, testers, verifyFinding };
 }
 
 /** conducks' verdict. */
@@ -219,7 +262,7 @@ function conducksUnusedExports() {
   return found;
 }
 
-const { unused: oracle, examined, testers } = oracleUnusedExports();
+const { unused: oracle, examined, testers, verifyFinding } = oracleUnusedExports();
 const ours = conducksUnusedExports();
 // COMPARE ONLY WHERE THE ORACLE LOOKED.
 //
@@ -233,7 +276,17 @@ const oursScoped = new Map([...ours].filter(([k]) => inScope(k)));
 const outOfScope = ours.size - oursScoped.size;
 
 const missed = [...oracle].filter(([k]) => !oursScoped.has(k)).map(([, v]) => v);
-const extra = [...oursScoped].filter(([k]) => !oracle.has(k)).map(([, v]) => v);
+// A finding is EXTRA only when the compiler can actually SHOW a consumer that contradicts the
+// verdict conducks filed. Anything the oracle cannot locate is left out rather than counted.
+const extra = [...oursScoped]
+  .filter(([k]) => !oracle.has(k))
+  .map(([k, v]) => v)
+  .filter(v => {
+    const rel = String(v.file).toLowerCase().startsWith(projectDir.toLowerCase())
+      ? String(v.file).toLowerCase().slice(projectDir.length).replace(/^[/\\]/, '')
+      : String(v.file);
+    return verifyFinding(rel, String(v.symbol), v.type) === true;
+  });
 const agreed = [...oracle].filter(([k]) => oursScoped.has(k)).length;
 
 console.log(`\n--- UNUSED_EXPORT vs the TypeScript language service (${path.basename(projectDir)}) ---`);

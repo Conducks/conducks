@@ -14,5 +14,10 @@
     "oracle": 104,
     "missed": 15,
     "agreed": 89
+  },
+  "sofie::exports": {
+    "oracle": 212,
+    "missed": 86,
+    "agreed": 126
   }
 }

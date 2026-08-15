@@ -2385,3 +2385,22 @@ by construction.
   entries and find out by hand who consumes them. Mutation-checked afterwards: dropping a use-position
   raises `EXTRA` on subject-a via `oracle-tsc.mjs` — the exports oracle is insensitive to that rule by
   construction, so one oracle passing a mutation is not evidence the suite is a rubber stamp.
+
+## A local declaration lost every reference to a built-in of the same name
+- Gotcha: `interface Location` in subject-c's weather tool was reported ORPHAN -- "defined but never
+  referenced" -- while being referenced twice in its own file. The reference is routed to
+  `GLOBAL::location` the moment the name appears in the built-in list, and that test runs before
+  anything asks whether the file declares the name, so the DOM's Location took both edges and the
+  real declaration was left with none. `Request`, `Response`, `Document` and `Navigator` are on the
+  same list, and a project declaring its own Request or Response is ordinary.
+- Why: it is invisible by construction. Identical code differing only in the NAME gets opposite
+  verdicts, so every reproduction attempt that renames the symbol to something neutral makes the bug
+  disappear and reads as "cannot reproduce". Four hypotheses died that way first -- file size, a
+  lowercase/uppercase id collision, a parameter shadowing a local, the tree-sitter match limit -- and
+  each looked plausible because the real variable was never the one being changed.
+- Applies: shadowing is resolved AFTER the walk, from the set of names the file declares, because
+  deciding during it would depend on whether the declaration was read before the use -- a property of
+  the file's layout, not of the code. Guarded by the oracle rather than by `prune-precision`: the
+  fixture shape passed with the fix disabled TWICE (first because an imported symbol has an import
+  edge regardless, then for a reason not chased down), and an assertion that passes either way is
+  worse than none. Mutation-check any fixture whose subject is a name.

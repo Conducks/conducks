@@ -1364,6 +1364,34 @@ export class ConducksReflector {
 
     spectrum.nodes = [...Array.from(nodeCache.values()), ...virtualNodes];
 
+    // A LOCAL DECLARATION SHADOWS A GLOBAL, which is how the language itself reads the code.
+    //
+    // A reference is routed to `GLOBAL::name` the moment the name is in the built-in list, and that
+    // test runs before anything asks whether THIS FILE declares the name. A file declaring its own
+    // `Location` therefore handed every reference to the DOM's, leaving its own declaration with no
+    // incoming edge at all — reported ORPHAN, "defined but never referenced", while being used two
+    // lines below. MEASURED on subject-c: `interface Location` in the weather tool, referenced twice.
+    //
+    // Not a one-name problem: `Request`, `Response`, `Document` and `Navigator` are on that list too,
+    // and a project declaring its own Request or Response is ordinary rather than exotic.
+    //
+    // Applied AFTER the walk on purpose. Deciding during it would depend on whether the declaration
+    // happened to be read before the use, which is a property of the file's layout and not of the
+    // code's meaning. Only the local name is restored — the target falls back to the bare form that
+    // graph ingestion qualifies, exactly as an ordinary same-file reference does.
+    const declaredHere = new Set(
+      spectrum.nodes
+        .filter(n => String(n.kind) !== 'file')
+        .map(n => String(n.name).toLowerCase()));
+    if (declaredHere.size > 0) {
+      for (const rel of spectrum.relationships) {
+        const target = String(rel.targetName);
+        if (!target.startsWith('GLOBAL::')) continue;
+        const bare = target.slice('GLOBAL::'.length);
+        if (declaredHere.has(bare)) rel.targetName = bare;
+      }
+    }
+
     // JOIN THE HARVESTED PROSE TO ITS DECLARATION (ADR 0133).
     //
     // After the walk, because a comment ABOVE a declaration is seen before the declaration exists,
