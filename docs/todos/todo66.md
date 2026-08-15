@@ -2,6 +2,9 @@
 Status: blocked
 - Acceptance: on subject-c, `globalPromptPath`, `kernelPromptPath`, `agentRoutingPath`, `TOOL_REGISTRARS`, `computeEffectiveSignificance` and `readAgentRoutingPrompt` are NOT reported by `prune`, because the import that consumes them resolves — measured, not asserted.
 - Builds: 0026
+- Blocked by: only ONE of three subjects shows the shape, and nothing declares the mapping — Phase 0
+  measured both. Clears when a SECOND subject shows a specifier that resolves only through the build
+  layout, or when a project declares that mapping somewhere a resolver can read.
 - DEFERRED 2026-08-15, before Phase 1 was started, on this todo's own bar. Phase 0 found that
   NOTHING declares the mapping — it emerges from two build configs — and that only ONE of three
   subjects has the shape. The defect is real and its cost is stated below; what is not justified
