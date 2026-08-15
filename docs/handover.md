@@ -11,9 +11,9 @@ against, not the ones further down this file:
 
 | | subject-c | subject-a | orchestrator |
 | --- | --- | --- | --- |
-| ORPHAN | 17 | 18 | 84 |
+| ORPHAN | 17 | 18 | 79 |
 | UNUSED_EXPORT | 120 | – | 96 |
-| UNIMPORTED_MODULE | 11 | 44 | 64 |
+| UNIMPORTED_MODULE | 11 | 44 | 63 |
 | STALE_IMPORT | 1 | 7 | 0 |
 
 Every `STALE_IMPORT` above was checked against the source by hand and is a TRUE positive.
@@ -24,6 +24,15 @@ hands back its handlers), and a default export (`export default Card`, the reaso
 exists). The monorepo moved ORPHAN 98 → 84 and STALE_IMPORT 1 → 0, while UNUSED_EXPORT rose 93 → 96,
 which is RECALL: symbols previously hidden behind a false ORPHAN are now judged. The other two
 subjects did not move — these shapes are pervasive in a React monorepo and rare elsewhere.
+
+**A THIRD benchmark run found two more, both ordinary JavaScript.** `useSyncExternalStore(subscribe,
+getSnapshot, getServerSnapshot)` had arguments 2 and 3 reported ORPHAN while the first resolved —
+because the kinesis pattern captures arguments as `(arguments (_)* @kinesis_arg)` and that quantifier
+yields exactly ONE capture, probed against the real grammar. Every call argument after the first was
+invisible to the whole pipeline. And `const { shouldRetry = shouldRetryError } = options` — a
+destructuring DEFAULT — was invisible too. Both are captured in the shared block now; the argument
+one is a SEPARATE pattern rather than a fix to the quantifier, because folding it in would multiply
+the match count and with it the CALLS edges. orchestrator ORPHAN 84 → 79.
 
 **A process failure worth recording:** the first reading of that run reported ORPHAN 98 → 9 and
 UNIMPORTED_MODULE 67 → 4. Both were wrong — a `cd` earlier in the same command had left the shell in

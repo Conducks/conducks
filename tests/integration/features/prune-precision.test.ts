@@ -48,6 +48,11 @@ const TRUTH = {
     //   `handleBack`  returned as `{ handleNext, handleBack }` — object shorthand
     //   `Card`        published by `export default Card`  — the reason the file exists
     'ParenTyped', 'shorthandUsed', 'defaultExported',
+    // Two more from the third benchmark run, both ordinary JavaScript:
+    //   `secondArg`  passed as the SECOND argument of a call — the kinesis pattern's `(_)*`
+    //                quantifier captures only the first, so every later argument was invisible
+    //   `fallbackFn` used as a destructuring DEFAULT (`{ x = fallbackFn } = opts`)
+    'secondArg', 'fallbackFn',
   ],
 };
 
@@ -99,6 +104,8 @@ export interface Boxed<T> { value: T }
 export class ThrownError extends Error {}
 export interface Intersected { a: number }
 export interface Constrained { b: number }
+export function secondArg(): number { return 12; }
+export function fallbackFn(): number { return 13; }
 export interface ParenTyped { p: number }
 export function shorthandUsed(): number { return 10; }
 export function defaultExported(): number { return 11; }
@@ -166,6 +173,7 @@ import {
   wiredInArray, wiredInTernary, Reason, Boxed,
   ThrownError, Intersected, Constrained,
   ParenTyped, shorthandUsed,
+  secondArg, fallbackFn,
   staticallyUsed,
 } from './lib.js';
 
@@ -199,6 +207,16 @@ export function takesMany(...items: (ParenTyped)[]): number { return items.lengt
 
 // 9. OBJECT SHORTHAND — how every hook returns its handlers
 export const bundle = { shorthandUsed };
+
+// 10. SECOND ARGUMENT of a call. The first argument has always resolved; anything after it did not.
+export function subscribe(a: unknown, b: unknown): unknown { return [a, b]; }
+export const wired = subscribe(staticallyUsed, secondArg);
+
+// 11. DESTRUCTURING DEFAULT — the fallback a caller gets when the option is absent
+export function withOpts(opts: { pick?: () => number } = {}): number {
+  const { pick = fallbackFn } = opts;
+  return pick();
+}
 `);
     // 10. DEFAULT EXPORT — the symbol a component file exists to publish.
     // `staticallyUsed` is imported and CALLED here for the same reason it is in `wiring.ts`: with
@@ -264,6 +282,8 @@ export default defaultExported;
       parenthesisedType: stale.has('ParenTyped'),
       objectShorthand: stale.has('shorthandUsed'),
       defaultExport: stale.has('defaultExported'),
+      secondCallArgument: stale.has('secondArg'),
+      destructuringDefault: stale.has('fallbackFn'),
     }).toEqual({
       arrayLiteral: false,
       ternaryBranch: false,
@@ -275,6 +295,8 @@ export default defaultExported;
       parenthesisedType: false,
       objectShorthand: false,
       defaultExport: false,
+      secondCallArgument: false,
+      destructuringDefault: false,
     });
   });
 

@@ -46,6 +46,28 @@ export const EC_VALUE_POSITIONS = `
   (binary_expression operator: "instanceof" right: (identifier) @ref_value)
   (export_statement value: (identifier) @ref_value)
   (for_in_statement right: (identifier) @ref_value)
+  ;; EVERY identifier ARGUMENT of a call, not just the first.
+  ;;
+  ;; The kinesis pattern captures arguments as (arguments (_)* @kinesis_arg), and that quantifier
+  ;; yields exactly ONE capture — probed against the real grammar: useSyncExternalStore(subA, subB,
+  ;; subC) produces a single match carrying subA and nothing else. So every argument after the first
+  ;; was invisible to the reference-as-value path, and a callback handed over in second position
+  ;; read as unreferenced.
+  ;;
+  ;; MEASURED on the monorepo subject: getSnapshot and getServerSnapshot, arguments 2 and 3 of
+  ;; useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot), were both reported ORPHAN while
+  ;; the first argument resolved fine.
+  ;;
+  ;; Captured SEPARATELY rather than by fixing the quantifier in place: this pattern matches once per
+  ;; argument, and folding that into the kinesis pattern would multiply its match count and with it
+  ;; the CALLS edges it emits.
+  (call_expression arguments: (arguments (identifier) @ref_value))
+  ;; A DESTRUCTURING DEFAULT names the fallback it falls back TO:
+  ;;   const { shouldRetry = shouldRetryError } = options
+  ;; The identifier sits in an object_assignment_pattern beside the shorthand name, and no other
+  ;; pattern reached it. MEASURED on the monorepo subject: shouldRetryError was reported ORPHAN while
+  ;; being the default for shouldRetry twenty-five lines below its own declaration.
+  (object_assignment_pattern (identifier) @ref_value)
 `;
 
 /**
