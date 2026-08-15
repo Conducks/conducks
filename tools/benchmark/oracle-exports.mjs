@@ -26,7 +26,7 @@
  *     demanding zero.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
@@ -96,6 +96,14 @@ function oracleUnusedExports() {
 
 /** conducks' verdict. */
 function conducksUnusedExports() {
+  // RE-ANALYZE FROM AN EMPTY VAULT, ALWAYS. `prune` answers from the vault, and a GRAMMAR change
+  // alters no file hash — so `analyze` skips every file as unchanged and the score is taken against
+  // the PREVIOUS build. Measured twice while writing this: removing a capture pattern, rebuilding
+  // and re-running left the numbers identical and the gate green, first with no analyze at all and
+  // then with an analyze that no-opped. A gate that scores stale data is worse than no gate, because
+  // it reports success. The vault is derived state and costs seconds to rebuild.
+  rmSync(path.join(projectDir, '.conducks'), { recursive: true, force: true });
+  execFileSync('node', [CLI, 'analyze'], { cwd: projectDir, stdio: 'ignore', maxBuffer: 64 * 1024 * 1024 });
   const raw = execFileSync('node', [CLI, 'prune', '--json'],
     { cwd: projectDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const lowerRoot = projectDir.toLowerCase();

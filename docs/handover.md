@@ -85,8 +85,11 @@ independent one.
 
 | measure | oracle | conducks | agreed | MISSED | EXTRA |
 | --- | --- | --- | --- | --- | --- |
-| unused IMPORTS (`tsc --noUnusedLocals`) | 31 | 1 | 1 | 30 | **0** |
-| unused EXPORTS (`LanguageService.findReferences`) | 149 | 78 | 78 | 71 | **0** |
+| TS unused IMPORTS (`tsc --noUnusedLocals`) | 31 | 1 | 1 | 30 | **0** |
+| TS unused EXPORTS (`LanguageService.findReferences`) | 149 | 78 | 78 | 71 | **0** |
+| PY unused IMPORTS (python's own `ast`) | 11 | 7 | 7 | 4 | **0** |
+
+Recall reads 3% / 52% / **64%** — the Python surface, where the worst defects were, scores best.
 
 **EXTRA is 0 on both.** conducks contradicts the compiler nowhere — the thirteen use-position fixes
 did what they claimed. What it is, is QUIET: 3% recall on imports, 52% on exports.

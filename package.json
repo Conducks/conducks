@@ -47,6 +47,7 @@
     "oracle": "node tools/benchmark/oracle-tsc.mjs && node tools/benchmark/oracle-exports.mjs",
     "oracle:imports": "node tools/benchmark/oracle-tsc.mjs",
     "oracle:exports": "node tools/benchmark/oracle-exports.mjs",
+    "oracle:python": "node tools/benchmark/oracle-python.mjs ../test-projects/scraper",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
     "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js"
   },

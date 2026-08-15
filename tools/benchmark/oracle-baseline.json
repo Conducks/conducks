@@ -9,5 +9,10 @@
     "oracle": 149,
     "missed": 71,
     "agreed": 78
+  },
+  "scraper::python": {
+    "oracle": 11,
+    "missed": 4,
+    "agreed": 7
   }
 }
