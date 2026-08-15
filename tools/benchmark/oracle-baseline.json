@@ -4,5 +4,10 @@
     "missed": 30,
     "agreed": 1,
     "recorded": "run with --write-baseline to update"
+  },
+  "conducks::exports": {
+    "oracle": 149,
+    "missed": 71,
+    "agreed": 78
   }
 }

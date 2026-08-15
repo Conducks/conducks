@@ -80,6 +80,28 @@ independent one.
   nothing measured today speaks to it, so the decision stands; the reasoning behind it no longer
   does unexamined.
 
+**`prune` is now SCORED against the compiler, in both directions** (`npm run oracle`). Until
+2026-08-15 nothing independent checked it, and the largest category had no oracle at all.
+
+| measure | oracle | conducks | agreed | MISSED | EXTRA |
+| --- | --- | --- | --- | --- | --- |
+| unused IMPORTS (`tsc --noUnusedLocals`) | 31 | 1 | 1 | 30 | **0** |
+| unused EXPORTS (`LanguageService.findReferences`) | 149 | 78 | 78 | 71 | **0** |
+
+**EXTRA is 0 on both.** conducks contradicts the compiler nowhere — the thirteen use-position fixes
+did what they claimed. What it is, is QUIET: 3% recall on imports, 52% on exports.
+
+Both gates are TWO-SIDED, because precision alone is gameable to the limit — capture every identifier
+position and `prune` reports nothing while scoring perfectly. `EXTRA` hard-fails; `MISSED` ratchets
+against `tools/benchmark/oracle-baseline.json` and may never rise. Mutation-verified in both files:
+silencing `findStaleImports` gives "RECALL WENT BACKWARDS 30 → 31", silencing `UNUSED_EXPORT` gives
+71 → 149. Either change would have passed every gate this project had the day before.
+
+Each oracle also checks ITSELF first, because an oracle that quietly stops finding things turns the
+gate into a rubber stamp — MISSED to zero, EXTRA to zero, everything green. That is not theoretical:
+the first import oracle parsed only `TS6133` and was blind to `TS6192` (emitted when EVERY name in a
+declaration is unused), so it reported a CORRECT conducks finding as a precision bug.
+
 **Known open, with the mechanism already found:**
 - ~~Java/C# same-package calls do not resolve~~ — FIXED 2026-08-15. My earlier claim that "the graph
   never records a DECLARED package" was WRONG, and wrong because of the fixture: `package app;` is a
