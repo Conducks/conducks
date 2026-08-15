@@ -2472,3 +2472,20 @@ by construction.
   `<file>::default` and all 18 stayed ORPHAN — the fix looked wrong when only the edge type was.
   ACCESSES works. Claim the DEFAULT only, never the namespace: `lazyNamedButDead` in
   `prune-precision` is the counter-test that a named export of a lazily loaded module still dies.
+
+## findReferences does not cross a module boundary for a DEFAULT export
+- Gotcha: asking the language service about a default-exported symbol returns ONE reference, its own
+  definition. Probed on subject-a: `PluginList` is default-exported, statically imported by
+  `PluginPanel.tsx` and rendered at five JSX sites; from the declaration the answer is the
+  definition alone, and from the import site only the six uses inside the importing file. Named
+  exports in the same tree answer correctly (5, 7, 4 external references), and `getFileReferences`
+  returns 0 as well. So it is specific to `default`, not to the program's scope.
+- Why: the export oracle therefore called every default export unused whenever its consumers use it
+  as a default — 28 of the 47 exports it reported as "referenced nowhere" on subject-a were named
+  `default`, and conducks was charged a recall miss for each while being right. Read the import
+  statements instead: `importClause.name` IS the default binding, resolved with `resolveModuleName`.
+- Applies: STATIC imports only. A dynamic `import('./X')` consumes the default too, but that is the
+  claim conducks makes, and an oracle that adopts the claim it checks has stopped being evidence —
+  the 18 lazily loaded components stay counted as unused and stay MISSED, which is the honest
+  reading. Verified the instrument fires before believing it: breaking conducks' default-import
+  binding on purpose raises EXTRA from 0 to 1.

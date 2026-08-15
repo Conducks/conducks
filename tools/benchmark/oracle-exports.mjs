@@ -161,6 +161,38 @@ function oracleUnusedExports() {
   const program = service.getProgram();
   const checker = program.getTypeChecker();
 
+  // WHO DEFAULT-IMPORTS WHOM, read from the import statements rather than from `findReferences`.
+  //
+  // `findReferences` does not cross the module boundary for a DEFAULT export. Probed on subject-a:
+  // `PluginList` is default-exported, statically imported by `PluginPanel.tsx` and rendered at five
+  // JSX sites; asking from the declaration returns ONE reference, its own definition, and asking
+  // from the import site returns only the six uses inside the importing file. A NAMED export in the
+  // same tree answers correctly (5, 7 and 4 external references), so this is specific to `default`,
+  // not to the program's scope. `getFileReferences` returns 0 here too.
+  //
+  // So every default export whose consumers use it as a default read as UNUSED to this oracle: 28 of
+  // the 47 exports it called "referenced nowhere" on subject-a are named `default`, and conducks was
+  // charged a recall miss for each one while being right.
+  //
+  // STATIC IMPORTS ONLY, deliberately. A dynamic `import('./X')` also consumes the default in
+  // practice, but that is precisely the claim conducks makes, and an oracle that adopts the claim it
+  // is meant to check has stopped being evidence. Those stay counted as unused here, and stay
+  // MISSED — the honest reading is that this instrument cannot see them.
+  const defaultImportedBy = new Map();   // resolved file (lower) -> Set of importing file names
+  for (const sf of program.getSourceFiles()) {
+    if (sf.isDeclarationFile) continue;
+    for (const st of sf.statements) {
+      if (!ts.isImportDeclaration(st) || !st.importClause?.name) continue;   // `.name` IS the default binding
+      const spec = st.moduleSpecifier.text;
+      const resolved = ts.resolveModuleName(spec, sf.fileName, cfg.options, ts.sys).resolvedModule;
+      if (!resolved) continue;
+      const key = resolved.resolvedFileName.toLowerCase();
+      const set = defaultImportedBy.get(key) ?? new Set();
+      set.add(sf.fileName);
+      defaultImportedBy.set(key, set);
+    }
+  }
+
   // VERIFY A CONDUCKS FINDING DIRECTLY, instead of asking whether it appears in a set.
   //
   // EXTRA was computed as a set difference against the ENUMERATED EXPORTS, so any finding about a
@@ -189,6 +221,23 @@ function oracleUnusedExports() {
     };
     ts.forEachChild(abs, visit);
     if (!nameNode) return null;
+    // THE SAME BLIND SPOT ON THE PRECISION SIDE. If conducks wrongly flags a default-exported
+    // component, `findReferences` cannot produce the consumer that contradicts it, so the finding
+    // would pass as verified-EXTRA-free. Ask the import map first: a static default import of this
+    // file IS a consumer, and it contradicts both verdicts.
+    //
+    // NOT SHOWN TO BE LOAD-BEARING, and said plainly rather than left to look proven. Breaking
+    // conducks' default-import binding on purpose raises EXTRA to 1 with this block disabled as
+    // well — `findReferences` catches that one by itself. The blind spot it closes is measured
+    // (asking about a default export returns only its own definition); a finding that lands in it
+    // is not, on the three subjects available.
+    const defaultOfThisFile = checker.getExportsOfModule(checker.getSymbolAtLocation(abs) ?? {})
+      ?.find?.(e => e.getName() === 'default');
+    if (defaultOfThisFile?.declarations?.[0] &&
+        (defaultOfThisFile.declarations[0].name?.getText?.().toLowerCase() === wanted)) {
+      const importers = defaultImportedBy.get(abs.fileName.toLowerCase());
+      if (importers && importers.size > 0) return true;
+    }
     let refs;
     try { refs = service.findReferences(abs.fileName, nameNode.getStart()); } catch { return null; }
     if (!refs) return null;
@@ -238,6 +287,12 @@ function oracleUnusedExports() {
       // Test-only consumption is still worth knowing — an export that exists solely for a test is a
       // real smell — so it is counted and reported separately rather than folded into either number.
       let external = 0, testOnly = 0, sameFile = 0;
+      // The default export's consumers come from the import map above, for the reason stated there.
+      if (exp.getName() === 'default') {
+        for (const importer of defaultImportedBy.get(sf.fileName.toLowerCase()) ?? []) {
+          if (isTestPath(path.relative(projectDir, importer))) testOnly++; else external++;
+        }
+      }
       for (const group of refs) {
         for (const r of group.references) {
           if (r.fileName === sf.fileName) { sameFile++; continue; }   // same file is not "another module"
