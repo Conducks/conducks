@@ -108,6 +108,22 @@ export class IntraLinker {
     // Strip ::unit to give the resolver raw absolute paths
     const allFilePaths = Array.from(unitSymbols.keys()).map(u => u.split('::')[0]);
 
+    // WHICH SYMBOL EACH FILE PUBLISHES AS ITS DEFAULT, read from the ALIASES edge the reflector
+    // records at `<file>::default`.
+    //
+    // Kept as its own map rather than resolved by name, and that distinction is the whole point: a
+    // default import produces the target `<file>::default`, and the generic fallback below answers a
+    // plain name by searching the file's IMPORTS for it. Every file with a default export now offers
+    // a symbol called `default`, so that search answers with SOMEBODY ELSE'S — measured, a component
+    // whose local name matched its exported one resolved correctly until the file gained a single
+    // in-project import, and then read as ORPHAN. The name `default` is meaningful only relative to
+    // one file, so it is only ever looked up that way.
+    const defaultExportOf = new Map<string, string>();
+    for (const edge of graph.getAllEdges()) {
+      if (edge.type !== 'ALIASES' || !(edge as any).properties?.isDefaultExport) continue;
+      defaultExportOf.set(String(edge.sourceId).toLowerCase(), String(edge.targetId));
+    }
+
     // ── 2. Build sourceUnitId → importedUnitIds from IMPORTS edges ──────────
     const unitImports = new Map<string, string[]>();
 
@@ -442,6 +458,18 @@ export class IntraLinker {
         //
         // It IS enumerable at the target: the barrel's own IMPORTS name every file it re-exports
         // from. Resolve the name through them, uniqueness-gated so two files exporting it refuse.
+        // `<file>::default` names one file's default export and nothing else. Answered from the map
+        // above, and NEVER allowed to fall through to the name-based search below — that search would
+        // find a `default` in some other file this one imports and bind the reference to it.
+        if (symbol === 'default') {
+          const real = defaultExportOf.get(edge.targetId.toLowerCase());
+          if (real && real !== edge.targetId) {
+            graph.rebindEdgeTarget(edge, real);
+            resolved.push({ id: edge.id, newTargetId: real });
+          }
+          continue;
+        }
+
         if (dot === -1 && symbol && symbol !== 'unit') {
           const viaBarrel = this.resolveSymbolUnique(symbol, `${file}::unit`, unitImports, unitSymbols);
           if (viaBarrel && viaBarrel !== edge.targetId) {

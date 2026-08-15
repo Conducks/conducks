@@ -16,9 +16,9 @@
     "agreed": 89
   },
   "sofie::exports": {
-    "oracle": 212,
-    "missed": 86,
-    "agreed": 126
+    "oracle": 255,
+    "missed": 122,
+    "agreed": 133
   },
   "app::exports": {
     "oracle": 45,

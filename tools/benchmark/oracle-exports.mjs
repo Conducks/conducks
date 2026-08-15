@@ -26,7 +26,7 @@
  *     demanding zero.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import fs, { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
@@ -111,11 +111,41 @@ function oracleUnusedExports() {
                 `    node tools/benchmark/oracle-exports.mjs ${path.relative(process.cwd(), projectDir)}/app\n`);
     process.exit(0);
   }
+  // EVERY TSCONFIG IN THE PROJECT, NOT JUST THE ROOT ONE.
+  //
+  // A gate that quietly reads less than the tool does overstates itself, and this one did: subject-c's
+  // root config says `exclude: ["electron"]`, so an entire second source tree was never read. Six
+  // findings already KNOWN to be false (todo66) sit in exactly that tree — the gate reported EXTRA 0
+  // while being structurally unable to see them. "No false positives" and "no false positives in the
+  // half I read" are different claims, and only one of them was true.
+  //
+  // The file lists are UNIONED into one program rather than compared per config, because the
+  // consumption crosses the trees: a symbol declared under src/ is used from electron/, and two
+  // separate programs each see one end of that and call it unused.
+  const configPaths = [configPath];
+  for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (['node_modules', '.git', 'dist', 'build', '.conducks'].includes(entry.name)) continue;
+    const nested = path.join(projectDir, entry.name, 'tsconfig.json');
+    if (fs.existsSync(nested) && nested !== configPath) configPaths.push(nested);
+  }
   const cfg = ts.parseJsonConfigFileContent(
     ts.readConfigFile(configPath, ts.sys.readFile).config, ts.sys, path.dirname(configPath));
+  const allFileNames = new Set(cfg.fileNames);
+  for (const extra of configPaths.slice(1)) {
+    try {
+      const c = ts.parseJsonConfigFileContent(
+        ts.readConfigFile(extra, ts.sys.readFile).config, ts.sys, path.dirname(extra));
+      for (const f of c.fileNames) allFileNames.add(f);
+    } catch { /* a config this oracle cannot read is reported by the coverage line below */ }
+  }
+  if (configPaths.length > 1) {
+    console.log(`  reading ${configPaths.length} tsconfigs: ` +
+      configPaths.map(c => path.relative(projectDir, c) || 'tsconfig.json').join(', '));
+  }
 
   const host = {
-    getScriptFileNames: () => cfg.fileNames,
+    getScriptFileNames: () => [...allFileNames],
     getScriptVersion: () => '1',
     getScriptSnapshot: (f) => { try { return ts.ScriptSnapshot.fromString(readFileSync(f, 'utf8')); } catch { return undefined; } },
     getCurrentDirectory: () => path.dirname(configPath),
@@ -181,8 +211,10 @@ function oracleUnusedExports() {
     if (sf.isDeclarationFile) continue;
     const rel = path.relative(projectDir, sf.fileName);
     if (rel.startsWith('..') || isTestPath(rel)) continue;
-    // Only files this project owns — never node_modules, never generated output.
-    if (!rel.startsWith('src' + path.sep)) continue;
+    // Only files this project owns — never node_modules, never generated output. Widened from
+    // `src/` alone so a second source tree (electron/, server/, functions/) is examined too; the
+    // point of unioning the configs above is lost if the walk still refuses to look at them.
+    if (/(^|[/\\])(node_modules|dist|build|out|coverage|\.conducks)([/\\]|$)/.test(rel)) continue;
 
     examined.add(rel.toLowerCase());
     const moduleSymbol = checker.getSymbolAtLocation(sf);

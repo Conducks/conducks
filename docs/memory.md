@@ -2422,3 +2422,21 @@ by construction.
   passing, because the edge starts at a `<file>::default` id no node carries. Measured after writing
   a comment that claimed otherwise. Also the THIRD time the backtick gate (todo31) rejected a build
   whose output I had already piped to /dev/null — grep the build for the failure marker, always.
+
+## Widening the oracle's scope immediately found a regression the narrow one had hidden
+- Gotcha: the export oracle read only the ROOT tsconfig, and subject-c's excludes `electron` while
+  `renderer` has its own config — so two of three source trees were never scored. `EXTRA 0` meant
+  "none in the third I read". Unioning every tsconfig in the project into ONE program (the
+  consumption crosses trees, so separate programs each see one end and call it unused) took the
+  unscored count from 18 to 3 and surfaced a real precision bug in the first run.
+- Why: that bug was MINE, from an hour earlier. Teaching default imports to bind through `default`
+  fixed the renamed form and broke the same-name form: the target `<file>::default` fell through to
+  a fallback that answers a plain name by searching the FILE'S OWN IMPORTS, and every file with a
+  default export now offers a symbol called `default`. So a component resolved correctly until its
+  file gained a single in-project import, then read as ORPHAN. The renamed form passed throughout.
+- Applies: `default` is meaningful only relative to one file, so it is never looked up by name — the
+  guard that refuses the fallback is what the measurements move, and NOT resolving beats resolving
+  wrongly. The `isDefaultExport` map is kept for the correct-edge case but was NOT shown to be
+  load-bearing on any subject available; disabling it changes no number, and saying otherwise would
+  be a claim the evidence does not support. Also: four fixture entries written this session passed
+  with their own fix disabled. Mutation-test every new fixture entry, on a build you rebuilt.

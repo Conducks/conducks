@@ -77,6 +77,13 @@ const TRUTH = {
     // capture, so the local name was never registered, the call dangled, and the exported
     // declaration read as ORPHAN. The two names are joined through `default`.
     'liveDefault',
+    // The SAME shape with the local name MATCHING the exported one, in a file that imports something
+    // in-project. That combination regressed while the renamed form was being fixed: the default
+    // import produces the target `<file>::default`, and the generic fallback answers a plain name by
+    // searching the file's own imports — so once the file had an import, `default` resolved to
+    // SOMEBODY ELSE'S default export. The renamed form kept passing throughout, which is why this
+    // needs its own entry rather than trusting the one above.
+    'sameNameDefault',
   ],
 };
 
@@ -156,6 +163,12 @@ declare module 'a-package-not-in-this-project' {
     writeFile(repo, 'src/live-default.ts', `
 export default function liveDefault(): number { return 17; }
 `);
+    // The in-project import is the condition, not decoration: without it the name-based fallback
+    // has nothing to go wrong with and this file passes whether the hop is file-specific or not.
+    writeFile(repo, 'src/same-name-default.ts', `
+import { staticallyUsed } from './lib.js';
+export default function sameNameDefault(): number { return 19 + staticallyUsed(); }
+`);
     writeFile(repo, 'src/dead-default.ts', `
 export default function deadDefault(): number { return 18; }
 `);
@@ -179,6 +192,7 @@ import { staticallyUsed, usedConstant } from './lib.js';
 import { barrelUsed } from './index.js';
 import { augmentAnchor } from './augments.js';
 import RenamedOnImport from './live-default.js';
+import sameNameDefault from './same-name-default.js';
 // imported for its side effects only, so the FILE is reachable and its default export is judged as
 // a symbol rather than deferred as the UNIMPORTED_MODULE question
 import './dead-default.js';
@@ -192,7 +206,7 @@ export async function main(): Promise<number> {
   const { constructedDynamically } = await import('./lib.js');
   const c = new constructedDynamically().run();
 
-  return a + b + c + barrelUsed() + augmentAnchor() + RenamedOnImport();
+  return a + b + c + barrelUsed() + augmentAnchor() + RenamedOnImport() + sameNameDefault();
 }
 `);
 
