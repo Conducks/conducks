@@ -91,6 +91,24 @@ independent one.
 
 Recall reads 3% / 52% / **64%** — the Python surface, where the worst defects were, scores best.
 
+**The recall gap was then DIAGNOSED, not just measured.** 22 of the 30 missed TypeScript imports are
+one line: the import-site calibration in `dead-code.ts`, which skips a statement when NO name in it
+was observed used. Removing that line, measured in both directions:
+
+| | findings | MISSED | EXTRA |
+| --- | --- | --- | --- |
+| TypeScript | 1 → **20** | 30 → 11 | **0** |
+| Python | 7 → **87** | 4 → 1 | **77** |
+
+It costs 19 true findings on the language whose extractor is strong, and prevents a collapse into 77
+false ones on the language whose extractor is not. **Kept**, and deliberately not made
+language-conditional: a flag reading "TypeScript's extractor is good enough now" would assert as a
+constant something that was false last week and is only true because thirteen use-positions were
+closed. `npm run oracle` re-measures it; a constant would only remember it.
+
+That experiment is the first time a calibration decision in this project was made against numbers in
+BOTH directions rather than against a worry.
+
 **EXTRA is 0 on both.** conducks contradicts the compiler nowhere — the thirteen use-position fixes
 did what they claimed. What it is, is QUIET: 3% recall on imports, 52% on exports.
 

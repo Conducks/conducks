@@ -410,6 +410,20 @@ export class DeadCodeAnalyzer {
       // produce no relationship at all). Absence of evidence is then not evidence of absence, so
       // the whole statement is left alone. This costs recall on single-binding imports and is the
       // price of never being wrong.
+      // MEASURED 2026-08-15, once the oracles existed to measure it. Removing this line:
+      //
+      //   TypeScript : findings 1 -> 20, MISSED 30 -> 11, EXTRA still 0    (19 TRUE findings gained)
+      //   Python     : findings 7 -> 87, MISSED 4 -> 1,   EXTRA 0 -> 77    (77 FALSE findings gained)
+      //
+      // So the guard costs real recall on the language whose extractor is strong, and prevents a
+      // collapse on the language whose extractor is not. Its premise — "absence of evidence is not
+      // evidence of absence when the extractor may not cover this shape" — is still TRUE, just no
+      // longer true everywhere.
+      //
+      // KEPT, and deliberately NOT made language-conditional. A flag saying "TypeScript's extractor
+      // is good enough now" would be a constant asserting something that was false last week and is
+      // only true today because thirteen use-positions were closed. `npm run oracle` is where that
+      // claim belongs, because there it is re-measured rather than remembered.
       if (!statement.candidates.some(isUsed)) continue;
 
       for (const candidate of statement.candidates) {
