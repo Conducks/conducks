@@ -77,18 +77,23 @@ independent one.
   the unit suite made a live request to `api.github.com` with a 2-second timeout. `node:https` is
   stubbed now, answering as OFFLINE — one of the two cases that test already names — and the stub
   asserts it was reached, so the test cannot silently go back to using the real network.
-- **`docs-watcher.test.ts` flake is NOT fixed.** Diagnosed, one real defect corrected, and the
-  obvious remedy MEASURED AND REJECTED. The tests were hardened under todo60 to wait on conditions
-  with their own bounds (3s for a pulse, 15s for the debounce case) while jest's default per-test
-  cap stayed at 5s — so the declared bound could never fire, and the failure printed
-  `Exceeded timeout of 5000 ms`, which reads like a slow watcher. `jest.setTimeout(30_000)` makes
-  the declared bound reachable, and that is the only thing it does.
-  ORDER-BALANCED A/B under six writer processes: **2/6 failures with the cap raised, 2/6 without.**
-  No effect. The dominant failure is the watcher receiving no OS event within 15s, which no timeout
-  changes. Two earlier readings pointed the other way and both were artifacts — one of run order,
-  one of comparing the file against itself (the change was already committed, so `git stash` took
-  nothing). If it recurs, a bigger number is the one move known not to work; the answer is to drive
-  the watcher's handler directly in the unit test and keep a single integration test for the wiring.
+- ~~`docs-watcher` flake~~ — ROOT CAUSE FOUND AND FIXED 2026-08-15, and it was a PRODUCT defect, not
+  a test one. `whenReady()` resolved on chokidar's `ready`, which means the initial SCAN finished —
+  on macOS that fires BEFORE the fsevents stream is subscribed, so a write landing in the gap
+  produced no event at all. MEASURED under six writer processes: writing immediately after
+  `whenReady()` gave **0 pulses in 90 seconds** on one probe of three and ~356ms on the others —
+  binary, never or immediate. A one-second settle made it 5/5, which showed the gap was DELIVERY,
+  not slowness.
+  Readiness is now PROVEN: after `ready`, the watcher writes a probe inside the watched tree, waits
+  until it observes its own write, then arms. Fails open after 3s with a warning, because this
+  component is log-only by design and never arming would be worse than arming late.
+  **0/6 failures under the load that gave 2/6 before; mutation-verified (reverting to announced
+  readiness fails 2/4 on the new assertion).**
+  What this cost the user before the fix: start the watcher, save a doc a moment later, and get no
+  re-lint — no error, no retry, the gate simply quiet at the moment it should fire.
+  The earlier `jest.setTimeout(30_000)` stays for its own smaller reason: a test whose declared
+  bound cannot fire is lying about what it measures. It was never the fix, and the commit that
+  claimed it was is corrected in the log.
 
 **A method note worth keeping:** three of six quick language fixtures written today produced
 confident FALSE conclusions until a real toolchain checked them — `rustc` and `ruby` caught all three

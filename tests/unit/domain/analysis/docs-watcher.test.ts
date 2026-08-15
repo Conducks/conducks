@@ -115,6 +115,50 @@ describe('docs-watcher — re-lints on write, reports only', () => {
     expect(pulses).toBeLessThan(WRITES);
   });
 
+  it('whenReady() means events are DELIVERED, not that the scan finished', async () => {
+    // The defect this closes: chokidar emits `ready` when its initial SCAN completes, which on macOS
+    // is before the fsevents stream is subscribed. A write landing in that gap produced NO event at
+    // all — so a user who started the watcher and saved a doc a moment later got no re-lint, with no
+    // error and no retry.
+    //
+    // MEASURED with six processes each writing 200 files in a loop: writing immediately after
+    // `whenReady()` gave 0 pulses in NINETY SECONDS on one probe of three, and ~356ms on the others.
+    // Binary — never, or immediate. A one-second settle after `whenReady()` made it 5/5, which is
+    // what showed the gap was delivery and not slowness. After the fix: 6/6 under the same load.
+    //
+    // Asserted WITHOUT a settle on purpose: the write happens on the line after `whenReady()`, so
+    // this fails if readiness ever goes back to being announced rather than proven.
+    const write = setup();
+    watcher = new DocsWatcher(root, 50);
+    watcher.start();
+    await watcher.whenReady();
+
+    const pulse = await new Promise<DocsPulse | null>(resolve => {
+      const timer = setTimeout(() => resolve(null), 10000);
+      watcher!.setPulseSubscriber(p => { clearTimeout(timer); resolve(p); });
+      write('0010-armed.md', adr('0010'));
+    });
+    expect(pulse).not.toBeNull();
+  });
+
+  it('never reports its own readiness probe as a changed doc', async () => {
+    // The probe is a real write inside the watched tree, and its delete emits an `unlink` after the
+    // proving window has closed. Filtered by NAME rather than by a live flag for exactly that
+    // reason — otherwise arming would announce a file the user never touched.
+    const write = setup();
+    watcher = new DocsWatcher(root, 50);
+    watcher.start();
+    await watcher.whenReady();
+
+    const pulse = await new Promise<DocsPulse | null>(resolve => {
+      const timer = setTimeout(() => resolve(null), 10000);
+      watcher!.setPulseSubscriber(p => { clearTimeout(timer); resolve(p); });
+      write('0011-real.md', adr('0011'));
+    });
+    expect(pulse).not.toBeNull();
+    expect(pulse!.files.join(' ')).not.toContain('conducks-watch-probe');
+  });
+
   it('is inert without a docs/ dir, and stop() is safe when never started', async () => {
     root = mkdtempSync(path.join(tmpdir(), 'conducks-watch-'));
     watcher = new DocsWatcher(root, 50);
