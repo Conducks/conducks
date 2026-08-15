@@ -48,9 +48,38 @@ const isTestPath = (p) =>
  * Gated on the project actually depending on `next`, so a plain `src/app/` directory in some other
  * project keeps being scored normally.
  */
-const NEXT_CONTRACT = new Set(['default', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS',
-  'metadata', 'generateMetadata', 'generateStaticParams', 'dynamic', 'revalidate', 'runtime',
-  'fetchCache', 'dynamicParams', 'viewport', 'generateViewport', 'config', 'middleware']);
+// The contract is FILENAME-BOUND. Next.js does not load "anything under app/" — it loads files with
+// reserved NAMES, and each reserved export is only meaningful in specific ones: HTTP verbs in
+// route.ts, metadata in a page or layout. The first version of this check keyed on the DIRECTORY, and
+// on the orchestrator subject 60 of the 190 files under src/app are ordinary components — so a dead
+// `export default` in SharedSessionsPage.tsx was silenced along with the real routes. An exclusion
+// that wide stops the gate from being able to fail, which is the failure mode that looks like
+// success.
+const ROUTE_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+const PAGE_CONFIG = ['metadata', 'generateMetadata', 'generateStaticParams', 'dynamic', 'revalidate',
+  'runtime', 'fetchCache', 'dynamicParams', 'viewport', 'generateViewport', 'preferredRegion',
+  'maxDuration', 'experimental_ppr'];
+
+/** reserved basename -> the export names Next.js reads from it. `default` is the render/handler. */
+const NEXT_FILES = new Map([
+  ['page',            ['default', ...PAGE_CONFIG]],
+  ['layout',          ['default', ...PAGE_CONFIG]],
+  ['template',        ['default']],
+  ['loading',         ['default']],
+  ['error',           ['default']],
+  ['global-error',    ['default']],
+  ['not-found',       ['default']],
+  ['default',         ['default']],
+  ['route',           ['default', ...ROUTE_VERBS, ...PAGE_CONFIG]],
+  ['middleware',      ['default', 'middleware', 'config']],
+  ['sitemap',         ['default']],
+  ['robots',          ['default']],
+  ['manifest',        ['default']],
+  ['opengraph-image', ['default', 'alt', 'size', 'contentType']],
+  ['twitter-image',   ['default', 'alt', 'size', 'contentType']],
+  ['icon',            ['default', 'size', 'contentType']],
+  ['apple-icon',      ['default', 'size', 'contentType']],
+]);
 
 const usesNext = (() => {
   try {
@@ -60,8 +89,15 @@ const usesNext = (() => {
 })();
 
 /** True when this export is loaded by the framework rather than by an import. */
-const isFrameworkEntry = (rel, name) =>
-  usesNext && /(^|\/)app\//.test(rel.split(path.sep).join('/')) && NEXT_CONTRACT.has(name);
+function isFrameworkEntry(rel, name) {
+  if (!usesNext) return false;
+  const posix = rel.split(path.sep).join('/');
+  const base = path.basename(posix).replace(/\.[cm]?[jt]sx?$/, '');
+  const allowed = NEXT_FILES.get(base);
+  if (!allowed || !allowed.includes(name)) return false;
+  // middleware sits at the project/src root; everything else must be inside the app router.
+  return base === 'middleware' || /(^|\/)app\//.test(posix);
+}
 
 /** Every export the compiler can prove no OTHER file references. */
 function oracleUnusedExports() {

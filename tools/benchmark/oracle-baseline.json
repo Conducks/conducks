@@ -10,6 +10,11 @@
     "missed": 4,
     "agreed": 7
   },
+  "app::exports": {
+    "oracle": 45,
+    "missed": 21,
+    "agreed": 24
+  },
   "conducks::exports": {
     "oracle": 104,
     "missed": 26,
@@ -19,10 +24,5 @@
     "oracle": 212,
     "missed": 98,
     "agreed": 114
-  },
-  "app::exports": {
-    "oracle": 44,
-    "missed": 20,
-    "agreed": 24
   }
 }
