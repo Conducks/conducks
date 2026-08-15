@@ -8,29 +8,25 @@ import { DocsWatcher, type DocsPulse } from '@/lib/domain/analysis/docs-watcher.
 // closes that window — and must do it without ever throwing at the author mid-save.
 
 /**
- * JEST'S CAP MUST NOT UNDERCUT THE TEST'S OWN BOUND.
+ * The cap is raised so the bounds these tests DECLARE are reachable. It is not a flake fix.
  *
- * These tests drive a REAL filesystem watcher, so each already carries a falsifiable bound of its
- * own: `nextPulse` rejects after 3s, and the debounce case waits on a CONDITION with a 15s deadline
- * plus a settle. Jest's default per-test cap is 5s, so that 15s deadline was UNREACHABLE — under
- * load jest killed the test at 5s and reported `Exceeded timeout of 5000 ms`, which reads like a
- * slow watcher and is actually a ceiling firing before the test could finish its own logic. Whoever
- * hardened the waits (todo60) never raised the cap, so the hardening could not take effect.
+ * These tests drive a REAL filesystem watcher and each carries a bound of its own: `nextPulse`
+ * rejects after 3s, and the debounce case waits on a CONDITION with a 15s deadline plus a settle.
+ * Jest's default per-test cap is 5s, so the 15s deadline could never be reached — whoever hardened
+ * the waits (todo60) left the cap at the default, and a test whose declared bound cannot fire is
+ * lying about what it measures. Raising it fixes THAT, and only that.
  *
- * This is NOT the "widen the window" move the debounce case warns about below. That widens an
- * ASSERTION's tolerance until it stops failing, which is unfalsifiable. This lifts an unrelated
- * ceiling so the bound the test already declares is the one that decides the outcome.
+ * MEASURED, ORDER-BALANCED, and it refutes the obvious hope: under six processes each writing 200
+ * files in a loop, alternating runs gave **2/6 failures with this line and 2/6 without it**. The
+ * dominant failure is the watcher receiving no OS event at all within 15s, which no timeout value
+ * changes. Two earlier readings that looked decisive (3/6-vs-0/6, then 2/5-vs-4/5) were artifacts —
+ * one of run order, one of comparing the file against itself because the change was already
+ * committed and `git stash` had nothing to take.
  *
- * WHAT THIS DOES NOT FIX, measured rather than assumed: under a synthetic load of six processes each
- * writing 200 files in a continuous loop, the watcher delivers NO event within 15s and the debounce
- * case fails on its own deadline — with or without this change (2/4 vs 1/4 failures, same load). At
- * that point the OS event queue is the limit, not the cap. That load is far harsher than the suite,
- * whose real observed failure was always the 5000ms message.
- *
- * EVIDENCE: 8 consecutive full-suite runs green after this change, against roughly 3 failures in 12
- * runs before it. Not proof — a 25% flake could clear 8 runs by luck about 1 time in 10 — so if it
- * returns, the next move is NOT a bigger number. It is to stop depending on OS event delivery in a
- * unit test, and that is a redesign, not a tweak.
+ * So: the flake is NOT fixed, and nobody should read this line as having fixed it. If it recurs,
+ * a larger number is the one move known not to work. The real answer is to stop depending on OS
+ * event delivery inside a unit test — drive the watcher's handler directly and test the debounce
+ * logic, leaving one integration test for the wiring.
  */
 jest.setTimeout(30_000);
 
