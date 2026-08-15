@@ -44,6 +44,7 @@
     "check:queries": "node scripts/check-query-backticks.mjs",
     "postbuild": "node scripts/sync-skills-postbuild.mjs",
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
+    "oracle": "node tools/benchmark/oracle-tsc.mjs",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
     "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js"
   },
