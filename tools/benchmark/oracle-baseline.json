@@ -5,14 +5,19 @@
     "agreed": 1,
     "recorded": "run with --write-baseline to update"
   },
+  "scraper::python": {
+    "oracle": 11,
+    "missed": 4,
+    "agreed": 7
+  },
   "conducks::exports": {
     "oracle": 149,
     "missed": 71,
     "agreed": 78
   },
-  "scraper::python": {
-    "oracle": 11,
-    "missed": 4,
-    "agreed": 7
+  "app::exports": {
+    "oracle": 202,
+    "missed": 178,
+    "agreed": 24
   }
 }

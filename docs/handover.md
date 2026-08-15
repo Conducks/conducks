@@ -91,6 +91,32 @@ independent one.
 
 Recall reads 3% / 52% / **64%** — the Python surface, where the worst defects were, scores best.
 
+**Run against FOUR codebases on 2026-08-15, and EXTRA is 0 on every one** — conducks contradicts
+neither compiler nor parser anywhere:
+
+| project | oracle | conducks | agreed | MISSED | EXTRA |
+| --- | --- | --- | --- | --- | --- |
+| conducks (exports) | 149 | 78 | 78 | 71 | **0** |
+| subject-c (exports) | 212 | 120 | 114 | 98 | **0** |
+| orchestrator/app (exports) | 202 | 24 | 24 | 178 | **0** |
+| subject-a (python imports) | 11 | 7 | 7 | 4 | **0** |
+
+Two gate bugs were found by running it on subjects rather than only on this repository, and both
+failed in the direction that looks like a conducks defect:
+
+- **Scope.** The program is built from the project's tsconfig, and subject-c's root config says
+  `include: ["src/**/*"]` — so `renderer/**` is not in it. Scoring findings from a directory the
+  oracle never read reported 6 false contradictions, three of them symbols already verified BY HAND
+  as correct. The comparison is now limited to files the oracle actually examined, and what falls
+  outside is counted and named rather than silently scored.
+- **Monorepo.** `orchestrator` has no root tsconfig at all — each workspace carries its own — and the
+  gate stack-traced. It now skips with the workspace command to run instead. A gate that looks broken
+  on a normal repository gets switched off.
+
+The workspace number carries a caveat worth keeping: `orchestrator/app` scores 24 of 202 because a
+program scoped to ONE workspace cannot see consumers in its siblings, so most of that 178 is the
+library-boundary limit already recorded in the file, not conducks being quiet.
+
 **The recall gap was then DIAGNOSED, not just measured.** 22 of the 30 missed TypeScript imports are
 one line: the import-site calibration in `dead-code.ts`, which skips a statement when NO name in it
 was observed used. Removing that line, measured in both directions:

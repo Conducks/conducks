@@ -39,7 +39,15 @@ const isTestPath = (p) =>
 /** Every export the compiler can prove no OTHER file references. */
 function oracleUnusedExports() {
   const configPath = ts.findConfigFile(projectDir, ts.sys.fileExists, 'tsconfig.json');
-  if (!configPath) throw new Error(`no tsconfig.json under ${projectDir}`);
+  if (!configPath) {
+    // A legitimate project shape, not a defect: an npm-workspaces monorepo often has no ROOT
+    // tsconfig at all — each workspace carries its own. Stack-tracing on that would make the gate
+    // look broken on a perfectly normal repository, and a gate that appears broken gets ignored.
+    console.log(`\n--- UNUSED_EXPORT vs the TypeScript language service (${path.basename(projectDir)}) ---`);
+    console.log(`  SKIPPED — no root tsconfig.json. Point this at a workspace instead, e.g.\n` +
+                `    node tools/benchmark/oracle-exports.mjs ${path.relative(process.cwd(), projectDir)}/app\n`);
+    process.exit(0);
+  }
   const cfg = ts.parseJsonConfigFileContent(
     ts.readConfigFile(configPath, ts.sys.readFile).config, ts.sys, path.dirname(configPath));
 
@@ -61,6 +69,7 @@ function oracleUnusedExports() {
   const checker = program.getTypeChecker();
 
   const unused = new Map();
+  const examined = new Set();
   for (const sf of program.getSourceFiles()) {
     if (sf.isDeclarationFile) continue;
     const rel = path.relative(projectDir, sf.fileName);
@@ -68,6 +77,7 @@ function oracleUnusedExports() {
     // Only files this project owns — never node_modules, never generated output.
     if (!rel.startsWith('src' + path.sep)) continue;
 
+    examined.add(rel.toLowerCase());
     const moduleSymbol = checker.getSymbolAtLocation(sf);
     if (!moduleSymbol) continue;
     for (const exp of checker.getExportsOfModule(moduleSymbol)) {
@@ -91,7 +101,7 @@ function oracleUnusedExports() {
       if (external === 0) unused.set(`${rel.toLowerCase()}::${exp.getName().toLowerCase()}`, { file: rel, symbol: exp.getName() });
     }
   }
-  return unused;
+  return { unused, examined };
 }
 
 /** conducks' verdict. */
@@ -118,15 +128,26 @@ function conducksUnusedExports() {
   return found;
 }
 
-const oracle = oracleUnusedExports();
+const { unused: oracle, examined } = oracleUnusedExports();
 const ours = conducksUnusedExports();
-const missed = [...oracle].filter(([k]) => !ours.has(k)).map(([, v]) => v);
-const extra = [...ours].filter(([k]) => !oracle.has(k)).map(([, v]) => v);
-const agreed = [...oracle].filter(([k]) => ours.has(k)).length;
+// COMPARE ONLY WHERE THE ORACLE LOOKED.
+//
+// The program is built from the project's tsconfig, and a real project's root config often covers
+// one tree — sofie's says `include: ["src/**/*"]`, so `renderer/**` is not in it at all. Scoring
+// conducks' findings from an unexamined directory against an oracle that never read it reports every
+// one of them as a contradiction: 6 false EXTRAs on sofie, including three symbols already verified
+// BY HAND as correct findings. A gate that fails on correct behaviour gets switched off.
+const inScope = (k) => examined.has(k.slice(0, k.lastIndexOf('::')));
+const oursScoped = new Map([...ours].filter(([k]) => inScope(k)));
+const outOfScope = ours.size - oursScoped.size;
+
+const missed = [...oracle].filter(([k]) => !oursScoped.has(k)).map(([, v]) => v);
+const extra = [...oursScoped].filter(([k]) => !oracle.has(k)).map(([, v]) => v);
+const agreed = [...oracle].filter(([k]) => oursScoped.has(k)).length;
 
 console.log(`\n--- UNUSED_EXPORT vs the TypeScript language service (${path.basename(projectDir)}) ---`);
 console.log(`  compiler says unused : ${oracle.size}`);
-console.log(`  conducks says unused : ${ours.size}`);
+console.log(`  conducks says unused : ${ours.size}` + (outOfScope ? `  (${outOfScope} outside the compiler program — not scored)` : ''));
 console.log(`  agreed               : ${agreed}`);
 console.log(`  MISSED (compiler sees it, conducks silent): ${missed.length}`);
 for (const m of missed.slice(0, 15)) console.log(`      ${m.symbol}  ${m.file}`);
