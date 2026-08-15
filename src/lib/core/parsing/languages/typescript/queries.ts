@@ -14,6 +14,27 @@ export const TYPESCRIPT_QUERIES = `
     (import_clause (named_imports (import_specifier name: (identifier) @name alias: (identifier)? @alias)))
     source: (string) @source) @isImport
 
+  ;; DEFAULT IMPORT and DEFAULT EXPORT — the two halves of one fact.
+  ;;
+  ;; A default import binds a local name to whatever the target module publishes as its default, and
+  ;; the two names routinely differ: a default import written as SessionsPage reaches a declaration
+  ;; exported as OrgSessionsPage. Only NAMED specifiers had a per-binding capture, so
+  ;; the local name was never registered at all — the call fell through to a bare name, dangled, and
+  ;; the exported declaration was left with no incoming edge. MEASURED on the monorepo subject, where
+  ;; a page component is imported exactly this way by the route file beside it and reported ORPHAN.
+  ;;
+  ;; The importing file cannot know the exported NAME, so the two are joined through the name
+  ;; default: the import binds its local to it, and the exporting file records which symbol it is. No
+  ;; is-prefix on either capture — this mints no node, it only names one that already exists.
+  (import_statement
+    (import_clause (identifier) @default_import)
+    source: (string) @source) @isImport
+
+  (export_statement "default"
+    declaration: (function_declaration name: (identifier) @default_export_name))
+  (export_statement "default"
+    declaration: (class_declaration name: (type_identifier) @default_export_name))
+
   ;; Barrel re-export, per specifier: "export { coreDb as db } from ./DatabaseManager".
   ;;
   ;; The whole-file @isImport pattern above (@source only) sees the statement but not which names

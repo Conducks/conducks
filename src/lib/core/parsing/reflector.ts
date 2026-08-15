@@ -892,6 +892,15 @@ export class ConducksReflector {
                 // (`from pkg import module` binding a FILE) and pushes its own `isRaw` edge; this
                 // pushes an `isRawBinding` one. Different metadata, different consumers, no
                 // double-count — `markTypeOnlyImports` and dead-code both filter on isRawBinding.
+                // A DEFAULT IMPORT binds its local name to the target module's `default`, not to a
+                // symbol of the same name — the two differ routinely. Registered with `default` as
+                // the ORIGINAL, exactly as a renamed named import is, so the call target becomes
+                // `<module>::default`; the exporting file records which symbol that is.
+                if (cap.name === 'default_import' && cap.node && context) {
+                  const resolvedSpecifier = this.imports.resolve(specifier, file.path, allPaths, provider, context);
+                  context.registerLocalBinding(cap.node.text, resolvedSpecifier || specifier, 'default');
+                  continue;
+                }
                 const isBindingCapture = cap.name === CaptureTags.NAME || cap.name === 'named_import';
                 if (isBindingCapture && cap.node) {
                   // An alias is `@alias` in most grammars and `@metadata` in Python's
@@ -1201,6 +1210,20 @@ export class ConducksReflector {
           // rejected as noise. `@req_fn` / `@kinesis_object` carry it depending on call shape.
           const receiver = captureMap['req_fn'] ?? captureMap['kinesis_object'] ?? null;
           this.flow.processRequest(url, method, scopeName, spectrum, receiver, currentMatchRow + 1);
+        }
+        else if (cName === 'default_export_name') {
+          // WHICH symbol this file publishes as `default`. Recorded as an ALIASES edge because that
+          // is what it is — a second name for a declaration — and deliberately NOT as a reference:
+          // `ALIASES` is absent from dead-code's REFERENCE_EDGES, so a default export nobody imports
+          // stays reportable. The edge exists to let a default import, which can only name
+          // `<module>::default`, be rebound to the declaration that id stands for.
+          spectrum.relationships.push({
+            sourceName: 'default',
+            targetName: cText.trim().toLowerCase(),
+            type: 'ALIASES' as any,
+            confidence: 1.0,
+            metadata: { isDefaultExport: true, line: currentMatchRow + 1 },
+          });
         }
         else if (cName === 'pulse_type_target') {
           const scope = getScopeAt(currentMatchRow);

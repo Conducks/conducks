@@ -30,7 +30,15 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 /** The whole point: truth is declared here, in the test, not read back out of the tool. */
 const TRUTH = {
   /** Exported, imported by nobody, called by nobody. Deleting it changes nothing. */
-  dead: ['deadFunction', 'deadConstant'],
+  dead: ['deadFunction', 'deadConstant',
+    // A DEFAULT EXPORT NOBODY IMPORTS, so that teaching conducks to follow default imports cannot
+    // quietly make every default export look alive.
+    //
+    // It does NOT prove the narrower claim that ALIASES is excluded from REFERENCE_EDGES: adding
+    // ALIASES to that set leaves this entry passing, because the naming edge starts at a
+    // `<file>::default` id no node carries and so never lands as an incoming reference. Measured,
+    // not assumed — the first version of this comment asserted the stronger thing.
+    'deadDefault'],
   /** Reachable. Each one is reached by a DIFFERENT mechanism, named in the fixture below. */
   live: [
     'staticallyUsed', 'dynamicallyUsed', 'constructedDynamically', 'barrelUsed', 'usedConstant',
@@ -64,6 +72,11 @@ const TRUTH = {
     // only recognised when the specifier RESOLVED, so augmenting a package, or a workspace outside
     // the analysed root, reported the merged type as ORPHAN.
     'AugmentedMap',
+    // A DEFAULT IMPORT WHOSE LOCAL NAME DIFFERS from the exported one — the ordinary React/Next
+    // shape, where a route imports the component beside it. Only NAMED specifiers had a per-binding
+    // capture, so the local name was never registered, the call dangled, and the exported
+    // declaration read as ORPHAN. The two names are joined through `default`.
+    'liveDefault',
   ],
 };
 
@@ -137,6 +150,16 @@ declare module 'a-package-not-in-this-project' {
 }
 `);
 
+    // The two halves of the default-export shape. Separate files because a module has exactly one
+    // default, and the local name on the importing side is deliberately NOT the exported name — that
+    // difference is the whole defect.
+    writeFile(repo, 'src/live-default.ts', `
+export default function liveDefault(): number { return 17; }
+`);
+    writeFile(repo, 'src/dead-default.ts', `
+export default function deadDefault(): number { return 18; }
+`);
+
     // A barrel, so one live symbol is reached through a re-export chain rather than directly.
     writeFile(repo, 'src/barrel.ts', `
 export function barrelUsed(): number { return 6; }
@@ -155,6 +178,10 @@ export { barrelUsed } from './barrel.js';
 import { staticallyUsed, usedConstant } from './lib.js';
 import { barrelUsed } from './index.js';
 import { augmentAnchor } from './augments.js';
+import RenamedOnImport from './live-default.js';
+// imported for its side effects only, so the FILE is reachable and its default export is judged as
+// a symbol rather than deferred as the UNIMPORTED_MODULE question
+import './dead-default.js';
 
 export async function main(): Promise<number> {
   const a = staticallyUsed() + usedConstant;
@@ -165,7 +192,7 @@ export async function main(): Promise<number> {
   const { constructedDynamically } = await import('./lib.js');
   const c = new constructedDynamically().run();
 
-  return a + b + c + barrelUsed() + augmentAnchor();
+  return a + b + c + barrelUsed() + augmentAnchor() + RenamedOnImport();
 }
 `);
 

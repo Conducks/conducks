@@ -2404,3 +2404,21 @@ by construction.
   fixture shape passed with the fix disabled TWICE (first because an imported symbol has an import
   edge regardless, then for a reason not chased down), and an assertion that passes either way is
   worse than none. Mutation-check any fixture whose subject is a name.
+
+## Only NAMED imports had a per-binding capture, so default imports bound nothing
+- Gotcha: `import SessionsPage from './SessionsPage'` reaching `export default function
+  OrgSessionsPage` produced no link at all. The per-binding capture matched `named_imports` only, so
+  the local name was never registered, the call fell through to a bare name and dangled, and the
+  exported declaration was left with no incoming edge — reported ORPHAN. This is the ordinary
+  React/Next shape: a route importing the component beside it.
+- Why: the importing file cannot know the exported NAME, and the two differ by convention rather
+  than by accident. The halves join through `default` — the import binds its local to that name, the
+  exporting file records which symbol it is, and the existing alias-chain resolution does the rest.
+  No linker change was needed once the two facts existed, which is the sign the mechanism was
+  already there and only the evidence was missing.
+- Applies: the naming fact is an ALIASES edge, deliberately NOT in dead-code's REFERENCE_EDGES, so a
+  default export nobody imports stays reportable — `deadDefault` in `prune-precision` holds that
+  direction. Note what that entry does NOT prove: adding ALIASES to REFERENCE_EDGES leaves it
+  passing, because the edge starts at a `<file>::default` id no node carries. Measured after writing
+  a comment that claimed otherwise. Also the THIRD time the backtick gate (todo31) rejected a build
+  whose output I had already piped to /dev/null — grep the build for the failure marker, always.
