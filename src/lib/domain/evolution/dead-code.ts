@@ -476,9 +476,18 @@ export class DeadCodeAnalyzer {
   }
 
   private isEntryPoint(node: any): boolean {
+    // The name IS the convention, so it must match the whole name. This was a SUBSTRING test, and a
+    // substring test on these five words exempts a large, arbitrary slice of ordinary code from both
+    // verdicts: "Approval" contains app, "Domain" contains main, "Wrapper" contains app, "NameIndex"
+    // contains index. MEASURED across the three subjects — 53 of sofie's 887 exported names, 21 of
+    // orchestrator's 656, 5 of this repository's 445 — and tightening it to equality turned 18 of
+    // them into findings the language service agrees with, with EXTRA still 0 on all three.
+    //
+    // No oracle could have found this. A suppression makes the tool SILENT, and silence never
+    // contradicts a compiler; it only shows up in MISSED, mixed in with every other reason.
     const entryNames = ['main', 'index', 'app', 'handler', 'setup'];
     const name = node.properties.name.toLowerCase();
-    if (entryNames.some(e => name.includes(e))) return true;
+    if (entryNames.includes(name)) return true;
 
     // Framework convention (Next.js / app-router, etc.): symbols in these
     // special files are invoked by the framework via file-based routing, not

@@ -12,17 +12,17 @@
   },
   "conducks::exports": {
     "oracle": 104,
-    "missed": 15,
-    "agreed": 89
+    "missed": 14,
+    "agreed": 90
   },
   "sofie::exports": {
     "oracle": 255,
-    "missed": 122,
-    "agreed": 133
+    "missed": 116,
+    "agreed": 139
   },
   "app::exports": {
     "oracle": 45,
-    "missed": 9,
-    "agreed": 36
+    "missed": 6,
+    "agreed": 39
   }
 }

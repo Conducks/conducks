@@ -2440,3 +2440,19 @@ by construction.
   load-bearing on any subject available; disabling it changes no number, and saying otherwise would
   be a claim the evidence does not support. Also: four fixture entries written this session passed
   with their own fix disabled. Mutation-test every new fixture entry, on a build you rebuilt.
+
+## A suppression is invisible to a two-sided oracle, and this one exempted a slice of ordinary code
+- Gotcha: `isEntryPoint` tested its five convention names — main, index, app, handler, setup — with
+  `name.includes(e)`, a SUBSTRING match. So "Approval" contains app, "Domain" contains main,
+  "Wrapper" contains app, "NameIndex" contains index; each one skipped BOTH the ORPHAN and the
+  UNUSED_EXPORT branch. Census of exported names caught: 53 of sofie's 887, 21 of orchestrator's
+  656, 5 of this repository's 445. Tightening to equality turned 18 of them into findings the
+  language service agrees with, EXTRA still 0 on all three, 1866 tests green.
+- Why: no oracle could have found it. EXTRA scores what the tool SAYS; a suppression makes the tool
+  SILENT, and silence contradicts nothing. It lands in MISSED, mixed in with every other cause, and
+  MISSED only ratchets — it never fails a build. The two-sided gate has one blind side, and it is
+  the whole class of "we decided not to look".
+- Applies: read the SUPPRESSIONS when a recall number will not move. And 1866 passing tests meant
+  only that nothing covered the behaviour — `prune-precision` now carries `deadApprovalGate`, which
+  fails when the substring match comes back. Its counter-test `handler` passes either way, which is
+  stated rather than hidden: it guards a future over-tightening, not this fix.

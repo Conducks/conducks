@@ -38,7 +38,14 @@ const TRUTH = {
     // ALIASES to that set leaves this entry passing, because the naming edge starts at a
     // `<file>::default` id no node carries and so never lands as an incoming reference. Measured,
     // not assumed — the first version of this comment asserted the stronger thing.
-    'deadDefault'],
+    'deadDefault',
+    // A DEAD SYMBOL WHOSE NAME MERELY CONTAINS AN ENTRY-POINT WORD. `isEntryPoint` matched its five
+    // names — main, index, app, handler, setup — as SUBSTRINGS, so `deadApprovalGate` was exempted
+    // from both verdicts by the "App" inside "Approval". MEASURED across three subjects: 53 of
+    // sofie's 887 exported names were caught this way, 21 of orchestrator's 656, and tightening the
+    // match to equality turned 18 of them into findings the compiler agrees with, with no new
+    // contradiction. Silence is never EXTRA, so no oracle could have surfaced this.
+    'deadApprovalGate'],
   /** Reachable. Each one is reached by a DIFFERENT mechanism, named in the fixture below. */
   live: [
     'staticallyUsed', 'dynamicallyUsed', 'constructedDynamically', 'barrelUsed', 'usedConstant',
@@ -84,6 +91,11 @@ const TRUTH = {
     // SOMEBODY ELSE'S default export. The renamed form kept passing throughout, which is why this
     // needs its own entry rather than trusting the one above.
     'sameNameDefault',
+    // THE COUNTER-TEST for the entry above, and the case the tightened match must NOT eat. `handler`
+    // is spared by the entry-name CONVENTION, not by reachability: nothing in the fixture references
+    // it, and a framework would invoke it without importing it. It sits here because the assertion
+    // this list drives is "not flagged", which is exactly the claim being made about it.
+    'handler',
   ],
 };
 
@@ -142,6 +154,10 @@ export function shorthandUsed(): number { return 10; }
 export function defaultExported(): number { return 11; }
 export function nullishFallback(): number { return 14; }
 export function paramDefault(): number { return 15; }
+
+// The entry-name pair. Both are exported and referenced by nothing; only the NAME differs.
+export function deadApprovalGate(): number { return 20; }
+export function handler(): number { return 21; }
 `);
 
     // A file that MERGES INTO a module the analysis cannot see. Deliberately an unresolvable
