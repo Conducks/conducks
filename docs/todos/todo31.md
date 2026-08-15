@@ -35,3 +35,18 @@ success is the reason it is tolerable rather than the reason it is fine.
       and "the gate catches it" is a poor answer to someone meeting it for the first time
 - [>] The queries need tooling the string form cannot give — syntax highlighting, a tree-sitter
       formatter, or a query linter. All three exist for `.scm` and none for a `.ts` string
+- [>] ADDED 2026-08-15 — THE GATE ITSELF BECAME A DEFECT SOURCE, which none of the three triggers
+      above anticipated. Phase 0 rests on "the gate has removed the cost", and that is now a claim
+      about a script that has grown and has already been silently wrong once.
+      What happened: extracting the shared ECMAScript patterns created a query file that is not
+      `<lang>/queries.ts`, and the gate walked directories only — so the ONE file three grammars
+      depend on was the one file it could not see. Fixing that revealed the deeper assumption: it
+      took the span from the first backtick to the file's LAST one, correct for one literal per file
+      and wrong for two. Rewriting it to scan literal-by-literal then BROKE DETECTION ENTIRELY,
+      because a stray backtick genuinely ends the literal, so "scan to the next unescaped backtick"
+      stops exactly where the offence starts. It was caught only by mutation-testing the gate.
+      A mitigation that silently stops mitigating is worse than the hazard it covers, because the
+      hazard announces itself and a dead gate does not. This does not reopen the migration on its
+      own — the RISK Phase 0 named (runtime path resolution across build/, jest and spawned workers)
+      is unchanged, and nothing measured today speaks to it. It is recorded so the next reader
+      weighs a gate that needs its own mutation tests, not the twenty-second annoyance of 2026-08-05

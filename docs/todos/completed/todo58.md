@@ -1,7 +1,14 @@
 # todo58 — the linker does not resolve `await import()`, so live code is reported dead
-Status: todo
+Status: done
 - Acceptance: a symbol destructured from a dynamic `await import(...)` and used is NOT reported by `prune`, and DOES appear in `impact --direction upstream` for its callee — measured on subject-c, where 9 of 172 findings and 1 of 3 known callers are currently wrong.
 - Builds: 0026
+- VERIFIED 2026-08-15 on subject-c: `MacOSAdapter` and `LinuxAdapter` — the symbols destructured from
+  `await import(...)` — are NOT reported by `prune`, and `impact MacOSAdapter upstream` returns 7
+  callers. That is the acceptance, measured rather than asserted.
+  Six symbols this todo named are still flagged and are NOT this todo's cause: they come from a
+  specifier that only resolves through the project's build layout, which Phase 1 identified and
+  deliberately declined to model. Carried out to **todo66** with its call sites, so the reason
+  outlives this file rather than being buried by closing it.
 
 ## Context
 
@@ -80,13 +87,30 @@ misses `electron/main/index.ts:1341`, again behind `await import()`. Recall matt
 
 - [x] DONE — `tests/integration/features/prune-precision.test.ts`. A project whose truth is DECLARED in the test, scored on precision AND recall together (either alone is gameable: flag nothing, or flag everything). Four live symbols reached by four different mechanisms — static import, destructured dynamic import, dynamic import then `new`, and a barrel re-export — plus a genuinely dead one. Mutation-verified: starving the linker's alias map fails it
 - [x] It found a defect on its first run, which is the point of declaring truth rather than reading it back: exported const VALUES are wrong in BOTH directions — an unused one is missed, and a used one is flagged `STALE_IMPORT`, a verdict telling the user to delete an import their code needs. Held in the fixture's `KNOWN_WRONG` group so the headline score stays honest and the gap can neither grow nor silently vanish. Filed as todo63
-- [ ] The frozen subjects have never been driven at the MCP surface until today. Add a pass that runs
-      the tool surface against them, so payload shapes and finding quality are checked against data
-      that is not conducks' own.
+- [-] DROPPED 2026-08-15 — superseded, and the research is why. This asked for two things and both are
+      now covered elsewhere or deliberately unconstrained.
+      FINDING QUALITY: both doors reach the SAME domain call — `registry.explain.prune()` is what
+      `prune.ts:43` and `synapse.ts:1009` each invoke — and `paired-surfaces.test.ts` enforces that a
+      capability on both surfaces shares a `registry.*` accessor. Quality cannot diverge without that
+      test failing first.
+      THE ANSWER: `surface-equivalence.test.ts` already drives BOTH doors on the same vault at the
+      same moment, the MCP side over real stdio JSON-RPC through `tools/mcp-call.mjs`, and compares
+      the findings, status and counts. It runs against its own fixture repo, so "data that is not
+      conducks' own" is met.
+      PAYLOAD SHAPES: the one thing left, and ADR 0148 makes it ALLOWED to differ — source lines on
+      the CLI, a token budget on the tool. A pass asserting shapes match would be asserting against
+      the architecture, not for it.
 
 ## Noted, not chased
 
-- [ ] `impact --direction upstream` on `loadKernelPrompt` also returns `uid`, a test helper defined at
-      `prompt-loader.test.ts:11` that does not call it — the two are used in the same test block. May be
-      the co-location-vs-dependency class todo38 addressed for `trace`/`context`, leaking into `impact`.
-      One observation is not a pattern; look again when Phase 1 re-measures.
+- [x] ANSWERED 2026-08-15, and the hypothesis in it was WRONG. It still reproduces — `impact
+      loadKernelPrompt upstream` returns `watchKernelPrompt`, `uid` and the test unit — but `uid`
+      arrives on a **`PULSES_TO`** path, not a containment one. It is a real data-flow edge:
+      `const name = uid()` on line 50 feeds `loadKernelPrompt(name, 'ignored')` on line 52. So this is
+      NOT the co-location class todo38 fixed for `trace`/`context`; nothing is leaking.
+      What it leaves is a DESIGN question rather than a defect, and it is worth stating plainly:
+      `impact upstream` walks flow edges, so it answers "what feeds this" as well as "what breaks if I
+      change this". For `uid` those differ — changing `loadKernelPrompt` cannot break `uid`. Whether
+      blast radius should include `PULSES_TO` is a decision for whoever next touches `impact`, and it
+      needs its own todo if it is taken up. Recorded here so the observation is not re-investigated a
+      third time from scratch.

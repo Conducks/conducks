@@ -1,4 +1,4 @@
-# Handover — 2026-08-14
+# Handover — 2026-08-15
 Status: current
 
 ## Where it stands
@@ -49,6 +49,27 @@ printed a sentence with words missing, and `help` advertised flags `impact` reje
 every claim against source rather than recording output. It has already earned its keep: running it
 found four of today's bugs. `BASELINE-RUN-author.md` is my own run and does not substitute for an
 independent one.
+
+**Board, decided 2026-08-15 after research rather than left hanging:**
+- **todo58 CLOSED**, acceptance verified on the subject rather than assumed: `MacOSAdapter` and
+  `LinuxAdapter` are unreported and `impact MacOSAdapter upstream` returns 7. Its last open task was
+  DROPPED as superseded — both surfaces reach the same `registry.explain.prune()`,
+  `paired-surfaces` enforces that, and `surface-equivalence` already drives both doors over real
+  stdio and compares the answer. The only thing left uncovered is payload SHAPE, which ADR 0148
+  makes free to differ. Its "noted, not chased" `uid` item is answered too, and its hypothesis was
+  wrong: the edge is `PULSES_TO` data flow (`const name = uid()` feeding `loadKernelPrompt(name)`),
+  not the co-location leak it guessed.
+- **todo66 OPENED** to carry what todo58 could not close. Six symbols on subject-c are still falsely
+  flagged by one unresolved specifier — `electron/main/index.ts` imports `../engine/...` where the
+  file lives at `src/engine/...`, a mapping that exists only in the build config. Named symbols and
+  call sites are in the todo, so the count is falsifiable: six wrong today, zero when done.
+- **todo31 NOT reopened**, and a fourth trigger recorded instead. Its Phase 0 rests on "the gate has
+  removed the cost", and the gate became a defect source today: it could not see the new shared
+  query file, and my first fix for that SILENTLY BROKE DETECTION — a stray backtick ends the
+  literal, so scanning to the next unescaped one stops where the offence starts. Caught only by
+  mutation-testing the gate. The migration's own risk (runtime path resolution) is unchanged and
+  nothing measured today speaks to it, so the decision stands; the reasoning behind it no longer
+  does unexamined.
 
 **Known open, with the mechanism already found:**
 - ~~Java/C# same-package calls do not resolve~~ — FIXED 2026-08-15. My earlier claim that "the graph
