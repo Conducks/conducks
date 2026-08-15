@@ -106,7 +106,7 @@ function oracleUnusedExports() {
     // A legitimate project shape, not a defect: an npm-workspaces monorepo often has no ROOT
     // tsconfig at all — each workspace carries its own. Stack-tracing on that would make the gate
     // look broken on a perfectly normal repository, and a gate that appears broken gets ignored.
-    console.log(`\n--- UNUSED_EXPORT vs the TypeScript language service (${path.basename(projectDir)}) ---`);
+    console.log(`\n--- dead exports vs the TypeScript language service (${path.basename(projectDir)}) ---`);
     console.log(`  SKIPPED — no root tsconfig.json. Point this at a workspace instead, e.g.\n` +
                 `    node tools/benchmark/oracle-exports.mjs ${path.relative(process.cwd(), projectDir)}/app\n`);
     process.exit(0);
@@ -198,8 +198,19 @@ function conducksUnusedExports() {
     { cwd: projectDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const lowerRoot = projectDir.toLowerCase();
   const found = new Map();
+  // READ EVERY DEAD-CODE VERDICT, NOT ONE LABEL. `prune` decides ORPHAN before UNUSED_EXPORT: a
+  // symbol nothing references AT ALL gets the stronger wording, and only a symbol referenced inside
+  // its own file falls through to "exported but never consumed". Matching on UNUSED_EXPORT alone
+  // therefore scored conducks as SILENT on exactly the symbols it was most confident about — 11 of
+  // the 12 remaining "recall gaps" on this repository were sitting in the ORPHAN list the whole time
+  // (ConducksPrism, SynapseNode, Pulse, KineticResult, McpPagination, …).
+  //
+  // The question this oracle asks is "does conducks report this symbol as dead", so any of the three
+  // verdicts answers yes. EXTRA still means the compiler found a consumer, which is a precision bug
+  // under whichever label it was filed.
+  const DEAD_VERDICTS = new Set(['UNUSED_EXPORT', 'ORPHAN', 'UNIMPORTED_MODULE']);
   for (const f of JSON.parse(raw)) {
-    if (f.type !== 'UNUSED_EXPORT') continue;
+    if (!DEAD_VERDICTS.has(f.type)) continue;
     const abs = String(f.file).toLowerCase();
     const rel = abs.startsWith(lowerRoot) ? abs.slice(lowerRoot.length).replace(/^[/\\]/, '') : abs;
     if (isTestPath(rel)) continue;

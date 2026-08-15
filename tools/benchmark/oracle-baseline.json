@@ -10,19 +10,9 @@
     "missed": 4,
     "agreed": 7
   },
-  "app::exports": {
-    "oracle": 45,
-    "missed": 21,
-    "agreed": 24
-  },
   "conducks::exports": {
     "oracle": 104,
-    "missed": 26,
-    "agreed": 78
-  },
-  "sofie::exports": {
-    "oracle": 212,
-    "missed": 98,
-    "agreed": 114
+    "missed": 15,
+    "agreed": 89
   }
 }

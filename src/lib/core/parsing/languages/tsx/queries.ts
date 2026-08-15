@@ -3,7 +3,7 @@
  *
  * Superset of TypeScript queries with JSX-specific node captures.
  */
-import { EC_VALUE_POSITIONS, TS_TYPE_POSITIONS } from '../ecmascript-positions.js';
+import { EC_VALUE_POSITIONS, TS_PARAM_DEFAULTS, TS_TYPE_POSITIONS } from '../ecmascript-positions.js';
 
 export const TSX_QUERIES = `
   ;; --- Imports & Re-exports (L3-L4: Kinesis) ---
@@ -270,5 +270,6 @@ export const TSX_QUERIES = `
     name: (identifier) @instance_name
     value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
 ${EC_VALUE_POSITIONS}
+${TS_PARAM_DEFAULTS}
 ${TS_TYPE_POSITIONS}
 `;

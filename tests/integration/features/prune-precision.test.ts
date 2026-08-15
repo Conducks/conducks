@@ -53,6 +53,12 @@ const TRUTH = {
     //                quantifier captures only the first, so every later argument was invisible
     //   `fallbackFn` used as a destructuring DEFAULT (`{ x = fallbackFn } = opts`)
     'secondArg', 'fallbackFn',
+    // Two more, found by scoring ORPHAN against the language service for the first time. Both are
+    // FALLBACKS, and both were reported as never referenced while sitting on the line that uses them:
+    //   nullishFallback  the right operand of ??  — the grammar captured only the right operand of
+    //                    instanceof, and that narrow pattern read as if it covered binary_expression
+    //   paramDefault     a DEFAULT PARAMETER VALUE (run: T = paramDefault)
+    'nullishFallback', 'paramDefault',
   ],
 };
 
@@ -109,6 +115,8 @@ export function fallbackFn(): number { return 13; }
 export interface ParenTyped { p: number }
 export function shorthandUsed(): number { return 10; }
 export function defaultExported(): number { return 11; }
+export function nullishFallback(): number { return 14; }
+export function paramDefault(): number { return 15; }
 `);
 
     // A barrel, so one live symbol is reached through a re-export chain rather than directly.
@@ -174,6 +182,7 @@ import {
   ThrownError, Intersected, Constrained,
   ParenTyped, shorthandUsed,
   secondArg, fallbackFn,
+  nullishFallback, paramDefault,
   staticallyUsed,
 } from './lib.js';
 
@@ -207,6 +216,15 @@ export function takesMany(...items: (ParenTyped)[]): number { return items.lengt
 
 // 9. OBJECT SHORTHAND — how every hook returns its handlers
 export const bundle = { shorthandUsed };
+
+// 12. NULLISH FALLBACK - the right operand of ??. Every operator other than instanceof was invisible,
+// so a fallback named on the same line as its consumer read as dead.
+export function pickFn(opts: { fn?: () => number }): () => number { return opts.fn ?? nullishFallback; }
+
+// 13. DEFAULT PARAMETER VALUE. TypeScript parses this as required_parameter, JavaScript as
+// assignment_pattern - different nodes for the same code, which is why the pattern is split per
+// grammar rather than shared.
+export function runsWith(run: () => number = paramDefault): number { return run(); }
 
 // 10. SECOND ARGUMENT of a call. The first argument has always resolved; anything after it did not.
 export function subscribe(a: unknown, b: unknown): unknown { return [a, b]; }

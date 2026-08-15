@@ -43,7 +43,18 @@ export const EC_VALUE_POSITIONS = `
   (array (identifier) @ref_value)
   (ternary_expression (identifier) @ref_value)
   (member_expression object: (identifier) @ref_value)
-  (binary_expression operator: "instanceof" right: (identifier) @ref_value)
+  ;; BOTH OPERANDS OF ANY BINARY EXPRESSION, not just the right side of instanceof.
+  ;;
+  ;; The narrow instanceof pattern was written for one shape and read as if it covered the node. It
+  ;; does not: a nullish-coalescing fallback and a logical-or fallback both name something that is
+  ;; plainly used, and both were invisible. MEASURED on subject-c, defaultBuildInput and
+  ;; spawnOsascript were reported dead while being the fallback on the line that returns them.
+  ;;
+  ;; Nullish-coalescing and logical-or are the shapes that matter, but there is no reason to
+  ;; enumerate operators — an operand of plus or strict-equals is read exactly as much, and listing
+  ;; them one at a time is how the instanceof pattern came to be mistaken for full coverage.
+  (binary_expression left: (identifier) @ref_value)
+  (binary_expression right: (identifier) @ref_value)
   (export_statement value: (identifier) @ref_value)
   (for_in_statement right: (identifier) @ref_value)
   ;; EVERY identifier ARGUMENT of a call, not just the first.
@@ -68,6 +79,26 @@ export const EC_VALUE_POSITIONS = `
   ;; pattern reached it. MEASURED on the monorepo subject: shouldRetryError was reported ORPHAN while
   ;; being the default for shouldRetry twenty-five lines below its own declaration.
   (object_assignment_pattern (identifier) @ref_value)
+`;
+
+/**
+ * A DEFAULT PARAMETER VALUE names the thing it falls back to, and that is a use:
+ *
+ *   function registerMacosTools(registry: Registry, run: AppleScriptRunner = spawnOsascript)
+ *
+ * MEASURED on subject-c: `spawnOsascript` was reported as never referenced while being the default
+ * for the parameter on the same line as its only consumer.
+ *
+ * TYPESCRIPT AND TSX ONLY, and the split is not cosmetic. Probed against both grammars: a TypeScript
+ * parameter is a `required_parameter` EVEN WITHOUT A TYPE ANNOTATION, while JavaScript has no such
+ * node and spells the same code `assignment_pattern`. Naming `required_parameter` in the shared block
+ * makes the JavaScript query fail to COMPILE — `TSQueryErrorNodeType` — which drops every .js file to
+ * the regex fallback silently (ADR 0089). The JavaScript form lives in that grammar's own file.
+ */
+export const TS_PARAM_DEFAULTS = `
+  ;; --- Parameter defaults, TS/TSX only (shared, ecmascript-positions.ts) ---
+  (required_parameter value: (identifier) @ref_value)
+  (optional_parameter value: (identifier) @ref_value)
 `;
 
 /**

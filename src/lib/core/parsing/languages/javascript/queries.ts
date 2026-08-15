@@ -183,4 +183,10 @@ export const JAVASCRIPT_QUERIES = `
     name: (identifier) @instance_name
     value: (binary_expression right: (new_expression constructor: [(identifier) (member_expression)] @instance_type))) @isInstanceOf
 ${EC_VALUE_POSITIONS}
+
+  ;; A DEFAULT PARAMETER VALUE is a use. JavaScript spells this assignment_pattern, where
+  ;; TypeScript uses required_parameter — same code, different node, so this cannot live in the
+  ;; shared block: naming either node in the other grammar fails query COMPILATION outright and drops
+  ;; the language to the regex fallback (ADR 0089). Kept here, beside its own grammar, deliberately.
+  (assignment_pattern right: (identifier) @ref_value)
 `;
