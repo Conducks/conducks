@@ -80,6 +80,11 @@ export class DeadCodeAnalyzer {
     for (const edge of allEdges) {
       if (!DeadCodeAnalyzer.REFERENCE_EDGES.has(edge.type)) continue;
       if (graph.getNode(edge.targetId)) continue; // resolved to a real node
+      // An AUGMENTATION edge to an unresolved module is not a dangling reference to protect. It is
+      // read below by `augmentedByFile`, which is keyed by FILE — and this set is keyed by NAME
+      // ALONE, so letting it in here would spare every symbol sharing that name anywhere in the
+      // project. That is precisely the laundering the file-keying exists to prevent (todo30).
+      if ((edge as any).properties?.isAugmentation) continue;
       const bare = edge.targetId.includes('::') ? edge.targetId.split('::').pop()! : edge.targetId;
       if (!bare) continue;
       danglingRefNames.add(bare.toLowerCase());

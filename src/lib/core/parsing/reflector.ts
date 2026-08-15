@@ -1089,10 +1089,26 @@ export class ConducksReflector {
           const srcCap = match.captures.find((c: any) => c.name === 'augments_source')?.node?.text;
           const spec = srcCap ? srcCap.replace(/^['"]|['"]$/g, '') : null;
           const resolved = spec ? this.imports.resolve(spec, file.path, allPaths, provider, context) : null;
-          if (typeof resolved === 'string') {
+          // AN UNRESOLVED SPECIFIER STILL PROVES THE AUGMENTATION. Only the edge's TARGET was ever in
+          // doubt; that this file MERGES INTO something rather than declaring it is written in the
+          // syntax. Dropping the whole relationship when the module could not be resolved meant the
+          // merged interface read as a fresh declaration nothing references — reported ORPHAN, the
+          // strongest wording prune has.
+          //
+          // MEASURED on the monorepo subject: `@/core/*` maps to `../packages/core/*`, outside the
+          // workspace being analysed, so `ServiceTypeMap` was reported dead in BOTH files that
+          // augment it. `declare module 'express'` fails the same way and is ordinary code.
+          //
+          // The unresolved target is recorded as `external://<specifier>`, which is what conducks
+          // already calls a thing outside the project, so the id stays honest about what is known:
+          // the module named in the source, not a guess at a file.
+          const target = typeof resolved === 'string'
+            ? resolved.toLowerCase()
+            : (spec ? `external://${spec.toLowerCase()}` : null);
+          if (target) {
             spectrum.relationships.push({
               sourceName: 'unit',
-              targetName: `${resolved.toLowerCase()}::${cText.toLowerCase()}`,
+              targetName: `${target}::${cText.toLowerCase()}`,
               type: 'TYPE_REFERENCE' as any,
               confidence: 1.0,
               metadata: { isAugmentation: true, original: cText, line: currentMatchRow + 1 },

@@ -59,6 +59,11 @@ const TRUTH = {
     //                    instanceof, and that narrow pattern read as if it covered binary_expression
     //   paramDefault     a DEFAULT PARAMETER VALUE (run: T = paramDefault)
     'nullishFallback', 'paramDefault',
+    // A MODULE AUGMENTATION whose module does not resolve. `AugmentedMap` is merged into another
+    // module, not declared here, so nothing referencing it is its normal state. The augmentation was
+    // only recognised when the specifier RESOLVED, so augmenting a package, or a workspace outside
+    // the analysed root, reported the merged type as ORPHAN.
+    'AugmentedMap',
   ],
 };
 
@@ -119,6 +124,19 @@ export function nullishFallback(): number { return 14; }
 export function paramDefault(): number { return 15; }
 `);
 
+    // A file that MERGES INTO a module the analysis cannot see. Deliberately an unresolvable
+    // specifier: that is the case that broke, and a resolvable one passes either way. The file is
+    // imported by main.ts on purpose — inside an UNIMPORTED file every symbol is reported as the
+    // UNIMPORTED_MODULE question instead, which is not in VERDICT_TYPES and would make this shape
+    // pass whether the augmentation is understood or not.
+    writeFile(repo, 'src/augments.ts', `
+export function augmentAnchor(): number { return 16; }
+
+declare module 'a-package-not-in-this-project' {
+  interface AugmentedMap { ['product:thing']: string }
+}
+`);
+
     // A barrel, so one live symbol is reached through a re-export chain rather than directly.
     writeFile(repo, 'src/barrel.ts', `
 export function barrelUsed(): number { return 6; }
@@ -136,6 +154,7 @@ export { barrelUsed } from './barrel.js';
     writeFile(repo, 'src/main.ts', `
 import { staticallyUsed, usedConstant } from './lib.js';
 import { barrelUsed } from './index.js';
+import { augmentAnchor } from './augments.js';
 
 export async function main(): Promise<number> {
   const a = staticallyUsed() + usedConstant;
@@ -146,7 +165,7 @@ export async function main(): Promise<number> {
   const { constructedDynamically } = await import('./lib.js');
   const c = new constructedDynamically().run();
 
-  return a + b + c + barrelUsed();
+  return a + b + c + barrelUsed() + augmentAnchor();
 }
 `);
 
