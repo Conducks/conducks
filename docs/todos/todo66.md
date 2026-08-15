@@ -1,7 +1,13 @@
 # todo66 — a specifier that only resolves through the build layout leaves the target's exports looking dead
-Status: todo
+Status: blocked
 - Acceptance: on subject-c, `globalPromptPath`, `kernelPromptPath`, `agentRoutingPath`, `TOOL_REGISTRARS`, `computeEffectiveSignificance` and `readAgentRoutingPrompt` are NOT reported by `prune`, because the import that consumes them resolves — measured, not asserted.
 - Builds: 0026
+- DEFERRED 2026-08-15, before Phase 1 was started, on this todo's own bar. Phase 0 found that
+  NOTHING declares the mapping — it emerges from two build configs — and that only ONE of three
+  subjects has the shape. The defect is real and its cost is stated below; what is not justified
+  today is a bundler-config reader per framework, whose failure mode is a wrong edge making `prune`
+  confidently silent. Reopen when a SECOND subject shows it, or when a project declares the mapping
+  somewhere a resolver can read.
 
 ## Context
 
@@ -38,21 +44,45 @@ strongest wording `prune` has.
 
 ## Phase 0 — decide what "modelling the build layout" means before writing any of it
 
-- [ ] The declared source is a `tsconfig`/bundler `paths`/`rootDir` mapping, which is a FACT the
-      project states rather than something to infer. ADR 0070 forbids fabricating a target from a
-      coincidence; reading a declared mapping is not that, and todo58 already recorded this reasoning
-      after getting it wrong once
-- [ ] PRICE IT the way todo31 was priced — which resolvers change, what happens when no config
-      declares a mapping, and whether a wrong mapping can bind a symbol to the WRONG file. A wrong
-      edge is worse than a missing one here, because it would make `prune` confidently silent
-- [ ] Check whether the same shape appears in the other two subjects, or only where an Electron main
-      process reaches into a sibling source tree. One subject is not a pattern
+- [x] RESEARCHED 2026-08-15, and the premise of this bullet is FALSE. **Nothing declares the
+      mapping.** It was written assuming a `tsconfig`/bundler `paths`/`rootDir` entry could be read;
+      there is none to read.
+      MEASURED on subject-c: `findNearestTsconfig` from `electron/main/` finds
+      **`electron/tsconfig.json`**, which declares no `baseUrl`, no `rootDir` and no `paths` at all.
+      The ROOT `tsconfig.json` does declare `baseUrl: ./src` and `rootDir: ./src` — and explicitly
+      **`"exclude": ["electron"]`**, so it is the config that states it does NOT govern these files.
+      Borrowing its `baseUrl` for an electron file would mean using a declaration that says the
+      opposite.
+      The real mapping emerges from TWO configs at once: `tsc` emits `src/** → dist/**`, the bundler
+      emits `electron/main → dist/main`, and only after both does `dist/main/… → ../engine/…` land on
+      `dist/engine/…`. That is the build-layout modelling this todo priced as the expensive option,
+      not a declared fact one resolver can read.
+- [-] A small rule was TRIED and REVERTED — it cannot fire, because the nearest tsconfig declares no
+      source root to retry against. The rule was: retry a climbing specifier's tail beneath the
+      declared source root — verified by
+      calling the resolver directly on `../engine/executor/prompt-loader.js`, `../plugins/tools/index.js`
+      and `../kernel/index.js`, all still UNRESOLVED with the rule in place. Recorded so it is not
+      re-attempted as an obvious first idea
+- [>] PRICED — deferred because the price buys one layout and its failure mode is a wrong edge. It is
+      not one resolver change: it needs a
+      reader per bundler config (`electron.vite.config.ts` here, something else next time) plus the
+      root `tsconfig` `rootDir`/`outDir`, and the two composed. When no config declares a mapping the
+      answer must stay UNRESOLVED, which is today's behaviour — so the whole cost buys one layout.
+      A wrong mapping binds a symbol to the WRONG file and makes `prune` silent about real dead code,
+      which is worse than the six false verdicts it would remove
+- [x] CHECKED 2026-08-15 — **only one subject has it.** Neither subject-a nor orchestrator declares a
+      `rootDir` at all, and neither has a process reaching into a sibling source tree. On subject-c it
+      is 8 distinct climbing specifiers from `electron/`, not just the 6 symbols above.
+      This todo's own bar is written one line up: *one subject is not a pattern*. Combined with the
+      finding that nothing declares the mapping, the honest status is NOT-YET rather than next-up —
+      the cost is a bundler-config reader per framework, the risk is a wrong edge making `prune`
+      confidently silent, and the evidence is one project's Electron layout
 
 ## Phase 1 — the measurement that decides it worked
 
-- [ ] The six symbols above are the fixture. They are named, their call sites are known, and the
+- [>] Deferred with Phase 0 — waits on the decision above. The six symbols above are the fixture. They are named, their call sites are known, and the
       count is falsifiable: six wrong today, zero when this is done, and no NEW findings appearing
       elsewhere on the three subjects
-- [ ] Add the shape to `prune-precision.test.ts` — a file importing through a specifier that only
+- [>] Deferred with Phase 0 — there is no mapping to declare in a fixture yet. Add the shape to `prune-precision.test.ts` — a file importing through a specifier that only
       resolves via a declared mapping. Truth declared in the test, so it cannot pass by the mapping
       being absent
