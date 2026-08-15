@@ -2365,3 +2365,23 @@ by construction.
   opposite string would not have been). Verified against a real file rather than a mock: hash
   unchanged when omitted, written when `dryRun: false`. Grep any schema `default:` and ask whether
   the handler applies it.
+
+## Most of the "recall gap" was the oracle asking a different question than `prune` answers
+- Gotcha: `oracle-exports.mjs` reported 71 / 98 / 178 MISSED across three subjects, and it was read —
+  by me, out loud — as conducks being quiet. Three separate definitional mismatches, none of them a
+  conducks defect: (1) it EXCLUDED test files when counting consumers, so an export imported by nine
+  test files counted as dead (`ChronicleInterface`, `Verdict`, `isTestPath`, `CLUSTER_FALLBACK`);
+  (2) it folded together symbols referenced NOWHERE with symbols referenced inside their own file,
+  which conducks deliberately treats as consumption; (3) it scored Next.js app-router entries —
+  `default`, `GET`, `POST`, `metadata`, `generateStaticParams` — which the framework loads by file
+  convention and no file ever imports. That last one alone was 108 of orchestrator's 129.
+- Why: an oracle is a claim about what the tool PROMISES, and `prune` promises "exported but never
+  consumed by OTHER modules". A test file is another module. A framework entry point is consumed.
+  Every one of the three mismatches made conducks look worse, which is the direction that does not
+  get questioned — a gate reading too harshly is as broken as one reading too kindly, and it survives
+  longer because nobody argues with bad news about their own tool.
+- Applies: after 3 fixes the same runs read 26 / 98 / 20, and splitting the miss shows the true gap is
+  12 / 22 / 12 with EXTRA still 0 everywhere. Before believing a recall number, take three of its
+  entries and find out by hand who consumes them. Mutation-checked afterwards: dropping a use-position
+  raises `EXTRA` on subject-a via `oracle-tsc.mjs` — the exports oracle is insensitive to that rule by
+  construction, so one oracle passing a mutation is not evidence the suite is a rubber stamp.

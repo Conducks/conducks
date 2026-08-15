@@ -36,6 +36,33 @@ const CLI = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..
 const isTestPath = (p) =>
   /(^|\/)(tests?|__tests__|__mocks__|spec|fixtures?)\//.test(p) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p);
 
+/**
+ * A FRAMEWORK CONTRACT IS A CONSUMER, even though no file imports it.
+ *
+ * Next.js app-router loads `page`/`layout`/`route` files BY CONVENTION: it calls the default export
+ * to render, `GET`/`POST` to serve, and reads `metadata` to build the document. Nothing imports any of
+ * them, so `findReferences` sees zero consumers and the oracle called them dead — 108 of the 129
+ * "recall gaps" on the orchestrator subject were exactly this, and conducks was silent on every one
+ * BECAUSE IT WAS RIGHT. Flagging them tells a reader to delete a working route.
+ *
+ * Gated on the project actually depending on `next`, so a plain `src/app/` directory in some other
+ * project keeps being scored normally.
+ */
+const NEXT_CONTRACT = new Set(['default', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS',
+  'metadata', 'generateMetadata', 'generateStaticParams', 'dynamic', 'revalidate', 'runtime',
+  'fetchCache', 'dynamicParams', 'viewport', 'generateViewport', 'config', 'middleware']);
+
+const usesNext = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(projectDir, 'package.json'), 'utf8'));
+    return Boolean(pkg.dependencies?.next || pkg.devDependencies?.next);
+  } catch { return false; }
+})();
+
+/** True when this export is loaded by the framework rather than by an import. */
+const isFrameworkEntry = (rel, name) =>
+  usesNext && /(^|\/)app\//.test(rel.split(path.sep).join('/')) && NEXT_CONTRACT.has(name);
+
 /** Every export the compiler can prove no OTHER file references. */
 function oracleUnusedExports() {
   const configPath = ts.findConfigFile(projectDir, ts.sys.fileExists, 'tsconfig.json');
@@ -69,6 +96,7 @@ function oracleUnusedExports() {
   const checker = program.getTypeChecker();
 
   const unused = new Map();
+  const testers = new Map();   // exported, and only a test consumes it
   const examined = new Set();
   for (const sf of program.getSourceFiles()) {
     if (sf.isDeclarationFile) continue;
@@ -83,25 +111,41 @@ function oracleUnusedExports() {
     for (const exp of checker.getExportsOfModule(moduleSymbol)) {
       const decl = exp.declarations?.[0];
       if (!decl) continue;
+      if (isFrameworkEntry(rel, exp.getName())) continue;
       // The NAME node is what findReferences needs a position on.
       const nameNode = decl.name ?? decl;
       let refs;
       try { refs = service.findReferences(sf.fileName, nameNode.getStart()); } catch { continue; }
       if (!refs) continue;
 
-      let external = 0;
+      // A TEST IMPORT IS A CONSUMER. `prune` claims "exported but never consumed by OTHER modules",
+      // and a test file is another module — deleting the export breaks it. Excluding tests here
+      // measured a DIFFERENT claim ("unused by production code") and charged conducks for the
+      // difference: on this repository ChronicleInterface has NINE importers, all tests, and was
+      // counted as a recall miss. So were isTestPath, Verdict and CLUSTER_FALLBACK.
+      //
+      // Test-only consumption is still worth knowing — an export that exists solely for a test is a
+      // real smell — so it is counted and reported separately rather than folded into either number.
+      let external = 0, testOnly = 0, sameFile = 0;
       for (const group of refs) {
         for (const r of group.references) {
-          if (r.fileName === sf.fileName) continue;          // same file is not "another module"
-          const rr = path.relative(projectDir, r.fileName);
-          if (isTestPath(rr)) continue;                       // prune ignores tests; so does this
-          external++;
+          if (r.fileName === sf.fileName) { sameFile++; continue; }   // same file is not "another module"
+          if (isTestPath(path.relative(projectDir, r.fileName))) testOnly++;
+          else external++;
         }
       }
-      if (external === 0) unused.set(`${rel.toLowerCase()}::${exp.getName().toLowerCase()}`, { file: rel, symbol: exp.getName() });
+      if (external === 0 && testOnly === 0) {
+        // sameFile > 1 means the declaration is referenced by its OWN file (the declaration itself is
+        // one reference). Worth carrying: conducks stays silent on those, so a MISSED count that does
+        // not separate them reads as a recall gap when it is a difference of definition.
+        unused.set(`${rel.toLowerCase()}::${exp.getName().toLowerCase()}`,
+          { file: rel, symbol: exp.getName(), usedInOwnFile: sameFile > 1 });
+      } else if (external === 0) {
+        testers.set(`${rel.toLowerCase()}::${exp.getName().toLowerCase()}`, { file: rel, symbol: exp.getName() });
+      }
     }
   }
-  return { unused, examined };
+  return { unused, examined, testers };
 }
 
 /** conducks' verdict. */
@@ -128,7 +172,7 @@ function conducksUnusedExports() {
   return found;
 }
 
-const { unused: oracle, examined } = oracleUnusedExports();
+const { unused: oracle, examined, testers } = oracleUnusedExports();
 const ours = conducksUnusedExports();
 // COMPARE ONLY WHERE THE ORACLE LOOKED.
 //
@@ -149,7 +193,14 @@ console.log(`\n--- UNUSED_EXPORT vs the TypeScript language service (${path.base
 console.log(`  compiler says unused : ${oracle.size}`);
 console.log(`  conducks says unused : ${ours.size}` + (outOfScope ? `  (${outOfScope} outside the compiler program — not scored)` : ''));
 console.log(`  agreed               : ${agreed}`);
-console.log(`  MISSED (compiler sees it, conducks silent): ${missed.length}`);
+console.log(`  exported for TESTS only (not scored, but worth knowing): ${testers.size}`);
+// SPLIT THE MISS. Measured on this repository, 15 of 26 missed exports ARE referenced inside their
+// own file and conducks treats that as consumption; only 11 have no reference anywhere. Reporting one
+// number charged conducks 26 for a gap of 11 and hid which half a change would move.
+const missedOwnFile = missed.filter(m => m.usedInOwnFile).length;
+console.log(`  MISSED (compiler sees it, conducks silent): ${missed.length}` +
+  `  — ${missed.length - missedOwnFile} referenced NOWHERE (true recall gap), ` +
+  `${missedOwnFile} referenced only inside their own file (conducks counts that as consumption)`);
 for (const m of missed.slice(0, 15)) console.log(`      ${m.symbol}  ${m.file}`);
 if (missed.length > 15) console.log(`      … ${missed.length - 15} more`);
 console.log(`  EXTRA (conducks says unused, compiler finds a consumer): ${extra.length}`);
