@@ -514,6 +514,51 @@ export class ConducksAdjacencyList {
     this.inEdges.get(newTargetId)!.add(edge);
   }
 
+  /**
+   * Re-state one file: drop what that file said, keep what everyone else said about it.
+   *
+   * `clearFile` is the wholesale version and is wrong for a re-pulse. Measured on a two-node
+   * fixture: clearing `a.ts` also removes the incoming `CALLS` that `main.ts` owns, so re-parsing a
+   * file silently deletes other files' references to it — the same answer broken in the opposite
+   * direction. A re-parse restates the file's OWN outgoing edges and says nothing about anyone's.
+   *
+   * `keepIds` is what the new spectrum declares. Anything the file used to declare and no longer
+   * does is removed outright; an incoming edge left pointing at it becomes unresolved, which is the
+   * same state as any other reference the graph cannot place and is honest about what is known.
+   *
+   * Without this the live pulse only ever ADDED, so a deleted call kept its edge — and the watcher
+   * records the file's hash afterwards, so the next `analyze` saw 0 dirty units and never repaired
+   * it (todo67).
+   */
+  public replaceFile(filePath: string, keepIds: ReadonlySet<NodeId>): void {
+    if (!filePath || typeof filePath !== 'string') return;
+    const ids = new Set(this.getNodeIdsByFilePath(filePath.toLowerCase()));
+
+    for (const id of ids) {
+      // 1. The file's OWN outgoing edges go, whether the node survives or not: the re-parse is
+      //    about to restate them, and a stale one is exactly the defect this fixes.
+      const outgoing = this.outEdges.get(id);
+      if (outgoing) {
+        for (const edge of outgoing) {
+          const inSet = this.inEdges.get(edge.targetId);
+          if (inSet) for (const e of [...inSet]) if (e.id === edge.id) inSet.delete(e);
+        }
+        this.outEdges.delete(id);
+      }
+
+      // 2. A node the file still declares stays, incoming edges and all.
+      if (keepIds.has(id)) continue;
+
+      // 3. A node it no longer declares is removed. Incoming edges are NOT hunted down and deleted —
+      //    they belong to other files, and leaving them unresolved is the truthful record.
+      const node = this.nodes.get(id);
+      if (node) this.unindex(id, node);
+      this.inEdges.delete(id);
+      this.nodes.delete(id);
+      this.meatCache.delete(id);
+    }
+  }
+
   public clearFile(filePath: string): void {
     if (!filePath || typeof filePath !== 'string') return;
     const targetPath = filePath.toLowerCase();

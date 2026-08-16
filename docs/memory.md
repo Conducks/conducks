@@ -2514,3 +2514,26 @@ by construction.
 - Applies: refusing is a behaviour change, and a refusal is only safe once the match is complete.
   The counter-test that survives is `MyClass::method` — a qualifier that is not a path at all, which
   must keep falling back to the bare name (ADR 0106).
+
+## A re-pulse must replace what the FILE said, not everything about the file
+- Gotcha: `clearFile` looks like the tool for replace-on-repulse and is the wrong one. Measured on a
+  two-node fixture: it removes the incoming `CALLS` another file owns, so re-parsing `a.ts` deletes
+  `main.ts`'s reference to it — the same answer broken in the opposite direction. `replaceFile`
+  drops the file's OUTGOING edges and the nodes it no longer declares, and leaves incoming alone.
+- Why: it also exposed a second gap. The live path never ran the INTRA-LINKER, which `analyze` does.
+  That was invisible while the pulse only ADDED, because the previously resolved edge masked the
+  dangling new one; the moment a re-pulse replaces the file's edges, `impact shared` drops to zero.
+  A fix can reveal an older defect rather than cause one — check which before reverting.
+- Applies: also correct the record when a premise turns out wrong. todo67 claimed the adjacency list
+  "exposes no node deletion at all" because I grepped one name (`removeNodes`, which only appears in
+  a comment). `clearFile` was there the whole time, with tests.
+
+## The vault does not delete, so fixing memory is only half of it
+- Gotcha: with memory correct, a separate process still read the stale answer — `save` inserts and
+  updates but never deletes. Purging the unit first fixed that column and broke the other: `impact
+  shared` went from one caller to zero and STAYED there through a full `analyze`, because the purged
+  cross-file edges were not written back and both files' hashes then read as clean.
+- Why: reverted rather than shipped. One wrong answer traded for a worse one is not progress, and a
+  vault that a full `analyze` cannot repair is the worst failure mode this tool has.
+- Applies: measure the counter-case in the SAME run as the target case. `onlyHere` alone read as a
+  clean success; only asking about `shared` in the same breath showed the trade.

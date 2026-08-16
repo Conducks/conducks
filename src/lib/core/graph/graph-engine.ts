@@ -35,6 +35,19 @@ const __dirname = path.dirname(__filename);
  * Logic for reflecting the technical structure into the graph.
  * Implements the Conducks Two-Pass Identity Model.
  */
+
+/**
+ * The id a spectrum node lands under — ONE rule, because two callers need it.
+ *
+ * `ingestSpectrum` computes it to write the node, and a re-pulse has to know it BEFORE ingesting, to
+ * decide which of the file's existing nodes the new spectrum still declares. Writing the rule twice
+ * is how the ecmascript queries drifted; this file already carries the scar.
+ */
+export function spectrumNodeId(canonicalFilePath: string, metaNode: { name: string; metadata?: any }): string {
+  const explicit = metaNode.metadata?.id;
+  return explicit ? String(explicit).toLowerCase() : `${canonicalFilePath}::${String(metaNode.name).toLowerCase()}`;
+}
+
 export class ConducksGraph {
   private graph = new ConducksAdjacencyList();
   private logger = new Logger("ConducksGraph");
@@ -90,6 +103,15 @@ export class ConducksGraph {
               this.logger.error(`[Conducks Synapse] Worker failure in ${res.path}: ${res.error}`);
               continue;
             }
+            // RE-STATE the file rather than adding to what it said last time. Without this a deleted
+            // call keeps its edge for the rest of the session — and once the watcher records the
+            // file's hash, the next `analyze` sees nothing dirty and never repairs it (todo67).
+            //
+            // Only after the parse SUCCEEDED: replacing first would empty the file on a parse error
+            // and leave the graph claiming the file declares nothing.
+            const canonical = canonicalize(res.path);
+            const declared = new Set<string>(res.spectrum.nodes.map((n: any) => spectrumNodeId(canonical, n)));
+            this.graph.replaceFile(canonical, declared);
             this.ingestSpectrum(res.path, res.spectrum);
           }
         });
@@ -415,7 +437,7 @@ export class ConducksGraph {
     // Pass 1: Ingest Semantic Nodes (Symbols)
     for (const metaNode of spectrum.nodes) {
       const m = metaNode.metadata || {};
-      let nodeId = m.id ? m.id.toLowerCase() : `${filePath}::${metaNode.name.toLowerCase()}`;
+      let nodeId = spectrumNodeId(filePath, metaNode);
 
       // A SYMBOL NAMED `unit` COLLIDES WITH THE FILE THAT CONTAINS IT.
       //

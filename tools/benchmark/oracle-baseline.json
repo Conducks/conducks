@@ -11,9 +11,9 @@
     "agreed": 7
   },
   "conducks::exports": {
-    "oracle": 103,
+    "oracle": 104,
     "missed": 13,
-    "agreed": 90
+    "agreed": 91
   },
   "sofie::exports": {
     "oracle": 245,

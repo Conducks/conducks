@@ -6,6 +6,7 @@ import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { GlobalSymbolLinker } from "@/lib/core/graph/linker.js";
+import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -54,6 +55,7 @@ const WATCHED_EXTENSIONS = SOURCE_EXTENSIONS;
 export class ConducksWatcher {
   private watcher: FSWatcher | null = null;
   private linker = new GlobalSymbolLinker();
+  private intraLinker = new IntraLinker();
   private impactAnalyzer = new BlastRadiusAnalyzer();
   private ignoreManager: IgnoreManager;
   private isInitialized = false;
@@ -325,6 +327,17 @@ export class ConducksWatcher {
       // 3. Global Synapse Re-Linking
       this.linker.link(this.graph.getGraph());
 
+      // 3b. INTRA-PROJECT RESOLUTION, which `analyze` runs and this path did not.
+      //
+      // A re-parse emits its call targets as bare names; the intra-linker is what binds them to real
+      // node ids. Skipping it was invisible while the live pulse only ADDED — the previously resolved
+      // edge survived and masked the dangling new one. The moment a re-pulse REPLACES the file's
+      // edges, the difference shows: measured, `impact shared` fell from one caller to none after an
+      // edit to the calling file, because the fresh CALLS edge never bound to anything.
+      const resolvedEdges = this.intraLinker.resolve(this.graph.getGraph());
+      const g0 = this.graph.getGraph();
+      for (const r of resolvedEdges) g0.retargetEdge(r.id, r.newTargetId);
+
       // 4. Kinetic Resonance Mapping
       if (changedLines.length > 0) {
         const affectedSymbols = new Set<string>();
@@ -370,6 +383,13 @@ export class ConducksWatcher {
       }
 
       // 5. Structural Persistence Update (Only if Writer or Auto-Pulse)
+      //
+      // NO PURGE HERE, and the attempt is recorded in todo67 because the result was worse. `save`
+      // inserts and updates but never deletes, so the vault keeps an edge the edit removed even once
+      // `replaceFile` has fixed memory. Purging the unit first fixes THAT and loses something else:
+      // measured, `impact shared` fell from one caller to zero and stayed there through a full
+      // `analyze`, because the purged cross-file edges were not written back and both files' hashes
+      // then read as clean. One wrong answer traded for a worse one.
       if (this.autoPulse && this.options.persistence && !(this.options.persistence as any).readOnly) {
         console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
         await this.options.persistence.save(this.graph.getGraph());

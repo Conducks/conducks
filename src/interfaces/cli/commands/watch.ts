@@ -56,19 +56,12 @@ export class WatchCommand implements ConducksCommand {
     const isPulse = args.includes('--pulse');
     const rootPath = process.cwd();
 
-    // READ-ONLY, AND `--pulse` DOES NOT CHANGE THAT — measured, opening the vault for writing here
-    // makes the tool WORSE rather than better, and the reason is worth stating where the decision is.
-    //
-    // The live pulse ADDS to the graph and never removes: `ingestSpectrum` has no counterpart, and
-    // the adjacency list has no node removal at all (the comment naming `removeNodes` describes a
-    // method that does not exist). So re-pulsing an edited file leaves its OLD edges in place. On a
-    // two-file project, deleting the only call to `onlyHere` and letting the watcher persist left
-    // `impact` still reporting one caller — and step 6 records the file's hash, so the next
-    // `analyze` found 0 dirty units and never repaired it. Staleness that `analyze` fixes became
-    // staleness that nothing fixes.
-    //
-    // Enabling the write needs replace-on-repulse first (todo67). Until then the flag is refused
-    // out loud rather than silently obeyed.
+    // READ-ONLY, AND `--pulse` DOES NOT CHANGE THAT YET — see todo67, which now carries two
+    // measurements rather than one. `replaceFile` fixed the in-memory half (a re-pulse no longer
+    // keeps a deleted call's edge). The vault half is unsolved: `save` never deletes, so the stale
+    // row survives, and purging the unit first loses cross-file edges that neither the intra-linker
+    // nor a later incremental `analyze` restores — `impact shared` went from one caller to zero and
+    // stayed there. Refused out loud rather than silently obeyed.
     await (registry as any).initialize(true, rootPath, true);
     await syncGraph(registry);
 
@@ -82,9 +75,9 @@ export class WatchCommand implements ConducksCommand {
     }
 
     if (isPulse) {
-      console.error("[Conducks Watch] --pulse is not available: a live pulse cannot yet REMOVE what an edit deleted, " +
-        "so persisting it would leave stale edges that 'analyze' then skips as unchanged (todo67). " +
-        "Watching read-only; run 'conducks analyze' to persist.");
+      console.error("[Conducks Watch] --pulse is not available yet: the vault half of replace-on-repulse " +
+        "is unsolved (todo67) and enabling it loses cross-file edges. Watching read-only; " +
+        "run 'conducks analyze' to persist.");
     }
 
     console.log('[Watch] Step 4: calling watcher.init()...');
@@ -121,6 +114,8 @@ export class WatchCommand implements ConducksCommand {
     const docsWatcher = registry.docs.watcher;
     docsWatcher.start();
 
+    // The banner names the mode, because they differ in the only way a reader cares about: whether
+    // anything outside this process will see the update.
     console.log("\n\x1b[32m🔭 Conducks Watcher — Live Mirror Mode (Read-Only) active.\x1b[0m");
     console.log("\x1b[34m- Changes update the in-memory Visual Mirror instantly.\x1b[0m");
     console.log("\x1b[34m- docs/ is watched too: grammar + link violations report on write.\x1b[0m");
