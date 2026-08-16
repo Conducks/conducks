@@ -1,4 +1,5 @@
 import { registry } from "@/registry/index.js";
+import { tryResolveSymbol, type NameIndex } from "@/contracts/symbol-resolution.js";
 
 /**
  * Conducks — the one place a caller-supplied symbol becomes a graph node id.
@@ -18,18 +19,25 @@ import { registry } from "@/registry/index.js";
  * never as an empty result set.
  */
 export function resolveSymbolId(symbol: string): string | null {
-  const graph = registry.infrastructure.graphEngine.getGraph();
-  const asId = symbol.toLowerCase();
+  return resolveSymbolWith(symbol, registry.infrastructure.graphEngine.getGraph());
+}
 
-  // An id is a resolution only if the graph holds it.
-  if (symbol.includes('::')) return graph.getNode(asId) ? asId : null;
-
-  // 58 node ids on this repo carry no `::` (`path.dirname`, `fs.readfilesync` — the ecosystem
-  // nodes), and each stores its id as its own `name`, so the name lookup already reaches them. No
-  // id-shaped fallback is needed beyond this.
-  const matches = graph.findNodesByName(symbol);
-  if (matches.length === 0) return null;
-  return matches.reduce((a: any, b: any) =>
-    ((b.properties?.gravity ?? 0) > (a.properties?.gravity ?? 0) ? b : a)
-  ).id as string;
+/**
+ * The rule itself, over any graph — ONE rule, shared with the CLI.
+ *
+ * This file used to hold a SECOND implementation, and the two drifted the moment either was fixed:
+ * teaching the CLI to honour a repo-relative id (`src/kernel/index.ts::createLogger`) left this
+ * surface rejecting the same input, which the mirror rule forbids — same input, same answer,
+ * differing only in rendering (ADR 0148, todo61).
+ *
+ * The property this copy was written for SURVIVES the merge, and is asserted rather than assumed:
+ * an INVENTED id resolves to null on both surfaces. `tryResolveSymbol` refuses a path that holds no
+ * such symbol, which is exactly the `nosuchfile.ts::totallyMadeUpSymbol` case that made four tools
+ * answer a confident zero (ADR 0145).
+ *
+ * Split from `resolveSymbolId` only so it can be driven against a fixture graph — the registry
+ * version needs a materialised vault, which is not what a rule of this shape should require to test.
+ */
+export function resolveSymbolWith(symbol: string, graph: NameIndex): string | null {
+  return tryResolveSymbol(symbol, graph);
 }

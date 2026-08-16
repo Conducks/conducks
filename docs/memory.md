@@ -2551,3 +2551,30 @@ by construction.
   nodes and `saveEdges` for the edges it OWNS. Incoming edges belong to other units: neither purged
   nor rewritten, the same asymmetry `replaceFile` applies in memory. `watch --pulse` works
   cross-process; read-only stays the default because a writable handle holds the write lock.
+
+## A `--pulse` watcher's writes are invisible to everyone else until it exits
+- Gotcha: measured on a generated 400-file project, not the two-file fixture that had been carrying
+  every check. Edit a file under `watch --pulse`, and a separate `impact` still answered the OLD
+  number at t+5s, t+15s and t+30s — then the correct one the moment the watcher was killed. The
+  write is real and lands; it is not READABLE. `status --json` names the mechanism: `servedFrom`
+  flips from `vault` to `previous-pulse-snapshot` while a writer holds the vault (ADR 0040).
+- Why: the banner I had just written promised the opposite — "other commands read the updated
+  graph". True on a two-file project because the pulse finished between commands; false for a whole
+  session on anything real. Scale was the variable, and the small fixture hid it.
+- Applies: run the acceptance measurement at REAL size before believing the claim, and never edit a
+  frozen subject to get there — generate a project instead. Also: two of the three surfaces I had
+  "verified by eye" had no test at all, and one of the tests I then wrote passed with the fix
+  removed. A tolerant assertion written for cross-platform safety is a test of nothing; probe the
+  filesystem at runtime and SKIP where the claim is untestable.
+
+## The MCP surface had its own copy of the symbol resolver
+- Gotcha: I stated that fixing `tryResolveSymbol` covered "CLI + MCP" because 11 consumers appeared
+  in one grep. Wrong — `interfaces/tools/shared/resolve-symbol.ts` held a SECOND implementation, so
+  the relative-id fix never reached the tools and the two surfaces answered differently for the same
+  input, which the mirror rule forbids (ADR 0148, todo61).
+- Why: the rule now lives in `contracts/symbol-resolution.ts`, which is the only layer both `cli`
+  and `mcp` may import — the architecture test refused `mcp -> cli`, which is how the right home was
+  found rather than guessed.
+- Applies: when merging two copies, assert the property the OLD copy existed for. This one was
+  written so an invented id (`nosuchfile.ts::totallyMadeUpSymbol`) returns null instead of four
+  confident zeros (ADR 0145); that case is now a test on both surfaces.

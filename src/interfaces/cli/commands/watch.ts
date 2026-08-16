@@ -118,8 +118,13 @@ export class WatchCommand implements ConducksCommand {
     console.log(`\n\x1b[32m🔭 Conducks Watcher — ${isPulse ? 'Auto-Pulse Mode (persists each change)' : 'Live Mirror Mode (Read-Only)'} active.\x1b[0m`);
     console.log("\x1b[34m- Changes update the in-memory Visual Mirror instantly.\x1b[0m");
     console.log("\x1b[34m- docs/ is watched too: grammar + link violations report on write.\x1b[0m");
+    // MEASURED, and the first wording of this line was wrong. While THIS process holds the vault
+    // writable, every other command is served from the previous pulse's SNAPSHOT (ADR 0040) — for
+    // the whole session, not merely while a write is in flight: on a 400-file project the change was
+    // still invisible to a separate `impact` 30 seconds later, and appeared the moment the watcher
+    // exited. The writes are real and land; they are simply not readable by anyone else until then.
     console.log(isPulse
-      ? "\x1b[34m- Each change is written, so other commands read the updated graph.\x1b[0m"
+      ? "\x1b[34m- Each change is written to the vault. Other commands keep reading the PREVIOUS pulse\n  while this watcher holds it — they pick the changes up when it exits.\x1b[0m"
       : "\x1b[33m- Note: Run 'conducks analyze' to persist, or 'watch --pulse' to persist as you edit.\x1b[0m");
 
     // A branch switch invalidates the graph, and a FILE watcher cannot see one (ADR 0035,
