@@ -31,7 +31,7 @@ describe('System domain integration (conducks setup)', () => {
   });
 
   it('installs skills into the sandboxed HOME and registers the project, without touching the real HOME', () => {
-    const realSkillsDir = path.join(os.homedir(), '.claude', 'skills', 'conducks-guide');
+    const realSkillsDir = path.join(os.homedir(), '.claude', 'skills', 'conducks');
     const realSkillsExistedBefore = fs.existsSync(realSkillsDir);
 
     const { combined, status } = runCli(['setup'], { cwd: repo, env: { HOME: fakeHome } });

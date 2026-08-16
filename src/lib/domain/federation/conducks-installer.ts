@@ -20,6 +20,9 @@ const RETIRED_SKILLS = [
   // merged into conducks-workflows (2026-07-26)
   "conducks-debugging", "conducks-exploring", "conducks-governance",
   "conducks-impact-analysis", "conducks-refactoring",
+  // merged into `conducks` (2026-08-16) — all three answered one question, "how do I use conducks",
+  // and split it across three loads: what it is, which command, which probe sequence.
+  "conducks-cli", "conducks-guide", "conducks-workflows",
 ];
 
 export interface SyncReport {

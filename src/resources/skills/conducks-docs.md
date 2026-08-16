@@ -961,6 +961,10 @@ moment and starts rotting immediately. `docs-lint` does not grammar-check it (§
 **Do not put here:** the module graph (`architecture.md`), tool output (`.conducks/`, §8), or anything
 a reader must be able to trust — a visual supports understanding, it never settles an argument.
 
+**How the pages are BUILT is the `conducks-visuals` skill**, not this file. This section owns the
+policy — when a visual may exist, what it must declare, what the gate refuses. The layout engine, the
+router, the occlusion rules and the porting procedure live there.
+
 **The gate: `conducks visuals-lint`.** The computable half is enforced: every `file:line` must
 resolve to exactly one tracked file, every `::symbol` must be defined, every `NAME=value` must still
 be the value the code assigns (ADR 0138). If the pages are GENERATED, declare the generator in
