@@ -41,6 +41,9 @@ const mkProject = () => {
 
 /** Pulse one file through the BUILT graph engine and report the symbol names that landed. */
 function livePulse(root: string, target: string, universe: string[]): string[] {
+  // A BUILT path, not an import specifier — it is resolved on disk and handed to a child process.
+  // A door rewrite once turned this line into `@/lib/core/graph/index.js`, which resolves to nothing
+  // at runtime and failed both cases here (todo73).
   const engine = path.resolve('build/src/lib/core/graph/graph-engine.js');
   const script = `
     const { ConducksGraph } = await import(${JSON.stringify(engine)});

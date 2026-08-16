@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { AnalyzeOrchestrator } from '@/lib/domain/analysis/orchestrator.js';
-import { ConducksGraph } from '@/lib/core/graph/graph-engine.js';
+import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapseRegistry } from '@/lib/core/registry/synapse-registry.js';
 import { TypeScriptProvider } from '@/lib/core/parsing/languages/typescript/index.js';
 import { grammars } from '@/lib/core/parsing/grammar-registry.js';
 import { ConducksComponent } from "@/contracts/index.js";
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
-import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
+import { IntraLinker } from "@/lib/core/graph/index.js";
 
 /**
  * ADR 0071 — a barrel re-export ("export { x as y } from './z'") must not leave the per-binding

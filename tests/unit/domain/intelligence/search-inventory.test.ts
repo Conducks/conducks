@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { ConducksSearch } from '@/lib/domain/intelligence/search-engine.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * `conducks query "*"` is documented in features.md as Symbol Listing — "the heaviest things here",

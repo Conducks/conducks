@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
-import { CanonicalKind, CanonicalRank, mapToCanonical } from '@/lib/core/parsing/taxonomy.js';
+import { CanonicalKind, CanonicalRank, mapToCanonical } from "@/contracts/index.js";
 
 /**
  * ADR 0099 — a kind has ONE rank, and `CanonicalRank` is where it lives.

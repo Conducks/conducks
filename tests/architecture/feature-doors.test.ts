@@ -38,6 +38,7 @@ const SRC = path.resolve('src');
 const DOORS = [
   'contracts',
   'lib/core/git',
+  'lib/core/graph',
   'lib/core/utils',
 ];
 

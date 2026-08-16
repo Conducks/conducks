@@ -1,7 +1,7 @@
-import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from "@/lib/core/graph/index.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
-import { isBuiltIn, getGlobalId, UNRESOLVED_CONFIDENCE } from "../built-ins.js";
+import { isBuiltIn, getGlobalId, UNRESOLVED_CONFIDENCE } from "@/contracts/index.js";
 
 /**
  * Conducks — Call Processor

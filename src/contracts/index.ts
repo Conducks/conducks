@@ -33,3 +33,10 @@ export { verdict, renderVerdict, verdictToJson } from './verdict.js';
 
 export type { PrismRequest, PrismSpectrum, SpectrumNode } from './prism-types.js';
 export type { Advice } from './domain.js';
+
+// Moved out of `core/parsing` to break a FEATURE cycle: graph imported both while parsing imported
+// graph's node types, so each door would have imported the other's (todo73). Three features use each
+// — graph, parsing and domain for the taxonomy; graph, parsing and persistence for the built-ins —
+// which is rule 5's definition of a contract rather than a convenience.
+export { CanonicalKind, CanonicalRank, mapToCanonical } from './taxonomy.js';
+export { isBuiltIn, getGlobalId, isUniversalMemberCall, GLOBAL_ATMOSPHERE, UNIVERSAL_MEMBERS, UNRESOLVED_CONFIDENCE } from './built-ins.js';

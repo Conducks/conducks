@@ -8,7 +8,7 @@
  * fail — each has a negative case beside it.
  */
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import { ConducksAdvisor } from '@/lib/domain/governance/advisor.js';
 
 const node = (id: string, filePath: string) => ({

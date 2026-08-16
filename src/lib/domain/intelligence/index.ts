@@ -1,5 +1,5 @@
 import { ConducksSearch } from "./search-engine.js";
-import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+import { FederatedLinker } from "@/lib/core/graph/index.js";
 
 /**
  * Conducks — Intelligence Service
@@ -26,4 +26,4 @@ export class IntelligenceService {
 }
 
 export { ConducksSearch } from "./search-engine.js";
-export { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+export { FederatedLinker } from "@/lib/core/graph/index.js";

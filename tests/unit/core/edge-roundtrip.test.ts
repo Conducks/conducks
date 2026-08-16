@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 // Edge data lives on `.properties`/`.confidence` — never `.metadata`/`.weight`. Both sides of the
 // vault round-trip once read the wrong fields: saveEdges wrote `properties={}` on every edge, and

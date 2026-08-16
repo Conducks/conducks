@@ -42,6 +42,22 @@ It happened again on the next feature: a rewrite reached 21 files, the gate name
 
 A text search shaped like one import style cannot see the others.
 
+### Rule 5b · A door is itself a dependency edge
+
+Importing `<feature>/index.ts` imports every internal file the door re-exports. A leaf import that
+was safe can become a cycle. Before pointing a caller at a door, check whether anything the door
+re-exports imports that caller back.
+
+*Why.* Measured: `persistence.ts` imported `graph/adjacency-list.js`, a leaf, with no cycle. Pointing
+it at `graph/index.js` made it import a barrel re-exporting `linker-federated.ts`, which imports
+`persistence.ts`. **Nothing failed to compile.** A race test reading `status` mid-write failed against
+the partially initialised module, and the cause was only proven by stashing the work and watching the
+test pass. Fixed by inverting the dependency — the linker takes an opener function and composition
+supplies it.
+
+Three features had doors before this one and none hit it, because none had an internal file importing
+back up. The rule set did not have this until a door caused the defect it was meant to prevent.
+
 ### Rule 10 · Every test must bite
 
 Every new test must FAIL against a deliberately broken version of the thing it covers. A test that

@@ -1,5 +1,5 @@
 import { BaseAnalyzer } from './trace.js';
-import { ConducksAdjacencyList, NodeId } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
 
 /**

@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { ConducksAdjacencyList, NodeId, STRUCTURAL_EDGE_TYPES } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId, STRUCTURAL_EDGE_TYPES } from "@/lib/core/graph/index.js";
 
 /** Containment edges (MEMBER_OF, CONTAINS, HAS_METHOD, HAS_PROPERTY) name no text, so they are not rename sites. */
 const STRUCTURAL = new Set<string>(STRUCTURAL_EDGE_TYPES);

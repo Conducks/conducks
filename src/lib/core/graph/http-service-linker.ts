@@ -26,7 +26,15 @@ const SERVICE_KINDS = new Set(['DIRECTORY', 'NAMESPACE', 'REPOSITORY', 'ECOSYSTE
  */
 const PROSE_EXTENSIONS = /\.(md|mdx|markdown|rst|txt|adoc)$/i;
 
+/**
+ * Joins a REQUEST to the ROUTE it calls, across services.
+ *
+ * Both ends are SYNTHESISED nodes standing for an endpoint rather than a symbol anyone declared,
+ * which is why dead-code treats them as never-orphaned: "nothing references this route" is its
+ * normal state and says nothing about whether the code behind it runs (ADR 0092).
+ */
 export class HttpServiceLinker {
+  /** Holds the graph it links over; every method reads and rebinds within it. */
   constructor(private readonly graph: ConducksAdjacencyList) {}
 
   /**

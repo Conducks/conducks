@@ -43,6 +43,9 @@ Concretely, and each of these is binding:
 3. The feature's own files and its own tests may import internals. Nobody else may.
 4. A door exports operations and types — never mutable state, never a singleton a caller can mutate.
 5. A type two features share moves to `contracts/`; it does not travel through a door.
+5b. **A DOOR IS ITSELF A DEPENDENCY EDGE.** Importing `<feature>/index.ts` imports every internal
+    file the door re-exports, so a leaf import that was safe can become a cycle. Before pointing a
+    caller at a door, check whether anything the door re-exports imports that caller back.
 
 *Code*
 6. Every file, class and exported function carries a comment saying why it exists (conducks-docs
@@ -104,6 +107,14 @@ before the counter-case was measured and had to be reverted.
 
 Cleaning is explicitly not fixing (rule 16). A clean that also changes behaviour cannot say which
 change caused which result, and this repository has paid for that twice in one session.
+
+**AMENDED by measurement, todo73.** Rule 5b was added after the graph door CREATED an ESM cycle
+rather than revealing one. `persistence.ts` imported `graph/adjacency-list.js` — a leaf, no cycle.
+Pointing it at `graph/index.js` made it import a barrel that re-exports `linker-federated.ts`, which
+imports `persistence.ts`. Nothing failed to compile; a race test that reads `status` mid-write failed
+against the partially initialised module, and only stashing the work proved the cause. Fixed by
+inverting the dependency — `FederatedLinker` takes an `openVault` function and composition supplies
+it. Third ESM cycle this repository has paid for, first one a door caused.
 
 `Open:` the boundary test landed with todo69#P1 and holds `core/git` only — `DOORS` in that file is
 a list, and a feature is enforced from the moment its line is added. Every other feature remains a

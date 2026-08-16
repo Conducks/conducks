@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { GovernanceService } from '@/lib/domain/governance/index.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 describe('GovernanceService Audit', () => {
   it('should filter out hierarchical circularities (parent-child MEMBER_OF cycles)', () => {

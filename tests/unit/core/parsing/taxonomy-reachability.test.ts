@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { CanonicalKind, CanonicalRank, mapToCanonical } from '@/lib/core/parsing/taxonomy.js';
+import { CanonicalKind, CanonicalRank, mapToCanonical } from "@/contracts/index.js";
 
 /**
  * ADR 0100 — every declared kind has a producer.

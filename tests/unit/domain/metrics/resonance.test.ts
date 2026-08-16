@@ -5,7 +5,7 @@
  * it described live behaviour nothing else covered. Kept as it was, apart from its location.
  */
 import { describe, it, expect } from '@jest/globals';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import { ResonanceAnalyzer } from '@/lib/domain/metrics/resonance.js';
 
 function buildGraph(kind: string, kineticValues: number[], edges: Array<[number, number]>): ConducksAdjacencyList {

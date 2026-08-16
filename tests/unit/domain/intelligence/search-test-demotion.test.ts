@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { ConducksSearch } from '@/lib/domain/intelligence/search-engine.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * todo43 — a test file matching a query is not the same claim as a source file matching it.

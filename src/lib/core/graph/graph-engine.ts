@@ -1,5 +1,5 @@
 import { ConducksAdjacencyList, type ConducksNode, type ConducksEdge, type EdgeType } from "./adjacency-list.js";
-import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
+import { PrismSpectrum } from "@/contracts/index.js";
 
 /**
  * This file is where a parsed relationship BECOMES a graph edge, so it is where the two unions have
@@ -18,9 +18,9 @@ const _assertParserTypesAreEdgeTypes: _ParserTypesAreEdgeTypes = true;
 void _assertParserTypesAreEdgeTypes;
 import { canonicalize } from "@/lib/core/utils/index.js";
 import { Logger } from "@/lib/core/utils/index.js";
-import { PrismRequest } from "@/lib/core/parsing/prism-core.js";
+import { PrismRequest } from "@/contracts/index.js";
 import { StructuralRanker } from "../../core/graph/algorithms/ranker.js";
-import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
+import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
 import { Worker } from "node:worker_threads";
 import os from "node:os";
 import path from "node:path";
@@ -48,6 +48,14 @@ export function spectrumNodeId(canonicalFilePath: string, metaNode: { name: stri
   return explicit ? String(explicit).toLowerCase() : `${canonicalFilePath}::${String(metaNode.name).toLowerCase()}`;
 }
 
+/**
+ * Turns parsed spectra into a graph, in two paths that must not be confused.
+ *
+ * `flushAndClear` is the ANALYZE path: a full pulse, written wave by wave and cleared between them.
+ * `pulseStructuralStream` is the LIVE path the watcher uses, one file at a time — and it must
+ * REPLACE that file rather than add to it, or a deleted call keeps its edge for the rest of the
+ * session (todo67).
+ */
 export class ConducksGraph {
   private graph = new ConducksAdjacencyList();
   private logger = new Logger("ConducksGraph");
@@ -158,6 +166,7 @@ export class ConducksGraph {
    */
   public handoverEndpointDrops = 0;
 
+  /** Runs every binder over the loaded graph. The WRITE-side rebuild — a read path calling it reports a graph it just mutated (ADR 0118). */
   public resonate(): void {
     this.logger.info(`[Conducks Synapse] Pushing Structural Resonance Flow...`);
     this.lastResonanceEdges = [];
@@ -396,6 +405,7 @@ export class ConducksGraph {
     }
   }
 
+  /** Joins one REQUEST to the ROUTE it calls, once the URLs are known to match. */
   private bindResonance(req: ConducksNode, route: ConducksNode, reqUrl: string): void {
     const edge: ConducksEdge = {
       id: `RESONANCE::${req.id}->${route.id}`,

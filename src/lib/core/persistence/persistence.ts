@@ -1,6 +1,6 @@
-import { isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from '@/lib/core/parsing/built-ins.js';
+import { isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from "@/contracts/index.js";
 import { createHash } from "node:crypto";
-import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
+import { clusterOf } from "@/lib/core/graph/index.js";
 import fs from "node:fs";
 import path from "node:path";
 import { chronicle } from "@/lib/core/git/index.js";

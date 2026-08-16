@@ -1,20 +1,41 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ConducksAdjacencyList } from './adjacency-list.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+
+/** Opens a neighbour's vault read-only. Injected, for the reason on the constructor. */
+export type OpenNeighbourVault = (path: string) => { load(graph: ConducksAdjacencyList): Promise<unknown> };
 
 /**
  * Conducks — Federated Linker
- * 
+ *
  * Manages cross-project dependencies by linking intelligence graphs
  * from neighboring foundation repositories.
  */
 export class FederatedLinker {
   private configPath: string;
 
+  /**
+   * Takes its dependencies rather than importing them, and `openVault` is the load-bearing one.
+   *
+   * This file used to `import { SynapsePersistence }` directly. That was harmless while
+   * `persistence.ts` imported `graph/adjacency-list.js` — a leaf — and became a REAL ESM cycle the
+   * moment the graph door existed, because `persistence.ts` then imported `graph/index.js`, which
+   * re-exports this file. Measured, not predicted: `status-pulse-visibility` failed on the partially
+   * initialised module and passed again once the import was inverted (todo73).
+   *
+   * The same shape the watcher carries, for the same reason, and the third time this repository has
+   * paid for it — `registry` ↔ `watcher`, `chronicle` ↔ `typescript/resolver`, now this.
+   *
+   * `openVault` THROWS by default rather than defaulting to a no-op. It was optional first, and a
+   * caller that forgot it got a warning and an empty hydration — which reads exactly like "the
+   * neighbour had nothing to give", the failure-looks-like-absence conflation this file's own
+   * neighbours spend most of their comments preventing. A test that drives the linker directly
+   * caught it.
+   */
   constructor(
     baseDir: string = process.cwd(),
-    private readonly fsMock: any = fs
+    private readonly fsMock: any = fs,
+    private readonly openVault: OpenNeighbourVault = () => { throw new Error('[Federated Linker] no vault opener injected — construct with one (todo73)'); }
   ) {
     this.configPath = path.join(baseDir, '.conducks', 'links.json');
   }
@@ -51,7 +72,7 @@ export class FederatedLinker {
       // an exclusive lock on a database this process does not own and blocking that project's own
       // readers. Since ADR 0040's reader snapshot, it would also have paid a full vault copy per
       // neighbour on every federated load.
-      const p = new SynapsePersistence(linkPath, true);
+      const p = this.openVault(linkPath);
       const before = mainGraph.stats.nodeCount;
       await p.load(mainGraph);
       const success = mainGraph.stats.nodeCount > before;
@@ -102,6 +123,7 @@ export class FederatedLinker {
     return parsed as string[];
   }
 
+  /** Persists the cross-project links so a later session need not re-derive them. */
   private async saveLinks(links: string[]): Promise<void> {
     const dir = path.dirname(this.configPath);
     await this.fsMock.mkdir(dir, { recursive: true });

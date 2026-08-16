@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { DeadCodeAnalyzer } from '@/lib/domain/evolution/dead-code.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * ADR 0104 — `prune` separates a verdict from a question.

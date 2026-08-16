@@ -1,5 +1,5 @@
 import { AnalyzeOrchestrator } from "./orchestrator.js";
-import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
@@ -10,11 +10,11 @@ import fsSync from "node:fs";
 import { canonicalize } from "@/lib/core/utils/index.js";
 import { traceMemory } from "@/lib/core/utils/index.js";
 import fs from "node:fs/promises";
-import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
-import { IntraLinker } from "@/lib/core/graph/linker-intra.js";
-import { externalNodeProps, libraryNamespaceId } from "@/lib/core/graph/external-nodes.js";
-import { HttpServiceLinker } from "@/lib/core/graph/http-service-linker.js";
-import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
+import { FederatedLinker } from "@/lib/core/graph/index.js";
+import { IntraLinker } from "@/lib/core/graph/index.js";
+import { externalNodeProps, libraryNamespaceId } from "@/lib/core/graph/index.js";
+import { HttpServiceLinker } from "@/lib/core/graph/index.js";
+import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
 
 import { QueryService } from "./query-service.js";
 
@@ -350,7 +350,7 @@ export class AnalysisService {
       await this.persistence.saveEdges(serviceEdges, pulseId);
     }
 
-    const linker = new FederatedLinker();
+    const linker = new FederatedLinker(undefined, undefined, (path: string) => new SynapsePersistence(path, true));
     await linker.hydrate(this.graph.getGraph());
 
     // 4.2 Sync metadata and pulse record (no node/edge rows — they are already in vault)

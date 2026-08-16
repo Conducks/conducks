@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, ConducksNode } from "@/lib/core/graph/index.js";
 import { isTestNode } from "@/contracts/index.js";
 
 /**

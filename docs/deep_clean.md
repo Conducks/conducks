@@ -541,3 +541,121 @@ and all three are defaults that read as trivia until they are wrong:
 
 **15 PASS, 1 n/a, 0 open.** The first feature to satisfy every applicable rule — and rule 4 passed
 here for the reason it fails elsewhere: a contracts layer has no instance to hand out.
+
+---
+
+## core/graph — the first feature with real internal structure (2026-08-16)
+
+Fourth feature. 14 files, 3.9k lines, including `adjacency-list` at 912 and `linker-intra` at 1,120 —
+the first unit in this campaign that is not a leaf, and therefore the first real test of whether the
+16 rules generalise beyond small files.
+
+### graph and parsing imported each other
+
+Measured in both directions before anything moved:
+
+| direction | what crossed |
+|---|---|
+| graph → parsing | `PrismSpectrum`/`PrismRequest` via `prism-core`, `CanonicalKind`/`CanonicalRank` via `taxonomy`, `isBuiltIn`/`getGlobalId` via `built-ins` |
+| parsing → graph | `ConducksNode`, `ConducksEdge`, `NodeId`, `EXTERNAL_ROOT`, `classifyOrigin` — six files |
+
+CONDUCKS-1 forbids circular imports in core and PASSED, because no single FILE closed a loop. The
+cycle was between the two FEATURES, which becomes a file cycle the instant each has a door.
+
+Broken before the door was written, with rule 5: `taxonomy` and `built-ins` moved to `contracts/` —
+three features use each — and `graph-engine` now takes the prism types from `contracts/` rather than
+through `prism-core`, which only re-exported them. `prism-core` also carried four imports it never
+used; each was mentioned exactly once in the file, on its own import line.
+
+The direction that remains is the true one: parsing PRODUCES spectra, graph STORES them.
+
+### Then the door created a NEW cycle, and a test caught it
+
+`persistence.ts` imported `graph/adjacency-list.js` — a leaf. Pointing it at `graph/index.js` made it
+import a barrel that re-exports `linker-federated.ts`, which imports `persistence.ts`.
+
+**`persistence` → `graph/index` → `linker-federated` → `persistence`.**
+
+Nothing failed to compile. `status-pulse-visibility` failed — a race test that reads `status` while a
+write holds the vault — because it ran against a partially initialised module. It failed alone as
+well as under load, which is what separated it from CPU contention, and it PASSED with the graph work
+stashed, which is what proved the cause rather than argued it.
+
+Fixed by inverting the dependency: `FederatedLinker` takes an `openVault` function instead of
+importing `SynapsePersistence`, and the composition root supplies it. Third time this repository has
+paid for an ESM cycle — `registry` ↔ `watcher`, `chronicle` ↔ `typescript/resolver`, now this one —
+and the first time a DOOR caused it.
+
+**The lesson generalises and belongs in the rule set: a barrel makes every internal file a dependency
+of every importer.** A leaf import that was safe becomes a whole-feature import that may not be.
+
+### Docs and tests
+
+36 real doc gaps → 0. The three biggest were the types nothing explained: `ConducksNode` (its
+`properties` is a fixed persisted whitelist, not a free bag), `ConducksEdge` (`confidence` is
+load-bearing — 0.4 means the resolver gave up, per ADR 0046), and `ConducksAdjacencyList` itself,
+which owns what exists but explicitly not whether a reference RESOLVES.
+
+`store-adversarial.test.ts` — 10 cases. The store's own comment says its three indexes are maintained
+in exactly three places because a missed one "silently returns wrong answers rather than failing",
+and that claim had no test in either direction. Three mutations, three failures: skipping the name
+index, skipping the file index, and not unindexing the previous node on overwrite.
+
+One case was written wrong and the store corrected it: ids are LOWERCASED on write (CONDUCKS-4) while
+names keep their spelling, so a caller assuming the id it passed is the id it gets looks up nothing.
+That is now pinned rather than assumed.
+
+### Recall improved, and the reason is the door
+
+`oracle-tsc` went 30 → 28 missed. Consolidating import specifiers onto one door made two more stale
+imports visible to the analyzer — an unplanned effect of a structural change, measured rather than
+noticed later. Baseline ratcheted.
+
+### Rule table — core/graph
+
+| rule | |
+|---|---|
+| 1 one door | PASS |
+| 2 a test enforces it | PASS — fourth door in the gate |
+| 3 inside is private, own tests exempt | PASS |
+| 4 no mutable state on the door | PASS — the classes are constructed by callers; nothing is handed out as a shared instance |
+| 5 shared types to `contracts/` | PASS — and it is what broke the parsing cycle |
+| 6 comments | PASS — 36 gaps → 0 |
+| 7 no dead code | PASS — four unused imports removed from `prism-core` |
+| 8 every line has a purpose | PASS |
+| 9 no duplicated logic | PASS |
+| 10 every claim tested, and it bites | PASS for the store; the linkers carry pre-existing suites |
+| 11 adversarial | PASS |
+| 12 leaves tested from inside | PASS — the first feature where this rule DID work, because it is the first with leaves |
+| 13 leaves first | PASS |
+| 14 one unit per commit | PASS |
+| 15 gates after each unit | PASS |
+| 16 cleaning is not fixing | **PARTIAL** — the `openVault` inversion IS a behaviour change, forced by a defect the door itself created. Recorded here rather than pretended otherwise; the alternative was leaving a known ESM cycle in the tree |
+
+**15 PASS, 0 n/a, 1 partial.**
+
+### The inversion had its own defect, and a test named it
+
+Making `openVault` OPTIONAL was the first attempt. A caller that forgot it got a warning and an empty
+hydration — which reads exactly like "the neighbour had nothing to give". That is the
+failure-looks-like-absence conflation this codebase spends most of its comments preventing, and it
+was reintroduced while fixing a cycle.
+
+`multi-workspace` caught it, because that suite drives the linker DIRECTLY — its own name says so:
+"proves this is a wiring bug, not a logic bug". The opener now throws by default, so a caller cannot
+forget it silently.
+
+Fixing the test then hit a third trap: the child script is a TEMPLATE LITERAL, and a backtick in the
+comment explaining the injection closed it. Same family as todo31's query-backticks gate, which
+exists because the identical thing happens in the grammar files. Typecheck named it immediately.
+
+### Did the 16 rules hold on a feature with real structure
+
+Rule 12 earned its place for the first time — three features in, this is the first with leaves to test
+from inside. Rule 5 did the heavy lifting: it is what broke a feature cycle that CONDUCKS-1 could not
+see.
+
+And the rules were incomplete in one way worth writing down: **nothing in them warns that a door is
+itself a dependency edge.** Every previous feature had a door with no internal imports pointing back
+up. `core/graph` did, and the door turned a safe leaf import into a cycle. That is a rule the set did
+not have and now needs.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { classifyOrigin } from '@/lib/core/graph/boundary-classifier.js';
+import { classifyOrigin } from "@/lib/core/graph/index.js";
 
 // System 2 (ADR 0012): a boundary reference is only useful once its ORIGIN is known — internal vs
 // trusted-unversioned stdlib vs versioned supply-chain dependency.

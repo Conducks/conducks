@@ -1,5 +1,5 @@
-import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
-import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
+import { clusterOf } from "@/lib/core/graph/index.js";
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * Conducks — Mirror Engine

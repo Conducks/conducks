@@ -87,6 +87,7 @@ export class ConducksDiffEngine {
     };
   }
 
+  /** One line per bucket, so a diff reads as a sentence rather than as four numbers. */
   private summarize(an: number, rn: number, ae: number, re: number, driftCount: number): string {
     let summary = `Delta: +${an}/-${rn} Symbols, +${ae}/-${re} Relationships.`;
     if (driftCount > 0) {

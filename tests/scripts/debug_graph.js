@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { DuckDbPersistence } from '../../build/src/lib/core/persistence/persistence.js';
-import { ConducksAdjacencyList } from '../../build/src/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 async function debugGraph() {
   const archivePath = path.join(process.cwd(), '../archive/TargetedCV');

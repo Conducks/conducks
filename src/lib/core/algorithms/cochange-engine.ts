@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import path from 'node:path';
 
 /**

@@ -1,4 +1,4 @@
-import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { AnalysisService, AnalyzeOrchestrator, Conducks } from "@/lib/domain/analysis/index.js";
@@ -48,8 +48,8 @@ import {
 } from "@/lib/domain/analysis/coverage-baseline.js";
 import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/manifest/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
-import { ConducksDiffEngine } from "@/lib/core/graph/diff-engine.js";
-import { ConducksAdjacencyList } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import { PYTHON_SUITE } from "@/lib/core/parsing/languages/python/index.js";
 import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/languages/typescript/index.js";
 import { TSXProvider } from "@/lib/core/parsing/languages/tsx/index.js";
@@ -135,7 +135,7 @@ for (const provider of providerPrecedence) {
 
 // 3. Domain Component Instantiation (Lazy/Updatable)
 let search = new ConducksSearch(graph.getGraph());
-let federation = new FederatedLinker(process.cwd());
+let federation = new FederatedLinker(process.cwd(), undefined, (path: string) => new SynapsePersistence(path, true));
 const advisor = new ConducksAdvisor();
 const sentinel = new ConducksSentinel();
 const deadCode = new DeadCodeAnalyzer();
@@ -200,7 +200,7 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
 
   // Sync Federation and Search after bootstrapper update
   const effectiveRoot = chronicle.getProjectDir();
-  federation = new FederatedLinker(effectiveRoot);
+  federation = new FederatedLinker(effectiveRoot, undefined, (path: string) => new SynapsePersistence(path, true));
   search = new ConducksSearch(graph.getGraph());
   intelligence = new IntelligenceService(search, federation);
 }
@@ -481,7 +481,7 @@ export const registry = {
     installHook: (root: string, force = false): HookInstallResult =>
       installHook(root, process.argv[1], force),
     createMCPConfigurator: () => new MCPConfigurator(),
-    createLinker: (root: string) => new FederatedLinker(root),
+    createLinker: (root: string) => new FederatedLinker(root, undefined, (path: string) => new SynapsePersistence(path, true)),
     createProjectRegistry: () => new ProjectRegistry(),
     createProjectMonitor: (projects: ProjectRegistry) => new ProjectMonitor(projects),
     createUpdateCheck: () => new UpdateCheck(),

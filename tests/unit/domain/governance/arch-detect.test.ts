@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import { detectAdapters, detectCompositionRoot, detectLayers, dependencyDistances, clusterShape } from '@/lib/domain/governance/arch-detect.js';
 
 /**

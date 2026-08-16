@@ -64,7 +64,11 @@ describe('Multi-workspace domain integration (link)', () => {
 (async () => {
   const { FederatedLinker } = await import('./src/lib/core/graph/linker-federated.ts');
   const { ConducksAdjacencyList } = await import('./src/lib/core/graph/adjacency-list.ts');
-  const linker = new FederatedLinker(process.argv[1]);
+  const { SynapsePersistence } = await import('./src/lib/core/persistence/persistence.ts');
+  // The opener is INJECTED: the linker no longer imports persistence itself, because persistence
+  // imports the graph door and the door re-exports this file (todo73, rule 5b). No backticks in
+  // this comment on purpose -- it lives inside a template literal, and one would close it.
+  const linker = new FederatedLinker(process.argv[1], undefined, (p) => new SynapsePersistence(p, true));
   const results = { errors: [] };
 
   // 1. Link a real, analyzed neighbor.

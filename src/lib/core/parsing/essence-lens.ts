@@ -1,6 +1,6 @@
-import { EXTERNAL_ROOT } from "@/lib/core/graph/external-nodes.js";
+import { EXTERNAL_ROOT } from "@/lib/core/graph/index.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
-import { mapToCanonical } from "@/lib/core/parsing/taxonomy.js";
+import { mapToCanonical } from "@/contracts/index.js";
 import path from "node:path";
 
 /**

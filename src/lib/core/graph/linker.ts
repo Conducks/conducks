@@ -115,6 +115,7 @@ export class GlobalSymbolLinker {
     }
   }
 
+  /** Diagnostics for a resolver that runs over the whole graph — off unless the linker is being read. */
   private log(...args: unknown[]): void {
     if (process.env.CONDUCKS_DEBUG === '1') {
       console.error(...args);

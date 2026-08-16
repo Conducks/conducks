@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ConducksWatcher } from '@/lib/domain/evolution/watcher.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /** Minimal stand-ins — the watcher only calls these members on the hash-gate path. */
 const fakePersistence = () => {

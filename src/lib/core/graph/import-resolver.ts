@@ -13,6 +13,7 @@ import { ConducksAdjacencyList } from "./adjacency-list.js";
 
 export type ImportKind = 'named' | 'namespace' | 'default';
 
+/** Where an import specifier landed, and by which rule — the rule is what makes a wrong answer debuggable. */
 export interface ImportResolution {
   targetId: string;
   confidence: number; // 0–1
@@ -35,6 +36,7 @@ const LANGUAGE_FAMILY: Record<string, string> = {
   php: 'php', rb: 'ruby', swift: 'swift',
 };
 
+/** The language family a path belongs to, from its extension — used to refuse a cross-language match. */
 function familyOf(fileOrId: string): string | undefined {
   const file = fileOrId.split('::')[0];
   const m = /\.([a-z0-9]+)$/i.exec(file);
@@ -65,7 +67,15 @@ function detectImportKind(importText?: string): ImportKind {
   return 'default';
 }
 
+/**
+ * Turns an import specifier into the file it names, or says it could not.
+ *
+ * Ordered by certainty: same-file, then a real path on disk, then a global. A specifier that
+ * resolves to nothing stays unresolved rather than being guessed at — a wrong edge is worse than a
+ * missing one, because the graph then answers confidently about a file that was never imported.
+ */
 export class ImportResolver {
+  /** Resolution is answered against the graph's known files, so the store is the only dependency. */
   constructor(private readonly graph: ConducksAdjacencyList) {}
 
   /**
@@ -109,6 +119,7 @@ export class ImportResolver {
   // Tier 1 — Same-file symbol (confidence 0.95)
   // ---------------------------------------------------------------------------
 
+  /** First and most certain: the symbol is declared in the importing file itself. */
   private resolveSameFile(sourceFileId: string, symbolName: string): ImportResolution | null {
     // Derive the file path from the source node ID.
     // Convention: "<filePath>::<symbolName>" or "<filePath>::unit"
@@ -126,6 +137,7 @@ export class ImportResolver {
   // Tier 2 — Import-scoped resolution (confidence 0.9 / 0.85)
   // ---------------------------------------------------------------------------
 
+  /** Second: the specifier names a real file this graph knows, resolved relative to the importer. */
   private resolveByPath(
     sourceFileId: string,
     candidates: string[],
@@ -173,6 +185,7 @@ export class ImportResolver {
   // Tier 3 — Global registry fallback (confidence 0.5)
   // ---------------------------------------------------------------------------
 
+  /** Last: a project-wide name, and therefore the least certain — used only when the two above fail. */
   private resolveGlobal(sourceFileId: string, symbolName: string): ImportResolution | null {
     const lowerName = symbolName.toLowerCase();
     const candidates: string[] = [];

@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 interface StructuralSignature {
   density: number;

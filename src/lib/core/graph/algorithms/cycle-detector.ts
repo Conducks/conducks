@@ -28,6 +28,8 @@ export class CycleDetector {
     const indices = new Map<NodeId, number>();
     const lowlink = new Map<NodeId, number>();
 
+    // Tarjan's strongly-connected-components step. A cycle is an SCC of size > 1, or a node with an
+    // edge to itself — both are real findings and the second is easy to miss.
     const strongconnect = (nodeId: NodeId) => {
       indices.set(nodeId, index);
       lowlink.set(nodeId, index);

@@ -1,4 +1,4 @@
-import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
@@ -6,7 +6,7 @@ import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { logger } from "@/lib/core/utils/index.js";
 import { traceMemory } from "@/lib/core/utils/index.js";
 import { isNeverAProjectRoot } from "@/lib/core/utils/index.js";
-import { FederatedLinker } from "@/lib/core/graph/linker-federated.js";
+import { FederatedLinker } from "@/lib/core/graph/index.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fsSync from "node:fs";

@@ -3,7 +3,7 @@ import { getDefaultRules, ALLOWED_DEPENDENCIES } from '@/lib/domain/governance/s
 import { GovernanceService } from '@/lib/domain/governance/index.js';
 import { ConducksAdvisor } from '@/lib/domain/governance/advisor.js';
 import { ConducksSentinel } from '@/lib/domain/governance/sentinel.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * Layer contract (ADR 0005), enforced by the `layer_boundaries` sentinel rule

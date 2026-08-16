@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId, ConducksNode } from "@/lib/core/graph/index.js";
 
 /**
  * Conducks — Technical Flow Engine

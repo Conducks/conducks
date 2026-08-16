@@ -1,5 +1,5 @@
 import path from "node:path";
-import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/index.js";
 import { GVREngine, RefactorResult } from "./gvr-engine.js";
 import { ConducksWatcher } from "./watcher.js";
 import { DriftEngine, DriftResult } from "./drift-engine.js";

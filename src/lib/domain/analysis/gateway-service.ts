@@ -1,4 +1,4 @@
-import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import fs from "node:fs";

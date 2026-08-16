@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
-import { ConducksAdjacencyList, ConducksNode, NON_RUNTIME_EDGE_TYPES } from "@/lib/core/graph/adjacency-list.js";
-import { CanonicalKind } from "@/lib/core/parsing/taxonomy.js";
+import { ConducksAdjacencyList, ConducksNode, NON_RUNTIME_EDGE_TYPES } from "@/lib/core/graph/index.js";
+import { CanonicalKind } from "@/contracts/index.js";
 
 /**
  * What a rule's `matchLabel` may name. A node's `label` IS its canonical kind, so anything outside

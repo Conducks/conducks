@@ -2,7 +2,7 @@ import { ConducksAdvisor } from "./advisor.js";
 import type { Advice } from "@/contracts/index.js";
 import { ConducksSentinel } from "./sentinel.js";
 import { RegressionGuard } from "./guard.js";
-import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import fs from "node:fs";

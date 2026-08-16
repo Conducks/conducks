@@ -30,7 +30,7 @@
  * hand-built graph so the handler's own scoring/filtering branches are under test, not real BFS data.
  */
 import { describe, it, expect, jest } from '@jest/globals';
-import { CanonicalKind, CanonicalRank } from '@/lib/core/parsing/taxonomy.js';
+import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
 import { ContextAnalyzer } from '@/lib/domain/kinetic/context.js';
 
 const PROJECT_ROOT = '/fake/root';

@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/index.js";
 
 /**
  * Conducks — Architecture Detection 🏛️

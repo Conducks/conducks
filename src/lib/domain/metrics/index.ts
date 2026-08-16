@@ -1,4 +1,4 @@
-import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { DeadCodeAnalyzer, Finding } from "../evolution/dead-code.js";
 import { ResonanceAnalyzer } from "./resonance.js";

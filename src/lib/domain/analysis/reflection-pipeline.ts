@@ -1,12 +1,12 @@
 import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
-import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
-import { sameFamily } from "@/lib/core/graph/import-resolver.js";
+import { ConducksGraph } from "@/lib/core/graph/index.js";
+import { sameFamily } from "@/lib/core/graph/index.js";
 import { canonicalize } from "@/lib/core/utils/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
-import { ecosystemId, externalNodeProps } from "@/lib/core/graph/external-nodes.js";
-import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
+import { ecosystemId, externalNodeProps } from "@/lib/core/graph/index.js";
+import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
 import path from "node:path";
 
 /**

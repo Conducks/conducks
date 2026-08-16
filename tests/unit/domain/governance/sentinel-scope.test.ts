@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksSentinel } from '@/lib/domain/governance/sentinel.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * The sentinel reported 97 violations of one rule on this repository and 14 were real.

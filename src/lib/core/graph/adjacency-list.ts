@@ -83,6 +83,10 @@ const EDGE_COUPLING: Record<EdgeType, EdgeCoupling> = {
   VIRTUAL_LINK: 'module',
 };
 
+/**
+ * Every edge type at or below the given coupling levels. The three lists below are DERIVED from one
+ * table rather than written out — three hand-kept lists is how one of them ends up missing a type.
+ */
 const atOrBelow = (...levels: EdgeCoupling[]): EdgeType[] =>
   (Object.keys(EDGE_COUPLING) as EdgeType[]).filter(t => levels.includes(EDGE_COUPLING[t]));
 
@@ -98,6 +102,13 @@ export const NON_RUNTIME_EDGE_TYPES: EdgeType[] = atOrBelow('containment', 'eras
  */
 export const IMPORT_CYCLE_IGNORED_EDGE_TYPES: EdgeType[] = atOrBelow('containment', 'erased', 'local');
 
+/**
+ * One symbol in the graph. `id` is `canonicalize(file) + '::' + name`, lowercased (CONDUCKS-4), which
+ * is why two spellings of one path would split a symbol in two — see `contracts/path-utils`.
+ *
+ * `properties` is a fixed PERSISTED whitelist, not a free bag: a field added here reaches the vault
+ * only if the schema knows it. `metadata` is the carrier that survives the round trip.
+ */
 export interface ConducksNode<T = any> {
   id: NodeId;
   label: string;
@@ -146,6 +157,11 @@ export interface ConducksNode<T = any> {
   };
 }
 
+/**
+ * One reference between two symbols. `confidence` is load-bearing rather than decorative: an
+ * unresolved call target is recorded at 0.4 and a resolved one at 0.85 or above, so a query can ask
+ * for edges the resolver actually believes (ADR 0046).
+ */
 export interface ConducksEdge<T = any> {
   id: string; // "sourceId::targetId::type"
   sourceId: NodeId;
@@ -167,6 +183,18 @@ import zlib from "zlib";
 /** Shared empty result, so a miss allocates nothing. */
 const EMPTY_ID_SET: ReadonlySet<NodeId> = new Set<NodeId>();
 
+/**
+ * The store — every node, every edge, and three indexes over them.
+ *
+ * OWNS: what exists, what points at what, and the indexes that answer "by name" and "by file" in
+ * O(1) rather than by scanning. DOES NOT OWN: whether a reference RESOLVES — that is the linkers\'
+ * job, and this class holds an unresolved edge as willingly as a resolved one.
+ *
+ * The indexes are maintained in exactly three places — `addNode`, `unindex`, `clear` — and an index
+ * that misses one silently returns an id whose node is gone, which the resolver then binds an edge
+ * to. That failure mode is why `replaceFile` and `clearFile` are separate operations with different
+ * rules about incoming edges (todo67).
+ */
 export class ConducksAdjacencyList {
   /**
    * Set while a lazy load is DEFERRED: reading this graph is a bug until it is materialised.
@@ -193,6 +221,7 @@ export class ConducksAdjacencyList {
   /** Called by the loader once rows are in: the graph now answers for real. */
   public markMaterialised(): void { this.deferred = false; }
 
+  /** True while the graph is a promise rather than a graph — a read now would report zero, not error. */
   public get isDeferred(): boolean { return this.deferred; }
 
   /**
@@ -257,6 +286,7 @@ export class ConducksAdjacencyList {
   private lowerNameIndex: Map<string, Set<NodeId>> = new Map();
   private filePathIndex: Map<string, Set<NodeId>> = new Map();
 
+  /** Empties everything, indexes included. The third of the three places an index must be maintained. */
   public clear(): void {
     this.nodes.clear();
     this.outEdges.clear();
@@ -559,6 +589,13 @@ export class ConducksAdjacencyList {
     }
   }
 
+  /**
+   * Removes a file's nodes and EVERY edge touching them, incoming included.
+   *
+   * That is the difference from `replaceFile`, and why a re-pulse must not use this one: clearing a
+   * file also deletes the references other files own, so re-parsing `a.ts` would silently remove
+   * `main.ts`'s call to it (todo67).
+   */
   public clearFile(filePath: string): void {
     if (!filePath || typeof filePath !== 'string') return;
     const targetPath = filePath.toLowerCase();
@@ -666,6 +703,7 @@ export class ConducksAdjacencyList {
     return false;
   }
 
+  /** Edges touching a node, in one direction. `upstream` = who points AT it; `downstream` = what it points at. */
   public getNeighbors(nodeId: NodeId, direction: 'upstream' | 'downstream' = 'downstream', type?: EdgeType): ConducksEdge[] {
     this.assertMaterialised("getNeighbors");
     const normalizedId = nodeId.toLowerCase();
@@ -769,28 +807,34 @@ export class ConducksAdjacencyList {
     return this.nodes.has(nodeId.toLowerCase());
   }
 
+  /** Every node. A snapshot — callers iterate it while mutating the graph, so it must not be a live view. */
   public getAllNodes(): IterableIterator<ConducksNode> {
     this.assertMaterialised("getAllNodes");
     return this.nodes.values();
   }
 
+  /** The backing map, for callers that need identity rather than a copy. Handed out, so treat as read-only. */
   public getNodesMap(): Map<NodeId, ConducksNode> {
     this.assertMaterialised("getNodesMap");
     return this.nodes;
   }
 
+  /** The outgoing-edge index, same contract as `getNodesMap`. */
   public getOutEdgesMap(): Map<NodeId, Set<ConducksEdge>> {
     return this.outEdges;
   }
 
+  /** Graph-level facts — the pulse id, the branch, the last analysed commit. Survives to the vault. */
   public setMetadata(key: string, value: string): void {
     this.metadata.set(key, value);
   }
 
+  /** One metadata value, or null. Null means never set, which is distinct from set-to-empty. */
   public getMetadata(key: string): string | undefined {
     return this.metadata.get(key);
   }
 
+  /** Every metadata pair, which is what persistence writes back on save. */
   public getAllMetadata(): Map<string, string> {
     return this.metadata;
   }
@@ -887,6 +931,7 @@ export class ConducksAdjacencyList {
     return nodesInFile.find(n => n.label === 'module');
   }
 
+  /** Counts and density. A GETTER, not a method — calling it as one threw for every caller that tried. */
   public get stats() {
     const degrees = Array.from(this.outEdges.values()).map(s => s.size);
     degrees.sort((a, b) => a - b);

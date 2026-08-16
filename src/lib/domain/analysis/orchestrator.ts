@@ -7,7 +7,7 @@ import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
-import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
+import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";

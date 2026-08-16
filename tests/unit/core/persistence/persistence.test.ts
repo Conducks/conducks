@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 function tmpVault(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-persistence-'));

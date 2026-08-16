@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { MirrorEngine } from '@/lib/domain/visual/mirror.engine.js';
-import { ConducksAdjacencyList, ConducksNode, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, ConducksNode, ConducksEdge } from "@/lib/core/graph/index.js";
 
 /**
  * `MirrorEngine.getVisualWave` — the in-memory-graph visual wave.

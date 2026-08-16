@@ -16,6 +16,7 @@
 
 export type BoundaryOrigin = 'internal' | 'stdlib' | 'dependency';
 
+/** Whether a specifier is this project\'s, the standard library\'s, or a dependency\'s — plus which package. */
 export interface BoundaryClassification {
   origin: BoundaryOrigin;
   /** For a dependency, the package name (`@scope/name` or `name`); null otherwise. */

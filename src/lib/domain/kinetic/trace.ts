@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList, NodeId, ConducksEdge } from "@/lib/core/graph/index.js";
 
 /**
  * Structural Priority Queue (Min-Heap)

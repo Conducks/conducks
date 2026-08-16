@@ -1,7 +1,7 @@
 import { TraceAnalyzer } from "./trace.js";
 import { BlastRadiusAnalyzer } from "./impact.js";
 import { ConducksFlowEngine } from "./flow-engine.js";
-import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/adjacency-list.js";
+import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/index.js";
 import { ContextAnalyzer, type ContextNode, type ContextOptions } from './context.js';
 
 /**

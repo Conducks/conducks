@@ -1,4 +1,4 @@
-import { isBuiltIn, getGlobalId } from '@/lib/core/parsing/built-ins.js';
+import { isBuiltIn, getGlobalId } from "@/contracts/index.js";
 import { ConducksAdjacencyList, type EdgeType } from './adjacency-list.js';
 import { logger } from "@/lib/core/utils/index.js";
 import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js';
@@ -893,6 +893,7 @@ export class IntraLinker {
    */
   private static readonly CONSTRUCTED_NAMESPACES = new Set(['directory', 'ecosystem', 'lib', 'route', 'global', 'unresolved']);
 
+  /** Whether an id names a package rather than a file here — an external target is not a dangling one. */
   private static isExternalNamespace(namespace: string): boolean {
     if (!namespace || IntraLinker.CONSTRUCTED_NAMESPACES.has(namespace)) return false;
     if (namespace.startsWith('/') || namespace.startsWith('.') || /^[a-z]:\\/.test(namespace)) return false;
@@ -1081,6 +1082,13 @@ export class IntraLinker {
     return /^[A-Za-z_$][\w$]*$/.test(declared) ? declared.toLowerCase() : undefined;
   }
 
+  /**
+   * A bare name to a real node id, using the source file's OWN imports.
+   *
+   * Scoped to one file deliberately: a project-wide name lookup binds `format` to whichever `format`
+   * has the most edges, which is how a call once resolved to an unrelated same-named export in
+   * another module. What the file imports is what the file can be calling.
+   */
   private resolveSymbol(targetId: string, sourceUnitId: string, imports: Map<string, string[]>, symbols: Map<string, Map<string, string>>): string | null {
     const lowerName = targetId.toLowerCase();
     const importedUnits = imports.get(sourceUnitId) || [];

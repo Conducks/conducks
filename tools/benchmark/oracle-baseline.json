@@ -1,8 +1,8 @@
 {
   "conducks": {
-    "oracle": 31,
-    "missed": 30,
-    "agreed": 1,
+    "oracle": 28,
+    "missed": 28,
+    "agreed": 0,
     "recorded": "run with --write-baseline to update"
   },
   "scraper::python": {

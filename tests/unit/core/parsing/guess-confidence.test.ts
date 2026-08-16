@@ -71,7 +71,7 @@ describe('a heritage edge is priced by whether the clause was captured or inferr
 
 describe('a rebind clears the guess it was written with', () => {
   it('raises a low-confidence edge when its target becomes known', async () => {
-    const { ConducksAdjacencyList } = await import('@/lib/core/graph/adjacency-list.js');
+    const { ConducksAdjacencyList } = await import("@/lib/core/graph/index.js");
     const g = new ConducksAdjacencyList();
     g.addNode({ id: 'a.ts::caller', name: 'caller', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);
     g.addNode({ id: 'a.ts::helper', name: 'helper', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);
@@ -83,7 +83,7 @@ describe('a rebind clears the guess it was written with', () => {
   });
 
   it('does not touch an edge that was never a guess', async () => {
-    const { ConducksAdjacencyList } = await import('@/lib/core/graph/adjacency-list.js');
+    const { ConducksAdjacencyList } = await import("@/lib/core/graph/index.js");
     const g = new ConducksAdjacencyList();
     g.addNode({ id: 'a.ts::x', name: 'x', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);
     g.addNode({ id: 'a.ts::y', name: 'y', label: 'BEHAVIOR', properties: { filePath: 'a.ts' } } as any);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { KineticService } from '@/lib/domain/kinetic/index.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * `lib/domain/kinetic` had four source files and no unit tests (todo25#P5). It owns `impact` and

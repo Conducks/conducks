@@ -21,7 +21,7 @@
  * mcp-surface.test.ts) so only `conducks_trace`'s own handler branching is under test.
  */
 import { describe, it, expect, jest } from '@jest/globals';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import { TraceAnalyzer } from '@/lib/domain/kinetic/trace.js';
 
 const PROJECT_ROOT = '/fake/root';

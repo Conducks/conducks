@@ -2,7 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CanonicalKind } from '@/lib/core/parsing/taxonomy.js';
+import { CanonicalKind } from "@/contracts/index.js";
 
 /**
  * Decisions whose enforcement is an ABSENCE, or a shape nothing else asserts.
