@@ -4,6 +4,7 @@ import path from "node:path";
 import chalk from "chalk";
 import { isTestNode } from "@/contracts/test-path.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
+import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Status Command 🏺 🟦
@@ -114,6 +115,11 @@ export class StatusCommand implements ConducksCommand {
         .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
         .slice(0, 5);
 
+      // What is on DISK, as opposed to what is COMMITTED — see `checkWorkingTree`. Both lines are
+      // printed: "colleague's commits are not analyzed" and "your own edits are not in the graph"
+      // are different problems with different fixes.
+      const freshness = await registry.audit.checkWorkingTree();
+
       // Health: a real codebase graph is never near-disconnected. A density below ~0.5 on a
       // non-trivial node set means an analyze was interrupted and persisted a PARTIAL graph
       // (nodes written, edges lost) — it loads and looks fine but is silently broken. Flag it.
@@ -137,6 +143,7 @@ export class StatusCommand implements ConducksCommand {
           stats: status.stats,
           status: status.status,
           staleness: { ...status.staleness, pulseId, servedFrom },
+          freshness,
           health,
           topHotspots: topGravity.map(n => ({
             id: n.id,
@@ -169,12 +176,23 @@ export class StatusCommand implements ConducksCommand {
       } else {
         console.log(`- ${chalk.yellow('Staleness')}: ${chalk.green('SYNCHRONIZED')}`);
       }
+      // Printed BESIDE the commit line, never instead of it — see the note where it is computed.
+      if (!empty) {
+        console.log(`- ${chalk.yellow('Working tree')}: ` + (freshness.stale
+          ? chalk.red(`BEHIND — ${freshness.changed} file(s) changed, ${freshness.removed} gone since the last pulse`)
+          : chalk.green('matches the last pulse')));
+      }
       console.log(`- ${chalk.yellow('Pulse')}:   ${chalk.cyan(pulseId)}${servedFrom === 'previous-pulse-snapshot' ? chalk.yellow(' (served from the previous pulse\'s snapshot — a write is in flight)') : ''}`);
 
       // RELATIVE, like `impact` and `context` (ADR 0132): the absolute prefix was ~90 identical
       // characters on every row, which is the part a reader has to skip to reach the answer.
-      const projectRoot = (registry.infrastructure.chronicle.getProjectDir() || process.cwd()).toLowerCase();
-      const rel = (p: string) => p.startsWith(projectRoot) ? p.slice(projectRoot.length + 1) : p;
+      const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+      // The id is lowercased (CONDUCKS-4), so slicing the root off gives a path that opens nothing.
+      // `displayPath` recovers the on-disk spelling; the id itself is untouched.
+      const rel = (id: string) => {
+        const sep = id.lastIndexOf('::');
+        return sep === -1 ? id : `${displayPath(id.slice(0, sep), projectRoot)}${id.slice(sep)}`;
+      };
       console.log(chalk.bold(`\n--- 🚀 Top Structural Hotspots ---`));
       if (topGravity.length === 0) {
         // A bare header over no rows reads as "no hotspots" — a finding — when the truth is that

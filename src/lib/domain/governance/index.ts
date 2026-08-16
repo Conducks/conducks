@@ -5,6 +5,9 @@ import { RegressionGuard } from "./guard.js";
 import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import fs from "node:fs";
+import { classifyFreshness, isStale } from "@/lib/core/persistence/freshness.js";
+import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
 import path from "node:path";
 import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type SentinelRule } from "./sentinel-rules.js";
 
@@ -507,6 +510,41 @@ export class GovernanceService {
           : 0,
       },
     };
+  }
+
+  /**
+   * What is on DISK against what the vault analyzed — the question `status().staleness` does not ask.
+   *
+   * `staleness` compares HEAD to the last pulsed commit, so it cannot move until something is
+   * committed, and while working nothing is. Measured: edit a file, delete the only call to a
+   * symbol, and `status` printed SYNCHRONIZED while `impact` still reported the deleted caller.
+   *
+   * Lives in the DOMAIN because `cli` may not import `core` (ADR 0005) and `classifyFreshness` is
+   * core — the architecture test caught exactly that import, which is how this landed in the right
+   * layer. Same engine `monitor` and `watch` read (ADR 0036).
+   *
+   * `added` is reported and never counted as stale: `analyze` is incremental by mtime, so a file
+   * older than the last pulse legitimately carries no hash (see `isStale`).
+   */
+  public async checkWorkingTree(): Promise<{ changed: number; added: number; removed: number; tracked: number; stale: boolean }> {
+    const nothing = { changed: 0, added: 0, removed: 0, tracked: 0, stale: false };
+    if (!this.persistence) return nothing;
+    try {
+      const stored = await this.persistence.getAllFileHashes();
+      const onDisk = await chronicle.discoverFiles();
+      const f = classifyFreshness(
+        stored, onDisk, SOURCE_EXTENSIONS,
+        abs => { try { return fs.readFileSync(abs, "utf8"); } catch { return null; } },
+        abs => fs.existsSync(abs),
+        p => path.extname(p),
+      );
+      return {
+        changed: f.changed.length, added: f.added.length, removed: f.removed.length,
+        tracked: f.tracked, stale: isStale(f),
+      };
+    } catch {
+      return nothing;   // an unreadable vault is already reported by the health block in `status`
+    }
   }
 
   public status() {

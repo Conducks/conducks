@@ -297,6 +297,8 @@ export const registry = {
     // The same answer without materialising the graph — counts and metadata rows. Read paths use
     // this; `status()` stays for callers already holding a graph (todo21#P5).
     statusFromVault: () => governance.statusFromVault(),
+    // Files-changed, which is a different question from commits-behind — see `checkWorkingTree`.
+    checkWorkingTree: () => governance.checkWorkingTree(),
     guard: (threshold?: number) => governance.shouldBlock(threshold),
     rules: (root?: string) => governance.auditWithRules(root),
     // Composition-owned factories (ADR 0005): interfaces must not import domain directly.

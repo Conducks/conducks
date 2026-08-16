@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import chalk from "chalk";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
+import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Impact Command
@@ -96,7 +97,13 @@ export class ImpactCommand implements ConducksCommand {
       }
 
       console.log(`\n\x1b[1m--- Conducks ${direction.toUpperCase()} Impact Report: ${resolvedId} ---\x1b[0m`);
-      console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${impact.affectedCount} Symbols affected`);
+      // SAY WHICH QUESTION THE NUMBER ANSWERS. The default depth is 5, so this is a TRANSITIVE blast
+      // radius, and it was printed as a bare count — `createLogger` reads "409 Symbols affected"
+      // where 71 of them are direct. A reader asking "who calls this" takes the headline as the
+      // answer to that, and it is the answer to a different, larger question. The depth was already
+      // a flag; only the label was missing (todo44#P6 fixed the flag, CONDUCKS-37 the empty case).
+      console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${impact.affectedCount} Symbols affected `
+        + chalk.dim(depth === 1 ? '(direct only)' : `(up to ${depth} hops — '--depth 1' for direct callers only)`));
 
       // A TRUE ZERO AND A BROKEN ZERO MUST NOT PRINT THE SAME OUTPUT (todo44#P6, CONDUCKS-37).
       //
@@ -159,7 +166,9 @@ export class ImpactCommand implements ConducksCommand {
         const shown = impact.affectedNodes.slice(0, 10);
         const reader = registry.source.lineReader();
         const root = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
-        const rel = (p: string) => (p && p.toLowerCase().startsWith(root.toLowerCase()) ? p.slice(root.length + 1) : p);
+        // `displayPath` rather than a slice: the id is lowercased (CONDUCKS-4), so slicing gives a
+        // path that matches no file in the reader's editor. Ids are untouched; only this line is.
+        const rel = (p: string) => displayPath(p, root);
 
         const byFile = new Map<string, any[]>();
         for (const n of shown) {

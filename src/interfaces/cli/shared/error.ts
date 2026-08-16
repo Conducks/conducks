@@ -92,6 +92,50 @@ export function tryResolveSymbol(input: string, graph: NameIndex): string | null
 
     const bare = input.slice(input.lastIndexOf('::') + 2);
     if (!bare) return null;
+
+    // A RELATIVE id is qualified BY ITS FILE, and that half was being thrown away.
+    //
+    // Ids are absolute, so `src/kernel/index.ts::createLogger` matches none of the lookups above and
+    // fell straight through to the bare name — where gravity picks a winner that may live in a
+    // different file entirely. MEASURED on a real subject with two `createLogger` declarations:
+    // asking for the one in `src/kernel/index.ts` answered with `src/kernel/logger/index.ts`, and a
+    // FABRICATED path gave byte-identical output. The qualification was decoration.
+    //
+    // It matters more than a typo, because `status` PRINTS relative ids (ADR 0132) and the rule
+    // stated at the top of this function is that a printed id must be an accepted one.
+    //
+    // Matched as a path SUFFIX: the user has a repo-relative path and the graph has an absolute one.
+    const sep = input.lastIndexOf('::');
+    // Leading slashes are STRIPPED before matching, and that is not tidiness. On macOS a temp path
+    // is `/var/folders/...` while its resolved form — which is what the vault stores — is
+    // `/private/var/folders/...`. Comparing with the leading slash kept makes an absolute id fail to
+    // match its own node, and this branch then reported SYMBOL_NOT_FOUND for a symbol that exists:
+    // six rename tests, all passing a real absolute id. Suffix matching from the first real segment
+    // handles the relative form and the symlinked-prefix form with one rule.
+    const qualifier = input.slice(0, sep).toLowerCase()
+      .replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '');
+    // Only when the left side LOOKS like a file. `MyClass::method` is a qualifier too and is not a
+    // path — the bare-name fallback exists for exactly that (ADR 0106) and must survive.
+    const looksLikePath = qualifier.includes('/') || /\.[a-z0-9]+$/.test(qualifier);
+    if (looksLikePath) {
+      const inFile = graph.findNodesByName(bare).filter(n => {
+        const id = String(n.id).toLowerCase().replace(/\\/g, '/');
+        const idFile = id.slice(0, id.lastIndexOf('::')).replace(/^\/+/, '');
+        // EITHER direction, because either side may carry the longer prefix: the reader types the
+        // repo-relative path the tool printed, or pastes a resolved `/private/var/...` path whose
+        // vault form is the shorter `/var/...`, or the reverse. Both are the same file.
+        return idFile === qualifier
+          || idFile.endsWith(`/${qualifier}`)
+          || qualifier.endsWith(`/${idFile}`);
+      });
+      // A path that holds nothing by that name is a MISS, not a hint to guess elsewhere. Answering
+      // the gravity pick here is how a typo produced a confident report about a different symbol.
+      if (inFile.length === 0) return null;
+      if (inFile.length === 1) return inFile[0].id;
+      // Several in one file (an overload, a re-export beside the declaration): let the ordinary
+      // preference rules below decide, rather than inventing a second ranking here.
+    }
+
     return tryResolveSymbol(bare, graph);
   }
 

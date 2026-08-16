@@ -2489,3 +2489,28 @@ by construction.
   the 18 lazily loaded components stay counted as unused and stay MISSED, which is the honest
   reading. Verified the instrument fires before believing it: breaking conducks' default-import
   binding on purpose raises EXTRA from 0 to 1.
+
+## The freshness engine existed; only `monitor` and `watch` were asking it
+- Gotcha: `status` reported SYNCHRONIZED with edited files on disk, because its staleness is
+  `HEAD !== lastPulsedCommit` — a claim about GIT. While working, nothing is committed, so the line
+  could not move. `classifyFreshness` (content hashes, ADR 0036) already answered correctly and was
+  simply never called from there. Both lines are printed now: commits-behind and files-changed are
+  different problems with different fixes.
+- Why: it had to land in the DOMAIN, not the command. `cli` may not import `core` (ADR 0005) and
+  `freshness.ts` is core — the architecture test caught the import within one run, which is the gate
+  doing its job. `governance.checkWorkingTree()` is where `registry.audit.status()` already lives.
+- Applies: a fix in the wrong layer looks finished until a boundary test runs. Run the FULL suite,
+  not the suite for the thing you changed — my four failures were in rename, barrel-collapse,
+  analyze-twice and boundaries, none of which I would have thought to run.
+
+## A path suffix has two possible longer sides
+- Gotcha: teaching the symbol resolver to honour `src/kernel/index.ts::createLogger` broke six
+  rename tests. macOS hands out `/var/folders/...` while the resolved path the vault stores is
+  `/private/var/folders/...`, so an ABSOLUTE id matched nothing and the new "a path that holds
+  nothing is a miss" branch answered SYMBOL_NOT_FOUND for a symbol that exists.
+- Why: I compared with the leading slash kept, which assumes the id is always the longer side. Strip
+  leading slashes and test the suffix in BOTH directions — the reader may type the short path or
+  paste the resolved one, and either can be the longer string.
+- Applies: refusing is a behaviour change, and a refusal is only safe once the match is complete.
+  The counter-test that survives is `MyClass::method` — a qualifier that is not a path at all, which
+  must keep falling back to the bare name (ADR 0106).

@@ -126,7 +126,13 @@ export async function branchGuard(
  */
 export async function main() {
   const args = process.argv.slice(2);
-  const commandId = args[0] || "help";
+  // `--help` and `-h` are what every other CLI answers to, and this one replied
+  // `Unknown command "--help"` and exited 1 — a first run that fails is a bad first run.
+  const HELP_FLAGS = new Set(['--help', '-h', '--h']);
+  // `conducks --help` means the LIST, not "usage of the help command" — the per-command block below
+  // would otherwise consume the same flag and answer about `help` itself.
+  const helpFlagIsTheCommand = !!args[0] && HELP_FLAGS.has(args[0]);
+  const commandId = args[0] ? (helpFlagIsTheCommand ? 'help' : args[0]) : 'help';
   const cmdArgs = args.slice(1);
 
   // The CLI is QUIET by default; the MCP server is not (ADR 0080, todo02#P2).
@@ -235,7 +241,7 @@ export async function main() {
   //
   // Handled in the DISPATCHER rather than per command, because the defect is per command and the
   // fix should not have to be repeated thirty-nine times.
-  if (command && (args.includes('--help') || args.includes('-h'))) {
+  if (command && !helpFlagIsTheCommand && (args.includes('--help') || args.includes('-h'))) {
     console.log(`\n\x1b[1m${command.id}\x1b[0m — ${command.description}`);
     console.log(`\n\x1b[2mUsage:\x1b[0m ${command.usage ?? `conducks ${command.id}`}`);
     console.log(`\n\x1b[2mRun \`conducks help\` for the full command list.\x1b[0m\n`);
