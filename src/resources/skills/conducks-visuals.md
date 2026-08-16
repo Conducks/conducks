@@ -117,7 +117,15 @@ recovered from the hash. Write `79783ab + working tree (N files)` rather than th
 | form | says | who writes it |
 |---|---|---|
 | `<footer class="readlog">` | *Read at `<hash>` — these files were opened* | a person, after walking the canvas |
-| `<footer class="readlog" data-derived></footer>` | *Cited at `<hash>` — these files carry the anchors on this page* | `render.mjs` fills the empty slot on every build |
+| `<footer class="readlog" data-derived></footer>` | *N files carry the anchors on this page* — then the list | `render.mjs` fills the empty slot on every build |
+
+**The derived log carries NO commit hash, deliberately.** It stamped `git rev-parse HEAD` plus a
+`git status` dirty count until 2026-08-09, which made the rendered page change whenever the
+REPOSITORY moved rather than whenever the DATA did — so the drift gate, whose whole job is "the data
+changed and the page did not", reported drift on every commit and every uncommitted edit. A gate that
+fires for a reason unrelated to what it checks is one you learn to ignore. Currency is proven
+continuously by `visuals-lint` resolving every anchor; WHEN the page changed is in git history
+already. Never bake mutable repository state into a byte-compared artifact.
 
 The derived one exists because the hand-written one does not survive a big canvas. One repo's canvas
 cited 68 files across 972 anchors and carried **no read log at all** — the honest reason being that
@@ -359,7 +367,7 @@ not catch the next one unless somebody types them again.
 
 ### This file is global, and identical everywhere it is used
 
-It is a SKILL, installed at `~/.claude/skills/conducks-visuals/`, not a document inside one repo. It was one before — `docs/visuals/rules.md` in a single project — which made it invisible to every other repo it claimed to govern.
+It is a SKILL, installed at `~/.claude/skills/conducks-visuals/`, not a document inside one repo. It was one before — copied into each project's `docs/visuals/rules.md` — and the copies DRIFTED: this one carried the no-commit-hash rule from 2026-08-09 and another still described the behaviour it replaced. That is the whole argument for one installed copy.
 
 **One `rules.md`, byte-identical in every repo built to it** — the same rule as the other six shared
 files above, for the same reason. Not a canonical copy plus a local file of deviations: that arrangement means the
