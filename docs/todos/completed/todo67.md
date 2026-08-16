@@ -1,11 +1,11 @@
 # todo67 — a live pulse adds and never removes, so the watcher cannot be allowed to write
-Status: blocked
+Status: done
 - Acceptance: on a two-file project under `conducks watch --pulse`, deleting the only call to a
   symbol leaves `impact <symbol> upstream` reporting ZERO callers from a separate process —
   measured, not asserted — and a following `analyze` agrees.
-- Blocked by: the VAULT half. `save` inserts and updates but never deletes, so a row for an edge the
-  edit removed survives even once memory is correct; and purging the unit first loses cross-file
-  edges that neither the intra-linker nor a later incremental `analyze` restores.
+- MET 2026-08-16, measured on the two-file fixture: after the edit a SEPARATE process reads
+  `onlyHere` 0 / `shared` 1, and a following `analyze` agrees. Both columns, in the same run — the
+  target case alone read as a clean success while the counter-case was broken.
 - CORRECTION, 2026-08-16: the first version of this file said the adjacency list "exposes no node
   deletion at all". That was wrong and came from grepping one name — `clearFile` exists and is
   tested. It is still the wrong tool here, for a different reason, recorded in Phase 1 below.
@@ -64,13 +64,29 @@ Enabling `--pulse` on top of Phase 1 was tried and reverted. Both readings on th
 cross-file edges do not come back — then both files' hashes read as clean, so `analyze` repairs
 nothing. One wrong answer traded for a worse one.
 
-- [ ] Find why the purged cross-file edges are not written back by `save` — the likely answer is
-      that `save` writes what it considers dirty rather than the whole graph, which is exactly the
-      asymmetry `purgeUnits` breaks. MEASURE it before changing anything
-- [ ] Whatever the fix, the acceptance table above is the check: both columns must read 0 and 1
+- [x] MEASURED, and the guess above was wrong. `save()` writes NO nodes and NO edges at all — it
+      writes metadata and the `pulses` row and commits. Structure is written by `saveNodes` /
+      `saveEdges`, which only the analyze path ever called. So the watcher's write was a no-op, and
+      purging first deleted rows nothing would put back
+- [x] the watcher re-states the unit: `purgeUnits`, then `saveNodes` for the file's nodes and
+      `saveEdges` for the edges it OWNS. Incoming edges belong to other units and are neither
+      purged nor rewritten — the same asymmetry `replaceFile` applies in memory
+- [x] both columns read correctly, cross-process and after `analyze`
 
-## Phase 2 — let the watcher write again
+## Phase 2 — let the watcher write again — DONE
 
-- [ ] `watch --pulse` opens the vault writable and the refusal notice is deleted, not disabled
-- [ ] Cross-process check: watcher persists, a SEPARATE `impact` sees the change
-- [ ] `status` no longer needs to answer a staleness question the vault has already settled
+- [x] `watch --pulse` opens the vault writable; the refusal notice is deleted, not disabled.
+      Read-only stays the DEFAULT, because a writable handle holds the write lock for the session
+- [x] Cross-process check: the watcher persists and a SEPARATE `impact` reads the change
+- [x] `watcher-writes-the-unit` pins the ordering (purge before write) and the asymmetry (owned
+      edges written, incoming ones not). Mutation-tested — dropping the edge write fails it
+
+## What this does NOT fix
+
+- [>] DELETING a file leaves its symbols in the graph until the next `analyze`. Measured: after
+      `rm src/extra.ts` under a running watcher, `impact extraFn` still resolved; `analyze` then
+      reported it "no longer discoverable" and purged it. Pre-existing, unchanged by this work, and
+      repairable by the command that already repairs it — so recorded rather than widened into this
+- [>] `status` still answers the working-tree question separately. It has to: the vault is only
+      current while a `--pulse` watcher is actually running, and ADR 0036 is explicit that a daemon
+      is an accelerator and never a requirement

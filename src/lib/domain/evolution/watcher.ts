@@ -382,19 +382,30 @@ export class ConducksWatcher {
         }
       }
 
-      // 5. Structural Persistence Update (Only if Writer or Auto-Pulse)
+      // 5. Structural Persistence Update
       //
-      // NO PURGE HERE, and the attempt is recorded in todo67 because the result was worse. `save`
-      // inserts and updates but never deletes, so the vault keeps an edge the edit removed even once
-      // `replaceFile` has fixed memory. Purging the unit first fixes THAT and loses something else:
-      // measured, `impact shared` fell from one caller to zero and stayed there through a full
-      // `analyze`, because the purged cross-file edges were not written back and both files' hashes
-      // then read as clean. One wrong answer traded for a worse one.
-      if (this.autoPulse && this.options.persistence && !(this.options.persistence as any).readOnly) {
-        console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
-        await this.options.persistence.save(this.graph.getGraph());
-      } else if (this.options.persistence && !(this.options.persistence as any).readOnly) {
-        await this.options.persistence.save(this.graph.getGraph());
+      // `save()` WRITES NO NODES AND NO EDGES. It writes metadata and the `pulses` row and commits —
+      // structure is written by `saveNodes`/`saveEdges`, which only the analyze path called. That is
+      // why the watcher's write appeared to do nothing, and why purging the unit first LOST data:
+      // the rows were deleted and nothing put them back. Measured: `impact shared` fell from one
+      // caller to zero and stayed there through a full `analyze` (todo67 Phase 1b).
+      //
+      // So the unit is re-stated in the vault the same way `replaceFile` re-states it in memory:
+      // purge the unit's rows and the edges it OWNS, then write its current nodes and outgoing
+      // edges back. Incoming edges belong to other units and are neither purged nor rewritten here.
+      if (this.options.persistence && !(this.options.persistence as any).readOnly) {
+        if (this.autoPulse) console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
+        const persistence = this.options.persistence;
+        const g = this.graph.getGraph();
+        const lowerPath = normalizedPath.toLowerCase();
+        const ids = new Set(g.getNodeIdsByFilePath(lowerPath));
+        const nodes = [...ids].map(id => g.getNode(id)).filter(Boolean);
+        const owned = g.getAllEdges().filter(e => ids.has(String(e.sourceId)));
+        const pulseId = `watch_${Date.now()}`;
+        await persistence.purgeUnits([`${lowerPath}::unit`]);
+        if (nodes.length > 0) await persistence.saveNodes(nodes as any[], pulseId);
+        if (owned.length > 0) await persistence.saveEdges(owned as any[], pulseId);
+        await persistence.save(g);
       }
 
       // 6. Record the hash — AFTER the pulse and the save, never before. Recording first would make a

@@ -2537,3 +2537,17 @@ by construction.
   vault that a full `analyze` cannot repair is the worst failure mode this tool has.
 - Applies: measure the counter-case in the SAME run as the target case. `onlyHere` alone read as a
   clean success; only asking about `shared` in the same breath showed the trade.
+
+## `save()` writes no nodes and no edges
+- Gotcha: `SynapsePersistence.save(graph)` writes METADATA and the `pulses` row and commits. Every
+  node and edge is written by `saveNodes` / `saveEdges`, which only the analyze path called. So the
+  watcher "persisting a structural delta" changed nothing in the vault for as long as that code has
+  existed, and purging the unit first deleted rows nothing would put back — one wrong answer traded
+  for a permanent one.
+- Why: the name is the trap. I guessed twice about why the write did not stick (dirty-tracking, then
+  the intra-linker) before reading what `save` actually does, which took one minute. Read the method
+  whose name you are trusting.
+- Applies: a live update now re-states the unit — `purgeUnits`, then `saveNodes` for the file's
+  nodes and `saveEdges` for the edges it OWNS. Incoming edges belong to other units: neither purged
+  nor rewritten, the same asymmetry `replaceFile` applies in memory. `watch --pulse` works
+  cross-process; read-only stays the default because a writable handle holds the write lock.

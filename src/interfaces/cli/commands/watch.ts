@@ -56,13 +56,14 @@ export class WatchCommand implements ConducksCommand {
     const isPulse = args.includes('--pulse');
     const rootPath = process.cwd();
 
-    // READ-ONLY, AND `--pulse` DOES NOT CHANGE THAT YET — see todo67, which now carries two
-    // measurements rather than one. `replaceFile` fixed the in-memory half (a re-pulse no longer
-    // keeps a deleted call's edge). The vault half is unsolved: `save` never deletes, so the stale
-    // row survives, and purging the unit first loses cross-file edges that neither the intra-linker
-    // nor a later incremental `analyze` restores — `impact shared` went from one caller to zero and
-    // stayed there. Refused out loud rather than silently obeyed.
-    await (registry as any).initialize(true, rootPath, true);
+    // Read-only unless `--pulse` asks to persist, and read-only stays the DEFAULT: a writable handle
+    // holds the vault's write lock for the whole session, which nobody watching the mirror asked for.
+    //
+    // `--pulse` was a flag that read as obeyed and did nothing — this opened the registry read-only
+    // unconditionally while the watcher's save is guarded by `!persistence.readOnly`. Enabling it
+    // needed two things first: `replaceFile`, so a re-pulse stops keeping a deleted call's edge, and
+    // a real vault write, because `save()` writes only metadata and the pulse row (todo67).
+    await (registry as any).initialize(!isPulse, rootPath, true);
     await syncGraph(registry);
 
     console.log('[Watch] Step 2: getting watcher instance...');
@@ -74,10 +75,8 @@ export class WatchCommand implements ConducksCommand {
       process.exit(1);
     }
 
-    if (isPulse) {
-      console.error("[Conducks Watch] --pulse is not available yet: the vault half of replace-on-repulse " +
-        "is unsolved (todo67) and enabling it loses cross-file edges. Watching read-only; " +
-        "run 'conducks analyze' to persist.");
+    if (isPulse && watcher) {
+        (watcher as any).enableAutoPulse(true);
     }
 
     console.log('[Watch] Step 4: calling watcher.init()...');
@@ -116,10 +115,12 @@ export class WatchCommand implements ConducksCommand {
 
     // The banner names the mode, because they differ in the only way a reader cares about: whether
     // anything outside this process will see the update.
-    console.log("\n\x1b[32m🔭 Conducks Watcher — Live Mirror Mode (Read-Only) active.\x1b[0m");
+    console.log(`\n\x1b[32m🔭 Conducks Watcher — ${isPulse ? 'Auto-Pulse Mode (persists each change)' : 'Live Mirror Mode (Read-Only)'} active.\x1b[0m`);
     console.log("\x1b[34m- Changes update the in-memory Visual Mirror instantly.\x1b[0m");
     console.log("\x1b[34m- docs/ is watched too: grammar + link violations report on write.\x1b[0m");
-    console.log("\x1b[33m- Note: Run 'conducks analyze' to persist new symbols to disk.\x1b[0m");
+    console.log(isPulse
+      ? "\x1b[34m- Each change is written, so other commands read the updated graph.\x1b[0m"
+      : "\x1b[33m- Note: Run 'conducks analyze' to persist, or 'watch --pulse' to persist as you edit.\x1b[0m");
 
     // A branch switch invalidates the graph, and a FILE watcher cannot see one (ADR 0035,
     // todo20#P1). Auto-pulse is switched OFF at the switch rather than left running: every pulse

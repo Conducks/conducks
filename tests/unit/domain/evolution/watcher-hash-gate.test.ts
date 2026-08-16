@@ -32,6 +32,14 @@ const fakePersistence = () => {
     // fake without `save` never reaches it and every re-save looks changed. Deliberately ordered
     // that way in the source: recording first would make a parse that threw look complete.
     readOnly: false,
+    // The watcher RE-STATES the unit before saving — purge, then write its nodes and owned edges
+    // (todo67). A fake missing any of these throws inside the pulse's try/catch, the hash is never
+    // recorded, and the skip test fails against correct code. That is the same trap this file's
+    // header already records: the first version of this fake had `recordFileHash` and nothing was
+    // ever stored. The fake stands in for the real interface and has to keep up with it.
+    purgeUnits: async () => {},
+    saveNodes: async () => {},
+    saveEdges: async () => {},
     save: async () => {},
   } as any;
 };
