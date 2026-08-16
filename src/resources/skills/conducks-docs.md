@@ -976,6 +976,42 @@ checked, exit 0" is a gate that checks less than it appears to (ADR 0124). Prose
 the anchors is tier three — see the review stamps in §6.3 (ADR 0141/0142): `visuals-lint --stamp
 <page>` after a real re-read, and the gate flags exactly the claims whose cited code changed since.
 
+### §6.14 Code comments are docs, and the graph reads them
+
+A comment above a symbol is not decoration and not style. `doc-comments.ts` (ADR 0133) harvests it
+and attaches it to that symbol's node as `doc`, joined BY LINE so it works across every grammar —
+JSDoc above the declaration, a Python docstring inside the body. That is what `explain`, `context`
+and the MCP tools return when someone asks what a symbol is for.
+
+So an uncommented symbol is not a tidiness problem. It is a node with no meaning attached, and every
+surface that answers "what does this do" answers nothing for it.
+
+**Required, because each one is a node the graph will be asked about:**
+
+| | |
+|---|---|
+| **file** | a header saying why the file exists and what it owns |
+| **class / interface** | what it is responsible for |
+| **function** | why it exists — every exported one, and any internal one whose reason is not obvious from its name |
+
+**Not required:** variables, parameters, loop bodies, or a line restating what the line does. The
+graph already reads structure; the comment carries what structure cannot say.
+
+**A comment is held to the same bar as any other doc (§8, "Code outranks the doc").** A comment that
+no longer matches its code is WRONG, not merely stale, and it is fixed in the change that revealed
+it — it is being served to readers as the symbol's meaning.
+
+Write the REASON, not the mechanics:
+
+```ts
+// no: restates the code, and the graph already knows
+/** Loops over the nodes and returns the ones with no incoming edges. */
+
+// yes: says what the reader cannot derive
+/** Symbols nothing references. Excludes entry points, which are invoked by
+ *  convention rather than called — see ADR 0104. */
+```
+
 ---
 
 ## §7 Reading and enforcing
@@ -1028,6 +1064,7 @@ list to re-read when a change feels ambiguous, and each points back at the secti
 | **Generated output stays out** (§6.12) | Blueprints, dumps, pulse summaries live in `.conducks/`, gitignored. Never author `map.md`, `drift.md` or `progress.md` — all three are derived and classify as unread. A generated `.md` at the repo root outranks authored docs by accident and is stale within a commit. |
 | **Architecture is authored** (§6.2) | A person writes `architecture.md` and every module note. Wiring is queried. |
 | **Code outranks the doc** | Except a doc explicitly marked a **spec**, which decides what the code should do. `docs/product/*.md` are specs; everything else describes. A doc neither marked a spec nor matching the code is wrong — fix it in the change that revealed it. Code comments count as docs. |
+| **Code comments are docs** (§6.14) | A file, class and function each carry a comment saying why they exist — `doc-comments.ts` harvests it into the node's `doc`, so an uncommented symbol answers nothing when queried. Variables and parameters are exempt. A comment that contradicts its code is wrong, not stale. |
 | **`archive/` and `legacy/` are the last stop** | Nothing live links into them. Promote anything still true before moving; the move is one-way. |
 | **One fact, one place** | Derive what can be derived. Where a claim is kept anyway, let lint compare it against the truth and treat the gap as the finding. |
 
