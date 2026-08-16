@@ -19,6 +19,7 @@ export const DEAD_CODE_TYPES = [
   'UNIMPORTED_MODULE',
 ] as const;
 
+/** The union, derived from the list rather than restated — a second copy is how two went missing. */
 export type DeadCodeType = typeof DEAD_CODE_TYPES[number];
 
 /**

@@ -1,4 +1,4 @@
-import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
+import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import { readWatcherLiveness, type WatcherLiveness } from "@/lib/domain/evolution/watcher-liveness.js";
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import fs from "node:fs";

@@ -98,6 +98,7 @@ export interface RegistryConfig {
  * message, or to route a constant through composition, which is what happened here first.
  */
 export class FilterValidationError extends Error {
+  /** Sets `name` explicitly — `instanceof` survives, but the name is what a serialised error carries. */
   constructor(message: string) {
     super(message);
     this.name = 'FilterValidationError';

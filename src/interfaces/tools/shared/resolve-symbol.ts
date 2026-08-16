@@ -1,5 +1,5 @@
 import { registry } from "@/registry/index.js";
-import { tryResolveSymbol, type NameIndex } from "@/contracts/symbol-resolution.js";
+import { tryResolveSymbol, type NameIndex } from "@/contracts/index.js";
 
 /**
  * Conducks — the one place a caller-supplied symbol becomes a graph node id.

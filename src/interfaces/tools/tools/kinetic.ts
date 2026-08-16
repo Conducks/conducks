@@ -1,9 +1,9 @@
-import { Tool } from "@/contracts/types.js";
+import { Tool } from "@/contracts/index.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, releaseAnchor } from "../shared/anchor.js";
 import { resolveSymbolId } from "../shared/resolve-symbol.js";
 import { enumErr, numErr, boolErr } from "./synapse.js";
-import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
+import { mcpOk, mcpErr } from "@/interfaces/tools/shared/mcp-response.js";
 
 /**
  * Conducks — Behavioral Intelligence Tools (Standardized Taxonomy)

@@ -2,7 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import chalk from "chalk";
-import { isTestNode } from "@/contracts/test-path.js";
+import { isTestNode } from "@/contracts/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 

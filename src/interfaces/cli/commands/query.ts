@@ -1,6 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { FilterValidationError } from "@/contracts/types.js";
+import { FilterValidationError } from "@/contracts/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /**

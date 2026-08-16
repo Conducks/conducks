@@ -1,5 +1,5 @@
 import { ConducksAdvisor } from "./advisor.js";
-import type { Advice } from "@/types/domain.js";
+import type { Advice } from "@/contracts/index.js";
 import { ConducksSentinel } from "./sentinel.js";
 import { RegressionGuard } from "./guard.js";
 import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
@@ -7,7 +7,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import fs from "node:fs";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/freshness.js";
-import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
+import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import path from "node:path";
 import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type SentinelRule } from "./sentinel-rules.js";
 

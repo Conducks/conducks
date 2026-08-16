@@ -139,6 +139,8 @@ export function tryResolveSymbol(input: string, graph: NameIndex, warn?: (messag
   // allocateHostPort` described an export statement, reporting `kind: ATOM` at the barrel's line
   // instead of the function at its own. Kind first, gravity second (ADR 0112).
   const DECLARATION_KINDS = new Set(['BEHAVIOR', 'STRUCTURE', 'INFRA', 'UNIT']);
+  // A DECLARATION beats a re-export of it: `export { x } from './x'` mints an ATOM on the export
+  // line, and gravity alone could pick it over the function that actually declares `x`.
   const isDeclaration = (n: { properties?: unknown }) =>
     DECLARATION_KINDS.has(String((n.properties as any)?.canonicalKind ?? ''));
 

@@ -19,7 +19,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs";
 
-import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js";
+import { CaptureTags, DEFINITION_CAPTURES } from "@/lib/core/parsing/capture-tags.js";
 import { getProjectRelativePath } from "@/lib/core/utils/index.js";
 
 /**

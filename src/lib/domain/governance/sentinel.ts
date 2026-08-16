@@ -51,7 +51,7 @@ export interface SentinelReport {
   coverage?: Record<string, number>; // Summary of framework usage
 }
 
-import { ConducksComponent } from "@/contracts/types.js";
+import { ConducksComponent } from "@/contracts/index.js";
 
 export class ConducksSentinel {
   constructor(private readonly fileSystem: any = fs) { }

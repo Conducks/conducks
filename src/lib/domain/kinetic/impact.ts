@@ -1,6 +1,6 @@
 import { BaseAnalyzer } from './trace.js';
 import { ConducksAdjacencyList, NodeId } from '@/lib/core/graph/adjacency-list.js';
-import { ConducksComponent } from "@/contracts/types.js";
+import { ConducksComponent } from "@/contracts/index.js";
 
 /**
  * Conducks — Blast Radius Analyzer

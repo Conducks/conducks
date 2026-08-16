@@ -34,6 +34,7 @@ export const CaptureTags = {
   NAME:         'name',
 } as const;
 
+/** Every tag a grammar query may carry, derived from the table so the two cannot drift. */
 export type CaptureTag = typeof CaptureTags[keyof typeof CaptureTags];
 
 export const DEFINITION_CAPTURES = new Set<CaptureTag>([

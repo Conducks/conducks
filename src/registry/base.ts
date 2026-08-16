@@ -1,4 +1,4 @@
-import { ConducksComponent, RegistryEntry, RegistryConfig } from "@/contracts/types.js";
+import { ConducksComponent, RegistryEntry, RegistryConfig } from "@/contracts/index.js";
 
 /**
  * Universal Registry Base Implementation

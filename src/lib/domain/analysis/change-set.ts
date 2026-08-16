@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
-import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
+import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 
 /**
  * Conducks — what changed in the working tree, and which symbols those changes land on 🔍

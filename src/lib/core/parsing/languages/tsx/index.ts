@@ -1,5 +1,5 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
-import { ILanguagePlugin } from "@/types/language-plugin.js";
+import { ILanguagePlugin } from "@/lib/core/parsing/language-plugin.js";
 import { TSX_QUERIES } from "./queries.js";
 import { TypeScriptResolver } from "../typescript/resolver.js";
 import { TypeScriptExtractor } from "../typescript/extractor.js";

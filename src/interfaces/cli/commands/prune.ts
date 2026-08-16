@@ -2,7 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { warnIfStale } from "@/interfaces/cli/shared/stale-warning.js";
-import { DEAD_CODE_TYPES } from "@/contracts/dead-code-types.js";
+import { DEAD_CODE_TYPES } from "@/contracts/index.js";
 
 /**
  * Conducks — Prune Command

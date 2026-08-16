@@ -20,7 +20,7 @@ import {
 } from "@/lib/domain/analysis/docs-grammar.js";
 import { resolveDocsTrees } from "@/lib/domain/analysis/service-docs.js";
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
-import { verdict, verdictToJson } from "@/contracts/verdict.js";
+import { verdict, verdictToJson } from "@/contracts/index.js";
 
 export interface DocsBoard {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

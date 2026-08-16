@@ -1,5 +1,5 @@
 import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/base.js";
-import { ILanguagePlugin } from "@/types/language-plugin.js";
+import { ILanguagePlugin } from "@/lib/core/parsing/language-plugin.js";
 import { CSHARP_QUERIES } from "./queries.js";
 import { CSharpResolver } from "./resolver.js";
 import { CSharpExtractor } from "./extractor.js";

@@ -4,7 +4,7 @@ import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { sameFamily } from "@/lib/core/graph/import-resolver.js";
 import { canonicalize } from "@/lib/core/utils/index.js";
-import { ConducksComponent } from "@/contracts/types.js";
+import { ConducksComponent } from "@/contracts/index.js";
 import { ecosystemId, externalNodeProps } from "@/lib/core/graph/external-nodes.js";
 import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
 import path from "node:path";

@@ -20,7 +20,7 @@
  * sixth type reaches the summary and the enum by construction instead of by memory.
  */
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from '@/contracts/dead-code-types.js';
+import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from "@/contracts/index.js";
 
 let findings: Array<{ type: string; symbol: string; file: string; message: string }> = [];
 

@@ -1,5 +1,5 @@
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
-import { ConducksComponent } from "@/contracts/types.js";
+import { ConducksComponent } from "@/contracts/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { AnalyzeOrchestrator } from "@/lib/domain/analysis/orchestrator.js";
 import { PythonProvider } from "@/lib/core/parsing/languages/python/index.js";

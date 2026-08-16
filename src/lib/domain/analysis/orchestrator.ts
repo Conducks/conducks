@@ -14,7 +14,7 @@ import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import path from "node:path";
 
-import { ConducksComponent } from "@/contracts/types.js";
+import { ConducksComponent } from "@/contracts/index.js";
 import { logger } from "@/lib/core/utils/index.js";
 import { traceMemory } from "@/lib/core/utils/index.js";
 import { Worker } from "node:worker_threads";

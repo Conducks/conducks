@@ -62,8 +62,8 @@ export interface QueryFilter {
 // The error and the budget are shared vocabulary and live in `contracts` — both domain (which
 // throws and enforces) and the interfaces (which catch and clamp) must be able to name them.
 // Re-exported here so the compiler and its vocabulary still arrive together for domain callers.
-export { FilterValidationError, FILTER_MAX_LIMIT, FILTER_DEFAULT_LIMIT } from "@/contracts/types.js";
-import { FilterValidationError, FILTER_MAX_LIMIT, FILTER_DEFAULT_LIMIT } from "@/contracts/types.js";
+export { FilterValidationError, FILTER_MAX_LIMIT, FILTER_DEFAULT_LIMIT } from "@/contracts/index.js";
+import { FilterValidationError, FILTER_MAX_LIMIT, FILTER_DEFAULT_LIMIT } from "@/contracts/index.js";
 
 /**
  * Validate a typed filter and compile it to parameterised SQL. Throws FilterValidationError on

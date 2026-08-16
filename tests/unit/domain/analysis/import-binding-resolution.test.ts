@@ -5,7 +5,7 @@ import { ConducksGraph } from '@/lib/core/graph/graph-engine.js';
 import { SynapseRegistry } from '@/lib/core/registry/synapse-registry.js';
 import { TypeScriptProvider } from '@/lib/core/parsing/languages/typescript/index.js';
 import { grammars } from '@/lib/core/parsing/grammar-registry.js';
-import { ConducksComponent } from '@/contracts/types.js';
+import { ConducksComponent } from "@/contracts/index.js";
 
 /**
  * ADR 0070 — an unresolvable `@/` alias must refuse, not guess by basename.

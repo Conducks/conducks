@@ -1,5 +1,5 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode, IMPORT_CYCLE_IGNORED_EDGE_TYPES } from '@/lib/core/graph/adjacency-list.js';
-import type { Advice } from '@/types/domain.js';
+import type { Advice } from "@/contracts/index.js";
 
 /**
  * Conducks — Conducks Architecture Advisor

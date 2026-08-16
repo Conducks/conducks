@@ -1,8 +1,8 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import type { Advice } from "@/types/domain.js";
+import type { Advice } from "@/contracts/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
-import { verdict, renderVerdict, verdictToJson } from "@/contracts/verdict.js";
+import { verdict, renderVerdict, verdictToJson } from "@/contracts/index.js";
 
 /**
  * Conducks — Advise Command

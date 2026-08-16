@@ -1,11 +1,11 @@
-import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT } from "@/contracts/types.js";
+import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT } from "@/contracts/index.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, releaseAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { resolveSymbolId } from "../shared/resolve-symbol.js";
 import { emptyVaultAnswer } from "../shared/empty-vault.js";
-import { mcpOk, mcpErr } from "../../../types/mcp-response.js";
-import { verdict, verdictToJson } from "@/contracts/verdict.js";
-import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from "@/contracts/dead-code-types.js";
+import { mcpOk, mcpErr } from "@/interfaces/tools/shared/mcp-response.js";
+import { verdict, verdictToJson } from "@/contracts/index.js";
+import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from "@/contracts/index.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)

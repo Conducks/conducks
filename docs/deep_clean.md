@@ -446,3 +446,98 @@ reason. `logger` is a process sink whose only mutable state is a static flag tha
 PURPOSE: a per-instance flag silenced four of five boot lines and missed the fifth, because modules
 build their own instances. Whether rule 4 should admit a process-wide sink is a decision, and it is
 the same decision `chronicle` is waiting on.
+
+---
+
+## contracts — two layers became one, and three types went home (2026-08-16)
+
+Third feature. The one parsing depends on most: 13 of its language packs imported
+`types/language-plugin`, the single most-imported file in either folder.
+
+### There were two contracts layers, and only one was declared
+
+ADR 0005 puts `contracts (src/contracts): shared interfaces/types. Imports nothing.` at the bottom of
+the layer contract. `src/types/` held five more files doing the same job, named in no ADR, no
+convention and no gate — so neither the architecture test nor the door gate could say anything about
+it. A second home for shared types is where a type goes when nobody decides who owns it.
+
+### Three of the five were never contracts
+
+Measured by importer, not by folder:
+
+| file | imported by | went to |
+|---|---|---|
+| `language-plugin` | parsing only (13 language packs) | `core/parsing/` |
+| `capture-tags` | parsing only | `core/parsing/` |
+| `mcp-response` | the MCP surface only | `interfaces/tools/shared/` |
+| `prism-types` | parsing + domain/analysis | `contracts/` |
+| `domain` | cli + domain/governance | `contracts/` |
+
+ADR 0150 rule 5 says a type two features share moves to `contracts/`. Read the other way, it says a
+type ONE feature uses belongs to that feature — and putting it in a shared folder makes it everyone's
+permanently. `language-plugin` is parsing's own plugin contract; it had been sitting in a global
+namespace where any layer could reach it.
+
+`src/types/` is gone, not emptied. A folder left behind is a folder someone refills.
+
+### A `@/`-shaped grep called two live files dead
+
+`capture-tags` and `mcp-response` reported ZERO importers. Both are used, via
+`../../../types/capture-tags.js`. That is the **third** time in this campaign the same shape of
+search has undercounted:
+
+| feature | grep said | truth |
+|---|---|---|
+| `core/git` | 8 importers | 12 |
+| `core/utils` | 21 files | 24 |
+| contracts | 2 files dead | both live |
+
+Three for three. A text search shaped like one import style cannot see the others, and the gate —
+which resolves specifiers — is the only thing that has been right every time.
+
+### The door, and the one test that had to keep its internals
+
+`contracts/index.ts` exports 9 runtime symbols and 8 types. Pointing 39 files at it broke exactly one
+thing: `tests/unit/contracts/verdict.test.ts`, which imports `findingsOf`, `examinedOf` and the
+`Verdict` type — internals the door does not export and should not. It is the feature's OWN test, so
+rule 3 allows it, and it was pointed back at the internal path. The typecheck named it immediately.
+
+That is the rule working as intended rather than a snag: a door narrow enough to break the feature's
+own test on a blind rewrite is a door that is actually narrowing something.
+
+### Docs and tests
+
+10 real doc gaps closed, 0 remaining (12 UNIT nodes the harvester cannot reach). The MCP envelope got
+a file header explaining why it lives with the MCP surface rather than in `contracts/`.
+
+`mcp-response` shapes EVERY MCP answer and had no test. 10 cases, three mutations, three failures —
+and all three are defaults that read as trivia until they are wrong:
+
+- `truncated` defaults to FALSE, so a tool must opt IN to claiming it cut the answer. Flipping it
+  makes every complete answer claim truncation.
+- `retryable` defaults to FALSE, because an agent that retries a permanent error loops.
+- a falsy payload is DATA. `data || {}` erases `0`, `''` and `false` — three real answers.
+
+### Rule table — contracts
+
+| rule | |
+|---|---|
+| 1 one door | PASS |
+| 2 a test enforces it | PASS — third door in the gate |
+| 3 inside is private, own tests exempt | PASS — and exercised, by the one test that broke |
+| 4 no mutable state on the door | PASS — the first feature to manage it. Contracts export types, constants and pure functions; there is no instance to mutate |
+| 5 shared types to `contracts/` | PASS — and its inverse applied: three types went to their features |
+| 6 comments | PASS — 0 real gaps |
+| 7 no dead code | PASS — the two that looked dead were live |
+| 8 every line has a purpose | PASS |
+| 9 no duplicated logic | PASS — every file here exists to END a duplication |
+| 10 every claim tested, and it bites | PASS for the MCP envelope; `verdict` and `test-path` carry pre-existing suites |
+| 11 adversarial | PASS |
+| 12 leaves tested from inside | n/a |
+| 13 leaves first | PASS |
+| 14 one unit per commit | PASS |
+| 15 gates after each unit | PASS |
+| 16 cleaning is not fixing | PASS |
+
+**15 PASS, 1 n/a, 0 open.** The first feature to satisfy every applicable rule — and rule 4 passed
+here for the reason it fails elsewhere: a contracts layer has no instance to hand out.

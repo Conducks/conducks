@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { tryResolveSymbol, type NameIndex } from "@/contracts/symbol-resolution.js";
+import { tryResolveSymbol, type NameIndex } from "@/contracts/index.js";
 
 export function cliError(code: string, message: string, suggestion?: string): never {
   process.stderr.write(chalk.red(`[ERROR] ${code}: ${message}\n`));
@@ -27,4 +27,4 @@ export function resolveSymbol(input: string, graph: NameIndex): string {
   return resolved;
 }
 
-export { tryResolveSymbol, type NameIndex } from "@/contracts/symbol-resolution.js";
+export { tryResolveSymbol, type NameIndex } from "@/contracts/index.js";

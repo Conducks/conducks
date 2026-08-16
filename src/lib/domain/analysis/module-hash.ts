@@ -14,10 +14,10 @@ import { createHash } from "node:crypto";
  * Non-recursive on purpose: a note covers its module directory, and hashing subtrees would fire a
  * review flag for a change in a submodule that has its own note.
  */
-import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
+import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 // Re-exported from contracts so existing importers keep working — see contracts/source-extensions.ts
 // for why the three copies of this list were merged.
-export { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
+export { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
 

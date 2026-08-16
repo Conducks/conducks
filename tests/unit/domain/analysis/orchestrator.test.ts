@@ -5,7 +5,7 @@ import { SynapseRegistry } from '@/lib/core/registry/synapse-registry.js';
 import { IgnoreManager } from '@/lib/core/parsing/ignore-manager.js';
 import { TypeScriptProvider } from '@/lib/core/parsing/languages/typescript/index.js';
 import { grammars } from '@/lib/core/parsing/grammar-registry.js';
-import { ConducksComponent } from '@/contracts/types.js';
+import { ConducksComponent } from "@/contracts/index.js";
 import { CanonicalKind, CanonicalRank } from '@/lib/core/parsing/taxonomy.js';
 
 /**

@@ -1,5 +1,5 @@
 import { ConducksAdjacencyList, NodeId, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
-import { isTestNode } from '@/contracts/test-path.js';
+import { isTestNode } from "@/contracts/index.js";
 
 /** A test file's weight when it competes with source for a slot (todo43). Demotion, never exclusion. */
 const TEST_WEIGHT = 0.4;

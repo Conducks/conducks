@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { isTestPath } from "@/contracts/test-path.js";
+import { isTestPath } from "@/contracts/index.js";
 describe('isTestPath', () => {
   it.each([
     'src/tests/core/test_hands.py', 'a/__tests__/x.ts', 'tests/core/test_hands.py',

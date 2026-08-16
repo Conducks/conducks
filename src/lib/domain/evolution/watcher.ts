@@ -1,4 +1,4 @@
-import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";
+import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import { logger } from "@/lib/core/utils/index.js";
 import { classifyFreshness } from "@/lib/core/persistence/freshness.js";
 import { writeWatcherMarker, clearWatcherMarker, HEARTBEAT_INTERVAL_MS } from "@/lib/domain/evolution/watcher-liveness.js";

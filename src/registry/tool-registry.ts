@@ -4,7 +4,7 @@ import {
   Tool as MCPTool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { ConducksComponent } from "@/contracts/types.js";
+import { ConducksComponent } from "@/contracts/index.js";
 import { ConducksRegistry } from "./base.js";
 import { registry } from "./index.js";
 

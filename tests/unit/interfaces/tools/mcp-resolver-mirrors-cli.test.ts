@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { tryResolveSymbol, type NameIndex } from '@/contracts/symbol-resolution.js';
+import { tryResolveSymbol, type NameIndex } from "@/contracts/index.js";
 import { resolveSymbolWith } from '@/interfaces/tools/shared/resolve-symbol.js';
 
 /**

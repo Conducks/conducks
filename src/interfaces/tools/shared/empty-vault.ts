@@ -1,5 +1,5 @@
 import { registry } from "@/registry/index.js";
-import { verdict, verdictToJson } from "@/contracts/verdict.js";
+import { verdict, verdictToJson } from "@/contracts/index.js";
 
 /**
  * Conducks — the answer a report tool owes when the vault holds nothing 🫙

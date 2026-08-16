@@ -8,7 +8,7 @@ import { logger } from "@/lib/core/utils/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { traceMemory } from "@/lib/core/utils/index.js";
-import type { ConducksComponent } from "../../../contracts/types.js";
+import type { ConducksComponent } from "@/contracts/index.js";
 
 /**
  * Conducks — Synapse Persistence Engine (DuckDB v2) 🏺 🟦

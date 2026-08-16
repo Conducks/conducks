@@ -1,5 +1,5 @@
 import { ConducksAdjacencyList, ConducksNode } from '@/lib/core/graph/adjacency-list.js';
-import { isTestNode } from "@/contracts/test-path.js";
+import { isTestNode } from "@/contracts/index.js";
 
 /**
  * Conducks — Test Aligner (Conducks) 🧪

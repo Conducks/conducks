@@ -12,7 +12,7 @@
  * total of 99).
  */
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { DEAD_CODE_TYPES } from '@/contracts/dead-code-types.js';
+import { DEAD_CODE_TYPES } from "@/contracts/index.js";
 
 jest.unstable_mockModule('@/interfaces/cli/shared/context.js', () => ({
   syncGraph: jest.fn(async () => {}),
