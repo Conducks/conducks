@@ -4,6 +4,7 @@ import chalk from "chalk";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
 import { displayPath } from "@/interfaces/cli/shared/display-path.js";
+import { warnIfStale } from "@/interfaces/cli/shared/stale-warning.js";
 
 /**
  * Conducks — Impact Command
@@ -53,6 +54,8 @@ export class ImpactCommand implements ConducksCommand {
     }
 
     await syncGraph(registry);
+    // The answer below describes what was ANALYZED. Say so when that differs from what is on disk.
+    await warnIfStale(registry as any);
     const g = registry.query.graph.getGraph();
     const resolvedId = resolveSymbol(symbolId, g);
 

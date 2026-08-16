@@ -2578,3 +2578,15 @@ by construction.
 - Applies: when merging two copies, assert the property the OLD copy existed for. This one was
   written so an invented id (`nosuchfile.ts::totallyMadeUpSymbol`) returns null instead of four
   confident zeros (ADR 0145); that case is now a test on both surfaces.
+
+## An answering command should say when the graph is behind, and it costs something
+- Gotcha: `status` was taught to compare the working tree while `impact` and `prune` still answered
+  from whatever the vault held — the exact case that started the session, deleting a call and being
+  told the caller still exists. Both now warn; neither refuses. ADR 0036 makes a daemon an
+  accelerator, and refusing would break every CI use where a vault is built once and read many times.
+- Why: the sink is asserted, not intended. The export oracle parses `prune --json`, so the warning
+  goes to STDERR and a test parses stdout to prove it.
+- Applies: it hashes every discovered file, so state the price. MEASURED: `prune` on the largest
+  subject 1.81s -> 2.59s (+43%), `impact` on a 400-file project 0.40s -> 0.42s. Kept without an
+  opt-out flag — `prune`'s job is "is it safe to delete this", and a stale yes costs more than a
+  second. A cost measured and written down is a decision; a cost not measured is a surprise later.

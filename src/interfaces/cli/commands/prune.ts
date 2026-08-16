@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
+import { warnIfStale } from "@/interfaces/cli/shared/stale-warning.js";
 import { DEAD_CODE_TYPES } from "@/contracts/dead-code-types.js";
 
 /**
@@ -40,6 +41,9 @@ export class PruneCommand implements ConducksCommand {
     }
 
     await syncGraph(registry);
+    // A delete recommendation about code that has since changed is the sharpest form of this
+    // problem, so the warning matters more here than anywhere.
+    await warnIfStale(registry as any);
     let findings = registry.explain.prune();
     if (filterType && filterType !== 'all') {
       findings = findings.filter((f: { type: string }) => f.type === filterType);
