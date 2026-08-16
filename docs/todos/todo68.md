@@ -4,9 +4,9 @@ Status: doing
 
 ## Context
 
-ADR 0150 decided the shape; this todo is parsing's slice of it. Parsing first because it is where
-every answer starts — a defect here reaches all 35 commands — and because it is the largest feature
-in core at 8.8k lines across 69 files.
+ADR 0150 decided the shape; this todo is parsing's slice of it. Parsing matters most — a defect here
+reaches all 35 commands — and it is the largest feature in core at 8.8k lines across 69 files, which
+is exactly why it is cleaned after the method has been proven somewhere smaller.
 
 Two measurements set the work. Parsing is imported from outside at **24 separate files**, so no
 internal file is safe to rename or split today. And **138 of 364 parsing symbols carry no doc
@@ -15,11 +15,18 @@ comment**, which by conducks-docs §6.14 means 138 nodes answer nothing when que
 The order is leaves first: a unit is untouched until everything it depends on is done. That makes a
 failure attributable to the unit under test rather than to something below it.
 
+Parsing is NOT the first feature cleaned, and was going to be. It depends on
+`types/language-plugin` (13 of its files), `graph/adjacency-list`, `graph/external-nodes` and
+`utils/path-utils`, so cleaning it first would build on a foundation nobody had verified. todo69
+runs the same method on `core/git` — which imports nothing at all — and this todo waits on it, so
+the method is proven on one file before it is spent on 69.
+
 Behaviour does not change during a clean (ADR 0150 rule 16). A defect found outside the current unit
 is recorded and left; a fix is its own commit with its own measurement.
 
 ## Phase 0 — decide before cleaning
 - Builds: 0150
+- Depends: todo69#P4
 - [ ] `ecmascript-positions.ts` reports 1 of 1 symbols undocumented while carrying a long file header. Either the harvester misses a file-level comment or those symbols genuinely lack one. Read `doc-comments.ts` against the file and say which. If the harvester is at fault the 138 is inflated and the work list is wrong
 - [ ] `doc` is not in `FILTERABLE_FIELDS`, so conducks cannot be asked which symbols lack a comment — the audit above needed a direct vault read. Decide whether that is a defect to record or a deliberate limit, and say which
 
