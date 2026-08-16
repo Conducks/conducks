@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
-import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
-import { AnalyzeContext } from '@/lib/core/parsing/context.js';
-import { TypeScriptProvider } from '@/lib/core/parsing/languages/typescript/index.js';
-import { grammars } from '@/lib/core/parsing/grammar-registry.js';
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
+import { TypeScriptProvider } from "@/lib/core/parsing/index.js";
+import { grammars } from "@/lib/core/parsing/index.js";
 
 /**
  * ADR 0016 — a plain `import { X } from` whose bindings are only used in type position is erased by

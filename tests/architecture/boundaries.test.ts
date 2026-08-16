@@ -134,7 +134,7 @@ describe('layer contract, enforced against this repository', () => {
       expect(e.why.length).toBeGreaterThan(20);
     }
     // And the matcher must not treat an empty list as a licence: nothing is granted right now.
-    expect(isGranted({ file: 'src/lib/core/parsing/pulse-worker.ts', spec: '@/lib/core/parsing/reflector.js' })).toBe(false);
+    expect(isGranted({ file: 'src/lib/core/parsing/pulse-worker.ts', spec: "@/lib/core/parsing/index.js" })).toBe(false);
   });
 
   it('actually scanned the source tree', () => {

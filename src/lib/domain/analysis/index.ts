@@ -2,7 +2,7 @@ import { AnalyzeOrchestrator } from "./orchestrator.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/index.js";
-import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
+import { essenceLens } from "@/lib/core/parsing/index.js";
 import { buildBoard, enforcedByPaths } from "@/lib/domain/analysis/docs-board.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import path from "node:path";
@@ -793,5 +793,5 @@ export class AnalysisService {
 }
 
 export { AnalyzeOrchestrator } from "./orchestrator.js";
-export { ConducksReflector } from "@/lib/core/parsing/reflector.js";
+export { ConducksReflector } from "@/lib/core/parsing/index.js";
 export { Conducks } from "./conducks-core.js";

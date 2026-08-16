@@ -3,8 +3,8 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { DriftEngine } from '@/lib/domain/evolution/drift-engine.js';
 import type { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
-import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
-import { AnalyzeContext } from '@/lib/core/parsing/context.js';
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 
 /**
  * todo26 — the structural DNA columns todo4 declared finished.

@@ -659,3 +659,63 @@ And the rules were incomplete in one way worth writing down: **nothing in them w
 itself a dependency edge.** Every previous feature had a door with no internal imports pointing back
 up. `core/graph` did, and the door turned a safe leaf import into a cycle. That is a rule the set did
 not have and now needs.
+
+---
+
+## core/parsing — the door, and the one import that decides its gate (2026-08-16)
+
+Fifth and last core feature. 69 files, 8.8k lines — the feature ADR 0150 was written ABOUT, cleaned
+last because it depends on the other four. All four of its outside imports now go through finished
+doors: `contracts`, `graph`, `utils`, `git`.
+
+### The door
+
+`core/parsing/index.ts` exports 30 symbols: the reflector and `ParseFailure`, the grammar registry,
+the analysis context, the ignore manager, the pipeline, five processors, the doc-comment harvest, the
+capture tags, and the thirteen language providers. 31 files repointed.
+
+Everything else stays inside — every `queries.ts`, the shared `ecmascript-positions` block, each
+pack's resolver, extractor and bindings. A grammar query is an implementation detail of its language,
+and nothing outside parsing has business naming one.
+
+`ParseFailure` was missed on the first pass and added because typecheck named it: it is THROWN across
+the boundary and caught by callers, so it is part of the contract whether or not anyone listed it.
+
+### A fourth undercount, and the reason the gate is not on yet
+
+The gate found `graph/linker-intra.ts` importing `../parsing/languages/typescript/resolver.js` — an
+edge every earlier measurement missed, because the specifier contains no `core/parsing` for a text
+search to match. Fourth time in this campaign:
+
+| feature | search said | truth |
+|---|---|---|
+| `core/git` | 8 importers | 12 |
+| `core/utils` | 21 files | 24 |
+| `contracts` | 2 files dead | both live |
+| `core/parsing` | cycle broken | one edge left |
+
+**`lib/core/parsing` therefore has a door and is deliberately NOT in `DOORS`.** Every way to satisfy
+rule 1 for that single import costs something real:
+
+- export the resolver through parsing's door → graph imports parsing's door while parsing imports
+  graph's, which is the feature cycle rule 5b exists to prevent;
+- move it to `contracts/` → 237 lines of TypeScript-specific module resolution in a layer that holds
+  shared vocabulary, not language logic;
+- inject it → about ten test sites construct `new IntraLinker()` bare, and a default that silently
+  resolves nothing is the failure-looks-like-absence conflation this codebase keeps paying for.
+
+Listing it with the violation present would fail the gate; removing the violation quietly would pick
+one of those costs without saying so. The reason is written in the gate file itself, where the next
+person reading `DOORS` will find it.
+
+### Tests moved, and three more ADRs broke
+
+Twenty test files sat in `tests/unit/core/languages/` and `tests/unit/core/parse-failure.test.ts` —
+parsing's own tests, filed outside the module they test, which is what made the gate read them as
+outsiders. Moved beside their module.
+
+That broke `- Enforced by:` on ADRs 0087, 0088 and 0089 — six paths across three accepted decisions,
+silently reporting as unproven. `docs-lint` caught it, as it did for the two utils tests.
+
+**Second time this campaign, so it is a rule now and not an anecdote: a test path is an ADDRESS other
+records hold.** Moving one is a two-file change, and only the docs gate knows.

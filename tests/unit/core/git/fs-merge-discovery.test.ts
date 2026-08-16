@@ -19,8 +19,8 @@ import { execFileSync } from 'node:child_process';
  * cache. A blocker described as "dynamic import does not work" is unactionable; described as "this
  * module is not linked yet", it takes a minute.
  */
-import '@/lib/core/parsing/languages/typescript/index.js';
-import '@/lib/core/parsing/languages/python/index.js';
+import "@/lib/core/parsing/index.js";
+import "@/lib/core/parsing/index.js";
 import { ChronicleInterface } from '@/lib/core/git/chronicle-interface.js';
 
 const dirs: string[] = [];

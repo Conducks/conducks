@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
-import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
-import { AnalyzeContext } from '@/lib/core/parsing/context.js';
-import { PHPProvider } from '@/lib/core/parsing/languages/php/index.js';
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
+import { PHPProvider } from "@/lib/core/parsing/index.js";
 import { PHP_QUERIES } from '@/lib/core/parsing/languages/php/queries.js';
-import { grammars } from '@/lib/core/parsing/grammar-registry.js';
+import { grammars } from "@/lib/core/parsing/index.js";
 
 /**
  * todo13 — the PHP query used to fail tree-sitter compilation (TSQueryErrorNodeType at offset 199)

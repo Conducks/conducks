@@ -1,5 +1,5 @@
-import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
-import { AnalyzeContext } from "@/lib/core/parsing/context.js";
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { sameFamily } from "@/lib/core/graph/index.js";

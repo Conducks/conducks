@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
-import { AnalyzeContext } from "../../core/parsing/context.js";
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { SynapsePersistence } from "../../core/persistence/persistence.js";
 import { Logger } from "@/lib/core/utils/index.js";
-import { grammars } from "../../core/parsing/grammar-registry.js";
+import { grammars } from "@/lib/core/parsing/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 
 const logger = new Logger("MicroPulse");

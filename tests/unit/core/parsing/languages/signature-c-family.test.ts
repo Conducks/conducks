@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
-import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
-import { AnalyzeContext } from '@/lib/core/parsing/context.js';
-import { CProvider } from '@/lib/core/parsing/languages/c/index.js';
-import { CPPProvider } from '@/lib/core/parsing/languages/cpp/index.js';
-import { CSharpProvider } from '@/lib/core/parsing/languages/csharp/index.js';
-import { JavaProvider } from '@/lib/core/parsing/languages/java/index.js';
-import { grammars } from '@/lib/core/parsing/grammar-registry.js';
-import type { ConducksProvider } from '@/lib/core/parsing/providers/base.js';
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
+import { CProvider } from "@/lib/core/parsing/index.js";
+import { CPPProvider } from "@/lib/core/parsing/index.js";
+import { CSharpProvider } from "@/lib/core/parsing/index.js";
+import { JavaProvider } from "@/lib/core/parsing/index.js";
+import { grammars } from "@/lib/core/parsing/index.js";
+import type { ConducksProvider } from "@/lib/core/parsing/index.js";
 
 /**
  * `dna.params`/`dna.returns` for c, cpp, csharp, java (ADR 0086, ADR 0084). Until 2026-08-01 these

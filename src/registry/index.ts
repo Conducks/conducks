@@ -24,7 +24,7 @@ import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/d
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
 import { assessRoot, explainScope } from "@/lib/core/utils/index.js";
-import { grammars } from "@/lib/core/parsing/grammar-registry.js";
+import { grammars } from "@/lib/core/parsing/index.js";
 import { UpdateCheck } from "@/lib/domain/federation/update-check.js";
 import { ProjectRegistry } from "@/lib/domain/federation/project-registry.js";
 import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
@@ -32,7 +32,7 @@ import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/filter
 import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
 import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
 import { SourceLineReader } from "@/lib/core/utils/index.js";
-import { firstLineOf } from "@/lib/core/parsing/doc-comments.js";
+import { firstLineOf } from "@/lib/core/parsing/index.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
 import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
@@ -50,20 +50,20 @@ import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/man
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
-import { PYTHON_SUITE } from "@/lib/core/parsing/languages/python/index.js";
-import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/languages/typescript/index.js";
-import { TSXProvider } from "@/lib/core/parsing/languages/tsx/index.js";
-import { JavaScriptProvider } from "@/lib/core/parsing/languages/javascript/index.js";
-import { GoProvider } from "@/lib/core/parsing/languages/go/index.js";
-import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
-import { RustProvider } from "@/lib/core/parsing/languages/rust/index.js";
-import { JavaProvider } from "@/lib/core/parsing/languages/java/index.js";
-import { CSharpProvider } from "@/lib/core/parsing/languages/csharp/index.js";
-import { CPPProvider } from "@/lib/core/parsing/languages/cpp/index.js";
-import { PHPProvider } from "@/lib/core/parsing/languages/php/index.js";
-import { RubyProvider } from "@/lib/core/parsing/languages/ruby/index.js";
-import { SwiftProvider } from "@/lib/core/parsing/languages/swift/index.js";
-import { CProvider } from "@/lib/core/parsing/languages/c/index.js";
+import { PYTHON_SUITE } from "@/lib/core/parsing/index.js";
+import { TYPESCRIPT_SUITE } from "@/lib/core/parsing/index.js";
+import { TSXProvider } from "@/lib/core/parsing/index.js";
+import { JavaScriptProvider } from "@/lib/core/parsing/index.js";
+import { GoProvider } from "@/lib/core/parsing/index.js";
+import { IgnoreManager } from "@/lib/core/parsing/index.js";
+import { RustProvider } from "@/lib/core/parsing/index.js";
+import { JavaProvider } from "@/lib/core/parsing/index.js";
+import { CSharpProvider } from "@/lib/core/parsing/index.js";
+import { CPPProvider } from "@/lib/core/parsing/index.js";
+import { PHPProvider } from "@/lib/core/parsing/index.js";
+import { RubyProvider } from "@/lib/core/parsing/index.js";
+import { SwiftProvider } from "@/lib/core/parsing/index.js";
+import { CProvider } from "@/lib/core/parsing/index.js";
 import { Logger, logger } from "@/lib/core/utils/index.js";
 import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
 import { EventEmitter } from "node:events";

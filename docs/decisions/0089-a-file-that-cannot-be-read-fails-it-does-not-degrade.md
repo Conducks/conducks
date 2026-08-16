@@ -2,7 +2,7 @@
 Status: Accepted
 - Date: 2026-08-01
 - Builds: 0070, 0088
-- Enforced by: tests/unit/core/parse-failure.test.ts (an invalid query, an unregistered parser and a valid file each behave as decided, and the error carries file, language and reason as fields), scripts/check-query-backticks.mjs (run by `npm run build` before tsc)
+- Enforced by: tests/unit/core/parsing/parse-failure.test.ts (an invalid query, an unregistered parser and a valid file each behave as decided, and the error carries file, language and reason as fields), scripts/check-query-backticks.mjs (run by `npm run build` before tsc)
 
 ## Context
 

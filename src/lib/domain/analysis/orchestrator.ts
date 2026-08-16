@@ -1,17 +1,17 @@
-import { grammars } from '@/lib/core/parsing/grammar-registry.js';
-import { ConducksPipeline } from "@/lib/core/parsing/pipeline.js";
+import { grammars } from "@/lib/core/parsing/index.js";
+import { ConducksPipeline } from "@/lib/core/parsing/index.js";
 import { GraphSkeletonBuilder } from "@/lib/domain/analysis/graph-skeleton-builder.js";
 import { WorkerPool } from "@/lib/domain/analysis/worker-pool.js";
 import { ReflectionPipeline } from "@/lib/domain/analysis/reflection-pipeline.js";
-import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
-import { AnalyzeContext } from "@/lib/core/parsing/context.js";
-import { essenceLens } from "@/lib/core/parsing/essence-lens.js";
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
+import { essenceLens } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
-import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { IgnoreManager } from "@/lib/core/parsing/index.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/contracts/index.js";

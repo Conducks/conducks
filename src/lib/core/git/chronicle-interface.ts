@@ -85,19 +85,19 @@ async function getDiscoverySurface(): Promise<DiscoverySurface> {
   if (discoverySurface) return discoverySurface;
 
   const modules = await Promise.all([
-    import("@/lib/core/parsing/languages/python/index.js"),
-    import("@/lib/core/parsing/languages/typescript/index.js"),
-    import("@/lib/core/parsing/languages/tsx/index.js"),
-    import("@/lib/core/parsing/languages/javascript/index.js"),
-    import("@/lib/core/parsing/languages/go/index.js"),
-    import("@/lib/core/parsing/languages/rust/index.js"),
-    import("@/lib/core/parsing/languages/java/index.js"),
-    import("@/lib/core/parsing/languages/csharp/index.js"),
-    import("@/lib/core/parsing/languages/cpp/index.js"),
-    import("@/lib/core/parsing/languages/php/index.js"),
-    import("@/lib/core/parsing/languages/ruby/index.js"),
-    import("@/lib/core/parsing/languages/swift/index.js"),
-    import("@/lib/core/parsing/languages/c/index.js")
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js"),
+    import("@/lib/core/parsing/index.js")
   ]);
 
   const declared = [

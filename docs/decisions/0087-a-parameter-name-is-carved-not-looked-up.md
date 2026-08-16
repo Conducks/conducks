@@ -4,7 +4,7 @@ Status: Accepted
 - Amended by: 0088
 - Amends: 0086
 - Builds: 0084
-- Enforced by: tests/unit/core/instance-type-capture.test.ts, tests/unit/core/languages/signature-c-family.test.ts, tests/unit/core/languages/signature-dynamic.test.ts, tests/unit/core/languages/signature-javascript.test.ts, tests/unit/core/languages/signature-go-rust-swift.test.ts (each language asserts the measured name, including markers, grouped declarations and the annotation-only case)
+- Enforced by: tests/unit/core/instance-type-capture.test.ts, tests/unit/core/parsing/languages/signature-c-family.test.ts, tests/unit/core/parsing/languages/signature-dynamic.test.ts, tests/unit/core/parsing/languages/signature-javascript.test.ts, tests/unit/core/parsing/languages/signature-go-rust-swift.test.ts (each language asserts the measured name, including markers, grouped declarations and the annotation-only case)
 
 ## Context
 

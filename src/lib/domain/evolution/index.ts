@@ -4,7 +4,7 @@ import { GVREngine, RefactorResult } from "./gvr-engine.js";
 import { ConducksWatcher } from "./watcher.js";
 import { DriftEngine, DriftResult } from "./drift-engine.js";
 import { AuditService, AuditResult } from "./audit-service.js";
-import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { IgnoreManager } from "@/lib/core/parsing/index.js";
 
 /**
  * Conducks — Structural Evolution Service 🧬

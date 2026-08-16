@@ -13,7 +13,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
-import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { IgnoreManager } from "@/lib/core/parsing/index.js";
 import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
 
 /**

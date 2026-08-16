@@ -32,16 +32,16 @@ is recorded and left; a fix is its own commit with its own measurement.
 
 ## Phase 0 — decide before cleaning
 - Builds: 0150
-- [ ] `ecmascript-positions.ts` reports 1 of 1 symbols undocumented while carrying a long file header. Either the harvester misses a file-level comment or those symbols genuinely lack one. Read `doc-comments.ts` against the file and say which. If the harvester is at fault the 138 is inflated and the work list is wrong
-- [ ] `doc` is not in `FILTERABLE_FIELDS`, so conducks cannot be asked which symbols lack a comment — the audit above needed a direct vault read. Decide whether that is a defect to record or a deliberate limit, and say which
+- [x] ANSWERED by todo69, before this phase started: the harvester joins BY LINE, and a file header sits above line 1, so a UNIT node can never receive one. Structural, not an authoring gap. 70 of the 138 are UNIT nodes, so the real symbol gap is 68 — the number this todo was written against was half artefact
+- [x] a DEFECT, and recorded rather than fixed here: conducks harvests `doc` into every node and cannot be asked which nodes lack one, so the tool cannot produce its own cleanup list. Every measurement in this campaign needed a direct vault read instead. Fixing it is one line in `FILTERABLE_FIELDS` plus a test, and it is a behaviour change (rule 16) — its own commit
 
 ## Phase 1 — the door
 - Builds: 0150
 - Depends: todo68#P0
-- [ ] `core/parsing/index.ts` re-exports exactly what the 24 external importers use today, so the door exists before anything moves behind it
-- [ ] every external importer points at the door, and the count of files reaching past it is zero — measured the same way the 24 was measured, not asserted
-- [ ] a test fails when any file outside `core/parsing` imports an internal path. It must fail against a deliberately added violation, or it proves nothing
-- [ ] types that domain genuinely needs move to `contracts/` rather than through the door, so the door shrinks instead of formalising today's sprawl
+- [x] the door exports 30 symbols — the reflector, `ParseFailure`, the grammar registry, the context, the ignore manager, the pipeline, the five processors, the doc harvest, the capture tags and the thirteen providers. Every `queries.ts`, resolver, extractor and bindings file stays inside
+- [x] 31 files repointed. NOT zero: `graph/linker-intra.ts` still imports `../parsing/languages/typescript/resolver.js`, found by the gate and not by grep — the FOURTH time a text search has undercounted in this campaign, and this one was invisible because the specifier contains no `core/parsing`
+- [>] deferred with its reason stated in the gate itself — `parsing` has a door and is not yet listed in `DOORS`. Every way to satisfy rule 1 for that one import costs something real: exporting the resolver through the door recreates the feature cycle rule 5b prevents, moving it to `contracts/` puts 237 lines of TypeScript module resolution in a vocabulary layer, and injecting it touches ~10 bare `new IntraLinker()` test sites where a silent default would be the failure-looks-like-absence conflation. Listing it would fail the gate; removing the violation quietly would pick a cost without saying so
+- [x] done across todo72 and todo73: `taxonomy`, `built-ins` and the prism types are in `contracts/`; `language-plugin` and `capture-tags` came INTO parsing because only parsing uses them
 
 ## Phase 2 — C1.7 support
 - Builds: 0150

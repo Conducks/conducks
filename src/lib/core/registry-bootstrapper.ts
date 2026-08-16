@@ -1,8 +1,8 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { chronicle } from "@/lib/core/git/index.js";
-import { grammars } from "@/lib/core/parsing/grammar-registry.js";
-import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
+import { grammars } from "@/lib/core/parsing/index.js";
+import { IgnoreManager } from "@/lib/core/parsing/index.js";
 import { logger } from "@/lib/core/utils/index.js";
 import { traceMemory } from "@/lib/core/utils/index.js";
 import { isNeverAProjectRoot } from "@/lib/core/utils/index.js";

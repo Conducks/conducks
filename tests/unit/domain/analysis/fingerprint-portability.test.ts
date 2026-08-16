@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterEach } from '@jest/globals';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
-import { AnalyzeContext } from '@/lib/core/parsing/context.js';
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { chronicle } from '@/lib/core/git/index.js';
 
 /**

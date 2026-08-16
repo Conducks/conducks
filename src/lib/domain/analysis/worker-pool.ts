@@ -1,7 +1,7 @@
-import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
-import { AnalyzeContext } from "@/lib/core/parsing/context.js";
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
-import { grammars } from "@/lib/core/parsing/grammar-registry.js";
+import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
 import type { PrismSpectrum } from "@/contracts/index.js";
 import { spawn } from "node:child_process";

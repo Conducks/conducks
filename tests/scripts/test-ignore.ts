@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { IgnoreManager } from "../../src/lib/core/parsing/ignore-manager.js";
+import { IgnoreManager } from "@/lib/core/parsing/index.js";
 import { registry } from '../../src/registry/index.js';
 
 const root = path.join(process.cwd(), "../archive/TargetedCV");

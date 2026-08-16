@@ -3,7 +3,7 @@ Status: Accepted
 - Date: 2026-08-01
 - Amends: 0087
 - Builds: 0086
-- Enforced by: tests/unit/core/instance-type-capture.test.ts (a standalone and an async generator each produce a node and record their parameters), tests/unit/core/languages/signature-go-rust-swift.test.ts (Swift parameters captured through the inline form, argument label kept, and a zero-parameter function)
+- Enforced by: tests/unit/core/instance-type-capture.test.ts (a standalone and an async generator each produce a node and record their parameters), tests/unit/core/parsing/languages/signature-go-rust-swift.test.ts (Swift parameters captured through the inline form, argument label kept, and a zero-parameter function)
 
 ## Context
 

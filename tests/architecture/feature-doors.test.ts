@@ -43,6 +43,25 @@ const DOORS = [
 ];
 
 /**
+ * `lib/core/parsing` HAS a door — `src/lib/core/parsing/index.ts`, and 31 files use it — but is NOT
+ * listed above, and the reason is a decision rather than an oversight (todo68).
+ *
+ * `graph/linker-intra.ts` imports `../parsing/languages/typescript/resolver.js` and constructs it to
+ * resolve a specifier to a file. Every way of satisfying rule 1 here costs something real:
+ *
+ *   - export it through parsing's door → graph imports parsing's door while parsing imports graph's,
+ *     which is the feature cycle rule 5b exists to prevent;
+ *   - move it to `contracts/` → 237 lines of TypeScript-specific module resolution in a layer that
+ *     holds shared vocabulary, not language logic;
+ *   - inject it → ~10 test sites construct `new IntraLinker()` bare, and a default that silently
+ *     does nothing is the failure-looks-like-absence conflation this codebase keeps paying for.
+ *
+ * Listing it here with the violation present would fail the gate; removing the violation quietly
+ * would pick one of those costs without saying so. So the door exists, the gate does not yet hold it,
+ * and the choice is stated where someone will read it.
+ */
+
+/**
  * Test files that belong to a feature despite sitting outside its own folder, and may therefore
  * reach its internals. Each entry is a deliberate exception with a reason, never a convenience.
  */

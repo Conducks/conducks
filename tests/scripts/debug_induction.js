@@ -1,7 +1,7 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { ConducksReflector } from './src/lib/core/parsing/reflector.js';
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
 import { chronicle } from './src/lib/core/git/index.js';
-import { GrammarRegistry } from './src/lib/core/parsing/grammar-registry.js';
+import { GrammarRegistry } from "@/lib/core/parsing/index.js";
 import { AnalysisContext } from './src/lib/domain/analysis/context.js';
 import path from 'path';
 
