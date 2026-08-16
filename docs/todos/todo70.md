@@ -1,7 +1,7 @@
 # todo70 — the git door's four rule violations, each with its own measurement
-Status: blocked
+Status: todo
 - Acceptance: `core/git` satisfies every applicable rule of ADR 0150 — no mutable state on the door, no logic duplicated inside or outside it, and no operation carried without a caller or a stated reason.
-- Blocked by: removing the `chronicle` singleton needs constructor injection through `core/parsing/reflector.ts` and `core/persistence/persistence.ts`, which have no adversarial tests yet. Rule 13 — leaves first — applies to this fix as much as to the features: injecting into the two largest files in the codebase before either is pinned is how a parse-path regression becomes unattributable. Clears when todo68 (parsing) and the persistence clean have closed.
+- UNBLOCKED 2026-08-16: both prerequisites are met. `core/persistence` is cleaned and carries an adversarial suite; `core/parsing` has a door, zero doc gaps, and its behaviour is held by four oracles that read unchanged through the whole campaign. What remains owed in parsing is per-handler reflector coverage, which the injection does not touch.
 
 ## Context
 

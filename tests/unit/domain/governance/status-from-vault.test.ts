@@ -6,7 +6,7 @@ import { GovernanceService } from '@/lib/domain/governance/index.js';
 import { ConducksAdvisor } from '@/lib/domain/governance/advisor.js';
 import { ConducksSentinel } from '@/lib/domain/governance/sentinel.js';
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 /**
  * `statusFromVault()` (todo21#P5).

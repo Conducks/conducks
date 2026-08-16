@@ -753,3 +753,79 @@ Stated rather than implied, because the work is real and the todo carries it as 
   exactly the ambiguity rule 13 exists to prevent.
 - **Nine language packs have no oracle.** They are documented and they parse. Nothing measures
   whether their queries are RIGHT, and this campaign did not change that.
+
+---
+
+## core/persistence — the last core feature, and the asymmetry that cost the most (2026-08-16)
+
+Three files, 1,950 lines, 22 external importers. It imports only through the four finished doors plus
+`core/registry/synapse-registry`, which is a sixth core area with no door of its own — noted below.
+
+### The door makes CONDUCKS-5 checkable
+
+That convention already said "all persistence goes through the driver interface; direct DuckDB calls
+are forbidden outside this layer". It was a rule people remembered. `getRawConnection` is exported
+because two callers genuinely need it, and now every such caller is visible in one file rather than
+wherever an import can be written. 38 files repointed, gate green on the first run — the only feature
+so far where no hidden importer appeared.
+
+### `save()` writes no structure, and the name is the trap
+
+The single most expensive defect of this session, now a stated contract with a test:
+
+`save()` writes metadata and the `pulses` row and commits. Nodes and edges go through `saveNodes` and
+`saveEdges`, which only the analyze path called. So the watcher's "Persisting structural delta to
+vault" was a no-op for as long as that line existed, and a separate process kept answering from the
+last full analyze (todo67 Phase 1b).
+
+**The call SUCCEEDS.** That is the whole problem, and it is why the test asserts a count of zero
+rather than an error: a caller reading `save(graph)` has every reason to expect the graph to be
+saved.
+
+`save-writes-no-structure.test.ts` — 6 cases, 3 mutations, 3 failures. Two more rules ride along
+because they share the failure shape, a call that succeeds while doing nothing a caller would
+recognise:
+
+- a read-only handle THROWS on a mutational statement rather than dropping it, which is what makes a
+  read command's mistake visible;
+- `purgeUnits` removes the unit's OWN row and not merely its children — matching `unitId` alone left
+  every unit row behind and made `analyze`'s reconcile find the same units "no longer discoverable"
+  on every pulse, unbounded churn against a store that never reclaims deleted versions (ADR 0037).
+
+### Docs
+
+29 real gaps → 0. The ones worth reading are the constraints the code cannot show: one writer and
+many readers, so a reader arriving mid-pulse is served the PREVIOUS pulse's snapshot rather than
+blocked (ADR 0040); the schema is ADDITIVE ONLY, so an older vault gains columns and keeps its rows
+and no migration exists; and the two `exec` closures run against the connection directly because they
+ARE the transaction, and routing them through the read-only guard would refuse the COMMIT that
+publishes a legitimate write.
+
+### Rule table — core/persistence
+
+| rule | |
+|---|---|
+| 1 one door | PASS |
+| 2 a test enforces it | PASS — fifth door in the gate |
+| 3 inside is private, own tests exempt | PASS |
+| 4 no mutable state on the door | PASS — `getInstance` is per-vault-path and the class is constructed by callers |
+| 5 shared types to `contracts/` | n/a |
+| 6 comments | PASS — 29 gaps → 0 |
+| 7 no dead code | PASS |
+| 8 every line has a purpose | PASS |
+| 9 no duplicated logic | PASS |
+| 10 every claim tested, and it bites | PASS — 6 cases, 3 mutations |
+| 11 adversarial | PASS |
+| 12 leaves tested from inside | n/a |
+| 13 leaves first | PASS |
+| 14 one unit per commit | PASS |
+| 15 gates after each unit | PASS |
+| 16 cleaning is not fixing | PASS — nothing changed behaviour |
+
+**14 PASS, 2 n/a, 0 open.** Second feature to satisfy every applicable rule, after `contracts`.
+
+### What this unblocks
+
+`todo70` — git's rules 4 and 9 — was blocked on "parsing and persistence cleaned". Both now are. The
+`chronicle` singleton can be injected through `reflector.ts` and `persistence.ts` with both files
+pinned, which is what rule 13 was waiting for.

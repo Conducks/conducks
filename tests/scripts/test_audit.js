@@ -1,4 +1,4 @@
-const { DuckDbPersistence } = require('./conducks/build/src/lib/core/persistence/persistence.js');
+const { DuckDbPersistence } = require("@/lib/core/persistence/index.js");
 const { ConducksAdjacencyList } = require("@/lib/core/graph/index.js");
 const { GovernanceService } = require('./conducks/build/src/lib/domain/governance/index.js');
 const { ConducksAdvisor } = require('./conducks/build/src/lib/domain/governance/advisor.js');

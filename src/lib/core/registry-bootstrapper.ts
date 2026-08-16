@@ -1,5 +1,5 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
 import { IgnoreManager } from "@/lib/core/parsing/index.js";

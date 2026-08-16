@@ -10,7 +10,7 @@
  * `KEY=value` line per fact so the parent can parse it without a protocol.
  */
 import fs from 'node:fs';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 const [, , mode, root, signal] = process.argv;
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 /**
  * todo24#P3 — the pulse is checked by what it WROTE, not by what it ran.

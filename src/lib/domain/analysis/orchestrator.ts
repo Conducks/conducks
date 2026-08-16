@@ -9,8 +9,8 @@ import { essenceLens } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
-import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
+import { FileHashGate } from "@/lib/core/persistence/index.js";
 import { IgnoreManager } from "@/lib/core/parsing/index.js";
 import path from "node:path";
 

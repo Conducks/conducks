@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import fs from 'node:fs';
 import path from 'node:path';
 

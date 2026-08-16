@@ -39,6 +39,7 @@ const DOORS = [
   'contracts',
   'lib/core/git',
   'lib/core/graph',
+  'lib/core/persistence',
   'lib/core/utils',
 ];
 

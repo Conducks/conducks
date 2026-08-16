@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from '@jest/globals';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 /**
  * `reclaimVault()` — the gate between `bloatRatio()` and `compact()` (ADR 0037).

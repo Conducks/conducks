@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from '@jest/globals';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { DriftEngine } from '@/lib/domain/evolution/drift-engine.js';
-import type { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import type { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksReflector } from "@/lib/core/parsing/index.js";
 import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 

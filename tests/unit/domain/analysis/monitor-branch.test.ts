@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
 import { ProjectRegistry } from '@/lib/domain/federation/project-registry.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
-import { FileHashGate } from '@/lib/core/persistence/file-hash-gate.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
+import { FileHashGate } from "@/lib/core/persistence/index.js";
 
 /**
  * The monitor's branch dimension (ADR 0035, todo20#P1).

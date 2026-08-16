@@ -1,20 +1,20 @@
 import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import { logger } from "@/lib/core/utils/index.js";
-import { classifyFreshness } from "@/lib/core/persistence/freshness.js";
+import { classifyFreshness } from "@/lib/core/persistence/index.js";
 import { writeWatcherMarker, clearWatcherMarker, HEARTBEAT_INTERVAL_MS } from "@/lib/domain/evolution/watcher-liveness.js";
 import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { GlobalSymbolLinker } from "@/lib/core/graph/index.js";
 import { IntraLinker } from "@/lib/core/graph/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
 import { IgnoreManager } from "@/lib/core/parsing/index.js";
-import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
+import { FileHashGate } from "@/lib/core/persistence/index.js";
 
 /**
  * FIX 3: Remove the `registry` import entirely.

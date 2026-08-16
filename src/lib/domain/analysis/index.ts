@@ -1,6 +1,6 @@
 import { AnalyzeOrchestrator } from "./orchestrator.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { essenceLens } from "@/lib/core/parsing/index.js";
 import { buildBoard, enforcedByPaths } from "@/lib/domain/analysis/docs-board.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 /**
  * A type-only import is erased by the compiler, so it is not a runtime dependency and must not

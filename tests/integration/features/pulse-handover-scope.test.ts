@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 /**
  * A handover belongs to the SCOPE it happens in — PULSES_TO scoping (todo25#P13, ADR 0059's open

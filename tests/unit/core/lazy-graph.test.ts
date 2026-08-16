@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { RegistryBootstrapper } from '@/lib/core/registry-bootstrapper.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import fs from 'node:fs';
 import os from 'node:os';

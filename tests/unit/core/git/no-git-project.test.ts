@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ChronicleInterface } from '@/lib/core/git/chronicle-interface.js';
 import { branchGuard } from '@/interfaces/cli/index.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
 import { ProjectRegistry } from '@/lib/domain/federation/project-registry.js';
 import { buildBoard } from '@/lib/domain/analysis/docs-board.js';
@@ -109,7 +109,7 @@ describe('a directory with no .git', () => {
     const rel = 'src/a.ts';
     fs.mkdirSync(path.join(root, 'src'), { recursive: true });
     fs.writeFileSync(path.join(root, rel), 'export const a = 1;');
-    const { FileHashGate } = await import('@/lib/core/persistence/file-hash-gate.js');
+    const { FileHashGate } = await import("@/lib/core/persistence/index.js");
     await p.setFileHash(path.join(root, rel), FileHashGate.hash('export const a = 1;'), 19);
     await p.close();
 

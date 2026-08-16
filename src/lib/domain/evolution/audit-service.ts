@@ -1,4 +1,4 @@
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { logger } from "@/lib/core/utils/index.js";
 
 /**

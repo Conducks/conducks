@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ChronicleInterface, branchMismatch, branchRefusalMessage } from '@/lib/core/git/chronicle-interface.js';
 import { branchGuard } from '@/interfaces/cli/index.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 /**
  * The branch guard (ADR 0035, todo20#P1).

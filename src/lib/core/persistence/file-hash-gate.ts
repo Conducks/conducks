@@ -24,6 +24,7 @@ export class FileHashGate {
    */
   private cache = new Map<string, string>();
 
+  /** Reads and writes hashes through the vault; holds no state of its own between calls. */
   constructor(private readonly persistence: SynapsePersistence) {}
 
   /** SHA-256 of the exact bytes on disk. Content only — no path, no mtime. */

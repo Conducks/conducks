@@ -6,7 +6,7 @@ import { registry } from '../../build/src/registry/index.js';
 const buildRoot = path.join(process.cwd(), "build/src");
 
 async function runAudit() {
-    const { DuckDbPersistence } = await import(path.join(buildRoot, "lib/core/persistence/persistence.js"));
+    const { DuckDbPersistence } = await import(path.join(buildRoot, "@/lib/core/persistence/index.js"));
     const targetRoot = path.join(process.cwd(), "../archive/TargetedCV");
     const persistence = new DuckDbPersistence(targetRoot);
     

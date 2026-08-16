@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { DuckDbPersistence } from '../../build/src/lib/core/persistence/persistence.js';
+import { DuckDbPersistence } from "@/lib/core/persistence/index.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 async function debugGraph() {

@@ -1,5 +1,5 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { AnalysisService, AnalyzeOrchestrator, Conducks } from "@/lib/domain/analysis/index.js";
 import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";

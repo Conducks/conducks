@@ -19,6 +19,20 @@ import type { ConducksComponent } from "@/contracts/index.js";
 
 
 
+/**
+ * The vault — every read and write of the analysed graph, and the only place DuckDB is spoken to
+ * (CONDUCKS-5).
+ *
+ * ONE WRITER, MANY READERS, and that is the constraint most of this file exists to serve. A write
+ * takes an exclusive lock, so a reader arriving mid-pulse is served the PREVIOUS pulse's snapshot
+ * rather than blocked or given a half-written graph (ADR 0040). `servedFromSnapshot` is how a caller
+ * can tell which it got.
+ *
+ * `save()` DOES NOT WRITE STRUCTURE. It writes metadata and the `pulses` row and commits. Nodes and
+ * edges go through `saveNodes` and `saveEdges` — a caller expecting `save(graph)` to persist a graph
+ * gets a successful call that stored nothing, which is precisely what the watcher did for as long as
+ * it existed (todo67).
+ */
 export class SynapsePersistence {
   private static instance: SynapsePersistence;
   private db: DuckDBConnection | null = null;
@@ -57,10 +71,12 @@ export class SynapsePersistence {
     try { await this.run("ROLLBACK"); } catch { /* connection may already be gone */ }
   }
 
+  /** Does NOT open the vault — `ensureVaultOpen` does, on first use, so constructing one is free. */
   constructor(private vaultPath: string, readOnly = false) {
     this.readOnly = readOnly;
   }
 
+  /** One instance per vault path, because two writers to one file is the case the lock exists for. */
   public static getInstance(vaultPath: string): SynapsePersistence {
     if (!SynapsePersistence.instance) {
       SynapsePersistence.instance = new SynapsePersistence(vaultPath);
@@ -72,10 +88,17 @@ export class SynapsePersistence {
     return SynapsePersistence.instance;
   }
 
+  /**
+   * Read-only is the DEFAULT for every command except `analyze` and `clean` (cli/index.ts).
+   *
+   * It is not advisory: `run()` throws on a mutational statement against a read-only handle, which
+   * is what stops a read command taking the write lock and blocking every other reader.
+   */
   public setReadOnly(val: boolean) {
     this.readOnly = val;
   }
 
+  /** Whether a connection is open. False is normal — the vault opens lazily on first use. */
   public isConnected(): boolean {
     return this.db !== null;
   }
@@ -107,6 +130,11 @@ export class SynapsePersistence {
     return `${this.dbFile()}.reader`;
   }
 
+  /**
+   * Whether DuckDB refused because another process holds the write lock — the ONE error that has a
+   * good answer. A reader that hits it falls back to the previous pulse's snapshot; anything else is
+   * a real failure and is not swallowed (ADR 0040).
+   */
   private isLockError(err: unknown): boolean {
     return /Could not set lock|Conflicting lock/i.test(String((err as { message?: string })?.message ?? err));
   }
@@ -131,6 +159,12 @@ export class SynapsePersistence {
     }
   }
 
+  /**
+   * Opens the vault if it is not open, and decides what a reader gets when a writer holds it.
+   *
+   * Every public method funnels through here rather than opening its own connection, so the lock
+   * fallback, the schema check and the read-only refusal are decided once instead of per call site.
+   */
   private async ensureVaultOpen(): Promise<DuckDBConnection> {
     if (this.db) return this.db;
 
@@ -267,6 +301,7 @@ export class SynapsePersistence {
     return this.answeringFromSnapshot;
   }
 
+  /** The pulse the vault currently answers from, and whether it came from the live file or a snapshot. */
   public async currentPulse(): Promise<{ id: string; timestamp: number; commitHash: string | null; branch: string | null } | null> {
     const rows = await this.query<{ id: string; timestamp: number; commitHash: string | null; branch: string | null }>(
       `SELECT id, timestamp, commitHash, branch FROM pulses ORDER BY timestamp DESC LIMIT 1`);
@@ -302,6 +337,13 @@ export class SynapsePersistence {
     return `🛡️ [Vault Error] Could not anchor synapse at ${dbPath}: ${raw}`;
   }
 
+  /**
+   * Creates the tables and adds any column this build knows that the file does not.
+   *
+   * ADDITIVE ONLY — `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. An older vault opened by a newer
+   * build gains the column and keeps its rows; a newer vault opened by an older build is missing
+   * nothing it reads. Neither direction requires a re-analyze, which is why no migration exists.
+   */
   private async initializeSchema(): Promise<void> {
     if (this.readOnly) return; // 🛡️ [Conducks Gating] Skip schema initialization in read-only mode.
     const run = async (sql: string) => { await this.db!.run(sql); };
@@ -711,6 +753,12 @@ export class SynapsePersistence {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /**
+   * Writes node rows. One of the two methods that persist STRUCTURE — `save()` does not.
+   *
+   * The column list is a fixed whitelist: a property this does not name never reaches the vault,
+   * whatever the graph holds. `metadata` is the carrier for anything outside it.
+   */
   public async saveNodes(nodes: any[], pulseId: string): Promise<void> {
     if (this.readOnly) return;
     await this.ensureVaultOpen();
@@ -748,6 +796,10 @@ export class SynapsePersistence {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /**
+   * Writes edge rows. Reads `.properties` and `.confidence` — NOT `.metadata`/`.weight`, which is
+   * what an earlier version did, silently dropping every edge's properties and line number.
+   */
   public async saveEdges(edges: any[], pulseId: string): Promise<void> {
     if (this.readOnly) return;
     await this.ensureVaultOpen();
@@ -772,6 +824,14 @@ export class SynapsePersistence {
     }
   }
 
+  /**
+   * Removes a unit's rows and the edges it OWNS — matched on `unitId` OR `id`, because a unit's own
+   * row carries `unitId = NULL` and matching one alone left every unit row behind, which produced
+   * unbounded churn against a store that never reclaims deleted versions (ADR 0037).
+   *
+   * Its file hash goes too, deliberately: leaving one behind makes the file look analysed to the
+   * gate and it is skipped forever, with no nodes at all (ADR 0030).
+   */
   public async purgeUnits(unitIds: string[]): Promise<void> {
     if (this.readOnly) return;
     if (!unitIds.length) return;
@@ -851,6 +911,7 @@ export class SynapsePersistence {
     }
   }
 
+  /** One mutational statement. THROWS on a read-only handle — the refusal is the point, not a check. */
   public async run(sql: string, params: unknown[] = []): Promise<void> {
     if (this.readOnly) {
       throw new Error(`🛡️ [Persistence] WRITE BLOCKED: Attempted to execute mutational SQL on a Read-Only vault connection.`);
@@ -867,6 +928,7 @@ export class SynapsePersistence {
     await db.run(sql, params as any[]);
   }
 
+  /** One read. Available on a read-only handle, which is every command except `analyze` and `clean`. */
   public async query<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {
     const db = await this.ensureVaultOpen();
     try {
@@ -951,6 +1013,7 @@ export class SynapsePersistence {
       entries.map(e => [e.file.toLowerCase(), e.hash, e.sizeBytes, now]));
   }
 
+  /** Records that a file was analysed at this content. The gate skips a file whose hash is unchanged. */
   public async setFileHash(file: string, hash: string, sizeBytes: number): Promise<void> {
     if (this.readOnly) return;
     await this.run(
@@ -965,6 +1028,7 @@ export class SynapsePersistence {
     await this.run("DELETE FROM file_hashes WHERE file = ?", [file.toLowerCase()]);
   }
 
+  /** Writes PageRank back after the ranker runs — computed in memory, persisted once (CONDUCKS-6). */
   public async updateRanks(nodeRanks: Array<{ id: string, gravity: number, isEntryPoint?: boolean }>): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
@@ -994,6 +1058,9 @@ export class SynapsePersistence {
     if (!changed.length) return;
 
     try {
+      // Runs against the connection DIRECTLY rather than through `run()`, because these statements
+      // are the transaction itself — routing them through the read-only guard would refuse the
+      // COMMIT that publishes a legitimate write.
       const exec = async (sql: string) => { await db.run(sql); };
       const owned = !this.inPulse;
       if (owned) await exec("BEGIN TRANSACTION");
@@ -1011,15 +1078,20 @@ export class SynapsePersistence {
     }
   }
 
+  /** Recomputes the risk column from what is already stored, in SQL rather than row by row (CONDUCKS-7). */
   public async updateRisks(): Promise<void> {
     if (this.readOnly) return;
     await this.run(`UPDATE nodes SET risk = LEAST(COALESCE(complexity, 1) / 50.0, 1.0) WHERE canonicalKind IN ('BEHAVIOR', 'STRUCTURE', 'ATOM')`);
   }
 
+  /** Rebinds edges the intra-linker resolved, so a later session need not re-derive them. */
   public async updateEdgeTargets(rebinds: Array<{ id: string, newTargetId: string }>): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     try {
+      // Runs against the connection DIRECTLY rather than through `run()`, because these statements
+      // are the transaction itself — routing them through the read-only guard would refuse the
+      // COMMIT that publishes a legitimate write.
       const exec = async (sql: string) => { await db.run(sql); };
       const owned = !this.inPulse;
       if (owned) await exec("BEGIN TRANSACTION");
@@ -1211,6 +1283,12 @@ export class SynapsePersistence {
     return { nodes: Number(row?.n ?? 0), edges: Number(row?.e ?? 0) };
   }
 
+  /**
+   * Deletes rows no longer claimed by the current pulse — how a deleted file leaves the graph.
+   *
+   * Keyed on the pulse rather than on the filesystem: a file that failed to parse is absent from the
+   * pulse but present on disk, and treating absence-from-disk as the rule would delete it.
+   */
   public async sweepRowsNotInPulse(pulseId: string, scope?: string): Promise<{ nodes: number; edges: number }> {
     if (this.readOnly) return { nodes: 0, edges: 0 };
     await this.ensureVaultOpen();
@@ -1449,6 +1527,7 @@ export class SynapsePersistence {
     return dropped;
   }
 
+  /** Empties the vault. The write half of `conducks clean`; refuses on a read-only handle. */
   public async clear(): Promise<void> {
     if (this.readOnly) return;
     await this.run('DELETE FROM nodes');
@@ -1456,6 +1535,7 @@ export class SynapsePersistence {
     await this.run('DELETE FROM pulses');
   }
 
+  /** One node with its heavy columns — the ones the graph load deliberately leaves behind. */
   public async fetchNodeDeep(nodeId: string): Promise<any | null> {
     const rows = await this.query('SELECT * FROM nodes WHERE id = ?', [nodeId.toLowerCase()]);
     if (!rows || rows.length === 0) return null;
@@ -1477,6 +1557,11 @@ export class SynapsePersistence {
     };
   }
 
+  /**
+   * The DuckDB connection itself, for the two callers that genuinely need it. Exported through the
+   * door so every such caller is visible in one place rather than wherever an import can be written
+   * (CONDUCKS-5).
+   */
   public async getRawConnection(): Promise<DuckDBConnection> {
     return await this.ensureVaultOpen();
   }
@@ -1580,6 +1665,7 @@ export class SynapsePersistence {
     }
   }
 
+  /** Writes the kinetic columns in one statement, rather than a round trip per node. */
   public async updateKineticColumns(nodeId: string, data: {
     blame_age_days?: number;
     churn_count_90d?: number;
@@ -1616,6 +1702,7 @@ export class SynapsePersistence {
    */
   private static readonly KEEP_PULSES = 20;
 
+  /** Copies the vault beside itself, so a reader arriving mid-write has a consistent file (ADR 0040). */
   public async snapshotHistory(pulseId: string): Promise<void> {
     if (this.readOnly) return;
     await this.run(
@@ -1682,6 +1769,11 @@ export class SynapsePersistence {
     return this.compact();
   }
 
+  /**
+   * Rewrites the file to reclaim space. DuckDB never reclaims deleted row versions in place
+   * (ADR 0037), so a long-lived vault grows regardless of how much it holds — measured at 8.7 MB of
+   * rows inside 235 MB.
+   */
   public async compact(): Promise<{ before: number; after: number } | null> {
     if (this.readOnly) {
       throw new Error('🛡️ [Persistence] COMPACT BLOCKED: cannot rewrite a read-only vault.');
@@ -1753,6 +1845,7 @@ export class SynapsePersistence {
     }
   }
 
+  /** Releases the connection and the lock. A held lock is what makes every other reader wait. */
   public async close(): Promise<void> {
     // The snapshot exists so that readers survive THIS write session. Once the session is over the
     // vault is unlocked again and readers go straight to it, so keeping the copy would make ADR

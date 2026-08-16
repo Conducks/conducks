@@ -1,4 +1,4 @@
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { Logger } from "@/lib/core/utils/index.js";
 
 const logger = new Logger("QueryService");

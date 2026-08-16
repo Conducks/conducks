@@ -9,7 +9,7 @@ import { GlobalSymbolLinker } from "@/lib/core/graph/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { ConducksSearch } from "@/lib/domain/intelligence/search-engine.js";
 import { ConducksFlowEngine } from "@/lib/domain/kinetic/flow-engine.js";
-import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { GVREngine } from "@/lib/domain/evolution/gvr-engine.js";
 import { ResonanceAnalyzer } from "@/lib/domain/metrics/resonance.js";

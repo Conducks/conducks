@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
 import { ProjectRegistry } from '@/lib/domain/federation/project-registry.js';
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
-import { FileHashGate } from '@/lib/core/persistence/file-hash-gate.js';
+import { SynapsePersistence } from "@/lib/core/persistence/index.js";
+import { FileHashGate } from "@/lib/core/persistence/index.js";
 
 /**
  * The monitor reports; it never fixes (todo17 Phases 2-3, ADR 0030). These cover the parts that decide
