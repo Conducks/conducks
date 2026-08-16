@@ -265,3 +265,52 @@ Measured, not assumed:
 - **`getCommitResonance`, `isRepository`, `resolveTarget`, `resolveRef` and `readRef`** still have no
   `src/` caller. Three of them are the ADR 0035 layer model that `todo48#P4` measured and left
   carried; that decision is still open and is not this campaign's.
+
+### The four operations no test named, and the rule table
+
+Found by asking which public operations appear in no test file, not by reading. Three looked
+trivial; one was the pulse's entire read path.
+
+`door-untested-operations.test.ts` — 12 cases over `streamBatches`, `branchRefusal`,
+`getLastPulsedCommit` and `setLastPulsedCommit`. Three mutations, three failures: keeping an
+unreadable file as empty source, naming only one branch in the refusal, and writing the pulsed commit
+under a different metadata key.
+
+The second mutation initially reported PASS, and the test was nearly recorded as vacuous. The perl
+substitution had not matched the template literal — the mutation never applied. Re-applied with an
+assertion that the anchor exists, it failed the case by name. **A mutation that reports no failure is
+first a claim about the mutation.**
+
+`streamBatches` carries the rule that an unreadable file is DROPPED rather than yielded as empty
+source, and a counter-test pins the other side: a genuinely zero-byte file must survive. Empty source
+parses fine, produces a unit node with no symbols, and is recorded in the hash gate as analysed — so
+without the distinction a permissions error becomes a file that is permanently blank in the graph.
+
+**Where `core/git` stands against ADR 0150, stated per rule rather than summarised:**
+
+| rule | |
+|---|---|
+| 1 one door | PASS |
+| 2 a test enforces it | PASS — `src/` and `tests/`, both assertions mutated |
+| 3 inside is private, own tests exempt | PASS |
+| 4 no mutable state on the door | **OPEN** — `chronicle` is a singleton with a public `setProjectDir` |
+| 5 shared types to `contracts/` | n/a — none are shared |
+| 6 comments | PASS, less two UNIT nodes the harvester cannot reach |
+| 7 no dead code | **OPEN** — `isRepository` has no caller and no stated reason to keep |
+| 8 every line has a purpose | **OPEN** — the repo-relative block is inlined four times beside its helper |
+| 9 no duplicated logic | **OPEN** — that block, and `project-monitor` re-implementing two operations |
+| 10 every claim tested, and it bites | PASS — 26 cases, 9 mutations, 9 failures |
+| 11 adversarial | PASS |
+| 12 leaves tested from inside | n/a — one file, no leaves |
+| 13 leaves first | PASS |
+| 14 one unit per commit | PASS |
+| 15 gates after each unit | PASS |
+| 16 cleaning is not fixing | PASS |
+
+Eleven pass, two are not applicable, **four are open** — and all four are behaviour changes, which is
+precisely why they were not done inside a clean. They are todo70, and rule 4 is the root of rule 9:
+the door exports a singleton, so `project-monitor` cannot use the feature and duplicates it instead.
+
+**"Git is done" was said one message before this table existed, and was wrong.** The CLEAN was
+finished; the feature was not rule-clean. The table is what makes the difference visible, and it is
+the shape every later feature gets.
