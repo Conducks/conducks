@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
 import fs from "node:fs";
 import path from "node:path";
-import { chronicle } from "../git/chronicle-interface.js";
+import { chronicle } from "@/lib/core/git/index.js";
 import { logger } from "../../core/utils/logger.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";

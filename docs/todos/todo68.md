@@ -18,15 +18,20 @@ failure attributable to the unit under test rather than to something below it.
 Parsing is NOT the first feature cleaned, and was going to be. It depends on
 `types/language-plugin` (13 of its files), `graph/adjacency-list`, `graph/external-nodes` and
 `utils/path-utils`, so cleaning it first would build on a foundation nobody had verified. todo69
-runs the same method on `core/git` — which imports nothing at all — and this todo waits on it, so
-the method is proven on one file before it is spent on 69.
+ran the same method on `core/git` — which imports nothing at all — and closed on 2026-08-16, so the
+method is proven on one file before it is spent on 69. The `- Depends:` on it was removed when it
+moved to `completed/`: that folder is not scanned, so the address stops resolving and the gate fails
+the file. A finished dependency is stated in prose, not left as a link to a record nobody reads.
+
+What todo69 already answered, so this todo does not re-ask it: the doc harvester cannot attach a file
+header to a file node — it joins by line, and a header sits above line 1. **70 of the 138 gaps below
+are UNIT nodes**, so the real symbol gap is 68.
 
 Behaviour does not change during a clean (ADR 0150 rule 16). A defect found outside the current unit
 is recorded and left; a fix is its own commit with its own measurement.
 
 ## Phase 0 — decide before cleaning
 - Builds: 0150
-- Depends: todo69#P4
 - [ ] `ecmascript-positions.ts` reports 1 of 1 symbols undocumented while carrying a long file header. Either the harvester misses a file-level comment or those symbols genuinely lack one. Read `doc-comments.ts` against the file and say which. If the harvester is at fault the 138 is inflated and the work list is wrong
 - [ ] `doc` is not in `FILTERABLE_FIELDS`, so conducks cannot be asked which symbols lack a comment — the audit above needed a direct vault read. Decide whether that is a defect to record or a deliberate limit, and say which
 

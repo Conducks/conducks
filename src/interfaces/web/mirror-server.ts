@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GatewayService } from '@/lib/domain/analysis/gateway-service.js';
-import { chronicle } from '@/lib/core/git/chronicle-interface.js';
+import { chronicle } from '@/lib/core/git/index.js';
 import { Logger } from '@/lib/core/utils/logger.js';
 import { registry } from '@/registry/index.js';
 import http from 'node:http';

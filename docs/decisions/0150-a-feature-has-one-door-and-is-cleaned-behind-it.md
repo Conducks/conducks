@@ -1,5 +1,6 @@
 # 0150 — a feature has one door, and is cleaned behind it
 Status: Accepted
+- Enforced by: tests/architecture/feature-doors.test.ts
 - Date: 2026-08-16
 
 ## Context
@@ -104,6 +105,6 @@ before the counter-case was measured and had to be reverted.
 Cleaning is explicitly not fixing (rule 16). A clean that also changes behaviour cannot say which
 change caused which result, and this repository has paid for that twice in one session.
 
-`Open:` no boundary test exists yet, so rule 2 is unenforced and rule 1 is a convention until it
-lands. Writing it is Phase 1 of todo68; until that phase closes, this record is unbuilt and carries no
-`- Enforced by:` deliberately rather than pointing at a suite that would pass with the rule reversed.
+`Open:` the boundary test landed with todo69#P1 and holds `core/git` only — `DOORS` in that file is
+a list, and a feature is enforced from the moment its line is added. Every other feature remains a
+convention until its own door lands, and parsing's is todo68#P1.

@@ -12,7 +12,7 @@ import { CallProcessor } from "../../core/parsing/processors/call.js";
 import { HeritageProcessor } from "../../core/parsing/processors/heritage.js";
 import { FlowProcessor } from "../../core/parsing/processors/flow.js";
 import { AnalyzeContext } from "../../core/parsing/context.js";
-import { chronicle } from "../../core/git/chronicle-interface.js";
+import { chronicle } from "@/lib/core/git/index.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "../../core/algorithms/entropy.js";
 import { mapToCanonical, CanonicalKind, CanonicalRank } from "../../core/parsing/taxonomy.js";
 import path from "node:path";

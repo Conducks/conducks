@@ -208,3 +208,7 @@ banners started being refused. Look at what left before calling it either way. A
   from. None of them is covered by a test — dev tooling is what you reach for WHILE debugging, so it
   fails at the moment you need it and never before. One helper makes the next driver change one edit.
   — todo56
+
+## CONDUCKS-44 — a feature is entered through its door
+- Rule: outside code imports a feature only through `<feature>/index.ts`. The feature's own files and its own tests may import internals; nothing else may. A type two features share moves to `contracts/` rather than travelling through a door.
+- Reason: a feature reachable at many paths cannot be changed without checking every one of them. `core/parsing` is imported from outside at 24 separate files, which is why `reflector.ts` sits at 1,676 lines and `linker-intra.ts` at 1,120 — splitting either would mean checking two dozen call surfaces, so nobody has. Measured on `core/git`, three greps put the count at 8, then 10; the gate found 12, because a text search shaped like one import style cannot see `../git/...`. — ADR 0150, enforced by tests/architecture/feature-doors.test.ts

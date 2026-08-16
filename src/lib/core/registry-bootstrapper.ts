@@ -1,6 +1,6 @@
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { chronicle } from "@/lib/core/git/index.js";
 import { grammars } from "@/lib/core/parsing/grammar-registry.js";
 import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import { logger } from "@/lib/core/utils/logger.js";

@@ -1,3 +1,22 @@
+/**
+ * Conducks — every question this system asks of git. 🏺
+ *
+ * The one place a git subprocess is spawned, and therefore the one place where git's failure modes
+ * are decided. Two rules run through the whole file and explain most of its shape:
+ *
+ *   1. **A failure and an absence must never return the same value.** `getCommitsBehind` returns
+ *      null rather than 0, because 0 also means "you are current" and is the value that silences
+ *      the staleness banner. `getAuthorDistribution` returns null rather than `{}`, because an
+ *      empty map scores identical entropy to a perfectly-owned file. `streamBatches` drops an
+ *      unreadable file rather than yielding empty source, because empty source parses fine and gets
+ *      recorded in the hash gate as successfully analysed.
+ *   2. **A project with no repository is a supported input, not a broken one** (ADR 0035). Every
+ *      git-shaped answer here degrades to "not available" rather than throwing, and `discoverFiles`
+ *      falls back to a filesystem scan.
+ *
+ * Reached from outside only through `index.ts` (ADR 0150).
+ */
+
 import { execFileSync } from 'node:child_process';
 import fsSync from "node:fs";
 import path from 'node:path';
@@ -159,14 +178,25 @@ export function branchRefusalMessage(m: BranchMismatch): string {
 }
 
 /**
- * Conducks — Chronicle Interface (Git-Direct)
+ * Every git operation conducks performs, anchored at one project directory.
  *
- * Direct interaction with the Git Object Model for Chronoscopic Mirroring.
- * Replaces the generic filesystem crawler with a high-fidelity Git-native engine.
+ * OWNS: which files exist, what a file's history says, which branch and commit the checkout is on,
+ * and reading a ref's contents without checking it out.
+ *
+ * DOES NOT OWN: what any of that MEANS. Whether a commit distance is worth warning about, whether an
+ * author distribution is risky, whether a branch mismatch should refuse — all of that is decided by
+ * callers. This class reports facts and, where git cannot answer, reports that instead of guessing.
+ *
+ * `execFile` is injected so the whole surface can be driven without a repository — every adversarial
+ * case in `tests/unit/core/git/` uses that seam rather than building fixtures for a failing git.
  */
 export class ChronicleInterface {
   private projectDir: string;
 
+  /**
+   * `CONDUCKS_WORKSPACE_ROOT` wins over the process directory so a worker, an MCP server and the CLI
+   * all anchor at the same place regardless of where they were launched from.
+   */
   constructor(
     projectDir: string = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd(),
     private readonly execFile: typeof execFileSync = execFileSync
@@ -174,20 +204,6 @@ export class ChronicleInterface {
     this.projectDir = path.resolve(projectDir);
   }
 
-  /**
-   * The ONLY way this class runs git (ADR 0047, CONDUCKS-35).
-   *
-   * Arguments are passed as an ARRAY, so no value can reach a shell. Every command here used to be
-   * a template string run through `execSync`, which is `/bin/sh -c` — and the interpolated value
-   * was a repo-relative path from `git ls-files`, i.e. attacker-controlled in any cloned
-   * repository. Git allows a filename containing a quote and `$()`, so analysing a hostile repo
-   * executed whatever that filename said.
-   *
-   * The timeout is here rather than at each call site for the same reason (ADR 0049): nine call
-   * sites had none, so a corrupted or network-mounted `.git` hung the caller forever. 30s is
-   * generous for a local git operation and the first real timeout report is the measurement that
-   * corrects it.
-   */
   /**
    * Every repository root at or under `this.projectDir`, nearest first.
    *
@@ -206,6 +222,8 @@ export class ChronicleInterface {
     const roots: string[] = [];
     const skip = new Set(['node_modules', 'venv', '__pycache__', 'dist', 'build', 'out', '.next']);
 
+    // Records a root the moment it sees a `.git`, then keeps descending: a repository INSIDE a
+    // repository is the case this exists for, so stopping at the first hit would miss it.
     const walk = async (dir: string, depth: number): Promise<void> => {
       let entries;
       try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
@@ -220,6 +238,20 @@ export class ChronicleInterface {
     return roots;
   }
 
+  /**
+   * The ONLY way this class runs git (ADR 0047, CONDUCKS-35).
+   *
+   * Arguments are passed as an ARRAY, so no value can reach a shell. Every command here used to be
+   * a template string run through `execSync`, which is `/bin/sh -c` — and the interpolated value
+   * was a repo-relative path from `git ls-files`, i.e. attacker-controlled in any cloned
+   * repository. Git allows a filename containing a quote and `$()`, so analysing a hostile repo
+   * executed whatever that filename said.
+   *
+   * The timeout is here rather than at each call site for the same reason (ADR 0049): nine call
+   * sites had none, so a corrupted or network-mounted `.git` hung the caller forever. 30s is
+   * generous for a local git operation and the first real timeout report is the measurement that
+   * corrects it.
+   */
   private git(args: string[], opts: { quiet?: boolean; cwd?: string } = {}): string {
     return this.execFile('git', args, {
       cwd: opts.cwd ?? this.projectDir,
@@ -230,10 +262,15 @@ export class ChronicleInterface {
     }) as unknown as string;
   }
 
+  /**
+   * Re-anchors this instance. NOT resolved, unlike the constructor's argument — callers pass an
+   * already-absolute root, and resolving again would silently rewrite a path they had settled.
+   */
   public setProjectDir(dir: string): void {
     this.projectDir = dir;
   }
 
+  /** The directory every git command runs in, unless a call overrides it with its own repo root. */
   public getProjectDir(): string {
     return this.projectDir;
   }
@@ -311,6 +348,8 @@ export class ChronicleInterface {
     const fs = await import('node:fs/promises');
     const { extensions, filenames } = await getDiscoverySurface();
 
+    // The fallback walk, used only when git answered nothing. Accepts a file by extension or by
+    // exact filename — Ruby's `Rakefile` and a bare `Dockerfile` have no extension to match on.
     const scan = async (dir: string) => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
@@ -360,17 +399,6 @@ export class ChronicleInterface {
   }
 
   /**
-   * Legacy batch reader — now uses the stream generator internally.
-   */
-  public async readBatch(filePaths: string[], fromIndex: boolean = false): Promise<Record<string, string>> {
-    const results: Record<string, string> = {};
-    for await (const batch of this.streamBatches(filePaths, 20, fromIndex)) {
-      batch.forEach(item => results[item.path] = item.source);
-    }
-    return results;
-  }
-
-  /**
    * Reads the "Essence" (content) of a single file. (Primitive)
    */
   // NULL when the file could not be read; '' only when the file is genuinely empty. Returning ''
@@ -411,23 +439,6 @@ export class ChronicleInterface {
   // path is the one that must not confuse the two, and it uses streamBatches, which now drops them.
   public async readFile(filePath: string, fromIndex: boolean = false): Promise<string> {
     return (await this.readSingleFile(filePath, fromIndex)) ?? '';
-  }
-
-  /**
-   * Identifies all Federated Progenitors (Submodules).
-   */
-  public async getProgenitors(): Promise<string[]> {
-    try {
-      const output = this.git(['submodule', 'status']);
-      return (output as string).split('\n')
-        .filter(l => l.trim().length > 0)
-        .map(l => {
-          const parts = l.trim().split(' ');
-          return path.join(this.projectDir, parts[1]);
-        });
-    } catch {
-      return [];
-    }
   }
 
   /**
@@ -476,10 +487,6 @@ export class ChronicleInterface {
     }
   }
 
-  /**
-   * The repo-relative path, case-agnostically (critical on macOS and Windows). This was written out
-   * three times in this file, character for character, once per git-reading method.
-   */
   /** Cache: absolute directory -> the repository root that owns it, or null. */
   private gitRootCache = new Map<string, string | null>();
 
@@ -518,6 +525,17 @@ export class ChronicleInterface {
     return this.projectDir;
   }
 
+  /**
+   * The repo-relative path, case-agnostically — critical on macOS and Windows, where a path may
+   * differ from its root only by case and `path.relative` would then return a `../..` chain.
+   *
+   * FOUR call sites still inline this by hand instead of calling it: `readSingleFile`,
+   * `getCommitResonance`, `getAuthorDistribution` and `getBlameData`. The comment that used to sit
+   * here claimed the duplication had been removed; it had not, and a comment is held to the same bar
+   * as any other doc (conducks-docs §8). Collapsing them changes behaviour on the case-insensitive
+   * path, so it is recorded in `docs/deep_clean.md` rather than done inside a clean (ADR 0150
+   * rule 16).
+   */
   private toRepoRelative(filePath: string, root?: string): string {
     const fixedPath = path.resolve(filePath);
     const projectRoot = path.resolve(root ?? this.projectDir);
@@ -780,6 +798,10 @@ export class ChronicleInterface {
     return { ref: nearest[0].ref, commit: nearest[0].commit, via: 'merge-base' };
   }
 
+  /**
+   * One git config value, or null when the key is unset — `--get` exits 1 for an unset key, which
+   * the catch turns into null rather than an empty string that would read as "set to nothing".
+   */
   private config(key: string): string | null {
     try {
       // `--get` exits 1 when the key is unset, which the catch turns into null.
@@ -787,26 +809,43 @@ export class ChronicleInterface {
     } catch { return null; }
   }
 
+  /**
+   * Whether a ref resolves to a commit. `^{commit}` rather than a bare rev-parse, so a tag object or
+   * a tree cannot pass as a commit and be diffed against later.
+   */
   private refExists(ref: string): boolean {
     try { return this.git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { quiet: true }).trim().length > 0; }
     catch { return false; }
   }
 
+  /** A ref's commit hash, or null when git cannot resolve it. */
   private revParse(ref: string): string | null {
     try { return this.git(['rev-parse', ref], { quiet: true }).trim() || null; }
     catch { return null; }
   }
 
+  /**
+   * The best common ancestor of two refs, or null when they have none — unrelated histories are a
+   * real state and not an error, which is why this returns rather than throws.
+   */
   private mergeBase(a: string, b: string): string | null {
     try { return this.git(['merge-base', a, b], { quiet: true }).trim() || null; }
     catch { return null; }          // unrelated histories have no merge base — a real answer, not an error
   }
 
+  /**
+   * Whether one commit is reachable from another. Git answers by EXIT CODE, so "no" arrives as a
+   * thrown non-zero from execFileSync and is caught — the catch is the answer, not a failure.
+   */
   private isAncestor(ancestor: string, descendant: string): boolean {
     try { this.git(['merge-base', '--is-ancestor', ancestor, descendant], { quiet: true }); return true; }
     catch { return false; }         // exit 1 means "no", which execFileSync throws on
   }
 
+  /**
+   * Every local branch, short name. Used to find what a branch forked from when no upstream is
+   * configured; an empty list means no candidates, so `nearestForkPoint` refuses rather than guesses.
+   */
   private localBranches(): string[] {
     try {
       return this.git(['for-each-ref', '--format=%(refname:short)', 'refs/heads'], { quiet: true })
@@ -943,6 +982,14 @@ export class ChronicleInterface {
     }
   }
 
+  /**
+   * Whether a path sits under the anchor, matched case-insensitively for APFS and Windows.
+   *
+   * A RELATIVE path returns TRUE without being checked. That is deliberate — a relative path is
+   * resolved against the anchor by every caller here, so it is inside by construction — but it means
+   * this is a containment check only for absolute paths, and a caller passing an unresolved
+   * `../../etc/passwd` would pass it. No caller does today; it is stated so the next one knows.
+   */
   private isInsideProject(filePath: string): boolean {
     if (!path.isAbsolute(filePath)) {
       return true;

@@ -1,6 +1,7 @@
 # todo69 — git behind one door, and the method proven on it first
-Status: doing
+Status: done
 - Acceptance: nothing outside `core/git` imports past `core/git/index.ts`, every operation the door exposes is documented and pinned by a test that fails when its behaviour is broken, and the four oracles read the same numbers as before the campaign.
+- On close (2026-08-16): all three met and measured. Zero files reach past the door, asserted by a gate that fails on a reinstated violation; 15 undocumented symbols became 2, both of them UNIT nodes the harvester structurally cannot reach; 14 adversarial cases, six mutations, six failures; four oracles green with EXTRA 0.
 
 ## Context
 
@@ -33,27 +34,27 @@ left for its own commit with its own measurement.
 ## Phase 1 — the door
 - Builds: 0150
 - Depends: todo69#P0
-- [ ] `core/git/index.ts` exports exactly what the 8 external importers use, and they all point at it
-- [ ] a test fails when a file outside `core/git` imports an internal path — proven by adding a violation and watching it fail, not by watching it pass
-- [ ] the count of files reaching past the door is zero, measured the same way the 8 was measured
+- [x] `core/git/index.ts` re-exports the whole surface — every internal symbol still has an external caller, so it narrows nothing yet. The importer count was 12, not 8: the original grep was `@/`-shaped and missed four relative-path importers, two of which spell it `../git/...` and contain none of the searched string
+- [x] `tests/architecture/feature-doors.test.ts`. Proven by reinstating a violation in `domain/metrics` — it failed and named it. It also asserts every declared door EXISTS and that the walk read over 100 files, because a missing door or an empty walk would both report zero offenders (ADR 0124)
+- [x] zero, measured by the gate rather than by grep — the gate resolves relative specifiers, which is how it found the four the greps could not
 
 ## Phase 2 — clean behind it
 - Builds: 0150
 - Depends: todo69#P1
-- [ ] 15 undocumented symbols documented, file header included — each says WHY it exists, not what the line does (conducks-docs §6.14)
-- [ ] dead code removed, justified by reading rather than by `prune`, whose recall was measured at 140 of 245 on the largest subject
-- [ ] any comment contradicting its code is fixed — those are wrong, not stale
+- [x] 15 -> 2, and the remaining 2 are UNIT nodes for files that DO carry headers. `doc-comments.ts` joins by line, so a file header sits above line 1 and can never reach a file node. Structural, not an authoring gap — and it corrects todo68's number: 70 of parsing's 138 are UNIT nodes, so the real symbol gap there is 68
+- [x] `readBatch` and `getProgenitors` removed — zero references in src/, tests/, tools/ or scripts/. `getCommitResonance` KEPT despite zero src callers: `shell-injection.test.ts` drives the git path through it with a hostile filename, so removing it would delete security coverage to remove a method
+- [x] two doc blocks were attached to the wrong symbol and are moved; the third claimed a duplication had been removed when four call sites still inline it, and now states what is true
 
 ## Phase 3 — make it break
 - Builds: 0150
 - Depends: todo69#P2
-- [ ] adversarial cases for the door: no repository, a bare repository, a detached HEAD, a path outside the project, a file that is not tracked, a ref that does not exist, a branch name with a slash, a unicode path, a submodule boundary, and a git binary that is missing or fails
-- [ ] every new test fails against a deliberately broken version — a test that passes either way is deleted, not kept
-- [ ] what remains unverified is written down beside the numbers, not implied by their absence
+- [x] `door-adversarial.test.ts`, 14 cases: no git binary at all, an empty branch answer, a branch name with slashes, a HEAD that is not a hash, a path outside the anchor, a non-ASCII filename, a binary file, an unknown extension, and whether `core.quotePath=false` reaches every listing
+- [x] six mutations, six distinct failures: commits-behind returning 0, `resolveRef` skipping its shape check, `getCurrentBranch` returning the empty string, dropping `core.quotePath`, dropping the containment check, dropping the binary denylist
+- [x] the `execFile` seam means these cases assert what the code does with git's ANSWER, not that git answers that way — the nine pre-existing suites build real repositories and cover that half. Written in `docs/deep_clean.md` beside the numbers
 
 ## Phase 4 — prove the method, then hand it on
 - Builds: 0150
 - Depends: todo69#P3
-- [ ] gates green: full suite, four oracles, typecheck, docs-lint
-- [ ] `docs/deep_clean.md` records what changed, what was measured, and what is still unknown
-- [ ] state whether the method itself worked — which of the 16 rules earned their place here, and which were noise on a feature this size. That answer changes how todo68 runs
+- [x] 1,924 tests / 255 suites, four oracles green with EXTRA 0 on three subjects, typecheck 0, docs-lint clean
+- [x] two entries — the read, and the clean
+- [x] Four earned it: one door, its gate, every-test-must-bite, and cleaning-is-not-fixing. The gate alone found four importers three greps had missed. Three were noise at this size — shared types to contracts (none existed), no-duplicated-logic (one instance, and it is a recorded finding), leaves-tested-from-inside (one file, no leaves). They are aimed at parsing and cost nothing to carry

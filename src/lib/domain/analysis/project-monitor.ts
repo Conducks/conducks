@@ -9,7 +9,7 @@ import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/freshness.js";
 import { buildBoard } from "@/lib/domain/analysis/docs-board.js";
 import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/project-registry.js";
-import { branchMismatch } from "@/lib/core/git/chronicle-interface.js";
+import { branchMismatch } from "@/lib/core/git/index.js";
 
 /**
  * Conducks — Cross-Project Monitor

@@ -20,7 +20,7 @@ import { ConducksAdvisor } from "@/lib/domain/governance/advisor.js";
 import { CoChangeEngine } from "@/lib/core/algorithms/cochange-engine.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { chronicle } from "@/lib/core/git/index.js";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "url";

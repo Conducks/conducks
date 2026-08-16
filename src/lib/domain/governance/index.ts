@@ -4,7 +4,7 @@ import { ConducksSentinel } from "./sentinel.js";
 import { RegressionGuard } from "./guard.js";
 import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/adjacency-list.js";
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { chronicle } from "@/lib/core/git/index.js";
 import fs from "node:fs";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/freshness.js";
 import { SOURCE_EXTENSIONS } from "@/contracts/source-extensions.js";

@@ -3,7 +3,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { DeadCodeAnalyzer, Finding } from "../evolution/dead-code.js";
 import { ResonanceAnalyzer } from "./resonance.js";
 import { TestAligner } from "./test-aligner.js";
-import { chronicle } from "@/lib/core/git/chronicle-interface.js";
+import { chronicle } from "@/lib/core/git/index.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/entropy.js";
 
 /**

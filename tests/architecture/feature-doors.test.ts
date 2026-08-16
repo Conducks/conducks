@@ -1,0 +1,91 @@
+import { describe, it, expect } from '@jest/globals';
+import fs from 'node:fs';
+import path from 'node:path';
+
+/**
+ * ADR 0150 rule 1, enforced: outside code reaches a feature through its door and nowhere else.
+ *
+ * The rule exists because a feature reachable at many paths cannot be changed. Measured on this
+ * repository: `core/parsing` is imported from outside at 24 separate files, which is why
+ * `reflector.ts` sits at 1,676 lines and `linker-intra.ts` at 1,120 — splitting either would mean
+ * checking two dozen call surfaces, so nobody has.
+ *
+ * Reads the FILES, like `boundaries.test.ts` and for the same reason: a gate reading the graph sees
+ * only what the parser captured, and the first violation someone writes may be the one it missed.
+ *
+ * A RELATIVE import is a violation too, and this is not a hypothetical. Pointing the eight `@/`
+ * importers of `core/git` at its door left TWO more — `reflector.ts` and `micro-pulse.ts` — reaching
+ * in via `../../core/git/chronicle-interface.js`. The count that said "eight" had been measured with
+ * a `@/`-shaped grep, so a third of the real importers were invisible to the measurement. This gate
+ * resolves relative specifiers before judging them.
+ *
+ * WHAT IT CANNOT SEE, stated rather than implied: a computed specifier — `import(someVariable)` —
+ * cannot be resolved by reading text. Same limit `boundaries.test.ts` declares, same reason.
+ *
+ * TESTS ARE EXEMPT BY DESIGN (rule 3). A feature's own tests reach its internals — that is how a
+ * leaf gets tested at all — so this gate reads `src/` only.
+ */
+const SRC = path.resolve('src');
+
+/** Features that have a door, and must be entered through it. One line per door as they land. */
+const DOORS = [
+  'lib/core/git',
+];
+
+const walk = (dir: string, out: string[] = []): string[] => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, out);
+    else if (entry.name.endsWith('.ts')) out.push(full);
+  }
+  return out;
+};
+
+/** Every `from '...'` specifier in a file, resolved to a repo-relative path under `src/`. */
+const importsOf = (file: string): string[] => {
+  const text = fs.readFileSync(file, 'utf-8');
+  const specifiers = [...text.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(m => m[1]);
+  const resolved: string[] = [];
+  for (const spec of specifiers) {
+    if (spec.startsWith('@/')) {
+      resolved.push(spec.slice(2).replace(/\.js$/, ''));
+    } else if (spec.startsWith('.')) {
+      const abs = path.resolve(path.dirname(file), spec);
+      if (!abs.startsWith(SRC)) continue;
+      resolved.push(path.relative(SRC, abs).replace(/\\/g, '/').replace(/\.js$/, ''));
+    }
+  }
+  return resolved;
+};
+
+describe('a feature is entered through its door (ADR 0150)', () => {
+  const files = walk(SRC);
+
+  for (const door of DOORS) {
+    it(`nothing outside src/${door} imports past its door`, () => {
+      const offenders: string[] = [];
+      for (const file of files) {
+        const rel = path.relative(SRC, file).replace(/\\/g, '/');
+        if (rel.startsWith(`${door}/`)) continue;              // inside the feature — allowed
+        for (const target of importsOf(file)) {
+          if (!target.startsWith(`${door}/`)) continue;
+          if (target === `${door}/index`) continue;            // the door itself
+          offenders.push(`${rel}  imports  ${target}`);
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+  }
+
+  it('every declared door exists', () => {
+    // A door named here but absent would make the gate above pass by checking nothing — the same
+    // "0 checked, exit 0" failure ADR 0124 names.
+    const missing = DOORS.filter(d => !fs.existsSync(path.join(SRC, d, 'index.ts')));
+    expect(missing).toEqual([]);
+  });
+
+  it('reads enough files to be meaningful', () => {
+    // A walk that silently returned nothing would also report zero offenders.
+    expect(files.length).toBeGreaterThan(100);
+  });
+});

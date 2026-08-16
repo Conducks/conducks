@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { chronicle } from "../../../git/chronicle-interface.js";
+import { chronicle } from "@/lib/core/git/index.js";
 
 /**
  * Conducks — Node.js & TypeScript Module Resolver
