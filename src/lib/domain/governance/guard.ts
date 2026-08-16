@@ -1,6 +1,6 @@
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
 import { DriftEngine, DriftResult } from "@/lib/domain/evolution/drift-engine.js";
-import { logger } from "@/lib/core/utils/logger.js";
+import { logger } from "@/lib/core/utils/index.js";
 
 /**
  * Conducks — Structural Regression Guard 🛡️ 🏺 🟦

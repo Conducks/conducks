@@ -15,8 +15,8 @@ import { IgnoreManager } from "@/lib/core/parsing/ignore-manager.js";
 import path from "node:path";
 
 import { ConducksComponent } from "@/contracts/types.js";
-import { logger } from "@/lib/core/utils/logger.js";
-import { traceMemory } from "@/lib/core/utils/mem-trace.js";
+import { logger } from "@/lib/core/utils/index.js";
+import { traceMemory } from "@/lib/core/utils/index.js";
 import { Worker } from "node:worker_threads";
 import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";

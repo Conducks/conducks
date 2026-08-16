@@ -1,25 +1,17 @@
 import fs from 'node:fs';
 
 /**
- * Conducks — Source Line Reader 📄
- *
- * Turns a stored `(file, line)` into the LINE OF CODE at answer time (ADR 0132).
+ * Conducks — turning a stored `(file, line)` back into the line of code (ADR 0132).
  *
  * The line numbers have been in the vault since ADR 0110 — `edges.lineNumber` plus a `lines[]`
- * property carrying every call site rather than the first — and they already reach `impact --json`.
- * What was missing is reading the source back, which is the whole distance between
- * `execute (cohesion.ts:38)` and a line a reader can act on without opening the file.
- *
- * NOT STORED IN THE VAULT, deliberately. Code in the graph would double its size, go stale on every
- * edit, and duplicate what git already holds. The cost of reading at answer time is one file read per
- * distinct FILE in the answer — which is why this class caches by path and reports its own read
- * count, so the claim is checkable rather than asserted.
- *
- * A LINE THAT CANNOT BE READ SAYS SO. A vault older than the working tree points at a line that has
- * moved or gone, and printing whatever now sits at that number is a confident wrong answer — the
- * exact shape CONDUCKS-37 exists to prevent. `text: null` plus a `reason` is the honest form, and a
- * BLANK line is `''` rather than null, because "this line is empty" and "this line is unreadable"
- * are different facts.
+ * property carrying every call site rather than the first. What was missing is reading the source
+ * back, which is the whole distance between `execute (cohesion.ts:38)` and a line a reader can act
+ * on without opening the file.
+ */
+
+/**
+ * One line's answer. A BLANK line is `''` rather than null, because "this line is empty" and "this
+ * line is unreadable" are different facts and a reader acts differently on each.
  */
 export interface SourceLine {
   line: number;
@@ -29,6 +21,17 @@ export interface SourceLine {
   reason?: 'unreadable' | 'past-end';
 }
 
+/**
+ * Reads lines at ANSWER time, and caches by file so the cost is one read per distinct file.
+ *
+ * NOT STORED IN THE VAULT, deliberately: code in the graph would double its size, go stale on every
+ * edit, and duplicate what git already holds. `stats()` reports the read count so that claim is
+ * checkable rather than asserted.
+ *
+ * A LINE THAT CANNOT BE READ SAYS SO. A vault older than the working tree points at a line that has
+ * moved or gone, and printing whatever now sits at that number is a confident wrong answer — the
+ * shape CONDUCKS-37 exists to prevent.
+ */
 export class SourceLineReader {
   /** path -> lines, or null when the file could not be read. Absence means "not yet attempted". */
   private cache = new Map<string, string[] | null>();
@@ -39,6 +42,7 @@ export class SourceLineReader {
     return { fileReads: this.fileReads };
   }
 
+  /** One line, 1-based. Never throws — an unreadable file and a line past the end each say which. */
   public read(file: string, line: number): SourceLine {
     const lines = this.load(file);
     if (lines === null) return { line, text: null, reason: 'unreadable' };
@@ -52,6 +56,7 @@ export class SourceLineReader {
     return lines.map(l => this.read(file, l));
   }
 
+  /** The file's lines, read once and cached — including the NULL that records a failed read. */
   private load(file: string): string[] | null {
     const hit = this.cache.get(file);
     if (hit !== undefined) return hit;

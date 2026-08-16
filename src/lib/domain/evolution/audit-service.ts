@@ -1,5 +1,5 @@
 import { SynapsePersistence } from "@/lib/core/persistence/persistence.js";
-import { logger } from "@/lib/core/utils/logger.js";
+import { logger } from "@/lib/core/utils/index.js";
 
 /**
  * Conducks — Geological Audit Service 🧬 🏺 🟦

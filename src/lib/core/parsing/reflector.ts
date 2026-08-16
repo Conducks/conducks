@@ -20,7 +20,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 
 import { CaptureTags, DEFINITION_CAPTURES } from "../../../types/capture-tags.js";
-import { getProjectRelativePath } from "../../core/utils/path-utils.js";
+import { getProjectRelativePath } from "@/lib/core/utils/index.js";
 
 /**
  * A `fingerprint` is a symbol's STRUCTURAL identity, so the only path term it may carry is the one

@@ -1,6 +1,17 @@
 import { logger } from "@/lib/core/utils/logger.js";
 
 /**
+ * Conducks — where a pulse's memory actually goes.
+ *
+ * One diagnostic, off unless `CONDUCKS_MEM_TRACE` is set, because a pulse should not pay for an
+ * instrument nobody asked for. It exists because five explanations of a 1 GB peak were written down
+ * before anything was measured, and every one was wrong.
+ */
+
+/** Wall clock since the first trace, so a stage's DURATION is readable and not just its memory. */
+let firstTraceAt: number | null = null;
+
+/**
  * Print where a pulse's memory actually is, when `CONDUCKS_MEM_TRACE` is set.
  *
  * A 446-unit pulse peaks above a gigabyte while the source it reads is 1.4 MB, and FIVE separate
@@ -19,11 +30,9 @@ import { logger } from "@/lib/core/utils/logger.js";
  * the pulse connection while the transaction is open kills the process with an INTERNAL assertion
  * inside `PipelineExecutor` — reproduced on the first attempt at writing this.
  */
-/** Wall clock since the first trace, so a stage's DURATION is readable and not just its memory. */
-let firstTraceAt: number | null = null;
-
 export function traceMemory(label: string): void {
   if (!process.env.CONDUCKS_MEM_TRACE) return;
+  /** Bytes to whole megabytes — the only unit any of these numbers is read in. */
   const mb = (n: number) => Math.round(n / 1048576);
   const m = process.memoryUsage();
   const native = mb(m.rss) - mb(m.heapTotal) - mb(m.external);

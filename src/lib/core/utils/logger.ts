@@ -2,10 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * Conducks — Unified Logger
- * 
- * Ensures all logs are sent to stderr to prevent corruption of the MCP stdout stream.
- * Now supports persistent file-based logging for real-time monitoring.
+ * Every diagnostic conducks writes, and the two places it can go.
+ *
+ * STDERR, NEVER STDOUT. The MCP server speaks JSON-RPC on stdout, so a single stray `console.log`
+ * corrupts the protocol for the whole session — which is why this exists as a class rather than as a
+ * convention nobody can enforce.
+ *
+ * A FILE SINK ALONGSIDE IT, always written, never suppressed. That is what makes `setQuiet` safe: a
+ * quiet command still leaves a full record in `.conducks/mcp.log`, so silence costs noise rather
+ * than diagnosability.
  */
 export class Logger {
   private prefix: string;
@@ -38,6 +43,7 @@ export class Logger {
    * measuring the output rather than by reading the code.
    */
   public setQuiet(quiet: boolean): void { Logger.quiet = quiet; }
+  /** Whether the process is quiet. Reads the static, so every instance agrees by construction. */
   public isQuiet(): boolean { return Logger.quiet; }
 
   /**
@@ -52,6 +58,7 @@ export class Logger {
     this.toFile('BOOT', message.replace(/\n$/, ''));
   }
 
+  /** `prefix` names the subsystem in every line it writes; `enabled: false` mutes an instance whole. */
   constructor(prefix: string = "Conducks", enabled: boolean = true) {
     this.prefix = prefix;
     this.enabled = enabled;
@@ -99,6 +106,13 @@ export class Logger {
    */
   private static readonly ALWAYS_SHOWN = new Set(['WARN', 'ERROR', 'SUCCESS']);
 
+  /**
+   * The one path every level goes through, and therefore the one place quiet is decided.
+   *
+   * Both sinks always run: the terminal write is conditional, the file append is not. A level added
+   * later inherits both behaviours without a second decision, which is the reason the six public
+   * methods below carry no logic of their own.
+   */
   private write(level: string, message: string, colorCode: string = "37"): void {
     if (!this.enabled) return;
 
@@ -111,26 +125,36 @@ export class Logger {
     this.toFile(level, message);
   }
 
+  /**
+   * The six levels. Each is a colour and a label over `write` — the behaviour lives there, and the
+   * only real differences are here: `warn` and `error` accept an error to append, `debug` is gated
+   * on `DEBUG` so it costs nothing when unset, and WARN, ERROR and SUCCESS are never suppressed by
+   * quiet (see `ALWAYS_SHOWN`).
+   */
   public info(message: string): void {
     this.write("INFO", message, "36"); // Cyan
   }
 
+  /** Takes an optional error to append, and is never suppressed by quiet — see `ALWAYS_SHOWN`. */
   public warn(message: string, error?: any): void {
     const errorMsg = error ? `: ${error.message || error}` : '';
     this.write("WARN", `⚠️  ${message}${errorMsg}`, "33"); // Yellow
   }
 
+  /** Same shape as `warn`, and equally unsuppressible: a command must not exit non-zero in silence. */
   public error(message: string, error?: any): void {
     const errorMsg = error ? `: ${error.message || error}` : '';
     this.write("ERROR", `❌ ${message}${errorMsg}`, "31"); // Red
   }
 
+  /** Gated on `DEBUG`, so it costs a single env read when unset rather than a formatted string. */
   public debug(message: string): void {
     if (process.env.DEBUG) {
       this.write("DEBUG", `[DEBUG] ${message}`, "90"); // Grey
     }
   }
 
+  /** An outcome, not narration — which is why quiet leaves it visible. */
   public success(message: string): void {
     this.write("SUCCESS", `✨ ${message}`, "32"); // Green
   }

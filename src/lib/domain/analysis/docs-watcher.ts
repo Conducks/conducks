@@ -17,7 +17,7 @@ import chokidar, { FSWatcher } from "chokidar";
 import path from "node:path";
 import { statSync, writeFileSync, rmSync } from "node:fs";
 import { buildBoard, type DocsBoard } from "@/lib/domain/analysis/docs-board.js";
-import { Logger } from "@/lib/core/utils/logger.js";
+import { Logger } from "@/lib/core/utils/index.js";
 
 const logger = new Logger("DocsWatcher");
 

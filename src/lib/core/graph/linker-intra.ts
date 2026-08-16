@@ -1,6 +1,6 @@
 import { isBuiltIn, getGlobalId } from '@/lib/core/parsing/built-ins.js';
 import { ConducksAdjacencyList, type EdgeType } from './adjacency-list.js';
-import { logger } from '@/lib/core/utils/logger.js';
+import { logger } from "@/lib/core/utils/index.js";
 import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js';
 
 /**

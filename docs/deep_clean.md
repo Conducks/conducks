@@ -346,3 +346,103 @@ rule being quietly amended to make the table green.
 **"Git is done" was said one message before this table existed, and was wrong.** The CLEAN was
 finished; the feature was not rule-clean. The table is what makes the difference visible, and it is
 the shape every later feature gets.
+
+---
+
+## core/utils — one door, five leaves (2026-08-16)
+
+Second feature through the method. Chosen because 13 parsing files depend on `path-utils`, so it is
+cleaned before parsing rather than after — rule 13 applied to the order of features.
+
+Five files, 464 lines, and it imports NOTHING, like `core/git`. 30 external importers, concentrated
+on `logger` (19) and `path-utils` (6).
+
+### The door found what the regex did not, again
+
+`core/utils/index.ts` exports only what crosses: `Logger`/`logger`, `canonicalize`,
+`getProjectRelativePath`, `traceMemory`, `assessRoot`, `explainScope`, `isNeverAProjectRoot`,
+`SourceLineReader`, and three types. `Logger`'s private sink, `SourceLineReader`'s cache and
+`scope-guard`'s marker tables stay inside.
+
+A path-shaped rewrite pointed 21 files at it. The gate then found three more the rewrite missed:
+`graph-engine` importing `../utils/logger.js` relatively, and two test files. That is the SECOND
+feature where a text rewrite left importers behind and the gate caught them — the pattern is not a
+one-off, it is what a specifier-shaped search cannot do.
+
+The two test files were `scope-guard.test.ts` and `root-discovery.test.ts`, sitting in
+`tests/unit/core/` rather than `tests/unit/core/utils/`. They are utils' OWN tests and were treated
+as outsiders because the gate identifies ownership by path. They moved next to the module, which is
+where a module's tests belong anyway.
+
+### The same doc defect, in every file
+
+`core/git` had two doc blocks attached to the wrong symbol. `core/utils` has it in FOUR of five
+files, and the shape is identical every time: a long explanatory block sits above whatever line
+follows it rather than above the thing it describes.
+
+| file | the block describes | it sat above |
+|---|---|---|
+| `mem-trace` | `traceMemory` | a module variable |
+| `source-line` | the class and the file | the `SourceLine` interface |
+| `logger` | the quiet concept | a static field |
+| `logger` | the levels quiet never suppresses | another static field |
+
+This is not sloppiness — it is what happens when the comment is written while thinking about the
+CONCEPT and the harvester joins by LINE. The graph reads the second thing, so the reasoning ends up
+attached to a field nobody queries while the method it explains answers nothing.
+
+**24 undocumented → 0 real gaps** (6 UNIT nodes remain, which the harvester structurally cannot
+reach). A second harvester limit surfaced on the way: one block documenting a GROUP — the six logger
+levels — attaches to the first member only, so the other five still read as undocumented. Each now
+carries the fact that actually differs (an optional error, an env gate, unsuppressible by quiet)
+rather than a line restating the code.
+
+### `path-utils` had never been tested, and it decides what a node id is
+
+Every id is `canonicalize(file) + '::' + name` (CONDUCKS-4). Any input it maps to two strings becomes
+two nodes for one symbol, with every edge between them dangling — the exact fragmentation the
+lowercasing exists to prevent.
+
+12 cases, including the property stated as a property: one file spelled four ways — case, separator,
+`..` segments, backslashes — must collapse to ONE id. Three mutations, three failures: dropping the
+lowercasing (4 cases), dropping the empty-string guard (`path.normalize('')` is `.`, which would
+become a node id pointing at the current directory), and lowercasing the DISPLAY path, which is the
+one thing `getProjectRelativePath` must not do because a lowercased path opens nothing on a
+case-sensitive filesystem.
+
+### Moving a test broke three ADRs, and only the lint knew
+
+`scope-guard.test.ts` and `root-discovery.test.ts` are named in `- Enforced by:` on ADRs 0021, 0039
+and 0069. Moving them into the module's folder made all three point at files that no longer exist —
+three accepted decisions silently reporting as unproven. `docs-lint` failed and named each one.
+
+Worth stating because it generalises: a test path is an ADDRESS other records hold, exactly like a
+todo number. Any move in this campaign that relocates a test must re-point whatever cites it, and the
+only thing that knows is the lint. Neither typecheck nor the suite would have said a word.
+
+### Rule table — core/utils
+
+| rule | |
+|---|---|
+| 1 one door | PASS |
+| 2 a test enforces it | PASS — `src/` and `tests/`, mutated |
+| 3 inside is private, own tests exempt | PASS — two suites moved to the module's folder to earn it |
+| 4 no mutable state on the door | **OPEN** — `logger` is a shared instance with a static quiet flag |
+| 5 shared types to `contracts/` | n/a |
+| 6 comments | PASS — 0 real gaps, 6 UNIT nodes unreachable |
+| 7 no dead code | PASS — every exported symbol has an external caller |
+| 8 every line has a purpose | PASS |
+| 9 no duplicated logic | PASS |
+| 10 every claim tested, and it bites | PASS for `path-utils`; `scope-guard`, `source-line` and `logger` carry pre-existing suites |
+| 11 adversarial | PASS |
+| 12 leaves tested from inside | n/a |
+| 13 leaves first | PASS |
+| 14 one unit per commit | PASS |
+| 15 gates after each unit | PASS |
+| 16 cleaning is not fixing | PASS |
+
+**14 PASS, 2 n/a, 1 open** — and the open one is the same rule `core/git` defers, for a related
+reason. `logger` is a process sink whose only mutable state is a static flag that is static ON
+PURPOSE: a per-instance flag silenced four of five boot lines and missed the fifth, because modules
+build their own instances. Whether rule 4 should admit a process-wide sink is a decision, and it is
+the same decision `chronicle` is waiting on.

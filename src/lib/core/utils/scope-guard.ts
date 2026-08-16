@@ -78,8 +78,13 @@ export function isNeverAProjectRoot(dir: string): boolean {
   return criticalRoots().includes(resolved) || CRITICAL_BASENAMES.has(path.basename(resolved));
 }
 
+/**
+ * How hard to stop before analysing a directory. Three levels rather than a boolean, because "this
+ * is probably several projects" and "this is your home directory" deserve different friction.
+ */
 export type ScopeLevel = "ok" | "ask" | "ask-twice";
 
+/** The verdict on one root, carrying the REASONS so a caller can print why rather than just what. */
 export interface ScopeAssessment {
   root: string;
   level: ScopeLevel;
@@ -93,10 +98,21 @@ export interface ScopeAssessment {
   childProjects: number;
 }
 
+/**
+ * Whether analysing this directory is what the caller meant.
+ *
+ * Cheap by construction: the file count stops at `fileCap`, because the question is "is this far too
+ * big" and an exact answer costs a full walk to tell you the same thing.
+ *
+ * It never refuses — it returns a level and its reasons, and the caller decides. A guard that
+ * refuses on its own would make `conducks analyze` unusable in the layouts it merely finds unusual.
+ */
 export function assessRoot(root: string, fileCap = 25_000): ScopeAssessment {
   const resolved = path.resolve(root);
   const reasons: string[] = [];
   let level: ScopeLevel = "ok";
+  // Records a reason and keeps the HIGHEST level seen — a root can trip several rules and the
+  // strongest one decides, while every reason is still reported.
   const raise = (to: ScopeLevel, why: string) => {
     reasons.push(why);
     if (to === "ask-twice" || level === "ok") level = to === "ask-twice" ? "ask-twice" : (level === "ask-twice" ? level : to);
@@ -131,6 +147,7 @@ export function assessRoot(root: string, fileCap = 25_000): ScopeAssessment {
   return { root: resolved, level, risky: level !== "ok", reasons, approxFiles: count, cappedAt: capped ? fileCap : null, childProjects };
 }
 
+/** Which project markers sit AT this root. None is the signal that it may not be one project. */
 function presentMarkers(root: string): string[] {
   let entries: string[];
   try { entries = readdirSync(root); } catch { return []; }
@@ -140,6 +157,10 @@ function presentMarkers(root: string): string[] {
     : set.has(m));
 }
 
+/**
+ * How many immediate children look like projects themselves. Two or more is the shape of a parking
+ * directory — a `~/Repos` holding twenty checkouts — which is the case worth stopping on.
+ */
 function countChildProjects(root: string): number {
   let entries: string[];
   try { entries = readdirSync(root); } catch { return 0; }

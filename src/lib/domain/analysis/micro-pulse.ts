@@ -4,7 +4,7 @@ import { ConducksReflector } from "@/lib/core/parsing/reflector.js";
 import { AnalyzeContext } from "../../core/parsing/context.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { SynapsePersistence } from "../../core/persistence/persistence.js";
-import { Logger } from "../../core/utils/logger.js";
+import { Logger } from "@/lib/core/utils/index.js";
 import { grammars } from "../../core/parsing/grammar-registry.js";
 import { chronicle } from "@/lib/core/git/index.js";
 

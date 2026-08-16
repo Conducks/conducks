@@ -20,7 +20,7 @@
 import { execFileSync } from 'node:child_process';
 import fsSync from "node:fs";
 import path from 'node:path';
-import { logger } from '@/lib/core/utils/logger.js';
+import { logger } from "@/lib/core/utils/index.js";
 
 /**
  * Non-code files the FS fallback still ingests. No language provider declares these — they carry

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { canonicalize } from "@/lib/core/utils/path-utils.js";
+import { canonicalize } from "@/lib/core/utils/index.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { ConducksProvider } from "@/lib/core/parsing/providers/base.js";

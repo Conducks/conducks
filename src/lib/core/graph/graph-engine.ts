@@ -16,8 +16,8 @@ type _ParserTypesAreEdgeTypes =
   : ['relationship type is not an EdgeType — add it to EdgeType and classify it in EDGE_COUPLING'];
 const _assertParserTypesAreEdgeTypes: _ParserTypesAreEdgeTypes = true;
 void _assertParserTypesAreEdgeTypes;
-import { canonicalize } from "@/lib/core/utils/path-utils.js";
-import { Logger } from "../utils/logger.js";
+import { canonicalize } from "@/lib/core/utils/index.js";
+import { Logger } from "@/lib/core/utils/index.js";
 import { PrismRequest } from "@/lib/core/parsing/prism-core.js";
 import { StructuralRanker } from "../../core/graph/algorithms/ranker.js";
 import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";

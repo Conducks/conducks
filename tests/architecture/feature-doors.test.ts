@@ -37,6 +37,7 @@ const SRC = path.resolve('src');
 /** Features that have a door, and must be entered through it. One line per door as they land. */
 const DOORS = [
   'lib/core/git',
+  'lib/core/utils',
 ];
 
 /**

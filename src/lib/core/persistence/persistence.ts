@@ -4,10 +4,10 @@ import { clusterOf } from "@/lib/core/graph/cluster-rule.js";
 import fs from "node:fs";
 import path from "node:path";
 import { chronicle } from "@/lib/core/git/index.js";
-import { logger } from "../../core/utils/logger.js";
+import { logger } from "@/lib/core/utils/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
-import { traceMemory } from "@/lib/core/utils/mem-trace.js";
+import { traceMemory } from "@/lib/core/utils/index.js";
 import type { ConducksComponent } from "../../../contracts/types.js";
 
 /**

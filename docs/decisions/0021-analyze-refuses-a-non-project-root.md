@@ -1,7 +1,7 @@
 # 0021 — Analyze guards its root; the wrong one costs two confirmations, not hours
 
 Status: Accepted
-- Enforced by: tests/unit/core/scope-guard.test.ts
+- Enforced by: tests/unit/core/utils/scope-guard.test.ts
 - Date: 2026-07-26
 - Promoted: docs/conventions.md CONDUCKS-23
 

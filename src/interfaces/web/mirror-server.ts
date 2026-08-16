@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GatewayService } from '@/lib/domain/analysis/gateway-service.js';
 import { chronicle } from '@/lib/core/git/index.js';
-import { Logger } from '@/lib/core/utils/logger.js';
+import { Logger } from "@/lib/core/utils/index.js";
 import { registry } from '@/registry/index.js';
 import http from 'node:http';
 

@@ -1,7 +1,7 @@
 # 0039 — a vault describes the tree beside it, and a service is a service everywhere
 Status: Accepted
 - Amended by: 0069, todo21 — the `conducks.json` half this record calls "not built at all" SHIPPED: `discoverRoot` reads a declaration as PASS 1 and returns before the marker walk, so a declared root now wins where both exist (`registry-bootstrapper.ts:64`). The paragraph below describes the state at the time of writing
-- Enforced by: tests/unit/core/root-discovery.test.ts (root discovery refuses a directory the scope guard already calls impossible, so one stray vault cannot claim the tree above it, and a real project is still found by its vault alone) — PARTLY. The worktree half is current behaviour and untested, and `discoverRoot()` still answers the boundary question independently of `conducks.json`; see Consequences.
+- Enforced by: tests/unit/core/utils/root-discovery.test.ts (root discovery refuses a directory the scope guard already calls impossible, so one stray vault cannot claim the tree above it, and a real project is still found by its vault alone) — PARTLY. The worktree half is current behaviour and untested, and `discoverRoot()` still answers the boundary question independently of `conducks.json`; see Consequences.
 - Date: 2026-07-28
 
 0069 built the half this record specified and left unbuilt. Its own `Enforced by:` line already

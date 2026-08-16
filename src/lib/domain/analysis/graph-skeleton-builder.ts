@@ -1,8 +1,8 @@
 import { EXTERNAL_ROOT } from "@/lib/core/graph/external-nodes.js";
 import { ConducksGraph } from "@/lib/core/graph/graph-engine.js";
-import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/path-utils.js";
+import { canonicalize, getProjectRelativePath } from "@/lib/core/utils/index.js";
 import { CanonicalKind, CanonicalRank } from "@/lib/core/parsing/taxonomy.js";
-import { logger } from "@/lib/core/utils/logger.js";
+import { logger } from "@/lib/core/utils/index.js";
 import path from "node:path";
 
 /**
