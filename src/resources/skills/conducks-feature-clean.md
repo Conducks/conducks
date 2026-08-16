@@ -16,7 +16,11 @@ not in this file.
 
 Everything else is situational. These are not.
 
-### 1 · One door
+**Numbers are ADR 0150's and never change.** Fourteen citations across the todos, the clean log and
+`conventions.md` address these rules by number, so the tiering here regroups them and renumbers
+nothing — a citation that silently points at the wrong rule is worse than no citation.
+
+### Rule 1 · One door
 
 Outside code imports a feature only through `<feature>/index.ts`. The feature's own files and its own
 tests may reach internals; nobody else may.
@@ -26,7 +30,7 @@ importer. Measured: one parsing module was imported from outside at **24 separat
 why its two largest files sat at 1,676 and 1,120 lines. Splitting either meant reading two dozen call
 sites, so nobody ever did.
 
-### 2 · A test enforces the door, not a habit
+### Rule 2 · A test enforces the door, not a habit
 
 A gate fails on any import that reaches past a door. It reads the FILES, resolves relative
 specifiers, and covers tests as well as source.
@@ -38,7 +42,7 @@ It happened again on the next feature: a rewrite reached 21 files, the gate name
 
 A text search shaped like one import style cannot see the others.
 
-### 3 · Every test must bite
+### Rule 10 · Every test must bite
 
 Every new test must FAIL against a deliberately broken version of the thing it covers. A test that
 passes either way is deleted, not kept.
@@ -51,7 +55,7 @@ of a path helper passed with the entire feature deleted.
 silently failed to match a template literal, so the "mutation" never applied and the test was nearly
 recorded as vacuous. Assert the anchor exists before believing the result.
 
-### 4 · Cleaning is not fixing
+### Rule 16 · Cleaning is not fixing
 
 Behaviour does not change during a clean. A fix is its own commit with its own measurement.
 
@@ -63,7 +67,7 @@ reverted — one of them would have made a stale answer permanent.
 
 ## The boundary rules
 
-**5 ·** A door exports operations and types. Never mutable state, never a singleton a caller can
+**Rule 4 ·** A door exports operations and types. Never mutable state, never a singleton a caller can
 mutate.
 
 > **This rule has failed on every feature it has met.** Two process-wide sinks — a git anchor and a
@@ -71,53 +75,55 @@ mutate.
 > per-instance flag silenced four of five boot lines and missed the fifth. Carry it as an open
 > question, not a rule, until something passes it.
 
-**6 ·** A type two features share moves to a shared contracts layer. It does not travel through a
+**Rule 5 ·** A type two features share moves to a shared contracts layer. It does not travel through a
 door.
 
-**7 ·** A feature never reaches another's internals to "just get one thing". Ask the door, or move
+**Rule 3 ·** Inside is private — a feature's own files and its own tests may reach its internals, nobody else may. A feature never reaches another's internals to "just get one thing". Ask the door, or move
 the thing to contracts.
 
 ---
 
 ## The code rules
 
-**8 ·** Every file, class and exported function carries a comment saying WHY it exists — not what the
+**Rule 6 ·** Every file, class and exported function carries a comment saying WHY it exists — not what the
 line does. Variables and parameters are exempt.
 
 > *Conducks-specific reason, and a good one anywhere:* the comment above a symbol is harvested into
 > that symbol's node, so an uncommented symbol answers nothing when anyone asks what it is for.
 
-**9 ·** A comment that contradicts its code is WRONG, not stale. Fix it in the change that revealed
+**Rule 6, second half ·** A comment that contradicts its code is WRONG, not stale. Fix it in the change that revealed
 it.
 
 *Why.* One comment stated that a duplication "was written out three times… once per method" as
 though removed. It was still there, four times.
 
-**10 ·** No dead code — justified by READING, not by a tool.
+**Rule 7 ·** No dead code — justified by READING, not by a tool.
 
 *Why.* A dead-code detector measured at 140 of 245 on the largest subject, so silence from it is not
 evidence. And reading changes the answer: on one feature the two methods that looked deadest had real
 callers, while the one that looked safe to delete was held by a security test.
 
-**11 ·** Every line traces to a purpose. No speculative flexibility, unused parameters, unreachable
+**Rule 8 ·** Every line traces to a purpose. No speculative flexibility, unused parameters, unreachable
 branches.
 
-**12 ·** No duplicated logic across files.
+**Rule 9 ·** No duplicated logic across files.
 
 ---
 
 ## The test rules
 
-**13 ·** Every claim the door makes has a test.
+**Rule 10, first half ·** Every claim the door makes has a test.
 
-**14 ·** Adversarial by default: empty · huge · unicode · duplicate ids · case-collision · cycle ·
+**Rule 12 ·** Leaves are tested directly from INSIDE the boundary; outside behaviour only through the door.
+
+**Rule 11 ·** Adversarial by default: empty · huge · unicode · duplicate ids · case-collision · cycle ·
 self-reference · wrong order · re-entry · the dependency absent entirely.
 
 *Why.* The cases that find defects are the ones nobody builds a fixture for. On one feature the new
 adversarial suite covered *no binary at all*, *an empty answer*, *a name containing the path
 separator*, *a response that is not the expected shape* — none of which nine existing suites touched.
 
-**15 ·** A test asserts the claim the code actually makes, not a stricter one that is easier to
+**Rule 15, and stated with it ·** A test asserts the claim the code actually makes, not a stricter one that is easier to
 check. State what the test did NOT cover, beside the number.
 
 *Why.* A checker that scores a stricter claim reports failures that are not failures, and one that
@@ -127,12 +133,12 @@ scores a looser claim reports a pass that is not a pass. Both read as rigour.
 
 ## The process rules
 
-**16 ·** Leaves first. A unit is untouched until everything it depends on is done — and this applies
+**Rule 13 ·** Leaves first. A unit is untouched until everything it depends on is done — and this applies
 to the FIXES as much as the features. Injecting into a file that has no tests yet is how a regression
 becomes unattributable.
 
-**One unit per commit**, in order: read → door → clean → tests → gates → log.
-**Gates after every unit**: the full suite, every oracle or benchmark the project has, typecheck,
+**Rule 14 — one unit per commit**, in order: read → door → clean → tests → gates → log.
+**Rule 15 — gates after every unit**: the full suite, every oracle or benchmark the project has, typecheck,
 lint. All green, or the unit is not done.
 
 ---
