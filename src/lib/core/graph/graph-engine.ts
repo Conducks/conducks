@@ -49,12 +49,25 @@ export class ConducksGraph {
   /**
    * Pulses the structural stream into the technical graph.
    * Kinetic Engine v3 — CPU-Parallelized via Worker Threads.
+   *
+   * `allPaths` IS THE RESOLUTION UNIVERSE, and leaving it out broke this whole path. The worker
+   * destructures `allPaths` from its `workerData`; this method passed `{ units }` alone, so it
+   * arrived `undefined` and the TypeScript resolver's `for (const f of allFiles)` threw
+   * `allFiles is not iterable`. The error was logged per file and the result skipped, so every file
+   * WITH AN IMPORT was silently dropped and only import-free files ingested. That is the watcher's
+   * only reflection path — measured on a two-file project under `conducks watch`.
+   *
+   * Defaults to the pulsed units' own paths rather than to `[]`: a single file resolving against
+   * itself is what `MicroPulseService` already does for the same one-file case, and it keeps the
+   * failure mode as "an import does not resolve" instead of "the file is not analyzed at all".
    */
-  public async pulseStructuralStream(stream: PrismRequest[]): Promise<void> {
+  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[]): Promise<void> {
     const unitCount = stream.length;
     this.logger.info(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
 
     if (unitCount === 0) return;
+
+    const resolutionUniverse = allPaths?.length ? allPaths : stream.map(u => u.path);
 
     const coreCount = Math.max(1, os.cpus().length - 1);
     const chunkSize = Math.ceil(unitCount / coreCount);
@@ -67,7 +80,7 @@ export class ConducksGraph {
 
       const p = new Promise<void>((resolve, reject) => {
         const worker = new Worker(workerScript, {
-          workerData: { units: chunk },
+          workerData: { units: chunk, allPaths: resolutionUniverse },
           execArgv: isTs ? ["--import", "tsx"] : []
         });
 

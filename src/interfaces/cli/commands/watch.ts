@@ -56,7 +56,19 @@ export class WatchCommand implements ConducksCommand {
     const isPulse = args.includes('--pulse');
     const rootPath = process.cwd();
 
-    // Read-Only: watcher observes structural shifts, only analyze writes
+    // READ-ONLY, AND `--pulse` DOES NOT CHANGE THAT — measured, opening the vault for writing here
+    // makes the tool WORSE rather than better, and the reason is worth stating where the decision is.
+    //
+    // The live pulse ADDS to the graph and never removes: `ingestSpectrum` has no counterpart, and
+    // the adjacency list has no node removal at all (the comment naming `removeNodes` describes a
+    // method that does not exist). So re-pulsing an edited file leaves its OLD edges in place. On a
+    // two-file project, deleting the only call to `onlyHere` and letting the watcher persist left
+    // `impact` still reporting one caller — and step 6 records the file's hash, so the next
+    // `analyze` found 0 dirty units and never repaired it. Staleness that `analyze` fixes became
+    // staleness that nothing fixes.
+    //
+    // Enabling the write needs replace-on-repulse first (todo67). Until then the flag is refused
+    // out loud rather than silently obeyed.
     await (registry as any).initialize(true, rootPath, true);
     await syncGraph(registry);
 
@@ -69,8 +81,10 @@ export class WatchCommand implements ConducksCommand {
       process.exit(1);
     }
 
-    if (isPulse && watcher) {
-        (watcher as any).enableAutoPulse(true);
+    if (isPulse) {
+      console.error("[Conducks Watch] --pulse is not available: a live pulse cannot yet REMOVE what an edit deleted, " +
+        "so persisting it would leave stale edges that 'analyze' then skips as unchanged (todo67). " +
+        "Watching read-only; run 'conducks analyze' to persist.");
     }
 
     console.log('[Watch] Step 4: calling watcher.init()...');

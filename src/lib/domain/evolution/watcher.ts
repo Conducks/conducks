@@ -221,6 +221,17 @@ export class ConducksWatcher {
    * Never throws. A watcher that cannot catch up must still watch — starting blind is strictly
    * better than not starting.
    */
+  /** Every file the graph currently holds a UNIT node for — the same key `dead-code` reads. */
+  private knownUnitPaths(): string[] {
+    const paths = new Set<string>();
+    for (const node of this.graph.getGraph().getAllNodes()) {
+      if (String((node.properties as any)?.canonicalKind ?? '') !== 'UNIT') continue;
+      const file = String((node.properties as any)?.filePath ?? '');
+      if (file) paths.add(file);
+    }
+    return [...paths];
+  }
+
   public async reconcileOnStart(onDisk: readonly string[]): Promise<{ changed: number; added: number }> {
     const persistence = this.options.persistence;
     if (!persistence) return { changed: 0, added: 0 };
@@ -298,7 +309,18 @@ export class ConducksWatcher {
       // Conducks: Resolved Canonical Identity (v1.6.5)
       if (!filePath) return;
       const normalizedPath = path.resolve(filePath);
-      await this.graph.pulseStructuralStream([{ path: normalizedPath, source }]);
+      // THE FILES THE GRAPH ALREADY KNOWS ARE THE RESOLUTION UNIVERSE. An import is resolved against
+      // a list of candidate paths, and re-pulsing one file in isolation gives the resolver nothing
+      // to match — every specifier dangles and the file's edges are lost on every save.
+      //
+      // Read from the graph's own UNIT nodes rather than walking the disk: the walk is what
+      // `analyze` and the startup reconcile do once, and repeating it per keystroke would put a
+      // filesystem traversal on the edit path. The changed file is added because a file created
+      // while the watcher runs has no unit node yet.
+      await this.graph.pulseStructuralStream(
+        [{ path: normalizedPath, source }],
+        [...this.knownUnitPaths(), normalizedPath],
+      );
 
       // 3. Global Synapse Re-Linking
       this.linker.link(this.graph.getGraph());
