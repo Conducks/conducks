@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { ConducksReflector } from '@/lib/core/parsing/reflector.js';
 import { AnalyzeContext } from '@/lib/core/parsing/context.js';
-import { chronicle } from '@/lib/core/git/chronicle-interface.js';
+import { chronicle } from '@/lib/core/git/index.js';
 
 /**
  * todo21 Phase 1 — a `fingerprint` is a STRUCTURAL identity, so it must not encode where the

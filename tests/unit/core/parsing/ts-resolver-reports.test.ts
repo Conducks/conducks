@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { TypeScriptResolver } from '@/lib/core/parsing/languages/typescript/resolver.js';
-import { chronicle } from '@/lib/core/git/chronicle-interface.js';
+import { chronicle } from '@/lib/core/git/index.js';
 
 /**
  * `findNearestTsconfig` walks up only while the directory is still INSIDE

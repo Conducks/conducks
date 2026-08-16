@@ -1,6 +1,6 @@
 import { ConducksGraph } from './src/lib/core/graph/graph-engine.js';
 import { ConducksReflector } from './src/lib/core/parsing/reflector.js';
-import { chronicle } from './src/lib/core/git/chronicle-interface.js';
+import { chronicle } from './src/lib/core/git/index.js';
 import { GrammarRegistry } from './src/lib/core/parsing/grammar-registry.js';
 import { AnalysisContext } from './src/lib/domain/analysis/context.js';
 import path from 'path';

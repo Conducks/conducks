@@ -207,3 +207,61 @@ last line.
 **What it cost:** one session for one file. Parsing is 69 files, but they are not 69 doors — it is
 ONE door and seven units behind it, and the expensive parts here (finding the real importer count,
 writing the gate) are already done and reusable.
+
+---
+
+## core/git — the tests, and what the feature still leaks (2026-08-16)
+
+### The tests are part of the module, and were not behind the door
+
+All ten suites in `tests/unit/core/git/` were read. Every one carries a header stating what it pins
+and why, so nothing needed writing there — the first check said otherwise and was wrong: it read the
+first three lines of each file, and these files open with imports.
+
+What was wrong is who reaches in. Rule 3 exempts a feature's OWN tests, not every test. Six files
+outside git's suite imported its internals: `parsing/ts-resolver-reports`,
+`domain/analysis/fingerprint-portability`, two debug scripts, and — legitimately —
+`shell-injection`, which drives git's shell-safety path with a hostile filename and is git's own test
+filed under integration because it needs a real repository.
+
+The first four now use the door. `shell-injection` is a NAMED exception in the gate, with its reason
+beside it, rather than a silent allowance.
+
+`feature-doors.test.ts` now checks `tests/` as well as `src/`, identifying a feature's own suite by
+path. Both new assertions were mutated: pointing one test back at the internal path fails it by name,
+and declaring a door that does not exist fails the existence check.
+
+### What the feature still leaks, recorded not fixed
+
+**`project-monitor.ts` runs git itself** — `symbolic-ref --quiet --short HEAD` and
+`ls-files --cached --others --exclude-standard`, duplicating `getCurrentBranch` and the discovery
+half of `discoverFiles`. The gate cannot see it, because it is not an import.
+
+It is documented and the reason is real: the `chronicle` SINGLETON anchors to one project directory
+for the whole process, and the monitor is cross-project by definition, so routing through it would
+report the same branch for every row.
+
+But that reason is the tension already recorded on the door. `ChronicleInterface` is a class — `new
+ChronicleInterface(root)` answers per root — so the duplication exists because the door exports a
+mutable singleton (ADR 0150 rule 4), not because the class cannot do it. One rule violation is
+causing another:
+
+    rule 4 (singleton on the door)  ->  rule 9 (git logic duplicated outside the feature)
+
+Fixing it means changing what `chronicle` is, which is a behaviour change and therefore its own
+commit with its own measurement (rule 16). Written down here so it is someone's next task rather than
+a rediscovery.
+
+### Anything else left in the feature
+
+Measured, not assumed:
+
+- **No other file spawns git.** `project-monitor` above is the only one, and `scope-guard` /
+  `registry-bootstrapper` merely name `.git` as a directory marker while walking — they read no
+  repository and run no command.
+- **Zero files reach past the door**, in `src/` and now in `tests/`.
+- **Two symbols remain undocumented** and cannot be documented: both are UNIT nodes, which the
+  harvester cannot reach.
+- **`getCommitResonance`, `isRepository`, `resolveTarget`, `resolveRef` and `readRef`** still have no
+  `src/` caller. Three of them are the ADR 0035 layer model that `todo48#P4` measured and left
+  carried; that decision is still open and is not this campaign's.

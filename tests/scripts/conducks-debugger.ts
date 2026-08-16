@@ -1,5 +1,5 @@
 import { registry } from "../../src/registry/index.js";
-import { chronicle } from "../../src/lib/core/git/chronicle-interface.js";
+import { chronicle } from "../../src/lib/core/git/index.js";
 import path from "node:path";
 
 async function debugSync() {

@@ -22,8 +22,15 @@ import path from 'node:path';
  * WHAT IT CANNOT SEE, stated rather than implied: a computed specifier — `import(someVariable)` —
  * cannot be resolved by reading text. Same limit `boundaries.test.ts` declares, same reason.
  *
- * TESTS ARE EXEMPT BY DESIGN (rule 3). A feature's own tests reach its internals — that is how a
- * leaf gets tested at all — so this gate reads `src/` only.
+ * TESTS ARE NOT EXEMPT — only a feature's OWN tests are (rule 3). A leaf is tested by reaching its
+ * internals, so `tests/unit/core/git/` may import them; `tests/unit/core/parsing/` may not, and it
+ * was. Four test files and two debug scripts reached into git from outside its own suite, which is
+ * the same coupling the rule exists to prevent — a test pinned to an internal path blocks the rename
+ * exactly as a source file does.
+ *
+ * A feature's own tests are identified by PATH: `tests/**\/<feature-tail>/**`, where the tail is the
+ * feature's directory name. `core/git` owns `tests/unit/core/git/` and `shell-injection.test.ts`,
+ * which drives git's own shell-safety path and is listed explicitly.
  */
 const SRC = path.resolve('src');
 
@@ -31,6 +38,18 @@ const SRC = path.resolve('src');
 const DOORS = [
   'lib/core/git',
 ];
+
+/**
+ * Test files that belong to a feature despite sitting outside its own folder, and may therefore
+ * reach its internals. Each entry is a deliberate exception with a reason, never a convenience.
+ */
+const OWN_TESTS: Record<string, string[]> = {
+  // Drives the git path with a filename containing a quote and `$()` — it is a test OF this
+  // feature's shell safety (ADR 0047), filed under integration because it needs a real repository.
+  'lib/core/git': ['integration/features/shell-injection.test.ts'],
+};
+
+const TESTS = path.resolve('tests');
 
 const walk = (dir: string, out: string[] = []): string[] => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -58,6 +77,13 @@ const importsOf = (file: string): string[] => {
   return resolved;
 };
 
+/** The same read, for a test file — its `@/` specifiers point at `src/`, its relative ones do not. */
+const importsOfTest = (file: string): string[] =>
+  [...fs.readFileSync(file, 'utf-8').matchAll(/from\s+['"]([^'"]+)['"]/g)]
+    .map(m => m[1])
+    .filter(spec => spec.startsWith('@/'))
+    .map(spec => spec.slice(2).replace(/\.js$/, ''));
+
 describe('a feature is entered through its door (ADR 0150)', () => {
   const files = walk(SRC);
 
@@ -70,6 +96,24 @@ describe('a feature is entered through its door (ADR 0150)', () => {
         for (const target of importsOf(file)) {
           if (!target.startsWith(`${door}/`)) continue;
           if (target === `${door}/index`) continue;            // the door itself
+          offenders.push(`${rel}  imports  ${target}`);
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+  }
+
+  for (const door of DOORS) {
+    const tail = door.split('/').pop()!;
+    it(`only src/${door}'s OWN tests import past its door`, () => {
+      const offenders: string[] = [];
+      for (const file of walk(TESTS)) {
+        const rel = path.relative(TESTS, file).replace(/\\/g, '/');
+        if (rel.includes(`/${tail}/`)) continue;                      // the feature's own suite
+        if ((OWN_TESTS[door] ?? []).includes(rel)) continue;          // a named exception
+        for (const target of importsOfTest(file)) {
+          if (!target.startsWith(`${door}/`)) continue;
+          if (target === `${door}/index`) continue;
           offenders.push(`${rel}  imports  ${target}`);
         }
       }
