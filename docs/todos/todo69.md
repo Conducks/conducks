@@ -26,9 +26,9 @@ left for its own commit with its own measurement.
 
 ## Phase 0 — read before touching
 - Builds: 0150
-- [ ] Read all 973 lines and list every claim the file makes — what each public method promises, and what it promises when git is absent, the repo is bare, or the command fails
-- [ ] Name which of the 20 public methods have NO caller outside `core/git`. `getProgenitors`, `getCommitResonance`, `getAuthorDistribution` and `getBlameData` are the candidates — measure rather than assume, because a method used only by a test is not used
-- [ ] Decide what the door exposes. A method with no caller is either dead (rule 7) or an unused capability, and the two have different answers — say which each is and why
+- [x] Read all 973 lines. Every public operation and what it promises on failure is tabled in `docs/deep_clean.md`, with six findings recorded and not fixed — two orphaned doc blocks, a comment stating a duplication was removed while it is still there four times, a superseded method with zero callers, one place where absence and failure collapse to the same value, and a containment check that returns true for any relative path
+- [x] MEASURED: seven public operations have zero callers in `src/` — `readBatch`, `getProgenitors`, `getCommitResonance`, `isRepository`, `resolveTarget`, `resolveRef`, `readRef`. `getAuthorDistribution` and `getBlameData` were candidates and are NOT: both have real callers in `domain/metrics` and `domain/analysis`
+- [x] They are three different things, not one. `readBatch` and `getProgenitors` are superseded with no test holding them. `getCommitResonance` is superseded by `getFileHistory` — which exists because git subprocesses were 86% of parse time — and only tests keep it. `isRepository` is a capability nothing consumes. `resolveTarget`, `resolveRef` and `readRef` are NOT dead: they are the ADR 0035 layer model, which todo20 left deliberately unwired and todo48#P4 measured at 454 lines and 95 tests with zero user-facing surface, stating ACTIVATE-or-DELETE and then being dropped. That decision is not this clean's to make (rule 16); Phase 1 decides only whether the door exposes them
 
 ## Phase 1 — the door
 - Builds: 0150
