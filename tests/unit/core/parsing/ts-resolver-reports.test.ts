@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { TypeScriptResolver } from '@/lib/core/parsing/languages/typescript/resolver.js';
-import { chronicle } from '@/lib/core/git/index.js';
+import { chronicle, anchorChronicle } from '@/lib/core/git/index.js';
 
 /**
  * `findNearestTsconfig` walks up only while the directory is still INSIDE
@@ -26,7 +26,7 @@ const roots: string[] = [];
 const mkProject = (tsconfig: object, files: string[]): { root: string; all: string[] } => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-tsres-'));
   roots.push(root);
-  chronicle.setProjectDir(root);
+  anchorChronicle(root);
   fs.writeFileSync(path.join(root, 'tsconfig.json'), JSON.stringify(tsconfig));
   const all = files.map(f => {
     const abs = path.join(root, f);
@@ -37,7 +37,7 @@ const mkProject = (tsconfig: object, files: string[]): { root: string; all: stri
   return { root, all };
 };
 afterEach(() => {
-  chronicle.setProjectDir(originalProjectDir);
+  anchorChronicle(originalProjectDir);
   for (const r of roots.splice(0)) fs.rmSync(r, { recursive: true, force: true });
 });
 

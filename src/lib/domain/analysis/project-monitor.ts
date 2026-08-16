@@ -3,13 +3,12 @@ import { readWatcherLiveness, type WatcherLiveness } from "@/lib/domain/evolutio
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { FileHashGate } from "@/lib/core/persistence/index.js";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
 import { buildBoard } from "@/lib/domain/analysis/docs-board.js";
 import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/project-registry.js";
-import { branchMismatch } from "@/lib/core/git/index.js";
+import { branchMismatch, ChronicleInterface } from "@/lib/core/git/index.js";
 
 /**
  * Conducks — Cross-Project Monitor
@@ -141,7 +140,7 @@ export class ProjectMonitor {
     const persistence = new SynapsePersistence(project.root, true);   // READ_ONLY
     try {
       const stored = await persistence.getAllFileHashes();
-      const onDisk = this.sourceFiles(project.root);
+      const onDisk = await this.sourceFiles(project.root);
       base.graph.analyzed = true;
       base.graph.tracked = stored.size;
 
@@ -300,57 +299,29 @@ export class ProjectMonitor {
   /**
    * The branch a registered project's checkout is on, or null when it has none.
    *
-   * Spawned per project root rather than routed through the `chronicle` singleton, which anchors to
-   * ONE project directory for the whole process — the monitor is cross-project by definition and
-   * would otherwise read the same branch for every row. Same shape as `ChronicleInterface.
-   * getCurrentBranch`: `--quiet --short` exits non-zero and prints nothing on a detached HEAD, so
-   * null means "no branch here" and never an invented name.
+   * ASKS THE GIT FEATURE, per root. It used to spawn `symbolic-ref` itself, and the reason given was
+   * real at the time: the `chronicle` SINGLETON anchors to one directory for the whole process, and
+   * the monitor is cross-project by definition. But `ChronicleInterface` is a class — one per root
+   * answers per root — so the duplication existed because the door exported a singleton, not because
+   * the class could not do it. Rule 4 caused rule 9; fixing 4 is what made this deletable (todo70).
    */
   private checkoutBranch(root: string): string | null {
-    try {
-      const out = execFileSync("git", ["symbolic-ref", "--quiet", "--short", "HEAD"], {
-        cwd: root, encoding: "utf8", timeout: 10_000,
-        // A non-git project is an expected case, not an error — do not print git's complaint.
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-      return out.trim() || null;
-    } catch {
-      return null;                 // detached HEAD, no repository, or an unreadable root
-    }
+    return new ChronicleInterface(root).getCurrentBranch();
   }
 
   /**
-   * Source files under a root. `git ls-files` when possible — it already honours `.gitignore`, which is
-   * the only cheap way to avoid walking `node_modules` — and a bounded filesystem walk otherwise.
+   * Source files under a root, asked of the git feature per root for the same reason as above.
+   *
+   * `discoverFiles` already carries what this re-implemented AND more: it honours `.gitignore`, asks
+   * every NESTED repository rather than only the anchor (ADR 0069), passes `core.quotePath=false` so
+   * a non-ASCII filename survives, drops binaries, and falls back to a filesystem scan derived from
+   * what the language providers declare. The local copy had none of those.
+   *
+   * The extension filter stays here: the monitor counts SOURCE files, while discovery deliberately
+   * ingests config and documentation too.
    */
-  private sourceFiles(root: string): string[] {
-    try {
-      const out = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
-        cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
-        // A non-git project is the fallback case, not an error — do not print git's complaint about it.
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-      return out.split("\n")
-        .filter(f => f && SOURCE_EXTENSIONS.has(path.extname(f)))
-        .map(f => path.join(root, f));
-    } catch {
-      return this.walk(root, 0);
-    }
-  }
-
-  private walk(dir: string, depth: number): string[] {
-    if (depth > 12) return [];
-    const skip = new Set(["node_modules", ".git", "build", "dist", ".conducks", "target", ".venv", "vendor"]);
-    const out: string[] = [];
-    let entries: fs.Dirent[] = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
-    for (const entry of entries) {
-      if (entry.name.startsWith(".") && entry.name !== ".conducks") continue;
-      if (skip.has(entry.name)) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) out.push(...this.walk(full, depth + 1));
-      else if (SOURCE_EXTENSIONS.has(path.extname(entry.name))) out.push(full);
-    }
-    return out;
+  private async sourceFiles(root: string): Promise<string[]> {
+    const found = await new ChronicleInterface(root).discoverFiles();
+    return found.filter((f: string) => SOURCE_EXTENSIONS.has(path.extname(f)));
   }
 }

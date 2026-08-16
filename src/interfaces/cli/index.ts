@@ -209,7 +209,9 @@ export async function main() {
   const isReadCommand = !['analyze', 'clean'].includes(commandId);
   const persistence = registry.infrastructure.createPersistence(targetPath, isReadCommand);
   
-  registry.infrastructure.chronicle.setProjectDir(targetPath);
+  // Named operation through composition: the CLI cannot reach `core` (ADR 0005), and the anchor is
+  // no longer a method on the handed-out `chronicle` (ADR 0150 rule 4, todo70).
+  registry.infrastructure.anchorTo(targetPath);
 
   // Registry of modular commands
   const commands: ConducksCommand[] = [

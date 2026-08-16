@@ -1,5 +1,5 @@
 # todo70 — the git door's four rule violations, each with its own measurement
-Status: todo
+Status: done
 - Acceptance: `core/git` satisfies every applicable rule of ADR 0150 — no mutable state on the door, no logic duplicated inside or outside it, and no operation carried without a caller or a stated reason.
 - UNBLOCKED 2026-08-16: both prerequisites are met. `core/persistence` is cleaned and carries an adversarial suite; `core/parsing` has a door, zero doc gaps, and its behaviour is held by four oracles that read unchanged through the whole campaign. What remains owed in parsing is per-handler reflector coverage, which the injection does not touch.
 
@@ -28,15 +28,19 @@ proving they bite, and four oracles read unchanged.
 ## Phase 1 — rule 4, the singleton on the door
 - Builds: 0150
 - [x] MEASURED: 24 files use the singleton — 4 in `core/`, 5 in `domain/`, 15 outer. `setProjectDir` is called in three `src/` places, all anchoring at boot or at a CLI target. The four core files are what make this expensive: `core` may not import the registry (ADR 0005), so they need the instance INJECTED, and two of them are `reflector.ts` and `persistence.ts`
-- [ ] injection through parsing and persistence, once both are pinned by their own adversarial tests
-- [ ] the door stops exporting a mutable singleton. What replaces it is decided by the measurement, not in advance
-- [ ] no caller changes behaviour: the four oracles read the same numbers, and the branch guard still refuses on a real two-branch fixture
+- [x] NO injection was needed, and that is the finding. The measurement asked "who calls `setProjectDir`", not "who holds the instance" — five sites, three in `src/`, two in tests already driving their own instance. Threading a constructor argument through `reflector.ts` and `persistence.ts` would have been work done against a fear rather than a number
+- [x] the door exports `chronicle` as `ReadOnlyChronicle` — `Omit<ChronicleInterface, 'setProjectDir'>` — and moving the anchor is the named `anchorChronicle(root)`. The guarantee is compile-time, and the test says so out loud: the method still exists at runtime and a cast still reaches it. What is gone is the accidental case, which is the one that happens
+- [x] `cli -> core` is not a legal edge (ADR 0005) and the first attempt broke it; `boundaries.test.ts` caught it the same run. The anchor goes through `registry.infrastructure.anchorTo(root)` — composition carries the edge
+- [x] no caller changed behaviour: 1,990 tests green, four oracles read unchanged with EXTRA 0, typecheck 0
 
 ## Phase 2 — rule 9, the duplicated git
 - Builds: 0150
 - Depends: todo70#P1
-- [ ] `project-monitor.ts` stops spawning `symbolic-ref` and `ls-files` itself and asks the feature, per root. Its own comment says why it could not: the singleton anchors to one directory and the monitor is cross-project — Phase 1 removes that reason
-- [ ] `monitor` reports the same branch and the same file counts for every registered project as it does today, measured on the real registry rather than a fixture
+- [x] both methods are now one line each — `new ChronicleInterface(root)` per root. The private 15-line `walk` fallback went with them, orphaned by the change that removed its only caller
+- [x] MEASURED on this repository, and the counts are NOT the same: the private `ls-files` saw 575 source files, the git feature sees 578. The three are every file under `tests/fixtures/mock-repo`, a nested checkout — the local copy asked only the anchor repository, while `discoverFiles` asks every repository under it (ADR 0069). `status` had been reporting a smaller tree than `analyze` ingested
+- [x] branch is unchanged on every real root checked, which is the half that had no bug
+- [x] `tests/unit/domain/analysis/monitor-sees-nested-repositories.test.ts` — 3 cases with the counter-test beside them: a plain single-repo project still counts 2 and not 3, so a fix that only ever counts MORE cannot pass. Mutation (the old private `ls-files` restored) killed 2 of 3
+- [x] COST, stated: a non-git project now prints one `Falling back to universal FS scan` line on `status` where the private copy was silent. Kept — it is true, it is stderr, and `analyze` already says it about the same directory
 
 ## Phase 3 — rules 8 and 9 inside the file
 - Builds: 0150
@@ -46,6 +50,6 @@ proving they bite, and four oracles read unchanged.
 ## Phase 4 — close it honestly
 - Builds: 0150
 - Depends: todo70#P3
-- [ ] gates green: full suite, four oracles, typecheck, docs-lint
-- [ ] `docs/deep_clean.md` records what changed and what is still unknown
-- [ ] the rule table for `core/git` is restated with every row PASS or N/A, or the remaining row keeps its reason. A feature is not done because its clean finished
+- [x] gates green: 1,990 tests / 262 suites · four oracles, EXTRA 0 · typecheck 0 · docs-lint 187 clean
+- [x] `docs/deep_clean.md` unit 7 records the before/after count, the two mutations, and the one cost
+- [x] rule table restated: 14 PASS, 2 n/a, 0 open. Rule 16 is the row that is deliberately BROKEN — rule 9 changed what `status` counts, so it is filed as a behaviour change with a number, not as a clean

@@ -829,3 +829,105 @@ publishes a legitimate write.
 `todo70` — git's rules 4 and 9 — was blocked on "parsing and persistence cleaned". Both now are. The
 `chronicle` singleton can be injected through `reflector.ts` and `persistence.ts` with both files
 pinned, which is what rule 13 was waiting for.
+
+---
+
+## Unit 7 — `core/git`, rules 4 and 9 (todo70 closed)
+
+The two rules git was carrying as DEFERRED since unit 1. The blocker was named at the time — parsing
+and persistence had to be cleaned first — and both now are, so this closes the debt rather than
+amending the rule.
+
+### Rule 4 — the anchor stopped being a method
+
+`chronicle` is one instance held by 24 files, and every one of them could call `setProjectDir` and
+point the whole process at another directory mid-run. Nothing would report it; every later answer
+would simply be about a different tree.
+
+The door now hands it out as a type that cannot do that:
+
+```ts
+export type ReadOnlyChronicle = Omit<ChronicleInterface, 'setProjectDir'>;
+export const chronicle: ReadOnlyChronicle = new ChronicleInterface();
+export function anchorChronicle(root: string): void { (chronicle as ChronicleInterface).setProjectDir(root); }
+```
+
+The compiler named every caller: **five**, not the "wherever it is written" the grep-shaped fear
+assumed. Three moved to `anchorChronicle` — CLI boot, registry re-anchor, core boot. Two were tests
+driving their OWN instance and were already correct.
+
+**What this does NOT claim, and the test says so out loud:** the instance is still shared and the
+method still exists at runtime. What is gone is the ACCIDENTAL case — a mutator reachable on every
+handed-out reference — which is the one that happens. A cast still gets through, and pretending
+otherwise would be the more expensive lie.
+
+`cli -> core` is not a legal edge (ADR 0005), and the first attempt imported the door straight into
+`cli/index.ts`. `boundaries.test.ts` caught it in the same run. The anchor is now
+`registry.infrastructure.anchorTo(root)` — composition carries the edge, which is its job.
+
+### Rule 9 — `project-monitor` stopped re-implementing git
+
+It spawned `symbolic-ref` and `ls-files` itself. The reason recorded in the code was true when
+written: the singleton anchors to ONE directory, and the monitor is cross-project by definition, so
+routing through `chronicle` would have reported the same branch for every row.
+
+But `ChronicleInterface` is a CLASS. One per root answers per root. The duplication existed because
+the door exported a singleton — **rule 4 caused rule 9**, exactly as unit 1 predicted, and fixing 4 is
+what made this deletable. Both methods are now one line each, and the private 15-line `walk` fallback
+went with them.
+
+### The measurement, before and after
+
+The local copy asked only the anchor repository. `discoverFiles` asks every repository under it
+(ADR 0069), passes `core.quotePath=false` so a non-ASCII filename survives, drops binaries, and falls
+back to a scan derived from what the language providers declare. On this repository:
+
+| | source files seen |
+|---|---|
+| the private `ls-files` | 575 |
+| the git feature | 578 |
+
+The three were every file under `tests/fixtures/mock-repo` — a nested checkout. `status` had been
+reporting a tree smaller than the one `analyze` ingested, and no test knew.
+
+`tests/unit/domain/analysis/monitor-sees-nested-repositories.test.ts` pins it with the counter-test
+beside it: a plain single-repo project still counts 2 and not 3, because a fix that only ever counts
+MORE would pass the nested case by walking the filesystem and putting `node_modules` back into every
+count. Mutation — the old private `ls-files` restored — killed 2 of 3.
+
+The type guarantee got its own mutation: widening `chronicle` back to `ChronicleInterface` makes the
+`@ts-expect-error` in `anchor-is-not-a-method.test.ts` an error. A type claim is only enforced if
+`tsc` fails without it.
+
+### One cost, stated
+
+A non-git project now prints `Git discovery failed. Falling back to universal FS scan` on `status`.
+The private copy fell back silently. Kept: it is true, it goes to stderr, and it is what `analyze`
+already says about the same directory. A second, quieter answer to the same question is what rule 9
+is about.
+
+### Rule table — core/git, final
+
+| rule | |
+|---|---|
+| 1 one door | PASS |
+| 2 a test enforces it | PASS |
+| 3 inside is private, own tests exempt | PASS |
+| 4 no mutable state on the door | **PASS** — `ReadOnlyChronicle`, mutation-checked against `tsc` |
+| 5 shared types to `contracts/` | n/a |
+| 6 comments | PASS |
+| 7 no dead code | PASS |
+| 8 every line has a purpose | PASS |
+| 9 no duplicated logic | **PASS** — the monitor asks the feature; `walk` deleted |
+| 10 every claim tested, and it bites | PASS — 3 new cases, 2 mutations |
+| 11 adversarial | PASS |
+| 12 leaves tested from inside | n/a |
+| 13 leaves first | PASS — this is the rule that made it wait, and it was right to |
+| 14 one unit per commit | PASS |
+| 15 gates after each unit | PASS |
+| 16 cleaning is not fixing | **broken deliberately** — rule 9 changed what `status` counts, and it
+  is a fix. Recorded as a behaviour change with a before/after number rather than filed as a clean. |
+
+**14 PASS, 2 n/a, 0 open.** Third feature to satisfy every applicable rule.
+
+Gates: 1,990 tests / 262 suites green · typecheck 0 · oracles EXTRA 0 · docs-lint 187 clean.

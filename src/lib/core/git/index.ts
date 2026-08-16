@@ -12,11 +12,14 @@
  * every one of them has an external caller — so this door re-exports the whole surface rather than
  * pretending to narrow it. Narrowing happens when a symbol loses its last caller, not before.
  *
- * KNOWN TENSION, recorded rather than fixed. ADR 0150 rule 4 says a door exports operations and
- * types and never a mutable singleton — and `chronicle` is exactly that: a module-level instance
- * whose `setProjectDir` any caller may call. Seven of the eight importers want precisely that
- * instance, so changing it is a behaviour change, which rule 16 forbids inside a clean. It is
- * carried here, named, and left for its own decision with its own measurement.
+ * RULE 4, resolved (todo70). `chronicle` is exported as `ReadOnlyChronicle` — the class minus its
+ * one mutator — so none of the twenty-four files holding it can re-anchor the process. Moving the
+ * anchor is `anchorChronicle(root)`, a named operation used at three sites that all anchor at boot
+ * or at a CLI target rather than wandering mid-run.
+ *
+ * What this does NOT claim: the instance is still shared, and `anchorChronicle` is still importable
+ * by anyone. What it removes is the accidental case — a method reachable on every handed-out
+ * reference — which is the one that actually happened.
  */
-export { ChronicleInterface, chronicle, branchMismatch, branchRefusalMessage } from './chronicle-interface.js';
-export type { ResolvedTarget, BranchMismatch } from './chronicle-interface.js';
+export { ChronicleInterface, chronicle, anchorChronicle, branchMismatch, branchRefusalMessage } from './chronicle-interface.js';
+export type { ResolvedTarget, BranchMismatch, ReadOnlyChronicle } from './chronicle-interface.js';

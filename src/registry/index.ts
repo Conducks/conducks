@@ -1,6 +1,6 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
-import { chronicle } from "@/lib/core/git/index.js";
+import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
 import { AnalysisService, AnalyzeOrchestrator, Conducks } from "@/lib/domain/analysis/index.js";
 import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
@@ -551,6 +551,15 @@ export const registry = {
      */
     reclaimVault: (minRatio = 3) => persistence.reclaimIfBloated(minRatio),
     get chronicle() { return chronicle; },
+    /**
+     * Point the process anchor at a root.
+     *
+     * `chronicle` above is handed out as `ReadOnlyChronicle` — the class minus its one mutator — so
+     * none of the files holding it can move the anchor by accident (ADR 0150 rule 4). Moving it is
+     * this, deliberately named and deliberately here: the CLI resolves a target directory and must
+     * anchor to it, and `cli -> core` is not a legal edge (ADR 0005), so composition carries it.
+     */
+    anchorTo: (root: string) => anchorChronicle(root),
     get registry() { return synapseRegistry; },
     get logger() { return logger; },
     createLogger: (scope?: string) => new Logger(scope),

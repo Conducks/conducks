@@ -973,4 +973,26 @@ export class ChronicleInterface {
   }
 }
 
-export const chronicle = new ChronicleInterface();
+/**
+ * Everything a caller may do with the process anchor — the class MINUS `setProjectDir`.
+ *
+ * ADR 0150 rule 4 forbids a door exporting a singleton a caller can mutate, and `setProjectDir` was
+ * the only mutator on this class. Twenty-four files import the shared instance; before this, any one
+ * of them could silently re-anchor the whole process, and three did.
+ */
+export type ReadOnlyChronicle = Omit<ChronicleInterface, 'setProjectDir'>;
+
+/** The process anchor. Typed read-only — see `ReadOnlyChronicle` and `anchorChronicle`. */
+export const chronicle: ReadOnlyChronicle = new ChronicleInterface();
+
+/**
+ * Points the process anchor at a root. THE ONLY WAY to move it, and a named operation rather than a
+ * method reachable on every handed-out reference.
+ *
+ * Called by the bootstrapper and by the CLI when a command targets another directory — three sites,
+ * all of which anchor rather than wander. It re-points the SAME instance on purpose: twenty-four
+ * files hold this binding, and replacing the object would leave every one of them on the old root.
+ */
+export function anchorChronicle(root: string): void {
+  (chronicle as ChronicleInterface).setProjectDir(root);
+}

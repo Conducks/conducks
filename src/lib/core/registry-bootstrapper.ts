@@ -1,6 +1,6 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
-import { chronicle } from "@/lib/core/git/index.js";
+import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
 import { IgnoreManager } from "@/lib/core/parsing/index.js";
 import { logger } from "@/lib/core/utils/index.js";
@@ -334,7 +334,7 @@ export class RegistryBootstrapper {
 
       const newPersistence = new SynapsePersistence(effectiveRoot, readOnly);
       updatePersistence(newPersistence);
-      chronicle.setProjectDir(effectiveRoot);
+      anchorChronicle(effectiveRoot);
       
       const newIgnoreManager = new IgnoreManager(effectiveRoot);
       updateIgnoreManager(newIgnoreManager);
