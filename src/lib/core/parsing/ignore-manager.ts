@@ -41,6 +41,7 @@ export class IgnoreManager {
     "**/.conducks/**"
   ];
 
+  /** Reads the project's ignore rules once — every later `isIgnored` is a match against them. */
   constructor(private rootDir: string) {
     this.loadCustomIgnores();
   }

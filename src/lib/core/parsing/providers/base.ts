@@ -6,6 +6,7 @@ import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 
 export type ImportSemantics = 'named' | 'wildcard' | 'namespace';
 
+/** What every language pack must supply for the reflector to use it (CONDUCKS-2). */
 export interface ConducksProvider {
   /** Unique ID (e.g. 'typescript-provider') */
   readonly id: string;
@@ -64,6 +65,7 @@ export interface ConducksProvider {
   /**
    * Built-in/Stdlib filtration.
    */
+  /** Whether a name is the language's own — a built-in is not an unresolved reference. */
   isBuiltIn?(name: string): boolean;
 
   /**
@@ -89,6 +91,7 @@ export abstract class NativeProvider implements ConducksProvider {
 
   public readonly importSemantics: ImportSemantics = 'named';
 
+  /** The default answer: no built-ins. A pack that has them overrides this; most do not. */
   public isBuiltIn(name: string): boolean {
     return false;
   }

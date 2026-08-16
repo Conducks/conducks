@@ -25,6 +25,7 @@ export class GrammarRegistry {
   private nativeParser: any | undefined;
   private nativeLoadFailed = false;
 
+  /** Private: one registry per process, because a tree-sitter binding serves one wrapper (ADR 0027). */
   private constructor() {}
 
   /**
@@ -59,6 +60,7 @@ export class GrammarRegistry {
     return this.loadNative() !== undefined;
   }
 
+  /** The process-wide registry. The singleton is the point — grammars are expensive and shared. */
   public static getInstance(): GrammarRegistry {
     if (!GrammarRegistry.instance) {
       GrammarRegistry.instance = new GrammarRegistry();
@@ -200,10 +202,15 @@ export class GrammarRegistry {
     }
   }
 
+  /**
+   * Whether a grammar was TRIED and could not be loaded — distinct from one nobody has asked for.
+   * The difference decides whether a file degrades to the regex fallback or was never a candidate.
+   */
   public isLanguageUnavailable(langId: string): boolean {
     return this.unavailableLanguages.has(langId);
   }
 
+  /** A loaded grammar, or undefined. Undefined means not loaded YET, not unavailable — see above. */
   public getLanguage(langId: string): any | undefined {
     return this.languages.get(langId);
   }
@@ -255,6 +262,10 @@ export class GrammarRegistry {
 
 
 
+  /**
+   * Hangs the grammar's `node-types.json` off the language object, so a query can be validated
+   * against the node types that grammar really has rather than failing at match time (ADR 0089).
+   */
   private attachNodeTypeInfo(lang: any, packageName: string, langId: string): void {
     try {
       const modulePath = this.require.resolve(packageName);
@@ -280,6 +291,7 @@ export class GrammarRegistry {
     }
   }
 
+  /** Grammar loading is the noisiest thing in a cold start, so it says nothing unless asked. */
   private log(...args: unknown[]): void {
     if (process.env.CONDUCKS_DEBUG === '1') {
       console.error(...args);

@@ -16,6 +16,12 @@ export class TypeScriptResolver {
   // simple in-memory cache for tsconfig per projectRoot
   private static tsconfigCache: Record<string, { mtime: number; config: any }> = {};
 
+  /**
+   * A TypeScript specifier to a real file: tsconfig paths, then relative, then index resolution.
+   *
+   * Case-insensitively, deliberately — on APFS a path differing only by case is the SAME file, and
+   * treating it as another one splits a node in two (CONDUCKS-4).
+   */
   public resolve(rawImportPath: string, currentFile: string, allFiles: string[]): string | undefined {
     // 0. Strip Quotes (Tree-sitter 'string' node includes them)
     const cleanPath = rawImportPath.replace(/^['"]|['"]$/g, '');
@@ -175,6 +181,7 @@ export class TypeScriptResolver {
 
       // prefer exports if present (support string, object, and conditional exports)
       const exportsField = pkg.exports;
+      // A package `exports` entry: a string, or a conditions object keyed by import/require/default.
       const resolveExportEntry = (entry: any): string | undefined => {
         if (!entry) return undefined;
         if (typeof entry === 'string') return entry;

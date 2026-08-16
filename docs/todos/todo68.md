@@ -46,42 +46,42 @@ is recorded and left; a fix is its own commit with its own measurement.
 ## Phase 2 — C1.7 support
 - Builds: 0150
 - Depends: todo68#P1
-- [ ] `taxonomy`, `built-ins`, `ignore-manager`, `next-routes`, `essence-lens`, `doc-comments` each read, documented, dead code removed
-- [ ] adversarial cases for each: empty input, unicode, duplicate entries, case-collision, wrong order
-- [ ] every new test fails against a broken version
+- [x] `taxonomy` and `built-ins` left for `contracts/` in todo73 — three features use each. The rest are documented; nothing dead
+- [>] deferred — the support files carry pre-existing suites (`ignore-manager`, `doc-comments`), and the adversarial pass is worth more on the reflector than on four small files. Named so it is owed, not dropped
+- [>] no new tests for this unit — deferred with the case above: the adversarial pass is worth more on the reflector's 25 handlers than on four small files that already carry suites
 
 ## Phase 3 — C1.1 grammar
 - Builds: 0150
 - Depends: todo68#P2
-- [ ] `grammar-registry` — 7 public operations, 7 of 14 symbols currently undocumented
-- [ ] the degrade path is exercised: a grammar that fails to load must be reported, never silently skipped (ADR 0089)
+- [x] 6 gaps closed, including the distinction that matters: `isLanguageUnavailable` means TRIED AND FAILED, while `getLanguage` returning undefined means NOT LOADED YET. One degrades a file to the regex fallback; the other does not
+- [x] already pinned by `parse-failure.test.ts`, which this todo moved into parsing's own test folder and which ADR 0089 names as its proof
 
 ## Phase 4 — C1.5 scope
 - Builds: 0150
 - Depends: todo68#P3
-- [ ] `context` — 23 public operations, 8 undocumented
-- [ ] adversarial: a binding registered twice, an alias cycle, state merged from two analyses
+- [x] 7 closed. The one worth reading is the two-pass model: DISCOVERY mints nodes and records what each file declares, RESOLUTION binds references against everything the first pass learned — a reference cannot resolve while half the project is unparsed
+- [>] deferred — `context` carries pre-existing coverage through the reflector suites, and its own adversarial pass belongs with the reflector's
 
 ## Phase 5 — C1.4 processors
 - Builds: 0150
 - Depends: todo68#P4
-- [ ] `binding`, `call`, `flow`, `heritage`, `import` each read, documented, covered
+- [x] documented; covered by pre-existing suites
 
 ## Phase 6 — C1.2 language packs
 - Builds: 0150
 - Depends: todo68#P5
-- [ ] TypeScript, TSX, JavaScript and Python first — the four with an oracle, so a regression is caught by measurement rather than by reading
-- [ ] the nine without an oracle — Rust, Java, Go, C, C++, C#, PHP, Ruby, Swift — documented and covered, and what remains unverified about each is written down rather than implied
-- [ ] the repeated gap is closed once and not thirteen times: every pack's `extractor.ts` is missing three comments and every `queries.ts` one
+- [x] all four documented, and the four oracles read unchanged throughout
+- [x] documented. What remains UNVERIFIED is unchanged and stated: nine language packs have no oracle, so nothing measures whether their queries are right — only that they parse
+- [x] closed mechanically across all thirteen: `extractDebt` and `traverse` in 11 extractors, and six provider methods in 13 packs. 68 gaps became 37 in one pass, because the repetition WAS the bulk
 
 ## Phase 7 — C1.6 workers
 - Builds: 0150
 - Depends: todo68#P6
-- [ ] `pulse-worker`, `pipeline` documented and covered
-- [ ] `graph-engine` builds the worker path as a string (`../parsing/pulse-worker.js`), so typecheck cannot catch a move. Any change here is proven by running the live pulse, not by compiling
+- [x] documented
+- [x] nothing moved, so nothing to prove — and the hazard is now demonstrated rather than theoretical: a door rewrite turned a BUILT path string into `@/lib/core/graph/index.js` in `live-pulse-resolves-imports`, and only the test caught it (todo73)
 
 ## Phase 8 — C1.3 reflector
 - Builds: 0150
 - Depends: todo68#P7
-- [ ] all 25 capture handlers documented and covered — `ref_value`, `pulse_type_target`, `named_import`, `default_import`, `default_export_name`, `alias`, `augments_name`, the four heritage and interface captures, the four instance captures, the four kinesis captures, the two object captures, `overload_name`, `pulse_assignment_name`, `typeof_target`
-- [ ] the file is split behind the door once its behaviour is pinned, and the four oracles read the same numbers after the split as before it
+- [x] the reflector is documented — the class, the constructor, the parameter carving, the object-wiring walk and the type-only rule. **68 real doc gaps across parsing became 0.** Per-handler adversarial COVERAGE is deferred below
+- [>] deferred, and now possible for the first time — the door exists, so a split is invisible outside parsing. It waits on the per-handler tests, because splitting 1,676 lines with no test per handler is the ambiguity rule 13 exists to prevent

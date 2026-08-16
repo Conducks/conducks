@@ -29,6 +29,7 @@ export class TypeScriptProvider extends NativeProvider implements ILanguagePlugi
   /**
    * Delegates import resolution to the TS-specific resolver.
    */
+  /** This language's rule for turning a specifier into a file — the one thing a pack cannot share. */
   public resolveImport(rawPath: string, currentFile: string, allFiles: string[]): string | undefined {
     return this.resolver.resolve(rawPath, currentFile, allFiles);
   }
@@ -37,6 +38,7 @@ export class TypeScriptProvider extends NativeProvider implements ILanguagePlugi
    * Conducks — Structural Complexity
    * Calculates branch complexity, including React hook transitions.
    */
+  /** Branch count, used as the complexity signal on every symbol this pack produces. */
   public calculateComplexity(node: any): number {
     return this.extractor.calculateComplexity(node);
   }
@@ -44,6 +46,7 @@ export class TypeScriptProvider extends NativeProvider implements ILanguagePlugi
   /**
    * Conducks — Technical Debt Signals
    */
+  /** Debt markers inside a symbol, so "where is the known debt" is a graph question, not a grep. */
   public extractDebt(node: any): string[] {
     return this.extractor.extractDebt(node);
   }
@@ -51,6 +54,7 @@ export class TypeScriptProvider extends NativeProvider implements ILanguagePlugi
   /**
    * Conducks — Behavioral Documentation (JSDoc)
    */
+  /** The comment a reader wrote about this symbol — harvested into the node's `doc` (ADR 0133). */
   public extractDocs(node: any): string | undefined {
     return this.extractor.extractDocs(node);
   }
@@ -58,6 +62,7 @@ export class TypeScriptProvider extends NativeProvider implements ILanguagePlugi
   /**
    * Conducks — Visibility Heuristic
    */
+  /** Public, private or protected, from whatever this language spells it with. */
   public getVisibility(node: any): 'public' | 'private' | 'protected' {
     return this.extractor.getVisibility(node);
   }
@@ -65,6 +70,7 @@ export class TypeScriptProvider extends NativeProvider implements ILanguagePlugi
   /**
    * Extracts specific named bindings from an import or export node.
    */
+  /** The names an import statement binds locally, which is what makes a call resolvable. */
   public extractNamedBindings(node: any): Array<{ name: string; alias?: string; from?: string }> {
     const raw = this.bindings.extract(node);
     return raw.map(b => ({ name: b.exported, alias: b.local === b.exported ? undefined : b.local, from: (b as any).from }));

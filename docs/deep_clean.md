@@ -719,3 +719,37 @@ silently reporting as unproven. `docs-lint` caught it, as it did for the two uti
 
 **Second time this campaign, so it is a rule now and not an anecdote: a test path is an ADDRESS other
 records hold.** Moving one is a two-file change, and only the docs gate knows.
+
+### parsing's 68 doc gaps, and why half of them fell in one pass
+
+**68 real gaps → 0.** Not 138 — that number was half UNIT nodes the harvester structurally cannot
+reach, corrected by todo69 before this work started.
+
+The bulk was MECHANICAL REPETITION, and treating it that way is what made it cheap: `extractDebt`
+and `traverse` are the same function in eleven language extractors, and six provider methods repeat
+across thirteen packs. One pass over all of them took 68 to 37. Writing thirteen bespoke comments for
+thirteen identical delegations would have cost more and said less.
+
+The gaps worth reading afterwards were the ones a reader cannot derive:
+
+- **`context`'s two-pass model.** DISCOVERY mints nodes and records what each file declares;
+  RESOLUTION binds references against everything the first pass learned. A reference cannot resolve
+  while half the project is unparsed — which is why it is a mode rather than an ordering.
+- **`grammar-registry`'s two kinds of missing.** `isLanguageUnavailable` means TRIED AND FAILED;
+  `getLanguage` returning undefined means NOT LOADED YET. One degrades a file to the regex fallback
+  (ADR 0089), the other does not, and nothing said so.
+- **`isTypeOnly` in the reflector.** A type-only import is erased at compile time, so it is not a
+  runtime dependency and must not count as one in a cycle check (ADR 0016). Python's
+  `if TYPE_CHECKING:` is the same fact in another language.
+
+### What parsing still owes
+
+Stated rather than implied, because the work is real and the todo carries it as `[>]`:
+
+- **Per-handler adversarial tests for the reflector's 25 capture handlers.** The file is documented;
+  it is not covered handler by handler.
+- **The split of `reflector.ts`.** Now POSSIBLE for the first time — the door makes it invisible
+  outside parsing — and still waiting, because splitting 1,676 lines with no test per handler is
+  exactly the ambiguity rule 13 exists to prevent.
+- **Nine language packs have no oracle.** They are documented and they parse. Nothing measures
+  whether their queries are RIGHT, and this campaign did not change that.

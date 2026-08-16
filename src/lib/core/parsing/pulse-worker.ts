@@ -58,7 +58,8 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
   const cppProvider = new CPPProvider();
   const cProvider = new CProvider();
 
-  function isCppHeader(filePath: string): boolean {
+  /** A `.h` is C or C++ and the extension cannot say which; the content decides. */
+function isCppHeader(filePath: string): boolean {
     try {
       const content = fs.readFileSync(filePath, 'utf8').slice(0, 2000);
       return /\bclass\b|\btemplate\s*<|\bnamespace\b|::/.test(content);

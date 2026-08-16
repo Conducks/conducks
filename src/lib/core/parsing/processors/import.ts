@@ -36,6 +36,7 @@ export class ImportProcessor {
    */
   private static basenameCache = new WeakMap<string[], Map<string, string[]>>();
 
+  /** Files grouped by basename, so a specifier missing its extension can still find its one match. */
   private static basenameIndexFor(allPaths: string[]): Map<string, string[]> {
     let index = ImportProcessor.basenameCache.get(allPaths);
     if (!index) {
@@ -50,6 +51,7 @@ export class ImportProcessor {
     return index;
   }
 
+  /** The canonicalised file set, built once per pulse rather than per import — this is the hot path. */
   private static canonicalSetFor(allPaths: string[]): Set<string> {
     let set = ImportProcessor.canonicalCache.get(allPaths);
     if (!set) {

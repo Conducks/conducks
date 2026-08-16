@@ -29,6 +29,7 @@ export interface HarvestedComment {
   text: string;
 }
 
+/** A symbol a comment can attach to — its line is what the harvest joins on. */
 export interface DocTarget {
   /** 1-based line the declaration starts on. */
   lineStart: number;
@@ -190,6 +191,7 @@ export function attachDocs<T extends DocTarget>(
   // declaration's body. A constant window cannot express that — too small and a wrapped signature
   // hides its docstring, too large and an inner function's docstring is handed to its parent.
   const declLines = ordered.filter(t => (t.rank ?? 0) === 0).map(t => t.lineStart);
+  // How far above a declaration a comment may sit and still belong to it — a blank line ends reach.
   const reachOf = (t: DocTarget): number | undefined => {
     if (t.lineEnd === undefined) return undefined;
     const nextDecl = declLines.find(l => l > t.lineStart);

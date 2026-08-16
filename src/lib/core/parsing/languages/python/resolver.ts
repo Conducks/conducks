@@ -31,6 +31,10 @@ const PYTHON_STDLIB = new Set([
   'unittest', 'urllib', 'uuid', 'venv', 'warnings', 'weakref', 'xml', 'zipfile', 'zlib', 'zoneinfo',
 ]);
 
+/**
+ * Python's import rules, which are namespace-shaped rather than path-shaped: `from foundation import
+ * paths` binds a MODULE, and until that resolved to a file every call through it dangled (todo44#P6).
+ */
 export class PythonResolver {
 
   /**
@@ -158,6 +162,8 @@ function buildMRO(
   const result: string[] = [className];
   const seen = new Set<string>([className]);
 
+  // Walks the base-class chain, because Python inheritance is transitive and a method may be
+  // declared several classes up from the one the call names.
   function walk(bases: string[]): void {
     for (const base of bases) {
       if (!seen.has(base)) {

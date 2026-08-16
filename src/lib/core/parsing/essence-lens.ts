@@ -99,6 +99,7 @@ export class EssenceLens {
     return null;
   }
 
+  /** Declared npm dependencies, which is what separates a third-party import from a project one. */
   private parsePackageJson(filePath: string, source: string, spectrum: PrismSpectrum): void {
     try {
       const pkg = JSON.parse(source);
@@ -142,6 +143,7 @@ export class EssenceLens {
     }
   }
 
+  /** The same for Python: a declared requirement is a dependency, not a missing local module. */
   private parseRequirementsTxt(filePath: string, source: string, spectrum: PrismSpectrum): void {
     const lines = source.split('\n');
     console.error(`[EssenceLens]   -> Total lines in requirements.txt: ${lines.length}`);

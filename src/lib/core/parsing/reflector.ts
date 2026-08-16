@@ -137,6 +137,8 @@ function memberTypesOf(bodyNode: any): Record<string, string> {
 function objectPathsOf(objectNode: any): Record<string, string> {
   const out: Record<string, string> = {};
 
+  // Depth-first with a PREFIX, because an object literal's shape is a path — `container.db.query`
+  // is one wiring fact, and losing the prefix loses which property chain reached it.
   const walk = (node: any, prefix: string, depth: number): void => {
     // A container nests a few levels; a deep literal is data, not wiring.
     if (!node || depth > 6) return;
@@ -261,6 +263,12 @@ function kindFromCapture(captureName: string, match: any): string {
   return hasParams ? 'function' : kind;
 }
 
+/**
+ * The parameters a match declares, carved from the capture rather than looked up (ADR 0087).
+ *
+ * A name is taken from the tree at the position the query captured. Resolving it against anything
+ * else is what produced parameters belonging to a different function of the same name.
+ */
 function paramsOf(match: any): Array<{ name: string; type: string | null; optional: boolean }> {
   // TWO capture forms, because one grammar has no parameter-list node at all.
   //
@@ -364,6 +372,7 @@ function returnTypeOf(match: any): string | null {
  * costs that file and is counted, instead of costing the truth about every file like it.
  */
 export class ParseFailure extends Error {
+  /** Holds the processors; the reflector itself owns dispatch, not extraction. */
   constructor(
     public readonly filePath: string,
     public readonly langId: string,
@@ -374,6 +383,15 @@ export class ParseFailure extends Error {
   }
 }
 
+/**
+ * Turns one file's tree-sitter matches into nodes and edges — the single place where source becomes
+ * graph, and therefore where every later answer's fidelity is decided.
+ *
+ * Twenty-five capture handlers, one per kind of fact a grammar can state: a definition, a value read,
+ * a type reference, an import binding, a heritage clause, a call, a route, an object wiring. A
+ * grammar that captures nothing for one of them contributes nothing, which is how thirteen languages
+ * share one reflector without a per-language branch here.
+ */
 export class ConducksReflector {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
@@ -1642,6 +1660,8 @@ export class ConducksReflector {
       }
     }
 
+    // A TYPE-ONLY import is erased at compile time, so it is not a runtime dependency and must not
+    // count as one in a cycle check (ADR 0016). Python's `if TYPE_CHECKING:` is the same fact.
     const isTypeOnly = (binding: string): boolean => {
       const name = leaf(binding);
       return typeUses.has(name) && !valueUses.has(name) && !valueUsesFolded.has(name.toLowerCase());

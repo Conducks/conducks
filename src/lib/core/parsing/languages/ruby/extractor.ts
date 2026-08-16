@@ -27,6 +27,8 @@ export class RubyExtractor {
       'block'
     ]);
 
+    // Depth-first over every child, because the node types this collects can nest arbitrarily and
+    // tree-sitter exposes children by index rather than as an iterable.
     const traverse = (n: any) => {
       if (!n) return;
       if (branchNodes.has(n.type)) {
@@ -61,6 +63,14 @@ export class RubyExtractor {
     return '';
   }
 
+  /**
+   * Debt markers written in the source — TODO, FIXME, HACK and the rest — attached to the symbol
+   * that contains them, so "where is the known debt" is a graph question rather than a grep.
+   *
+   * Substring matching on the node's whole text, deliberately: a marker inside a string literal or a
+   * URL counts. The alternative is a per-language comment-node walk in thirteen packs to remove a
+   * false positive nobody has reported.
+   */
   public extractDebt(node: any): string[] {
     const text = node?.text || '';
     const markers = ['TODO', 'FIXME', 'HACK', 'BUG', 'REFACTOR', 'DEPRECATED', 'XXX'];

@@ -27,6 +27,7 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   /**
    * Delegates import resolution to the Python-specific PEP 328/451 resolver.
    */
+  /** This language's rule for turning a specifier into a file — the one thing a pack cannot share. */
   public resolveImport(rawPath: string, currentFile: string, allFiles: string[]): string | undefined {
     return this.resolver.resolve(rawPath, currentFile, allFiles);
   }
@@ -44,6 +45,7 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   /**
    * Extracts Python-specific named bindings for aliased imports.
    */
+  /** The names an import statement binds locally, which is what makes a call resolvable. */
   public extractNamedBindings(node: any): Array<{ name: string; alias?: string }> {
     const extracted = this.bindings.extract(node);
     return extracted.map(b => ({ name: b.exported, alias: b.local }));
@@ -53,6 +55,7 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
    * Conducks — Structural Complexity
    * Calculates branch complexity, including Python 3.10 match/case.
    */
+  /** Branch count, used as the complexity signal on every symbol this pack produces. */
   public calculateComplexity(node: any): number {
     return this.extractor.calculateComplexity(node);
   }
@@ -60,6 +63,7 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   /**
    * Conducks — Technical Debt Signals
    */
+  /** Debt markers inside a symbol, so "where is the known debt" is a graph question, not a grep. */
   public extractDebt(node: any): string[] {
     return this.extractor.extractDebt(node);
   }
@@ -67,6 +71,7 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   /**
    * Conducks — Behavioral Documentation (Docstrings)
    */
+  /** The comment a reader wrote about this symbol — harvested into the node's `doc` (ADR 0133). */
   public extractDocs(node: any): string | undefined {
     return this.extractor.extractDocs(node);
   }
@@ -74,6 +79,7 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   /**
    * Conducks — Visibility Heuristic
    */
+  /** Public, private or protected, from whatever this language spells it with. */
   public getVisibility(node: any): 'public' | 'private' | 'protected' {
     const nameNode = node.childByFieldName('name') || node;
     const name = nameNode.text || '';

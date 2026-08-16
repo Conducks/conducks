@@ -24,6 +24,7 @@ export class GoProvider extends NativeProvider implements ILanguagePlugin {
   /**
    * Delegates import resolution to the Go-specific package/module resolver.
    */
+  /** This language's rule for turning a specifier into a file — the one thing a pack cannot share. */
   public resolveImport(rawPath: string, currentFile: string, allFiles: string[]): string | undefined {
     return this.resolver.resolve(rawPath, currentFile, allFiles);
   }
@@ -32,6 +33,7 @@ export class GoProvider extends NativeProvider implements ILanguagePlugin {
    * Conducks — Structural Complexity
    * Counts logical regions, concurrency, and generic structural depth.
    */
+  /** Branch count, used as the complexity signal on every symbol this pack produces. */
   public calculateComplexity(node: any): number {
     return this.extractor.calculateComplexity(node);
   }
@@ -40,6 +42,7 @@ export class GoProvider extends NativeProvider implements ILanguagePlugin {
    * Conducks — Visibility Heuristic
    * Maps Go capitalization and internal/ package rules to structural visibility.
    */
+  /** Public, private or protected, from whatever this language spells it with. */
   public getVisibility(name: string, node: any): 'public' | 'private' | 'protected' {
     const filePath = node.tree.uri || ''; 
     return this.extractor.getVisibility(name, filePath);
@@ -49,6 +52,7 @@ export class GoProvider extends NativeProvider implements ILanguagePlugin {
    * Conducks — Technical Debt Signals
    * Extracts markers (TODO, FIXME, etc.) from comments.
    */
+  /** Debt markers inside a symbol, so "where is the known debt" is a graph question, not a grep. */
   public extractDebt(node: any): string[] {
     return this.extractor.extractDebt(node);
   }
@@ -63,6 +67,7 @@ export class GoProvider extends NativeProvider implements ILanguagePlugin {
   /**
    * Extracts Go-specific named bindings from short assignments (:=).
    */
+  /** The names an import statement binds locally, which is what makes a call resolvable. */
   public extractNamedBindings(node: any): Array<{ name: string, alias?: string }> {
     return this.extractor.extractShortBindings(node);
   }

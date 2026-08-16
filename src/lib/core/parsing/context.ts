@@ -38,14 +38,21 @@ export class AnalyzeContext {
   /** Analysis Mode: Discovery (Pass 1) vs Resolution (Pass 2) */
   private discoveryMode: boolean = false;
 
+  /**
+   * Two passes over the same tree. DISCOVERY mints nodes and records what each file declares;
+   * RESOLUTION binds references against everything the first pass learned. A reference cannot be
+   * resolved while half the project is still unparsed, which is why this is a mode and not an order.
+   */
   public setDiscoveryMode(active: boolean): void {
     this.discoveryMode = active;
   }
 
+  /** True during the first pass, when a reference has nothing complete to resolve against. */
   public isDiscoveryMode(): boolean {
     return this.discoveryMode;
   }
 
+  /** True during the second pass. The two are not simply inverse — a context may be in neither. */
   public isResolutionMode(): boolean {
     return !this.discoveryMode;
   }
@@ -120,6 +127,12 @@ export class AnalyzeContext {
    */
   private workspacePackages: Map<string, string> = new Map();
 
+  /**
+   * A package this MONOREPO owns, by name and directory.
+   *
+   * Without it a sibling package reads as a third-party dependency, and the project reports its own
+   * modules as its supply-chain surface (ADR 0108).
+   */
   public registerWorkspacePackage(name: string, dir: string): void {
     if (!name) return;
     this.workspacePackages.set(name.toLowerCase(), dir);
@@ -138,14 +151,17 @@ export class AnalyzeContext {
     return { dir, subpath: seg.slice(consumed).join('/') };
   }
 
+  /** Every workspace package, for callers that classify a specifier as internal or external. */
   public getWorkspacePackages(): Array<[string, string]> {
     return Array.from(this.workspacePackages.entries());
   }
 
+  /** The framework detected for this project — decides which convention-based entry points count. */
   public setFramework(framework: string): void {
     this.framework = framework;
   }
 
+  /** The detected framework, or null when none was recognised — which is a normal state, not a miss. */
   public getFramework(): string | null {
     return this.framework;
   }

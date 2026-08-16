@@ -5,9 +5,11 @@
  */
 
 export class TypeScriptBindings {
+  /** The local names an import statement binds, which is what makes a later call resolvable. */
   public extract(node: any): Array<{ local: string; exported: string; from?: string }> {
     const bindings: Array<{ local: string; exported: string; from?: string }> = [];
 
+    // Depth-first: a binding can sit inside nested destructuring, and tree-sitter indexes children.
     const traverse = (n: any) => {
       // export_specifier, export_statement, export_from_statement
       if (n.type === 'export_specifier' || n.type === 'export_clause') {
