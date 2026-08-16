@@ -41,19 +41,6 @@ describe('ChronicleInterface Unit Tests 📜', () => {
   });
 
   describe('Git Intelligence (Conducks)', () => {
-    it('should extract commit resonance (count and authors)', async () => {
-      mockExec.mockReturnValueOnce('42\n'); // rev-list --count
-      // The unique-author count is derived here now: the shell pipe (`| sort -u | wc -l`) is gone
-      // with the shell, so the mock returns the raw `git log --format=%ae` lines instead of a total.
-      mockExec.mockReturnValueOnce('a@x.com\nb@x.com\na@x.com\n');
-
-      const res = await chronicle.getCommitResonance('src/main.ts');
-
-      expect(res.count).toBe(42);
-      expect(res.authors).toBe(2); // two DISTINCT addresses in the mocked log
-      expect(mockExec).toHaveBeenCalledWith('git', expect.arrayContaining(['rev-list', '--count']), expect.anything());
-    });
-
     describe('getFileHistory — one invocation for all three answers (ADR 0061)', () => {
       it('spawns git EXACTLY ONCE and derives count, author count and distribution from it', async () => {
         // The regression this exists for: the reflector called getCommitResonance and
@@ -72,16 +59,18 @@ describe('ChronicleInterface Unit Tests 📜', () => {
         expect(h!.distribution).toEqual({ 'a@x.com': 3, 'b@x.com': 1 });
       });
 
-      it('agrees with the two methods it replaces, on the same git output', async () => {
-        // Equivalence is the whole basis of the change, so it is pinned rather than assumed.
-        // `rev-list --count HEAD -- <path>` is dropped on the claim that it equals the line count
-        // of `log -- <path>`; both walk HEAD with the same path filter and the same default history
+      it('derives the same distribution as the method that still exists, from one git output', async () => {
+        // What this protects is the SUPERSESSION (ADR 0061): three subprocesses per file became one,
+        // on the claim that `rev-list --count HEAD -- <path>` equals the line count of
+        // `log -- <path>` — both walk HEAD with the same path filter and the same default history
         // simplification. Verified out-of-band across two repositories and 140 files, one carrying
-        // merge commits, with zero disagreements — and pinned here against drift.
+        // merge commits, with zero disagreements.
+        //
+        // It used to compare against `getCommitResonance` as well. That method had no caller left
+        // and was removed, so the comparison is now against `getAuthorDistribution`, which survives
+        // and has real callers, plus the line count the claim rests on.
         const log = 'alice@dev.com\nbob@dev.com\nalice@dev.com\n';
 
-        mockExec.mockReturnValueOnce('3\n').mockReturnValueOnce(log);
-        const oldRes = await chronicle.getCommitResonance('src/utils.ts');
         mockExec.mockReturnValue(log);
         const oldDist = await chronicle.getAuthorDistribution('src/utils.ts');
 
@@ -89,9 +78,9 @@ describe('ChronicleInterface Unit Tests 📜', () => {
         mockExec.mockReturnValue(log);
         const h = await chronicle.getFileHistory('src/utils.ts');
 
-        expect(h!.count).toBe(oldRes.count);
-        expect(h!.authors).toBe(oldRes.authors);
         expect(h!.distribution).toEqual(oldDist);
+        expect(h!.count).toBe(log.trim().split('\n').length);
+        expect(mockExec).toHaveBeenCalledTimes(1);
       });
 
       it('returns null when git fails, so an unreadable file is not a file with no history', async () => {
@@ -175,9 +164,10 @@ describe('git failure is distinguishable from a genuine zero', () => {
     await expect(git.getAuthorDistribution(inProject)).resolves.toBeNull();
   });
 
-  it('flags commit resonance as unavailable rather than reporting no history', async () => {
-    const res = await git.getCommitResonance(inProject);
-    expect(res.unavailable).toBe(true);
-    expect(res.count).toBe(0);
+  it('returns null file history when git cannot be read, not a file with no commits', async () => {
+    // The same rule as the two above, on the method the pulse actually uses. `getCommitResonance`
+    // carried it via an `unavailable` flag and was removed with no caller left; `getFileHistory`
+    // says the same thing by returning null, which no caller can mistake for zero commits.
+    await expect(git.getFileHistory(inProject)).resolves.toBeNull();
   });
 });

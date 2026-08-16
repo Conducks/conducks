@@ -311,6 +311,38 @@ Eleven pass, two are not applicable, **four are open** — and all four are beha
 precisely why they were not done inside a clean. They are todo70, and rule 4 is the root of rule 9:
 the door exports a singleton, so `project-monitor` cannot use the feature and duplicates it instead.
 
+### todo70 — three of the four closed, two deferred with a named blocker
+
+**Rule 7 — `getCommitResonance` removed, `isRepository` kept.** They looked like the same finding and
+were not. The removal exposed a real security gap on the way out: `shell-injection` asserts "every
+call site that takes a filename" and was MISSING `getFileHistory`, the one the pulse runs on every
+file — the list had been written against the methods it replaced and never followed the supersession.
+`isRepository` stays with its reason in the code: `hook-installer` needs the `.git` DIRECTORY, a
+different question, and ADR 0035 names this as the degrade check. Deleting six lines an accepted
+decision relies on needs its own decision.
+
+**Rules 8 and 9 inside the file — collapsed.** Three inline copies of the repo-relative path now call
+`toRepoRelative`, and each method resolves its repository root once rather than per git invocation.
+Pinned through the git ARGUMENTS rather than the private helper, so it asserts what callers send:
+dropping the case-insensitive branch turns the argument into a `../..` chain, git is asked about a
+path outside the repository, and the answer reads as a file with no history.
+
+**Rules 4 and 9-external — DEFERRED, blocked, not open.** Measured: 24 files use the `chronicle`
+singleton, four of them in `core/`, which may not import the registry (ADR 0005). Removing it means
+constructor injection through `reflector.ts` and `persistence.ts` — the two largest files in the
+codebase, neither pinned by a single adversarial test yet.
+
+Rule 13 applies to the fix as much as to the features. Injecting into the parse path before it is
+pinned is how a regression becomes unattributable, and this session already paid for that twice. So
+the blocker is named — todo70 clears when parsing and persistence have been cleaned — rather than the
+rule being quietly amended to make the table green.
+
+| | rules |
+|---|---|
+| PASS | 1, 2, 3, 6, 7, 8, 10, 11, 13, 14, 15, 16 |
+| n/a | 5, 12 |
+| deferred, blocked | 4, 9 |
+
 **"Git is done" was said one message before this table existed, and was wrong.** The CLEAN was
 finished; the feature was not rule-clean. The table is what makes the difference visible, and it is
 the shape every later feature gets.

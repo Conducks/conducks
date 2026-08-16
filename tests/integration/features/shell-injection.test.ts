@@ -63,8 +63,10 @@ describe('a hostile filename cannot execute commands', () => {
     const chronicle = new ChronicleInterface(repo);
     const target = path.join(repo, hostileName);
 
-    // Every call site that takes a filename.
-    await chronicle.getCommitResonance(target);
+    // Every call site that takes a filename. `getFileHistory` was MISSING from this list and is the
+    // one the pulse actually runs on every file — the list had been written against the methods it
+    // replaced and never followed the supersession.
+    await chronicle.getFileHistory(target);
     await chronicle.getAuthorDistribution(target);
     await chronicle.getBlameData(target);
     await chronicle.readFile(target, true);

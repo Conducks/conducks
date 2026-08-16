@@ -416,14 +416,8 @@ export class ChronicleInterface {
     }
 
     try {
-      const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.gitRootFor(filePath));
-
-      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
-      let relativePath = path.relative(projectRoot, fixedPath);
-      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
-        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
-      }
+      const repo = this.gitRootFor(filePath);
+      const relativePath = this.toRepoRelative(filePath, repo);
 
       return this.git(['show', `:0:${relativePath}`], { quiet: true });
     } catch {
@@ -444,9 +438,8 @@ export class ChronicleInterface {
   /**
    * Conducks — one file's authorship history, from ONE git invocation.
    *
-   * `getCommitResonance` and `getAuthorDistribution` below are both still used on their own, and
-   * both are correct. The problem is that the reflector calls them BACK TO BACK on every file, and
-   * between them they spawn three subprocesses to read one thing:
+   * It replaced two methods the reflector called BACK TO BACK on every file, which between them
+   * spawned three subprocesses to read one thing:
    *
    *   git rev-list --count HEAD -- <file>   (resonance: how many commits)
    *   git log --format=%ae -- <file>        (resonance: how many distinct authors)
@@ -529,8 +522,8 @@ export class ChronicleInterface {
    * The repo-relative path, case-agnostically — critical on macOS and Windows, where a path may
    * differ from its root only by case and `path.relative` would then return a `../..` chain.
    *
-   * FOUR call sites still inline this by hand instead of calling it: `readSingleFile`,
-   * `getCommitResonance`, `getAuthorDistribution` and `getBlameData`. The comment that used to sit
+   * THREE call sites still inline this by hand instead of calling it: `readSingleFile`,
+   * `getAuthorDistribution` and `getBlameData`. The comment that used to sit
    * here claimed the duplication had been removed; it had not, and a comment is held to the same bar
    * as any other doc (conducks-docs §8). Collapsing them changes behaviour on the case-insensitive
    * path, so it is recorded in `docs/deep_clean.md` rather than done inside a clean (ADR 0150
@@ -546,43 +539,6 @@ export class ChronicleInterface {
   }
 
   /**
-   * Conducks — Commit Resonance
-   * Extracts commit frequency and author count for a specific structural unit.
-   */
-  public async getCommitResonance(filePath: string): Promise<{ count: number, authors: number, unavailable?: boolean }> {
-    if (!this.isInsideProject(filePath)) {
-      return { count: 0, authors: 0, unavailable: true };
-    }
-
-    try {
-      const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.gitRootFor(filePath));
-
-      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
-      let relativePath = path.relative(projectRoot, fixedPath);
-      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
-        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
-      }
-
-      // 1. Commit Count (Frequency)
-      const countOutput = this.git(['rev-list', '--count', 'HEAD', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
-      const count = parseInt(countOutput.trim(), 10) || 0;
-
-      // 2. Unique Authors (Density)
-      // The unique-author count was `git log ... | sort -u | wc -l`, which needs a shell. Counting
-      // distinct lines here removes the pipe, and with it the only reason this call needed one.
-      const authorLines = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
-      const authors = new Set(authorLines.split('\n').map(a => a.trim()).filter(Boolean)).size;
-
-      return { count, authors };
-    } catch {
-      // `unavailable` separates a git failure from a symbol that genuinely has no commits. Both
-      // used to return a bare {0,0}, so entropy scored an unreadable file identically to a
-      // brand-new one — a real risk signal and its absence, reported the same way.
-      return { count: 0, authors: 0, unavailable: true };
-    }
-  }
-  /**
    * Conducks — Authorship Distribution
    * Calculates the commit count per unique author for Shannon Entropy analysis.
    */
@@ -595,16 +551,10 @@ export class ChronicleInterface {
     }
 
     try {
-      const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.gitRootFor(filePath));
+      const repo = this.gitRootFor(filePath);
+      const relativePath = this.toRepoRelative(filePath, repo);
 
-      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
-      let relativePath = path.relative(projectRoot, fixedPath);
-      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
-        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
-      }
-
-      const output = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
+      const output = this.git(['log', '--format=%ae', '--', relativePath], { quiet: true, cwd: repo });
       const authors = output.split('\n').filter(a => a.trim().length > 0);
 
       const distribution: Record<string, number> = {};
@@ -628,15 +578,9 @@ export class ChronicleInterface {
     }
 
     try {
-      const fixedPath = path.resolve(filePath);
-      const projectRoot = path.resolve(this.gitRootFor(filePath));
-
-      // Conducks: Case-agnostic relative path (Critical for macOS/Windows)
-      let relativePath = path.relative(projectRoot, fixedPath);
-      if (fixedPath.toLowerCase().startsWith(projectRoot.toLowerCase())) {
-        relativePath = fixedPath.slice(projectRoot.length).replace(/^[\\\/]/, '');
-      }
-      const output = this.git(['blame', '--porcelain', '--', relativePath], { quiet: true, cwd: this.gitRootFor(filePath) });
+      const repo = this.gitRootFor(filePath);
+      const relativePath = this.toRepoRelative(filePath, repo);
+      const output = this.git(['blame', '--porcelain', '--', relativePath], { quiet: true, cwd: repo });
       const lines = output.split('\n');
 
       let currentAuthor = '';
@@ -713,6 +657,18 @@ export class ChronicleInterface {
    * ADR 0035: a project with no repository is not a broken mode. It has no commits, therefore no
    * layers, no target and no branch — and every command it answers today must keep answering. This
    * is the check that lets the git-shaped features say "not available here" instead of failing.
+   */
+  /**
+   * KEPT DELIBERATELY DESPITE HAVING NO CALLER, and the reason is the point (todo70#P0).
+   *
+   * `hook-installer` was the one candidate and is not one: it needs the `.git` DIRECTORY because it
+   * writes `.git/hooks/`, which is a different question from "inside a work tree" and is true in a
+   * subdirectory where no `.git` exists. Every other site degrades by CATCHING rather than by asking
+   * first, which is why nothing calls this.
+   *
+   * It stays because ADR 0035 names it as the check that lets a git-shaped feature say "not
+   * available here" instead of failing, and deleting something an accepted decision relies on — for
+   * six lines — needs its own decision, not a cleanup.
    */
   public isRepository(): boolean {
     try {

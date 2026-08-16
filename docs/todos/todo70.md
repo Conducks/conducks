@@ -1,6 +1,7 @@
 # todo70 — the git door's four rule violations, each with its own measurement
-Status: todo
+Status: blocked
 - Acceptance: `core/git` satisfies every applicable rule of ADR 0150 — no mutable state on the door, no logic duplicated inside or outside it, and no operation carried without a caller or a stated reason.
+- Blocked by: removing the `chronicle` singleton needs constructor injection through `core/parsing/reflector.ts` and `core/persistence/persistence.ts`, which have no adversarial tests yet. Rule 13 — leaves first — applies to this fix as much as to the features: injecting into the two largest files in the codebase before either is pinned is how a parse-path regression becomes unattributable. Clears when todo68 (parsing) and the persistence clean have closed.
 
 ## Context
 
@@ -21,13 +22,13 @@ proving they bite, and four oracles read unchanged.
 
 ## Phase 0 — measure before deciding
 - Builds: 0150
-- [ ] `isRepository` has no caller in `src/` and one in tests. Find whether anything SHOULD call it — ADR 0035 describes it as the check that lets a git-shaped feature say "not available here" rather than fail, so a missing caller may be a missing guard rather than a dead method. Say which, with the call sites that would use it
-- [ ] `getCommitResonance` has no `src/` caller and is held by `shell-injection.test.ts`. Decide whether that test should drive `getFileHistory` instead — if it can, the method goes; if it cannot, say what the test needs that only this method gives
+- [x] `isRepository` KEPT, with the reason stated in code. `hook-installer` was the one candidate and is not a caller: it needs the `.git` DIRECTORY because it writes `.git/hooks/`, which is a different question from "inside a work tree" and is true in a subdirectory where no `.git` exists. Every other site degrades by catching rather than by asking. It is a public capability an accepted ADR names, costing six lines — deleting something ADR 0035 relies on, without an ADR, is worse than carrying it
+- [x] `getCommitResonance` REMOVED, and the test that held it improved rather than deleted. `shell-injection` asserts "every call site that takes a filename" and was MISSING `getFileHistory` — the one the pulse actually runs on every file. The list had been written against the methods it replaced and never followed the supersession, so a real security gap was open. It now drives `getFileHistory`, and the equivalence test was rewritten against `getAuthorDistribution`, which survives and has callers
 
 ## Phase 1 — rule 4, the singleton on the door
 - Builds: 0150
-- Depends: todo70#P0
-- [ ] MEASURE first: every caller of the `chronicle` singleton, and which of them depend on it being process-wide rather than per-root. `setProjectDir` is public and called in three places — those are the ones that make it mutable
+- [x] MEASURED: 24 files use the singleton — 4 in `core/`, 5 in `domain/`, 15 outer. `setProjectDir` is called in three `src/` places, all anchoring at boot or at a CLI target. The four core files are what make this expensive: `core` may not import the registry (ADR 0005), so they need the instance INJECTED, and two of them are `reflector.ts` and `persistence.ts`
+- [ ] injection through parsing and persistence, once both are pinned by their own adversarial tests
 - [ ] the door stops exporting a mutable singleton. What replaces it is decided by the measurement, not in advance
 - [ ] no caller changes behaviour: the four oracles read the same numbers, and the branch guard still refuses on a real two-branch fixture
 
@@ -39,9 +40,8 @@ proving they bite, and four oracles read unchanged.
 
 ## Phase 3 — rules 8 and 9 inside the file
 - Builds: 0150
-- Depends: todo70#P2
-- [ ] the repo-relative path block is inlined at four call sites — `readSingleFile`, `getCommitResonance`, `getAuthorDistribution`, `getBlameData` — while `toRepoRelative` exists and only `getFileHistory` calls it. Collapse them
-- [ ] the case-insensitive branch is what makes this a behaviour change and not a tidy-up: prove the collapsed version answers identically for a path differing from its root only by case, which is the case the inline version was written for
+- [x] collapsed. Three copies remained after `getCommitResonance` went; all three now call `toRepoRelative`, and each method resolves its repository root ONCE instead of per git invocation
+- [x] the case-insensitive path is pinned through the git ARGUMENTS rather than the private helper, so it asserts what callers actually send. Dropping that branch from `toRepoRelative` fails it — without it the argument becomes a `../..` chain and git is asked about a path outside the repository, which answers nothing and reads as a file with no history
 
 ## Phase 4 — close it honestly
 - Builds: 0150

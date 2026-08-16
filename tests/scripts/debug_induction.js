@@ -18,7 +18,7 @@ async function debug() {
   console.log(`Testing Kinetic Signals for: ${dummyPath}`);
   
   try {
-    const resonance = await chronicle.getCommitResonance(dummyPath);
+    const resonance = await chronicle.getFileHistory(dummyPath);
     const distribution = await chronicle.getAuthorDistribution(dummyPath);
     console.log('Resonance:', resonance);
     console.log('Distribution:', distribution);

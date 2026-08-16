@@ -1515,7 +1515,7 @@ export class ConducksReflector {
     // Conducks: Ingest Kinetic Git Signals (Only in Resolution Mode)
     if (!context.isDiscoveryMode()) {
       // ONE git invocation for both, not three. These two lines used to call
-      // `getCommitResonance` and `getAuthorDistribution` back to back, which spawned
+      // two per-file history methods back to back, which spawned
       // `rev-list --count` plus the SAME `git log --format=%ae` twice. A CPU profile of this
       // function put 86% of its time in git subprocesses and under 1% in tree-sitter, so the spawn
       // count is what parse speed is made of. Both public methods stay for their other callers.

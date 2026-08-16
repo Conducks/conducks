@@ -161,3 +161,42 @@ describe('the last pulsed commit round trip', () => {
     expect(graph.store.get('lastAnalyzedCommit')).toBe('deadbeef');
   });
 });
+
+describe('the repo-relative path, after the four inline copies were collapsed', () => {
+  /**
+   * The collapse is only safe if `toRepoRelative` answers identically on the case-insensitive path,
+   * which is the case the inline version existed for: on APFS and Windows a file may sit under a
+   * root that differs from it only by case, and `path.relative` would then walk out and back with a
+   * `../..` chain instead of returning a plain relative path.
+   *
+   * Asserted through the git ARGUMENTS rather than by calling the private helper, so it pins what
+   * the callers actually send.
+   */
+  const argsFor = async (root: string, file: string): Promise<string[]> => {
+    const seen: string[][] = [];
+    const git = new ChronicleInterface(root, ((_c: string, args: string[]) => {
+      seen.push(args);
+      return 'a@x.com\n';
+    }) as never);
+    await git.getAuthorDistribution(file);
+    return seen[0] ?? [];
+  };
+
+  it('passes a plain relative path when the root case matches', async () => {
+    const dir = mkDir();
+    const args = await argsFor(dir, path.join(dir, 'src', 'File.ts'));
+
+    expect(args[args.length - 1]).toBe(path.join('src', 'File.ts'));
+  });
+
+  it('passes the SAME path when the root differs only by case', async () => {
+    // Without the case-insensitive branch this returns a `../..` chain, and git is asked about a
+    // path outside the repository — which answers nothing and looks like a file with no history.
+    const dir = mkDir();
+    const shouted = dir.toUpperCase();
+    const args = await argsFor(dir, path.join(shouted, 'src', 'File.ts'));
+
+    expect(args[args.length - 1]).not.toContain('..');
+    expect(args[args.length - 1].toLowerCase()).toBe(path.join('src', 'file.ts'));
+  });
+});
