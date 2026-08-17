@@ -1137,3 +1137,160 @@ Stated plainly, because a table of green rows reads as more than it is:
 - `reflector.ts` is still 1,696 lines.
 - The layers ABOVE core — `domain`, `composition`, `interfaces` — have had no such pass. `registry/`
   is the composition root and is deliberately last.
+
+---
+
+# THE RECHECK — what "core is done" was hiding (2026-08-17)
+
+Core was declared done. A recheck by MEASUREMENT rather than by reading the log found three
+classes of gap, one of them structural. Everything below was found by a script that reads the
+tree, not by re-reading these pages — which is the point: the log had been written by the same
+process that made the errors.
+
+## The census failure, first, because it is the largest
+
+The campaign audited SIX features. Core has NINE.
+
+| never audited | lines | door | reached from |
+|---|---|---|---|
+| `core/algorithms` | 134 | none | parsing, domain/metrics |
+| `core/registry` | 71 | none | persistence, composition, domain |
+| `registry-bootstrapper.ts` | 393 | none — a loose file at the core root | composition |
+
+"Every feature in core is behind one door" was true of the six that were named. Nobody
+established that six was the whole list. CLAUDE.md §4 asks the census question first — *how many
+places ask this?* — and it was answered by assumption.
+
+All three now have doors and are on the gate. The bootstrapper moved to `core/bootstrap/` and its
+four test files moved with it, breaking `- Enforced by:` paths on six ADRs and two todos. Only
+docs-lint knew. Third time this campaign.
+
+**The registry and the bootstrapper are separate doors on purpose.** One door re-exporting both
+would make `persistence -> registry -> bootstrapper -> persistence` a cycle, because a door is
+itself a dependency edge (rule 5b) — the failure the graph door caused once already.
+
+## Over-exported doors
+
+25 symbols crossed a door with zero users outside their own feature; parsing alone had 14. Rule 1
+says a door exports what CROSSES. Removed. Two of parsing's own tests were reaching the door for
+internals and now import the leaf directly, which rule 3 has always permitted.
+
+## Untested exports, and two dead subsystems
+
+16 value exports were named in no test while being called from three to seven places each. Worse
+than dead code: dead code is inert, while a used predicate with no test can be edited into a
+different answer with every gate green.
+
+Writing those tests found two subsystems that **could never run**:
+
+**`GlobalSymbolLinker`** scanned every node on every watcher pulse and emitted nothing. Two
+independent reasons, both measured on the real 7,562-node graph:
+
+- it only visits a node whose `label` is `'import'`. `label` comes from `canonicalKind` at ingest;
+  the labels that exist are ATOM, BEHAVIOR, UNIT, STRUCTURE, DIRECTORY, ECOSYSTEM, NAMESPACE,
+  REPOSITORY, PACKAGE, INFRA. Count of `'import'`: **0**. An import is an EDGE here, not a node;
+- and `resolveImport` reads `properties.source`, which is not on the skeleton `getNodesMap()`
+  yields. Nodes carrying `source`: **0**.
+
+It was found by writing a test for it: five negative cases passed immediately and the one positive
+case failed. **That is the tell** — a linker that never links satisfies every negative test
+vacuously. 250 lines removed, no measurement changed.
+
+**`extractNamedBindings`** was declared optional on two provider interfaces, implemented by five
+packs, and called by nothing. It dragged two binding classes with it and orphaned a third method.
+Same shape: an interface method with implementations reads as a feature in every review.
+
+## The instrument was wrong twice, and that is worth more than the findings
+
+Rule 12 asks whether a leaf is TESTED. The audit measured it three ways before getting it right:
+
+| attempt | why it was wrong |
+|---|---|
+| does a test mention the FILENAME | a test importing through a door never names the file |
+| does a test mention an EXPORTED NAME | a leaf reached through a wrapper is never named — which is how every language resolver is reached |
+| **statement COVERAGE** | asks the only question that matters: did a test run this code |
+
+The first was wrong in the flattering direction and the second in the harsh one. Both would have
+produced a confident table. The final instrument was **tamper-tested** — forcing a covered file to
+0% in the summary makes it flag — because a checker that cannot fail is not a checker.
+
+Coverage has one blind spot, recorded rather than papered over: `pulse-worker.ts` runs in a worker
+thread, a separate V8 isolate jest cannot instrument across, so it reads 0% while every `analyze`
+runs it. **Proved rather than assumed**: sabotaging the worker fails three integration tests.
+
+## Mutation caught three tests that would have read as coverage
+
+Out of roughly twenty mutations, three survived their first pass:
+
+- **co-change**: `if (!hasEdge)` replaced with `if (true)` passed all five tests. The engine reports
+  HIDDEN coupling; every case used a graph with no edges, so none could notice the one condition
+  that defines the feature;
+- **traversal**: removing the `visited` guard passed. The comment claimed it prevented a hang. It
+  does not — `maxDepth` bounds the walk either way. What it protects is the ANSWER: a node reachable
+  by two paths keeps whichever depth the queue drains last, so `impact` reports a direct caller as
+  distant;
+- **go vendor**: the case imported from `/p/cmd/main.go`, where the proximity walk never reaches
+  `/p/vendor` at all. It asserted the proximity walk while claiming to assert the vendor filter.
+
+Each was a green row that proved nothing.
+
+## The behaviour bug: inheritance produced no edge in three languages
+
+TypeScript emitted EXTENDS and IMPLEMENTS. **Ruby, Rust and PHP emitted nothing** — not a wrong
+edge, no edge at all. PHP had no heritage pattern of any kind, so `class Child extends Base` had
+never once produced a relation.
+
+All three failed the same way, and TypeScript's own query file had already written down the rule:
+`@heritage` must be co-captured with `@name` in the SAME pattern, or the reflector resolves no
+definition node and drops the capture silently. Rust's query said its pattern "creates IMPLEMENTS
+edge conceptually" — conceptually was the problem.
+
+Fixed against the REAL trees, dumped per grammar rather than guessed. On this repository:
+IMPLEMENTS 57, EXTENDS 20. Before it, a Ruby, Rust or PHP codebase read as having no type hierarchy
+at all — which `audit`, `arch` and every containment walk cannot tell apart from a codebase that
+genuinely has none.
+
+This closed a gap a test was PINNING. `every-definition-capture-mints-its-kind` asserted Rust
+produced no heritage edge, with the note that an edge appearing would be good news that must still
+be read. It appeared, the test went red, and it was rewritten as a positive. That is the whole
+reason for pinning a known gap instead of only writing it down.
+
+## `doc` is filterable (domain, not core — the last item on the list)
+
+conducks harvests a `doc` per node and could not be asked which nodes lack one. Every doc-gap
+measurement in this campaign was a direct vault read because the tool could not produce its own
+cleanup list. One line in `FILTERABLE_FIELDS`, with a counter-test that the allowlist did not widen.
+
+## Core — final, measured
+
+| feature | door | rules 7 / 10 / 12 |
+|---|---|---|
+| `contracts` | yes | clean |
+| `core/algorithms` | yes | clean |
+| `core/bootstrap` | yes | clean |
+| `core/git` | yes | clean |
+| `core/graph` | yes | clean |
+| `core/parsing` | yes | clean |
+| `core/persistence` | yes | clean |
+| `core/registry` | yes | clean |
+| `core/utils` | yes | clean |
+
+Nine features, nine doors, all on the gate, and the gate bites for each — verified by reinstating a
+leaf import per door and watching it fail by name.
+
+Coverage: **72.03% statements, 61.36% branches, 75.39% functions**, one file at 0% and that one an
+instrument blind spot with the sabotage test to prove it.
+
+Gates: 2,107 tests / 273 suites · four oracles EXTRA 0 · typecheck 0 · docs-lint 187 ·
+visuals-lint 61 anchors.
+
+## What core still does NOT claim
+
+- **72% is not 100%.** Every leaf is exercised; many branches are not.
+- Nine of thirteen language packs have no oracle. Their resolvers now have tests; their QUERIES are
+  still unmeasured — nothing checks that a pack captures the right things, only that it parses.
+- `csharp`, `php` and `swift` resolve imports by substring `includes`, so a longer path can win by
+  accident and the answer is order-dependent. Pinned as a limitation, not fixed.
+- `reflector.ts` is still 1,696 lines. The split is its own todo; the blocker is scope, not coverage.
+- **`domain`, `interfaces` and `registry` have had no pass at all.** Two dead subsystems were found
+  in core, which had been audited once. Nobody should assume the unaudited layers are cleaner.

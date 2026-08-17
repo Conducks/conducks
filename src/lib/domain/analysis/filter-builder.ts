@@ -30,6 +30,13 @@ export const FILTERABLE_FIELDS = new Set([
   'id', 'name', 'file', 'canonicalKind', 'canonicalRank', 'namespaceId', 'unitId',
   'structureId', 'parentId', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint',
   'visibility', 'lineStart', 'lineEnd',
+  // `doc` is the author's own description, harvested from the comment above a symbol (ADR 0133).
+  // It was missing from this list, which meant conducks could not be asked which of ITS OWN nodes
+  // carry no documentation — every doc-gap measurement in the ADR 0150 campaign had to be a direct
+  // vault read instead, and the tool could not produce its own cleanup list. One line, and the
+  // reason it is worth a line: a code-intelligence tool that cannot answer a question about itself
+  // is one nobody can check.
+  'doc',
 ]);
 
 // Fixed operator token -> SQL text. The caller's operator is looked up here, never concatenated

@@ -190,3 +190,38 @@ describe('buildFilterQuery — guard is load-bearing', () => {
     ).toThrow(FilterValidationError);
   });
 });
+
+/**
+ * `doc` is filterable, so conducks can be asked which of its own symbols are undocumented.
+ *
+ * It was missing from the allowlist, and the cost was concrete: every doc-gap measurement in the
+ * ADR 0150 campaign had to be a direct vault read, because the tool could not produce its own
+ * cleanup list. A code-intelligence tool that cannot answer a question about itself is one nobody
+ * can check.
+ *
+ * Kept as a separate block from the security cases above, because the allowlist is the security
+ * boundary: this asserts a field was ADDED to it deliberately, which is exactly the kind of change
+ * that should never happen by accident.
+ */
+describe('doc is filterable', () => {
+  it('accepts a condition on doc and binds the value', () => {
+    const { sql, params } = buildFilterQuery({
+      conditions: [{ field: 'doc', operator: 'like', value: '%Shannon%' }],
+    } as QueryFilter);
+
+    expect(sql).toContain('doc');
+    expect(params).toContain('%Shannon%');
+  });
+
+  it('is in the allowlist beside the fields that were always there', () => {
+    expect(FILTERABLE_FIELDS.has('doc')).toBe(true);
+    expect(FILTERABLE_FIELDS.has('name')).toBe(true);
+  });
+
+  it('still refuses a field that is NOT on the list', () => {
+    // The counter-test, and the one that matters: adding `doc` must not have widened the gate.
+    expect(() => buildFilterQuery({
+      conditions: [{ field: 'docs', operator: 'like', value: '%x%' }],
+    } as QueryFilter)).toThrow(FilterValidationError);
+  });
+});
