@@ -187,9 +187,27 @@ if (prev && missed.length > prev.missed) {
 }
 if (failed) process.exit(1);
 
-if (process.argv.includes('--write-baseline') || !prev) {
+// A MISSING BASELINE IS NOT A PASS (ADR 0044).
+//
+// This used to read `--write-baseline || !prev`: with no recorded entry for this key it silently
+// wrote one and then printed the tick. The key is derived from the subject's DIRECTORY NAME, so
+// running against a copy — which is how the frozen subjects are scored without touching them —
+// produced a NEW key every time, self-baselined it, and reported green. Found on 2026-08-17 by
+// running this oracle on `scraper2`, a copy of `scraper`: it recorded a fresh entry and passed
+// while scoring against nothing. The half-verdict it prints in that case ("no finding contradicts
+// the parser", without the recall clause) was the only visible difference, and nobody reads a tick
+// for a missing sentence.
+//
+// Recording a baseline is now a DELIBERATE act. Without one, this exits non-zero and says so.
+if (process.argv.includes('--write-baseline')) {
   baseline[key] = { oracle: inProject.size, missed: missed.length, agreed };
   writeFileSync(BASELINE, JSON.stringify(baseline, null, 2) + '\n');
-  console.log(`\n  baseline recorded for ${key}: oracle=${inProject.size} missed=${missed.length}`);
+  console.log(`\n  baseline recorded for ${key}.\n`);
+  process.exit(0);
 }
-console.log(`\n✓ no Python finding contradicts the parser` + (prev ? `, and recall did not regress.` : `.`) + `\n`);
+if (!prev) {
+  console.log(`\n  ✖ NO BASELINE for '${key}' — nothing to compare against, so this is not a pass.`);
+  console.log(`    Re-run with --write-baseline to record one deliberately.\n`);
+  process.exit(1);
+}
+console.log(`\n✓ no Python finding contradicts the parser, and recall did not regress.\n`);

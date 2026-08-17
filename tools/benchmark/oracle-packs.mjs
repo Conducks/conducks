@@ -54,6 +54,12 @@
  *     binding, a template parameter. Skipped rather than guessed at.
  *   - anything a fixture does not exercise. The fixtures ARE the denominator; the declared count is
  *     printed per pack so a shrinking one is visible rather than silently flattering.
+ *   - the loss of ONE PATTERN where several capture the same construct. Found by mutation while the
+ *     four ECMAScript-family packs were added: deleting `(class_declaration name: … ) @isStruct`
+ *     from the typescript and tsx packs changed NOTHING here, because `export_statement` and the two
+ *     heritage patterns still mint the same classes. The oracle's granularity is "the pack stopped
+ *     producing this symbol at all", not "a pattern was lost" — a redundant pattern can rot in
+ *     silence. javascript and python, which capture classes once, regressed immediately.
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -75,6 +81,15 @@ const PACKS = [
   { lang: 'php',    pkg: 'tree-sitter-php',     file: 'sample.php',    provider: 'PHPProvider' },
   { lang: 'ruby',   pkg: 'tree-sitter-ruby',    file: 'sample.rb',     provider: 'RubyProvider' },
   { lang: 'swift',  pkg: 'tree-sitter-swift',   file: 'Sample.swift',  provider: 'SwiftProvider' },
+  // The four that were left out when this oracle was built, on the reasoning that they already had
+  // one. They did not: `oracle-tsc.mjs` and `oracle-python.mjs` score IMPORT findings against a
+  // compiler and an ast — a different claim entirely from whether the pack captures the declarations
+  // the grammar can produce. These are the packs that read most of the code this tool is pointed at,
+  // and they were the least scored.
+  { lang: 'typescript', pkg: 'tree-sitter-typescript', file: 'sample.ts',  provider: 'TypeScriptProvider' },
+  { lang: 'tsx',        pkg: 'tree-sitter-typescript', file: 'sample.tsx', provider: 'TSXProvider' },
+  { lang: 'javascript', pkg: 'tree-sitter-javascript', file: 'sample.js',  provider: 'JavaScriptProvider' },
+  { lang: 'python',     pkg: 'tree-sitter-python',     file: 'sample.py',  provider: 'PythonProvider' },
 ];
 
 /**
@@ -104,12 +119,18 @@ const NOT_A_SYMBOL = new Set([
   'parameter_declaration', 'optional_parameter_declaration', 'variadic_parameter_declaration',
   'method_parameters', 'capture_list_item', 'import_declaration', 'use_declaration',
   'attribute_item', 'inner_attribute_item', 'attribute_declaration', 'preproc_function_def',
+  // `import { readFileSync } from 'node:fs'` — the grammar calls the binding an `import_specifier`,
+  // which the `_specifier` suffix rule catches. It is not a declaration: the symbol is declared in
+  // the file it comes FROM, and minting it here would create a second node for one function. The
+  // import is already modelled as an EDGE. `import_declaration` was excluded for this reason before
+  // typescript was scored; this is the same rule reaching the same shape one level down.
+  'import_specifier', 'namespace_import', 'import_clause',
 ]);
 
 /** `node-types.json` moves around between grammar packages; try where each is known to keep it. */
-const nodeTypesFor = (pkg) => {
-  for (const rel of [`${pkg}/src/node-types.json`, `${pkg}/php/src/node-types.json`,
-                     `${pkg}/common/src/node-types.json`]) {
+const nodeTypesFor = (pkg, lang) => {
+  for (const rel of [`${pkg}/${lang}/src/node-types.json`, `${pkg}/src/node-types.json`,
+                     `${pkg}/php/src/node-types.json`, `${pkg}/common/src/node-types.json`]) {
     const p = path.join(ROOT, 'node_modules', rel);
     if (existsSync(p)) return JSON.parse(readFileSync(p, 'utf8'));
   }
@@ -179,7 +200,7 @@ const report = [];
 let hardFail = false;
 
 for (const pack of PACKS) {
-  const types = nodeTypesFor(pack.pkg);
+  const types = nodeTypesFor(pack.pkg, pack.lang);
   if (!types) { report.push({ lang: pack.lang, skipped: 'no node-types.json in the grammar package' }); continue; }
   const declTypes = new Set([
     ...types.filter(t => t.named).map(t => t.type).filter(t => DECL_SUFFIX.some(s => t.endsWith(s))),

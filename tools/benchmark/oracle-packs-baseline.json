@@ -34,5 +34,21 @@
   "swift": {
     "missed": 0,
     "extra": 0
+  },
+  "typescript": {
+    "missed": 0,
+    "extra": 0
+  },
+  "tsx": {
+    "missed": 0,
+    "extra": 2
+  },
+  "javascript": {
+    "missed": 0,
+    "extra": 0
+  },
+  "python": {
+    "missed": 0,
+    "extra": 3
   }
 }
