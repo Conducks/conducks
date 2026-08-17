@@ -3,6 +3,11 @@
 **Part of:** [core/graph](../graph.md). `core/graph/import-resolver.ts`,
 `core/graph/linker-intra.ts`, `core/graph/linker-federated.ts`, `core/graph/http-service-linker.ts`.
 
+**Read at `7c11bc4`.** Two sections below were FALSE before that commit and every anchor in them
+still resolved — the failure this standard names as the one no gate closes. `GlobalSymbolLinker` and
+the three-tier `ImportResolver` were deleted on 2026-08-17 after being measured dead, and the
+paragraphs describing their tiers survived them by three commits.
+
 **Responsibility:** the second half of resolution. Parsing emits targets that are often just a bare
 name (`ensureCollection`) or an unresolved specifier; the linkers bind those to real node IDs once
 every file is known. `linker-intra` handles same-repo symbol references; `linker-federated` and
@@ -65,21 +70,42 @@ recovered exactly the difference, which is what proved the cause before anything
 It is a second PASS rather than a reorder: induction reads the dangling set that linking produces, so
 inducting first would starve it.
 
-## Fuzzy matching is the risk, `sameFamily` is the guard
+## The fuzzy tier is GONE, and `sameFamily` is what outlived it
 
-Resolution degrades gracefully: exact path, then extension inference, then index files, then a fuzzy
-basename match. That last tier is what makes polyglot repos work, and it is also what will bind a
-`.py` import to a same-named `.tsx` or `.go` file.
+This section used to describe a graded fallback — exact path, extension inference, index files, then a
+fuzzy basename match — owned by `ImportResolver` and `GlobalSymbolLinker.fuzzyLink`. **Both were
+deleted on 2026-08-17.** They could never run: the linker only visited a node whose `label` was
+`'import'`, and `label` is assigned from `canonicalKind` at ingest, so the count on a real 7,562-node
+graph was 0. An import is an EDGE in this model, not a node.
 
-Every tier that can fuzzy-match is guarded by `sameFamily()`. This is not defensive decoration — the
-confidence-1 resolution path produced the majority of false cross-language edges before the guard was
-added. **A new resolution tier must apply it.**
+Nothing was lost, and that was measured rather than argued. Import resolution happens at PARSE time
+in `ImportProcessor`, per language, and the vault carries 2,725 `IMPORTS` edges with exactly one
+dangling target — 99.96%, all of them per-symbol rather than whole-file.
+
+`sameFamily()` in `core/graph/import-resolver.ts` is all that remains of that file, and it still
+matters: `linker-intra` calls it before binding a bare name. A single-candidate match across
+languages is the MOST confident kind of wrong answer, because nothing downstream can tell it from a
+correct one. It fails OPEN on an unknown extension by design — a language added to the parser before
+the family table would otherwise have every import refused, which reads as "nothing imports this"
+instead of "not classified".
+
+**A new resolution tier must still apply it.**
 
 ## TS imports lie about their extension
 
-TypeScript ESM writes a ./x.js specifier for a file that is `x.ts`. The resolver tries the specifier as written
-*and* with `.js` stripped, then extensions, then `/index.*`. Anything reimplementing resolution needs
-both forms or every relative import in the codebase silently fails to bind.
+TypeScript ESM writes a dot-slash `x.js` specifier for a file whose source is `x.ts`. The resolver tries the specifier
+as written *and* with `.js` stripped, then extensions, then `/index.*`. Anything reimplementing
+resolution needs both forms or every relative import in the codebase silently fails to bind.
+
+**This is still true, and it moved.** It lives in `core/parsing/languages/typescript/resolver.ts`, not
+in `core/graph`, and graph reaches it through a PORT rather than by importing it: `IntraLinker`
+declares `ResolveSpecifier` and refuses to construct without one, because `core/graph` importing
+`core/parsing`'s door would close a cycle — the door re-exports the processors and they import
+graph's (ADR 0150 rule 5b). Domain supplies the implementation, being the layer allowed to know both.
+
+The refusal is deliberate: a default that resolved nothing would leave every cross-file edge
+dangling, and dangling is already what the linker reports for a specifier naming nothing. The two
+states would be indistinguishable.
 
 ## Self-imports are detected from the specifier, not the resolution
 
