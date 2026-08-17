@@ -33,13 +33,6 @@ export type McpResponse<T> =
   | { data: T; meta: McpMeta }
   | { error: McpError };
 
-/** A window over a longer answer. `total` is optional because some sources cannot count cheaply. */
-export interface McpPagination {
-  offset: number;
-  limit: number;
-  total?: number;
-}
-
 /** A success. `truncated: false` is the default so a tool must OPT IN to claiming it cut the answer. */
 export function mcpOk<T>(data: T, meta?: Partial<McpMeta>): McpResponse<T> {
   return { data, meta: { truncated: false, ...meta } };

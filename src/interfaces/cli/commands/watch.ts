@@ -3,7 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 
 /** How often the watcher re-reads HEAD's branch. Cheap: one `symbolic-ref` against the local repo. */
-export const BRANCH_POLL_MS = 2_000;
+const BRANCH_POLL_MS = 2_000;
 
 /**
  * Watches for the branch moving under a running watcher, and calls back once per switch.

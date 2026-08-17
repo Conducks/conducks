@@ -131,7 +131,7 @@ export function readStatus(raw: string | null): { status: string | null; state: 
 }
 
 /** `todo09.md` → `todo09`. The stem other files address phases through. */
-export function todoId(file: string): string {
+function todoId(file: string): string {
   return path.basename(file).replace(/\.md$/i, "");
 }
 
@@ -148,7 +148,7 @@ function addrsIn(value?: string): string[] {
 }
 
 /** The four-digit ADR number, from the filename (`0016-…md`) or, failing that, the title. */
-export function adrId(file: string, title: string | null): string | null {
+function adrId(file: string, title: string | null): string | null {
   return path.basename(file).match(/^(\d{4})/)?.[1] ?? title?.match(/^(\d{4})/)?.[1] ?? null;
 }
 

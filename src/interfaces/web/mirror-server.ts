@@ -15,7 +15,7 @@ const logger = new Logger("MirrorServer");
 /**
  * Conducks — High-Fidelity Command Center (v2.0.0) 💎
  */
-export class MirrorServer {
+class MirrorServer {
   private app = express();
   private clients: http.ServerResponse[] = [];
   private server: http.Server | null = null;

@@ -416,7 +416,7 @@ export type ReviewStamps = Record<string, Record<string, string>>;
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex").slice(0, 16);
 
 /** The canonical identity of a cited span — what a stamp is FOR, independent of author spelling. */
-export function spanKeyOf(resolvedPath: string, a: { line?: number; endLine?: number; symbol?: string }): string {
+function spanKeyOf(resolvedPath: string, a: { line?: number; endLine?: number; symbol?: string }): string {
   if (a.symbol) return `${resolvedPath}::${a.symbol}`;
   if (a.line !== undefined) return `${resolvedPath}:${a.line}${a.endLine !== undefined ? `-${a.endLine}` : ""}`;
   return resolvedPath;
@@ -430,7 +430,7 @@ export function spanKeyOf(resolvedPath: string, a: { line?: number; endLine?: nu
  * when the code does, not to parse it). A bare file hashes whole. Lines are trimmed so a pure
  * re-indent does not fire a flag.
  */
-export function spanHashOf(source: string, a: { line?: number; endLine?: number; symbol?: string }): string {
+function spanHashOf(source: string, a: { line?: number; endLine?: number; symbol?: string }): string {
   const lines = source.split("\n");
   if (a.line !== undefined) {
     const from = a.line - 1;

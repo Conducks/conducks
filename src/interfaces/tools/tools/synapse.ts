@@ -112,13 +112,13 @@ const FORBIDDEN_SQL_FUNCTIONS = [
  * indication — the same defect as `audit`'s unknown mode, on the tool whose own history already
  * includes `manifest` silently returning health's payload (todo28#P1, todo53#P2).
  */
-export const STATUS_MODES = ['health', 'map', 'manifest', 'pulse'] as const;
+const STATUS_MODES = ['health', 'map', 'manifest', 'pulse'] as const;
 /** The modes `conducks_audit` actually implements, and the values its schema advertises. */
 export const AUDIT_MODES = ['scan', 'advice', 'guard', 'archeology', 'fallback'] as const;
 /** The modes `conducks_query` implements. */
-export const QUERY_MODES = ['fuzzy', 'template', 'filter'] as const;
+const QUERY_MODES = ['fuzzy', 'template', 'filter'] as const;
 /** The layers `conducks_docs` publishes: threads + constraints, or threads alone. */
-export const DOCS_LAYERS = ['all', 'board'] as const;
+const DOCS_LAYERS = ['all', 'board'] as const;
 /**
  * The finding types `conducks_prune` can filter to, plus the unfiltered `all`.
  *

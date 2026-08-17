@@ -71,7 +71,7 @@ export function parseDiffHunks(diff: string, cwd: string): FileChange[] {
  * Filtered to SOURCE_EXTENSIONS because the untracked set otherwise includes the `.conducks` vault
  * itself and a clean tree reports changes.
  */
-export function untrackedChanges(cwd: string): FileChange[] {
+function untrackedChanges(cwd: string): FileChange[] {
   try {
     const out = execSync('git ls-files --others --exclude-standard', { encoding: 'utf-8', cwd });
     const root = path.resolve(cwd);

@@ -357,7 +357,7 @@ function walkReadmes(dir: string): string[] {
  * reference written as a bare `0069` is still unchecked, and that is a stated gap rather than a
  * silent one.
  */
-export function proseRefs(src: string): Array<{ kind: "phase" | "adr"; ref: string }> {
+function proseRefs(src: string): Array<{ kind: "phase" | "adr"; ref: string }> {
   const out: Array<{ kind: "phase" | "adr"; ref: string }> = [];
   let fenced = false;
   for (const line of src.split(/\r?\n/)) {
