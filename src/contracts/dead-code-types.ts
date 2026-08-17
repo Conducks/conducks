@@ -32,6 +32,3 @@ export type DeadCodeType = typeof DEAD_CODE_TYPES[number];
  */
 export const DEAD_CODE_QUESTION_TYPES: readonly DeadCodeType[] = ['UNIMPORTED_MODULE'];
 
-/** Verdicts: everything that is not a question. Derived, so the two can never disagree. */
-export const DEAD_CODE_VERDICT_TYPES: readonly DeadCodeType[] =
-  DEAD_CODE_TYPES.filter(t => !DEAD_CODE_QUESTION_TYPES.includes(t));

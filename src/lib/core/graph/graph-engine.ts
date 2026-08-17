@@ -43,7 +43,7 @@ const __dirname = path.dirname(__filename);
  * decide which of the file's existing nodes the new spectrum still declares. Writing the rule twice
  * is how the ecmascript queries drifted; this file already carries the scar.
  */
-export function spectrumNodeId(canonicalFilePath: string, metaNode: { name: string; metadata?: any }): string {
+function spectrumNodeId(canonicalFilePath: string, metaNode: { name: string; metadata?: any }): string {
   const explicit = metaNode.metadata?.id;
   return explicit ? String(explicit).toLowerCase() : `${canonicalFilePath}::${String(metaNode.name).toLowerCase()}`;
 }

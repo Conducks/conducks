@@ -76,9 +76,3 @@ export class GoProvider extends NativeProvider implements ILanguagePlugin {
   }
 }
 
-export const GO_SUITE = {
-  id: 'go-suite',
-  provider: new GoProvider(),
-  resolver: new GoResolver(),
-  extractor: new GoExtractor()
-};

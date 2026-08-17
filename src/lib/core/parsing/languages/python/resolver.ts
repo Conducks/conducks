@@ -205,6 +205,20 @@ function resolveMethodInMRO(
 /**
  * Conducks — Python MRO-Aware Scope Resolver
  *
+ * NOT WIRED, deliberately carried, and the distinction matters. `conducks prune` reports this as an
+ * ORPHAN, and the question its own message asks — "was this disconnected, or never connected?" — was
+ * answered by measurement: it has the same zero references today that it had at the campaign base,
+ * so nothing here disconnected it. It was written and never connected.
+ *
+ * It is kept rather than deleted because it is a working CAPABILITY, not a leftover. Python heritage
+ * now produces real EXTENDS edges (2026-08-17), which is the input this needs, so wiring it would
+ * let a call to an inherited method resolve to the class that defines it instead of dangling. That
+ * is a behaviour change with its own measurement and its own oracle run — a feature, not a clean
+ * (ADR 0150 rule 16) — so it is recorded as owed instead of being done at the end of a sweep.
+ *
+ * Deleting six lines an accepted design relies on needs its own decision; the same call was made for
+ * `isRepository` in `core/git`.
+ *
  * Builds a class-hierarchy map from tree-sitter AST heritage captures and
  * resolves method calls to their defining class via Python's MRO.
  *

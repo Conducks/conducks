@@ -96,7 +96,7 @@ export function cleanDocText(raw: string): string {
  * printing it under a symbol is worse than printing nothing: the reader cannot tell it apart from a
  * function whose author wrote a useless docstring.
  */
-export function isDescriptive(text: string): boolean {
+function isDescriptive(text: string): boolean {
   if (!/\p{L}/u.test(text)) return false;
   // A DIRECTIVE ADDRESSES THE TOOLCHAIN, NOT THE READER. Measured on orchestrator, `debounce` was
   // served `eslint-disable-next-line @typescript-eslint/no-explicit-any` — it has letters, so the

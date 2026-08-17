@@ -25,7 +25,7 @@
  */
 
 /** The three kinds that end the walk. A node of any other kind is climbed past. */
-export const CLUSTER_CONTAINERS: ReadonlySet<string> = new Set(['DIRECTORY', 'REPOSITORY', 'NAMESPACE']);
+const CLUSTER_CONTAINERS: ReadonlySet<string> = new Set(['DIRECTORY', 'REPOSITORY', 'NAMESPACE']);
 
 /** Where the walk lands when nothing above a node is a container (ADR 0057's single root). */
 export const CLUSTER_FALLBACK = 'ecosystem::global';

@@ -6,7 +6,7 @@
  * are correctly anchored to a GLOBAL namespace instead of being reported as orphans.
  */
 
-export const GLOBAL_ATMOSPHERE: Record<string, string[]> = {
+const GLOBAL_ATMOSPHERE: Record<string, string[]> = {
   typescript: [
     'process', 'console', 'require', 'module', 'exports', '__filename', '__dirname',
     'import', 'export', 'Set', 'Map', 'Promise', 'Error', 'JSON', 'Math', 'Date',
@@ -111,7 +111,7 @@ export function getGlobalId(symbol: string): string {
  * `has`, `add`, `delete` and `find` are all absent for exactly that reason — they are Map/Set methods
  * AND extremely common repository and service method names.
  */
-export const UNIVERSAL_MEMBERS: ReadonlySet<string> = new Set([
+const UNIVERSAL_MEMBERS: ReadonlySet<string> = new Set([
   // Array
   'map', 'filter', 'foreach', 'reduce', 'reduceright', 'slice', 'splice', 'push', 'pop', 'shift',
   'unshift', 'concat', 'join', 'reverse', 'flat', 'flatmap', 'fill', 'indexof', 'lastindexof',
