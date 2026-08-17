@@ -155,7 +155,7 @@ export async function main() {
   // suppresses WARN/ERROR/SUCCESS at any level, so a failure is still reported.
   const NARRATES = new Set(['analyze', 'watch', 'clean', 'record', 'mcp', 'setup', 'doctor', 'uninstall']);
   const verbose = args.includes('--verbose') || process.env.CONDUCKS_VERBOSE === '1';
-  registry.infrastructure.logger.setQuiet(!verbose && !NARRATES.has(commandId));
+  registry.infrastructure.setQuiet(!verbose && !NARRATES.has(commandId));
 
   // Apostle v3: Intelligent Persistence Targeting
   let positionalArgs: string[] = [];

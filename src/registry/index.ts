@@ -64,7 +64,7 @@ import { PHPProvider } from "@/lib/core/parsing/index.js";
 import { RubyProvider } from "@/lib/core/parsing/index.js";
 import { SwiftProvider } from "@/lib/core/parsing/index.js";
 import { CProvider } from "@/lib/core/parsing/index.js";
-import { Logger, logger } from "@/lib/core/utils/index.js";
+import { Logger, logger, setProcessQuiet } from "@/lib/core/utils/index.js";
 import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
 import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
@@ -562,6 +562,13 @@ export const registry = {
     anchorTo: (root: string) => anchorChronicle(root),
     get registry() { return synapseRegistry; },
     get logger() { return logger; },
+    /**
+     * Silence the process, or stop silencing it.
+     *
+     * Named here rather than reached through `logger`, because it is a decision about the PROCESS
+     * and not about one sink (ADR 0150 rule 4). One caller: the CLI, per command.
+     */
+    setQuiet: (quiet: boolean) => setProcessQuiet(quiet),
     createLogger: (scope?: string) => new Logger(scope),
     createPersistence: (dbPath: string, readOnly?: boolean) => new SynapsePersistence(dbPath, readOnly),
     // An empty graph, for callers that need to reconstitute one (the chronoscopic diff loads two

@@ -12,39 +12,29 @@ import path from 'node:path';
  * quiet command still leaves a full record in `.conducks/mcp.log`, so silence costs noise rather
  * than diagnosability.
  */
+/**
+ * Suppress the STDERR half of logging. The file sink is untouched.
+ *
+ * `conducks status` printed five boot lines to stderr before its report — grammar engine starting,
+ * grammar engine ready, log sink anchored, synapse anchored, resonance flow pushed — on every
+ * read-only command. None of it is the answer the caller asked for, and a tool that narrates its
+ * own startup is one an agent has to filter (todo02#P2).
+ *
+ * Quiet does NOT mean lost, which is the reason this is a stderr switch rather than a `write()`
+ * guard: every suppressed line still lands in `.conducks/mcp.log`, so a failure is still
+ * diagnosable afterwards. Deleting the diagnostics would trade noise for blindness.
+ *
+ * MODULE-LEVEL, and private to this file. It belongs to the PROCESS, not to one logger — a
+ * per-instance flag silenced four of the five boot lines and left the fifth printing from an
+ * instance nobody had a handle to. It lives outside the class rather than as a static so that no
+ * holder of a `Logger` can reach it: the only way in is `setProcessQuiet` (ADR 0150 rule 4).
+ */
+let quiet = false;
+
 export class Logger {
   private prefix: string;
   private enabled: boolean;
   private logFilePath: string | null = null;
-
-  /**
-   * Suppress the STDERR half of logging. The file sink is untouched.
-   *
-   * `conducks status` printed five boot lines to stderr before its report — grammar engine starting,
-   * grammar engine ready, log sink anchored, synapse anchored, resonance flow pushed — on every
-   * read-only command. None of it is the answer the caller asked for, and a tool that narrates its
-   * own startup is one an agent has to filter (todo02#P2).
-   *
-   * Quiet does NOT mean lost, which is the reason this is a stderr switch rather than a `write()`
-   * guard: every suppressed line still lands in `.conducks/mcp.log`, so a failure is still
-   * diagnosable afterwards. Deleting the diagnostics would trade noise for blindness.
-   *
-   * The MCP server does NOT set this. There, stdout is the JSON-RPC channel and stderr is the only
-   * legal log sink, so the same lines are the correct and only way to see what the server is doing.
-   */
-  private static quiet: boolean = false;
-
-  /**
-   * STATIC, because quietness is a property of the PROCESS, not of one logger.
-   *
-   * Modules build their own instances — `new Logger("ConducksGraph")` is one — so a per-instance
-   * flag set on the shared singleton silenced four of the five boot lines and left the fifth
-   * ("Pushing Structural Resonance Flow") printing from an instance nobody had a handle to. Found by
-   * measuring the output rather than by reading the code.
-   */
-  public setQuiet(quiet: boolean): void { Logger.quiet = quiet; }
-  /** Whether the process is quiet. Reads the static, so every instance agrees by construction. */
-  public isQuiet(): boolean { return Logger.quiet; }
 
   /**
    * A startup diagnostic: to the terminal only when not quiet, to the file sink always.
@@ -54,7 +44,7 @@ export class Logger {
    * straight to the file descriptor.
    */
   public boot(message: string): void {
-    if (!Logger.quiet) process.stderr.write(message.endsWith('\n') ? message : `${message}\n`);
+    if (!quiet) process.stderr.write(message.endsWith('\n') ? message : `${message}\n`);
     this.toFile('BOOT', message.replace(/\n$/, ''));
   }
 
@@ -78,7 +68,7 @@ export class Logger {
       this.logFilePath = filePath;
       // Direct stderr write, not `write()`, to avoid recursion — and gated, because announcing
       // where the log goes is itself a log line nobody asked for on a read-only command.
-      if (!Logger.quiet) {
+      if (!quiet) {
         process.stderr.write(`\x1b[36m[Logger] Structural Diagnostic Sink anchored at: ${filePath}\x1b[0m\n`);
       }
     } catch (err) {
@@ -117,7 +107,7 @@ export class Logger {
     if (!this.enabled) return;
 
     // 1. MCP Standard: stderr. Quiet suppresses narration only — see ALWAYS_SHOWN.
-    if (!Logger.quiet || Logger.ALWAYS_SHOWN.has(level)) {
+    if (!quiet || Logger.ALWAYS_SHOWN.has(level)) {
       process.stderr.write(`\x1b[${colorCode}m[${this.prefix}] ${message}\x1b[0m\n`);
     }
 
@@ -161,3 +151,19 @@ export class Logger {
 }
 
 export const logger = new Logger();
+
+/**
+ * Silence the process, or stop silencing it.
+ *
+ * A FUNCTION rather than a method, and that is the whole point of it (ADR 0150 rule 4). The flag is
+ * static because quietness belongs to the process — a per-instance flag silenced four of the five
+ * boot lines and left the fifth printing from an instance nobody had a handle to. But while it was
+ * set THROUGH an instance method, any of the seventeen places that build a logger could flip it for
+ * everyone, and a `new Logger("ConducksGraph").setQuiet(true)` reads as a local decision while
+ * having a global effect. Naming it at module level makes the reach visible at the call site.
+ *
+ * One caller: the CLI, which decides per command whether narration is wanted. The MCP server does
+ * NOT call it — there, stderr is the only legal log sink and the lines are the only way to see what
+ * the server is doing.
+ */
+export function setProcessQuiet(enabled: boolean): void { quiet = enabled; }

@@ -55,3 +55,4 @@ commit with its own measurement.
 - [x] 1,952 tests / 257 suites, four oracles green, typecheck 0, docs-lint clean at 188 — after repointing three ADRs whose `- Enforced by:` named the tests this todo moved
 - [x] recorded
 - [x] 14 PASS, 2 n/a, 1 open — rule 4, because `logger` is a process sink whose static quiet flag is static ON PURPOSE. Same decision `chronicle` waits on
+- [x] CLOSED 2026-08-17, after `chronicle` answered the same question. The flag stays process-wide — that part was measured right — but it left the CLASS: it is a module-level `let` private to `logger.ts`, reachable only through `setProcessQuiet`. While it was set through an instance method, any of the 17 places that build a logger could silence everything, and the call read as local. `isQuiet()` went with it, zero callers. **15 PASS, 2 n/a, 0 open**. See `docs/deep_clean.md` unit 8

@@ -427,7 +427,7 @@ only thing that knows is the lint. Neither typecheck nor the suite would have sa
 | 1 one door | PASS |
 | 2 a test enforces it | PASS — `src/` and `tests/`, mutated |
 | 3 inside is private, own tests exempt | PASS — two suites moved to the module's folder to earn it |
-| 4 no mutable state on the door | **OPEN** — `logger` is a shared instance with a static quiet flag |
+| 4 no mutable state on the door | **PASS** — closed in unit 8; the flag left the class |
 | 5 shared types to `contracts/` | n/a |
 | 6 comments | PASS — 0 real gaps, 6 UNIT nodes unreachable |
 | 7 no dead code | PASS — every exported symbol has an external caller |
@@ -441,11 +441,14 @@ only thing that knows is the lint. Neither typecheck nor the suite would have sa
 | 15 gates after each unit | PASS |
 | 16 cleaning is not fixing | PASS |
 
-**14 PASS, 2 n/a, 1 open** — and the open one is the same rule `core/git` defers, for a related
-reason. `logger` is a process sink whose only mutable state is a static flag that is static ON
-PURPOSE: a per-instance flag silenced four of five boot lines and missed the fifth, because modules
-build their own instances. Whether rule 4 should admit a process-wide sink is a decision, and it is
-the same decision `chronicle` is waiting on.
+**14 PASS, 2 n/a, 1 open at the time of writing** — and the open one was the same rule `core/git`
+deferred, for a related reason. `logger` is a process sink whose only mutable state is a static flag
+that is static ON PURPOSE: a per-instance flag silenced four of five boot lines and missed the fifth,
+because modules build their own instances. Whether rule 4 should admit a process-wide sink is a
+decision, and it is the same decision `chronicle` is waiting on.
+
+**Closed in unit 8, and the decision went the other way.** The flag stays process-wide; what moved is
+where it is SET. See below — 15 PASS, 2 n/a, 0 open.
 
 ---
 
@@ -931,3 +934,77 @@ is about.
 **14 PASS, 2 n/a, 0 open.** Third feature to satisfy every applicable rule.
 
 Gates: 1,990 tests / 262 suites green · typecheck 0 · oracles EXTRA 0 · docs-lint 187 clean.
+
+---
+
+## Unit 8 — `core/utils`, rule 4 (todo71 closed)
+
+The last open row in the campaign's rule tables, and the same question `core/git` had just answered:
+what does a door do with state that genuinely belongs to the process?
+
+### The decision, and what it is not
+
+Not "make the flag per-instance". That was tried before this campaign and MEASURED wrong: modules
+build their own loggers — `new Logger("ConducksGraph")` is one — so a per-instance flag silenced four
+of the five boot lines and left the fifth printing from a handle nobody held.
+
+The flag is right to be process-wide. What was wrong is that it was set through an INSTANCE:
+
+```ts
+public setQuiet(quiet: boolean): void { Logger.quiet = quiet; }   // on every logger, everywhere
+```
+
+Seventeen places construct a logger. Any of them could silence the whole process, and
+`new Logger("ConducksGraph").setQuiet(true)` reads as a local decision while having a global effect.
+That is what rule 4 is about — not the mutability, but the reach being invisible at the call site.
+
+So the flag left the class entirely. It is a module-level `let` private to `logger.ts`, and the only
+way in is `setProcessQuiet(enabled)`. No holder of a `Logger` can reach it; no static on the class
+can be called around it. The reach is now in the name.
+
+`isQuiet()` went with it — zero callers in `src/` or `tests/`, so it was rule 7 as well as rule 4.
+
+### The wiring had no test, and that is where this kind of thing breaks
+
+`logger-quiet.test.ts` covered the SINK well: eight cases, and the mutation that makes
+`setProcessQuiet` a no-op kills four of them. What nothing covered is the three-hop chain that
+actually decides: CLI reads the command and the `--verbose` flag → `registry.infrastructure.setQuiet`
+→ `setProcessQuiet`. Break any hop and five boot lines return in front of every answer an agent
+parses, which is the exact state ADR 0080 was written about.
+
+`tests/integration/features/read-commands-say-nothing-else.test.ts` drives a real process and names
+the five lines individually — a substring check on "Conducks" would pass for a run that leaked a
+different one, and each of them was measured leaking separately. The `--verbose` case is the
+counter-test: a suite that only checks for silence passes just as well against a deleted logger.
+
+Mutation: `setQuiet(false)` unconditionally in the CLI kills the silence case and leaves the verbose
+one passing, which is the correct pair.
+
+A third case was written and DELETED before commit — "a warning is never silenced", asserted by
+running `status` in a directory with no vault and checking output was non-empty. It would have passed
+for almost any behaviour. What it claimed is already asserted precisely against the sink, and a test
+that cannot fail for the reason it names is worse than no test, because the row in the table reads
+the same either way.
+
+### Rule table — core/utils, final
+
+| rule | |
+|---|---|
+| 4 no mutable state on the door | **PASS** — the flag is module-private; `setProcessQuiet` is the only way in |
+| 7 no dead code | PASS — `isQuiet()` removed, zero callers |
+| 10 every claim tested, and it bites | PASS — the sink had 8 cases; the WIRING now has 2, mutation-checked |
+
+**15 PASS, 2 n/a, 0 open.** Every remaining row is unchanged from the unit 2 table.
+
+### Campaign state
+
+| feature | rules |
+|---|---|
+| `contracts` | 15 PASS · 1 n/a · 0 open |
+| `core/git` | 14 PASS · 2 n/a · 0 open |
+| `core/utils` | 15 PASS · 2 n/a · 0 open |
+| `core/graph` | 15 PASS · 0 n/a · 1 partial |
+| `core/persistence` | 14 PASS · 2 n/a · 0 open |
+| `core/parsing` | door up, docs 0 gaps, gate entry deferred |
+
+Gates: 1,992 tests / 263 suites green · typecheck 0 · oracles EXTRA 0 · docs-lint 187 clean.

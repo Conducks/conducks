@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Logger } from '@/lib/core/utils/logger.js';
+import { Logger, setProcessQuiet } from '@/lib/core/utils/logger.js';
 
 /**
  * ADR 0080 — a read-only command answers the question and says nothing else (todo02#P2).
@@ -37,7 +37,7 @@ describe('quiet suppresses narration, not failures', () => {
 
   afterEach(() => {
     restore();
-    new Logger().setQuiet(false);            // static — must not leak into the next test
+    setProcessQuiet(false);            // process-wide — must not leak into the next test
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
@@ -50,14 +50,14 @@ describe('quiet suppresses narration, not failures', () => {
 
   it('prints info to stderr when loud', () => {
     const l = mk();
-    l.setQuiet(false);
+    setProcessQuiet(false);
     l.info('narration');
     expect(captured.join('')).toContain('narration');
   });
 
   it('keeps info OFF stderr when quiet', () => {
     const l = mk();
-    l.setQuiet(true);
+    setProcessQuiet(true);
     captured.length = 0;
     l.info('narration');
     expect(captured.join('')).not.toContain('narration');
@@ -65,7 +65,7 @@ describe('quiet suppresses narration, not failures', () => {
 
   it('still writes the suppressed line to the file sink — quiet is not lossy', () => {
     const l = mk();
-    l.setQuiet(true);
+    setProcessQuiet(true);
     l.info('narration');
     expect(fileText()).toContain('narration');
   });
@@ -76,7 +76,7 @@ describe('quiet suppresses narration, not failures', () => {
    */
   it('NEVER suppresses an error, however quiet', () => {
     const l = mk();
-    l.setQuiet(true);
+    setProcessQuiet(true);
     captured.length = 0;
     l.error('the vault could not be opened');
     expect(captured.join('')).toContain('the vault could not be opened');
@@ -84,7 +84,7 @@ describe('quiet suppresses narration, not failures', () => {
 
   it('NEVER suppresses a warning', () => {
     const l = mk();
-    l.setQuiet(true);
+    setProcessQuiet(true);
     captured.length = 0;
     l.warn('anchoring by fallback');
     expect(captured.join('')).toContain('anchoring by fallback');
@@ -94,9 +94,12 @@ describe('quiet suppresses narration, not failures', () => {
    * Quiet is a property of the PROCESS, not of one logger. Modules build their own instances —
    * `new Logger("ConducksGraph")` is one — and a per-instance flag left that instance printing from
    * a handle nobody held. Four of five lines went quiet and the fifth did not.
+   *
+   * Which is why setting it is `setProcessQuiet` and not a method: the reach is the point, so the
+   * call site should show it (ADR 0150 rule 4, todo71).
    */
   it('applies to every instance, including ones created afterwards', () => {
-    new Logger('first').setQuiet(true);
+    setProcessQuiet(true);
     const later = new Logger('made-later');
     later.setLogFile(logFile);
     captured.length = 0;
@@ -105,7 +108,7 @@ describe('quiet suppresses narration, not failures', () => {
   });
 
   it('announcing the log sink is itself gated', () => {
-    new Logger().setQuiet(true);
+    setProcessQuiet(true);
     captured.length = 0;
     const l = new Logger('T');
     l.setLogFile(path.join(dir, 'other.log'));
@@ -114,7 +117,7 @@ describe('quiet suppresses narration, not failures', () => {
 
   it('boot diagnostics follow the same rule: off stderr, on in the file', () => {
     const l = mk();
-    l.setQuiet(true);
+    setProcessQuiet(true);
     captured.length = 0;
     l.boot('Initializing Native Grammar Engine...');
     expect(captured.join('')).not.toContain('Initializing');

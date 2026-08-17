@@ -11,15 +11,15 @@
  *
  * `tests/architecture/feature-doors.test.ts` fails when anything outside reaches past it.
  *
- * WHY `logger` IS AN INSTANCE AND NOT A FACTORY. It is a shared process-wide sink, and ADR 0150
- * rule 4 forbids a door exporting mutable state — the same tension `core/git` carries with
- * `chronicle`, recorded there and here rather than papered over. The difference is that `Logger`'s
- * only mutable state is a static quiet flag, which is a property OF the process by design
- * (`setQuiet` is static precisely because a per-instance flag silenced four of five boot lines and
- * missed the fifth). Modules that want their own prefix construct their own `new Logger(prefix)`,
- * which is why the class is exported beside the instance.
+ * WHY `logger` IS AN INSTANCE AND NOT A FACTORY, and how rule 4 is met (todo71). It is a shared
+ * process-wide sink. Rule 4 forbids a door exporting MUTABLE state, and the mutable part was the
+ * quiet flag: while it was set through an instance method, any of the seventeen places that build a
+ * logger could silence the whole process, and the call read as a local decision. The flag is now a
+ * module-level `let` private to `logger.ts`, reachable only through `setProcessQuiet` — so the
+ * instance this door hands out carries no state a holder can change. Modules that want their own
+ * prefix construct `new Logger(prefix)`, which is why the class is exported beside the instance.
  */
-export { Logger, logger } from './logger.js';
+export { Logger, logger, setProcessQuiet } from './logger.js';
 export { canonicalize, getProjectRelativePath } from './path-utils.js';
 export { traceMemory } from './mem-trace.js';
 export { assessRoot, explainScope, isNeverAProjectRoot } from './scope-guard.js';
