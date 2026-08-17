@@ -1,18 +1,19 @@
 {
   "docs/visuals/modules/core/graph/algorithms.md": {
-    "src/lib/core/graph/algorithms/cycle-detector.ts": "8ac39f0aa626c56e",
-    "src/lib/core/graph/algorithms/ranker.ts": "d031c649f6389bd0",
-    "src/lib/core/graph/algorithms/traversal.ts": "9474068c0c60ca1b"
+    "src/lib/core/graph/algorithms/cycle-detector.ts": "0edf2c20cdee48c7",
+    "src/lib/core/graph/algorithms/ranker.ts": "ca50f4091c1b8e3b",
+    "src/lib/core/graph/algorithms/traversal.ts": "719c42ac0eaeeff8"
   },
   "docs/visuals/modules/core/graph/linkers.md": {
-    "src/lib/core/graph/import-resolver.ts": "d980d8d58f996b34",
-    "src/lib/core/graph/linker-intra.ts": "d348dffbc55dce74",
-    "src/lib/core/graph/linker-federated.ts": "d5f43a3ff5351a39",
-    "src/lib/core/graph/http-service-linker.ts": "f273be0ff1d00903"
+    "src/lib/core/graph/import-resolver.ts": "3a421fb782f43199",
+    "src/lib/core/graph/linker-intra.ts": "6ea686088590d312",
+    "src/lib/core/graph/linker-federated.ts": "4b0d82b9e8d7c5fb",
+    "src/lib/core/graph/http-service-linker.ts": "db25b7b834f3af60",
+    "src/lib/core/parsing/languages/typescript/resolver.ts": "f90fc8a1bb915208"
   },
   "docs/visuals/modules/core/graph.md": {
-    "src/lib/core/graph/adjacency-list.ts": "c547a15cad546963",
-    "src/lib/core/graph/graph-engine.ts": "7572253790d95778"
+    "src/lib/core/graph/adjacency-list.ts": "97a12c20a5d04b30",
+    "src/lib/core/graph/graph-engine.ts": "205ea02a30a1872a"
   },
   "docs/visuals/modules/core/parsing/grammar-registry.md": {
     "tests/unit/core/parsing/optional-native-binding.test.ts": "ba7f05e5a933f9f0"
@@ -30,13 +31,14 @@
     "src/lib/core/parsing/processors/flow.ts": "bf9e2649c0ac706b"
   },
   "docs/visuals/modules/core/parsing/reflector.md": {
-    "src/lib/core/parsing/reflector.ts": "2ff81af8984e9134"
+    "src/lib/core/parsing/reflector.ts": "e4354b340cf33d58"
   },
   "docs/visuals/modules/core/parsing/taxonomy.md": {
     "tests/unit/core/taxonomy-rank-single-source.test.ts": "b0fbaf12c00a4fb4"
   },
   "docs/visuals/modules/core/parsing.md": {
-    "src/lib/core/parsing/prism-core.ts": "4c31f12cdaa5849a"
+    "src/lib/core/parsing/prism-core.ts": "644b993400150eae",
+    "src/contracts/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
     "src/lib/core/persistence/persistence.ts": "486d235b5c786e16"
@@ -52,7 +54,7 @@
     "src/lib/domain/analysis/micro-pulse.ts": "c0fd6f64c86d95a2"
   },
   "docs/visuals/modules/domain/analysis.md": {
-    "src/lib/domain/analysis/index.ts": "afd9f83050018770"
+    "src/lib/domain/analysis/index.ts": "120eb7279d5b09ba"
   },
   "docs/visuals/modules/domain/evolution.md": {
     "src/lib/domain/evolution/dead-code.ts": "6bf41d3e118a9dfe",

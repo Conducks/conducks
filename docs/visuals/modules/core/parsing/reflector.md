@@ -14,7 +14,15 @@ graph or the vault. Anything needing repo-wide knowledge belongs to the
 
 **Deferred / not built:** the split. This should be a dispatcher over per-capture handlers (import,
 call, definition, reference-as-value) and is instead one giant `for (const capture of match.captures)`
-chain with no internal seams. It is wanted, not done, and it is the main reason edits here are risky.
+chain. It is wanted, not done, and it is the main reason edits here are risky.
+
+Two pieces HAVE come out, and neither is the dispatch: the pure functions moved to
+<span class="anchor">src/lib/core/parsing/match-facts.ts</span> (a node or a match in, a plain value
+out, nothing touching the spectrum), and the four capture pairs that each held their own
+`pending… = null` became one `PendingPair`. The chain itself stays, and the measurement that explains
+why is worth keeping: moving it needs **29 of `reflect()`'s locals** threaded out, 19 of them shared
+mutable state. That converts implicit coupling into an explicit bag rather than reducing it, in the
+file where a defect reaches all 42 commands.
 
 ## Treat every change as systemic
 
@@ -69,8 +77,19 @@ pattern reads as "this import is a value use". Python's forward reference is the
 `o: "Order"` is a STRING, which is exactly what a name imported under `if TYPE_CHECKING:` requires,
 so the imports the feature most needs to see were the ones no query captured.
 
-## Gnosis fallback
+## There is no fallback here — it FAILS
 
-When a grammar is unavailable or a parse/query fails, the reflector falls back to a regex extractor
-producing file-level nodes only — no symbols, no edges. It is a resilience path, not a mode anyone
-should be in: if a language is silently in Gnosis, everything it contains looks orphaned.
+This section used to describe a Gnosis regex extractor the reflector fell back to when a grammar was
+unavailable or a parse failed. **That has not been true since ADR 0089**, and the paragraph directly
+contradicted the one further up this same page, which already said so. Both were on the page at once
+for weeks; nothing reads prose, so nothing noticed.
+
+What actually happens: a missing parser, a grammar that cannot parse the file, or a query that
+compiles to nothing each `throw new ParseFailure` carrying file, language and reason
+(<span class="anchor">src/lib/core/parsing/reflector.ts:194</span>). The orchestrator reports those
+and says plainly that the symbols and edges are MISSING — the whole point of ADR 0089 being that a
+degraded answer is indistinguishable from a real one.
+
+`Gnosis` survives as a name in <span class="anchor">src/lib/core/parsing/grammar-registry.ts:51</span>
+for the case where the NATIVE BINDING itself will not load, which is a different failure from a file
+that will not parse.

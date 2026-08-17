@@ -97,6 +97,13 @@ TypeScript ESM writes a dot-slash `x.js` specifier for a file whose source is `x
 as written *and* with `.js` stripped, then extensions, then `/index.*`. Anything reimplementing
 resolution needs both forms or every relative import in the codebase silently fails to bind.
 
+**A fourth step was added on 2026-08-17 and it runs LAST** (ADR 0153): a specifier that only makes
+sense in the BUILD layout. `electron/main/index.ts` importing `'../engine/…'` names no file on disk —
+it is written against where the two halves LAND, and the project's `tsconfig` and bundler config
+declare that between them. Because it runs after everything above has refused, it can only turn an
+UNRESOLVED into a resolution and never redirect one that already worked. It answers nothing whenever
+a declaration is missing or two of them are ambiguous, which is most projects.
+
 **This is still true, and it moved.** It lives in `core/parsing/languages/typescript/resolver.ts`, not
 in `core/graph`, and graph reaches it through a PORT rather than by importing it: `IntraLinker`
 declares `ResolveSpecifier` and refuses to construct without one, because `core/graph` importing
@@ -111,6 +118,9 @@ states would be indistinguishable.
 
 A file that re-exports from its own path (`export * from './self'`) is a degenerate stub, flagged as
 ARCH-4. Detection keys strictly off the **specifier** resolving back to the same file — never off the
-resolver's output, because the fuzzy tier matches a bare package name (`context`, `routing`) to a
-same-named local file and would report a false self-import. The audit matches only the explicit
-`self::` edge marker, never a generic unit → unit self-loop.
+resolver's output. The reason written here was the fuzzy tier matching a bare package name
+(`context`, `routing`) onto a same-named local file; that tier was deleted on 2026-08-17, so the
+example is now history rather than a live hazard. The rule outlives it, because ANY resolver that
+answers generously can land a specifier back on its own file. The audit matches only the explicit
+`self::` edge marker (<span class="anchor">src/lib/domain/governance/index.ts:133</span>), never a
+generic unit → unit self-loop.

@@ -30,8 +30,14 @@ Breadth was chosen over uniform depth; see the per-part docs for what that costs
 
 Unlisted files are small and self-describing: `context` (per-pulse symbol registry and local
 bindings), `ignore-manager` (`.conducksignore`), `pipeline` and `pulse-worker` (batching and worker
-entry), `built-ins` (per-language globals), `essence-lens` (package manifests), `language-plugin` and
-`providers/base` (the provider interface), `prism-core` (the abstract prism + spectrum types).
+entry), `essence-lens` (package manifests), `language-plugin` and `providers/base` (the provider
+interface), `prism-core` (the abstract prism + spectrum types), `match-facts` (the reflector's pure
+half — a node or a match in, a plain value out), `build-layout` (where a source file lands, read from
+the project's own build config — ADR 0153), `doc-comments`, `capture-tags` and `next-routes`.
+
+`built-ins` (per-language globals) is NOT here: it lives in
+<span class="anchor">src/contracts/built-ins.ts</span>, because both parsing and the graph read it.
+Listed as a parsing file until 2026-08-17.
 
 **A seam that WAS duplicated, resolved.** `parsing/prism-core.ts` once had a byte-identical twin
 under persistence — two copies of the same `ConducksPrism` base re-exporting `contracts/prism-types.ts`.

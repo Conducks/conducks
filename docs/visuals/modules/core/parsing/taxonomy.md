@@ -35,7 +35,7 @@ nodes here were a C# and a PHP `namespace` wearing the wrong kind.
   call inside a loop is the enclosing BEHAVIOR plus a line (ADR 0099). One node per statement would
   take this repository from ~5,220 nodes to roughly its 32,069 line count. A position is not an
   entity. Coverage range-joins onto BEHAVIOR spans
-  ([coverage](../../domain/analysis/coverage.md), ADR 0004).
+  ([coverage](../../domain/coverage.md), ADR 0004).
 - **DATA — cut.** A parameter is an attribute on its parent (`dna.params`, ADR 0086); the kind
   existed only for `pruneTaxonomy` to delete. Those raw strings now reach the ATOM default, where the
   edge gate reaches the same outcome with one rung fewer.

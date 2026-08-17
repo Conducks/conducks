@@ -15,14 +15,21 @@ properties do not survive a persist/reload round-trip — `addNode` copies an al
 skeleton and the DB has fixed columns. Passing a signal from an analysis pass to an audit therefore
 requires a distinctly-id'd edge, not a node property. A constraint, not an oversight.
 
+The allowlist has a companion trap. What is NOT in the skeleton is kept as "meat", and the split was
+made by deleting a hand-written list of keys — so a key added to the skeleton and forgotten in that
+list was stored TWICE, in both halves, and the two could disagree after a partial update. It strips
+every skeleton key by construction now (`for (const key of Object.keys(skeletonNode.properties))`),
+which is the only version that cannot drift when the skeleton grows.
+
 ## Parts
 
 - **[algorithms/](graph/algorithms.md)** — Tarjan cycle detection, gravity ranking, traversal.
 - **[linkers/](graph/linkers.md)** — binding bare names and specifiers to real nodes across files
   and repos.
 
-`boundary-classifier` (internal / stdlib / dependency origin, ADR 0014) and `diff-engine` (graph-to-
-graph comparison) are single-purpose and self-describing.
+`boundary-classifier` (internal / stdlib / dependency origin, ADR 0014), `diff-engine` (graph-to-graph
+comparison), `cluster-rule` (which ecosystem a node belongs to) and `external-nodes` (the properties
+an induced external node carries) are single-purpose and self-describing.
 
 ## Two rules that are easy to break
 

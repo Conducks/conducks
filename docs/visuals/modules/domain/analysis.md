@@ -20,12 +20,18 @@ Adequate while the question set is known.
 
 - **[reflector/](../core/parsing/reflector.md)** — file → spectrum. The single most load-bearing unit here.
 - **[orchestrator/](analysis/orchestrator.md)** — the multi-pass pulse, incremental analysis, workers.
-- **[coverage/](analysis/coverage.md)** — binding an external coverage report onto the graph.
-- **[docs-grammar/](docs/docs-grammar.md)** — the conducks-docs standard, enforced.
+
+`coverage` and `docs` are no longer parts of this module — they are their own areas,
+[coverage](coverage.md) and [docs](docs.md), split out in the ADR 0150 campaign because each has its
+own door. The link here pointed at `analysis/coverage.md` for some time after the move and resolved
+to nothing: `visuals-lint` checks that every code ANCHOR resolves and does not follow markdown links
+between notes, so a dead link between pages is invisible to it.
 
 `conducks-core` is the façade the registry wires; `query-service` answers structural questions;
 `gateway-service` is the live vault-watch feed behind the Mirror dashboard, constructed by the
-`mirror` CLI command and consumed by the web server.
+`mirror` CLI command and consumed by the web server. `project-monitor`, `change-set`, `module-hash`
+and `micro-pulse` carry the incremental path; `graph-skeleton-builder` and `reflection-pipeline` the
+pulse itself.
 
 ## The pulse links, inducts, then links AGAIN
 
@@ -47,7 +53,7 @@ One pass cannot resolve a cross-file reference, because the target may not be pa
 constraint is what divides this module: the [reflector](../core/parsing/reflector.md) sees exactly one file and
 seeds unresolved specifiers, the [orchestrator](analysis/orchestrator.md) is the only thing allowed to
 see all files and is therefore where real edges get built, and the feature analyses
-([coverage](analysis/coverage.md), [docs-grammar](docs/docs-grammar.md)) read the finished graph and
+([coverage](coverage.md), [docs-grammar](docs/docs-grammar.md)) read the finished graph and
 never touch parsing. Anything that needs repo-wide knowledge moves up, never sideways.
 
 The consequence every part inherits — `analyze` is incremental, so a re-run can show no change while

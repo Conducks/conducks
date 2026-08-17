@@ -39,3 +39,16 @@ reappearing under a different command. They now share `IMPORT_CYCLE_IGNORED_EDGE
 Two properties worth keeping in mind when adding a caller: an SCC is an **unordered set**, not an
 ordered path — walking it as `c[i] → c[i+1]` inspects non-edges, a bug that shipped once — and a
 single-node component is only a cycle if it has a genuine self-edge.
+
+## Gravity needs ANCHORS, and it had none
+
+PageRank here is seeded from anchor nodes, and the filter that picks them reads
+`properties.canonicalKind`. It listed only kinds that never appear on the nodes it was walking, so on
+2026-08-17 the ranker was measured seeding from **zero** anchors — every symbol scored the same
+damping floor, and `query`, `impact` and `context` ranked their answers by a constant while looking
+entirely healthy. A rank that is uniform is indistinguishable from a rank nobody looked at.
+
+The filter now accepts `STRUCTURE`, `FUNCTION`, `BEHAVIOR`, `INFRA`, plus `isModule` and the `module`
+and `unit` labels. When touching it, assert the ANCHOR COUNT, not the scores: scores come out of a
+run with no anchors too.
+
