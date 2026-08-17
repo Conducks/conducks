@@ -25,6 +25,14 @@ export const C_QUERIES = `
       parameters: (parameter_list) @params)) @isFunction
   (struct_specifier (type_identifier) @name) @isStruct
   (union_specifier (type_identifier) @name) @isStruct
+
+  ;; A TYPE ALIAS is a declaration the project can be searched for, and none of these packs captured
+  ;; one — found by oracle-packs.mjs, which walks the grammar exhaustively and asked why a
+  ;; type_item the tree plainly holds minted no node. An alias names a type the code refers to by
+  ;; that name, so impact on it reported nothing and query could not find it at all.
+  ;; STRUCTURE rather than a rung of its own: an alias IS a type, and inventing a kind for it would
+  ;; add a rung with one producer (ADR 0100).
+  (type_definition declarator: (type_identifier) @name) @isStruct
   (enum_specifier (type_identifier) @name) @isEnum
 
   ;; --- Infrastructure (L3: Entry Points) ---

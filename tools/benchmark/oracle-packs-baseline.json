@@ -1,10 +1,10 @@
 {
   "rust": {
-    "missed": 2,
+    "missed": 1,
     "extra": 0
   },
   "go": {
-    "missed": 1,
+    "missed": 0,
     "extra": 0
   },
   "java": {
@@ -12,7 +12,7 @@
     "extra": 0
   },
   "c": {
-    "missed": 1,
+    "missed": 0,
     "extra": 0
   },
   "cpp": {
@@ -20,7 +20,7 @@
     "extra": 2
   },
   "csharp": {
-    "missed": 4,
+    "missed": 1,
     "extra": 0
   },
   "php": {

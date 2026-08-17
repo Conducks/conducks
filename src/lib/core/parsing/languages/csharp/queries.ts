@@ -15,6 +15,16 @@ export const CSHARP_QUERIES = `
   (record_declaration (identifier) @name) @isStruct
   (interface_declaration (identifier) @name) @isInterface
   (enum_declaration (identifier) @name) @isEnum
+
+  ;; A STRUCT is a type C# projects use as heavily as a class, and this pack captured none — found by
+  ;; oracle-packs.mjs walking the grammar. Every struct in every C# project was invisible: absent from
+  ;; query, from impact, from the containment tree.
+  (struct_declaration name: (identifier) @name) @isStruct
+
+  ;; An ENUM MEMBER is a referenceable symbol. Without it, Status.Active resolved to the enum and the
+  ;; member itself could not be found or impacted. Captured as a PROPERTY rather than a rung of its
+  ;; own, which is what the other packs do with a member of a type.
+  (enum_member_declaration name: (identifier) @name) @isProperty
   
   ;; Probed against tree-sitter-c-sharp (node-types.json + a live parse): method_declaration names its
   ;; return type field \`returns\`, not \`return_type\` or \`type\` — both \`returns\` and \`parameters\` are
