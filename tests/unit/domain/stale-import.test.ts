@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from '@jest/globals';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
-import { DeadCodeAnalyzer } from '@/lib/domain/evolution/dead-code.js';
+import { DeadCodeAnalyzer } from '@/lib/domain/evolution/index.js';
 
 /**
  * todo11 Phase 2 — STALE_IMPORT.

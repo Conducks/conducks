@@ -114,8 +114,29 @@ export class EvolutionService {
   }
 }
 
-export type { RefactorResult, DriftResult, AuditResult };
+/**
+ * Conducks — the evolution feature's only door (ADR 0150).
+ *
+ * How a codebase CHANGES, and what that costs: what has decayed since the last pulse, what is no
+ * longer reached, what a rename would touch, and whether anything is watching the tree at all. Every
+ * other domain area answers a question about the code as it stands; this one answers questions with
+ * a BEFORE in them.
+ *
+ * WHAT CROSSES, measured rather than assumed. `DeadCodeAnalyzer` is named at six places outside this
+ * folder and was not on the door at all — the most-used symbol here reached by six separate leaf
+ * imports. `readWatcherLiveness` and its type were the same, one place each.
+ *
+ * WHAT NO LONGER CROSSES: `ConducksWatcher`, `AuditService`, `RefactorResult` and `AuditResult`. Zero
+ * external callers each — the watcher is reached through `EvolutionService.getWatcher`, and the two
+ * result types are shapes a caller destructures rather than names.
+ *
+ * `tests/architecture/feature-doors.test.ts` fails when anything outside reaches past this file.
+ */
+export type { DriftResult };
 export { GVREngine } from "./gvr-engine.js";
-export { ConducksWatcher } from "./watcher.js";
 export { DriftEngine } from "./drift-engine.js";
-export { AuditService } from "./audit-service.js";
+export { DeadCodeAnalyzer } from "./dead-code.js";
+// `Finding` crosses to `metrics`, which consumes what the analyzer returns.
+export type { Finding } from "./dead-code.js";
+export { readWatcherLiveness } from "./watcher-liveness.js";
+export type { WatcherLiveness } from "./watcher-liveness.js";

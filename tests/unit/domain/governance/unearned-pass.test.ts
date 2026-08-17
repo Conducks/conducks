@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { DriftEngine } from '@/lib/domain/evolution/drift-engine.js';
+import { DriftEngine } from '@/lib/domain/evolution/index.js';
 import { RegressionGuard } from '@/lib/domain/governance/guard.js';
 
 /**

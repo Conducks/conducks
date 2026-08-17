@@ -1,5 +1,5 @@
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
-import { DriftEngine, DriftResult } from "@/lib/domain/evolution/drift-engine.js";
+import { DriftEngine, DriftResult } from "@/lib/domain/evolution/index.js";
 import { logger } from "@/lib/core/utils/index.js";
 
 /**

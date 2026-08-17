@@ -52,6 +52,7 @@ const DOORS = [
   //   then          evolution -> kinetic
   //   then          governance, metrics -> evolution
   //   last          analysis -> six of the others
+  'lib/domain/evolution',
   'lib/domain/federation',
   'lib/domain/intelligence',
   'lib/domain/kinetic',
@@ -83,6 +84,19 @@ const OWN_TESTS: Record<string, string[]> = {
   // Drives the git path with a filename containing a quote and `$()` — it is a test OF this
   // feature's shell safety (ADR 0047), filed under integration because it needs a real repository.
   'lib/core/git': ['integration/features/shell-injection.test.ts'],
+  // Fakes a watcher marker to prove `status` answers with NO daemon running. The marker writers have
+  // zero callers in `src` — nothing but a watcher writes one — so putting them on the door would be
+  // the door exporting for a test's benefit, which rule 1 forbids. The exception is narrower than
+  // the export would be.
+  'lib/domain/evolution': [
+    // Fakes a watcher marker to prove `status` answers with NO daemon running.
+    'unit/domain/analysis/answers-without-a-daemon.test.ts',
+    // ADR 0044 — "a check that ran on nothing is not a pass" — spans two features: the status half
+    // is evolution's `AuditService`, the gate half is governance's `guard`. The test is filed with
+    // the gate it protects. `AuditService` has zero callers in `src`, so putting it on the door to
+    // satisfy this would be the door exporting for a test.
+    'unit/domain/governance/audit-status.test.ts',
+  ],
 };
 
 const TESTS = path.resolve('tests');
