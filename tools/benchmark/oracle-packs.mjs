@@ -38,6 +38,15 @@
  * ratchet does catch is the thing worth catching: a pack that STOPS capturing something it captures
  * today, which is invisible to every other gate because the parse still succeeds.
  *
+ * IT ALSO SCORES ONE EDGE CLASS: HERITAGE. Nodes are not the only thing a pack can silently stop
+ * producing, and on 2026-08-17 three packs — ruby, rust and php — emitted no inheritance edge AT ALL.
+ * Not a wrong edge: none. Every file parsed, every pack loaded, the suite was green, and `audit`,
+ * `arch` and every containment walk read those codebases as having no type hierarchy — which is
+ * indistinguishable from a codebase that genuinely has none.
+ *
+ * So: every pack whose queries mention a heritage capture must PRODUCE a heritage edge for a two-line
+ * fixture that plainly has one. That is the check nothing was making.
+ *
  * WHAT IT CANNOT SEE, stated rather than discovered later:
  *   - whether a captured node got the RIGHT KIND. `every-definition-capture-mints-its-kind.test.ts`
  *     covers that; this covers whether it was captured at all.
@@ -210,6 +219,40 @@ for (const pack of PACKS) {
   });
 }
 
+// ── Heritage: a pack that captures inheritance must emit an edge for it ───────
+//
+// The fixture per language is deliberately two lines and unambiguous. A pack that cannot resolve
+// THIS has nothing subtle wrong with it.
+const HERITAGE = [
+  ['typescript', 'TypeScriptProvider', '/h/a.ts',    'class Base {}\nclass Child extends Base {}\n'],
+  ['tsx',        'TSXProvider',        '/h/a.tsx',   'class Base {}\nclass Child extends Base {}\n'],
+  ['javascript', 'JavaScriptProvider', '/h/a.js',    'class Base {}\nclass Child extends Base {}\n'],
+  ['python',     'PythonProvider',     '/h/a.py',    'class Base:\n    pass\nclass Child(Base):\n    pass\n'],
+  ['java',       'JavaProvider',       '/h/A.java',  'class Base {}\nclass Child extends Base {}\n'],
+  ['go',         'GoProvider',         '/h/a.go',    'package p\ntype Base struct{}\ntype Child struct{ Base }\n'],
+  ['ruby',       'RubyProvider',       '/h/a.rb',    'class Base\nend\nclass Child < Base\nend\n'],
+  ['rust',       'RustProvider',       '/h/a.rs',    'struct Child;\ntrait Base {}\nimpl Base for Child {}\n'],
+  ['php',        'PHPProvider',        '/h/a.php',   '<?php\nclass Base {}\nclass Child extends Base {}\n'],
+  ['swift',      'SwiftProvider',      '/h/A.swift', 'class Base {}\nclass Child: Base {}\n'],
+];
+
+const heritageMissing = [];
+for (const [lang, providerName, file, source] of HERITAGE) {
+  const qPath = path.join(ROOT, `src/lib/core/parsing/languages/${lang}/queries.ts`);
+  if (!existsSync(qPath)) continue;
+  // Only score a pack that CLAIMS to capture heritage. One that does not is a gap of a different
+  // kind, and reporting it here would blame the pack for a language feature nobody wired.
+  if (!/@heritage/.test(readFileSync(qPath, 'utf8'))) continue;
+
+  await grammars.loadLanguage(lang);
+  if (grammars.isLanguageUnavailable(lang)) continue;
+  const mod = await import(`${B}/languages/${lang}/index.js`);
+  const spectrum = await reflector.reflect({ path: file, source }, new mod[providerName](), new AnalyzeContext(), [file]);
+  const edges = (spectrum.relationships ?? [])
+    .filter(e => e.type === 'EXTENDS' || e.type === 'IMPLEMENTS' || e.type === 'INHERITS');
+  if (!edges.length) heritageMissing.push(lang);
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 const base = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
 const next = {};
@@ -237,6 +280,11 @@ for (const r of report) {
   if (r.missed.length) console.log(`          types:  ${r.missedTypes.join(', ')}`);
   if (r.extra.length)  console.log(`          EXTRA:  ${r.extra.join(', ')}`);
 }
+
+console.log(`\n  heritage · ${HERITAGE.length} packs claim an inheritance capture · `
+  + (heritageMissing.length ? `${heritageMissing.length} PRODUCE NO EDGE: ${heritageMissing.join(', ')}`
+                            : 'every one produces an edge'));
+if (heritageMissing.length) hardFail = true;
 
 if (process.argv.includes('--write-baseline')) {
   writeFileSync(BASELINE, JSON.stringify(next, null, 2) + '\n');

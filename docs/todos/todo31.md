@@ -50,3 +50,14 @@ success is the reason it is tolerable rather than the reason it is fine.
       own — the RISK Phase 0 named (runtime path resolution across build/, jest and spawned workers)
       is unchanged, and nothing measured today speaks to it. It is recorded so the next reader
       weighs a gate that needs its own mutation tests, not the twenty-second annoyance of 2026-08-05
+- [>] REVISITED 2026-08-17 — deferred still, because the risk Phase 0 named is untouched while the
+      cost it priced was re-measured and has not grown. New evidence rather than repeated reasoning. The gate fired three more times in one
+      session — writing query comments for the rust, go, c, ruby and php heritage and alias
+      patterns — bringing it to 10 of 10 caught. Every one was in a `;;` COMMENT, which is
+      trigger 1's condition still not being met: it has never once fired inside a pattern body.
+      Two of the three cost only the twenty seconds Phase 0 priced. The THIRD cost more, and that
+      is the finding worth recording: the build failed and the pack oracle then reported numbers
+      from the PREVIOUS binary, so a green-looking measurement was made against stale output. That
+      is not an argument for the migration — it is an argument for grepping the build for its
+      failure marker before believing anything downstream, which is now habit. The risk Phase 0
+      named is still untouched by anything measured
