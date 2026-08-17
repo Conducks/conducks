@@ -21,7 +21,8 @@ import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type Sentinel
  * graph was empty. Shared by both callers deliberately — the same field name answering differently
  * on the CLI and MCP surfaces is how `density` drifted 5,000x.
  */
-export function emptyOrReady(nodeCount: number): 'empty' | 'ready' {
+// Not exported: zero callers outside this file. Kept because `GovernanceService` reads it.
+function emptyOrReady(nodeCount: number): 'empty' | 'ready' {
   return nodeCount === 0 ? 'empty' : 'ready';
 }
 

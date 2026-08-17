@@ -20,7 +20,7 @@
 export { buildBoard, agentView, governedCount, buildTrees, enforcedByPaths, crossTreeLint,
          treeShapeLint } from './docs-board.js';
 export { DocsWatcher } from './docs-watcher.js';
-export { lintVisuals, collectVisualPages, buildStamps, staleStamps, definesSymbol } from './visuals-lint.js';
+export { lintVisuals, collectVisualPages, buildStamps, staleStamps } from './visuals-lint.js';
 export type { VisualsViolation, ReviewStamps } from './visuals-lint.js';
 export { checkVisualsDrift, generatorCommandOf } from './visuals-drift.js';
 export type { DriftResult } from './visuals-drift.js';

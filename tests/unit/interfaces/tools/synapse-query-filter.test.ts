@@ -6,7 +6,7 @@
  * never with caller input concatenated into the SQL string.
  */
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { buildFilterQuery } from '@/lib/domain/analysis/filter-builder.js';
+import { buildFilterQuery } from '@/lib/domain/analysis/index.js';
 
 const queryMock = jest.fn(async (_sql: string, _params: unknown[] = []) => [
   { id: 'n1', name: 'Foo', file: 'a.ts', canonicalKind: 'BEHAVIOR', canonicalRank: 2, risk: 0.1, gravity: 0.2 },

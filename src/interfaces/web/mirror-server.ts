@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GatewayService } from '@/lib/domain/analysis/gateway-service.js';
+import { GatewayService } from '@/lib/domain/analysis/index.js';
 import { chronicle } from '@/lib/core/git/index.js';
 import { Logger } from "@/lib/core/utils/index.js";
 import { registry } from '@/registry/index.js';

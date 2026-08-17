@@ -795,6 +795,34 @@ export class AnalysisService {
   }
 }
 
+/**
+ * Conducks — the analysis feature's only door (ADR 0150).
+ *
+ * The analyze PULSE and the services composed around it: what changed, what to re-parse, what the
+ * graph then knows, and the read paths the registry wires on top — query filters, the project
+ * monitor, the mirror gateway.
+ *
+ * WHAT LEFT. This folder held twenty-three files and four subjects. The docs tooling and the coverage
+ * pair are their own areas now, because neither imported anything else here — measured before
+ * moving, not judged by eye.
+ *
+ * WHAT NO LONGER CROSSES FROM HERE: `ConducksReflector`. This door re-exported it from
+ * `core/parsing`, and nothing ever took it from here — both tests that name it import parsing's own
+ * door. It is the FOURTH door in this campaign caught republishing another feature's class, after
+ * `intelligence` with `FederatedLinker` and `metrics` with `DeadCodeAnalyzer` and `Finding`. A door
+ * that republishes becomes a dependency edge onto the door it borrows from (rule 5b).
+ *
+ * `tests/architecture/feature-doors.test.ts` fails when anything outside reaches past this file.
+ */
 export { AnalyzeOrchestrator } from "./orchestrator.js";
-export { ConducksReflector } from "@/lib/core/parsing/index.js";
 export { Conducks } from "./conducks-core.js";
+
+// The surfaces the registry composes, each reached by a leaf import until now.
+export { MicroPulseService } from "./micro-pulse.js";
+export { ProjectMonitor } from "./project-monitor.js";
+export { GatewayService } from "./gateway-service.js";
+export { FallbackDetector } from "./fallback-detector.js";
+export { collectChanges, impactedSymbolIds } from "./change-set.js";
+export { buildFilterQuery } from "./filter-builder.js";
+export type { QueryFilter } from "./filter-builder.js";
+export { moduleHashOf } from "./module-hash.js";

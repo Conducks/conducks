@@ -52,6 +52,7 @@ const DOORS = [
   //   then          evolution -> kinetic
   //   then          governance, metrics -> evolution
   //   last          analysis -> six of the others
+  'lib/domain/analysis',
   'lib/domain/coverage',
   'lib/domain/docs',
   'lib/domain/evolution',

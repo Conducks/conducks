@@ -7,9 +7,9 @@
  * once (MCP query template interpolation, unparameterised purgeUnits DELETE).
  */
 import { describe, it, expect } from '@jest/globals';
+import { FilterValidationError } from '@/contracts/index.js';
 import {
   buildFilterQuery,
-  FilterValidationError,
   FILTERABLE_FIELDS,
   FILTER_MAX_LIMIT,
   FILTER_DEFAULT_LIMIT,

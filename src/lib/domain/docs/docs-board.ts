@@ -19,7 +19,7 @@ import {
   GOVERNED, REL, RE, type DocType, inferType, parseBody, shape, lint,
 } from "./docs-grammar.js";
 import { resolveDocsTrees } from "./service-docs.js";
-import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
+import { moduleHashOf } from "@/lib/domain/analysis/index.js";
 import { verdict, verdictToJson } from "@/contracts/index.js";
 
 export interface DocsBoard {

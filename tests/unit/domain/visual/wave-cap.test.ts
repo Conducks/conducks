@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { GatewayService } from '@/lib/domain/analysis/gateway-service.js';
+import { GatewayService } from '@/lib/domain/analysis/index.js';
 
 /**
  * todo48#P1 — the wave cap is a DEFAULT, not a contract.
