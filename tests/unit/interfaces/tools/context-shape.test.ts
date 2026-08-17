@@ -31,7 +31,10 @@
  */
 import { describe, it, expect, jest } from '@jest/globals';
 import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
-import { ContextAnalyzer } from '@/lib/domain/kinetic/context.js';
+// Through the DOOR, and through the class the registry actually wires: `KineticService.context`
+// delegates to the same analyzer, so this stub stays honest while the test stops reaching past
+// kinetic's boundary for a class only that feature's own tests may name (ADR 0150 rule 3).
+import { KineticService } from '@/lib/domain/kinetic/index.js';
 
 const PROJECT_ROOT = '/fake/root';
 
@@ -122,7 +125,7 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
     // still exercise here.
     kinetic: {
       context: (symbolId: string, options?: { radius?: number; includeAtoms?: boolean }) =>
-        new ContextAnalyzer(mockGraph as never).neighbourhood(symbolId, options),
+        new KineticService(mockGraph as never).context(symbolId, options),
     },
   },
 }));

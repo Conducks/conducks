@@ -15,7 +15,8 @@ import { decide as decideArch } from "@/lib/domain/governance/arch-verdict.js";
  * answers "no pattern detected, here is the shape" — which is the honest verdict, not a failure.
  */
 const DEFAULT_INTERFACE_FRAGMENTS = ['/interfaces/', '/adapters/', '/apps/', '/cli/', '/api/', '/web/'];
-import { IntelligenceService, ConducksSearch, FederatedLinker } from "@/lib/domain/intelligence/index.js";
+import { IntelligenceService, ConducksSearch } from "@/lib/domain/intelligence/index.js";
+import { FederatedLinker } from "@/lib/core/graph/index.js";
 import { EvolutionService, GVREngine } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/analysis/docs-board.js";
 import { collectChanges, impactedSymbolIds } from "@/lib/domain/analysis/change-set.js";

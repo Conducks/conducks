@@ -1,4 +1,4 @@
-import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
+import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { AnalyzeOrchestrator } from "@/lib/domain/analysis/orchestrator.js";
@@ -6,8 +6,8 @@ import { PythonProvider } from "@/lib/core/parsing/index.js";
 import { TypeScriptProvider } from "@/lib/core/parsing/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { ConducksSearch } from "@/lib/domain/intelligence/search-engine.js";
-import { ConducksFlowEngine } from "@/lib/domain/kinetic/flow-engine.js";
+import { ConducksSearch } from "@/lib/domain/intelligence/index.js";
+import { ConducksFlowEngine } from "@/lib/domain/kinetic/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { GVREngine } from "@/lib/domain/evolution/gvr-engine.js";

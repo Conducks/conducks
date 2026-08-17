@@ -53,6 +53,8 @@ const DOORS = [
   //   then          governance, metrics -> evolution
   //   last          analysis -> six of the others
   'lib/domain/federation',
+  'lib/domain/intelligence',
+  'lib/domain/kinetic',
   'lib/domain/manifest',
   'lib/domain/visual',
 ];

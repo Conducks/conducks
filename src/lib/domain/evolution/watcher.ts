@@ -11,7 +11,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
-import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
+import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/index.js";
 import { IgnoreManager, TypeScriptResolver } from "@/lib/core/parsing/index.js";
 import { FileHashGate } from "@/lib/core/persistence/index.js";
 

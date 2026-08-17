@@ -21,7 +21,10 @@
  * `boolErr` sit beside it so a bound is written once and enforced where it is declared.
  */
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { ContextAnalyzer } from '@/lib/domain/kinetic/context.js';
+// Through the DOOR, and through the class the registry actually wires: `KineticService.context`
+// delegates to the same analyzer, so this stub stays honest while the test stops reaching past
+// kinetic's boundary for a class only that feature's own tests may name (ADR 0150 rule 3).
+import { KineticService } from '@/lib/domain/kinetic/index.js';
 
 const PROJECT_ROOT = '/fake/root';
 const ROOT_ID = `${PROJECT_ROOT}/src/core.ts::corefn`;
@@ -83,7 +86,7 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
       // Delegates to the REAL analyzer (todo57 moved the scored BFS into the domain); a canned list
       // would make the bounds this suite checks meaningless.
       context: (symbolId: string, options?: { radius?: number; includeAtoms?: boolean }) =>
-        new ContextAnalyzer(mockGraph as never).neighbourhood(symbolId, options),
+        new KineticService(mockGraph as never).context(symbolId, options),
     },
   },
 }));

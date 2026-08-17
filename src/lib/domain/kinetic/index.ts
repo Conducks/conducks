@@ -5,9 +5,19 @@ import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/index.js";
 import { ContextAnalyzer, type ContextNode, type ContextOptions } from './context.js';
 
 /**
- * Conducks — Kinetic Domain Service
- * 
- * Unifies the 'Pulse' (movement) logic of the structural graph.
+ * Conducks — the kinetic feature's only door (ADR 0150).
+ *
+ * Everything about MOVEMENT through the graph rather than its shape: what a change reaches, what
+ * reaches a symbol, the neighbourhood around one, and the flow of data between them. `trace`,
+ * `impact`, `context` and `flows` are all this feature.
+ *
+ * A LEAF: it imports nothing else in `domain`.
+ *
+ * WHAT DELIBERATELY DOES NOT CROSS: `TraceAnalyzer` and `ContextAnalyzer`. Both are reached through
+ * `KineticService`, and the only place naming `TraceAnalyzer` directly is this feature's own test,
+ * which rule 3 allows to import the leaf. A door exports what CROSSES.
+ *
+ * `tests/architecture/feature-doors.test.ts` fails when anything outside reaches past this file.
  */
 export class KineticService {
   private traceAnalyzer: TraceAnalyzer;
@@ -68,6 +78,5 @@ export class KineticService {
   }
 }
 
-export { TraceAnalyzer } from "./trace.js";
 export { BlastRadiusAnalyzer } from "./impact.js";
 export { ConducksFlowEngine } from "./flow-engine.js";
