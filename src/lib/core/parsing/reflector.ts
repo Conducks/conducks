@@ -752,6 +752,20 @@ export class ConducksReflector {
                 // has no scope, so this is the identity there — which is why the 57 healthy alias
                 // edges never showed the bug.
                 this.bindings.processAlias(`${scopePrefix}${node.name}`, `${target.toLowerCase()}::${node.name.toLowerCase()}`, spectrum, currentMatchRow + 1);
+
+                // Register the binding too — the RENAMED branch below does, and this one did not.
+                //
+                // Without it `const { TOOL_REGISTRARS } = await import('…')` produced an ALIASES
+                // edge and no local binding, so a CALL through the name resolved and a VALUE READ
+                // did not: `resolveLocalBinding` returned undefined, the reference-as-value edge was
+                // emitted as a bare name, and the export it came from read as unconsumed.
+                //
+                // Measured on subject-c: `TOOL_REGISTRARS` is destructured from a dynamic import and
+                // then ITERATED, never called, and it was the one symbol of todo66's six that the
+                // build-layout fix did not clear. The five that cleared are all CALLED. That is the
+                // whole difference, and it is the same shape as the note above — the renamed form
+                // reached a branch the un-renamed form never did.
+                if (context) context.registerLocalBinding(node.name, target, node.name);
               }
             }
 

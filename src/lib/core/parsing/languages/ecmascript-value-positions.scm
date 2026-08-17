@@ -17,6 +17,12 @@
   (binary_expression left: (identifier) @ref_value)
   (binary_expression right: (identifier) @ref_value)
   (export_statement value: (identifier) @ref_value)
+  ;; `for (const k in TABLE)` AND `for (const x of LIST)`.
+  ;;
+  ;; The tree-sitter node for both is `for_in_statement` in the ECMAScript grammars — `of` is an
+  ;; operator inside it, not a separate node — so this one pattern already covers both spellings.
+  ;; Kept as one line with this note because the absence of a `for_of_statement` pattern reads like
+  ;; a gap and was investigated as one (todo66): the grammar simply has no such node.
   (for_in_statement right: (identifier) @ref_value)
   ;; EVERY identifier ARGUMENT of a call, not just the first.
   ;;

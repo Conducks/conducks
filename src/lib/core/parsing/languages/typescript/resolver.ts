@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chronicle } from "@/lib/core/git/index.js";
+import { resolveThroughBuildLayout } from "@/lib/core/parsing/build-layout.js";
 
 /**
  * Conducks — Node.js & TypeScript Module Resolver
@@ -104,7 +105,19 @@ export class TypeScriptResolver {
     const baseWithoutExt = cleanPath.replace(/\.(js|jsx|ts|tsx)$/, '');
     const targetBase = path.resolve(dir, baseWithoutExt).toLowerCase();
 
-    return this.tryFile(targetBase, lowerToOriginal) || this.tryDirectory(targetBase, lowerToOriginal);
+    const local = this.tryFile(targetBase, lowerToOriginal) || this.tryDirectory(targetBase, lowerToOriginal);
+    if (local) return local;
+
+    // 4. THE BUILD LAYOUT, last and only after everything above refused (todo66, ADR 0153).
+    //
+    // `electron/main/index.ts` importing `../engine/executor/prompt-loader.js` names no file on
+    // disk: `electron/engine/` does not exist. The specifier is written against where the two halves
+    // LAND — `dist/main/../engine/…` is `dist/engine/…`, which is what `src/engine/…` compiles to.
+    // Both halves of that are declared, in `tsconfig.json` and the bundler config.
+    //
+    // Runs LAST on purpose. Every ordinary answer is preferred, so this can only ever turn an
+    // UNRESOLVED into a resolution and never redirect one that already worked.
+    return resolveThroughBuildLayout(cleanPath, currentFile, rootDir, lowerToOriginal);
   }
 
   /**

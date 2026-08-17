@@ -1,10 +1,10 @@
 # todo66 — a specifier that only resolves through the build layout leaves the target's exports looking dead
-Status: blocked
+Status: done
 - Acceptance: on subject-c, `globalPromptPath`, `kernelPromptPath`, `agentRoutingPath`, `TOOL_REGISTRARS`, `computeEffectiveSignificance` and `readAgentRoutingPrompt` are NOT reported by `prune`, because the import that consumes them resolves — measured, not asserted.
 - Builds: 0026
-- Blocked by: only ONE of three subjects shows the shape, and nothing declares the mapping — Phase 0
-  measured both. Clears when a SECOND subject shows a specifier that resolves only through the build
-  layout, or when a project declares that mapping somewhere a resolver can read.
+- Blocked by: CLEARED 2026-08-17 — not by a second subject appearing, but by the owner deciding the
+  one subject was enough. The second half of the bar turned out to be already true: nothing declares
+  the mapping in a SINGLE config, and the PAIR of configs the project already keeps does.
 - DEFERRED 2026-08-15, before Phase 1 was started, on this todo's own bar. Phase 0 found that
   NOTHING declares the mapping — it emerges from two build configs — and that only ONE of three
   subjects has the shape. The defect is real and its cost is stated below; what is not justified
@@ -93,9 +93,17 @@ strongest wording `prune` has.
 
 ## Phase 1 — the measurement that decides it worked
 
-- [>] Deferred with Phase 0 — waits on the decision above. The six symbols above are the fixture. They are named, their call sites are known, and the
-      count is falsifiable: six wrong today, zero when this is done, and no NEW findings appearing
-      elsewhere on the three subjects
-- [>] Deferred with Phase 0 — there is no mapping to declare in a fixture yet. Add the shape to `prune-precision.test.ts` — a file importing through a specifier that only
-      resolves via a declared mapping. Truth declared in the test, so it cannot pass by the mapping
-      being absent
+- [x] DONE 2026-08-17 (ADR 0153). The owner overrode the deferral. MEASURED on all three subjects,
+      before and after, on copies:
+      subject-c the six go 6 -> 0, total findings 147 -> 141, NEW findings 0.
+      orchestrator 241 -> 241, NEW 0, removed 0. scraper 75 -> 75, NEW 0, removed 0.
+      The count was falsifiable and it fell exactly where this bullet said it should.
+- [x] DONE — `tests/unit/core/parsing/build-layout.test.ts` builds the two configs on disk and
+      declares the truth in the test, so it cannot pass by the mapping being absent. 14 cases, half
+      of them refusals, six mutations each turning it red. Three survived the first pass and every
+      one was the fixture being too weak, not the code being right for another reason.
+- [x] TWO MORE HOLES, found because this fix exposed them. Five of the six symbols cleared as soon as
+      the specifier resolved; `TOOL_REGISTRARS` needed more, and the difference is that the five are
+      CALLED while it is only READ. The un-renamed destructure of a dynamic import registered no
+      local binding where the renamed form did, and `as_expression` had a pattern for its type half
+      and none for its value half. Both fixed, both mutation-verified, recorded in ADR 0153.
