@@ -1,23 +1,21 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Conducks — domain/analysis/coverage — test coverage as a graph overlay</title>
+<title>Conducks — domain/coverage — an external report, joined to the graph</title>
 <link rel="stylesheet" href="../../system.css">
 <div class="wrap">
 <div class="meta"><b>DERIVED</b> — rendered from <code>coverage.md</code> beside this file.
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../architecture.html">&larr; back to the architecture</a>
-<h1>domain/analysis/coverage — test coverage as a graph overlay</h1>
-<p><b>Part of:</b> <a href="coverage.html">domain/coverage</a>. <code>coverage-bind</code> and <code>coverage-baseline</code>.</p>
-<p><b>Responsibility:</b> binding an external coverage report (<code>coverage-final.json</code>) onto graph nodes, and comparing a run against a saved baseline to detect drift.</p>
-<p><b>Boundaries:</b> conducks does not measure coverage — it consumes someone else's report. No test runner is invoked and none is assumed beyond the report format.</p>
-<p><b>Deferred / not built:</b> no default report discovery. <code>conducks coverage</code> requires an explicit path rather than guessing at a <code>coverage-final.json</code> location.</p>
-<h2>Coverage is a range-join, not a lookup (ADR 0004)</h2>
-<p>A coverage report speaks in line ranges; the graph speaks in symbols with line spans. Binding is a range-join of report ranges onto node spans, surfaced as a <b>fill percentage</b> per symbol rather than a covered/uncovered flag. That is what makes "which functions are under-tested, ranked by blast radius" answerable — the question coverage tools cannot answer on their own, because they have no dependency graph.</p>
-<p>The join lands on <b>BEHAVIOR</b> nodes — functions and methods — because a span is what makes a fill percentage meaningful (<code>coverage-bind.ts:50</code>, <code>cli/commands/coverage.ts:11</code>). Any node emitted without a real <code>[lineStart, lineEnd]</code> scores 0% and looks dark whether it is tested or not; UNIT nodes were given a line-1-to-EOF range for exactly this reason. A new kind that wants coverage needs a span first.</p>
-<h2>The matcher used to over-match on basename — fixed, keep it fixed</h2>
-<p><code>matchFile</code> once fell back to a bare-basename <code>endsWith</code>, so one covered <code>index.ts</code> bound its lines to <b>every</b> <code>index.ts</code> in the graph: 64 rows all reported FULL from a single covered file. That is repaired (todo08 done). <code>suffixMatch</code> now requires the suffix to land on a path-segment boundary <b>and</b> to span at least <code>dir/basename</code> (<code>coverage-bind.ts:56-58</code>), which took 64 phantom rows to 2 real ones with honest, differing fill.</p>
-<p>This is a matching problem, not a vault problem: the earlier read of it as "incremental analyze duplicates nodes" was verified false and retracted. If a coverage row ever looks suspiciously round again, suspect this matcher and loosening in it — never node duplication.</p>
-<h2>Baselines are for drift, not for gating</h2>
-<p><code>--save-baseline</code> / <code>--vs-baseline</code> exist to answer "did this change make something worse" — verified to fire on a real regression (<code>addNode: was 86% → now 0% (BROKE)</code>) with no false positives on identical input. There is deliberately no threshold-gate mode; that belongs in CI config, not here.</p>
+<h1>domain/coverage — an external report, joined to the graph</h1>
+<p><b>Layer:</b> domain. <code>domain/coverage/coverage-bind.ts</code>, <code>coverage-baseline.ts</code>.</p>
+<p><b>Read at <code>8d4e7ff</code>.</b> Split out of <code>domain/analysis</code> on 2026-08-17, for the same measured reason as <code>domain/docs</code>: these two files import nothing else in that folder.</p>
+<p><b>Responsibility:</b> parse what a test run measured, range-join it onto node spans, and compare a run against a recorded baseline.</p>
+<p><b>Boundaries:</b> it does not decide what is covered. It reads a report and binds it.</p>
+<h2>Reading a report rather than inferring coverage IS the feature</h2>
+<p>There was another way of answering this, and it ran on every analyze for months. <code>TestAligner</code> walked from every test node to depth 5 and marked whatever it reached as covered-by-that-test — a structural guess, not a measurement.</p>
+<p>It was removed on 2026-08-17, for two reasons that were each sufficient. It wrote <code>coveredBy</code> onto the object <code>getNode</code> RETURNS, which is a merged copy rather than the node the graph holds, so the write was lost; and nothing read the property either way. <code>mirror.engine</code> had read it until the visual wave moved to SQL (ADR 0054), and the reader went without the writer.</p>
+<p>So the distinction is not academic. A depth-5 walk says "this test reaches that function". An istanbul report says "these lines executed". Only one of them is evidence, and the codebase carried both until one was measured.</p>
+<h2>The baseline is what makes a number a verdict</h2>
+<p>A coverage percentage on its own is a fact nobody acts on. <code>coverage-baseline</code> records a run so the next one can be compared to it, which turns the number into a direction — and a direction is the only form of this measurement a gate can use.</p>
 <footer>Source: <code>docs/visuals/modules/domain/coverage.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

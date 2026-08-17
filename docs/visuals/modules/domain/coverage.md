@@ -1,44 +1,32 @@
-# domain/analysis/coverage — test coverage as a graph overlay
+# domain/coverage — an external report, joined to the graph
 
-**Part of:** [domain/coverage](coverage.md). `coverage-bind` and `coverage-baseline`.
+**Layer:** domain. `domain/coverage/coverage-bind.ts`, `coverage-baseline.ts`.
 
-**Responsibility:** binding an external coverage report (`coverage-final.json`) onto graph nodes, and
-comparing a run against a saved baseline to detect drift.
+**Read at `8d4e7ff`.** Split out of `domain/analysis` on 2026-08-17, for the same measured reason as
+`domain/docs`: these two files import nothing else in that folder.
 
-**Boundaries:** conducks does not measure coverage — it consumes someone else's report. No test
-runner is invoked and none is assumed beyond the report format.
+**Responsibility:** parse what a test run measured, range-join it onto node spans, and compare a run
+against a recorded baseline.
 
-**Deferred / not built:** no default report discovery. `conducks coverage` requires an explicit path
-rather than guessing at a `coverage-final.json` location.
+**Boundaries:** it does not decide what is covered. It reads a report and binds it.
 
-## Coverage is a range-join, not a lookup (ADR 0004)
+## Reading a report rather than inferring coverage IS the feature
 
-A coverage report speaks in line ranges; the graph speaks in symbols with line spans. Binding is a
-range-join of report ranges onto node spans, surfaced as a **fill percentage** per symbol rather than
-a covered/uncovered flag. That is what makes "which functions are under-tested, ranked by blast
-radius" answerable — the question coverage tools cannot answer on their own, because they have no
-dependency graph.
+There was another way of answering this, and it ran on every analyze for months. `TestAligner` walked
+from every test node to depth 5 and marked whatever it reached as covered-by-that-test — a structural
+guess, not a measurement.
 
-The join lands on **BEHAVIOR** nodes — functions and methods — because a span is what makes a fill
-percentage meaningful (`coverage-bind.ts:50`, `cli/commands/coverage.ts:11`). Any node emitted without
-a real `[lineStart, lineEnd]` scores 0% and looks dark whether it is tested or not; UNIT nodes were
-given a line-1-to-EOF range for exactly this reason. A new kind that wants coverage needs a span
-first.
+It was removed on 2026-08-17, for two reasons that were each sufficient. It wrote `coveredBy` onto the
+object `getNode` RETURNS, which is a merged copy rather than the node the graph holds, so the write
+was lost; and nothing read the property either way. `mirror.engine` had read it until the visual wave
+moved to SQL (ADR 0054), and the reader went without the writer.
 
-## The matcher used to over-match on basename — fixed, keep it fixed
+So the distinction is not academic. A depth-5 walk says "this test reaches that function". An
+istanbul report says "these lines executed". Only one of them is evidence, and the codebase carried
+both until one was measured.
 
-`matchFile` once fell back to a bare-basename `endsWith`, so one covered `index.ts` bound its lines to
-**every** `index.ts` in the graph: 64 rows all reported FULL from a single covered file. That is
-repaired (todo08 done). `suffixMatch` now requires the suffix to land on a path-segment boundary
-**and** to span at least `dir/basename` (`coverage-bind.ts:56-58`), which took 64 phantom rows to 2
-real ones with honest, differing fill.
+## The baseline is what makes a number a verdict
 
-This is a matching problem, not a vault problem: the earlier read of it as "incremental analyze
-duplicates nodes" was verified false and retracted. If a coverage row ever looks suspiciously round
-again, suspect this matcher and loosening in it — never node duplication.
-
-## Baselines are for drift, not for gating
-
-`--save-baseline` / `--vs-baseline` exist to answer "did this change make something worse" — verified
-to fire on a real regression (`addNode: was 86% → now 0% (BROKE)`) with no false positives on
-identical input. There is deliberately no threshold-gate mode; that belongs in CI config, not here.
+A coverage percentage on its own is a fact nobody acts on. `coverage-baseline` records a run so the
+next one can be compared to it, which turns the number into a direction — and a direction is the only
+form of this measurement a gate can use.

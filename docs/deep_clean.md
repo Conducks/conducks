@@ -1409,3 +1409,129 @@ three mutations, three kills.
 face. Branch coverage is not a target that was hit — it is a number that moved while defects were
 being fixed. The pack oracle's residue is instrument-side and named in its header: a rust parameter,
 a C++ template parameter, a C# accessor, a PHP property minted with its `$` sigil.
+
+---
+
+# THE DOMAIN CAMPAIGN, AND THE LAYERS ABOVE IT (2026-08-17)
+
+Core finished with three layers named as unswept: `domain`, `interfaces`, `registry`. The canvas said
+so on its own face, deliberately, so the gap could not be forgotten. All three are done now.
+
+## The census, first, because it is what core got wrong
+
+Nine areas, 56 files, 12,159 lines. Eight carried an `index.ts` and only two were doors — an index
+nothing is forced through is a barrel. **35 source files and 25 tests reached past a domain index.**
+
+The ORDER was measured too, not guessed, because rule 13 asks for leaves first and a wrong order puts
+a failure in the wrong place:
+
+    leaves      federation · intelligence · kinetic · manifest · visual
+    then        evolution -> kinetic
+    then        governance, metrics -> evolution
+    last        analysis -> six of the others
+
+## Analysis was four subjects, and the count said so
+
+Twenty-three files under one name. Grouping by subject and counting imports BETWEEN the groups gave
+**five cross-group edges in total**, and two groups with none at all. The docs tooling imported
+nothing else in the folder; the coverage pair imported nothing else. Only two files imported back.
+
+So `domain/docs` and `domain/coverage` are their own areas. A folder holding four unrelated subjects
+is not a feature; it is a place things were put.
+
+`visuals-lint` went with docs rather than `domain/visual`, which already existed. They share a word:
+one lints the docs/visuals PAGES, the other is the graph's visual wave. Pairing them by the word is
+how the folder got that way.
+
+## Four doors were republishing another feature's class
+
+The same mistake, four times, found four different ways:
+
+| door | republished | from |
+|---|---|---|
+| `intelligence` | `FederatedLinker` | `core/graph` |
+| `metrics` | `DeadCodeAnalyzer` | `evolution` |
+| `metrics` | `Finding` | `evolution` |
+| `analysis` | `ConducksReflector` | `core/parsing` |
+
+None of them crossed — every consumer took the symbol from its owner. The habit is legible: someone
+needs a symbol, the nearest door is not its owner, and the fix is to widen the near door rather than
+reach the right one. A door that republishes becomes a dependency edge onto the door it borrows from,
+which is rule 5b one layer up from where it was written.
+
+## Four dead subsystems, all of them running
+
+Core found two. Domain found two more, and the shape is identical every time: **a consumer was
+removed while the producer stayed wired.**
+
+- `GlobalSymbolLinker` — scanned every node on every watcher pulse, emitted nothing. Two independent
+  reasons, both measured on the real 7,562-node graph.
+- `extractNamedBindings` — declared on two interfaces, implemented by five packs, called by nothing.
+- `TestAligner` — walked from every test node to depth 5 on every analyze, wrote `coveredBy` onto the
+  object `getNode` RETURNS rather than the node the graph holds, and nothing read it either way.
+  `mirror.engine` had read it until the wave moved to SQL (ADR 0054).
+- `analysis/pipeline.ts` — `core/parsing/pipeline.ts` with the variables renamed. Never imported, in
+  the entire history.
+
+**All four looked like features in every review.** None of them failed. A no-op linker and a correct
+linker with no work to do produce identical output, which is why reading could never have found them.
+
+## A detector that cannot fire
+
+`fallback-detector.ts` — 272 lines at 0% coverage behind the live `conducks fallback` command — cannot
+return true. That is a proof, not a suspicion.
+
+The verdict needs THREE of five indicators. Four read fields the parser never writes:
+
+    pipelinePosition   edge.properties.pipelineOrder     0 occurrences in core/parsing
+    conditionalUsage   edge.properties.isConditional     0
+    errorHandling      node.properties.dna.catchBlocks   0, and 0 nodes carry it
+    usageRatio         any of the three above            so its ratio is always 0
+
+The fifth is naming, and naming fires only for a symbol named EXACTLY `fallback`, `legacy` or `try`.
+`fallbackHandler` scores 0; so does `fallback_handler`, because `\b` counts an underscore as a word
+character. **One indicator maximum, three required.**
+
+Measured end to end: `audit --fallback` examines 1,900 functions here and reports none. That reads as
+a clean bill of health and is a detector whose inputs do not exist.
+
+Recorded, not fixed. Emitting three new parser fields is a feature; deleting the command removes a
+user-facing surface. Both are decisions, and a decision is not taken inside a clean. Four tests assert
+that parsing does not emit those fields, so the day one appears this goes red.
+
+## Interfaces needed no doors, and that is a conclusion
+
+A door keeps outside callers off a feature's internals. **Nothing imports `interfaces` at all** — it
+is the top of the stack — and its three areas do not import each other. The rule was applied and came
+back not-applicable, which is different from skipped.
+
+Its 21% coverage is an instrument artefact, proved rather than assumed: 61 integration files drive a
+REAL process and jest cannot instrument across a spawn. Sabotaging `analyze.ts` fails three tests.
+
+The question coverage cannot answer was scripted instead — read each command's `public id`, search the
+whole test corpus. **42 of 42 commands are driven.**
+
+`registry` was already clean: zero dead-code findings, because every door it composes was straightened
+while the layers beneath were swept. That is why it was deliberately last.
+
+## State
+
+| | |
+|---|---|
+| doors | **20** — nine in core, eleven in domain — all on the gate, all biting |
+| interfaces | no doors needed; 42/42 commands driven by a test |
+| oracles | 4, all running to completion |
+| tests | 2,237 across 281 suites |
+| dead code | none, in any layer |
+| open todos | none |
+
+## What is still NOT claimed
+
+- **`conducks fallback` cannot fire.** Pinned, not fixed. It is a decision.
+- Branch coverage was never a target that was hit. It moved while defects were being fixed, which is
+  the only reason it moved at all.
+- The pack oracle's residue is instrument-side and named in its own header: a rust parameter, a C++
+  template parameter, a C# accessor, a PHP property minted with its `$` sigil.
+- `reflector.ts` is still 1,696 lines. The split has its own todo; the blocker is scope.
+- `prune` still reports types that appear in exported signatures. That is the tool counting an export
+  as consumed only when another module imports it BY NAME — a limitation, recorded, not a defect.
