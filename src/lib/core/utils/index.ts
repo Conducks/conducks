@@ -24,5 +24,3 @@ export { canonicalize, getProjectRelativePath } from './path-utils.js';
 export { traceMemory } from './mem-trace.js';
 export { assessRoot, explainScope, isNeverAProjectRoot } from './scope-guard.js';
 export { SourceLineReader } from './source-line.js';
-export type { ScopeAssessment, ScopeLevel } from './scope-guard.js';
-export type { SourceLine } from './source-line.js';

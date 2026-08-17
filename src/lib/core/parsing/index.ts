@@ -22,22 +22,16 @@
  * through a DYNAMIC import instead, and must keep doing so: a static import there closes the
  * `chronicle` ↔ `typescript/resolver` cycle this repository has already fixed once.
  */
-export { ConducksReflector, ParseFailure } from './reflector.js';
+export { ConducksReflector } from './reflector.js';
 export { grammars } from './grammar-registry.js';
 export { AnalyzeContext } from './context.js';
 export { IgnoreManager } from './ignore-manager.js';
 export { ConducksPipeline } from './pipeline.js';
 export { essenceLens } from './essence-lens.js';
-export { nextRoutes } from './next-routes.js';
 
-export { attachDocs, firstLineOf } from './doc-comments.js';
-export type { HarvestedComment } from './doc-comments.js';
+export { firstLineOf } from './doc-comments.js';
 
-export { CaptureTags, DEFINITION_CAPTURES } from './capture-tags.js';
-export type { CaptureTag } from './capture-tags.js';
 
-export type { ILanguagePlugin } from './language-plugin.js';
-export { ConducksPrism } from './prism-core.js';
 
 /**
  * Specifier resolution, exported because `graph`'s intra-linker needs it and may not reach inside.
@@ -49,13 +43,9 @@ export { ConducksPrism } from './prism-core.js';
  */
 export { TypeScriptResolver } from './languages/typescript/resolver.js';
 
-export { NativeProvider } from './providers/base.js';
-export type { ConducksProvider, ImportSemantics } from './providers/base.js';
 
-export { BindingProcessor } from './processors/binding.js';
 export { CallProcessor } from './processors/call.js';
 export { FlowProcessor } from './processors/flow.js';
-export { HeritageProcessor } from './processors/heritage.js';
 export { ImportProcessor } from './processors/import.js';
 
 export { TypeScriptProvider, TYPESCRIPT_SUITE } from './languages/typescript/index.js';

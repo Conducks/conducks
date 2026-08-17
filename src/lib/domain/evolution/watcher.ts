@@ -5,7 +5,6 @@ import { writeWatcherMarker, clearWatcherMarker, HEARTBEAT_INTERVAL_MS } from "@
 import chokidar, { FSWatcher } from "chokidar";
 import fs from "fs-extra";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { GlobalSymbolLinker } from "@/lib/core/graph/index.js";
 import { IntraLinker } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import path from "node:path";
@@ -54,7 +53,6 @@ const WATCHED_EXTENSIONS = SOURCE_EXTENSIONS;
 
 export class ConducksWatcher {
   private watcher: FSWatcher | null = null;
-  private linker = new GlobalSymbolLinker();
   // Same wiring as the analyze path: the port is graph's, the implementation is parsing's, and
   // domain is the layer allowed to know both (ADR 0005).
   private tsResolver = new TypeScriptResolver();
@@ -326,9 +324,6 @@ export class ConducksWatcher {
         [{ path: normalizedPath, source }],
         [...this.knownUnitPaths(), normalizedPath],
       );
-
-      // 3. Global Synapse Re-Linking
-      this.linker.link(this.graph.getGraph());
 
       // 3b. INTRA-PROJECT RESOLUTION, which `analyze` runs and this path did not.
       //

@@ -1,6 +1,6 @@
 # core/graph/linkers — binding names to symbols across files
 
-**Part of:** [core/graph](../graph.md). `core/graph/import-resolver.ts`, `core/graph/linker.ts`,
+**Part of:** [core/graph](../graph.md). `core/graph/import-resolver.ts`,
 `core/graph/linker-intra.ts`, `core/graph/linker-federated.ts`, `core/graph/http-service-linker.ts`.
 
 **Responsibility:** the second half of resolution. Parsing emits targets that are often just a bare

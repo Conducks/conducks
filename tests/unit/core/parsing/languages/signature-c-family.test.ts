@@ -6,7 +6,8 @@ import { CPPProvider } from "@/lib/core/parsing/index.js";
 import { CSharpProvider } from "@/lib/core/parsing/index.js";
 import { JavaProvider } from "@/lib/core/parsing/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
-import type { ConducksProvider } from "@/lib/core/parsing/index.js";
+// The leaf, not the door — same reason as above: nothing outside parsing names this type.
+import type { ConducksProvider } from "@/lib/core/parsing/providers/base.js";
 
 /**
  * `dna.params`/`dna.returns` for c, cpp, csharp, java (ADR 0086, ADR 0084). Until 2026-08-01 these

@@ -39,4 +39,4 @@ export type { Advice } from './domain.js';
 // — graph, parsing and domain for the taxonomy; graph, parsing and persistence for the built-ins —
 // which is rule 5's definition of a contract rather than a convenience.
 export { CanonicalKind, CanonicalRank, mapToCanonical } from './taxonomy.js';
-export { isBuiltIn, getGlobalId, isUniversalMemberCall, GLOBAL_ATMOSPHERE, UNIVERSAL_MEMBERS, UNRESOLVED_CONFIDENCE } from './built-ins.js';
+export { isBuiltIn, getGlobalId, isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from './built-ins.js';

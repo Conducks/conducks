@@ -21,5 +21,5 @@
  * by anyone. What it removes is the accidental case — a method reachable on every handed-out
  * reference — which is the one that actually happened.
  */
-export { ChronicleInterface, chronicle, anchorChronicle, branchMismatch, branchRefusalMessage } from './chronicle-interface.js';
-export type { ResolvedTarget, BranchMismatch, ReadOnlyChronicle } from './chronicle-interface.js';
+export { ChronicleInterface, chronicle, anchorChronicle, branchMismatch } from './chronicle-interface.js';
+export type { ReadOnlyChronicle } from './chronicle-interface.js';

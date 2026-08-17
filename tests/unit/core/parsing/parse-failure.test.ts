@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
-import { ConducksReflector, ParseFailure } from "@/lib/core/parsing/index.js";
+import { ConducksReflector } from "@/lib/core/parsing/index.js";
+// The leaf, not the door: `ParseFailure` is thrown and caught INSIDE parsing, so it does not cross
+// and is not on the door. Rule 3 lets a feature's own tests reach its internals (ADR 0150).
+import { ParseFailure } from "@/lib/core/parsing/reflector.js";
 import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { TypeScriptProvider } from "@/lib/core/parsing/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";

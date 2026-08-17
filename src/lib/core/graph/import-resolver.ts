@@ -1,24 +1,26 @@
-import { ConducksAdjacencyList } from "./adjacency-list.js";
-
 /**
- * Conducks — 3-Tier Import Resolver
+ * Conducks — may an import in THIS file bind to a symbol in THAT one?
  *
- * Resolves import edges with per-language semantics and confidence scores.
+ * One question, one answer: a specifier written in a TypeScript file cannot name a symbol in a
+ * `.py`, `.go` or `.rs` file, however unique the name is. Every linker that guesses by name has to
+ * ask this before it commits an edge, because a single-candidate match across languages is the most
+ * confident kind of wrong answer — nothing downstream can tell it from a correct one.
  *
- * Tier 1 (0.95): Same-file symbol — the imported symbol is defined in the same file.
- * Tier 2 (0.9 / 0.85): Import-scoped — match source path against graph, then resolve
- *   named / namespace / default import semantics.
- * Tier 3 (0.5): Global registry fallback — fuzzy match symbol name across all exports.
+ * WHAT WAS HERE UNTIL 2026-08-17, and why it is gone. This file also held `ImportResolver`, a
+ * three-tier resolver, and `linker.ts` held the `GlobalSymbolLinker` that drove it. Both were dead
+ * at runtime, in two independent ways, and measured before removal:
+ *
+ *   - the linker only visits a node whose `label` is `'import'`, and `label` is assigned from
+ *     `canonicalKind` at ingest (`graph-engine.ts`). On the real 7,562-node graph the labels are
+ *     ATOM, BEHAVIOR, UNIT, STRUCTURE, DIRECTORY, ECOSYSTEM, NAMESPACE, REPOSITORY, PACKAGE and
+ *     INFRA. `'import'` count: 0. An import is an EDGE in this model, not a node;
+ *   - and had one existed, `resolveImport` reads `properties.source`, which is not on the skeleton
+ *     `addNode` keeps. Nodes carrying `source` on that same graph: 0. It would have returned at its
+ *     first guard.
+ *
+ * So it scanned every node on every watcher pulse and could never emit an edge. `sameFamily` is the
+ * part that was doing real work — `IntraLinker` calls it — and it is what remains.
  */
-
-export type ImportKind = 'named' | 'namespace' | 'default';
-
-/** Where an import specifier landed, and by which rule — the rule is what makes a wrong answer debuggable. */
-export interface ImportResolution {
-  targetId: string;
-  confidence: number; // 0–1
-  tier: 1 | 2 | 3;
-}
 
 /**
  * Language family per file extension. An import in one family must never resolve
@@ -36,181 +38,29 @@ const LANGUAGE_FAMILY: Record<string, string> = {
   php: 'php', rb: 'ruby', swift: 'swift',
 };
 
-/** The language family a path belongs to, from its extension — used to refuse a cross-language match. */
+/**
+ * The language family a path belongs to, from its extension.
+ *
+ * Splits on `::` because callers pass NODE IDS, not paths. Without it every id-shaped argument
+ * would have an unknown extension — and the guard fails open, so the refusal would silently stop
+ * happening rather than fail loudly.
+ */
 function familyOf(fileOrId: string): string | undefined {
   const file = fileOrId.split('::')[0];
   const m = /\.([a-z0-9]+)$/i.exec(file);
   return m ? LANGUAGE_FAMILY[m[1].toLowerCase()] : undefined;
 }
 
-/** True unless both files have a known, differing language family. */
+/**
+ * True unless both files have a known, DIFFERING language family.
+ *
+ * Fails open on purpose. A language added to the parser before it is added to the table above would
+ * otherwise have every import refused, which reads downstream as "nothing imports this" rather than
+ * as "not classified" — the failure that cannot be told from a real answer.
+ */
 export function sameFamily(sourceFileId: string, targetFileId: string): boolean {
   const a = familyOf(sourceFileId);
   const b = familyOf(targetFileId);
   if (a && b && a !== b) return false;
   return true;
-}
-
-/**
- * Detect the kind of import from the raw import text.
- *
- * Examples:
- *   `import { A, B } from './foo'`   → named
- *   `import * as X from './bar'`     → namespace
- *   `import X from './baz'`          → default
- *   `import './side-effect'`         → default (no binding)
- */
-function detectImportKind(importText?: string): ImportKind {
-  if (!importText) return 'default';
-  if (/\*\s+as\s+\w+/.test(importText)) return 'namespace';
-  if (/\{[^}]+\}/.test(importText)) return 'named';
-  return 'default';
-}
-
-/**
- * Turns an import specifier into the file it names, or says it could not.
- *
- * Ordered by certainty: same-file, then a real path on disk, then a global. A specifier that
- * resolves to nothing stays unresolved rather than being guessed at — a wrong edge is worse than a
- * missing one, because the graph then answers confidently about a file that was never imported.
- */
-export class ImportResolver {
-  /** Resolution is answered against the graph's known files, so the store is the only dependency. */
-  constructor(private readonly graph: ConducksAdjacencyList) {}
-
-  /**
-   * Resolve an import to a graph node.
-   *
-   * @param sourceFileId  - The node ID of the import node (used to derive the file path)
-   * @param importSource  - The raw source path string from the import (e.g. `./utils.js`)
-   * @param symbolName    - The specific symbol being imported, if any
-   * @param importText    - The full import statement text, used to detect import kind
-   * @param resolvedCandidates - Pre-computed list of candidate absolute paths to check
-   *   (caller is responsible for expanding extensions, index files, etc.)
-   */
-  public resolve(
-    sourceFileId: string,
-    importSource: string,
-    symbolName?: string,
-    importText?: string,
-    resolvedCandidates?: string[]
-  ): ImportResolution | null {
-    const importKind = detectImportKind(importText);
-
-    // Tier 1: Same-file symbol
-    if (symbolName) {
-      const tier1 = this.resolveSameFile(sourceFileId, symbolName);
-      if (tier1) return tier1;
-    }
-
-    // Tier 2: Import-scoped resolution (language-family scoped)
-    const tier2 = this.resolveByPath(sourceFileId, resolvedCandidates ?? [], symbolName, importKind);
-    if (tier2) return tier2;
-
-    // Tier 3: Global registry fallback (language-family scoped)
-    if (symbolName) {
-      return this.resolveGlobal(sourceFileId, symbolName);
-    }
-
-    return null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Tier 1 — Same-file symbol (confidence 0.95)
-  // ---------------------------------------------------------------------------
-
-  /** First and most certain: the symbol is declared in the importing file itself. */
-  private resolveSameFile(sourceFileId: string, symbolName: string): ImportResolution | null {
-    // Derive the file path from the source node ID.
-    // Convention: "<filePath>::<symbolName>" or "<filePath>::unit"
-    const colonIdx = sourceFileId.indexOf('::');
-    const filePrefix = colonIdx !== -1 ? sourceFileId.slice(0, colonIdx) : sourceFileId;
-
-    const candidateId = `${filePrefix}::${symbolName.toLowerCase()}`;
-    if (this.graph.getNode(candidateId)) {
-      return { targetId: candidateId, confidence: 0.95, tier: 1 };
-    }
-    return null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Tier 2 — Import-scoped resolution (confidence 0.9 / 0.85)
-  // ---------------------------------------------------------------------------
-
-  /** Second: the specifier names a real file this graph knows, resolved relative to the importer. */
-  private resolveByPath(
-    sourceFileId: string,
-    candidates: string[],
-    symbolName: string | undefined,
-    importKind: ImportKind
-  ): ImportResolution | null {
-    for (const candidate of candidates) {
-      // Never bind across language families (TS import → .rs/.go/.py file, etc.)
-      if (!sameFamily(sourceFileId, candidate)) continue;
-      const base = candidate.toLowerCase();
-
-      // Named import: prefer the specific symbol node, fall back to unit
-      if (importKind === 'named' && symbolName) {
-        const symbolId = `${base}::${symbolName.toLowerCase()}`;
-        if (this.graph.getNode(symbolId)) {
-          return { targetId: symbolId, confidence: 0.9, tier: 2 };
-        }
-        const unitId = `${base}::unit`;
-        if (this.graph.getNode(unitId)) {
-          return { targetId: unitId, confidence: 0.9, tier: 2 };
-        }
-      }
-
-      // Namespace import (* as X): always target the unit node
-      if (importKind === 'namespace') {
-        const unitId = `${base}::unit`;
-        if (this.graph.getNode(unitId)) {
-          return { targetId: unitId, confidence: 0.9, tier: 2 };
-        }
-      }
-
-      // Default import: target the unit node at reduced confidence
-      if (importKind === 'default') {
-        const unitId = `${base}::unit`;
-        if (this.graph.getNode(unitId)) {
-          return { targetId: unitId, confidence: 0.85, tier: 2 };
-        }
-      }
-    }
-
-    return null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Tier 3 — Global registry fallback (confidence 0.5)
-  // ---------------------------------------------------------------------------
-
-  /** Last: a project-wide name, and therefore the least certain — used only when the two above fail. */
-  private resolveGlobal(sourceFileId: string, symbolName: string): ImportResolution | null {
-    const lowerName = symbolName.toLowerCase();
-    const candidates: string[] = [];
-
-    // This used to walk EVERY node in the graph to find the ones whose name matched, and it runs
-    // once per unresolved import — O(imports x nodes). The graph already indexes nodes by name, so
-    // the same answer is one map lookup plus a walk of the handful of nodes that share the name.
-    for (const nodeId of this.graph.getNodeIdsByLowerName(lowerName)) {
-      const node = this.graph.getNode(nodeId);
-      if (!node) continue;
-
-      // Only consider exported symbols
-      if (!node.properties?.isExport) continue;
-
-      // Never bind across language families (a TS symbol cannot import a Rust/Go/Python one)
-      if (!sameFamily(sourceFileId, node.id)) continue;
-
-      candidates.push(node.id);
-    }
-
-    if (candidates.length === 1) {
-      return { targetId: candidates[0], confidence: 0.5, tier: 3 };
-    }
-
-    // Multiple matches — too ambiguous, skip
-    return null;
-  }
 }

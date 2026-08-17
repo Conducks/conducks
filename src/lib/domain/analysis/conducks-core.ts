@@ -5,7 +5,6 @@ import { AnalyzeOrchestrator } from "@/lib/domain/analysis/orchestrator.js";
 import { PythonProvider } from "@/lib/core/parsing/index.js";
 import { TypeScriptProvider } from "@/lib/core/parsing/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
-import { GlobalSymbolLinker } from "@/lib/core/graph/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { ConducksSearch } from "@/lib/domain/intelligence/search-engine.js";
 import { ConducksFlowEngine } from "@/lib/domain/kinetic/flow-engine.js";
@@ -47,7 +46,6 @@ export class Conducks {
   private orchestrator: AnalyzeOrchestrator;
   private registry = new SynapseRegistry<ConducksComponent>();
   private persistence: SynapsePersistence;
-  private linker = new GlobalSymbolLinker();
 
   constructor(options?: { baseDir?: string }) {
     this.persistence = new SynapsePersistence(options?.baseDir || chronicle.getProjectDir() || process.cwd());

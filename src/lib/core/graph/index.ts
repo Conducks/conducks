@@ -29,9 +29,8 @@ export {
   IMPORT_CYCLE_IGNORED_EDGE_TYPES,
 } from './adjacency-list.js';
 
-export { ConducksGraph, spectrumNodeId } from './graph-engine.js';
+export { ConducksGraph } from './graph-engine.js';
 
-export { GlobalSymbolLinker } from './linker.js';
 export { IntraLinker } from './linker-intra.js';
 export { FederatedLinker } from './linker-federated.js';
 export { HttpServiceLinker } from './http-service-linker.js';

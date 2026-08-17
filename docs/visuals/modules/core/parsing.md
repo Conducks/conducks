@@ -34,7 +34,7 @@ entry), `built-ins` (per-language globals), `essence-lens` (package manifests), 
 `providers/base` (the provider interface), `prism-core` (the abstract prism + spectrum types).
 
 **A seam that WAS duplicated, resolved.** `parsing/prism-core.ts` once had a byte-identical twin
-under persistence — two copies of the same `ConducksPrism` base re-exporting `types/prism-types.ts`.
+under persistence — two copies of the same `ConducksPrism` base re-exporting `contracts/prism-types.ts`.
 The persistence copy is deleted; the parsing copy is the only one. If a second prism base ever
 appears under another module, that is the same accident returning — the spectrum type belongs to
 parsing.

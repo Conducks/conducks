@@ -19,4 +19,4 @@
 export { SynapsePersistence } from './persistence.js';
 export { FileHashGate } from './file-hash-gate.js';
 export { classifyFreshness, isStale } from './freshness.js';
-export type { Freshness, ReadFile, StillExists } from './freshness.js';
+export type { Freshness } from './freshness.js';

@@ -1,6 +1,8 @@
 # core/parsing/taxonomy — the canonical kind vocabulary
 
-**Part of:** [core/parsing](../parsing.md). One file, `parsing/taxonomy.ts`.
+**Part of:** [core/parsing](../parsing.md). One file, `contracts/taxonomy.ts` — it moved to
+`contracts/` in todo72, because three features read the taxonomy and a type two features share does
+not travel through a door (ADR 0150 rule 5).
 
 **Responsibility:** mapping each language's own node kinds onto one shared vocabulary, so that a
 Python class and a Go struct answer the same question. Every node carries a `canonicalKind` and a
