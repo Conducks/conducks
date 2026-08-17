@@ -44,13 +44,14 @@
     "check:queries": "node scripts/check-query-backticks.mjs",
     "postbuild": "node scripts/sync-skills-postbuild.mjs",
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
-    "oracle": "node tools/benchmark/oracle-tsc.mjs && node tools/benchmark/oracle-exports.mjs",
+    "oracle": "node tools/benchmark/oracle-tsc.mjs && node tools/benchmark/oracle-exports.mjs && node tools/benchmark/oracle-packs.mjs",
     "oracle:imports": "node tools/benchmark/oracle-tsc.mjs",
     "oracle:exports": "node tools/benchmark/oracle-exports.mjs",
     "oracle:python": "node tools/benchmark/oracle-python.mjs ../test-projects/scraper",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
     "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js",
-    "visuals": "node scripts/visuals/render.mjs && node scripts/visuals/detail.mjs && node scripts/visuals/notes.mjs"
+    "visuals": "node scripts/visuals/render.mjs && node scripts/visuals/detail.mjs && node scripts/visuals/notes.mjs",
+    "oracle:packs": "node tools/benchmark/oracle-packs.mjs"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.5-r.3",

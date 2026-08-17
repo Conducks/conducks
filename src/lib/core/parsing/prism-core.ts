@@ -1,6 +1,5 @@
 
 export type { PrismRequest, SpectrumNode, PrismSpectrum } from "@/contracts/index.js";
-import type { PrismRequest, PrismSpectrum } from "@/contracts/index.js";
 
 /**
  * Conducks — the prism vocabulary, re-exported for parsing's internals.
