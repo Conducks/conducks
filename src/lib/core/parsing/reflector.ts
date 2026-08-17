@@ -65,6 +65,34 @@ export class ParseFailure extends Error {
  * grammar that captures nothing for one of them contributes nothing, which is how thirteen languages
  * share one reflector without a per-language branch here.
  */
+
+/**
+ * A capture that arrives as a PAIR — the name first, the value second — held between the two.
+ *
+ * Four of the semantic captures have this shape: `iface_name`/`iface_body`,
+ * `object_name`/`object_value`, `instance_name`/`instance_type` and
+ * `instance_call_name`/`instance_call_target`. Each carried its own `let pending… : string | null`
+ * and its own `if (pending) { record; pending = null; }`, which is one rule written four times
+ * (ADR 0150 rule 9).
+ *
+ * The invariant is the part worth stating once rather than four times: arming REPLACES whatever was
+ * held, and firing CLEARS unconditionally — including when the value turns out to be empty and
+ * nothing is recorded. Clearing only on a successful record would leave a stale name armed, so the
+ * NEXT value in the file would be attributed to the previous name. That is a wrong association
+ * rather than a missing one, and it reads as correct everywhere downstream.
+ */
+export class PendingPair {
+  private key: string | null = null;
+
+  /** The name half arrived. */
+  arm(key: string | null): void { this.key = key; }
+
+  /** The value half arrived: record it against the armed name, then clear either way. */
+  fire(record: (key: string) => void): void {
+    if (this.key) { record(this.key); this.key = null; }
+  }
+}
+
 export class ConducksReflector {
   public id = 'structural-reflector';
   public type = 'analyzer' as any;
@@ -320,16 +348,16 @@ export class ConducksReflector {
     // The DECLARATION line of each typed variable, kept beside the type because the instance-type
     // edges are emitted after the capture loop and the row is gone by then (ADR 0099).
     const instanceTypeLines = new Map<string, number>();
-    let pendingInstance: string | null = null;
+    const pendingInstance = new PendingPair();
     /** `const x = Y.factory()` pairs — the CALL, resolved to a type later by IntraLinker. */
     const instanceCalls = new Map<string, string>();
-    let pendingInstanceCall: string | null = null;
+    const pendingInstanceCall = new PendingPair();
     /** Object-literal wiring: variable name -> { property path: identifier it aliases }. */
     const objectPaths = new Map<string, Record<string, string>>();
-    let pendingObject: string | null = null;
+    const pendingObject = new PendingPair();
     /** Interface name -> { member: declared type }. */
     const memberTypes = new Map<string, Record<string, string>>();
-    let pendingIface: string | null = null;
+    const pendingIface = new PendingPair();
 
     const refValueCandidates: Array<{ scope: string; name: string; raw: string; line: number }> = [];
     for (const match of matches) {
@@ -816,13 +844,12 @@ export class ConducksReflector {
           // usually lives in another file that this wave may not have parsed yet. So record the call
           // and let IntraLinker read the answer once the whole graph exists. Still a READ — the
           // return type is written on the method — and it resolves to nothing when it is not.
-          pendingInstanceCall = scopedVarKey(getScopeAt(currentMatchRow), cText);
+          pendingInstanceCall.arm(scopedVarKey(getScopeAt(currentMatchRow), cText));
         }
         else if (cName === 'instance_call_target') {
-          if (pendingInstanceCall) {
-            instanceCalls.set(pendingInstanceCall, cText.trim().toLowerCase());
-            pendingInstanceCall = null;
-          }
+          pendingInstanceCall.fire(key => {
+            instanceCalls.set(key, cText.trim().toLowerCase());
+          });
         }
         else if (cName === 'augments_name') {
           // An augmentation REFERENCES the type it extends, in the module it names. Both are written
@@ -858,24 +885,22 @@ export class ConducksReflector {
           }
         }
         else if (cName === 'iface_name') {
-          pendingIface = cText.trim().toLowerCase();
+          pendingIface.arm(cText.trim().toLowerCase());
         }
         else if (cName === 'iface_body') {
-          if (pendingIface) {
+          pendingIface.fire(key => {
             const members = memberTypesOf(capture.node);
-            if (Object.keys(members).length > 0) memberTypes.set(pendingIface, members);
-            pendingIface = null;
-          }
+            if (Object.keys(members).length > 0) memberTypes.set(key, members);
+          });
         }
         else if (cName === 'object_name') {
-          pendingObject = scopedVarKey(getScopeAt(currentMatchRow), cText);
+          pendingObject.arm(scopedVarKey(getScopeAt(currentMatchRow), cText));
         }
         else if (cName === 'object_value') {
-          if (pendingObject) {
+          pendingObject.fire(key => {
             const paths = objectPathsOf(capture.node);
-            if (Object.keys(paths).length > 0) objectPaths.set(pendingObject, paths);
-            pendingObject = null;
-          }
+            if (Object.keys(paths).length > 0) objectPaths.set(key, paths);
+          });
         }
         else if (cName === 'instance_name') {
           // `const x = new Y()` — remember that x IS a Y (todo29#P3b).
@@ -893,14 +918,13 @@ export class ConducksReflector {
           // `const client = new HttpClient()`, and every `client.x()` at module scope then resolved
           // to the WRONG class — a confidently wrong edge, which is worse than the dangling one it
           // replaced. Found by testing shadowing rather than by a failure.
-          pendingInstance = scopedVarKey(getScopeAt(currentMatchRow), cText);
+          pendingInstance.arm(scopedVarKey(getScopeAt(currentMatchRow), cText));
         }
         else if (cName === 'instance_type') {
-          if (pendingInstance) {
-            instanceTypes.set(pendingInstance, cText.trim().split('.').pop()!.toLowerCase());
-            instanceTypeLines.set(pendingInstance, currentMatchRow + 1);
-            pendingInstance = null;
-          }
+          pendingInstance.fire(key => {
+            instanceTypes.set(key, cText.trim().split('.').pop()!.toLowerCase());
+            instanceTypeLines.set(key, currentMatchRow + 1);
+          });
         }
         else if (cName === 'ref_value') {
           // Object-literal value `{ key: someSymbol }` — a reference-as-value (DI table / command
