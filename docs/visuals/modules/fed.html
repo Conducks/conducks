@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — federation</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>FEDERATION</h1>
+<p class="sub">domain/federation — many projects, one machine</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="roster">
+  <h3>A list of project roots</h3>
+  <div class="where">src/lib/domain/federation/project-registry.ts::ProjectRegistry</div>
+  <p>without it every project is an island and nothing can answer "which of my repos has fallen behind its code". A corrupt or missing file degrades to "no projects" rather than an error, because nothing depends on it</p>
+  <p class="file">on the canvas: plain JSON, hand-editable on purpose</p>
+</div>
+
+<div class="det" id="mon">
+  <h3>Report on every one of them</h3>
+  <div class="where">src/lib/domain/analysis/project-monitor.ts::report</div>
+  <p>it used to spawn its own git and see only the anchor repository; it asks the git feature per root now, which is what made a nested checkout visible</p>
+  <p class="file">on the canvas: per root, not per process</p>
+</div>
+
+<div class="det" id="neigh">
+  <h3>Read a NEIGHBOUR's vault</h3>
+  <div class="where">src/lib/core/graph/linker-federated.ts::FederatedLinker</div>
+  <p class="file">on the canvas: another project's graph, read-only</p>
+</div>
+
+<div class="det" id="inject">
+  <h3>The opener is INJECTED, and refuses</h3>
+  <div class="where">src/lib/core/graph/linker-federated.ts::OpenNeighbourVault</div>
+  <p>importing persistence here became a real ESM cycle the moment the graph door existed, measured by a test that failed on the partially initialised module. It was optional first, and an optional no-op made a whole neighbour workspace read as empty</p>
+  <p class="file">on the canvas: no silent default</p>
+</div>
+
+<div class="det" id="third">
+  <h3>The third cycle of this exact shape</h3>
+  <div class="where">src/lib/core/graph/linker-federated.ts::FederatedLinker</div>
+  <p>a door is itself a dependency edge, so importing one pulls in everything it re-exports. Each time it compiled fine and one unrelated test failed</p>
+  <p class="file">on the canvas: registry↔watcher · chronicle↔resolver · this</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>A list of project roots</td><td>Report on every one of them</td><td>—</td></tr>
+    <tr><td>A list of project roots</td><td>Read a NEIGHBOUR's vault</td><td>—</td></tr>
+    <tr><td>Read a NEIGHBOUR's vault</td><td>The opener is INJECTED, and refuses</td><td>—</td></tr>
+    <tr><td>The opener is INJECTED, and refuses</td><td>The third cycle of this exact shape</td><td>—</td></tr>
+  </tbody>
+</table>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

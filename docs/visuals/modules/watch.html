@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the watcher</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE WATCHER</h1>
+<p class="sub">domain/evolution — one file at a time, on save</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="ready">
+  <h3>Wait for the BASELINE</h3>
+  <div class="where">src/lib/domain/evolution/watcher.ts::whenReady</div>
+  <p>a reconcile finishing before the watcher is genuinely watching leaves a window where a new file is neither reported as an event nor caught by the sweep (todo55)</p>
+  <p class="file">on the canvas: before announcing, and before reconciling</p>
+</div>
+
+<div class="det" id="recon">
+  <h3>Sweep once at startup</h3>
+  <div class="where">src/lib/domain/evolution/watcher.ts::reconcileOnStart</div>
+  <p class="file">on the canvas: what changed while nothing was watching</p>
+</div>
+
+<div class="det" id="univ">
+  <h3>A re-pulse needs the WHOLE file list</h3>
+  <div class="where">src/lib/domain/evolution/watcher.ts::ConducksWatcher</div>
+  <p>an import resolves against candidate paths, so re-pulsing one file alone gives the resolver nothing to match and the file loses its edges on every save. The list is read from the graph's own UNIT nodes rather than the disk, because a filesystem walk per keystroke is not free</p>
+  <p class="file">on the canvas: or every specifier dangles</p>
+</div>
+
+<div class="det" id="rebind">
+  <h3>Then bind the bare names again</h3>
+  <div class="where">src/lib/domain/evolution/watcher.ts::ConducksWatcher</div>
+  <p>invisible while a live pulse only ADDED, because the previously resolved edge survived and masked the dangling new one. The moment a re-pulse REPLACES a file's edges it shows: measured, `impact` fell from one caller to none after editing the calling file</p>
+  <p class="file">on the canvas: the step analyze runs and this path did not</p>
+</div>
+
+<div class="det" id="beat">
+  <h3>A heartbeat, and a pid</h3>
+  <div class="where">src/lib/domain/evolution/watcher-liveness.ts::writeWatcherMarker</div>
+  <p>both signals are needed: a pid alone is fooled by a machine that recycles pids, a heartbeat alone cannot tell a clean exit from a hang</p>
+  <p class="file">on the canvas: so a DEAD watcher is not read as no watcher</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>Wait for the BASELINE</td><td>Sweep once at startup</td><td>baseline established</td></tr>
+    <tr><td>Sweep once at startup</td><td>A re-pulse needs the WHOLE file list</td><td>—</td></tr>
+    <tr><td>A re-pulse needs the WHOLE file list</td><td>Then bind the bare names again</td><td>—</td></tr>
+    <tr><td>Wait for the BASELINE</td><td>A heartbeat, and a pid</td><td>—</td></tr>
+  </tbody>
+</table>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

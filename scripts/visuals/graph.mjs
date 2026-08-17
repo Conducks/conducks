@@ -193,7 +193,61 @@ export const BAND2 = {
   ],
 };
 
-export const BANDS = [BAND1, BAND2];
+// ── Band 3 — how it keeps up, and how it crosses a repository ────────────────
+//
+// Two paths that both re-enter Band 1 rather than following it, which is why they are one band: the
+// watcher re-pulses a single file mid-way through the write path, and federation reaches into
+// ANOTHER project's vault. Neither starts at the top.
+//
+// Read at `10bc5da` — watcher.ts, watcher-liveness.ts, project-registry.ts, linker-federated.ts and
+// project-monitor.ts, opened for this band.
+export const BAND3 = {
+  id:'band3', title:'HOW IT KEEPS UP, AND HOW IT CROSSES A REPOSITORY',
+  sub:'the watcher re-enters the write path; federation reaches into a neighbour',
+  containers:[
+    { id:'c_watch', title:'THE WATCHER', sub:'domain/evolution — one file at a time, on save',
+      nodes:[
+        n('ready','Wait for the BASELINE','before announcing, and before reconciling',
+          'src/lib/domain/evolution/watcher.ts::whenReady — a reconcile finishing before the watcher is genuinely watching leaves a window where a new file is neither reported as an event nor caught by the sweep (todo55)',
+          {cls:'n-ok'}),
+        n('recon','Sweep once at startup','what changed while nothing was watching',
+          'src/lib/domain/evolution/watcher.ts::reconcileOnStart'),
+        n('univ','A re-pulse needs the WHOLE file list','or every specifier dangles',
+          'src/lib/domain/evolution/watcher.ts::ConducksWatcher — an import resolves against candidate paths, so re-pulsing one file alone gives the resolver nothing to match and the file loses its edges on every save. The list is read from the graph\'s own UNIT nodes rather than the disk, because a filesystem walk per keystroke is not free',
+          {cls:'n-hi'}),
+        n('rebind','Then bind the bare names again','the step analyze runs and this path did not',
+          'src/lib/domain/evolution/watcher.ts::ConducksWatcher — invisible while a live pulse only ADDED, because the previously resolved edge survived and masked the dangling new one. The moment a re-pulse REPLACES a file\'s edges it shows: measured, `impact` fell from one caller to none after editing the calling file',
+          {cls:'n-warn'}),
+        n('beat','A heartbeat, and a pid','so a DEAD watcher is not read as no watcher',
+          'src/lib/domain/evolution/watcher-liveness.ts::writeWatcherMarker — both signals are needed: a pid alone is fooled by a machine that recycles pids, a heartbeat alone cannot tell a clean exit from a hang',
+          {shape:'dia'}),
+      ],
+      edges:[['ready','recon','baseline established'],['recon','univ'],['univ','rebind'],['ready','beat']]},
+
+    { id:'c_fed', title:'FEDERATION', sub:'domain/federation — many projects, one machine',
+      nodes:[
+        n('roster','A list of project roots','plain JSON, hand-editable on purpose',
+          'src/lib/domain/federation/project-registry.ts::ProjectRegistry — without it every project is an island and nothing can answer "which of my repos has fallen behind its code". A corrupt or missing file degrades to "no projects" rather than an error, because nothing depends on it',
+          {cls:'n-ok'}),
+        n('mon','Report on every one of them','per root, not per process',
+          'src/lib/domain/analysis/project-monitor.ts::report — it used to spawn its own git and see only the anchor repository; it asks the git feature per root now, which is what made a nested checkout visible'),
+        n('neigh','Read a NEIGHBOUR\'s vault','another project\'s graph, read-only',
+          'src/lib/core/graph/linker-federated.ts::FederatedLinker'),
+        n('inject','The opener is INJECTED, and refuses','no silent default',
+          'src/lib/core/graph/linker-federated.ts::OpenNeighbourVault — importing persistence here became a real ESM cycle the moment the graph door existed, measured by a test that failed on the partially initialised module. It was optional first, and an optional no-op made a whole neighbour workspace read as empty',
+          {cls:'n-ok'}),
+        n('third','The third cycle of this exact shape','registry↔watcher · chronicle↔resolver · this',
+          'src/lib/core/graph/linker-federated.ts::FederatedLinker — a door is itself a dependency edge, so importing one pulls in everything it re-exports. Each time it compiled fine and one unrelated test failed',
+          {cls:'n-warn'}),
+      ],
+      edges:[['roster','mon'],['roster','neigh'],['neigh','inject'],['inject','third']]},
+  ],
+  crossEdges:[
+    ['beat','mon','a dead watcher is an incident, not a setting'],
+  ],
+};
+
+export const BANDS = [BAND1, BAND2, BAND3];
 
 // Bands are chapters of ONE drawing, and edges between them may point backwards — that is what makes
 // the picture a CYCLE rather than a stack. Both of these do: Band 2 reads what Band 1 wrote, and the
@@ -202,4 +256,11 @@ export const BAND_LINKS = [
   ['nodes','sql','every answer reads what the pulse wrote'],
   ['fresh','stale','the same freshness engine both surfaces use'],
   ['argv','anchor','analyze is a command like any other',{prio:10}],
+  // Band 3 does not follow Band 1 — it re-enters it. The watcher rejoins the write path at the
+  // reflector, skipping discovery entirely, and that is the whole reason it needs the file list
+  // handed to it. Marked as the loop-back so ELK does not hoist the watcher above the pulse.
+  ['univ','refl','one file, mid-pulse',{prio:-10}],
+  ['recon','fresh','what changed while nothing watched'],
+  ['argv','ready','conducks watch'],
+  ['mon','stale','and reports it per project'],
 ];
