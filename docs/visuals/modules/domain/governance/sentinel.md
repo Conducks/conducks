@@ -69,7 +69,7 @@ ever reworked, move the load behind the registry.
 ## `max_fans` counts runtime fan-in only
 
 ARCH-1 hub overload must exclude edges the compiler erases — type references and type-only imports
-(ADR 0016) — or it measures the wrong thing. It did, for a long time: `registry/index.ts` reported
+(ADR 0016) — or it measures the wrong thing. It did, for a long time: `src/registry/index.ts` reported
 74 and 77 upstream connections against a limit of 50, and the honest numbers are **14 and 37**. The
 recommendation that followed from the bad numbers ("split the composition root by domain") was
 wrong and has been withdrawn.

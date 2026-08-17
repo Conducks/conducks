@@ -5,7 +5,7 @@
  * it described live behaviour nothing else covered. Kept as it was, apart from its location.
  */
 import { describe, it, expect } from '@jest/globals';
-import { calculateShannonEntropy, normalizeEntropyRisk } from '@/lib/core/algorithms/entropy.js';
+import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/index.js";
 
 describe('Shannon Entropy Unit Tests 📊', () => {
   describe('calculateShannonEntropy', () => {

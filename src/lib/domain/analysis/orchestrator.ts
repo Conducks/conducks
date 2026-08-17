@@ -6,7 +6,7 @@ import { ReflectionPipeline } from "@/lib/domain/analysis/reflection-pipeline.js
 import { ConducksReflector } from "@/lib/core/parsing/index.js";
 import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { essenceLens } from "@/lib/core/parsing/index.js";
-import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";

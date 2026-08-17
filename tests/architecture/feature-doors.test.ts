@@ -37,10 +37,13 @@ const SRC = path.resolve('src');
 /** Features that have a door, and must be entered through it. One line per door as they land. */
 const DOORS = [
   'contracts',
+  'lib/core/algorithms',
+  'lib/core/bootstrap',
   'lib/core/git',
   'lib/core/graph',
   'lib/core/parsing',
   'lib/core/persistence',
+  'lib/core/registry',
   'lib/core/utils',
 ];
 

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { ConducksReflector } from "@/lib/core/parsing/index.js";
 import { AnalyzeContext } from "@/lib/core/parsing/index.js";
-import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";

@@ -3,7 +3,7 @@ Status: Accepted
 - Supersedes: 0146
 - Builds: 0146, 0128, 0040
 - Date: 2026-08-09
-- Enforced by: tests/integration/features/mcp-concurrency.test.ts (pipelined calls over a real stdio server; each fix below mutation-verified against it — putting `pendingLoad = null` back at the top of `initialize()` reproduces the wrong answer, restoring `tool-registry`'s unconditional `close()` reproduces the closed handle), tests/unit/core/persistence-handle-owner.test.ts (the handle is not swapped merely because it was closed), tools/mcp-parallel.mjs (the cost measurement, itself mutation-verified against a symbol that does not exist)
+- Enforced by: tests/integration/features/mcp-concurrency.test.ts (pipelined calls over a real stdio server; each fix below mutation-verified against it — putting `pendingLoad = null` back at the top of `initialize()` reproduces the wrong answer, restoring `tool-registry`'s unconditional `close()` reproduces the closed handle), tests/unit/core/bootstrap/persistence-handle-owner.test.ts (the handle is not swapped merely because it was closed), tools/mcp-parallel.mjs (the cost measurement, itself mutation-verified against a symbol that does not exist)
 
 ## Context
 

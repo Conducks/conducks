@@ -1,6 +1,6 @@
 # 0038 — the graph loads when something walks it, and forgetting is loud
 Status: Accepted
-- Enforced by: tests/unit/integration (cli, evolution, metrics — the four commands that walk the graph now materialise it, and the suite goes red if one stops); tests/unit/core/lazy-graph.test.ts (a deferral runs once for N callers, takes the current connection, and is cleared by a later eager load); tests/unit/domain/governance/status-from-vault.test.ts (the vault path reports real counts against an empty graph)
+- Enforced by: tests/unit/integration (cli, evolution, metrics — the four commands that walk the graph now materialise it, and the suite goes red if one stops); tests/unit/core/bootstrap/lazy-graph.test.ts (a deferral runs once for N callers, takes the current connection, and is cleared by a later eager load); tests/unit/domain/governance/status-from-vault.test.ts (the vault path reports real counts against an empty graph)
 - Date: 2026-07-28
 
 ## Context

@@ -2,8 +2,8 @@ import { describe, it, expect, afterEach } from '@jest/globals';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { RegistryBootstrapper } from '@/lib/core/registry-bootstrapper.js';
-import { isNeverAProjectRoot } from '@/lib/core/utils/scope-guard.js';
+import { RegistryBootstrapper } from "@/lib/core/bootstrap/index.js";
+import { isNeverAProjectRoot } from '@/lib/core/utils/index.js';
 
 /**
  * Root discovery must not anchor a vault outside a project (ADR 0039).

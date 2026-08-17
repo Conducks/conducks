@@ -25,7 +25,7 @@ the problem is not lifetime but the swap: no ref-count makes an object swap atom
       bootstrapper's guard was `if (isCurrentlyConnected && !rootChanged && !modeChanged) return`.
       `releaseAnchor()` closes the vault at the end of every call, so the next call found a
       disconnected handle, fell through, and ran `updatePersistence(new SynapsePersistence(...))` with
-      NOTHING changed but our own close. Pinned by `tests/unit/core/persistence-handle-owner.test.ts`,
+      NOTHING changed but our own close. Pinned by `tests/unit/core/bootstrap/persistence-handle-owner.test.ts`,
       which measured one swap from the close and zero from the anchor.
 - [x] It could, and did, on every call — so the exposure was not a startup window but the steady
       state. Fixed at source: the handle is replaced only on a real root or mode change. A second

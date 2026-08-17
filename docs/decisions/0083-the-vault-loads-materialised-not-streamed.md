@@ -2,7 +2,7 @@
 Status: Accepted
 - Date: 2026-08-01
 - Builds: 0060
-- Enforced by: tests/unit/core/deferred-graph-guard.test.ts and tests/unit/core/lazy-graph.test.ts (walking an unmaterialised graph is refused, not answered emptily)
+- Enforced by: tests/unit/core/deferred-graph-guard.test.ts and tests/unit/core/bootstrap/lazy-graph.test.ts (walking an unmaterialised graph is refused, not answered emptily)
 
 ## Context
 

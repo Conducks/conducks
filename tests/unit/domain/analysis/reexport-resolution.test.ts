@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { AnalyzeOrchestrator } from '@/lib/domain/analysis/orchestrator.js';
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { SynapseRegistry } from '@/lib/core/registry/synapse-registry.js';
+import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { TypeScriptProvider } from "@/lib/core/parsing/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksComponent } from "@/contracts/index.js";

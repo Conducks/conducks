@@ -1,6 +1,6 @@
 # 0069 — a workspace is declared, not inferred from whatever marker is nearest
 Status: Accepted
-- Enforced by: tests/unit/core/utils/root-discovery.test.ts (a declared workspace wins over a nearer package marker and over a stray vault, and a single repo with no declaration still resolves exactly as before)
+- Enforced by: tests/unit/core/bootstrap/root-discovery.test.ts (a declared workspace wins over a nearer package marker and over a stray vault, and a single repo with no declaration still resolves exactly as before)
 - Amends: 0039
 - Date: 2026-07-31
 

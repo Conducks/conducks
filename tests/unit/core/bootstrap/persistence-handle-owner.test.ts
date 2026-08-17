@@ -23,7 +23,7 @@
  * so a closed-but-same-root handle genuinely does reopen itself; the object never needed replacing.
  */
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { RegistryBootstrapper } from '@/lib/core/registry-bootstrapper.js';
+import { RegistryBootstrapper } from "@/lib/core/bootstrap/index.js";
 
 const ROOT = process.cwd();
 

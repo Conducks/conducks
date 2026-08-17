@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { RegistryBootstrapper } from '@/lib/core/registry-bootstrapper.js';
+import { RegistryBootstrapper } from "@/lib/core/bootstrap/index.js";
 
 /**
  * ADR 0039's worktree half, which was CURRENT BEHAVIOUR that nothing pinned (todo21#P0).

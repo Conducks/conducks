@@ -1,6 +1,6 @@
 import { ConducksReflector } from "@/lib/core/parsing/index.js";
 import { AnalyzeContext } from "@/lib/core/parsing/index.js";
-import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { sameFamily } from "@/lib/core/graph/index.js";
 import { canonicalize } from "@/lib/core/utils/index.js";

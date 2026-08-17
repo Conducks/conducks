@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { chronicle } from "@/lib/core/git/index.js";
 import { logger } from "@/lib/core/utils/index.js";
-import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { traceMemory } from "@/lib/core/utils/index.js";
 import type { ConducksComponent } from "@/contracts/index.js";

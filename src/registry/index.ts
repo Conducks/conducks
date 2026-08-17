@@ -47,7 +47,7 @@ import {
   type CoverageSnapshot,
 } from "@/lib/domain/analysis/coverage-baseline.js";
 import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/manifest/index.js";
-import { SynapseRegistry } from "@/lib/core/registry/synapse-registry.js";
+import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import { PYTHON_SUITE } from "@/lib/core/parsing/index.js";
@@ -65,7 +65,7 @@ import { RubyProvider } from "@/lib/core/parsing/index.js";
 import { SwiftProvider } from "@/lib/core/parsing/index.js";
 import { CProvider } from "@/lib/core/parsing/index.js";
 import { Logger, logger, setProcessQuiet } from "@/lib/core/utils/index.js";
-import { RegistryBootstrapper } from "@/lib/core/registry-bootstrapper.js";
+import { RegistryBootstrapper } from "@/lib/core/bootstrap/index.js";
 import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import path from "node:path";

@@ -14,7 +14,7 @@ withdrawn — see below.
 
 ## It looks like a hub and is not
 
-The audit flagged `registry/index.ts` at 74 and 77 upstream connections against a limit of 50, and
+The audit flagged `src/registry/index.ts` at 74 and 77 upstream connections against a limit of 50, and
 the obvious reading — "composition-root god object, split it by domain" — was wrong. Measured after
 type-only imports were excluded: **74 raw → 14 runtime, 77 → 37**, both well under the limit.
 
