@@ -35,7 +35,9 @@ import path from "node:path";
  * project using something else gets no mappings and the old answer, which is honest; guessing at an
  * arbitrary config would be the failure mode this exists to avoid.
  */
-export interface BuildMapping {
+/** Not exported: `buildMappings` returns these and TypeScript infers the shape at every call site.
+ *  Exporting a name nothing imports is the UNUSED_EXPORT this project's own `prune` reports. */
+interface BuildMapping {
   /** Absolute directory the sources live in. */
   sourceDir: string;
   /** Absolute directory those sources are emitted to. */
