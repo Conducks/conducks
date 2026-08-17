@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
-import { ProjectRegistry } from '@/lib/domain/federation/project-registry.js';
+import { ProjectRegistry } from '@/lib/domain/federation/index.js';
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { FileHashGate } from "@/lib/core/persistence/index.js";
 

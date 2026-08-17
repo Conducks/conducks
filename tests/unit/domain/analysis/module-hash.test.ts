@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
-import { ProjectRegistry } from "@/lib/domain/federation/project-registry.js";
+import { ProjectRegistry } from "@/lib/domain/federation/index.js";
 
 /**
  * todo21's acceptance: ONE module-hash implementation, and it has to actually hash the module.

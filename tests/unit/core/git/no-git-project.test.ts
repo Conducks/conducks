@@ -6,7 +6,7 @@ import { ChronicleInterface } from '@/lib/core/git/chronicle-interface.js';
 import { branchGuard } from '@/interfaces/cli/index.js';
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
-import { ProjectRegistry } from '@/lib/domain/federation/project-registry.js';
+import { ProjectRegistry } from '@/lib/domain/federation/index.js';
 import { buildBoard } from '@/lib/domain/analysis/docs-board.js';
 
 /**

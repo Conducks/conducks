@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { EvolutionService } from '@/lib/domain/evolution/index.js';
-import { ProjectRegistry } from '@/lib/domain/federation/project-registry.js';
+import { ProjectRegistry } from '@/lib/domain/federation/index.js';
 import { readWatcherLiveness, watcherMarkerPath } from '@/lib/domain/evolution/watcher-liveness.js';
 
 /**

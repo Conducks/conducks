@@ -45,6 +45,16 @@ const DOORS = [
   'lib/core/persistence',
   'lib/core/registry',
   'lib/core/utils',
+  // DOMAIN begins here. The layer was drawn on the canvas before it was swept, and Band 2 says so on
+  // its own face — a path read file by file is not a swept layer. Areas land in this list one at a
+  // time, leaves first, in the order their dependencies allow (rule 13):
+  //   leaves        federation · intelligence · kinetic · manifest · visual
+  //   then          evolution -> kinetic
+  //   then          governance, metrics -> evolution
+  //   last          analysis -> six of the others
+  'lib/domain/federation',
+  'lib/domain/manifest',
+  'lib/domain/visual',
 ];
 
 /**

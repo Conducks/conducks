@@ -25,8 +25,8 @@ import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/d
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
 import { assessRoot, explainScope } from "@/lib/core/utils/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
-import { UpdateCheck } from "@/lib/domain/federation/update-check.js";
-import { ProjectRegistry } from "@/lib/domain/federation/project-registry.js";
+import { UpdateCheck } from "@/lib/domain/federation/index.js";
+import { ProjectRegistry } from "@/lib/domain/federation/index.js";
 import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
 import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
 import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
@@ -35,9 +35,9 @@ import { SourceLineReader } from "@/lib/core/utils/index.js";
 import { firstLineOf } from "@/lib/core/parsing/index.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
 import { GatewayService } from "@/lib/domain/analysis/gateway-service.js";
-import { ConducksInstaller } from "@/lib/domain/federation/conducks-installer.js";
-import { installHook, type HookInstallResult } from "@/lib/domain/federation/hook-installer.js";
-import { MCPConfigurator } from "@/lib/domain/federation/mcp-configurator.js";
+import { ConducksInstaller } from "@/lib/domain/federation/index.js";
+import { installHook, type HookInstallResult } from "@/lib/domain/federation/index.js";
+import { MCPConfigurator } from "@/lib/domain/federation/index.js";
 import {
   defaultBaselinePath,
   saveBaseline,

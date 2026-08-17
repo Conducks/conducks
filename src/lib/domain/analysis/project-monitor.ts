@@ -7,7 +7,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { FileHashGate } from "@/lib/core/persistence/index.js";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
 import { buildBoard } from "@/lib/domain/analysis/docs-board.js";
-import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/project-registry.js";
+import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/index.js";
 import { branchMismatch, ChronicleInterface } from "@/lib/core/git/index.js";
 
 /**

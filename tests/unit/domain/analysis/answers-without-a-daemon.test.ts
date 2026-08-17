@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
-import { ProjectRegistry, probeGitActivity } from '@/lib/domain/federation/project-registry.js';
+import { ProjectRegistry, probeGitActivity } from '@/lib/domain/federation/index.js';
 import { writeWatcherMarker, clearWatcherMarker } from '@/lib/domain/evolution/watcher-liveness.js';
 
 /**
