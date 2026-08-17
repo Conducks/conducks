@@ -14,10 +14,21 @@ export class StructuralRanker {
     if (nodes.length === 0) return;
 
     // 1. Identify Architectural Anchors
+    // The label comparison is CASE-INSENSITIVE, and it was not. `label` is assigned from
+    // `canonicalKind` at ingest, so it is `UNIT` and `MODULE` in upper case — the lower-case
+    // comparisons here matched nothing, and every file-level node in every project was excluded
+    // from ranking. Measured on this repository: 968 UNIT nodes, gravity 0, sum 0.
+    //
+    // It hid behind a second field. `entry` sorts on `properties.rank`, which lives in the metadata
+    // blob rather than the `gravity` COLUMN, and the blob kept a plausible-looking value from an
+    // older pulse — so the command printed a sensible ranking while the column beside it was zero.
+    // Two names for one number, persisted by two routes, disagreeing.
     const anchors = nodes.filter(node => {
       const p = node.properties;
       const ck = p.canonicalKind;
-      return ck === 'STRUCTURE' || ck === 'FUNCTION' || ck === 'BEHAVIOR' || ck === 'INFRA' || p.isModule || node.label === 'module' || node.label === 'unit';
+      const label = String(node.label ?? '').toLowerCase();
+      return ck === 'STRUCTURE' || ck === 'FUNCTION' || ck === 'BEHAVIOR' || ck === 'INFRA'
+        || p.isModule || label === 'module' || label === 'unit';
     });
 
     const AN = anchors.length;

@@ -358,6 +358,13 @@ export class ConducksAdjacencyList {
         rank: node.properties.rank,
         kineticEnergy: node.properties.kineticEnergy,
         isEntryPoint: node.properties.isEntryPoint,
+        // PAIRED with `isEntryPoint`, and on the skeleton for the same reason `doc` and `instanceOf`
+        // are: the two are written together by `StructuralRanker` and read together by `entry`, and
+        // a field that is not on the skeleton cannot be CLEARED through it. `detectEntryPoints`
+        // deliberately has no latch — a node that gains a caller stops being an entry — but the
+        // delete landed on the skeleton while the meat kept its copy, and `getNode` merges meat over
+        // skeleton, so a stale reason outlived the flag it explains.
+        entryReason: node.properties.entryReason,
         isExport: node.properties.isExport,
         canonicalKind: node.properties.canonicalKind,
         canonicalRank: node.properties.canonicalRank,
@@ -415,12 +422,21 @@ export class ConducksAdjacencyList {
     this.meatCache.delete(id);
     if (!node.isShallow) {
       try {
-        const meat = { ...node.properties };
-        // Remove skeleton props from meat to avoid redundancy
-        delete (meat as any).name;
-        delete (meat as any).filePath;
-        delete (meat as any).kind;
-        delete (meat as any).parentname;
+        // Every skeleton key is stripped, derived from the skeleton just built rather than from a
+        // hand-written list. The list WAS hand-written and named four of about thirty-five, so a
+        // property lived in both halves — and `getNode` merges meat OVER skeleton, which makes the
+        // stale copy win.
+        //
+        // That is a live trap between the two accessors: `getAllNodes()` hands out the skeleton
+        // itself, so `StructuralRanker` writes `gravity`, `rank` and `isEntryPoint` straight onto
+        // it, while a later `getNode()` returns those fields from the meat as they were at ingest.
+        // Write with one accessor, read with the other, and the write is invisible.
+        //
+        // It has not bitten production, and that was measured before changing anything: the vault
+        // carries 264 distinct gravity values and six sensible entry points, because the persist
+        // path reads skeletons. It bit the first test ever written against the ranker.
+        const meat = { ...node.properties } as Record<string, unknown>;
+        for (const key of Object.keys(skeletonNode.properties)) delete meat[key];
         
         const compressed = zlib.deflateSync(JSON.stringify(meat));
         this.compressedMeat.set(id, compressed);
