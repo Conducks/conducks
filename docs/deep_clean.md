@@ -1008,3 +1008,132 @@ the same either way.
 | `core/parsing` | door up, docs 0 gaps, gate entry deferred |
 
 Gates: 1,992 tests / 263 suites green · typecheck 0 · oracles EXTRA 0 · docs-lint 187 clean.
+
+---
+
+## Unit 9 — `core/parsing`, the door on the gate and the reflector measured (todo68 closed)
+
+The two rows parsing carried, and the last open work in core.
+
+### The gate entry: the fix was the option written down as most expensive
+
+One import kept `lib/core/parsing` out of `DOORS`. `graph/linker-intra.ts` imported
+`../parsing/languages/typescript/resolver.js` and constructed it. The gate file had listed three ways
+out and the cost of each — and the cheapest-sounding two are both wrong:
+
+| way out | cost |
+|---|---|
+| export it through parsing's door | a cycle: the door re-exports the processors, they import graph's door (rule 5b) |
+| move it to `contracts/` | 237 lines of TypeScript module resolution in a vocabulary layer |
+| **invert it** | every bare construction site has to be changed |
+
+Inversion won. `IntraLinker` declares a `ResolveSpecifier` port and REFUSES to construct without one;
+domain supplies `TypeScriptResolver`, being the layer allowed to know both doors (ADR 0005).
+
+Refusing rather than defaulting is the same lesson as `openVault` two units ago: a default resolving
+nothing leaves every cross-file edge dangling, and dangling is *already* what the linker reports for
+a specifier naming nothing. The two states would be indistinguishable.
+
+**The recorded cost was wrong by 3x.** "~10 test sites" was 32. Every one now passes the real
+resolver, for the same reason the default refuses — a stub returning undefined makes those cases pass
+for the wrong reason.
+
+Measured live, not inferred: `analyze --force` resolves 5,157 cross-file references through the
+injected port.
+
+The first mutation of this gate reported PASS because the anchor string did not exist in the file and
+the substitution silently did nothing. Re-run with an assertion on the anchor, it failed by name.
+**A mutation that reports no failure is first a claim about the mutation** — third time this campaign
+has paid for that, and the third time it was caught by asserting the anchor rather than trusting it.
+
+### The reflector: one case per capture tag, and what that measured
+
+The reflector is 1,696 lines and reaches all 35 commands. Its suites covered every case that had once
+been WRONG — arrow functions, aliases, type-only imports, Python resolution — and nothing that had
+merely always worked. A tag with no test can be renamed, dropped from a query, or mapped to the wrong
+rung with every gate green.
+
+`every-definition-capture-mints-its-kind.test.ts` drives one real snippet per tag through the whole
+chain: tree-sitter → the query → `kindFromCapture` → `mapToCanonical` → a node. The language for each
+tag came from grepping `@<tag>` across all thirteen `queries.ts` files rather than from intuition,
+and that mapping is itself asserted — because the trap was real:
+
+**`isClass` is emitted by ONE of the thirteen grammars.** The other twelve tag a class `@isStruct`.
+A TypeScript case would have exercised `isStruct` while claiming to test `isClass`, and passed. The
+suite asserts, per case, that the named language's query file actually contains that tag.
+
+Three findings, none of which a hand-written test would have gone looking for:
+
+| tag | measured |
+|---|---|
+| `isTrait` | emitted by NO grammar, read by nothing. Removed (rule 7). Rust tags a `trait_item` `@isInterface` — that is where its traits always came from |
+| `isInfra` | mints no INFRA node. It feeds the flow processor, which mints a virtual `ROUTE::…` that is BEHAVIOR deliberately (ADR 0099) |
+| `isHeritage` | mints NOTHING, anywhere. In Ruby, Rust and PHP it sits in name position inside a match captured as something else. `impl Base for Child` produces the struct, the trait and the method — and no edge between them, despite the query comment saying it "creates IMPLEMENTS edge conceptually" |
+
+The last two are recorded, not fixed: behaviour changes belong in their own commit with their own
+measurement (rule 16). `isHeritage` is pinned by a test that asserts the gap AND asserts the parts
+that do work first — otherwise a grammar that stopped parsing entirely would satisfy the negative and
+read as the same known gap.
+
+Three mutations, three failures: `enum → variable` in `kindFromCapture`, `namespace` losing its rung
+in `mapToCanonical`, and a new tag added to `DEFINITION_CAPTURES` with no case.
+
+### What stays deferred, with the reason changed
+
+Splitting `reflector.ts`. Rule 13's objection — "no test per handler" — is now met. What remains is
+scope: it is a large mechanical change to the most consequential file in the project, and it belongs
+in its own todo with its own before/after measurement rather than at the end of a session that has
+already changed four features. The blocker is SCOPE now, not coverage, and saying which one it is
+matters more than the row being open.
+
+Also still owed and unchanged: nine language packs have no oracle, so nothing measures whether their
+queries are right — only that they parse.
+
+### Rule table — core/parsing, final
+
+| rule | |
+|---|---|
+| 1 one door | PASS — on the gate, and it bites |
+| 2 a test enforces it | PASS — reinstating a leaf import fails by name |
+| 3 inside is private, own tests exempt | PASS |
+| 4 no mutable state on the door | PASS |
+| 5 shared types to `contracts/` | PASS — taxonomy, built-ins and the prism types went; `language-plugin` and `capture-tags` came IN |
+| 6 comments | PASS — 68 real gaps → 0 |
+| 7 no dead code | PASS — `isTrait` removed |
+| 8 every line has a purpose | PASS |
+| 9 no duplicated logic | PASS |
+| 10 every claim tested, and it bites | PASS — 16 new cases, 3 mutations |
+| 11 adversarial | PASS |
+| 12 leaves tested from inside | PASS |
+| 13 leaves first | PASS |
+| 14 one unit per commit | PASS |
+| 15 gates after each unit | PASS |
+| 16 cleaning is not fixing | PASS — the two behaviour findings are recorded, not fixed |
+
+**16 PASS, 0 n/a, 0 open** — the only feature where every rule applies and every rule passes.
+
+## Core, closed
+
+| feature | rules |
+|---|---|
+| `contracts` | 15 PASS · 1 n/a · 0 open |
+| `core/git` | 14 PASS · 2 n/a · 0 open |
+| `core/utils` | 15 PASS · 2 n/a · 0 open |
+| `core/graph` | 15 PASS · 0 n/a · 1 recorded behaviour change (rule 16) |
+| `core/persistence` | 14 PASS · 2 n/a · 0 open |
+| `core/parsing` | 16 PASS · 0 n/a · 0 open |
+
+Every feature in `core` is behind one door, every door is on the gate, and the gate bites for each of
+them. Six features, six doors, zero bypasses in `src/` or `tests/`.
+
+Gates: 2,012 tests / 264 suites green · typecheck 0 · four oracles EXTRA 0 · docs-lint 187 clean.
+
+### What core does NOT claim
+
+Stated plainly, because a table of green rows reads as more than it is:
+
+- Nine of thirteen language packs have no oracle. Their queries are unmeasured — only that they parse.
+- `isHeritage` produces no inheritance edge in Ruby, Rust or PHP. Known, pinned, unfixed.
+- `reflector.ts` is still 1,696 lines.
+- The layers ABOVE core — `domain`, `composition`, `interfaces` — have had no such pass. `registry/`
+  is the composition root and is deliberately last.

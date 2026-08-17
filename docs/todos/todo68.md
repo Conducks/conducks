@@ -1,5 +1,5 @@
 # todo68 — parsing behind one door, cleaned unit by unit
-Status: doing
+Status: done
 - Acceptance: nothing outside `core/parsing` imports past `core/parsing/index.ts`, every symbol the door exposes is documented and covered by a test that fails when the behaviour is broken, and the four oracles read the same numbers as before the campaign.
 
 ## Context
@@ -84,5 +84,7 @@ is recorded and left; a fix is its own commit with its own measurement.
 ## Phase 8 — C1.3 reflector
 - Builds: 0150
 - Depends: todo68#P7
-- [x] the reflector is documented — the class, the constructor, the parameter carving, the object-wiring walk and the type-only rule. **68 real doc gaps across parsing became 0.** Per-handler adversarial COVERAGE is deferred below
-- [>] deferred, and now possible for the first time — the door exists, so a split is invisible outside parsing. It waits on the per-handler tests, because splitting 1,676 lines with no test per handler is the ambiguity rule 13 exists to prevent
+- [x] the reflector is documented — the class, the constructor, the parameter carving, the object-wiring walk and the type-only rule. **68 real doc gaps across parsing became 0.**
+- [x] per-capture coverage landed 2026-08-17: `every-definition-capture-mints-its-kind.test.ts`, one case per tag in `DEFINITION_CAPTURES`, each in a language MEASURED to emit it (grepped `@<tag>` across all thirteen `queries.ts`). Three mutations, three failures. The completeness row is what keeps it working: a tag added to the set with no case fails the suite
+- [x] THREE findings the measurement produced, none of which a hand-written test would have looked for. `isTrait` was emitted by no grammar and read by nothing — removed (rule 7); Rust tags a `trait_item` `@isInterface`, which is where its traits always came from. `isInfra` mints no INFRA node at all: it feeds the flow processor, which mints a virtual ROUTE that is BEHAVIOR by ADR 0099. `isHeritage` mints nothing anywhere — in Ruby, Rust and PHP it sits in NAME position inside a match captured as something else, and `impl Base for Child` produces no edge between them despite the query comment claiming it does. Left as a recorded gap with a test pinning it, not fixed inside a clean (rule 16)
+- [>] STILL deferred, and the reason has changed. The per-capture tests now exist, so rule 13's objection is met — but they pin the tag→kind chain, not the 1,696 lines of scope tracking, object-wiring and receiver inference around it. A split is a large mechanical change to the most consequential file in the project, and it belongs in its own todo with its own before/after measurement rather than at the end of a session that has already changed four features. Named as owed, with the blocker now being SCOPE rather than coverage
