@@ -6,7 +6,7 @@ import {
   lintVisuals, resolveAnchor, definesSymbol, constantValue, collectVisualPages,
   buildStamps, staleStamps,
   type VisualPage,
-} from "@/lib/domain/analysis/visuals-lint.js";
+} from "@/lib/domain/docs/visuals-lint.js";
 
 /**
  * The gate that makes a diagram checkable. Each case below is a way a visual goes quietly wrong —

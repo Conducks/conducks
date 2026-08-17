@@ -2,7 +2,7 @@
 
 Status: Accepted
 - Amends: 0020 (which made progress optional; optional was the wrong answer)
-- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts
+- Enforced by: tests/unit/domain/docs/docs-grammar.test.ts
 - Date: 2026-07-26
 - Promoted: docs/conventions.md CONDUCKS-25
 

@@ -1,13 +1,13 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Conducks — domain/analysis/coverage — test coverage as a graph overlay</title>
-<link rel="stylesheet" href="../../../system.css">
+<link rel="stylesheet" href="../../system.css">
 <div class="wrap">
 <div class="meta"><b>DERIVED</b> — rendered from <code>coverage.md</code> beside this file.
 An edit made here is discarded by the next render; edit the .md.</div>
-<a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
 <h1>domain/analysis/coverage — test coverage as a graph overlay</h1>
-<p><b>Part of:</b> <a href="../analysis.html">domain/analysis</a>. <code>coverage-bind</code> and <code>coverage-baseline</code>.</p>
+<p><b>Part of:</b> <a href="coverage.html">domain/coverage</a>. <code>coverage-bind</code> and <code>coverage-baseline</code>.</p>
 <p><b>Responsibility:</b> binding an external coverage report (<code>coverage-final.json</code>) onto graph nodes, and comparing a run against a saved baseline to detect drift.</p>
 <p><b>Boundaries:</b> conducks does not measure coverage — it consumes someone else's report. No test runner is invoked and none is assumed beyond the report format.</p>
 <p><b>Deferred / not built:</b> no default report discovery. <code>conducks coverage</code> requires an explicit path rather than guessing at a <code>coverage-final.json</code> location.</p>
@@ -19,5 +19,5 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>This is a matching problem, not a vault problem: the earlier read of it as "incremental analyze duplicates nodes" was verified false and retracted. If a coverage row ever looks suspiciously round again, suspect this matcher and loosening in it — never node duplication.</p>
 <h2>Baselines are for drift, not for gating</h2>
 <p><code>--save-baseline</code> / <code>--vs-baseline</code> exist to answer "did this change make something worse" — verified to fire on a real regression (<code>addNode: was 86% → now 0% (BROKE)</code>) with no false positives on identical input. There is deliberately no threshold-gate mode; that belongs in CI config, not here.</p>
-<footer>Source: <code>docs/visuals/modules/domain/analysis/coverage.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+<footer>Source: <code>docs/visuals/modules/domain/coverage.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

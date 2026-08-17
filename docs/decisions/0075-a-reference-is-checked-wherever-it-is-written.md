@@ -1,7 +1,7 @@
 # 0075 — a reference is checked wherever it is written, not only in a field
 Status: Accepted
 - Date: 2026-07-31
-- Enforced by: tests/unit/domain/analysis/docs-board.test.ts (an invented phase number and an invented ADR number both fail the gate; a phase inside a `completed/` todo still resolves; a fenced example and a cross-tree address are left alone)
+- Enforced by: tests/unit/domain/docs/docs-board.test.ts (an invented phase number and an invented ADR number both fail the gate; a phase inside a `completed/` todo still resolves; a fenced example and a cross-tree address are left alone)
 
 ## Context
 

@@ -7,7 +7,7 @@ import { branchGuard } from '@/interfaces/cli/index.js';
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
 import { ProjectRegistry } from '@/lib/domain/federation/index.js';
-import { buildBoard } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard } from '@/lib/domain/docs/index.js';
 
 /**
  * A project with NO git keeps answering everything it answers today (ADR 0035).

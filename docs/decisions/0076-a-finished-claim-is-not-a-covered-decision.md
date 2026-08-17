@@ -1,7 +1,7 @@
 # 0076 — a finished claim is not a covered decision
 Status: Accepted
 - Date: 2026-07-31
-- Enforced by: tests/unit/domain/analysis/docs-board.test.ts (an ADR whose phases are all done reports `claimed` without an `- Enforced by:` and `proven` with one); tests/unit/domain/analysis/docs-standard-citations.test.ts (every marker the parser accepts is defined in the standard's §5.2 table, and every `ROOT_ONLY`/`DERIVED_FILES` name appears in the standard)
+- Enforced by: tests/unit/domain/docs/docs-board.test.ts (an ADR whose phases are all done reports `claimed` without an `- Enforced by:` and `proven` with one); tests/unit/domain/docs/docs-standard-citations.test.ts (every marker the parser accepts is defined in the standard's §5.2 table, and every `ROOT_ONLY`/`DERIVED_FILES` name appears in the standard)
 
 ## Context
 

@@ -40,7 +40,7 @@ const populatedBoard = {
 
 let trees: Array<{ label: string; board: any }> = [];
 
-const { agentView, governedCount } = await import('@/lib/domain/analysis/docs-board.js');
+const { agentView, governedCount } = await import('@/lib/domain/docs/index.js');
 
 jest.unstable_mockModule('@/registry/index.js', () => ({
   registry: {

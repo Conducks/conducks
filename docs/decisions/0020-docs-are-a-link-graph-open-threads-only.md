@@ -3,7 +3,7 @@
 Status: Accepted
 - Amended by: 0024 (progress is retired outright, not merely optional)
 - Amends: 0019 (which fixed how ONE record carries state; this fixes the links BETWEEN records)
-- Enforced by: tests/unit/domain/analysis/docs-board.test.ts
+- Enforced by: tests/unit/domain/docs/docs-board.test.ts
 - Date: 2026-07-26
 - Promoted: docs/conventions.md CONDUCKS-20 (phase is the unit of linkage), CONDUCKS-21 (read-once vs read-often)
 

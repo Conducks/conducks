@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ProjectMonitor } from '@/lib/domain/analysis/project-monitor.js';
-import { buildBoard } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard } from '@/lib/domain/docs/index.js';
 
 /**
  * todo21#P3 / ADR 0031 — the two module-hash implementations must agree.

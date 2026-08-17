@@ -1,7 +1,7 @@
 # todo15 — watch the docs, and link the decisions that predate the link fields
 
 Status: done
-- Enforced by: tests/unit/domain/analysis/docs-watcher.test.ts
+- Enforced by: tests/unit/domain/docs/docs-watcher.test.ts
 - Promoted: docs/features.md ("Docs Board", "Docs Grammar Gate"); conducks-docs skill (a closed todo's `- Builds:` link must be promoted to `- Enforced by:`)
 - Acceptance: editing a governed doc emits a pulse that re-lints it without anyone typing a command, and every ADR that asserts something about the code carries a `- Builds:` phase or an `- Enforced by:` artifact
 

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, jest } from '@jest/globals';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { DocsWatcher, type DocsPulse } from '@/lib/domain/analysis/docs-watcher.js';
+import { DocsWatcher, type DocsPulse } from '@/lib/domain/docs/docs-watcher.js';
 
 // The gate only ran when someone typed `docs-lint`, so a broken link survived until review. This
 // closes that window — and must do it without ever throwing at the author mid-save.

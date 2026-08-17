@@ -1,6 +1,6 @@
-# domain/analysis/docs-grammar — the docs standard, enforced
+# domain/docs/docs-grammar — the docs standard, enforced
 
-**Part of:** [domain/analysis](../analysis.md). Backs `conducks docs-lint`, `docs-status` and
+**Part of:** [domain/docs](../docs.md). Backs `conducks docs-lint`, `docs-status` and
 `bootstrap-docs`.
 
 **Responsibility:** classifying every file under `docs/` by type — todo, decision, features,

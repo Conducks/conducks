@@ -1,13 +1,13 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Conducks — domain/analysis/docs-board — the links between docs</title>
+<title>Conducks — domain/docs/docs-board — the links between docs</title>
 <link rel="stylesheet" href="../../../system.css">
 <div class="wrap">
 <div class="meta"><b>DERIVED</b> — rendered from <code>docs-board.md</code> beside this file.
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
-<h1>domain/analysis/docs-board — the links between docs</h1>
-<p><b>Part of:</b> <a href="../analysis.html">domain/analysis</a>. Sits on top of <a href="docs-grammar.html">docs-grammar</a>; backs <code>conducks docs-status</code>, <code>conducks_docs</code> and the mirror's /api/docs. <code>analysis/docs-board.ts</code> and <code>analysis/docs-watcher.ts</code> are documented here together — the watcher is a thin trigger on this module, not a subsystem of its own.</p>
+<h1>domain/docs/docs-board — the links between docs</h1>
+<p><b>Part of:</b> <a href="../docs.html">domain/docs</a>. Sits on top of <a href="docs-grammar.html">docs-grammar</a>; backs <code>conducks docs-status</code>, <code>conducks_docs</code> and the mirror's /api/docs. <code>docs/docs-board.ts</code> and <code>docs/docs-watcher.ts</code> are documented here together — the watcher is a thin trigger on this module, not a subsystem of its own.</p>
 <p><b>Responsibility:</b> the cross-file half of the docs standard. <code>docs-grammar</code> parses ONE file and has no idea the others exist; this walks the tree and resolves what only the set can answer — which decision a phase builds, which phase another waits on, what an accepted record left unbuilt, and whether a supersede dropped a remainder. It also owns the agent projection.</p>
 <p><b>Boundaries:</b> derivation and linkage only. It never parses markdown (that is <code>docs-grammar</code>) and never touches the code graph — no call, import or coverage fact enters this module. It reads the docs tree from disk and returns a plain object; nothing is written back, ever.</p>
 <p><b>Deferred / not built:</b> <code>- Builds:</code> / <code>- Depends:</code> are hand-written, so an unlinked ADR is reported rather than detected. Proving a decision is implemented from the code itself (walk <code>- Enforced by:</code> into the graph and check the symbol exists and its test passes) is the obvious next step and is deliberately not built — it needs the graph, which would put a code-layer dependency into a module that is currently docs-only.</p>
@@ -57,5 +57,5 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><code>unlinkedWork</code> keeps only todos with an OPEN phase, and the "every task is closed" hygiene warning deliberately exempts deferred records — so a todo parked with reopen-triggers appeared on NEITHER surface. <code>parked</code> lists them with their real <code>Status:</code>, because two records were invisible that way and one of them claimed <code>todo</code> while showing up nowhere.</p>
 <h2>The module hash lives in one file, and that is the whole point</h2>
 <p>A reviewed module note is compared against <code>moduleHashOf</code> (<code>analysis/module-hash.ts</code>). That function used to exist TWICE — here and in <code>ProjectMonitor</code> — coupled only by a "must match" comment. Two copies of a hash is a drift waiting for its moment: the two disagreeing marks every reviewed note drifted, or none, and either way silently. Both callers import the one function now and the equality is pinned by a test rather than by a comment. Non-recursive on purpose: a note covers its own directory, so hashing subtrees would fire a flag for a change in a submodule that has its own note.</p>
-<footer>Source: <code>docs/visuals/modules/domain/analysis/docs-board.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+<footer>Source: <code>docs/visuals/modules/domain/docs/docs-board.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

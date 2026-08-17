@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
-import { inferType, parseBody, shape, lint, readStatus, readRelations } from '@/lib/domain/analysis/docs-grammar.js';
-import { crossCheckDecisions } from '@/lib/domain/analysis/docs-board.js';
+import { inferType, parseBody, shape, lint, readStatus, readRelations } from '@/lib/domain/docs/docs-grammar.js';
+import { crossCheckDecisions } from '@/lib/domain/docs/docs-board.js';
 
 // Gate 2 (conducks-docs): the parser must classify EVERY file/folder the standard defines —
 // no part of the format reads as "unknown". "unknown" is reserved for files not in the standard.

@@ -2,7 +2,7 @@
 Status: Accepted
 - Builds: 0011, 0138, 0139
 - Date: 2026-08-06
-- Enforced by: tests/unit/domain/analysis/docs-board.test.ts (driftedReviews resolves the new path) and visuals-lint anchor coverage of `docs/visuals/modules/*.md`
+- Enforced by: tests/unit/domain/docs/docs-board.test.ts (driftedReviews resolves the new path) and visuals-lint anchor coverage of `docs/visuals/modules/*.md`
 
 ## Context
 

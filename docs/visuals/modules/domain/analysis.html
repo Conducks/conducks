@@ -16,7 +16,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <li><b><a href="../core/parsing/reflector.html">reflector/</a></b> — file → spectrum. The single most load-bearing unit here.</li>
 <li><b><a href="analysis/orchestrator.html">orchestrator/</a></b> — the multi-pass pulse, incremental analysis, workers.</li>
 <li><b><a href="analysis/coverage.html">coverage/</a></b> — binding an external coverage report onto the graph.</li>
-<li><b><a href="analysis/docs-grammar.html">docs-grammar/</a></b> — the conducks-docs standard, enforced.</li>
+<li><b><a href="docs/docs-grammar.html">docs-grammar/</a></b> — the conducks-docs standard, enforced.</li>
 </ul>
 <p><code>conducks-core</code> is the façade the registry wires; <code>query-service</code> answers structural questions; <code>fallback-detector</code> reports where analysis degraded; <code>gateway-service</code> is the live vault-watch feed behind the Mirror dashboard, constructed by the <code>mirror</code> CLI command and consumed by the web server.</p>
 <h2>The pulse links, inducts, then links AGAIN</h2>
@@ -24,7 +24,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>Without that second pass the first analyze on a fresh vault resolves fewer references than a rebuild of the same code — the induced nodes did not exist when linking happened, and on a warm vault they only appear to work because they survived from the previous pulse. Measured on subject-c: 7,531 resolutions cold against 7,994 warm, dangling 3,440 against 3,146 (todo59).</p>
 <p>Not a reorder — induction READS the dangling set that linking produces, so inducting first would starve it.</p>
 <h2>Why the split between the parts is where it is</h2>
-<p>One pass cannot resolve a cross-file reference, because the target may not be parsed yet. That single constraint is what divides this module: the <a href="../core/parsing/reflector.html">reflector</a> sees exactly one file and seeds unresolved specifiers, the <a href="analysis/orchestrator.html">orchestrator</a> is the only thing allowed to see all files and is therefore where real edges get built, and the feature analyses (<a href="analysis/coverage.html">coverage</a>, <a href="analysis/docs-grammar.html">docs-grammar</a>) read the finished graph and never touch parsing. Anything that needs repo-wide knowledge moves up, never sideways.</p>
+<p>One pass cannot resolve a cross-file reference, because the target may not be parsed yet. That single constraint is what divides this module: the <a href="../core/parsing/reflector.html">reflector</a> sees exactly one file and seeds unresolved specifiers, the <a href="analysis/orchestrator.html">orchestrator</a> is the only thing allowed to see all files and is therefore where real edges get built, and the feature analyses (<a href="analysis/coverage.html">coverage</a>, <a href="docs/docs-grammar.html">docs-grammar</a>) read the finished graph and never touch parsing. Anything that needs repo-wide knowledge moves up, never sideways.</p>
 <p>The consequence every part inherits — <code>analyze</code> is incremental, so a re-run can show no change while your new logic never executed — is spelled out once, in the orchestrator's doc. Read it before believing any number produced from this module.</p>
 <footer>Source: <code>docs/visuals/modules/domain/analysis.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

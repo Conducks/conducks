@@ -1,7 +1,7 @@
 # 0019 — ADR state lives in the record; the docs grammar is line-atomic
 
 Status: Accepted
-- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts
+- Enforced by: tests/unit/domain/docs/docs-grammar.test.ts
 - Amends: 0011 (which banned generated derived docs but left a hand-authored index standing)
 - Amended by: 0020 (extends the same rule from one record's state to the links between records)
 - Date: 2026-07-26

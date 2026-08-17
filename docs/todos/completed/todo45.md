@@ -15,7 +15,7 @@ at real code and describes something that no longer happens. No anchor check can
 the most common way a diagram lies.
 
 The mechanism already exists for the neighbouring case. `driftedReviews`
-(`src/lib/domain/analysis/docs-board.ts:431`) records a `MODULE.md` as reviewed against
+(`src/lib/domain/docs/docs-board.ts:431`) records a `MODULE.md` as reviewed against
 `moduleHashOf(dir)` in `.conducks/doc-reviews.json`, and reports it as drifted once that hash moves.
 `ProjectMonitor.dismissReview` writes the record, in two shapes — bare "still accurate", or with an
 `intent` that must address a doc that exists.
@@ -31,7 +31,7 @@ visual cites an arbitrary set of files across many modules. The hash must theref
 ## Phase 1 — a visual can be marked reviewed
 - [x] A review record for a visual, written the way `dismissReview` writes one for a module — reusing `.conducks/doc-reviews.json` rather than a second store, so one file answers "what has been checked against what". → built as `.conducks/note-reviews.json` BESIDE it, deliberately not inside it: the schema differs (span-keyed per page vs module-hash per dir) and the stamp store is COMMITTED (ADR 0142) while doc-reviews stays local — merging them would force one file to be both.
 - [x] The recorded hash covers the files the page's anchors resolve to, computed by the ADR 0138 resolver so the two can never disagree about which files a page cites. → `buildStamps` calls `resolveAnchor` itself; keys ARE resolved paths.
-- [x] Proven: recording a review, then changing an unrelated file, leaves the page silent; changing a cited file makes it drifted. → pinned finer: an edit elsewhere IN THE SAME FILE stays silent for line/symbol stamps (tests/unit/domain/analysis/visuals-lint.test.ts).
+- [x] Proven: recording a review, then changing an unrelated file, leaves the page silent; changing a cited file makes it drifted. → pinned finer: an edit elsewhere IN THE SAME FILE stays silent for line/symbol stamps (tests/unit/domain/docs/visuals-lint.test.ts).
 
 ## Phase 2 — drift is reported where the anchors are
 - [x] `visuals-lint` reports a drifted page in its existing output, naming the files that moved since the review — a bare "this is stale" sends the reader to re-read everything, which is what nobody does. → flags name page AND span key; caught real rot three times in its first day (skill-file citations, cli/index.ts:121 shifted by an import).

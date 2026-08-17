@@ -2,7 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import path from 'node:path';
 import {
   checkVisualsDrift, generatorCommandOf, type DriftIO,
-} from "@/lib/domain/analysis/visuals-drift.js";
+} from "@/lib/domain/docs/visuals-drift.js";
 
 /**
  * The generator-drift half of the visuals gate (ADR 0139). The failure it exists for: a data edit

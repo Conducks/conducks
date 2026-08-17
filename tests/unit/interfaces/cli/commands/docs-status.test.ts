@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DocsStatusCommand } from '@/interfaces/cli/commands/docs-status.js';
 import { DocsLintCommand } from '@/interfaces/cli/commands/docs-lint.js';
-import { buildBoard, buildTrees, governedCount } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard, buildTrees, governedCount } from '@/lib/domain/docs/index.js';
 
 // A working `registry.docs.board` stand-in — the pre-fix `docs-status` reads it directly, so the
 // stub must behave like the real thing rather than throw, or a failure here would just be a crash,

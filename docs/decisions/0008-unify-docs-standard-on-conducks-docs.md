@@ -1,6 +1,6 @@
 # 0008 — unify the docs standard on conducks-docs; retire docs-rules
 Status: Accepted
-- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts
+- Enforced by: tests/unit/domain/docs/docs-grammar.test.ts
 - Date: 2026-07-18
 
 ## Context
@@ -33,7 +33,7 @@ skill folder (`SKILL.md.base`).
 One docs standard, one source — the spine is stated once, not twice, so it cannot drift. Repos not
 yet running conducks still have a complete, hand-authorable standard (format-first). `docs-lint`
 stays clean on conducks's own docs (19 governed files incl. handover); the grammar change is locked
-by `tests/unit/domain/analysis/docs-grammar.test.ts`. Vault references (`VAULT.md`, `Workshop.md`)
+by `tests/unit/domain/docs/docs-grammar.test.ts`. Vault references (`VAULT.md`, `Workshop.md`)
 point at a phantom `docs_rules.md` path and are Said's to update — flagged, not touched. Follow-up:
 conducks's own five flat root docs (`business_plan.md`, `creative_brief.md`, `product_plan.md`,
 `styling.md`, `implementation.md`) now read `unknown` — they belong in the category folders.

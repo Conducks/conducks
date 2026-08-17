@@ -1,13 +1,13 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Conducks — domain/analysis/docs-grammar — the docs standard, enforced</title>
+<title>Conducks — domain/docs/docs-grammar — the docs standard, enforced</title>
 <link rel="stylesheet" href="../../../system.css">
 <div class="wrap">
 <div class="meta"><b>DERIVED</b> — rendered from <code>docs-grammar.md</code> beside this file.
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
-<h1>domain/analysis/docs-grammar — the docs standard, enforced</h1>
-<p><b>Part of:</b> <a href="../analysis.html">domain/analysis</a>. Backs <code>conducks docs-lint</code>, <code>docs-status</code> and <code>bootstrap-docs</code>.</p>
+<h1>domain/docs/docs-grammar — the docs standard, enforced</h1>
+<p><b>Part of:</b> <a href="../docs.html">domain/docs</a>. Backs <code>conducks docs-lint</code>, <code>docs-status</code> and <code>bootstrap-docs</code>.</p>
 <p><b>Responsibility:</b> classifying every file under <code>docs/</code> by type — todo, decision, features, conventions, memory, progress, handover, architecture — and checking that each conforms to the per-type skeleton. It is the mechanism that keeps the conducks-docs standard from being advice.</p>
 <p><b>Boundaries:</b> structure only. It checks that an ADR has Context/Decision/Consequences and that a todo has <code>Status:</code> and <code>## Phase N —</code>; it has no opinion about whether the content is any good.</p>
 <p><b>Deferred / not built:</b> the grammar accepts a bare <code>Status:</code> line only. Other projects using this standard (subject-c) write <code><b>Status 2026-07-17:</b> …</code> — richer information in a form the linter rejects. Whether to loosen the check or conform the docs is unresolved.</p>
@@ -18,5 +18,5 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>That exemption is the point of ADR 0015, and it was a correction: architecture was briefly treated as DERIVED — something a tool generates — which is banned (ADR 0011). Wiring is queryable and rots in prose, so it is never written down; but a human explaining a module's *intent* is exactly what a doc is for, and no skeleton should constrain it. Hence <code>architecture/**/MODULE.md</code> classifies as authored and passes untouched, while <code>map.md</code> / <code>drift.md</code> remain forbidden as derived artefacts.</p>
 <h2>Living vs record</h2>
 <p>The classifier encodes the standard's core distinction: living files (features, conventions, memory, architecture) are overwritten in place; records (decisions, todos, progress, handover) are appended and never mutated. An accepted ADR is immutable — a later one amends or supersedes it, and the index carries the state.</p>
-<footer>Source: <code>docs/visuals/modules/domain/analysis/docs-grammar.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+<footer>Source: <code>docs/visuals/modules/domain/docs/docs-grammar.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

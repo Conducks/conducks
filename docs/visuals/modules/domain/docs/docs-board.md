@@ -1,8 +1,8 @@
-# domain/analysis/docs-board — the links between docs
+# domain/docs/docs-board — the links between docs
 
-**Part of:** [domain/analysis](../analysis.md). Sits on top of
+**Part of:** [domain/docs](../docs.md). Sits on top of
 [docs-grammar](docs-grammar.md); backs `conducks docs-status`, `conducks_docs` and the
-mirror's /api/docs. `analysis/docs-board.ts` and `analysis/docs-watcher.ts` are documented here together — the watcher is a thin trigger on this
+mirror's /api/docs. `docs/docs-board.ts` and `docs/docs-watcher.ts` are documented here together — the watcher is a thin trigger on this
 module, not a subsystem of its own.
 
 **Responsibility:** the cross-file half of the docs standard. `docs-grammar` parses ONE file and has

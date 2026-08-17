@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { buildBoard, agentView, crossTreeLint, treeShapeLint } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard, agentView, crossTreeLint, treeShapeLint } from '@/lib/domain/docs/docs-board.js';
 
 // The cross-file half of the standard: what a phase builds, what it waits on, and what an old
 // decision left unbuilt — facts no single file can hold, so they can only be tested on a tree.

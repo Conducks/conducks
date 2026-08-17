@@ -1,6 +1,6 @@
 # domain/analysis/coverage — test coverage as a graph overlay
 
-**Part of:** [domain/analysis](../analysis.md). `coverage-bind` and `coverage-baseline`.
+**Part of:** [domain/coverage](coverage.md). `coverage-bind` and `coverage-baseline`.
 
 **Responsibility:** binding an external coverage report (`coverage-final.json`) onto graph nodes, and
 comparing a run against a saved baseline to detect drift.

@@ -17,8 +17,8 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import {
   GOVERNED, REL, RE, type DocType, inferType, parseBody, shape, lint,
-} from "@/lib/domain/analysis/docs-grammar.js";
-import { resolveDocsTrees } from "@/lib/domain/analysis/service-docs.js";
+} from "./docs-grammar.js";
+import { resolveDocsTrees } from "./service-docs.js";
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import { verdict, verdictToJson } from "@/contracts/index.js";
 

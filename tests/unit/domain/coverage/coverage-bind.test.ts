@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { bindCoverage, type CovNode, type ParsedCoverage } from '@/lib/domain/analysis/coverage-bind.js';
+import { bindCoverage, type CovNode, type ParsedCoverage } from '@/lib/domain/coverage/coverage-bind.js';
 
 // One covered file. The regression (todo08): the old bare-basename fallback in matchFile
 // let this file's ran-lines bind onto EVERY same-named file, lighting them all FULL.

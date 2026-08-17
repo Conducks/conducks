@@ -157,8 +157,8 @@ describe('layer_boundaries — synthetic upward edge is blocked', () => {
     const { graph, addNode, addEdge } = build();
     // `test-runner.ts` ships. Only a `.test.`/`.spec.` suffix or a `tests/` directory is a test.
     addNode('/repo/src/interfaces/cli/commands/test-runner.ts::unit', 'test-runner.ts', '/repo/src/interfaces/cli/commands/test-runner.ts');
-    addNode('/repo/src/lib/domain/analysis/docs-board.ts::unit', 'docs-board.ts', '/repo/src/lib/domain/analysis/docs-board.ts');
-    addEdge('e1', '/repo/src/interfaces/cli/commands/test-runner.ts::unit', '/repo/src/lib/domain/analysis/docs-board.ts::unit');
+    addNode('/repo/src/lib/domain/docs/docs-board.ts::unit', 'docs-board.ts', '/repo/src/lib/domain/docs/docs-board.ts');
+    addEdge('e1', '/repo/src/interfaces/cli/commands/test-runner.ts::unit', '/repo/src/lib/domain/docs/docs-board.ts::unit');
 
     const report = auditOf(graph);
     const violations = report.violations.filter(v => v.ruleId === 'layer_boundaries');

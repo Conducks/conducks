@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { findServiceDocs, serviceDocsNotice } from '@/lib/domain/analysis/service-docs.js';
+import { findServiceDocs, serviceDocsNotice } from '@/lib/domain/docs/service-docs.js';
 
 /**
  * The docs tools resolve exactly ONE `docs/` — the one under the path they were given — and never walk

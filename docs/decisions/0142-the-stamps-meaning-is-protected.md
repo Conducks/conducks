@@ -3,7 +3,7 @@ Status: Accepted
 - Amends: 0138 — the freshness half it deferred to todo45
 - Builds: 0141
 - Date: 2026-08-06
-- Enforced by: tests/unit/domain/analysis/visuals-lint.test.ts (reworded-anchor-keeps-stamp, deleted-claim-orphans-visibly, bare-word-authored-fails, per-page stamping)
+- Enforced by: tests/unit/domain/docs/visuals-lint.test.ts (reworded-anchor-keeps-stamp, deleted-claim-orphans-visibly, bare-word-authored-fails, per-page stamping)
 
 ## Context
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { enforcedByPaths } from '@/lib/domain/analysis/docs-board.js';
+import { enforcedByPaths } from '@/lib/domain/docs/docs-board.js';
 
 /**
  * ADR 0058 — extracting the code paths an `- Enforced by:` value names.
@@ -15,8 +15,8 @@ import { enforcedByPaths } from '@/lib/domain/analysis/docs-board.js';
  */
 describe('enforcedByPaths', () => {
   it('takes a bare path', () => {
-    expect(enforcedByPaths('tests/unit/domain/analysis/coverage-bind.test.ts'))
-      .toEqual(['tests/unit/domain/analysis/coverage-bind.test.ts']);
+    expect(enforcedByPaths('tests/unit/domain/coverage/coverage-bind.test.ts'))
+      .toEqual(['tests/unit/domain/coverage/coverage-bind.test.ts']);
   });
 
   it('ignores the prose after a path', () => {

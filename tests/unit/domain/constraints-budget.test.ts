@@ -12,7 +12,7 @@
  * the cap REPORTS: what was omitted, and where to read the rest.
  */
 import { describe, it, expect } from '@jest/globals';
-import { agentView } from '@/lib/domain/analysis/docs-board.js';
+import { agentView } from '@/lib/domain/docs/index.js';
 
 const entries = (n: number, size = 200) =>
   Array.from({ length: n }, (_, i) => ({ name: `entry${i}`, Rule: 'x'.repeat(size), Gotcha: 'x'.repeat(size) }));

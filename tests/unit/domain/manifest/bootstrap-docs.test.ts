@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ManifestService } from '@/lib/domain/manifest/index.js';
-import { buildBoard, treeShapeLint } from '@/lib/domain/analysis/docs-board.js';
+import { buildBoard, treeShapeLint } from '@/lib/domain/docs/index.js';
 
 /**
  * Bootstrap writes the conducks-docs create-now set. Two things must hold, and only a real run on a

@@ -2,7 +2,7 @@
 Status: Accepted
 - Builds: 0138, 0124
 - Date: 2026-08-06
-- Enforced by: tests/unit/domain/analysis/visuals-drift.test.ts (the restore contract and the create/delete cases carry the decision)
+- Enforced by: tests/unit/domain/docs/visuals-drift.test.ts (the restore contract and the create/delete cases carry the decision)
 
 ## Context
 

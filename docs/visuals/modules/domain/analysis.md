@@ -21,7 +21,7 @@ Adequate while the question set is known.
 - **[reflector/](../core/parsing/reflector.md)** — file → spectrum. The single most load-bearing unit here.
 - **[orchestrator/](analysis/orchestrator.md)** — the multi-pass pulse, incremental analysis, workers.
 - **[coverage/](analysis/coverage.md)** — binding an external coverage report onto the graph.
-- **[docs-grammar/](analysis/docs-grammar.md)** — the conducks-docs standard, enforced.
+- **[docs-grammar/](docs/docs-grammar.md)** — the conducks-docs standard, enforced.
 
 `conducks-core` is the façade the registry wires; `query-service` answers structural questions;
 `fallback-detector` reports where analysis degraded; `gateway-service` is the live vault-watch feed
@@ -47,7 +47,7 @@ One pass cannot resolve a cross-file reference, because the target may not be pa
 constraint is what divides this module: the [reflector](../core/parsing/reflector.md) sees exactly one file and
 seeds unresolved specifiers, the [orchestrator](analysis/orchestrator.md) is the only thing allowed to
 see all files and is therefore where real edges get built, and the feature analyses
-([coverage](analysis/coverage.md), [docs-grammar](analysis/docs-grammar.md)) read the finished graph and
+([coverage](analysis/coverage.md), [docs-grammar](docs/docs-grammar.md)) read the finished graph and
 never touch parsing. Anything that needs repo-wide knowledge moves up, never sideways.
 
 The consequence every part inherits — `analyze` is incremental, so a re-run can show no change while

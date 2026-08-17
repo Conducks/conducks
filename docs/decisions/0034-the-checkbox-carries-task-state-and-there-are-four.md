@@ -1,6 +1,6 @@
 # 0034 — the checkbox carries task state, and there are four
 Status: Accepted
-- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts (the four markers parse, an unknown one fails, a reasonless [>] fails); tests/unit/domain/analysis/docs-board.test.ts (deferred leaves the denominator, dropped leaves entirely, and neither launders work away)
+- Enforced by: tests/unit/domain/docs/docs-grammar.test.ts (the four markers parse, an unknown one fails, a reasonless [>] fails); tests/unit/domain/docs/docs-board.test.ts (deferred leaves the denominator, dropped leaves entirely, and neither launders work away)
 - Date: 2026-07-27
 
 ## Context

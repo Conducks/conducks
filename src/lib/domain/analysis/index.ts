@@ -3,7 +3,7 @@ import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { essenceLens, TypeScriptResolver } from "@/lib/core/parsing/index.js";
-import { buildBoard, enforcedByPaths } from "@/lib/domain/analysis/docs-board.js";
+import { buildBoard, enforcedByPaths } from "@/lib/domain/docs/index.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import path from "node:path";
 import fsSync from "node:fs";

@@ -1,6 +1,6 @@
 # 0015 — Architecture docs are AUTHORED, not derived
 Status: Accepted
-- Enforced by: tests/unit/domain/analysis/docs-grammar.test.ts ("classifies architecture as AUTHORED (file OR folder OR MODULE.md), not derived — ADR 0015")
+- Enforced by: tests/unit/domain/docs/docs-grammar.test.ts ("classifies architecture as AUTHORED (file OR folder OR MODULE.md), not derived — ADR 0015")
 - Amends: 0009 (which classified architecture as the "derived" tier)
 - Related: 0011 (killed auto-generated derived docs — still correct)
 - Date: 2026-07-19

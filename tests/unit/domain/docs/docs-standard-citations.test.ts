@@ -128,7 +128,7 @@ describe('conducks-docs — the standard names what the code enforces', () => {
    * the reverse of this failure, and the reason the marker set is closed.
    */
   it('documents every checkbox marker `MARKER_TO_STATE` accepts, in the section that defines them', () => {
-    const decl = /const MARKER_TO_STATE[^=]*=\s*\{([^}]*)\}/.exec(source('src/lib/domain/analysis/docs-grammar.ts'));
+    const decl = /const MARKER_TO_STATE[^=]*=\s*\{([^}]*)\}/.exec(source('src/lib/domain/docs/docs-grammar.ts'));
     expect(decl).not.toBeNull();
     const markers = [...decl![1].matchAll(/(?:"([^"]*)"|'([^']*)'|\b([A-Za-z])\s*):/g)]
       .map(m => m[1] ?? m[2] ?? m[3])
@@ -160,7 +160,7 @@ describe('conducks-docs — the standard names what the code enforces', () => {
    * not to the standard is a document failing a rule its author had no way to read.
    */
   it('names every file `ROOT_ONLY` and `DERIVED_FILES` special-case', () => {
-    const board = source('src/lib/domain/analysis/docs-board.ts');
+    const board = source('src/lib/domain/docs/docs-board.ts');
     const names = (decl: string): string[] => {
       const m = new RegExp(`const ${decl}[^=]*=\\s*\\[([^\\]]*)\\]`).exec(board);
       expect(m).not.toBeNull();

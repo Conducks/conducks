@@ -15,7 +15,7 @@
  * board can say "this exists and is waiting on a trigger" without inflating the open count.
  */
 import { describe, it, expect } from '@jest/globals';
-import { agentView } from '@/lib/domain/analysis/docs-board.js';
+import { agentView } from '@/lib/domain/docs/index.js';
 
 const board = (todos: any[]) => ({
   todos, decisions: [], other: [], lint: [], warns: [], unlinked: [], crossRefs: [],

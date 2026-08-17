@@ -17,10 +17,10 @@ const DEFAULT_INTERFACE_FRAGMENTS = ['/interfaces/', '/adapters/', '/apps/', '/c
 import { IntelligenceService, ConducksSearch } from "@/lib/domain/intelligence/index.js";
 import { FederatedLinker } from "@/lib/core/graph/index.js";
 import { EvolutionService, GVREngine, DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
-import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/analysis/docs-board.js";
+import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/docs/index.js";
 import { collectChanges, impactedSymbolIds } from "@/lib/domain/analysis/change-set.js";
-import { lintVisuals, collectVisualPages, buildStamps, staleStamps, type VisualsViolation, type ReviewStamps } from "@/lib/domain/analysis/visuals-lint.js";
-import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/analysis/visuals-drift.js";
+import { lintVisuals, collectVisualPages, buildStamps, staleStamps, type VisualsViolation, type ReviewStamps } from "@/lib/domain/docs/index.js";
+import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/docs/index.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
 import { assessRoot, explainScope } from "@/lib/core/utils/index.js";
@@ -29,8 +29,8 @@ import { UpdateCheck } from "@/lib/domain/federation/index.js";
 import { ProjectRegistry } from "@/lib/domain/federation/index.js";
 import { ProjectMonitor } from "@/lib/domain/analysis/project-monitor.js";
 import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/filter-builder.js";
-import { DocsWatcher } from "@/lib/domain/analysis/docs-watcher.js";
-import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/analysis/coverage-bind.js";
+import { DocsWatcher } from "@/lib/domain/docs/index.js";
+import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/coverage/index.js";
 import { SourceLineReader } from "@/lib/core/utils/index.js";
 import { firstLineOf } from "@/lib/core/parsing/index.js";
 import { FallbackDetector } from "@/lib/domain/analysis/fallback-detector.js";
@@ -45,7 +45,7 @@ import {
   diffAgainstBaseline,
   type CoverageResult,
   type CoverageSnapshot,
-} from "@/lib/domain/analysis/coverage-baseline.js";
+} from "@/lib/domain/coverage/index.js";
 import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/manifest/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";

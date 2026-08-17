@@ -5,7 +5,7 @@ Status: done
 ## Phase 1 — fix the matcher
 - [x] reproduced: `conducks coverage scratch/cov/coverage-final.json .` showed 64 index.ts rows all FULL from ONE covered index.ts (matchFile's endsWith-basename fallback)
 - [x] fixed coverage-bind.ts matchFile: dropped the bare-basename fallback; suffix match now requires a path-segment boundary AND ≥ dir/basename (suffix must span a "/")
-- [x] verified: 64 → 2 index.ts rows, fill varies (90%/69%) not phantom FULL; summary honest at `0 full · 14 partial · 77 dark`. Locked with tests/unit/domain/analysis/coverage-bind.test.ts (4 tests). Full suite 30/30 green, typecheck clean.
+- [x] verified: 64 → 2 index.ts rows, fill varies (90%/69%) not phantom FULL; summary honest at `0 full · 14 partial · 77 dark`. Locked with tests/unit/domain/coverage/coverage-bind.test.ts (4 tests). Full suite 30/30 green, typecheck clean.
 
 ## Retraction note (supersedes the original todo08 premise)
 - Original premise "incremental analyze duplicates vault nodes" is FALSE — verified: clean+analyze
