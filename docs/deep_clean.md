@@ -1294,3 +1294,118 @@ visuals-lint 61 anchors.
 - `reflector.ts` is still 1,696 lines. The split is its own todo; the blocker is scope, not coverage.
 - **`domain`, `interfaces` and `registry` have had no pass at all.** Two dead subsystems were found
   in core, which had been audited once. Nobody should assume the unaudited layers are cleaner.
+
+---
+
+# AFTER THE RECHECK — what core gained, and where domain begins (2026-08-17)
+
+The recheck above closed with core at 72% statements and two named gaps: branch coverage, and nine
+language packs whose queries nothing measured. Both were worked, and both produced defects rather
+than percentage points — which is the argument for choosing targets by CONSEQUENCE rather than by
+counting uncovered branches.
+
+## The ranker: one untested file, three defects
+
+`algorithms/ranker.ts` sat at 16% branch coverage while producing `gravity` — the number that orders
+every answer — and `isEntryPoint`. Gravity is never displayed as a figure anyone checks, so a wrong
+value reorders results silently with nothing on screen to disagree with.
+
+| defect | effect |
+|---|---|
+| `addNode` stripped 4 of ~35 skeleton keys from the compressed meat | a write through `getAllNodes()` was INVISIBLE through `getNode()` |
+| `entryReason` was not on the skeleton | a stale reason could outlive the flag it explains |
+| the anchor filter compared `'unit'` against `'UNIT'` | **no file was ever ranked** — 968 UNIT nodes, gravity 0 |
+
+The third hid behind a second field for its entire life. `entry` sorts on `properties.rank`, which
+lives in the metadata blob; the vault stores `gravity`, a column. The blob held a plausible old value,
+so the command printed a sensible ranking while the column beside it was zero. Two names for one
+number, two persist routes, nothing comparing them.
+
+**I nearly missed it.** After the first fix the vault showed 264 distinct gravity values and six
+sensible entry points, and I wrote down that production was fine. It was not — 264 was what a masked
+field produced. What settled it was PageRank's own INVARIANT: anchor gravity must sum to 1. That is
+checkable without knowing the right answer in advance, which "looks sane" never is.
+
+    UNIT gravity sum   0.0000 -> 0.3686        distinct values  264 -> 1182
+    total gravity      1.0000 -> 1.0000        (the invariant, unchanged)
+
+## The pack oracle, and three rounds of the instrument being wrong
+
+Nine of thirteen packs had nothing checking their queries. Not a compiler per language — javac,
+dotnet and php are not installed here, and an oracle that runs only where nine toolchains exist is an
+oracle nobody runs. tree-sitter ships `node-types.json` with every grammar: the grammar author's own
+declaration of what it produces. Conducks matches hand-written shapes; the oracle walks every node.
+
+**It accused the packs three times before it was right.** The first run reported all nine as
+catastrophically broken — `childByFieldName` returns undefined on this binding, so the denominator was
+empty, and an empty denominator reports 100% wrong while looking exactly like a real finding. Then
+Ruby scored 0 declared against 9 minted, because Ruby names no declaration with the suffixes the rule
+looked for. Then every C and C++ function read as EXTRA, because their names sit down a `declarator`
+chain.
+
+So BOTH directions ratchet here, and the header says so — unlike `oracle-python.mjs`, where EXTRA
+genuinely is exact. Claiming an exactness already disproved three times would be the flattering lie
+these files exist to prevent.
+
+Then it earned itself: **four constructs no pack captured.** A type alias in rust, go AND c — three
+packs, one blind spot, `query AccountId` finding nothing. A struct in C#, as common there as a class
+and entirely invisible. An enum member in C#. None reachable by any other gate, because a query that
+stops matching a construct looks exactly like a project that does not use it.
+
+## The chain that hid its own verdict, for four commits
+
+`npm run oracle` chains with `&&`. The tsc oracle had been failing since `7c11bc4` — my own dead-code
+commit — so the exports oracle had not run since, and I read the surviving tail output as green.
+
+That is the gate-read-through-a-pipe failure this log already records, committed again by the person
+who wrote it down. **A pipeline that stops on failure is a pipeline whose later output is evidence of
+nothing.**
+
+The cause was mine and small: deleting `ConducksPrism` left its two imports behind. Removing them
+restored 28. That unmasked a second — `domain/federation/context.ts`, an `AnalyzeContext` duplicating
+parsing's, which git history shows NOTHING has ever imported. 84 lines dead since written, hidden
+behind the name collision. Deleted rather than baselined.
+
+## Where domain begins
+
+Nine areas, 56 files, 12,159 lines. Eight carried an `index.ts` and only two were doors, because an
+index nothing is forced through is a barrel. Measured: **35 source files and 25 tests reach past a
+domain index.**
+
+The ORDER is measured too, because rule 13 asks for leaves first:
+
+    leaves      federation · intelligence · kinetic · manifest · visual
+    then        evolution -> kinetic
+    then        governance, metrics -> evolution
+    last        analysis -> six of the others
+
+`federation` is done — a leaf, and the only area with no index at all. Its door exports six symbols
+and deliberately not five more. Its own tests keep leaf imports, which rule 3 allows and which a
+first over-eager rewrite wrongly took away.
+
+`mcp-configurator.ts` was 60 lines at 0% coverage and it **edits a file the user owns**. The failure
+worth testing is not "conducks did not register" but "conducks registered, and removed something
+else" — a config that loses an unrelated MCP server takes another tool offline, and nobody connects
+that to having run `conducks setup`. Every case runs against a temporary home via an injected
+`homedir()`; the real config's mtime was checked afterwards and is eleven days old.
+
+`manifest` and `visual` went onto the gate beside federation because they had zero bypasses — but
+that is a claim about doors, not about sweeps, and the commit message implied more. `ManifestEngine`
+was exported and named in no test; it decides what `bootstrap-docs` and `record` WRITE, including the
+`# Title` whose absence made this command's own output fail `docs-lint` (ADR 0122). Nine cases now,
+three mutations, three kills.
+
+## State
+
+| | |
+|---|---|
+| doors | 12 — nine in core, three in domain — all on the gate, all biting |
+| oracles | 4, all running to completion |
+| tests | 2,176 across 278 suites |
+| core coverage | 74% statements, 64% branches |
+| open todos | none from this campaign; `docs-status` reports nothing open |
+
+**What is still not claimed.** Six domain areas remain unswept, and the canvas says so on its own
+face. Branch coverage is not a target that was hit — it is a number that moved while defects were
+being fixed. The pack oracle's residue is instrument-side and named in its header: a rust parameter,
+a C++ template parameter, a C# accessor, a PHP property minted with its `$` sigil.
