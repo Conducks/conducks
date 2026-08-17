@@ -59,10 +59,16 @@ export const RUST_QUERIES = `
   (type_parameters
     (type_parameter) @isProperty)
 
-  ;; Trait implementations (creates IMPLEMENTS edge conceptually)
+  ;; Trait implementations. "impl Base for Child" IS an IMPLEMENTS edge, and until now it produced
+  ;; none: the old pattern captured the trait as @source and the type as @isHeritage with no @name
+  ;; anywhere, so the reflector resolved no definition node and dropped it. The comment above it
+  ;; said "creates IMPLEMENTS edge conceptually" — conceptually was the whole problem.
+  ;;
+  ;; @name is the implementing TYPE, which the struct_item pattern above already mints; re-capturing it here
+  ;; resolves the same node rather than a second one, which is what lets the heritage capture land.
   (impl_item
-    trait: (_) @source
-    type: (_) @isHeritage) @isInfra
+    trait: (type_identifier) @heritage_implements
+    type: (type_identifier) @name) @isStruct
 
   ;; Implementation Blocks
   (impl_item type: (type_identifier) @heritage)

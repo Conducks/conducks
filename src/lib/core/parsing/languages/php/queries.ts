@@ -15,6 +15,22 @@ export const PHP_QUERIES = `
   
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class_declaration (name) @name) @isStruct
+
+  ;; Heritage: extends / implements (EXTENDS + IMPLEMENTS edges).
+  ;;
+  ;; @name is co-captured in the SAME pattern deliberately. The reflector only processes a heritage
+  ;; capture when the match also resolves a definition node, so a standalone (base_clause (name))
+  ;; pattern compiles, captures the supertype, and is then dropped in silence — which is precisely
+  ;; what PHP had: no pattern at all, and therefore zero heritage edges for every PHP class.
+  ;; Verified against the real tree: a class's supertypes are SIBLINGS of the name field, in
+  ;; (base_clause) for extends and (class_interface_clause) for implements — two separate nodes, so
+  ;; two separate patterns. The capture name carries the relation and must not be re-guessed.
+  (class_declaration
+    (name) @name
+    (base_clause (name) @heritage_extends)) @isStruct
+  (class_declaration
+    (name) @name
+    (class_interface_clause (name) @heritage_implements)) @isStruct
   (interface_declaration (name) @name) @isInterface
   (trait_declaration (name) @name) @isStruct
   (enum_declaration (name) @name) @isEnum

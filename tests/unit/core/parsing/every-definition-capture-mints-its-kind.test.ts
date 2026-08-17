@@ -136,21 +136,19 @@ const CASES: Case[] = [
 ];
 
 /**
- * Tags in `DEFINITION_CAPTURES` that mint NO node in any language that emits them — measured, not
- * assumed, and left as a finding rather than fixed inside a clean (ADR 0150 rule 16).
+ * Tags in `DEFINITION_CAPTURES` that mint NO node in any language that emits them.
  *
- * `isHeritage` is the whole list. In all three grammars that emit it — Ruby, Rust and PHP — it sits
- * in NAME position inside a match whose top-level capture is something else, so the reflector never
- * treats it as a definition. Rust's own query comment says the pattern "creates IMPLEMENTS edge
- * conceptually"; measured, `impl Base for Child` produces the struct, the trait and the method, and
- * no edge between Child and Base at all. Ruby's `include Base` produces one `CALLS` edge to
- * `GLOBAL::include`, which is the mixin read as a function call.
+ * `isHeritage` used to be on this list. It is not any more, and the entry closing is the reason the
+ * list exists: measuring the gap is what produced the fix. In Ruby, Rust and PHP the tag sat in name
+ * position inside a match captured as something else, and no heritage edge was produced at all —
+ * which is now fixed and pinned by `heritage-across-languages.test.ts`.
  *
- * Recorded here so it is a KNOWN gap with a test behind it. If someone makes heritage mint a node,
- * this row goes red and they move it up into CASES — which is the point of writing it down.
+ * The tag still mints no NODE, and that is correct: inheritance is an EDGE. What it declares is a
+ * relation between two symbols the grammar has already named elsewhere, so it belongs in
+ * `DEFINITION_CAPTURES` as a marker that a match is a definition, not as a request for a node.
  */
 const MINTS_NO_NODE: Array<{ tag: string; why: string }> = [
-  { tag: CaptureTags.IS_HERITAGE, why: 'name-position capture in Ruby, Rust and PHP; no IMPLEMENTS edge is produced' },
+  { tag: CaptureTags.IS_HERITAGE, why: 'inheritance is an EDGE between named symbols, not a node — see heritage-across-languages.test.ts' },
 ];
 
 const reflector = new ConducksReflector();
@@ -190,24 +188,26 @@ describe('every definition capture mints a node of the kind it declares', () => 
     expect(uncovered).toEqual([]);
   });
 
-  it('isHeritage mints no node in Ruby, Rust or PHP — the known gap, pinned', async () => {
-    // Asserted so the gap cannot close silently. A heritage node appearing here is good news that
-    // must still be read: the row moves into CASES and this test goes with it.
+  it('isHeritage produces an EDGE rather than a node, in the packs that emit it', async () => {
+    // This case replaces a test that pinned the OPPOSITE: that Rust produced no heritage edge at
+    // all. It was written as a known gap with the note "a heritage node appearing here is good news
+    // that must still be read". The gap was then fixed, this test went red, and it was rewritten —
+    // which is the whole point of pinning a gap instead of only writing it down.
     const rust: any = await reflect({
       tag: CaptureTags.IS_HERITAGE, lang: 'rust', provider: new RustProvider(),
       file: '/repo/h.rs', symbol: '', canonicalKind: '',
       source: 'struct Child;\ntrait Base { fn go(&self); }\nimpl Base for Child { fn go(&self) {} }\n',
     });
 
-    // The parts that DO work, asserted first — otherwise a grammar that stopped parsing entirely
-    // would satisfy the negative below and read as the same known gap.
     const kinds = rust.nodes.map((n: any) => `${n.name}:${n.canonicalKind}`);
     expect(kinds).toContain('Child:STRUCTURE');
     expect(kinds).toContain('Base:STRUCTURE');
 
-    const heritageEdges = (rust.relationships ?? []).filter((e: any) =>
-      e.type === 'INHERITS' || e.type === 'IMPLEMENTS' || e.type === 'EXTENDS');
-    expect(heritageEdges).toEqual([]);
+    // The relation, which is what the tag is for — and NO node named after the relation itself.
+    const heritage = (rust.relationships ?? []).filter((e: any) =>
+      e.type === 'IMPLEMENTS' || e.type === 'EXTENDS');
+    expect(heritage.map((e: any) => `${e.type} ${e.sourceName}->${e.targetName}`))
+      .toEqual(['IMPLEMENTS Child->Base']);
   }, 60000);
 
   it('every case names a language whose grammar actually emits that tag', () => {

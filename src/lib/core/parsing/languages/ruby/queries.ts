@@ -14,6 +14,24 @@ export const RUBY_QUERIES = `
   
   ;; --- Definitions (L4-L5: Structure & Behavior) ---
   (class name: (constant) @name) @isStruct
+
+  ;; Heritage. Same co-capture rule as every other pack: @name must sit in the SAME pattern, or the
+  ;; reflector resolves no definition node and drops the capture silently. Ruby had an @isHeritage
+  ;; pattern for mixins that carried no @name, so it produced nothing — measured, zero heritage
+  ;; edges for Ruby.
+  ;;
+  ;; "class Child < Base" is single inheritance: the supertype sits in a (superclass) sibling of the
+  ;; name field. "include Base" is a MIXIN — a call in the class body — and is IMPLEMENTS rather
+  ;; than EXTENDS, because a module contributes behaviour without being the parent.
+  (class
+    name: (constant) @name
+    superclass: (superclass (constant) @heritage_extends)) @isStruct
+  (class
+    name: (constant) @name
+    body: (body_statement
+      (call
+        method: (identifier) @heritage_method (#match? @heritage_method "^(include|extend|prepend)$")
+        arguments: (argument_list (constant) @heritage_implements)))) @isStruct
   (module name: (constant) @name) @isStruct
   ;; --- Signature (ADR 0086/0087): parameters only — Ruby has no return type annotations, so
   ;; there is no @return_type capture at all (paramsOf/returnTypeOf treat its absence as an
@@ -34,10 +52,9 @@ export const RUBY_QUERIES = `
     method: (identifier) @infra_method (#match? @infra_method "^(resources|resource|get|post|put|patch|delete|root)$")
     arguments: (argument_list (_) @kinesis_route_path)) @isInfra
 
-  ;; Module Mixins: include, extend, prepend
-  (call
-    method: (identifier) @heritage_method (#match? @heritage_method "^(include|extend|prepend)$")
-    arguments: (argument_list (constant) @heritage)) @isHeritage
+  ;; Module mixins are handled by the co-captured class pattern above. The standalone version that
+  ;; used to sit here carried no @name, so the reflector resolved no definition node and dropped
+  ;; every capture — it was the reason Ruby had zero heritage edges.
   
   ;; --- Pulse Flow (Assignments) ---
   (assignment left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
