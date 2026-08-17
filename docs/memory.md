@@ -2590,3 +2590,48 @@ by construction.
   subject 1.81s -> 2.59s (+43%), `impact` on a 400-file project 0.40s -> 0.42s. Kept without an
   opt-out flag — `prune`'s job is "is it safe to delete this", and a stale yes costs more than a
   second. A cost measured and written down is a decision; a cost not measured is a surprise later.
+
+## A gate that self-baselines reports green after scoring nothing
+- Gotcha: three of the four oracles read `--write-baseline || !prev`, so an unrecorded key wrote a
+  baseline and printed the tick. The key comes from the subject's DIRECTORY NAME, so scoring a COPY
+  — which is how a frozen subject is scored without touching it — minted a fresh key every run,
+  self-baselined it, and passed. Found by running the Python oracle on `scraper2`, a copy of
+  `scraper`: it recorded a new entry and announced success while comparing against nothing.
+- Why: the only visible difference was a missing clause in the verdict — "no finding contradicts the
+  parser" instead of "…, and recall did not regress". Nobody reads a tick for an absent sentence.
+- Applies: recording a baseline is a deliberate act. Without one the oracle exits 1 and names the key
+  it lacked. Same shape as ADR 0044 — a check that ran on nothing is not a pass — one layer up, in
+  the thing doing the checking.
+
+## A measurement that reads prose as code is not a measurement
+- Gotcha: the scan re-checking todo66's blocker reported orchestrator as a SECOND subject showing the
+  unresolvable-specifier shape, which would have cleared the blocker and authorised a bundler-config
+  reader per framework. It was matching `Prefer importing from '../shared/types'` inside a doc
+  comment; the file's real imports are `'../../shared/types'` and resolve fine.
+- Why: the regex asked for `from '<specifier>'` and prose contains that phrase. Nothing announced the
+  false positive — it looked exactly like the evidence the todo was waiting for.
+- Applies: strip comments before scanning source for facts, and be most suspicious of a measurement
+  that authorises expensive work. Re-measured with comments stripped: sofie 18 unresolved of 1,096,
+  orchestrator 0 of 169, scraper none. Still one subject; blocker holds.
+
+## A refactor that makes an invariant statable makes it mutable, and mine was scored by nothing
+- Gotcha: four capture pairs each carried `let pending… = null` and `if (pending) { record; pending
+  = null; }` — one rule written four times (rule 9). Folding them into one holder let me mutate it,
+  and BOTH halves survived: making `fire` skip its clear left 2,296 tests green, and making `arm`
+  refuse to replace left 2,296 tests green.
+- Why: every existing case arms and fires exactly once, so neither the clear nor the replace is ever
+  observable. The failure they prevent is a value recorded against the PREVIOUS name — a confident
+  wrong edge, which `impact`, `trace` and `prune` cannot distinguish from a right one.
+- Applies: duplication hides more than effort. Four copies of a rule mean four places where nobody
+  can point at the rule to test it. Also: a defensive guard that nothing outside the class can
+  observe should be recorded as unscored rather than covered by a test that passes either way.
+
+## A test can pass because the wrong branch could not have succeeded
+- Gotcha: the longest-prefix-first case in the DI resolver passed with the loop counting UP. The
+  short path's member did not exist, so the wrong branch failed to resolve and the loop reached the
+  right answer anyway. Three more mutations survived the same way — `pathsOwner ?? file` is invisible
+  while the object and its alias share a file, and stripping `[]` from a declared type had no case.
+- Why: a case only tests an ordering rule if BOTH orders can succeed. Making the wrong branch
+  reachable is what turns coverage into a claim.
+- Applies: when a mutation survives, suspect the case before the claim. All four were the fixture
+  being too weak, not the code being right for another reason.
