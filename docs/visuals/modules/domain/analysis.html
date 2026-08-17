@@ -18,7 +18,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <li><b><a href="analysis/coverage.html">coverage/</a></b> — binding an external coverage report onto the graph.</li>
 <li><b><a href="docs/docs-grammar.html">docs-grammar/</a></b> — the conducks-docs standard, enforced.</li>
 </ul>
-<p><code>conducks-core</code> is the façade the registry wires; <code>query-service</code> answers structural questions; <code>fallback-detector</code> reports where analysis degraded; <code>gateway-service</code> is the live vault-watch feed behind the Mirror dashboard, constructed by the <code>mirror</code> CLI command and consumed by the web server.</p>
+<p><code>conducks-core</code> is the façade the registry wires; <code>query-service</code> answers structural questions; <code>gateway-service</code> is the live vault-watch feed behind the Mirror dashboard, constructed by the <code>mirror</code> CLI command and consumed by the web server.</p>
 <h2>The pulse links, inducts, then links AGAIN</h2>
 <p>The order inside <code>analyze</code> matters and is not obvious. <code>IntraLinker</code> runs once the whole graph is in memory, then virtual/external induction materialises nodes for references that pointed outside the project, then the linker runs a SECOND time against those new nodes.</p>
 <p>Without that second pass the first analyze on a fresh vault resolves fewer references than a rebuild of the same code — the induced nodes did not exist when linking happened, and on a warm vault they only appear to work because they survived from the previous pulse. Measured on subject-c: 7,531 resolutions cold against 7,994 warm, dangling 3,440 against 3,146 (todo59).</p>

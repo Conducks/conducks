@@ -25,7 +25,6 @@ import { WatchCommand } from "./commands/watch.js";
 import { MirrorCommand } from "./commands/mirror.js";
 import { TraceCommand } from "./commands/trace.js";
 import { ExplainCommand } from "./commands/explain.js";
-import { FallbackCommand } from "./commands/fallback.js";
 import { HelpCommand } from "./commands/help.js";
 import { EntryCommand } from "./commands/entry.js";
 import { McpCommand } from "./commands/mcp.js";
@@ -58,7 +57,7 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
  * Two reasons land a command here: it writes the graph (`analyze`, `clean`), or it does not read it.
  */
 export const STALENESS_BYPASS = new Set([
-  'analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror', 'fallback',
+  'analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror',
   'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
   'visuals-lint', 'install-hooks',
 ]);
@@ -220,7 +219,7 @@ export async function main() {
     new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
     new AdviseCommand(), new PruneCommand(),
     new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
-    new TraceCommand(), new ExplainCommand(), new FallbackCommand(), new EntryCommand(), new McpCommand(),
+    new TraceCommand(), new ExplainCommand(), new EntryCommand(), new McpCommand(),
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
     new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(), new VisualsLintCommand(),

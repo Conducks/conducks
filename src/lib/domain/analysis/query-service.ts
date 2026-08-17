@@ -451,29 +451,6 @@ export class QueryService {
       `
     },
 
-    suspicious_fallbacks: {
-      description: "Find functions that appear to be legacy fallbacks based on structural patterns",
-      params: ["minConfidence", "minTenureDays", "limit"],
-      sql: `
-        SELECT
-          n.id, n.name, n.file, n.risk, n.gravity, n.complexity,
-          n.canonicalKind, n.canonicalRank,
-          json_extract_string(n.kinetic, '$.tenureDays') AS tenureDays,
-          json_extract_string(n.dna, '$.fallbackAnalysis.confidence') AS fallbackConfidence,
-          json_extract_string(n.dna, '$.fallbackAnalysis.patterns.usageRatio.ratio') AS fallbackRatio,
-          json_extract_string(n.dna, '$.fallbackAnalysis.patterns.namingPatterns.score') AS namingScore
-        FROM nodes n
-        WHERE json_extract(n.dna, '$.fallbackAnalysis.isFallback') = true
-        AND CAST(json_extract_string(n.dna, '$.fallbackAnalysis.confidence') AS REAL) >= ?
-        AND CAST(json_extract_string(n.kinetic, '$.tenureDays') AS INTEGER) >= ?
-        AND n.canonicalKind IN ('BEHAVIOR', 'STRUCTURE')
-        ORDER BY
-          CAST(json_extract_string(n.dna, '$.fallbackAnalysis.confidence') AS REAL) DESC,
-          n.risk DESC
-        LIMIT ?
-      `
-    },
-
     type_coupling: {
       description: "Types and interfaces imported by the most distinct files — compile-time coupling hotspots. Change these → ripple everywhere.",
       params: ["minImporters", "limit"],

@@ -53,10 +53,6 @@
 - Purpose: Push graph changes to connected dashboard clients as they land, so the picture on screen matches the code on disk.
 - Intent: A dashboard that needs a manual refresh loses the value of watch mode — the two are meant to be used together.
 
-## Fallback Pattern Detection — built by `conducks analyze`, read via `conducks fallback`
-- Purpose: Recognise code whose only job is to catch a primary path's failure, so it can be weighed differently from canonical logic.
-- Intent: Fallback code inflates apparent complexity and risk if treated as equally important as the path it backs up — so risk scoring re-weights once a symbol is recognised as fallback.
-
 ## Symbol Query — `conducks query <pattern>`
 - Purpose: Turn a half-remembered name into a canonical, addressable symbol ID that every other command accepts.
 - Intent: Agents need a precise handle on "this exact symbol," not a text match — grep cannot disambiguate an overloaded or shadowed name, and every downstream command needs the ID, not the string.
@@ -108,10 +104,6 @@
 ## Structural Integrity Audit — `conducks audit [--history=<window>]`
 - Purpose: Run a fixed set of architectural sanity checks — import cycles, hub overload, orphan exports — plus the project's own declared rules, and report violations.
 - Intent: Encodes house rules as enforceable checks instead of tribal knowledge that erodes as a team changes. `--history` reads several past pulses so the answer can be "trending better or worse", not only "bad today".
-
-## Fallback Reporting — `conducks fallback`, `conducks audit --fallback`
-- Purpose: Rank fallback-tagged code for review or removal by confidence and usage, rather than listing every match.
-- Intent: Not all fallback code is cruft — ranking sends cleanup effort to the candidates that are actually stale.
 
 ## Structural Advisory — `conducks advise`
 - Purpose: Turn metrics into concrete suggestions — split candidates, hidden coupling, unpinned or heavy dependencies, stability risks.

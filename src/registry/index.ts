@@ -33,7 +33,6 @@ import { DocsWatcher } from "@/lib/domain/docs/index.js";
 import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/coverage/index.js";
 import { SourceLineReader } from "@/lib/core/utils/index.js";
 import { firstLineOf } from "@/lib/core/parsing/index.js";
-import { FallbackDetector } from "@/lib/domain/analysis/index.js";
 import { GatewayService } from "@/lib/domain/analysis/index.js";
 import { ConducksInstaller } from "@/lib/domain/federation/index.js";
 import { installHook, type HookInstallResult } from "@/lib/domain/federation/index.js";
@@ -302,7 +301,6 @@ export const registry = {
     rules: (root?: string) => governance.auditWithRules(root),
     // Composition-owned factories (ADR 0005): interfaces must not import domain directly.
     createSentinel: () => new ConducksSentinel(),
-    createFallbackDetector: () => new FallbackDetector()
   },
   docs: {
     board: (root?: string) => buildBoard(root || chronicle.getProjectDir() || process.cwd()),

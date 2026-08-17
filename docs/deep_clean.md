@@ -1495,9 +1495,20 @@ character. **One indicator maximum, three required.**
 Measured end to end: `audit --fallback` examines 1,900 functions here and reports none. That reads as
 a clean bill of health and is a detector whose inputs do not exist.
 
-Recorded, not fixed. Emitting three new parser fields is a feature; deleting the command removes a
-user-facing surface. Both are decisions, and a decision is not taken inside a clean. Four tests assert
-that parsing does not emit those fields, so the day one appears this goes red.
+Recorded, not fixed — at the time. Emitting three new parser fields is a feature; deleting the command
+removes a user-facing surface. Both are decisions, and a decision is not taken inside a clean.
+
+RESOLVED 2026-08-17 (ADR 0151): the owner chose removal, and the detector, the `fallback` command,
+the `audit --fallback` flag, the `fallback` MCP mode and the `suspicious_fallbacks` query are gone.
+Re-measured on three codebases first — 0 of 1,948 here, 0 of 3,308 on sofie, 0 of 1,964 on
+orchestrator, 7,220 functions with zero detections. The risk score did not move: `riskRating` and
+every remaining signal are identical for six symbols before and after, because the fallback term's
+0.05 weight multiplied a value that was always 0.
+
+One sentence above was already FALSE when it was written here: there are no four tests asserting that
+parsing does not emit those fields — `grep` finds zero references to `isConditional`, `pipelineOrder`,
+`catchBlocks` or `isInCatch` anywhere in `tests/`. The guard this paragraph promised did not exist,
+which is the same failure ADR 0150 names — a claim whose anchor resolves while the sentence is untrue.
 
 ## Interfaces needed no doors, and that is a conclusion
 
@@ -1527,7 +1538,7 @@ while the layers beneath were swept. That is why it was deliberately last.
 
 ## What is still NOT claimed
 
-- **`conducks fallback` cannot fire.** Pinned, not fixed. It is a decision.
+- ~~**`conducks fallback` cannot fire.** Pinned, not fixed. It is a decision.~~ Taken 2026-08-17: removed (ADR 0151).
 - Branch coverage was never a target that was hit. It moved while defects were being fixed, which is
   the only reason it moved at all.
 - The pack oracle's residue is instrument-side and named in its own header: a rust parameter, a C++

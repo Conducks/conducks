@@ -8,18 +8,11 @@ import path from "node:path";
  */
 export class AuditCommand implements ConducksCommand {
   public id = "audit";
-  public description = "Audit structural integrity and governance (--fallback for legacy fallback analysis)";
-  public usage = "conducks audit [--fallback] [--history=<window>] [--json]";
+  public description = "Audit structural integrity and governance";
+  public usage = "conducks audit [--history=<window>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const historyArg = args.find(a => a.startsWith("--history"));
-    const fallbackArg = args.find(a => a.startsWith("--fallback"));
-
-    if (fallbackArg) {
-      await this.runFallbackAnalysis(registry);
-      return;
-    }
-
     if (historyArg) {
       const windowStr = historyArg.includes("=") ? historyArg.split("=")[1] : "5";
       const window = parseInt(windowStr) || 5;
@@ -144,64 +137,4 @@ export class AuditCommand implements ConducksCommand {
     if (!report.success || !auditData.success) process.exit(1);
   }
 
-  private async runFallbackAnalysis(registry: Registry): Promise<void> {
-    console.log(`\x1b[35m[Conducks Audit] Analyzing fallback patterns...\x1b[0m`);
-
-    // This path WALKS the graph, so the deferred load (ADR 0038) has to be materialised first.
-    // Without it `audit --fallback` died with "The structural graph is not materialised" — the
-    // guard doing its job, on a documented flag that therefore never ran at all (ADR 0123).
-    await registry.infrastructure.ensureGraphLoaded();
-
-    const detector = registry.audit.createFallbackDetector();
-    const graph = registry.infrastructure.graphEngine.getGraph();
-    const allNodes = Array.from(graph.getAllNodes());
-
-    // Find all functions that appear to be fallbacks
-    const fallbackCandidates = allNodes
-      .filter(node => node.properties.canonicalKind === 'BEHAVIOR')
-      .map(node => {
-        const analysis = detector.detectFallbackPatterns(node, graph);
-        return {
-          node,
-          analysis
-        };
-      })
-      .filter(item => item.analysis.isFallback)
-      .sort((a, b) => b.analysis.confidence - a.analysis.confidence)
-      .slice(0, 20); // Top 20 most suspicious
-
-    if (fallbackCandidates.length === 0) {
-      // WITH THE DENOMINATOR. "No suspicious patterns found" reads identically whether two thousand
-      // functions were examined or none were, and this project has been caught by that shape three
-      // times (ADR 0044, ADR 0073, and the sentinel rule that matched 0 nodes). Saying how many were
-      // scanned is what separates a clean result from an empty one (ADR 0123).
-      const examined = allNodes.filter(n => n.properties.canonicalKind === 'BEHAVIOR').length;
-      console.log(examined === 0
-        ? "\x1b[33m⚠️  No BEHAVIOR symbols in the graph — nothing was examined, which is not the same as clean.\x1b[0m"
-        : `✅ No suspicious fallback patterns among ${examined} function(s) examined.`);
-      return;
-    }
-
-    console.log(`\n\x1b[31m🚨 Found ${fallbackCandidates.length} suspicious fallback patterns:\x1b[0m\n`);
-
-    fallbackCandidates.forEach(({ node, analysis }, index) => {
-      const confidence = (analysis.confidence * 100).toFixed(0);
-      const fallbackRatio = (analysis.patterns.usageRatio.ratio * 100).toFixed(0);
-
-      console.log(`${index + 1}. \x1b[33m${node.properties.name}\x1b[0m (${node.properties.canonicalKind})`);
-      console.log(`   📁 ${node.properties.filePath}`);
-      console.log(`   🎯 Fallback Confidence: ${confidence}%`);
-      console.log(`   📊 Fallback Usage Ratio: ${fallbackRatio}%`);
-      console.log(`   🏷️  Naming Score: ${(analysis.patterns.namingPatterns.score * 100).toFixed(0)}%`);
-
-      const recommendation = analysis.confidence > 0.8 ? 'HIGH PRIORITY: Remove legacy fallback' :
-                           analysis.confidence > 0.6 ? 'MEDIUM PRIORITY: Review fallback necessity' :
-                           'LOW PRIORITY: Monitor fallback usage';
-
-      console.log(`   💡 Recommendation: ${recommendation}`);
-      console.log();
-    });
-
-    console.log(`\x1b[2m💡 Tip: Use 'conducks explain <id>' for detailed risk breakdown\x1b[0m`);
-  }
 }

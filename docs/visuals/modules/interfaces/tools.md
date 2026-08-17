@@ -1,9 +1,10 @@
 # interfaces/tools — the MCP server
 
 **Layer:** interfaces. Never imports another interface, and clean on composition: the two direct
-reaches into lib it once had (`domain/analysis/fallback-detector.ts`, `core/utils/logger.ts`) are
-routed through the registry now, so the encoded contract (`mcp → composition, contracts`) holds with
-no exceptions.
+reaches into lib it once had (a detector under `domain/analysis/`, and `core/utils/logger.ts`) were
+routed through the registry, so the encoded contract (`mcp → composition, contracts`) holds with no
+exceptions. The detector itself was removed on 2026-08-17 (ADR 0151) — it is named here without an
+anchor because the file is gone and a link to it would be a claim that cannot be checked.
 
 **Responsibility:** exposing conducks' analysis to an agent over MCP. 14 tools cover what ~38 CLI
 commands do — query, impact, trace, audit, prune, coverage, docs and the rest are grouped, never one

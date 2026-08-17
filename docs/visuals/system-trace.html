@@ -510,12 +510,13 @@
       <p>2,133 rows carry blame age, churn and entropy from the same git walk. Author lands on none.</p>
     </div>
     <div class="card">
-      <div class="metric">3 / 5</div>
+      <div class="metric">gone</div>
       <h3>fallback-detector signals</h3>
       <p>Read <code>dna.tryBlocks</code>, <code>dna.ifElseChains</code>,
-      <code>edge.properties.isConditional</code> — fields no producer writes. The
-      <code>suspicious_fallbacks</code> query filters on another field never written, so it returns
-      empty by construction.</p>
+      <code>edge.properties.isConditional</code> — fields no producer wrote, so the verdict could
+      never reach the three of five it required. Measured at 0 detections across 7,220 functions on
+      three codebases. Removed on 2026-08-17 with every surface that read it (ADR 0151); the risk
+      score did not move, because the term's weight multiplied a value that was always zero.</p>
     </div>
     <div class="card">
       <div class="metric">1.0</div>

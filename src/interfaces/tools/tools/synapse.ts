@@ -517,7 +517,7 @@ Modes:
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["scan", "advice", "guard", "archeology", "fallback"], default: "scan" },
+        mode: { type: "string", enum: ["scan", "advice", "guard", "archeology"], default: "scan" },
         threshold: { type: "number", default: 0.1, description: "Max allowed decay (for guard mode)." },
         // MCP1: numeric bounds on window
         window: { type: "number", default: 5, minimum: 1, maximum: 10, description: "Historical window size (for archeology mode)." },
@@ -553,44 +553,6 @@ Modes:
         if (mode === "advice") {
           const advice = await registry.audit.advise();
           return mcpOk({ advice, indexStaleness: registry.audit.status().staleness.stale });
-        }
-
-        if (mode === "fallback") {
-          const detector = registry.audit.createFallbackDetector();
-          const graph = registry.infrastructure.graphEngine.getGraph();
-          const allNodes = Array.from(graph.getAllNodes());
-
-          // Find all functions that appear to be fallbacks
-          const fallbackCandidates = allNodes
-            .filter((node: any) => node.properties.canonicalKind === 'BEHAVIOR')
-            .map((node: any) => {
-              const analysis = detector.detectFallbackPatterns(node, graph);
-              return {
-                id: node.id,
-                name: node.properties.name,
-                file: node.properties.filePath,
-                isFallback: analysis.isFallback,
-                confidence: analysis.confidence,
-                patterns: analysis.patterns
-              };
-            })
-            .filter((candidate: any) => candidate.isFallback)
-            .sort((a: any, b: any) => b.confidence - a.confidence)
-            .slice(0, 20); // Top 20 most suspicious
-
-          return mcpOk({
-            fallbackCandidates,
-            totalCandidates: fallbackCandidates.length,
-            recommendations: fallbackCandidates.map((candidate: any) => ({
-              symbol: candidate.name,
-              file: candidate.file,
-              confidence: candidate.confidence,
-              recommendation: candidate.confidence > 0.8 ? 'HIGH PRIORITY: Remove legacy fallback' :
-                            candidate.confidence > 0.6 ? 'MEDIUM PRIORITY: Review fallback necessity' :
-                            'LOW PRIORITY: Monitor fallback usage'
-            })),
-            indexStaleness: registry.audit.status().staleness.stale
-          }, { nodeCount: fallbackCandidates.length, truncated: false });
         }
 
         const audit = registry.audit.audit();

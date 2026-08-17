@@ -12,8 +12,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { GVREngine } from "@/lib/domain/evolution/index.js";
 import { ResonanceAnalyzer } from "@/lib/domain/metrics/index.js";
-import { FallbackDetector } from "./fallback-detector.js";
-import { ConducksNode, IMPORT_CYCLE_IGNORED_EDGE_TYPES } from "@/lib/core/graph/index.js";
+import { IMPORT_CYCLE_IGNORED_EDGE_TYPES } from "@/lib/core/graph/index.js";
 import { DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
 import { ConducksAdvisor } from "@/lib/domain/governance/index.js";
 import { CoChangeEngine } from "@/lib/core/algorithms/index.js";
@@ -37,7 +36,6 @@ export class Conducks {
   private diffEngine = new ConducksDiffEngine();
   private gvr = new GVREngine();
   private resonance = new ResonanceAnalyzer();
-  private fallbackDetector = new FallbackDetector();
   private death = new DeadCodeAnalyzer();
   private advisor = new ConducksAdvisor();
 
@@ -201,22 +199,13 @@ export class Conducks {
     const fanOutRisk = Math.min(outgoing / 10, 1.0);
     const gravity = node.properties.rank || 0;
 
-    // Fallback pattern analysis
-    const fallbackAnalysis = this.fallbackDetector.detectFallbackPatterns(node, graph);
-    const fallbackRisk = this.calculateFallbackRisk(fallbackAnalysis, node);
-
-    // Adjust weights when fallback is detected
-    const isFallback = fallbackAnalysis.isFallback;
-    const weights = isFallback ?
-      { gravity: 0.15, complexity: 0.30, entropy: 0.10, churn: 0.10, fanOut: 0.10, fallback: 0.25 } :
-      { gravity: 0.25, complexity: 0.35, entropy: 0.10, churn: 0.10, fanOut: 0.15, fallback: 0.05 };
+    const weights = { gravity: 0.25, complexity: 0.35, entropy: 0.10, churn: 0.10, fanOut: 0.15 };
 
     const score = (gravity * weights.gravity) +
                  (complexityRisk * weights.complexity) +
                  (entropyRisk * weights.entropy) +
                  (churnRisk * weights.churn) +
-                 (fanOutRisk * weights.fanOut) +
-                 (fallbackRisk * weights.fallback);
+                 (fanOutRisk * weights.fanOut);
 
     // WHY the score is what it is, in words.
     //
@@ -232,7 +221,6 @@ export class Conducks {
     if (churnRisk > 0.5) factors.push("High Kinetic Churn (frequently modified)");
     if (outgoing > 8) factors.push(`God Object Candidate (fan-out ${outgoing})`);
     if ((node.properties.complexity || 0) > 50) factors.push("Critical Complexity (difficult to maintain)");
-    if (isFallback) factors.push("Fallback Pattern (used as a secondary path)");
 
     return {
       score,
@@ -242,41 +230,9 @@ export class Conducks {
         complexity: complexityRisk,
         entropy: entropyRisk,
         churn: churnRisk,
-        fanOut: fanOutRisk,
-        fallback: fallbackRisk
-      },
-      fallbackAnalysis
+        fanOut: fanOutRisk
+      }
     };
-  }
-
-  /**
-   * Calculates fallback-specific risk factors
-   */
-  private calculateFallbackRisk(analysis: any, node: ConducksNode): number {
-    if (!analysis.isFallback) return 0;
-
-    let risk = 0;
-
-    // High confidence fallback with low usage = high risk
-    if (analysis.confidence > 0.7) {
-      const usageRatio = analysis.patterns.usageRatio.ratio;
-      risk += (1 - usageRatio) * 0.4; // Low usage increases risk
-    }
-
-    // Complex fallbacks are riskier to maintain
-    const complexity = node.properties.complexity || 1;
-    if (complexity > 10) {
-      risk += Math.min((complexity - 10) / 20, 0.3);
-    }
-
-    // Long-tenured fallbacks with legacy naming
-    const tenureDays = node.properties.tenureDays || 0;
-    const hasLegacyNaming = analysis.patterns.namingPatterns.score > 0.5;
-    if (tenureDays > 365 && hasLegacyNaming) {
-      risk += 0.3;
-    }
-
-    return Math.min(risk, 1.0);
   }
 
   public async resonate(): Promise<void> {

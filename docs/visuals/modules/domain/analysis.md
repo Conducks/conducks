@@ -24,8 +24,8 @@ Adequate while the question set is known.
 - **[docs-grammar/](docs/docs-grammar.md)** — the conducks-docs standard, enforced.
 
 `conducks-core` is the façade the registry wires; `query-service` answers structural questions;
-`fallback-detector` reports where analysis degraded; `gateway-service` is the live vault-watch feed
-behind the Mirror dashboard, constructed by the `mirror` CLI command and consumed by the web server.
+`gateway-service` is the live vault-watch feed behind the Mirror dashboard, constructed by the
+`mirror` CLI command and consumed by the web server.
 
 ## The pulse links, inducts, then links AGAIN
 

@@ -1,9 +1,10 @@
 # 0123 — an absence is not a clean verdict
 
-Status: Accepted
+Status: Superseded by 0151
+- Superseded by: 0151
 - Date: 2026-08-03
 - Builds: 0111, 0115, 0122
-- Enforced by: tests/integration/features/fallback-command.test.ts (fallback tells "never measured" from "none suspicious"; audit --fallback does not crash) — run against the unfixed build first, all 3 failed
+- Enforced by: docs/decisions/0151-a-detector-whose-inputs-are-never-written-is-removed.md — the command this record governs was removed on 2026-08-17, because the detector behind it could never fire. The GENERAL rule survives it and is enforced elsewhere: ADR 0044 refuses an oracle that scored nothing, and `tests/integration/features/verdict-truth.test.ts` holds the remaining "state your denominator" cases
 
 ## Context
 

@@ -37,11 +37,11 @@ it. <b>The page is healthy when it is shrinking.</b></p>
       <code>registry</code> have had the structural pass now — twenty doors across every layer, each
       on the gate. Four dead subsystems were found doing it, every one of them a feature that ran and
       did nothing.</td><td>done — see <code>docs/deep_clean.md</code></td></tr>
-    <tr><td><code>conducks fallback</code> CANNOT RETURN TRUE. Its verdict needs three of five
-      indicators; four read fields the parser never writes, and the fifth fires only for a symbol
-      named exactly <code>fallback</code>, <code>legacy</code> or <code>try</code>. Measured:
-      1,900 functions examined, none reported.</td><td>a decision — emit the fields, or drop the
-      command</td></tr>
+    <tr><td><b>Left this page on 2026-08-17.</b> <code>conducks fallback</code> COULD NOT RETURN
+      TRUE — three of five indicators required, four reading fields no producer writes. Re-measured
+      across three codebases before the decision: 7,220 functions, zero detections. The owner chose
+      removal, so the detector and every surface reading it are gone.</td>
+      <td>done — ADR 0151</td></tr>
     <tr><td>The vault's HISTORY — pulses, the ledger, a chronoscopic diff between two of them. The
       canvas draws the present tense only.</td><td>a band about time</td></tr>
   </tbody>

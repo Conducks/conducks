@@ -821,7 +821,6 @@ export { Conducks } from "./conducks-core.js";
 export { MicroPulseService } from "./micro-pulse.js";
 export { ProjectMonitor } from "./project-monitor.js";
 export { GatewayService } from "./gateway-service.js";
-export { FallbackDetector } from "./fallback-detector.js";
 export { collectChanges, impactedSymbolIds } from "./change-set.js";
 export { buildFilterQuery } from "./filter-builder.js";
 export type { QueryFilter } from "./filter-builder.js";

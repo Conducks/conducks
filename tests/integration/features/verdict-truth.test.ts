@@ -88,20 +88,6 @@ export function alsoB(): number { return fromA(); }
     expect(out).toMatch(/circular/i);
   });
 
-  it('fallback REFUSES rather than reporting a clean scan it did not run', () => {
-    const r = runCli(['fallback'], { cwd: repo, allowFail: true });
-    const out = plain(r.combined);
-    // The valuable behaviour, and the one worth pinning: no node carries a fallback analysis in this
-    // fixture, and the command says so — "nothing was measured — this is NOT a clean result" — and
-    // names the command that would measure it. A zero findings line here would have been a lie.
-    expect(out).toMatch(/nothing was measured/i);
-    expect(out).toMatch(/NOT a clean result/i);
-    expect(out).toMatch(/audit --fallback/);
-    expect(r.status).not.toBe(0);
-    // Its filters are still stated, so the reader knows what would have been scanned.
-    expect(out).toMatch(/confidence|tenure|limit/i);
-  });
-
   it('ledger grades the workspace and shows the arithmetic behind the grade', () => {
     const out = plain(runCli(['ledger'], { cwd: repo }).combined);
     expect(out).toMatch(/Grade:\s*[A-F]\b/);

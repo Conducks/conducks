@@ -40,7 +40,7 @@ describe('explain and status print values, not placeholders', () => {
     expect(combined).not.toContain('NaN');
 
     // Each named signal carries a numeric value on its own line.
-    for (const signal of ['gravity', 'complexity', 'fan-out', 'churn', 'entropy', 'fallback']) {
+    for (const signal of ['gravity', 'complexity', 'fan-out', 'churn', 'entropy']) {
       const line = combined.split('\n').find(l => l.includes(`${signal}:`));
       expect(line).toBeDefined();
       expect(line).toMatch(/\d+\.\d{2}/);
