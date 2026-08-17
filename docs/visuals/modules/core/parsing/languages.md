@@ -40,14 +40,24 @@ Never verify a pattern against grammar documentation or memory. Compile it.
 ## A capture only fires where its handler can reach a node
 
 A standalone pattern — one with no `@isX` definition capture — builds no node, so a handler gated on
-the enclosing node never runs. This is why the graph has **zero EXTENDS/IMPLEMENTS edges** — still
-true today; a vault edge census shows no heritage edge of either type. The heritage patterns are
-syntactically correct and hit when probed, but every one of them is standalone
-(`typescript/queries.ts:30-32`, `python/queries.ts:22-23`, and the same shape in go, rust, java,
-javascript), while the handler is gated on an enclosing node — `&& node`, now on a three-way capture
-test that also takes `heritage_extends`/`heritage_implements` (`parsing/reflector.ts:1011`). Ruby is the only language whose heritage pattern carries a definition
-capture (`@isHeritage`), and so the only one that could reach the handler at all. Fix tracked in
-todo11. **Pattern a capture together with
+the enclosing node never runs. That is what produced **zero EXTENDS/IMPLEMENTS edges** for a long
+time: the heritage patterns were syntactically correct and hit when probed, but every one of them
+was standalone, while the handler is gated on an enclosing node — `&& node`, now on a three-way
+capture test that also takes `heritage_extends`/`heritage_implements`
+(<span class="anchor">src/lib/core/parsing/reflector.ts:795</span>).
+
+**FIXED, and the fix is now scored.** Every heritage pattern co-captures a definition node — see
+<span class="anchor">src/lib/core/parsing/languages/python/queries.scm:39</span>, where `@heritage`
+sits inside a pattern ending `@isStruct`, and the note at
+<span class="anchor">src/lib/core/parsing/languages/typescript/queries.scm:158</span> that records
+why the standalone form was abandoned. `tools/benchmark/oracle-packs.mjs` fails the build if any pack
+that CLAIMS a heritage capture stops producing an edge for a two-line fixture that plainly has one;
+all ten produce one today. Three packs — ruby, rust and php — were found emitting none on 2026-08-17
+by exactly that check, with every gate otherwise green.
+
+The paragraph above said "still true today; a vault edge census shows no heritage edge of either
+type" for some time after it had stopped being true. Nothing catches that: `visuals-lint` proves an
+anchor resolves, never that the sentence around it is honest. **Pattern a capture together with
 the definition it belongs to when its handler needs one.**
 
 ## Signature capture, and the one rule behind it
