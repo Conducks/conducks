@@ -11,13 +11,12 @@ import { ConducksFlowEngine } from "@/lib/domain/kinetic/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { GVREngine } from "@/lib/domain/evolution/index.js";
-import { ResonanceAnalyzer } from "@/lib/domain/metrics/resonance.js";
+import { ResonanceAnalyzer } from "@/lib/domain/metrics/index.js";
 import { FallbackDetector } from "./fallback-detector.js";
 import { ConducksNode, IMPORT_CYCLE_IGNORED_EDGE_TYPES } from "@/lib/core/graph/index.js";
 import { DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
-import { ConducksAdvisor } from "@/lib/domain/governance/advisor.js";
+import { ConducksAdvisor } from "@/lib/domain/governance/index.js";
 import { CoChangeEngine } from "@/lib/core/algorithms/index.js";
-import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/index.js";
 import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
 import path from "node:path";
@@ -41,7 +40,6 @@ export class Conducks {
   private fallbackDetector = new FallbackDetector();
   private death = new DeadCodeAnalyzer();
   private advisor = new ConducksAdvisor();
-  private aligner = new TestAligner();
 
   private orchestrator: AnalyzeOrchestrator;
   private registry = new SynapseRegistry<ConducksComponent>();
@@ -49,7 +47,7 @@ export class Conducks {
 
   constructor(options?: { baseDir?: string }) {
     this.persistence = new SynapsePersistence(options?.baseDir || chronicle.getProjectDir() || process.cwd());
-    this.orchestrator = new AnalyzeOrchestrator(this.registry, this.graph, this.aligner, this.persistence);
+    this.orchestrator = new AnalyzeOrchestrator(this.registry, this.graph, this.persistence);
     this.setupDefaults();
   }
 
@@ -113,7 +111,6 @@ export class Conducks {
     console.error(`[ConducksCore] Orchestrator call complete.`);
 
     // Conducks: Align Test Coverage
-    this.aligner.align(this.graph.getGraph());
 
     // Conducks: Architectural Audit (Mark Anomalies)
     this.advisor.analyze(this.graph.getGraph());

@@ -573,9 +573,28 @@ export class GovernanceService {
   }
 }
 
+/**
+ * Conducks — the governance feature's only door (ADR 0150).
+ *
+ * What the codebase should be, against what it is: the architecture rules, the sentinel that scores
+ * them, the drift gate, and the advice a person reads. Every other domain area DESCRIBES the code;
+ * this one JUDGES it.
+ *
+ * WHAT NO LONGER CROSSES: `RegressionGuard`, `loadSentinelRules`, `getDefaultRules`, the three
+ * sentinel rule types, and `emptyOrReady`. Zero callers outside this folder each — the guard is
+ * reached through `GovernanceService`, and the rules are loaded by the sentinel that uses them.
+ * `RegressionGuard` was IMPORTED BY THE REGISTRY AND NEVER USED, which the tsc oracle had already
+ * been reporting as a recall gap.
+ *
+ * Governance's own tests import the leaves directly, which rule 3 has always allowed.
+ *
+ * `tests/architecture/feature-doors.test.ts` fails when anything outside reaches past this file.
+ */
 export type { Advice };
 export { ConducksAdvisor } from "./advisor.js";
 export { ConducksSentinel } from "./sentinel.js";
-export { RegressionGuard } from "./guard.js";
-export { loadSentinelRules, getDefaultRules } from "./sentinel-rules.js";
-export type { SentinelRule, SentinelCondition, SentinelRuleFile } from "./sentinel-rules.js";
+
+// The ARCHITECTURE measurement, which the registry composes into the `arch` command: measure the
+// graph, decide a verdict from the measurements, and the two service-topology helpers beside them.
+export { measure, detectServiceRoots, subgraphUnder } from "./arch-detect.js";
+export { decide } from "./arch-verdict.js";

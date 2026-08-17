@@ -8,7 +8,6 @@ import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { essenceLens } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { TestAligner } from "@/lib/domain/metrics/test-aligner.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { FileHashGate } from "@/lib/core/persistence/index.js";
 import { IgnoreManager } from "@/lib/core/parsing/index.js";
@@ -42,7 +41,6 @@ export class AnalyzeOrchestrator {
   constructor(
     private registry: SynapseRegistry<ConducksComponent>,
     private graph: ConducksGraph,
-    private aligner?: TestAligner,
     private persistence?: SynapsePersistence,
     private reflector: ConducksReflector = new ConducksReflector(),
     private ignoreManager?: IgnoreManager
@@ -347,9 +345,6 @@ export class AnalyzeOrchestrator {
    */
   public resonate(): void {
     this.graph.resonate();
-    if (this.aligner) {
-      this.aligner.align(this.graph.getGraph());
-    }
   }
 }
 

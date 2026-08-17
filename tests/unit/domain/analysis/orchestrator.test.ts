@@ -165,7 +165,7 @@ describe('AnalyzeOrchestrator.analyze — characterization', () => {
   it('excludes ignored files from the unit skeleton entirely', async () => {
     const graph = new ConducksGraph();
     const ignoreManager = { isIgnored: (p: string) => p.endsWith('ext.ts') } as unknown as IgnoreManager;
-    const orchestrator = new AnalyzeOrchestrator(makeRegistry(), graph, undefined, undefined, undefined, ignoreManager);
+    const orchestrator = new AnalyzeOrchestrator(makeRegistry(), graph, undefined, undefined, ignoreManager);
     await orchestrator.analyze(files(), { workspaceRoot: ROOT });
 
     const g = graph.getGraph();
@@ -181,20 +181,26 @@ describe('AnalyzeOrchestrator.analyze — characterization', () => {
     expect((orchestrator as any).persistence).toBe(fakePersistence);
   });
 
-  it('resonate() delegates to graph.resonate() and, when configured, the aligner', () => {
+  it('resonate() delegates to graph.resonate(), and to nothing else', () => {
+    // This case used to assert a second delegation — to `TestAligner.align` — and that half was
+    // deleted with the aligner itself. It walked from every test node to depth 5 on every analyze,
+    // wrote `coveredBy` onto the object `getNode` RETURNS rather than the one the graph holds, and
+    // nothing read the property either way. Two independent reasons it did nothing.
+    //
+    // It was DISCONNECTED, not never-connected: `mirror.engine` read `coveredBy` until the visual
+    // wave moved to SQL (ADR 0054), and the reader went without the writer. The capability is
+    // superseded rather than lost — `coverage` binds a real istanbul report to node spans, which is
+    // a measurement rather than a depth-5 guess.
     let resonateCalled = false;
-    let alignCalledWith: unknown = null;
     const fakeGraph = {
       resonate: () => { resonateCalled = true; },
       getGraph: () => 'the-adjacency-list',
     } as unknown as ConducksGraph;
-    const fakeAligner = { align: (g: unknown) => { alignCalledWith = g; } } as any;
 
-    const orchestrator = new AnalyzeOrchestrator(makeRegistry(), fakeGraph, fakeAligner);
+    const orchestrator = new AnalyzeOrchestrator(makeRegistry(), fakeGraph);
     orchestrator.resonate();
 
     expect(resonateCalled).toBe(true);
-    expect(alignCalledWith).toBe('the-adjacency-list');
   });
 
   it('resonate() is a no-op on the aligner when none is configured', () => {

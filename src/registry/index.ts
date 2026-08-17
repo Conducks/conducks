@@ -4,10 +4,9 @@ import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
 import { AnalysisService, AnalyzeOrchestrator, Conducks } from "@/lib/domain/analysis/index.js";
 import { MicroPulseService } from "@/lib/domain/analysis/micro-pulse.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
-import { MetricsService, ResonanceAnalyzer, TestAligner } from "@/lib/domain/metrics/index.js";
-import { GovernanceService, ConducksAdvisor, ConducksSentinel, RegressionGuard } from "@/lib/domain/governance/index.js";
-import { measure as measureArch, detectServiceRoots, subgraphUnder } from "@/lib/domain/governance/arch-detect.js";
-import { decide as decideArch } from "@/lib/domain/governance/arch-verdict.js";
+import { MetricsService, ResonanceAnalyzer } from "@/lib/domain/metrics/index.js";
+import { GovernanceService, ConducksAdvisor, ConducksSentinel } from "@/lib/domain/governance/index.js";
+import { measure as measureArch, detectServiceRoots, subgraphUnder, decide as decideArch } from "@/lib/domain/governance/index.js";
 
 /**
  * Where a DOOR lives, by convention. `interfaces/` is this repository's own; the rest are the
@@ -141,16 +140,15 @@ const advisor = new ConducksAdvisor();
 const sentinel = new ConducksSentinel();
 const deadCode = new DeadCodeAnalyzer();
 const resonance = new ResonanceAnalyzer();
-const aligner = new TestAligner();
 const diffEngine = new ConducksDiffEngine();
 const manifestEngine = new ManifestEngine();
 
 // 4. Domain Facade Consolidation (Service Layer)
-let orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, aligner, persistence, undefined, ignoreManager);
+let orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, persistence, undefined, ignoreManager);
 let microPulse = new MicroPulseService(synapseRegistry, persistence);
 let analysis = new AnalysisService(orchestrator, graph, persistence);
 let kinetic = new KineticService(graph.getGraph());
-let metrics = new MetricsService(graph, deadCode, resonance, aligner);
+let metrics = new MetricsService(graph, deadCode, resonance);
 let conducksCore = new Conducks();
 (conducksCore as any).orchestrator = orchestrator;
 (conducksCore as any).graph = graph;

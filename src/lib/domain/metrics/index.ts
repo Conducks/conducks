@@ -2,7 +2,6 @@ import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { DeadCodeAnalyzer, type Finding } from "@/lib/domain/evolution/index.js";
 import { ResonanceAnalyzer } from "./resonance.js";
-import { TestAligner } from "./test-aligner.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/index.js";
 
@@ -17,8 +16,7 @@ export class MetricsService {
   constructor(
     private graph: ConducksGraph,
     private deadCode: DeadCodeAnalyzer,
-    private resonance: ResonanceAnalyzer,
-    private aligner?: TestAligner
+    private resonance: ResonanceAnalyzer
   ) {}
 
   /**
@@ -90,9 +88,10 @@ export class MetricsService {
   }
 }
 
-export type { Finding };
+// `Finding` is NOT re-exported. It is evolution's type — this feature CONSUMES it, and nothing
+// outside takes it from here. Republishing another feature's vocabulary is the same rule 5b
+// mistake as republishing its class, which this door was also doing until a commit ago.
 // `DeadCodeAnalyzer` is NOT re-exported here. It belongs to `evolution`, and republishing another
 // feature's class makes this door a dependency edge onto that one (rule 5b) — the same thing
 // `intelligence` was doing with `FederatedLinker`. The registry takes it from evolution directly.
 export { ResonanceAnalyzer } from "./resonance.js";
-export { TestAligner } from "./test-aligner.js";

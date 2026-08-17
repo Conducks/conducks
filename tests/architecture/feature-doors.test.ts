@@ -54,9 +54,11 @@ const DOORS = [
   //   last          analysis -> six of the others
   'lib/domain/evolution',
   'lib/domain/federation',
+  'lib/domain/governance',
   'lib/domain/intelligence',
   'lib/domain/kinetic',
   'lib/domain/manifest',
+  'lib/domain/metrics',
   'lib/domain/visual',
 ];
 
@@ -88,6 +90,11 @@ const OWN_TESTS: Record<string, string[]> = {
   // zero callers in `src` — nothing but a watcher writes one — so putting them on the door would be
   // the door exporting for a test's benefit, which rule 1 forbids. The exception is narrower than
   // the export would be.
+  // `boundaries.test.ts` enforces the ADR 0005 layer contract from governance's OWN rule table, so
+  // the gate and the sentinel cannot drift apart. Both constants have zero callers in `src` — the
+  // table is consumed by the sentinel that owns it — so putting them on the door would be exporting
+  // for a test. Sharing the source of truth is the point; the exception is narrower than the export.
+  'lib/domain/governance': ['architecture/boundaries.test.ts'],
   'lib/domain/evolution': [
     // Fakes a watcher marker to prove `status` answers with NO daemon running.
     'unit/domain/analysis/answers-without-a-daemon.test.ts',
