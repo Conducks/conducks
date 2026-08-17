@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — core/parsing/taxonomy — the canonical kind vocabulary</title>
+<link rel="stylesheet" href="../../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>taxonomy.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
+<h1>core/parsing/taxonomy — the canonical kind vocabulary</h1>
+<p><b>Part of:</b> <a href="../parsing.html">core/parsing</a>. One file, <code>contracts/taxonomy.ts</code> — it moved to <code>contracts/</code> in todo72, because three features read the taxonomy and a type two features share does not travel through a door (ADR 0150 rule 5).</p>
+<p><b>Responsibility:</b> mapping each language's own node kinds onto one shared vocabulary, so that a Python class and a Go struct answer the same question. Every node carries a <code>canonicalKind</code> and a <code>canonicalRank</code>, and rank is what gives the graph its hierarchy — the ladder is <b>10 rungs, 0…9</b>: ecosystem → repository → package → namespace → directory → unit → infra → structure → behavior → atom.</p>
+<p><b>Two kind columns, and a query filtering the wrong one reads as clean.</b> <code>canonicalKind</code> holds the taxonomy kind (<code>NAMESPACE</code>, uppercase); <code>semantic_kind</code> holds the language's RAW kind (<code>namespace</code>, lowercase, plus shapes the taxonomy has no rung for — <code>library_symbol</code>, <code>binding</code>). So <code>WHERE semantic_kind IN ('PACKAGE')</code> matches nothing and answers zero, which is indistinguishable from a true zero. Both an ADR count and a namespace check were written that way in one session before the shape was noticed. Filter <code>canonicalKind</code> for taxonomy questions.</p>
+<p><b>Boundaries:</b> naming only. It does not decide which nodes survive — see below.</p>
+<p><b>Deferred / not built:</b> the second classification system. ADR 0012 describes two orthogonal systems — *what a symbol is* (this) and *where its boundary lies* (origin: internal / stdlib / dependency, ADR 0014). They are deliberately separate axes; do not fold origin into the kind enum.</p>
+<h2>Every declared kind has a producer</h2>
+<p>This is the rule the enum is maintained to (ADR 0100), and it was not true until 2026-08-02. Thirteen kinds were declared and four could never hold a node: STATEMENT, BRANCH and DATA had no capture tag in any grammar, and NAMESPACE's sources were all tagged <code>@isPackage</code>. That was not a harmless reservation — the taxonomy legend published rungs no node could stand on, and PACKAGE's only two nodes here were a C# and a PHP <code>namespace</code> wearing the wrong kind.</p>
+<ul>
+<li><b>STATEMENT / BRANCH — cut.</b> A sub-line position is <code>edges.lineNumber</code>, a number on the edge, so a</li>
+</ul>
+<p>  call inside a loop is the enclosing BEHAVIOR plus a line (ADR 0099). One node per statement would   take this repository from ~5,220 nodes to roughly its 32,069 line count. A position is not an   entity. Coverage range-joins onto BEHAVIOR spans   (<a href="../../domain/analysis/coverage.html">coverage</a>, ADR 0004).</p>
+<ul>
+<li><b>DATA — cut.</b> A parameter is an attribute on its parent (<code>dna.params</code>, ADR 0086); the kind</li>
+</ul>
+<p>  existed only for <code>pruneTaxonomy</code> to delete. Those raw strings now reach the ATOM default, where the   edge gate reaches the same outcome with one rung fewer.</p>
+<ul>
+<li><b>NAMESPACE — repaired, not cut.</b> Four consumers already read it (<code>cluster-rule.ts</code>,</li>
+</ul>
+<p>  <code>http-service-linker.ts</code>, <code>mirror.engine.ts</code>, <code>dead-code.ts</code>) and its sources existed. C++/C#/PHP/   Rust now tag <code>@isNamespace</code>; Go and Java keep <code>@isPackage</code>, because <code>package foo</code> names a   deployable unit and <code>namespace X</code> names a scope.</p>
+<p><b>To add a kind, add its producer in the same change.</b> <code>taxonomy-reachability.test.ts</code> names the capture tag or code path behind every rung and fails if one has none.</p>
+<h2>A vault carrying fewer than ten kinds is normal — for two different reasons</h2>
+<p>Easy to conflate, and the difference matters:</p>
+<ul>
+<li><b>Pruned:</b> every analyze ends with <code>persistence.pruneTaxonomy()</code>, which keeps an ATOM only if it</li>
+</ul>
+<p>  carries a non-structural reference edge. This is what killed the old 72% ATOM flood (3561 → ~227 at   ADR 0013; the live figure moves with the code — recount, don't quote).</p>
+<ul>
+<li><b>Language-gated:</b> PACKAGE needs Go or Java, INFRA needs Java/JS/Ruby/Rust/C# or a C/C++ macro. On</li>
+</ul>
+<p>  this TypeScript repository both sit at 0 real nodes. <b>That is not unreachable.</b> INFRA was nearly   deleted on exactly that misreading; it has five producers, none of them TypeScript. Check the   grammars, not the vault.</p>
+<p><b>To change what survives, edit <code>pruneTaxonomy</code> in persistence — not this enum.</b> Design in ADR 0012, decision in ADR 0013, the producer rule in ADR 0100.</p>
+<h2>Rank is not decoration</h2>
+<p>Rank drives hierarchy, layer paths and several governance rules. A new kind needs a deliberate rank, not the next free number — getting it wrong silently reshapes containment for every node of that kind.</p>
+<p><b>Read <code>CanonicalRank</code>; never write the number.</b> Six producers used to write it by hand, from an older ladder this table had since outgrown, and the vault held two different ranks for the same kind — 215 files at 3 and 410 at 5, directories at 2 instead of 4, routes at 6 instead of 8. A rank is a plain integer, so a wrong one type-checks and persists exactly like a right one; the guard is a grep over <code>src/</code> in <code>tests/unit/core/taxonomy-rank-single-source.test.ts</code>. The taxonomy LEGEND the graph emits is derived from the enum for the same reason — it was a hand-written list, and it described a different taxonomy than the one in use. One exemption, commented at its site: the legend's anchor is <code>-1</code>, because a node describing the ladder cannot stand on a rung of it. ADR 0099.</p>
+<footer>Source: <code>docs/visuals/modules/core/parsing/taxonomy.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

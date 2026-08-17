@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks visuals — start here</title>
+<!-- Provenance: authored — a navigation page; it makes no code claims. -->
+<link rel="stylesheet" href="system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="index.html" class="here"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+
+<h1>Conducks — the visual maps</h1>
+<p class="sub">How the system is wired, drawn one journey at a time.</p>
+
+<div class="meta">
+  <b>What these are for.</b> A map here answers one question a person actually asks, end to end,
+  across whatever modules it happens to cross. That is the thing no single module note can show —
+  because no module owns it.<br><br>
+  <b>What they are not.</b> Not a tour of the codebase. If a fact lives inside one module it belongs
+  in that module's note, and a map links to it rather than copying it. A copy is a second thing to go
+  stale.
+</div>
+
+<h2>The one architecture, in bands</h2>
+<p>There is a single <a href="architecture.html">architecture</a> — one zoomable canvas, not a set of
+pages. It grows by adding a band to that canvas, never by adding a tab: the tabs above are concerns,
+not chapters.</p>
+<div class="grid">
+  <div class="card"><h4><a href="architecture.html">Band 1 · How a codebase becomes a graph</a></h4>
+    <p>The <code>analyze</code> pulse — the only path that writes. Git is asked which files exist, the
+    reflector turns each into nodes and edges, the linkers bind bare names once every file is known,
+    and the vault stores the result. Twenty-one blocks across four core features.</p></div>
+  <div class="card"><h4>Band 2 · How a question is answered <span class="tag">not drawn</span></h4>
+    <p>The 35 read commands and the 14 MCP tools, which all read what Band 1 produced. Named here so
+    the edge of the picture is not read as the edge of the system.</p></div>
+</div>
+
+<h2>Module notes</h2>
+<p>The <a href="modules/index.html">module notes</a> are the authored memory: what a module is for,
+what it owns, and what it refuses. They settle arguments the canvas is too small to hold. The canvas
+links into them; they do not duplicate it.</p>
+
+<h2>A page on a different subject</h2>
+<p><a href="system-trace.html">System trace</a> — what happens on one path, in order, and what each
+step hands the next. The canvas is anatomy; that page is physiology, and no query produces it.</p>
+
+<h2>The rules these pages are bound by</h2>
+<p>The canvas is generated. <code>scripts/visuals/graph.mjs</code> holds the architecture as data with
+no coordinates in it; ELK computes every position; the build refuses to publish a drawing where an
+edge crosses a block it has nothing to do with, or where anything is hidden underneath anything else.
+Every claim carries a <code>file:line</code> that <code>conducks visuals-lint</code> resolves against
+the working tree.</p>
+<p class="elsewhere"><b>What no gate can check:</b> whether the sentence attached to a resolving
+anchor is still TRUE. That failure has already happened here — a module note described a resolver
+that had been deleted three commits earlier, and every anchor in it still resolved.</p>
+
+<footer>
+  Never hand-edit the SVG in <code>architecture.html</code>, or anything under
+  <code>modules/</code> that carries a DERIVED header. They are output. Edit
+  <code>scripts/visuals/graph.mjs</code> or the <code>.md</code> beside the note, then run
+  <code>npm run visuals</code>.
+</footer>
+</div>

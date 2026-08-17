@@ -340,3 +340,45 @@ describe("a DERIVED render is exempt from declare-or-fail", () => {
     expect(r.violations).toHaveLength(0);
   });
 });
+
+/**
+ * `definesSymbol` must see a method however many modifiers it carries.
+ *
+ * It allowed exactly one. `public async discoverFiles()` and `public static topologicalSort()` are
+ * the two commonest declaration forms in this codebase and neither matched, so every `::symbol`
+ * anchor pointing at one produced a WARNING rather than a pass — twelve of them on the first
+ * generated canvas, all false.
+ *
+ * That is worse than a missed check: a gate whose warnings are usually wrong is one whose real
+ * warnings get scrolled past, which is the failure `rules.md` §12 names about gates that check less
+ * than they appear to.
+ */
+describe('definesSymbol sees a method behind any number of modifiers', () => {
+  const cases: Array<[string, string]> = [
+    ['public async discoverFiles(stagedOnly: boolean = false): Promise<string[]> {', 'discoverFiles'],
+    ['public static topologicalSort(importMap: Map<string, Set<string>>): string[][] {', 'topologicalSort'],
+    ['protected readonly resolve(spec: string) {', 'resolve'],
+    ['private async load(): Promise<void> {', 'load'],
+    ['public reflect(', 'reflect'],
+    ['export function attachDocs<T>(', 'attachDocs'],
+    ['export class ChronicleInterface {', 'ChronicleInterface'],
+    ['const sameFamily = (a: string) => true;', 'sameFamily'],
+  ];
+
+  for (const [line, name] of cases) {
+    it(`finds ${name} in "${line.slice(0, 34)}…"`, () => {
+      expect(definesSymbol(`class X {\n  ${line}\n}\n`, name)).toBe(true);
+    });
+  }
+
+  it('still refuses a name that is only USED, never defined', () => {
+    // The counter-test. Widening the modifier list must not turn every mention into a definition —
+    // that would make the check pass for a symbol that was renamed, which is exactly what it exists
+    // to catch.
+    expect(definesSymbol('const x = discoverFiles();\nawait obj.discoverFiles();\n', 'discoverFiles')).toBe(false);
+  });
+
+  it('does not match a longer name that merely starts the same', () => {
+    expect(definesSymbol('public async discoverFilesAndThings() {}', 'discoverFiles')).toBe(false);
+  });
+});

@@ -1,0 +1,34 @@
+<!-- THE CANVAS CHROME. Shared verbatim by every repo built to conducks-visuals §0 — do not edit locally.
+
+     conducks-visuals §0 describes this block in prose and in a markup table, and a second repo rebuilt it
+     from that description: it got the toolbar right, got the mini-map right, and shipped both with
+     no <script>, so every control was dead while the drawing looked correct. A description is not
+     an artifact. This is the artifact.
+
+     __VIEWBOX__ and __BODY__ are the only slots. Everything else is fixed, and gate 8 in render.mjs
+     refuses a page that has changed any of it. -->
+<div class="bleed">
+  <div class="canvas-wrap">
+    <div class="zoom-bar">
+      <input class="find" type="search" placeholder="find a block…" spellcheck="false">
+      <span class="find-n"></span>
+      <button data-z="in" title="zoom in">+</button>
+      <button data-z="out" title="zoom out">−</button>
+      <button data-z="reset" title="reset (0)">1:1</button>
+      <button data-z="fit" title="fit the whole canvas">fit</button>
+      <button data-z="full" title="fullscreen (f · Esc to exit)">⤢</button>
+      <span class="zoom-hint">click to highlight · double-click or the i to open · click an edge to trace it · Esc clears</span>
+      <span class="sel-count"></span>
+      <span class="zoom-pct">100%</span>
+    </div>
+<svg id="canvas" viewBox="__VIEWBOX__" xmlns="http://www.w3.org/2000/svg">
+<g id="viewport">
+__BODY__
+</g>
+</svg>
+    <div class="minimap" title="drag to move around the canvas">
+      <svg id="mini" xmlns="http://www.w3.org/2000/svg"><g id="mini-g"></g><rect id="mini-vp"/></svg>
+    </div>
+  </div>
+</div>
+<script src="system.js"></script>

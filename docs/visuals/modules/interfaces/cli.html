@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — interfaces/cli — the command surface</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>cli.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>interfaces/cli — the command surface</h1>
+<p><b>Layer:</b> interfaces. It is *meant* to import composition only, and it does import another interface exactly once, legally: <code>mirror.ts:3</code> pulls <code>initGlobalMirror</code> from <code>interfaces/web</code> — a launcher edge, not logic coupling (ADR 0005, encoded as <code>cli → web</code>).</p>
+<p><b>What it actually does, today:</b> 19 imports across 14 command files reach past the registry straight into <code>@/lib/domain/*</code> and <code>@/lib/core/*</code> (<code>chronicle-interface</code>, <code>persistence</code>, <code>docs-grammar</code>, <code>sentinel</code>, <code>gateway-service</code>, <code>linker-federated</code>, …). The encoded contract allows cli → composition, contracts and web only, so each of those is an illegal downward reach. They are not caught because the layer rule is not loaded (<a href="../domain/governance/sentinel.html">sentinel</a>). Treat "imports composition only" as the target state; when you touch a command that does otherwise, route it through the registry instead of adding another one.</p>
+<p><b>Responsibility:</b> argument parsing, output formatting, exit codes, and the one-line lifecycle of opening and closing the vault. 38 commands, one file each.</p>
+<p><b>Boundaries:</b> a command holds no analysis logic, and it never loads policy or config itself. If a command computes something rather than asking a service for it, that computation belongs in domain. Commands are meant to be thin enough that reading one tells you which service does the work. The standing exception is <code>audit.ts</code>, which loads the sentinel policy file itself; that is how it managed to evaluate an empty rule set while printing a pass (<a href="../domain/governance/sentinel.html">sentinel</a>).</p>
+<p><b>Deferred / not built:</b> commands take symbol IDs, not file paths. <code>conducks impact &lt;symbolId&gt;</code> resolves a bare name via <code>resolveSymbol</code> but rejects a path, since a path has no <code>::</code>. Accepting a path is a small, unbuilt convenience — the error already points at <code>conducks query</code> to find valid IDs.</p>
+<h2>Why every command imports the registry for typing only</h2>
+<p>Each command implements the <code>ConducksCommand</code> contract and receives the wired registry. The import exists to type the handler, so TypeScript erases it — which is why the registry's fan-in looked like a hub overload and was not (see <a href="../registry.html">registry</a>). This is the intended shape.</p>
+<h2>Every MCP tool is a CLI command, and they mirror</h2>
+<p>ADR 0148. The rule is one-directional: <code>mirror</code>, <code>setup</code> and <code>install-hooks</code> have no agent audience and stay CLI-only, but an agent must never be able to ask something a person cannot — the CLI is where a person checks what the agent did.</p>
+<p>"Mirror" means the same input yields the same ANSWER, not that the argument parsers look alike. <code>--json</code> is the comparison point, because it is this surface's machine output and should carry the same data the tool returns. Rendering differs by design: <code>context</code> prints source lines here and a token budget there.</p>
+<p>Enforced by <code>tests/architecture/paired-surfaces.test.ts</code>, deliberately weakly — one shared <code>registry.*</code> accessor per pair. A call-graph version would fail on legitimate presentation differences and get switched off; every defect this rule was written for violates the weak form anyway.</p>
+<p><b>Judge capability, not parameter lists.</b> The first audit compared <code>inputSchema</code> properties against <code>usage</code> strings and reported <code>audit</code> as missing four modes; every one already had a CLI home under a different command name (<code>conducks advise</code>, <code>conducks guard</code>). One surface grouping five things under one tool while this one spreads them across three commands is a layout difference, not drift.</p>
+<h2>Output is a product surface</h2>
+<p>These commands are the primary way a human or an agent meets conducks, so a false finding is more expensive here than a missing one. Two habits follow: a finding that cannot be trusted should not be printed at all (see evolution's STALE_IMPORT), and any command that reports structure should be run against a <b>fresh</b> graph before its numbers are quoted, because <code>analyze</code> is incremental and stale results look identical to real ones.</p>
+<footer>Source: <code>docs/visuals/modules/interfaces/cli.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

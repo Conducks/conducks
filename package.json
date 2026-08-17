@@ -49,7 +49,8 @@
     "oracle:exports": "node tools/benchmark/oracle-exports.mjs",
     "oracle:python": "node tools/benchmark/oracle-python.mjs ../test-projects/scraper",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
-    "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js"
+    "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js",
+    "visuals": "node scripts/visuals/render.mjs && node scripts/visuals/detail.mjs && node scripts/visuals/notes.mjs"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.5-r.3",
@@ -89,6 +90,7 @@
     "@types/marked": "^5.0.2",
     "@types/node": "^20.19.37",
     "cross-env": "^10.1.0",
+    "elkjs": "^0.12.0",
     "jest": "^30.3.0",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",

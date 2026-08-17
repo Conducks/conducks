@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — core/registry — file to provider, id to component</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>registry.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>core/registry — file to provider, id to component</h1>
+<p><b>Layer:</b> core. One file, <code>core/registry/synapse-registry.ts</code>. Imports <code>contracts</code> and nothing else.</p>
+<p><b>Read at <code>7c11bc4</code>.</b> No door and no note until 2026-08-17 — one of the three core features the campaign's own census missed.</p>
+<p><b>Responsibility:</b> the map from a file to the provider that can parse it, and from an id to a registered component. The smallest feature in core and the most widely held: persistence, composition and two domain services each keep one.</p>
+<p><b>Boundaries:</b> it stores registrations and answers lookups. It decides nothing about what a provider does, and it never constructs one — <code>src/registry/index.ts</code> builds the provider list and hands them over in precedence order, first claimant keeping a pattern.</p>
+<h2>Why the BOOTSTRAPPER is not in here, though the names say it should be</h2>
+<p><code>RegistryBootstrapper</code> fills a registry, so <code>core/registry</code> reads like its home. It has its own door at <code>core/bootstrap</code> instead, and the reason is mechanical rather than aesthetic.</p>
+<p>That class imports the graph, persistence, git, parsing and utils doors. <code>core/persistence/persistence.ts</code> imports THIS one. Re-exporting both through a single door would make</p>
+<p>    persistence → registry → bootstrapper → persistence</p>
+<p>a cycle — because a door is itself a dependency edge, and importing one pulls in everything it re-exports (ADR 0150 rule 5b).</p>
+<p>That is not a hypothetical. The graph door closed exactly this kind of cycle once, nothing failed to compile, and a single unrelated test failed instead. Rule 5b exists because of it.</p>
+<p>So this door stays a LEAF: one class, one import, safe for anything in core to hold.</p>
+<footer>Source: <code>docs/visuals/modules/core/registry.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

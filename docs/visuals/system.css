@@ -1,0 +1,314 @@
+
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --line:#222a33; --txt:#dfe6ee; --mut:#8b98a8; --dim:#5c6875;
+    --ok:#3fb950; --no:#f85149; --cond:#d29922; --sofie:#3fb9a8; --accent:#58a6ff; --warn:#f0883e;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+       padding:40px 24px 90px}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:27px;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:19px;margin:52px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line);letter-spacing:-.01em}
+  h3{font-size:14px;margin:26px 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.09em}
+  p{margin:12px 0}
+  code{font-family:var(--mono);font-size:12.5px;background:#1a2028;padding:1.5px 5px;border-radius:4px;color:#a9c7e8}
+  .sub{color:var(--mut);font-size:14px;margin-bottom:26px}
+  .meta{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+        border-radius:6px;padding:14px 18px;margin:22px 0;font-size:13.5px;color:var(--mut)}
+  .meta b{color:var(--txt);font-weight:600}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;
+     background:#0f1318;position:sticky;top:0}
+  tbody tr:hover{background:#11161c}
+  .y{color:var(--ok);font-weight:700} .n{color:var(--no);font-weight:700} .c{color:var(--cond);font-weight:700}
+  .file{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:1.5px 7px;border-radius:20px;
+       border:1px solid;margin-right:6px;vertical-align:1px}
+  .t-traced{color:var(--ok);border-color:#1f6b32;background:#0f2015}
+  .t-measured{color:var(--accent);border-color:#1f4f79;background:#0d1a26}
+  .t-open{color:var(--warn);border-color:#7a4a1f;background:#241708}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));margin:16px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:15px 17px}
+  .card h4{margin:0 0 7px;font-size:14px;color:var(--sofie)}
+  .card p{margin:5px 0;font-size:13px;color:var(--mut)}
+  .prob{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--no);
+        border-radius:6px;padding:14px 18px;margin:13px 0}
+  .prob.fixed{border-left-color:var(--ok);opacity:.72}
+  .prob h4{margin:0 0 6px;font-size:14.5px;color:var(--txt)}
+  .prob p{margin:6px 0;font-size:13.5px;color:var(--mut)}
+  .owner{float:right;font-family:var(--mono);font-size:11px;color:var(--accent);
+         border:1px solid #1f4f79;border-radius:4px;padding:2px 8px}
+  svg{max-width:100%;height:auto;display:block;margin:18px 0}
+  .n-box{fill:var(--panel);stroke:var(--line)}
+  .n-hi{fill:#0f2a26;stroke:#2b6f64}
+  .n-warn{fill:#241708;stroke:#7a4a1f}
+  .n-t{fill:var(--txt);font:12px -apple-system,sans-serif}
+  .n-s{fill:var(--mut);font:10.5px var(--mono)}
+  .edge{stroke:#3a4552;stroke-width:1.5;fill:none;marker-end:url(#a)}
+  .edge-d{stroke:#3a4552;stroke-width:1.5;fill:none;stroke-dasharray:4 4;marker-end:url(#a)}
+  .edge-b{stroke:#5b4a7d;stroke-width:1.6;fill:none;marker-end:url(#b)}
+  .edge-u{stroke:#7a4a1f;stroke-width:1.4;fill:none;stroke-dasharray:5 4;marker-end:url(#c)}
+  .n-bg{fill:#1a1226;stroke:#4a3570}
+  .n-ok{fill:#0f2015;stroke:#1f6b32}
+  .sec{fill:none;stroke:#2a323c;stroke-width:1;stroke-dasharray:3 3}
+  .sec-t{fill:var(--dim);font:10.5px var(--mono);letter-spacing:.08em}
+  .lbl{fill:var(--dim);font:10.5px var(--mono)}
+  .b-t{fill:var(--txt);font:13.5px -apple-system,sans-serif;font-weight:600}
+  .b-s{fill:var(--mut);font:11px -apple-system,sans-serif}
+  .blk{cursor:pointer}
+  /* The i marker is the only part that OPENS on a single click; the rest of the block selects.
+     Its hit disc is transparent but must still take the pointer, so fill:transparent not none —
+     fill:none makes an SVG shape unhittable. */
+  .hint-h{fill:transparent;cursor:pointer}
+  .hint-h:hover{fill:var(--accent);fill-opacity:.16}
+  .blk:hover rect{stroke:var(--accent);stroke-width:1.8}
+  .hint{fill:none;stroke:#39434f}
+  .blk:hover .hint{stroke:var(--accent)}
+  .hint-t{fill:var(--dim);font:9px var(--mono);text-anchor:middle}
+  .blk:hover .hint-t{fill:var(--accent)}
+  .fg{color:var(--ok);font-weight:600} .bgk{color:#a98fd8;font-weight:600}
+  .warn{color:var(--warn)}
+  .todo{color:var(--warn);font-size:13px;border-left:3px solid var(--warn);padding-left:12px}
+  footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
+  footer.readlog{font:11.5px var(--mono);line-height:1.7;color:var(--dim)}
+  footer.readlog code{color:var(--sofie)}
+  a{color:var(--accent)}
+
+  /* ── page nav (added at the 3-page split) ── */
+  nav.pages{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 26px;padding-bottom:16px;
+            border-bottom:1px solid var(--line)}
+  nav.pages a{display:block;padding:8px 14px;border:1px solid var(--line);border-radius:7px;
+              background:var(--panel);text-decoration:none;color:var(--mut);font-size:13px;line-height:1.35}
+  nav.pages a b{display:block;color:var(--txt);font-weight:600;font-size:13.5px}
+  nav.pages a:hover{border-color:var(--accent)}
+  nav.pages a.here{border-color:var(--sofie);background:#0f2a26}
+  nav.pages a.here b{color:var(--sofie)}
+  .elsewhere{color:var(--mut);font-size:13px;margin:0 0 30px}
+  .elsewhere b{color:var(--txt)}
+  .anchors td:first-child{white-space:nowrap}
+  .prob:target{border-left-color:var(--accent);background:#0d1a26}
+
+  /* ── containers are clickable: a container opens its entry page ── */
+  .cont-r{fill:#0d1117;stroke:#2f3945;stroke-dasharray:none;stroke-width:1.2}
+  .cont a{cursor:pointer}
+  .cont:hover .cont-r{stroke:var(--sofie)}
+  .cont-t{fill:var(--txt);font:14px var(--mono);letter-spacing:.10em;font-weight:600}
+  .cont-s{fill:var(--dim);font:11px -apple-system,sans-serif}
+  .cont-go{fill:var(--dim);font:11px var(--mono);text-anchor:end}
+  .cont:hover .cont-go{fill:var(--sofie)}
+  .cont:hover .cont-t{fill:var(--sofie)}
+  .blk a{cursor:pointer}
+  /* a block deep-linked from the architecture highlights itself on arrival */
+  .det.fixed{border-left-color:var(--ok);opacity:.72}
+  .det:target{border-left-color:var(--sofie);background:#0f2a26}
+  .det{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
+       border-radius:7px;padding:15px 18px;margin:14px 0}
+  .det h3{margin:0 0 4px;font-size:15px;color:var(--txt);text-transform:none;letter-spacing:0}
+  .det .where{font-family:var(--mono);font-size:11.5px;color:var(--accent);margin:2px 0 9px}
+  .det p{margin:7px 0;font-size:13.5px;color:var(--mut)}
+  .back{display:inline-block;margin:0 0 18px;font-size:13px}
+  .edge-plain{stroke:#3a4552;stroke-width:1.5;fill:none}
+
+  /* ── layer nav: navigation WITHIN the architecture, not a top-level tab ── */
+  nav.layers{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 30px}
+  nav.layers a{padding:7px 13px;border:1px solid var(--line);border-radius:6px;background:var(--panel);
+               text-decoration:none;color:var(--mut);font-size:12.5px}
+  nav.layers a b{color:var(--txt);font-weight:600;margin-right:6px}
+  nav.layers a:hover{border-color:var(--sofie)}
+  h2[id^="layer"]{border-bottom:2px solid var(--sofie);margin-top:64px}
+
+  /* ── the canvas: one picture, zoom and pan ── */
+  .canvas-wrap{position:relative;border:1px solid var(--line);border-radius:10px;background:#0a0c0f;
+               margin:22px 0;overflow:hidden}
+  .canvas-wrap svg{display:block;width:100%;height:80vh;cursor:grab;margin:0}
+  /* fullscreen — the API path and the overlay fallback land in the same place */
+  .canvas-wrap:fullscreen{background:var(--bg);border:0;border-radius:0}
+  .canvas-wrap:fullscreen svg{height:100vh}
+  .canvas-wrap.overlay{position:fixed;inset:0;z-index:9999;border-radius:0;border:0;background:var(--bg)}
+  .canvas-wrap.overlay svg{height:100vh}
+  .canvas-wrap.is-full .zoom-bar{top:16px;right:16px}
+  .canvas-wrap svg.grabbing{cursor:grabbing}
+  .zoom-bar{position:absolute;top:12px;right:12px;z-index:5;display:flex;align-items:center;gap:6px;
+            background:rgba(12,16,20,.92);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+  .zoom-bar button{background:var(--panel);color:var(--txt);border:1px solid var(--line);
+                   border-radius:5px;font:12px var(--mono);padding:3px 9px;cursor:pointer}
+  .zoom-bar button:hover{border-color:var(--sofie);color:var(--sofie)}
+  .zoom-hint{color:var(--dim);font:11px var(--mono);margin-left:4px}
+  .zoom-pct{color:var(--sofie);font:11px var(--mono);min-width:42px;text-align:right}
+  .band-n{fill:var(--sofie);font:600 34px var(--mono)}
+  .band-t{fill:var(--txt);font:600 19px -apple-system,sans-serif;letter-spacing:.02em}
+  .band-s{fill:var(--mut);font:13px -apple-system,sans-serif}
+
+  /* full-bleed: the canvas uses the whole window width, the prose stays readable */
+  .bleed{width:100vw;margin-left:calc(50% - 50vw);padding:0 18px 4px}
+  .band-r{fill:#0a0d11;stroke:#242c36;stroke-width:1.2}
+
+
+  /* a long edge is drawn in full, but reads as a deliberate span; hover to trace it */
+  .edge-far{stroke:var(--sofie);stroke-width:1.6;fill:none;opacity:.45;marker-end:url(#a)}
+  .e{cursor:crosshair}
+  .e:hover .edge-far{opacity:1;stroke-width:2.6}
+  .e:hover .edge{stroke:var(--sofie);stroke-width:2.6}
+
+  /* selecting an edge: a fat invisible path makes a 1.5px line clickable */
+  .edge-hit{stroke:transparent;stroke-width:14;fill:none;pointer-events:stroke}
+  .e{cursor:pointer}
+  svg.has-sel .e:not(.sel) .edge,
+  svg.has-sel .e:not(.sel) .edge-far{opacity:.08}
+  svg.has-sel .blk:not(.on){opacity:.34}
+  svg.has-sel .lbl:not(.sel){opacity:.12}
+  .e.sel .edge, .e.sel .edge-far{stroke:var(--warn);stroke-width:3.4;opacity:1}
+  .lbl.sel{fill:var(--warn);font-weight:700;opacity:1}
+  .sel-count{color:var(--warn);font:11px var(--mono);margin-right:6px}
+
+  /* find, block selection and the mini-map */
+  .zoom-bar{flex-wrap:wrap;max-width:min(96vw,920px)}
+  .find{background:#0c1015;border:1px solid var(--line);border-radius:5px;color:var(--txt);
+        font:12px var(--mono);padding:4px 9px;width:148px;outline:none}
+  .find:focus{border-color:var(--sofie)}
+  .find-n{color:var(--sofie);font:11px var(--mono);min-width:34px}
+  .blk.hit rect{stroke:var(--warn);stroke-width:3}
+  svg.has-sel .blk.on rect{stroke:var(--warn);stroke-width:2.4}
+  svg.has-sel .blk.pick rect{stroke:var(--warn);stroke-width:3.4}
+  svg.has-sel .cont-r{opacity:.45}
+  .minimap{position:absolute;right:12px;bottom:12px;width:148px;height:206px;z-index:6;
+           background:rgba(10,13,17,.94);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .minimap svg{width:100%;height:100%;display:block;margin:0;cursor:crosshair}
+  #mini-g rect{fill:#2b3441}
+  #mini-vp{fill:rgba(63,185,168,.13);stroke:var(--sofie);stroke-width:8;vector-effect:non-scaling-stroke}
+
+  /* ── trace pages ──────────────────────────────────────────────────────────────
+     A visual on a DIFFERENT SUBJECT from the canvas — a runtime trace, which
+     conducks-docs §6.13 puts here and architecture.md may not hold. It is still a
+     page in this folder, so its classes live in this file.
+
+     They did not. `system-trace.html` shipped 180 lines of private <style> with a
+     second palette (--signal, --good, --dead against --sofie, --ok, --accent), so
+     the one page in the folder that nothing shared was also the one nothing could
+     restyle. Same failure as a second renderer, one layer down.
+
+     Everything is scoped to `.tracepage` so none of it can reach the canvas. */
+  .tracepage{--r:4px; --panel-2:#1a2028; --line-soft:#1a212a; --sig-soft:#0f2a26;
+             --ok-soft:#0f2015; --warn-soft:#241708; --no-soft:#2a1216;
+             --dead:#a98fd8; --dead-soft:#1a1226}
+  .tracepage h1{font-size:clamp(1.9rem,5vw,2.6rem);line-height:1.1;margin:0}
+  .tracepage h2{font-size:clamp(1.2rem,3vw,1.5rem);margin:0;padding:0;border:0}
+  .tracepage h3{font-size:1rem;margin:0;color:var(--txt);text-transform:none;letter-spacing:-.01em}
+  .tracepage p{margin:0;max-width:68ch}
+  .tracepage section{display:flex;flex-direction:column;gap:1.15rem;padding:3rem 0 0}
+  .tracepage .eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.16em;
+                      text-transform:uppercase;color:var(--dim)}
+  .tracepage .dim{color:var(--mut)}
+  .tracepage header.masthead{display:flex;flex-direction:column;gap:1rem;
+                             padding-bottom:1.6rem;border-bottom:2px solid var(--mut)}
+  .tracepage .masthead .sub{font-size:1.05rem;color:var(--mut);max-width:62ch;margin:0}
+  .tracepage .meta-row{display:flex;flex-wrap:wrap;gap:.4rem 1.4rem;
+                       font-family:var(--mono);font-size:.72rem;color:var(--dim)}
+  .tracepage .sec-head{display:flex;flex-direction:column;gap:.45rem}
+
+  /* the per-claim provenance stamp — conducks-docs §6.13 */
+  .prov{display:inline-block;font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;
+        text-transform:uppercase;padding:.1rem .34rem;border-radius:2px;white-space:nowrap;
+        vertical-align:.12em}
+  .prov.traced{background:var(--ok-soft);color:var(--ok)}
+  .prov.measured{background:var(--sig-soft);color:var(--sofie)}
+  .prov.queried{background:var(--panel-2);color:var(--mut)}
+  .prov.authored{background:var(--dead-soft);color:var(--dead)}
+  .prov.unver{background:var(--no-soft);color:var(--no)}
+  .provenance{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--sofie);
+              border-radius:var(--r);padding:1rem 1.15rem;display:flex;flex-direction:column;gap:.7rem}
+  .provenance dl{margin:0;display:grid;gap:.3rem 1rem;grid-template-columns:max-content 1fr;font-size:.83rem}
+  .provenance dt{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+                 color:var(--dim);padding-top:.15rem}
+  .provenance dd{margin:0;color:var(--mut)}
+
+  .graph-scroll{overflow-x:auto;background:var(--panel);border:1px solid var(--line);
+                border-radius:var(--r);padding:1.3rem 1rem}
+  .mermaid{min-width:720px}
+
+  .claim{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--sig,var(--sofie));
+         border-radius:var(--r);padding:1.05rem 1.1rem;display:flex;flex-direction:column;gap:.5rem}
+  .claim.ok{--sig:var(--ok)} .claim.no{--sig:var(--no)}
+  .claim h3{font-size:.95rem} .claim p{font-size:.9rem;color:var(--mut)}
+  .verdict{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+           color:var(--sig,var(--sofie))}
+  .thesis{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+
+  /* a flow lane — one path, left to right, with what each step hands the next */
+  .lane{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .lane+.lane{margin-top:1.15rem}
+  .lane-head{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap;padding:.7rem 1rem;
+             background:var(--panel-2);border-bottom:1px solid var(--line)}
+  .lane-head .n{font-family:var(--mono);font-size:.7rem;color:var(--sofie);letter-spacing:.1em;font-weight:400}
+  .lane-head h3{font-size:.98rem}
+  .lane-head .trigger{font-family:var(--mono);font-size:.72rem;color:var(--dim)}
+  .track{overflow-x:auto;padding:1.15rem 1rem 1.3rem}
+  .chain{display:flex;align-items:stretch;gap:0;min-width:min-content}
+  .stage{flex:0 0 auto;width:178px;background:var(--bg);border:1px solid var(--line-soft);
+         border-radius:var(--r);padding:.6rem .7rem;display:flex;flex-direction:column;gap:.32rem}
+  .stage .fn{font-family:var(--mono);font-size:.76rem;color:var(--txt);font-weight:600}
+  .stage .what{font-size:.76rem;color:var(--mut);line-height:1.4}
+  .stage.emit{border-color:var(--sofie);background:var(--sig-soft)}
+  .stage.oracle{border-color:var(--ok);background:var(--ok-soft)}
+  .stage.risk{border-color:var(--no);background:var(--no-soft)}
+  .wire{flex:0 0 auto;width:44px;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;gap:.25rem;position:relative}
+  .wire::before{content:"";position:absolute;top:50%;left:0;right:0;height:1px;background:var(--line)}
+  .wire::after{content:"";position:absolute;top:50%;right:2px;width:0;height:0;transform:translateY(-50%);
+               border-left:5px solid var(--line);border-top:4px solid transparent;
+               border-bottom:4px solid transparent}
+  .wire .payload{position:relative;z-index:1;background:var(--panel);font-family:var(--mono);
+                 font-size:.6rem;color:var(--sofie);padding:.1rem .2rem;text-align:center;
+                 line-height:1.25;border-radius:2px}
+  .lane-foot{border-top:1px dashed var(--line);padding:.7rem 1rem .85rem;font-size:.82rem;
+             color:var(--mut);display:flex;flex-direction:column;gap:.3rem}
+  .lane-foot b{color:var(--txt);font-weight:600}
+
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+  .tracepage table{margin:0;font-size:.85rem;min-width:660px}
+  .tracepage th{background:var(--panel-2);font-family:var(--mono);font-size:.66rem;letter-spacing:.12em}
+  .tracepage td{border-bottom:1px solid var(--line-soft)}
+  .tracepage tbody tr:last-child td{border-bottom:0}
+  .tracepage td.mono,.tracepage th.mono{font-family:var(--mono);font-size:.78rem;white-space:nowrap}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:.63rem;letter-spacing:.08em;
+        text-transform:uppercase;padding:.15rem .42rem;border-radius:2px;white-space:nowrap}
+  .pill.good{background:var(--ok-soft);color:var(--ok)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.bad{background:var(--no-soft);color:var(--no)}
+  .pill.dead{background:var(--dead-soft);color:var(--dead)}
+  .pill.sig{background:var(--sig-soft);color:var(--sofie)}
+
+  /* small prose inside a trace section — six places had it as an inline font-size, in three
+     sizes that nobody chose deliberately. One class, one size. */
+  .tracepage .fine{font-size:.88rem}
+  .ladder{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem}
+  .ladder+.ladder{margin-top:.7rem}
+  .ladder-lbl{width:100%;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;
+              text-transform:uppercase;color:var(--mut)}
+  .ladder .gate.branch{margin-left:1rem}
+  .table-scroll+.panel{margin-top:1.15rem}
+  .rung{font-family:var(--mono);font-size:.72rem;border:1px solid var(--line);background:var(--panel);
+        padding:.32rem .6rem;border-radius:var(--r)}
+  .rung.exec{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+  .rung.quar{border-color:var(--no);color:var(--no);background:var(--no-soft)}
+  .gate{font-family:var(--mono);font-size:.66rem;color:var(--dim)}
+
+  .trace{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--no);
+         border-radius:var(--r);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.8rem}
+  .trace ol{margin:0;padding-left:1.2rem;display:flex;flex-direction:column;gap:.45rem}
+  .trace li{font-size:.88rem;color:var(--mut)}
+  .trace li b{color:var(--txt);font-weight:600}
+
+  .grid-2{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+         padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.6rem}
+  .panel ul{margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:.35rem}
+  .panel li{font-size:.85rem;color:var(--mut)}
+  .tracepage footer{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--line);
+                    font-family:var(--mono);font-size:.7rem;color:var(--dim);
+                    display:flex;flex-wrap:wrap;gap:.4rem 1.5rem}
+  @media (max-width:620px){ .stage{width:152px} .wire{width:34px} }

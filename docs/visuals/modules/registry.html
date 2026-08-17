@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — registry — the composition root</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>registry.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>registry — the composition root</h1>
+<p><b>Layer:</b> composition. Imports core + domain + contracts; imported by every interface. It is the only place allowed to know about everything.</p>
+<p><b>Responsibility:</b> dependency injection and lifecycle. It constructs the persistence handle, the graph, the analysis and governance services, and hands interfaces a single wired object. It owns read-only vs read-write mode and teardown.</p>
+<p><b>Boundaries:</b> no logic. If a behaviour lives here rather than in a domain service, it is misplaced.</p>
+<p><b>Deferred / not built:</b> no splitting by domain. This was recommended once and is now explicitly withdrawn — see below.</p>
+<h2>It looks like a hub and is not</h2>
+<p>The audit flagged <code>src/registry/index.ts</code> at 74 and 77 upstream connections against a limit of 50, and the obvious reading — "composition-root god object, split it by domain" — was wrong. Measured after type-only imports were excluded: <b>74 raw → 14 runtime, 77 → 37</b>, both well under the limit.</p>
+<p>38 of its 50 importers are CLI commands, and every one of the 38 imports the registry purely to *type* its handler, so the compiler erases all of them. The registry is a DI type contract, not a runtime hub. Do not split it on fan-in evidence, and be suspicious of any future coupling metric here that has not excluded type imports (ADR 0016).</p>
+<h2>The vault hold lives here, with the object it protects</h2>
+<p><code>acquireVault</code> / <code>releaseVault</code> ref-count who is reading the shared DuckDB handle; it closes only when the last holder releases. That count sits on the registry rather than in the MCP layer because a single tool call passed through THREE independent closers — <code>hypertoon</code>'s wrapper, the handler's own <code>ensureAnchor</code>/<code>releaseAnchor</code> pair, and <code>tool-registry</code>'s <code>finally</code>, which closed outright and ignored the count. With two calls in flight, whichever finished first hung up on the other (todo52, ADR 0147).</p>
+<p>It could not stay in <code>interfaces/tools/shared/anchor.ts</code>: composition would have to import the MCP layer to reach it, and <code>boundaries.test.ts</code> refuses that edge — correctly, since a vault hold is an infrastructure concern and MCP is one of its callers.</p>
+<p><code>changeSet</code>/<code>impactedSymbols</code> and <code>governedCount</code> are exposed here for the same reason: the CLI must not import the domain directly, so a fact both surfaces need is reached through the registry.</p>
+<h2>Dynamic access is invisible to static analysis</h2>
+<p>Services are reached through property chains (<code>registry.evolution.watcher</code>), so the getters have no incoming edge in the graph and dead-code reports them as orphans. Four of them are permanent, known false positives. This is the price of the DI shape and is accepted; do not "fix" it by deleting a getter, and do not add a special case to dead-code for it.</p>
+<footer>Source: <code>docs/visuals/modules/registry.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

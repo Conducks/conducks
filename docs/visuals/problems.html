@@ -1,0 +1,31 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks visuals — problems</title>
+<!-- Provenance: authored — a concern page. It makes no code claims of its own; every
+     measurement it cites is anchored on the canvas or in docs/deep_clean.md. -->
+<link rel="stylesheet" href="system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="problems.html" class="here"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<h1>Problems</h1>
+<p class="sub">A defect, its evidence, and who owns it. A block on the canvas that IS one links here.</p>
+
+<p class="elsewhere"><b>Empty on purpose, and that is a claim about process rather than about
+quality.</b> The ADR 0150 core campaign found and FIXED its defects in the same pass — inheritance
+producing no edge in three languages, a linker that could never run, a monitor re-implementing git,
+a filter that was a no-op. Each is recorded in <code>docs/deep_clean.md</code> with the measurement
+that found it and the mutation that proved the fix. None is open, so none is listed here.</p>
+
+<p>What core still does not claim is on the canvas under
+<a href="architecture.html#scope">what this band does not show</a>, and in
+<a href="holding.html">holding</a>. Those are limits and unmeasured areas — not defects with an
+owner, which is what this page is for.</p>
+
+<p class="elsewhere">When the read band is drawn and the first defect in it survives the walk, it
+lands here with an id so a block can point at it declaratively. A block that is merely NEAR a defect
+must never link to one — that reads as an accusation and sends the reader to the wrong page.</p>
+</div>

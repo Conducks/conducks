@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — domain/governance — judgement</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>governance.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>domain/governance — judgement</h1>
+<p><b>Layer:</b> domain. Imports core + contracts.</p>
+<p><b>Responsibility:</b> turning structural facts into findings — ARCH-1 hub overload, ARCH-3 circular dependency, ARCH-4 self-import, layer-boundary violations — and owning the thresholds that define them.</p>
+<p><b>Boundaries:</b> it computes nothing about the code itself. Every input comes from the graph, so a wrong finding is fixed either by the filter here or the data in core — never by a special case in the reporting path.</p>
+<p><b>Deferred / not built:</b> symbol-level mutual-call tangles. ADR 0017 removed them from ARCH-3 deliberately — they are real properties of the code but not circular *dependencies* — and the separate "call cycle" finding that should carry them is not built. They are reported nowhere today. Deferred, not dropped.</p>
+<h2>Parts</h2>
+<ul>
+<li><b><a href="governance/sentinel.html">sentinel/</a></b> — the declarative rule engine, the layer contract (encoded but</li>
+</ul>
+<p>  <b>not currently loaded at runtime</b> — read this before trusting a green <code>guard</code>), <code>conducks guard</code>.</p>
+<p><code>advisor</code> produces prioritized recommendations; <code>index</code> hosts the audit that assembles findings for <code>conducks audit</code>.</p>
+<h2>The one lesson this module keeps relearning</h2>
+<p>Every false-positive hunt here had the same root cause: <b>the finding counted a relationship that is not the relationship it claims to measure.</b></p>
+<ul>
+<li>ADR 0010 — containment edges (a class owning its methods) counted as dependency. 49 cycles → 3.</li>
+<li>ADR 0016 — type-only imports counted as runtime coupling. The compiler erases them.</li>
+<li>ADR 0017 — a <code>CALLS</code> edge onto a *parameter's* method, resolved onto the owning class only because</li>
+</ul>
+<p>  the parameter is type-annotated, counted as a module dependency.</p>
+<p>Worse, consumers disagreed with each other: <code>advisor</code> had always restricted cycles to import-level, <code>governance/index</code> filtered containment only, and <code>conducks-core.audit</code> had no filter at all — three definitions of "cycle", which is why the same false positive kept reappearing under a different command. They now share <code>IMPORT_CYCLE_IGNORED_EDGE_TYPES</code>. Keep them aligned.</p>
+<p><b>Before adding a rule, write down which edge types it traverses and whether each survives compilation, in the ADR.</b> That single step would have prevented all three.</p>
+<h2>What a clean audit means</h2>
+<p><b>"Orphan" means two different things and they are both right.</b> Here, an orphan is a *dangling edge* — an edge whose target node was never induced (<code>governance/index.ts:141-212</code>, reported as ECOSYSTEM-1 or DISCOVERY-1). In <a href="evolution.html">evolution</a>, an ORPHAN is a *node with no incoming edge*. So <code>conducks audit</code> reporting zero orphans while <code>conducks prune</code> lists 25 is not a contradiction and neither number is stale. Never quote one as the other.</p>
+<p><code>conducks audit</code> on conducks reports zero findings, and that is validated rather than assumed: on compiled JS, conducks and <code>madge</code> both report zero cycles. <code>madge</code> on TS *source* still reports three — its type-erasure blind spot. Conducks being the more accurate of the two on the same repo is the claim this module exists to defend, so any change that loosens a filter needs the same cross-check.</p>
+<footer>Source: <code>docs/visuals/modules/domain/governance.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — core/bootstrap — what has to happen before any question can be answered</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>bootstrap.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>core/bootstrap — what has to happen before any question can be answered</h1>
+<p><b>Layer:</b> core. One file, <code>core/bootstrap/registry-bootstrapper.ts</code>.</p>
+<p><b>Read at <code>7c11bc4</code>.</b> Until 2026-08-17 this was a loose file at the core root with no door, reached directly by composition — the third of three features the campaign's census missed.</p>
+<p><b>Responsibility:</b> environment discovery, grammar initialisation, and anchor resolution. Which directory is the project root, is a native grammar available, which vault does this checkout use. Kept out of the composition root so that root stays a wiring point rather than a procedure.</p>
+<p><b>Boundaries:</b> it sets things up and answers nothing. No query goes through here.</p>
+<h2>It sits ON TOP of every other core door</h2>
+<p>It imports graph, persistence, git, parsing and utils. That makes it the one feature in core that must never be imported BY them, and the door gate is what keeps that true — nothing in core does, and its single consumer is <code>src/registry/index.ts</code>.</p>
+<h2>A tension, recorded rather than resolved</h2>
+<p>A file that wires five features together and is used by exactly one composition root reads like composition that was placed in core. Moving it to <code>src/registry/</code> would be legal under ADR 0005 and is arguably where it belongs.</p>
+<p>That decision waits for the composition-root unit, which this campaign deliberately does last. Deciding it here would mean deciding the shape of a layer nobody has measured yet — and this project has already paid twice for a structural call made ahead of its measurement.</p>
+<h2>The lazy graph is the part worth knowing</h2>
+<p><code>registry-bootstrapper.ts</code> carries <code>pendingLoad</code>, the deferral that lets a read-only command answer without materialising the graph. Materialising costs roughly 165 MB and 146 ms for 2,381 nodes, and a read-only caller frequently walks no node at all.</p>
+<p>The trap it holds: a deferred graph reads as an EMPTY one. Four of six MCP tools broke that way and three broke silently — no error, just zero results. Anything that WALKS must call <code>ensureGraphLoaded()</code> first, and the registry's <code>graphEngine</code> getter makes forgetting a loud failure at the call site instead of a wrong answer downstream.</p>
+<footer>Source: <code>docs/visuals/modules/core/bootstrap.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — core/algorithms — the two measurements that read HISTORY, not structure</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>algorithms.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>core/algorithms — the two measurements that read HISTORY, not structure</h1>
+<p><b>Layer:</b> core. <code>core/algorithms/entropy.ts</code>, <code>core/algorithms/cochange-engine.ts</code>.</p>
+<p><b>Read at <code>7c11bc4</code>.</b> This module had no door and no note until 2026-08-17; it was one of three core features an audit of "six features" never looked at, because nobody had established that six was the whole list.</p>
+<p><b>Responsibility:</b> everything else in core answers *what does this code say*. These two answer *what has happened to it*. Entropy reads the author distribution of a unit and turns it into an ownership risk; the co-change engine reads the commit log for files that change together while nothing in the code links them.</p>
+<p><b>Boundaries:</b> pure computation over inputs someone else gathered. Neither opens a vault or a repository of its own — <code>CoChangeEngine</code> takes an optional <code>historyExtractor</code>, and the analyze path hands it a connection rather than making one.</p>
+<p>They share no code, and that is fine. A feature here is a BOUNDARY, not a cluster of similar functions.</p>
+<h2>The threshold is the feature</h2>
+<p><code>cochange-engine.ts</code> reports a pair only when it appears together in MORE than three commits. Two files touched in one commit is a coincidence, and a tool that reported it would bury its real findings under noise.</p>
+<p>The other half is <code>!hasEdge</code>: a pair the code ALREADY links is not a finding, it is a codebase working as intended.</p>
+<p>Both are pinned, and the second one only because mutation caught its absence — replacing <code>!hasEdge</code> with <code>true</code> passed all five tests written before it, because every one of them used a graph with no edges. A green suite that cannot see the condition defining the feature.</p>
+<h2>Entropy is normalised against the author count, not an absolute</h2>
+<p><code>normalizeEntropyRisk</code> divides by <code>log2(authorCount)</code>, so "many authors, equal shares" is 1.0 whatever the team size. A raw Shannon score would make a large team look permanently risky and a two-person module permanently safe.</p>
+<p>A single author is 0 by an explicit guard, not by the arithmetic — <code>log2(1)</code> is zero and the division would be undefined.</p>
+<footer>Source: <code>docs/visuals/modules/core/algorithms.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

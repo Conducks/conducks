@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the graph</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE GRAPH</h1>
+<p class="sub">core/graph — nodes, edges, and binding names to them</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="add">
+  <h3>Every id is lowercased</h3>
+  <div class="where">src/lib/core/graph/adjacency-list.ts::addNode</div>
+  <p>treating them as two splits one symbol into two nodes, and every count then reports it twice (CONDUCKS-4)</p>
+  <p class="file">on the canvas: APFS calls two spellings one file</p>
+</div>
+
+<div class="det" id="skel">
+  <h3>A stored node is a SKELETON</h3>
+  <div class="where">src/lib/core/graph/adjacency-list.ts::addNode</div>
+  <p>a field not named in the skeleton is harvested correctly, carried through the worker correctly, and dropped at this boundary. `doc` and `instanceOf` each cost a debugging session before they were added</p>
+  <p class="file">on the canvas: getNode and getNodesMap differ</p>
+</div>
+
+<div class="det" id="kind">
+  <h3>A capture becomes a rung</h3>
+  <div class="where">src/contracts/taxonomy.ts::mapToCanonical</div>
+  <p>a declared rung nothing emits is not a reservation, it is a row that makes the table wrong (ADR 0100)</p>
+  <p class="file">on the canvas: BEHAVIOR, STRUCTURE, ATOM…</p>
+</div>
+
+<div class="det" id="intra">
+  <h3>Bind the bare names</h3>
+  <div class="where">src/lib/core/graph/linker-intra.ts::IntraLinker</div>
+  <p>during streaming induction a call to a symbol in a later batch is stored with a bare target. This runs after the whole graph exists</p>
+  <p class="file">on the canvas: once every file is known</p>
+</div>
+
+<div class="det" id="port">
+  <h3>It REFUSES to guess alone</h3>
+  <div class="where">src/lib/core/graph/linker-intra.ts::ResolveSpecifier</div>
+  <p>core/graph may not import core/parsing’s door without closing a cycle (rule 5b), so domain supplies the implementation. A default resolving nothing would be indistinguishable from a specifier that names nothing</p>
+  <p class="file">on the canvas: the resolver is injected</p>
+</div>
+
+<div class="det" id="fam">
+  <h3>Never bind across languages</h3>
+  <div class="where">src/lib/core/graph/import-resolver.ts::sameFamily</div>
+  <p>a single-candidate match across languages cannot be told from a correct one downstream. It fails OPEN on an unknown extension, so a new language is not silently refused</p>
+  <p class="file">on the canvas: the most confident wrong answer</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>Every id is lowercased</td><td>A stored node is a SKELETON</td><td>—</td></tr>
+    <tr><td>Every id is lowercased</td><td>A capture becomes a rung</td><td>—</td></tr>
+    <tr><td>A capture becomes a rung</td><td>Bind the bare names</td><td>—</td></tr>
+    <tr><td>Bind the bare names</td><td>It REFUSES to guess alone</td><td>—</td></tr>
+    <tr><td>It REFUSES to guess alone</td><td>Never bind across languages</td><td>—</td></tr>
+  </tbody>
+</table>
+<h2>Module notes</h2>
+<p class="sub">the authored memory of the modules this block cites — derived from the anchors above, not curated</p>
+<p>
+  <a href="contracts.html"><code>contracts</code></a>
+</p>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

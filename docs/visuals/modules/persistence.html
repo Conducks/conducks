@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the vault</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE VAULT</h1>
+<p class="sub">core/persistence — DuckDB, and one writer</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="save">
+  <h3>save() writes NO structure</h3>
+  <div class="where">src/lib/core/persistence/persistence.ts::SynapsePersistence</div>
+  <p>it writes metadata and the pulses row. Nodes and edges go through saveNodes and saveEdges, so the watcher’s "persisting structural delta" was a no-op for as long as that line existed</p>
+  <p class="file">on the canvas: and the call succeeds</p>
+</div>
+
+<div class="det" id="nodes">
+  <h3>saveNodes is what stores them</h3>
+  <div class="where">src/lib/core/persistence/persistence.ts::saveNodes</div>
+  <p class="file">on the canvas: batched, inside the pulse transaction</p>
+</div>
+
+<div class="det" id="purge">
+  <h3>Purge a unit, not just its children</h3>
+  <div class="where">src/lib/core/persistence/persistence.ts::purgeUnits</div>
+  <p>matching on unitId alone left every unit row behind, and analyze then found the same units "no longer discoverable" on EVERY pulse</p>
+  <p class="file">on the canvas: or reconcile churns forever</p>
+</div>
+
+<div class="det" id="fresh">
+  <h3>What changed since last time</h3>
+  <div class="where">src/lib/core/persistence/freshness.ts::classifyFreshness</div>
+  <p>this classification used to live inline in the monitor and the watcher had no way to ask for it, so a watcher started after edits was blind to every one of them</p>
+  <p class="file">on the canvas: the shared answer, not a second one</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>save() writes NO structure</td><td>saveNodes is what stores them</td><td>structure goes here instead</td></tr>
+    <tr><td>saveNodes is what stores them</td><td>Purge a unit, not just its children</td><td>—</td></tr>
+    <tr><td>Purge a unit, not just its children</td><td>What changed since last time</td><td>—</td></tr>
+  </tbody>
+</table>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

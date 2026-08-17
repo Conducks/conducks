@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — domain/analysis — establishing what is true about the code</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>analysis.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>domain/analysis — establishing what is true about the code</h1>
+<p><b>Layer:</b> domain. Imports core + contracts.</p>
+<p><b>Responsibility:</b> everything that turns source into knowledge (<code>domain/analysis/index.ts</code> is the facade) — reflecting files, sequencing a pulse, answering structural queries, and the feature-shaped analyses that sit on top (coverage, the docs grammar).</p>
+<p><b>Boundaries:</b> this module decides what is <b>true</b>, never what is <b>acceptable</b>. No thresholds, no violations, no severity — <a href="governance.html">governance</a> owns judgement. The split matters: the same cycle data serves an audit, an advisor and a guard with three different opinions applied on top.</p>
+<p><b>Deferred / not built:</b> a query planner. <code>query-service</code> answers a fixed set of questions with hand-written SQL and graph walks; there is no general query language. Adequate while the question set is known.</p>
+<h2>Parts</h2>
+<ul>
+<li><b><a href="../core/parsing/reflector.html">reflector/</a></b> — file → spectrum. The single most load-bearing unit here.</li>
+<li><b><a href="analysis/orchestrator.html">orchestrator/</a></b> — the multi-pass pulse, incremental analysis, workers.</li>
+<li><b><a href="analysis/coverage.html">coverage/</a></b> — binding an external coverage report onto the graph.</li>
+<li><b><a href="analysis/docs-grammar.html">docs-grammar/</a></b> — the conducks-docs standard, enforced.</li>
+</ul>
+<p><code>conducks-core</code> is the façade the registry wires; <code>query-service</code> answers structural questions; <code>fallback-detector</code> reports where analysis degraded; <code>gateway-service</code> is the live vault-watch feed behind the Mirror dashboard, constructed by the <code>mirror</code> CLI command and consumed by the web server.</p>
+<h2>The pulse links, inducts, then links AGAIN</h2>
+<p>The order inside <code>analyze</code> matters and is not obvious. <code>IntraLinker</code> runs once the whole graph is in memory, then virtual/external induction materialises nodes for references that pointed outside the project, then the linker runs a SECOND time against those new nodes.</p>
+<p>Without that second pass the first analyze on a fresh vault resolves fewer references than a rebuild of the same code — the induced nodes did not exist when linking happened, and on a warm vault they only appear to work because they survived from the previous pulse. Measured on subject-c: 7,531 resolutions cold against 7,994 warm, dangling 3,440 against 3,146 (todo59).</p>
+<p>Not a reorder — induction READS the dangling set that linking produces, so inducting first would starve it.</p>
+<h2>Why the split between the parts is where it is</h2>
+<p>One pass cannot resolve a cross-file reference, because the target may not be parsed yet. That single constraint is what divides this module: the <a href="../core/parsing/reflector.html">reflector</a> sees exactly one file and seeds unresolved specifiers, the <a href="analysis/orchestrator.html">orchestrator</a> is the only thing allowed to see all files and is therefore where real edges get built, and the feature analyses (<a href="analysis/coverage.html">coverage</a>, <a href="analysis/docs-grammar.html">docs-grammar</a>) read the finished graph and never touch parsing. Anything that needs repo-wide knowledge moves up, never sideways.</p>
+<p>The consequence every part inherits — <code>analyze</code> is incremental, so a re-run can show no change while your new logic never executed — is spelled out once, in the orchestrator's doc. Read it before believing any number produced from this module.</p>
+<footer>Source: <code>docs/visuals/modules/domain/analysis.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

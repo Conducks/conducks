@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — discovery</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>DISCOVERY</h1>
+<p class="sub">core/git — which files exist, asked of git itself</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="anchor">
+  <h3>Anchor on a root</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts::anchorChronicle</div>
+  <p>the door hands out `chronicle` as ReadOnlyChronicle, the class minus its one mutator, so none of the two dozen files holding it can re-anchor mid-run</p>
+  <p class="file">on the canvas: one directory for the whole process</p>
+</div>
+
+<div class="det" id="disc">
+  <h3>Ask every repository</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts::discoverFiles</div>
+  <p>`ls-files` in a root does not descend into a nested checkout. Measured on this repo: a private copy saw 575 source files, this sees 578, and the three were a nested fixture (ADR 0069)</p>
+  <p class="file">on the canvas: not just the anchor’s own</p>
+</div>
+
+<div class="det" id="quote">
+  <h3>Non-ASCII names survive</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts</div>
+  <p>git quotes any path with a non-ASCII byte, so a Turkish filename came back as a 52-character escaped literal that opened nothing. Passed per-invocation because conducks must not write to a repo it is only reading</p>
+  <p class="file">on the canvas: core.quotePath=false, per invocation</p>
+</div>
+
+<div class="det" id="fsfall">
+  <h3>No repository? Scan the tree</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts::discoverFiles</div>
+  <p>the fallback walk accepts a file by extension OR exact filename, because Rakefile and Dockerfile have no extension to match on</p>
+  <p class="file">on the canvas: the case ADR 0035 supports</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>Anchor on a root</td><td>Ask every repository</td><td>—</td></tr>
+    <tr><td>Ask every repository</td><td>Non-ASCII names survive</td><td>—</td></tr>
+    <tr><td>Ask every repository</td><td>No repository? Scan the tree</td><td>git said nothing</td></tr>
+  </tbody>
+</table>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

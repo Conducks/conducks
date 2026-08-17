@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — core/git — the repository, asked once</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>git.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>core/git — the repository, asked once</h1>
+<p><b>Layer:</b> core. Two files: <code>core/git/chronicle-interface.ts</code> and its door. Imports <code>contracts</code> and <code>core/utils</code>, nothing else — a true leaf, which is why it was the first feature cleaned.</p>
+<p><b>Read at <code>7c11bc4</code>.</b></p>
+<p><b>Responsibility:</b> every question that needs <code>git</code> to answer it. Which files exist, which branch is checked out, who touched a file and when, what a ref resolves to.</p>
+<p><b>Boundaries:</b> it runs git and returns what git said. It does not decide what a file MEANS — a <code>.py</code> and a <code>.md</code> come back the same way — and it never writes to a repository it is reading, which is why <code>core.quotePath=false</code> is passed per-invocation rather than set in the repo's config.</p>
+<h2>Discovery asks EVERY repository under the anchor, not just the anchor's own</h2>
+<p><code>ls-files</code> in the root of a repository does not descend into a nested checkout — it names the directory and stops. So a vendored dependency, a submodule or a test fixture with its own <code>.git</code> is invisible to it.</p>
+<p>Measured on this repository while cleaning the monitor: a private <code>ls-files</code> copy saw 575 source files and <code>discoverFiles</code> saw 578. The three were every file under a nested fixture checkout, and <code>status</code> had been reporting a smaller tree than <code>analyze</code> ingested with no test aware of it (ADR 0069).</p>
+<p>There is a matching trap in the other direction. A file can sit in the workspace and inside NO repository — the <code>conducks.json</code> that DECLARES a workspace whose services each carry their own <code>.git</code> is exactly that file. Git partially succeeds there, so returning early would silently drop every root-level file; measured on the fixture, 5 units became 4 and the missing one was the declaration defining the workspace.</p>
+<h2>The anchor is a named operation, not a method</h2>
+<p><code>chronicle</code> is one instance held by two dozen files. While <code>setProjectDir</code> was reachable on it, any of them could point the whole process at another directory mid-run — and nothing would report it, because every later answer would simply be about a different tree.</p>
+<p>The door hands it out as <code>ReadOnlyChronicle</code>, the class minus that one mutator. Moving the anchor is <code>anchorChronicle(root)</code>, used at three sites that all anchor at boot or at a resolved CLI target.</p>
+<p><b>What that does NOT claim:</b> the instance is still shared and the method still exists at runtime. A cast still reaches it. What is gone is the ACCIDENTAL case — a mutator reachable on every handed-out reference — which is the one that actually happened. The test says so out loud rather than implying a guarantee the type cannot make.</p>
+<p>Anything needing a DIFFERENT root constructs its own <code>ChronicleInterface</code>. That is what let <code>project-monitor</code> stop re-implementing two git operations: the duplication existed because the door exported a singleton, not because the class could not answer per root.</p>
+<footer>Source: <code>docs/visuals/modules/core/git.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

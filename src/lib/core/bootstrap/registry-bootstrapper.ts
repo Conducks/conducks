@@ -85,10 +85,39 @@ export class RegistryBootstrapper {
    * The same scope guard the marker walk uses applies here, so a stray `conducks.json` under
    * `/private/tmp` or a home directory cannot claim the tree above it.
    */
+  /**
+   * Does this `conducks.json` declare a WORKSPACE, or merely exist?
+   *
+   * It used to be `existsSync`, and that conflated two different files. `conducks.json` is the
+   * project's config, and a workspace is only one of the things it can hold — this repository's own
+   * declares a visuals generator and nothing else, and the moment it was added every path beneath it
+   * started resolving to this root. `tests/fixtures/mock-repo` is a real nested checkout used as an
+   * analyze fixture; it stopped anchoring to itself, and a CLI test that asserts a refusal for an
+   * unknown symbol began PASSING that symbol against the whole conducks graph instead.
+   *
+   * ADR 0069's own words are that a declaration is "a statement of intent". Declaring a generator
+   * states no intent about topology, so it must not outrank the marker walk. A workspace is declared
+   * by `services`, which is what every real declaration in this tree carries.
+   *
+   * An unreadable or malformed file is NOT treated as a declaration. The failure directions are not
+   * symmetric: ignoring it falls through to the marker walk, which is the behaviour that existed
+   * before declarations at all, while honouring it would silently move a whole tree's vault on a
+   * typo.
+   */
+  private declaresWorkspace(configPath: string): boolean {
+    if (!fsSync.existsSync(configPath)) return false;
+    try {
+      const parsed = JSON.parse(fsSync.readFileSync(configPath, 'utf-8'));
+      return Array.isArray(parsed?.services) && parsed.services.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
   private findDeclaredWorkspace(from: string): string | null {
     let current = from;
     while (current && current !== path.parse(current).root) {
-      if (!isNeverAProjectRoot(current) && fsSync.existsSync(path.join(current, 'conducks.json'))) {
+      if (!isNeverAProjectRoot(current) && this.declaresWorkspace(path.join(current, 'conducks.json'))) {
         return current;
       }
       const parent = path.dirname(current);

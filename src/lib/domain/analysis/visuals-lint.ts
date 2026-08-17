@@ -207,7 +207,12 @@ export function definesSymbol(source: string, name: string): boolean {
   const n = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const patterns = [
     new RegExp(`\\b(?:function|class|const|let|var|interface|type|enum|def)\\s+${n}\\b`),
-    new RegExp(`^\\s*(?:export\\s+)?(?:public|private|protected|static|async|\\*)?\\s*${n}\\s*[(<]`, "m"),
+    // A METHOD, with any number of modifiers before it. This used to allow exactly ONE, which
+    // missed `public async foo()` and `public static foo()` — the two commonest declaration forms in
+    // this codebase. Every `::symbol` anchor pointing at one warned falsely, and a gate that cries
+    // wolf is a gate people learn to scroll past. Found when the first generated canvas produced 12
+    // warnings and all 12 were this.
+    new RegExp(`^\\s*(?:export\\s+)?(?:(?:public|private|protected|static|async|readonly)\\s+)*\\*?\\s*${n}\\s*[(<]`, "m"),
     new RegExp(`\\b${n}\\s*[:=]\\s*(?:async\\s*)?(?:function|\\(|<)`),
   ];
   return patterns.some(p => p.test(source));

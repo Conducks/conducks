@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — interfaces/tools — the MCP server</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>tools.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>interfaces/tools — the MCP server</h1>
+<p><b>Layer:</b> interfaces. Never imports another interface, and clean on composition: the two direct reaches into lib it once had (<code>domain/analysis/fallback-detector.ts</code>, <code>core/utils/logger.ts</code>) are routed through the registry now, so the encoded contract (<code>mcp → composition, contracts</code>) holds with no exceptions.</p>
+<p><b>Responsibility:</b> exposing conducks' analysis to an agent over MCP. 14 tools cover what ~38 CLI commands do — query, impact, trace, audit, prune, coverage, docs and the rest are grouped, never one tool per command.</p>
+<p><b>Boundaries:</b> parity with the CLI, and no speculative tools (ADR 0007). A capability appears here because it exists and is used, not because it might be useful. Parity is on *capability*, not on defaults — where a default differs from the CLI's, the agent gets a different answer to the same question (see below).</p>
+<p><b>Deferred / not built:</b> no write tools <b>against the vault</b>. Every tool opens a read-only connection, because the CLI holds read-write and two read-write connections deadlock DuckDB. One tool does mutate <b>source</b>: <code>conducks_rename</code> (<code>tools/kinetic.ts:267</code>) performs graph-verified renaming, is annotated <code>destructiveHint: true</code>, and defaults to <code>dryRun: true</code>. "Read-only" here means the graph, not the working tree.</p>
+<h2>The audience is a model, so the contract is stricter</h2>
+<p>A human reading CLI output can discount a suspicious finding; an agent will act on it. That raises the cost of two things in particular:</p>
+<p><b>A documented finding that could not fire — fixed, and the lesson stands.</b> The tool schema advertised <code>STALE_IMPORT</code> for a year while its condition tested tree-sitter node types the graph never carries, so an agent filtering for it silently got nothing and concluded the codebase was clean. It fires since 2026-07-25 (<code>tests/unit/domain/stale-import.test.ts</code> asserts it can be produced). The rule that survives: when a finding type is declared on this surface, a test must assert it can actually be emitted.</p>
+<p><b>Direction is defined once, at the graph.</b> <code>getNeighbors(id, 'downstream')</code> walks <b>out</b>-edges (what this symbol depends on); <code>'upstream'</code> walks <b>in</b>-edges (who depends on it). "What breaks if I change X" is therefore <b>upstream</b>, and every surface — MCP tool, CLI, registry, analyzer — defaults to it (aligned 2026-07-25; the MCP tool had shipped with the two descriptions swapped and the opposite default). No test asserts direction semantics yet, so a regression here would be silent — worth one if this area is touched again. (<code>kinetic</code> has no module note of its own; if one is ever written, this belongs there and should leave a pointer here.)</p>
+<p><b>Stale results.</b> <code>analyze</code> is incremental, so a tool call can return numbers from a previous pulse that look entirely current. Anything reporting counts should be read as "as of the last pulse", and structural conclusions want a clean re-analyze behind them.</p>
+<h2>Driven end to end, and what that found</h2>
+<p>The whole surface was walked over real stdio JSON-RPC — every registered tool, every value of every enum — and produced <b>25 defects</b>, each behind a payload that looked fine (todo53). The shapes worth carrying:</p>
+<ul>
+<li><b>An id containing <code>::</code> was accepted without asking the graph.</b> An invented symbol made <code>trace</code>,</li>
+</ul>
+<p>  <code>impact</code>, <code>explain</code> and <code>context</code> each answer with a confident nothing. One <code>resolveSymbolId</code> in   <code>shared/resolve-symbol.ts</code> now returns a VERIFIED id or null.</p>
+<ul>
+<li><b>A bound declared in <code>inputSchema</code> is a comment.</b> <code>radius: "two"</code> made <code>Math.min</code> NaN, which removed</li>
+</ul>
+<p>  the depth guard entirely and produced the WIDEST possible walk from a junk value. <code>numErr</code>/<code>boolErr</code>   join <code>enumErr</code>, and bounds live in one constant the schema and the guard both read.</p>
+<ul>
+<li><b><code>truncated</code> was a literal in two places.</b> Fuzzy and template mode both called a capped result the</li>
+</ul>
+<p>  whole answer; template also ignored <code>limit</code> outright, so every template answer was ten rows whatever   the caller asked. Both now request cap+1 and MEASURE.</p>
+<ul>
+<li><b>An empty vault is not a pass.</b> <code>audit</code>, <code>prune</code>, <code>query</code> and <code>flows</code> reported clean results over</li>
+</ul>
+<p>  zero symbols until <code>shared/empty-vault.ts</code> gave them a <code>nothing-to-check</code> answer.</p>
+<ul>
+<li><b>A step that is not a node says so.</b> <code>trace</code> returned dangling edge targets styled exactly like</li>
+</ul>
+<p>  symbols; they now carry <code>resolved: false</code> and <code>kind: UNRESOLVED</code>.</p>
+<p>Tool calls no longer serialise. ADR 0146's queue is gone (ADR 0147) once both races behind it were closed at their source.</p>
+<h2>Entry point caveat</h2>
+<p>Importing the server entry starts the process as a side effect, so tests must not import it directly — mock it or defer the import. This has bitten the suite before.</p>
+<footer>Source: <code>docs/visuals/modules/interfaces/tools.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

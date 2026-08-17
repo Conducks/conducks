@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks visuals — holding</title>
+<!-- Provenance: authored — a concern page. It makes no code claims of its own; every
+     measurement it cites is anchored on the canvas or in docs/deep_clean.md. -->
+<link rel="stylesheet" href="system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="holding.html" class="here"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<h1>Holding</h1>
+<p class="sub">Read from the code, true when it was read — but not yet placed on a map.</p>
+<p class="elsewhere"><b>A waiting room, not a destination.</b> Everything here was traced against a
+real file and is worth keeping. None of it has earned a block yet, because a block is something a
+reader can point at. As each journey gets its band, the matching material leaves this page and joins
+it. <b>The page is healthy when it is shrinking.</b></p>
+
+<h2>Measured, unplaced</h2>
+<table>
+  <thead><tr><th>what was measured</th><th>where it belongs</th></tr></thead>
+  <tbody>
+    <tr><td>Core is <b>72.03% statements, 61.36% branches</b>. Every leaf is exercised; many branches
+      are not. One file reads 0% and is an instrument blind spot — the pulse worker runs in a worker
+      thread, a separate V8 isolate jest cannot instrument across, proved by sabotaging it and
+      watching three integration tests fail.</td><td>a coverage band, if one is ever drawn</td></tr>
+    <tr><td>Nine of thirteen language packs have <b>no oracle</b>. Their resolvers are tested; their
+      QUERIES are not — nothing checks that a pack captures the right things, only that it
+      parses.</td><td>Band 1's parsing container, once there is something to draw besides an
+      absence</td></tr>
+    <tr><td>Three language packs resolve imports by substring containment, so a longer path can win
+      by accident and the answer is order-dependent — the graph can change because a directory
+      listing changed.</td><td>a defect once someone owns it</td></tr>
+    <tr><td>The <b>read</b> path: 35 CLI commands and 14 MCP tools over one registry, all answering
+      from what Band 1 wrote.</td><td>Band 2</td></tr>
+    <tr><td><code>domain</code>, <code>interfaces</code> and <code>registry</code> have had no
+      structural pass. Two dead subsystems were found in core AFTER it had been declared clean, so
+      the unaudited layers should not be assumed cleaner.</td><td>Bands 2 and 3</td></tr>
+  </tbody>
+</table>
+</div>

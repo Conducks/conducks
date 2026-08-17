@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — core/parsing/processors — capture → relationship</title>
+<link rel="stylesheet" href="../../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>processors.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
+<h1>core/parsing/processors — capture → relationship</h1>
+<p><b>Part of:</b> <a href="../parsing.html">core/parsing</a>. Five small units: <code>parsing/processors/import.ts</code>, <code>parsing/processors/call.ts</code>, <code>parsing/processors/heritage.ts</code>, <code>parsing/processors/binding.ts</code>, <code>parsing/processors/flow.ts</code>.</p>
+<p><b>Responsibility:</b> turning a raw capture into a spectrum relationship, and resolving what can be resolved with only the current file in hand. <code>import</code> additionally owns module resolution — extension inference, index files, external-package detection.</p>
+<p><b>Boundaries:</b> file-local only. Anything needing the whole repo (binding a bare name to a symbol in another file) is the orchestrator's later pass; a processor emits an unresolved target and lets it dangle deliberately.</p>
+<p><b>Deferred / not built:</b> <code>heritage</code> is written and correct but <b>never runs</b> — its query patterns are standalone so no node exists for the handler's gate, and the graph has zero EXTENDS/IMPLEMENTS edges as a result (todo11). Anything reasoning about inheritance today is reasoning about nothing.</p>
+<h2>Preserve the original spelling or you break type/value classification</h2>
+<p>Node IDs are lowercased downstream (mandatory for APFS), which collapses TypeScript's type and value namespaces — the variable <code>nodeId</code> and the type <code>NodeId</code> become one key <code>nodeid</code>. A processor that emits only a lowercased name makes the variable's uses indistinguishable from the type's.</p>
+<p>So every name-bearing relationship carries the pre-lowercase spelling in <code>metadata.original</code> (<code>call.ts</code> sets it as <code>original</code>, flow assignments and reference-as-value ACCESSES likewise). This is not optional bookkeeping: skipping it caused a false ARCH-3 cycle that survived two ADRs, because a parameter named <code>nodeId</code> marked the imported *type* <code>NodeId</code> as value-used.</p>
+<p><b>A new processor emitting a named relationship must set <code>metadata.original</code>.</b></p>
+<h2>Resolution is guarded across language families</h2>
+<p>Import and symbol resolution falls back to fuzzy basename matching, which will happily bind a <code>.py</code> import to a same-named <code>.tsx</code> or <code>.go</code> file. <code>sameFamily()</code> guards every tier that can do this. The guard exists because the confidence-1 resolution path produced most of the false cross-language edges before it was added — do not add a resolution tier without it.</p>
+<p>Same family is not enough on its own: the fallback also binds within a family, so a repo owning its own typing.py captured every <code>from typing import ...</code> in it (316 dangling edges, measured). A provider can now REFUSE a specifier outright — <code>isBoundaryModule</code> (ADR 0143), Python's standard library — and a refusal skips the fallback while still falling through to induction. Refusing by returning <code>undefined</code> from <code>resolveImport</code> does NOT work and is the bug that ADR names: it is the same token the processor reads as "I don't know".</p>
+<h2>Reference-as-value is deliberately narrow</h2>
+<p>A bare identifier passed as an argument (<code>addEventListener('load', initUI)</code>) is a *use*, not a call, and the call processor only records the callee. Those candidates are collected during the match loop and emitted afterwards, gated on "imported here or defined in this file" — without the gate, every local variable would flood the graph with danglers.</p>
+<footer>Source: <code>docs/visuals/modules/core/parsing/processors.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

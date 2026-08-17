@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — contracts — the vocabulary every layer may name</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>contracts.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>contracts — the vocabulary every layer may name</h1>
+<p><b>Layer:</b> the bottom one. <code>contracts/</code> imports nothing in this codebase; everything else may import it, including <code>interfaces/cli</code>, which may not reach <code>core</code> (ADR 0005).</p>
+<p><b>Read at <code>7c11bc4</code>.</b></p>
+<p><b>Responsibility:</b> the words the layers share — the canonical kind ladder, what counts as a source extension, what counts as a test file, the prism types parsing produces and graph stores, and the verdict shape a command prints.</p>
+<p><b>Boundaries:</b> vocabulary, not logic. A predicate lives here when the QUESTION is shared, never because the implementation was convenient — <code>tryResolveSymbol</code> is here because the CLI and the MCP surface must resolve a symbol id the same way, not because it is a utility.</p>
+<h2>It used to be two layers, and that was the defect</h2>
+<p><code>src/types/</code> and <code>src/contracts/</code> both existed, and thirteen language packs imported <code>types/language-plugin</code> — the single most-imported file in either folder. Two homes for one idea means every new type is a coin toss, and the answer drifts.</p>
+<p>They are one folder now. Two things went the OTHER way, into parsing, because only parsing used them: <code>language-plugin</code> and <code>capture-tags</code>. A shared layer holding something one feature uses is the same mistake pointing the other direction.</p>
+<h2>What counts as a test is decided by the PATH</h2>
+<p><code>contracts/test-path.ts</code> answers it, and it is path-based for a reason that cost real answers: the reflector computes an <code>isTest</code> flag per file and writes it into node metadata, and the persisted metadata carries no such key. So <code>properties.isTest</code> is <code>undefined</code> on every graph loaded from the vault — which is every graph a read command sees.</p>
+<p>Three consumers trusted that flag. Two were therefore no-ops that LOOKED like working filters: <code>status</code> ranked a Python test file as the repository's top structural hotspot while filtering <code>!isTest</code>, and the test aligner marked test nodes themselves as covered-by-a-test.</p>
+<p>The rule is deliberately BROAD on directories and NARROW on names: any <code>/tests/</code> segment is a test tree in every language conducks parses, while a bare <code>test</code> prefix is claimed only for a filename. <code>testing/</code> is not a test tree — it routinely holds real source, and claiming it would silently drop that code from every filter.</p>
+<h2>The kind ladder is additive, and a declared rung needs a producer</h2>
+<p><code>mapToCanonical</code> turns a grammar's capture into a rung. A rung nothing emits is not a reservation — it is a row that makes the table wrong, and it hid a real defect: six different language constructs were all tagged <code>@isPackage</code>, so PACKAGE's only nodes on this repository were a C# and a PHP namespace while NAMESPACE — read by four consumers — had none at all (ADR 0100).</p>
+<p>Two capture tags have been removed for exactly this reason since. A tag with no producer is deleted, not carried.</p>
+<h2>On the canvas</h2>
+<p>cited by <a href="graph.html">THE GRAPH</a> — derived from the block anchors, not curated</p>
+<footer>Source: <code>docs/visuals/modules/contracts.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

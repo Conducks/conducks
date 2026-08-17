@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — core/graph/algorithms — cycle detection, ranking, traversal</title>
+<link rel="stylesheet" href="../../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>algorithms.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
+<h1>core/graph/algorithms — cycle detection, ranking, traversal</h1>
+<p><b>Part of:</b> <a href="../graph.html">core/graph</a>. Three static classes: <code>CycleDetector</code> (<code>graph/algorithms/cycle-detector.ts</code>), <code>StructuralRanker</code> (<code>graph/algorithms/ranker.ts</code>), <code>GraphTraversal</code> (<code>graph/algorithms/traversal.ts</code>).</p>
+<p><b>Responsibility:</b> graph math, and only graph math. Tarjan SCC for cycles, damped PageRank for gravity plus entry-point detection, BFS/A* for traversal and blast radius.</p>
+<p><b>Boundaries:</b> they answer "what is connected how", never "is that acceptable". <code>detect()</code> returns SCCs; whether an SCC is an ARCH-3 violation is <a href="../../domain/governance.html">governance</a>'s call. That separation is why the same detector serves the audit, the advisor and the guard with three different filters.</p>
+<p><b>Deferred / not built:</b> no incremental recomputation. Ranking runs over the whole graph each pulse; fine at current scale, and the obvious thing to revisit if it stops being fine.</p>
+<h2>They look like a circular dependency and are not</h2>
+<p><code>adjacency-list</code> imports all three; all three name <code>ConducksAdjacencyList</code> in their signatures. That reads as a cycle in any source-level tool — <code>madge</code> on TS source reports exactly this.</p>
+<p>It is not one. Each algorithm uses the type <b>only as a static-method parameter annotation</b> — no <code>new</code>, no <code>instanceof</code>, no static access — so TypeScript erases the import entirely. The compiled <code>algorithms/*.js</code> import nothing from <code>adjacency-list.js</code>, and <code>madge</code> on compiled JS agrees there is no cycle.</p>
+<p><b>Do not "fix" this by inverting the dependency or extracting an interface.</b> The shape is correct; the tools that flag it have a type-erasure blind spot, which is the whole subject of ADR 0016. If you change a signature here to take a concrete value rather than a type, you *would* create a real cycle — that is the thing to avoid.</p>
+<h2>Filtering is the caller's job, and callers used to disagree</h2>
+<p><code>detect()</code> takes <code>ignoreTypes</code> and <code>ignoreTypeOnly</code> and applies them literally. It has no opinion. For years the three callers passed three different filters, which is why one false positive kept reappearing under a different command. They now share <code>IMPORT_CYCLE_IGNORED_EDGE_TYPES</code> (ADR 0017).</p>
+<p>Two properties worth keeping in mind when adding a caller: an SCC is an <b>unordered set</b>, not an ordered path — walking it as <code>c[i] → c[i+1]</code> inspects non-edges, a bug that shipped once — and a single-node component is only a cycle if it has a genuine self-edge.</p>
+<footer>Source: <code>docs/visuals/modules/core/graph/algorithms.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

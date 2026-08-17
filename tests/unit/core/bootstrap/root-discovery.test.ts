@@ -189,3 +189,58 @@ describe('discoverRoot — a stray vault must not recruit the tree above it', ()
     expect(new RegistryBootstrapper().discoverRoot(project)).toBe(project);
   });
 });
+
+/**
+ * A `conducks.json` declares a WORKSPACE only when it declares services.
+ *
+ * The check was `existsSync`, which conflated two different files. `conducks.json` is the project's
+ * config and a workspace is only one thing it can hold — this repository's own declares a visuals
+ * generator and nothing else. The moment it was added, every path beneath it resolved to this root:
+ * `tests/fixtures/mock-repo`, a real nested checkout used as an analyze fixture, stopped anchoring
+ * to itself, and a CLI test asserting a refusal for an unknown symbol started passing that symbol
+ * against the whole conducks graph instead.
+ *
+ * ADR 0069 says a declaration is "a statement of intent". Declaring a generator states no intent
+ * about topology.
+ */
+describe('a declaration is a statement of intent, not a filename', () => {
+  const mk = (contents: string | null): string => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-decl-'));
+    fs.mkdirSync(path.join(dir, 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'nested', 'package.json'), '{"name":"nested"}');
+    if (contents !== null) fs.writeFileSync(path.join(dir, 'conducks.json'), contents);
+    return dir;
+  };
+
+  it('a conducks.json declaring services WINS over a nested marker', () => {
+    const dir = fs.realpathSync(mk('{"services":["nested"]}'));
+    try {
+      expect(new RegistryBootstrapper().discoverRoot(path.join(dir, 'nested'))).toBe(dir);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('a conducks.json declaring only a generator does NOT — the nested marker wins', () => {
+    // The regression this exists for. Adding a visuals generator to a repo must not move the anchor
+    // of every fixture beneath it.
+    const dir = fs.realpathSync(mk('{"visuals":{"generate":"npm run visuals"}}'));
+    try {
+      expect(new RegistryBootstrapper().discoverRoot(path.join(dir, 'nested'))).toBe(path.join(dir, 'nested'));
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('an empty services array declares nothing', () => {
+    const dir = fs.realpathSync(mk('{"services":[]}'));
+    try {
+      expect(new RegistryBootstrapper().discoverRoot(path.join(dir, 'nested'))).toBe(path.join(dir, 'nested'));
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('a MALFORMED conducks.json falls through rather than claiming the tree', () => {
+    // The failure directions are not symmetric. Ignoring it lands on the behaviour that existed
+    // before declarations; honouring it would move a whole tree's vault on a typo.
+    const dir = fs.realpathSync(mk('{ this is not json'));
+    try {
+      expect(new RegistryBootstrapper().discoverRoot(path.join(dir, 'nested'))).toBe(path.join(dir, 'nested'));
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+});

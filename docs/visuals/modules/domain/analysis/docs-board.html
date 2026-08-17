@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — domain/analysis/docs-board — the links between docs</title>
+<link rel="stylesheet" href="../../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>docs-board.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
+<h1>domain/analysis/docs-board — the links between docs</h1>
+<p><b>Part of:</b> <a href="../analysis.html">domain/analysis</a>. Sits on top of <a href="docs-grammar.html">docs-grammar</a>; backs <code>conducks docs-status</code>, <code>conducks_docs</code> and the mirror's /api/docs. <code>analysis/docs-board.ts</code> and <code>analysis/docs-watcher.ts</code> are documented here together — the watcher is a thin trigger on this module, not a subsystem of its own.</p>
+<p><b>Responsibility:</b> the cross-file half of the docs standard. <code>docs-grammar</code> parses ONE file and has no idea the others exist; this walks the tree and resolves what only the set can answer — which decision a phase builds, which phase another waits on, what an accepted record left unbuilt, and whether a supersede dropped a remainder. It also owns the agent projection.</p>
+<p><b>Boundaries:</b> derivation and linkage only. It never parses markdown (that is <code>docs-grammar</code>) and never touches the code graph — no call, import or coverage fact enters this module. It reads the docs tree from disk and returns a plain object; nothing is written back, ever.</p>
+<p><b>Deferred / not built:</b> <code>- Builds:</code> / <code>- Depends:</code> are hand-written, so an unlinked ADR is reported rather than detected. Proving a decision is implemented from the code itself (walk <code>- Enforced by:</code> into the graph and check the symbol exists and its test passes) is the obvious next step and is deliberately not built — it needs the graph, which would put a code-layer dependency into a module that is currently docs-only.</p>
+<h2>Why the projection exists, and why it is not just a smaller board</h2>
+<p><code>buildBoard</code> returns everything: 17.9k tokens on conducks itself. <code>agentView</code> returns 3.7k at session start and 1.4k after. The saving is not compression — it is a different question being answered. The board answers *how is the project doing* (percentages, counts, history); an agent needs *what may I do next, and what must I not break*. Percentages are unactionable; the next unchecked task and the rule you would violate are not.</p>
+<p>Two axes decide what is in the payload:</p>
+<ul>
+<li><b>Open vs closed.</b> Finished phases and done todos are absent. An agent needs the table, not the</li>
+</ul>
+<p>  history — and history is what <code>--all</code> and <code>--raw</code> are for.</p>
+<ul>
+<li><b>Read-once vs read-often.</b> Conventions and memory are loaded at session start and kept, so</li>
+</ul>
+<p>  shipping them on every call was 10.7k of the original 14.7k. <code>layer: "board"</code> drops them.</p>
+<p><code>features.md</code> is never in the payload at all. It is write-mostly: updated once an ADR and its todos are finished.</p>
+<h2>Everything here is derived, and that is the point</h2>
+<p>A phase's state is its checkboxes. Blocked is an unmet <code>- Depends:</code>. An ADR's build state is the phases that claim it. None of it is authored anywhere, so none of it can drift (ADR 0019, 0020, and CONDUCKS-19/20). The one authored claim that survives — a todo's <code>Status:</code> — is deliberately NOT trusted: <code>hygiene()</code> compares it against the checkboxes and reports the gap.</p>
+<p><code>unlinked</code> is a distinct build state, and the distinction is load-bearing. An ADR that nobody linked has no evidence either way; collapsing it into a success state would make silence read as success, which is the failure the whole link graph exists to prevent. But a PHASE LINK is not the only evidence: <code>completed/</code> is never walked, so promoting a todo removes the phases that linked its ADRs — 141 of 142 fell to <code>unlinked</code> the day this repo's board was finally clean. So <code>proven</code> (a <code>- Enforced by:</code> test) and <code>resolved</code> (a <code>- Resolved by:</code> successor) hold whether or not a phase still links, and <code>board.unlinked</code> is DERIVED from the field rather than re-deciding the question — computed separately, the two drifted apart and disagreed about the same ADRs.</p>
+<h2>Two severities, because a gate that cries wolf gets turned off</h2>
+<p><code>lint</code> is broken grammar — a dangling <code>- Builds:</code>, a supersede that abandons unbuilt work, a duplicate phase number. It fails <code>docs-lint</code> and therefore CI. <code>warns</code> is hygiene — a <code>done</code> todo still sitting in <code>todos/</code>, a <code>Status:</code> the checkboxes contradict. Both are true findings; only the first means the board is reading a file wrong. Mixing them would have failed this repo's CI on five unpromoted todos, and the fix for that is a filing cabinet, not a build.</p>
+<p>The unlinked-ADR finding is aggregated into a single <code>board.unlinked</code> list rather than one warning per file, because on a repo that predates the link fields it is every ADR at once, and a wall of identical lines trains the reader to ignore the channel.</p>
+<h2>The watcher exists because a gate nobody runs is not a gate</h2>
+<p><code>docs-watcher.ts</code> re-lints on write and reports; it never throws and never exits non-zero. A watcher that fails hard turns an editor save into a broken loop, and a developer who cannot save turns the watcher off — so the strict surface stays on <code>conducks docs-lint</code>, where CI and pre-commit want it.</p>
+<p>It re-reads the whole tree per event rather than the one changed file, because the findings that matter are relative to the other files: a <code>- Builds:</code> is only dangling with respect to the ADR set. A docs tree is tens of small markdown files.</p>
+<p>Two things the tests forced, both real:</p>
+<ul>
+<li><b><code>ready</code> gating.</b> Chokidar's <code>ignoreInitial</code> races its own scan — on macOS a file written moments</li>
+</ul>
+<p>  before <code>start()</code> can arrive as an <code>add</code> after <code>ready</code> fires. Events before <code>ready</code> are dropped; a   late straggler still costs only one extra re-lint, which is log-only anyway.</p>
+<ul>
+<li><b><code>files[]</code>, not <code>filePath</code>.</b> The pulse originally reported the last event in the debounce window</li>
+</ul>
+<p>  as "the file you edited". It is not — it is whatever landed last. The pulse now carries every file   in the window, and <code>filePath</code> is explicitly just the newest of them, for display.</p>
+<h2>The denominator, and the two lists that had none</h2>
+<p><code>governedCount(board)</code> is the number of governed docs a board was built from — the denominator behind every claim it makes. It lives here because <code>docs-status</code> and <code>docs-lint</code> each wrote that sum out by hand and <code>conducks_docs</code> never wrote it at all, so the TOOL reported <code>grammarViolations: 0</code> for a directory with no <code>docs/</code> whatsoever: the identical payload a fully-closed tree produces (todo53). <code>health.grammar</code> now carries a <code>Verdict</code> — <code>nothing-to-check</code> on an empty tree, <code>clean</code> with <code>checked</code> on a real one.</p>
+<p>Two lists in the projection are BOUNDED, and both bounds were found by measurement rather than foresight:</p>
+<ul>
+<li><b>constraints</b> were 96% of a 48,966-byte default response — 159 memory entries and 41 conventions,</li>
+</ul>
+<p>  growing every time a lesson is written down. Per-list byte budgets, newest kept first (these files   are appended to), with the omitted counts and the file to read shipped in the payload. Never drop a   rule silently.</p>
+<ul>
+<li><b><code>health.grammar.found</code></b> shipped every lint finding. On conducks, which has zero violations, that</li>
+</ul>
+<p>  field is empty and invisible; on a foreign subject with 30 violations it was 8,820 bytes, a third of   the response. Capped at 10 with <code>omitted</code> alongside — <code>grammarViolations</code> stays authoritative and   <code>docs-lint</code> prints them all.</p>
+<p>A payload measured on ONE repo is measured on that repo's data shape.</p>
+<h2>A parked todo is stated, not hidden</h2>
+<p><code>unlinkedWork</code> keeps only todos with an OPEN phase, and the "every task is closed" hygiene warning deliberately exempts deferred records — so a todo parked with reopen-triggers appeared on NEITHER surface. <code>parked</code> lists them with their real <code>Status:</code>, because two records were invisible that way and one of them claimed <code>todo</code> while showing up nowhere.</p>
+<h2>The module hash lives in one file, and that is the whole point</h2>
+<p>A reviewed module note is compared against <code>moduleHashOf</code> (<code>analysis/module-hash.ts</code>). That function used to exist TWICE — here and in <code>ProjectMonitor</code> — coupled only by a "must match" comment. Two copies of a hash is a drift waiting for its moment: the two disagreeing marks every reviewed note drifted, or none, and either way silently. Both callers import the one function now and the equality is pinned by a test rather than by a comment. Non-recursive on purpose: a note covers its own directory, so hashing subtrees would fire a flag for a change in a submodule that has its own note.</p>
+<footer>Source: <code>docs/visuals/modules/domain/analysis/docs-board.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

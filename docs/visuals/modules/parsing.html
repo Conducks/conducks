@@ -1,0 +1,84 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — parsing</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>PARSING</h1>
+<p class="sub">core/parsing — 13 language packs and one reflector</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="gate">
+  <h3>Has this file changed?</h3>
+  <div class="where">src/lib/core/persistence/file-hash-gate.ts::FileHashGate</div>
+  <p>a mtime changes on checkout and says nothing about content</p>
+  <p class="file">on the canvas: a content hash, not a timestamp</p>
+</div>
+
+<div class="det" id="order">
+  <h3>Order by dependency</h3>
+  <div class="where">src/lib/core/parsing/pipeline.ts::topologicalSort</div>
+  <p>a cycle has no valid order, and the two wrong answers are to drop those files or loop forever. They are appended as a final tier instead</p>
+  <p class="file">on the canvas: so a definition is parsed before its user</p>
+</div>
+
+<div class="det" id="refl">
+  <h3>The reflector</h3>
+  <div class="where">src/lib/core/parsing/reflector.ts::reflect</div>
+  <p>1,696 lines, the single most consequential file here: a defect reaches all 35 commands</p>
+  <p class="file">on the canvas: tree-sitter match in, nodes and edges out</p>
+</div>
+
+<div class="det" id="tags">
+  <h3>A capture declares a kind</h3>
+  <div class="where">src/lib/core/parsing/capture-tags.ts::DEFINITION_CAPTURES</div>
+  <p>one case per tag is pinned, in a language MEASURED to emit it. isClass is emitted by ONE of the thirteen grammars, so a TypeScript case would have tested isStruct and passed</p>
+  <p class="file">on the canvas: isFunction, isStruct, isBinding…</p>
+</div>
+
+<div class="det" id="her">
+  <h3>Inheritance is an EDGE</h3>
+  <div class="where">src/lib/core/parsing/languages/php/queries.ts</div>
+  <p>@heritage must be co-captured with @name in the SAME pattern or the reflector resolves no definition node and drops it silently. PHP had no heritage pattern at all until 2026-08-17</p>
+  <p class="file">on the canvas: and it produced none in three languages</p>
+</div>
+
+<div class="det" id="spec">
+  <h3>Each pack resolves its own imports</h3>
+  <div class="where">src/lib/core/parsing/languages/typescript/resolver.ts::TypeScriptResolver</div>
+  <p>TS ESM writes a .js specifier for a .ts file, so both forms are tried or every relative import fails to bind</p>
+  <p class="file">on the canvas: the one rule a pack cannot share</p>
+</div>
+
+<div class="det" id="noora">
+  <h3>Nine packs have no oracle</h3>
+  <div class="where">src/lib/core/parsing/languages/swift/queries.ts</div>
+  <p>only typescript, tsx, javascript and python are checked against an external tool. The rest are known to PARSE and not known to capture the right things</p>
+  <p class="file">on the canvas: their queries are unmeasured</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>Has this file changed?</td><td>Order by dependency</td><td>changed</td></tr>
+    <tr><td>Order by dependency</td><td>The reflector</td><td>—</td></tr>
+    <tr><td>The reflector</td><td>A capture declares a kind</td><td>—</td></tr>
+    <tr><td>A capture declares a kind</td><td>Inheritance is an EDGE</td><td>—</td></tr>
+    <tr><td>The reflector</td><td>Each pack resolves its own imports</td><td>—</td></tr>
+    <tr><td>Each pack resolves its own imports</td><td>Nine packs have no oracle</td><td>for nine of thirteen</td></tr>
+  </tbody>
+</table>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>
