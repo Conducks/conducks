@@ -55,7 +55,10 @@ test asserts the **full** save→load cycle. Treat any change here as high-risk 
 
 ## The taxonomy prune is authoritative
 
-The taxonomy enum declares 13 kinds; a persisted graph has 9. `pruneTaxonomy` deletes DATA outright
+The taxonomy enum declares **10** kinds (<span class="anchor">src/contracts/taxonomy.ts:45</span>);
+a persisted graph carries fewer. It said 13 here until 2026-08-17 — that was the count before ADR
+0100 cut STATEMENT, BRANCH and DATA and repaired NAMESPACE, and the number sat here unchanged
+afterwards. `pruneTaxonomy` deletes DATA outright
 and keeps an ATOM only if it carries a non-structural reference edge — **or if it is EXPORTED**
 (todo63). Emission and the persisted graph disagree **by design** — do not "fix" the enum to match.
 To change what survives, edit `pruneTaxonomy`. Rationale in ADR 0012, decision in ADR 0013.

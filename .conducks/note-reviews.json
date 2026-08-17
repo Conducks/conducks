@@ -24,24 +24,26 @@
     "src/lib/core/parsing/reflector.ts:1011": "7dfc0ef7544241ff"
   },
   "docs/visuals/modules/core/parsing/processors.md": {
-    "src/lib/core/parsing/processors/import.ts": "a0a3365315cca775",
-    "src/lib/core/parsing/processors/call.ts": "91ff386950510f68",
-    "src/lib/core/parsing/processors/heritage.ts": "c596e93a82c45477",
+    "src/lib/core/parsing/processors/import.ts": "bb28f4242b049e3e",
+    "src/lib/core/parsing/processors/call.ts": "0aba72ed7d57fd7d",
+    "src/lib/core/parsing/processors/heritage.ts": "4b840c293da0c6d4",
     "src/lib/core/parsing/processors/binding.ts": "9b8dd34ad4e10cf3",
-    "src/lib/core/parsing/processors/flow.ts": "bf9e2649c0ac706b"
+    "src/lib/core/parsing/processors/flow.ts": "cb60005fb5b50af8",
+    "tools/benchmark/oracle-packs.mjs": "1cf0af6c5ad696f9"
   },
   "docs/visuals/modules/core/parsing/reflector.md": {
     "src/lib/core/parsing/reflector.ts": "e4354b340cf33d58"
   },
   "docs/visuals/modules/core/parsing/taxonomy.md": {
-    "tests/unit/core/taxonomy-rank-single-source.test.ts": "b0fbaf12c00a4fb4"
+    "src/contracts/taxonomy.ts": "dcea21bd98d38f64",
+    "tests/unit/core/taxonomy-rank-single-source.test.ts": "1557c904d28ecdf1"
   },
   "docs/visuals/modules/core/parsing.md": {
     "src/lib/core/parsing/prism-core.ts": "644b993400150eae",
     "src/contracts/prism-types.ts": "b47a3e9045ed4f9e"
   },
   "docs/visuals/modules/core/persistence.md": {
-    "src/lib/core/persistence/persistence.ts": "486d235b5c786e16"
+    "src/lib/core/persistence/persistence.ts": "2b62d10e40d78114"
   },
   "docs/visuals/modules/domain/analysis/coverage.md": {
     "src/interfaces/cli/commands/coverage.ts:11": "fe92578cc587e09a"
@@ -50,17 +52,17 @@
     "src/resources/skills/conducks-docs.md": "2623cdf50fbb69a4"
   },
   "docs/visuals/modules/domain/analysis/orchestrator.md": {
-    "src/lib/domain/analysis/orchestrator.ts": "a85591e3d22772ee",
-    "src/lib/domain/analysis/micro-pulse.ts": "c0fd6f64c86d95a2"
+    "src/lib/domain/analysis/orchestrator.ts": "ffaaa577f6e2c4b0",
+    "src/lib/domain/analysis/micro-pulse.ts": "6ab922f93cb4bc15"
   },
   "docs/visuals/modules/domain/analysis.md": {
     "src/lib/domain/analysis/index.ts": "120eb7279d5b09ba"
   },
   "docs/visuals/modules/domain/evolution.md": {
-    "src/lib/domain/evolution/dead-code.ts": "6bf41d3e118a9dfe",
-    "src/lib/domain/evolution/drift-engine.ts": "8b435801d446d048",
-    "src/lib/domain/evolution/watcher.ts": "927e87f0228287db",
-    "src/contracts/dead-code-types.ts": "a2749f7611fced39"
+    "src/lib/domain/evolution/dead-code.ts": "59fe09bbf4e98e4f",
+    "src/lib/domain/evolution/drift-engine.ts": "7b028931328d43e1",
+    "src/lib/domain/evolution/watcher.ts": "73e05d8350da4435",
+    "src/contracts/dead-code-types.ts": "3358612b32a4a416"
   },
   "docs/visuals/modules/domain/governance/sentinel.md": {
     "src/lib/domain/governance/index.ts:337": "96d2d06ba682de50",

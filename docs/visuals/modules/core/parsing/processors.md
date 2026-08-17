@@ -12,9 +12,14 @@ inference, index files, external-package detection.
 another file) is the orchestrator's later pass; a processor emits an unresolved target and lets it
 dangle deliberately.
 
-**Deferred / not built:** `heritage` is written and correct but **never runs** — its query patterns
-are standalone so no node exists for the handler's gate, and the graph has zero EXTENDS/IMPLEMENTS
-edges as a result (todo11). Anything reasoning about inheritance today is reasoning about nothing.
+**Deferred / not built:** nothing outstanding here.
+
+`heritage` used to be described as "written and correct but never runs" — its patterns were
+standalone, so no node existed for the handler's gate and the graph carried zero EXTENDS/IMPLEMENTS
+edges. **That was fixed, and the sentence outlived it.** Every heritage pattern co-captures a
+definition node now, and `tools/benchmark/oracle-packs.mjs` fails the build if any of the ten packs
+claiming a heritage capture stops producing an edge for a two-line fixture — three packs (ruby, rust,
+php) were caught emitting none by exactly that check on 2026-08-17, with every other gate green.
 
 ## Preserve the original spelling or you break type/value classification
 
@@ -31,10 +36,21 @@ parameter named `nodeId` marked the imported *type* `NodeId` as value-used.
 
 ## Resolution is guarded across language families
 
-Import and symbol resolution falls back to fuzzy basename matching, which will happily bind a `.py`
-import to a same-named `.tsx` or `.go` file. `sameFamily()` guards every tier that can do this. The
-guard exists because the confidence-1 resolution path produced most of the false cross-language edges
-before it was added — do not add a resolution tier without it.
+Import and symbol resolution falls back to basename matching, which will happily bind a `.py` import
+to a same-named `.tsx` or `.go` file if nothing stops it. Two different guards do, and they are not
+the same guard — this section claimed `sameFamily()` covered every tier, and it does not:
+
+- **`sameFamily()`** guards the graph-side tiers, called from
+  <span class="anchor">src/lib/domain/analysis/reflection-pipeline.ts:128</span>. It fails OPEN on an
+  unknown extension by design, so a newly added language is not refused wholesale.
+- **The PARSE-time fallback in `import.ts` is guarded by UNIQUENESS and by refusal**, not by family:
+  a declared dependency or a provider-declared boundary module returns undefined before it
+  (<span class="anchor">src/lib/core/parsing/processors/import.ts:241</span>), and a basename that
+  matches more than one file answers nothing. `index.ts` occurs 24 times in this repository, so
+  guessing there is right about one time in twenty-four.
+
+Refusing costs an edge; guessing costs a WRONG edge, and a wrong edge is what `impact` and `trace`
+then walk. Do not add a resolution tier without deciding which of the two guards it needs.
 
 Same family is not enough on its own: the fallback also binds within a family, so a repo owning its own typing.py captured every `from typing import ...` in it (316 dangling edges, measured). A
 provider can now REFUSE a specifier outright — `isBoundaryModule` (ADR 0143), Python's standard

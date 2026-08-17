@@ -50,6 +50,12 @@ unreferenced** (14 have zero textual occurrences anywhere; 6 more appear only in
 comments, or a barrel re-export nothing consumes). All 5 unused exports are correct — the fix there
 is dropping the `export` keyword, not deleting the symbol.
 
+**Those counts are from the audit that produced them and are NOT current.** Re-measured 2026-08-17:
+105 findings on conducks — 45 UNIMPORTED_MODULE, 57 UNUSED_EXPORT, 2 ORPHAN, 1 STALE_IMPORT. The
+shape moved because the codebase did (twenty doors added in the ADR 0150 campaign turn a symbol's
+reachability inside out). The AUDIT above is what is worth keeping — the ratio was established by
+reading each symbol, and a re-run of the tool cannot re-establish it. Recount, never quote.
+
 The 5 remaining false positives are all dynamic dispatch: four registry getters reached via DI
 property chains, and a browser entry point. That profile is expected and acceptable.
 
@@ -68,6 +74,12 @@ outside its own file", scoped to source extensions and excluding build output.
 The numbers above are conducks auditing itself. Driven at a frozen benchmark subject (subject-c, 10.5k
 nodes) on 2026-08-09: **172 findings, ~94.8% precision**, and every error came from ONE mechanism
 rather than scattered noise — symbols reached only through `await import()`.
+
+**That mechanism was fixed on 2026-08-17 (ADR 0153)**, and this is the payoff of having named a
+single cause instead of calling it noise. Three things were wrong at once: the specifier resolved
+only through the project's BUILD layout, an un-renamed destructure of a dynamic import registered no
+local binding, and `as_expression` had no value-position pattern. On the same subject the findings
+go 147 → 141 with **zero new ones**, and the six symbols this was measured against are all gone.
 
 That mechanism has two halves and only one is fixed. A dynamic import written inside a function is now
 resolved (todo58, see `core/graph/linkers`). The remaining seven are specifiers written against the

@@ -13,7 +13,7 @@ splitting them would move the same code behind a parameter list of equal size wi
 coupling. Sequencing a full analysis is what this module is FOR; it is not a separable collaborator.
 
 **Responsibility:** sequencing a full analysis. It builds the ecosystem → repository → directory
-skeleton, runs discovery and induction waves across worker threads, and owns the final resolution
+skeleton, runs discovery and induction waves across worker PROCESSES, and owns the final resolution
 pass where imports become real edges.
 
 **Boundaries:** it coordinates; it does not parse (that is the reflector) and it does not judge (that
@@ -53,4 +53,8 @@ was invisible during streaming (ADR 0014).
 
 The whole pulse runs inside one transaction, so a killed analyze rolls back rather than leaving a
 partial graph (which historically loaded fine while being ~95% disconnected — everything looked like
-an orphan). Worker threads do not inherit the parent's grammars; each loads its own.
+an orphan). Workers are **processes, not threads** — `spawnSync` with a temp-file in/out protocol
+(<span class="anchor">src/lib/domain/analysis/worker-pool.ts:27</span>). This line said "worker
+threads" while the paragraph six lines above already said subprocesses, and the difference is not
+pedantry: a process shares no module state, which is exactly why each one loads its own grammars
+rather than inheriting the parent's.
