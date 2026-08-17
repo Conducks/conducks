@@ -36,50 +36,9 @@
  * Card`) — the named form `export { X }` is a separate pattern in each file, because JavaScript's
  * export clause node differs from TypeScript's.
  */
-export const EC_VALUE_POSITIONS = `
-  ;; --- Value positions: a name READ is a use (shared, ecmascript-positions.ts) ---
-  (pair value: (identifier) @ref_value)
-  (object (shorthand_property_identifier) @ref_value)
-  (array (identifier) @ref_value)
-  (ternary_expression (identifier) @ref_value)
-  (member_expression object: (identifier) @ref_value)
-  ;; BOTH OPERANDS OF ANY BINARY EXPRESSION, not just the right side of instanceof.
-  ;;
-  ;; The narrow instanceof pattern was written for one shape and read as if it covered the node. It
-  ;; does not: a nullish-coalescing fallback and a logical-or fallback both name something that is
-  ;; plainly used, and both were invisible. MEASURED on subject-c, defaultBuildInput and
-  ;; spawnOsascript were reported dead while being the fallback on the line that returns them.
-  ;;
-  ;; Nullish-coalescing and logical-or are the shapes that matter, but there is no reason to
-  ;; enumerate operators — an operand of plus or strict-equals is read exactly as much, and listing
-  ;; them one at a time is how the instanceof pattern came to be mistaken for full coverage.
-  (binary_expression left: (identifier) @ref_value)
-  (binary_expression right: (identifier) @ref_value)
-  (export_statement value: (identifier) @ref_value)
-  (for_in_statement right: (identifier) @ref_value)
-  ;; EVERY identifier ARGUMENT of a call, not just the first.
-  ;;
-  ;; The kinesis pattern captures arguments as (arguments (_)* @kinesis_arg), and that quantifier
-  ;; yields exactly ONE capture — probed against the real grammar: useSyncExternalStore(subA, subB,
-  ;; subC) produces a single match carrying subA and nothing else. So every argument after the first
-  ;; was invisible to the reference-as-value path, and a callback handed over in second position
-  ;; read as unreferenced.
-  ;;
-  ;; MEASURED on the monorepo subject: getSnapshot and getServerSnapshot, arguments 2 and 3 of
-  ;; useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot), were both reported ORPHAN while
-  ;; the first argument resolved fine.
-  ;;
-  ;; Captured SEPARATELY rather than by fixing the quantifier in place: this pattern matches once per
-  ;; argument, and folding that into the kinesis pattern would multiply its match count and with it
-  ;; the CALLS edges it emits.
-  (call_expression arguments: (arguments (identifier) @ref_value))
-  ;; A DESTRUCTURING DEFAULT names the fallback it falls back TO:
-  ;;   const { shouldRetry = shouldRetryError } = options
-  ;; The identifier sits in an object_assignment_pattern beside the shorthand name, and no other
-  ;; pattern reached it. MEASURED on the monorepo subject: shouldRetryError was reported ORPHAN while
-  ;; being the default for shouldRetry twenty-five lines below its own declaration.
-  (object_assignment_pattern (identifier) @ref_value)
-`;
+import { scm } from './scm.js';
+
+export const EC_VALUE_POSITIONS = scm(import.meta.url, './ecmascript-value-positions.scm');
 
 /**
  * A DYNAMIC IMPORT IS AN IMPORT, whatever is done with the promise.
@@ -104,10 +63,7 @@ export const EC_VALUE_POSITIONS = `
  * `@source`. That is a duplicate raw specifier for one line, and the graph carries one edge per
  * (source, target, type) — measured, not assumed: total edge count is unchanged on this repository.
  */
-export const EC_DYNAMIC_IMPORT = `
-  ;; --- Dynamic import, any surrounding shape (shared, ecmascript-positions.ts) ---
-  (call_expression function: (import) arguments: (arguments (string) @source)) @isImport @dynamic_import
-`;
+export const EC_DYNAMIC_IMPORT = scm(import.meta.url, './ecmascript-dynamic-import.scm');
 
 /**
  * A DEFAULT PARAMETER VALUE names the thing it falls back to, and that is a use:
@@ -123,11 +79,7 @@ export const EC_DYNAMIC_IMPORT = `
  * makes the JavaScript query fail to COMPILE — `TSQueryErrorNodeType` — which drops every .js file to
  * the regex fallback silently (ADR 0089). The JavaScript form lives in that grammar's own file.
  */
-export const TS_PARAM_DEFAULTS = `
-  ;; --- Parameter defaults, TS/TSX only (shared, ecmascript-positions.ts) ---
-  (required_parameter value: (identifier) @ref_value)
-  (optional_parameter value: (identifier) @ref_value)
-`;
+export const TS_PARAM_DEFAULTS = scm(import.meta.url, './ecmascript-param-defaults.scm');
 
 /**
  * A name READ in a TYPE position. TypeScript and TSX only — JavaScript has no type syntax, and
@@ -137,19 +89,4 @@ export const TS_PARAM_DEFAULTS = `
  * Each entry anchors on its own parent rather than capturing `(type_identifier)` blanketly: a
  * blanket capture also fires on a declaration's OWN name node and produces a self-referencing edge.
  */
-export const TS_TYPE_POSITIONS = `
-  ;; --- Type positions, ADR 0016 (shared, ecmascript-positions.ts) ---
-  (type_annotation (type_identifier) @pulse_type_target)
-  (type_annotation (generic_type name: (type_identifier) @pulse_type_target))
-  (type_arguments (type_identifier) @pulse_type_target)
-  (type_arguments (generic_type name: (type_identifier) @pulse_type_target))
-  (constraint (type_identifier) @pulse_type_target)
-  (array_type (type_identifier) @pulse_type_target)
-  (array_type (generic_type name: (type_identifier) @pulse_type_target))
-  (parenthesized_type (type_identifier) @pulse_type_target)
-  (as_expression (type_identifier) @pulse_type_target)
-  (type_predicate type: (type_identifier) @pulse_type_target)
-  (union_type (type_identifier) @pulse_type_target)
-  (intersection_type (type_identifier) @pulse_type_target)
-  (conditional_type (type_identifier) @pulse_type_target)
-`;
+export const TS_TYPE_POSITIONS = scm(import.meta.url, './ecmascript-type-positions.scm');

@@ -216,8 +216,11 @@ describe('every definition capture mints a node of the kind it declares', () => 
     // as coverage. Asserted against the query files rather than remembered.
     const wrong: string[] = [];
     for (const c of CASES) {
-      const q = path.resolve('src/lib/core/parsing/languages', c.lang, 'queries.ts');
-      if (!fs.readFileSync(q, 'utf-8').includes(`@${c.tag}`)) wrong.push(`${c.tag} is not emitted by ${c.lang}`);
+      // Asks the PROVIDER's composed query, not a file. Since todo31 the patterns live in
+      // `queries.scm` and three packs splice shared blocks in, so a tag can be real for a language
+      // while appearing in neither file on its own — reading the composed text is the only place the
+      // whole truth exists, and it does not care how the pack is stored.
+      if (!c.provider.queryScm.includes(`@${c.tag}`)) wrong.push(`${c.tag} is not emitted by ${c.lang}`);
     }
 
     expect(wrong).toEqual([]);

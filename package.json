@@ -25,7 +25,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "node scripts/check-query-backticks.mjs && rm -rf build && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/check-build-aliases.mjs && node scripts/check-declared-deps.mjs",
+    "build": "rm -rf build && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && node scripts/copy-scm.mjs && node scripts/check-build-aliases.mjs && node scripts/check-declared-deps.mjs",
     "postinstall": "node scripts/check-native-parser.mjs",
     "start": "node ./build/src/interfaces/cli/index.js mirror",
     "demo": "npm run build && npm run start",
@@ -41,7 +41,6 @@
     "test:persistence": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects persistence",
     "bootstrap": "node scripts/bootstrap.mjs",
     "hooks": "git config core.hooksPath scripts/hooks && echo \"hooks installed: pre-commit runs conducks docs-lint\"",
-    "check:queries": "node scripts/check-query-backticks.mjs",
     "postbuild": "node scripts/sync-skills-postbuild.mjs",
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
     "oracle": "node tools/benchmark/oracle-tsc.mjs && node tools/benchmark/oracle-exports.mjs && node tools/benchmark/oracle-packs.mjs",

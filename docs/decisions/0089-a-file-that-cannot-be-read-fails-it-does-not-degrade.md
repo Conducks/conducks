@@ -2,7 +2,8 @@
 Status: Accepted
 - Date: 2026-08-01
 - Builds: 0070, 0088
-- Enforced by: tests/unit/core/parsing/parse-failure.test.ts (an invalid query, an unregistered parser and a valid file each behave as decided, and the error carries file, language and reason as fields), scripts/check-query-backticks.mjs (run by `npm run build` before tsc)
+- Amended by: 0152
+- Enforced by: tests/unit/core/parsing/parse-failure.test.ts (an invalid query, an unregistered parser and a valid file each behave as decided, and the error carries file, language and reason as fields), tests/unit/core/parsing/query-files-are-scm.test.ts (the backtick half, inverted — see below)
 
 ## Context
 
@@ -40,6 +41,12 @@ which is exactly what the old path concealed.
 **And the backtick check now runs before the compiler.** A backtick inside a query template literal
 ends the string, and tsc reports `TS1005: ',' expected` pointing at query text — a symptom that names
 nothing useful. It has cost a debugging round five times.
+
+> AMENDED 2026-08-17 by ADR 0152. The template literals are gone: the patterns live in `.scm` files
+> and a backtick in one is an ordinary character, so `scripts/check-query-backticks.mjs` is deleted
+> rather than kept. The gate reached 10 of 10 catches and every one of them was a hazard that no
+> longer exists. Nothing else in this record changes — a file that cannot be READ still fails, and
+> that is the part `parse-failure.test.ts` enforces.
 
 ADR 0088 recorded that the guard TEST had failed to catch the fifth occurrence. **That was wrong.**
 The guard catches it and names the file and line exactly — verified by planting one. It had simply

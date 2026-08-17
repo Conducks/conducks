@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { CanonicalKind, CanonicalRank, mapToCanonical } from "@/contracts/index.js";
 
@@ -19,9 +19,15 @@ import { CanonicalKind, CanonicalRank, mapToCanonical } from "@/contracts/index.
 const LANGUAGES_DIR = join(process.cwd(), 'src/lib/core/parsing/languages');
 
 function allQueryFiles(): { path: string; source: string }[] {
+  // `queries.scm`, not `queries.ts` — since todo31 the `.ts` beside it is a five-line loader that
+  // holds no patterns at all. Scanning it would split this suite in two: the `toBeGreaterThan(0)`
+  // cases would fail loudly, and every assertion written as `isPackage: false` would pass on empty
+  // text, which is the half that would have been believed. A negative assertion over a source that
+  // turned out to be empty is the same fault as a check that ran on nothing (ADR 0044).
   return readdirSync(LANGUAGES_DIR, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    .map((e) => join(LANGUAGES_DIR, e.name, 'queries.ts'))
+    .map((e) => join(LANGUAGES_DIR, e.name, 'queries.scm'))
+    .filter((path) => existsSync(path))
     .map((path) => ({ path, source: readFileSync(path, 'utf8') }));
 }
 

@@ -1,5 +1,5 @@
 # todo31 — move language queries out of TypeScript template literals
-Status: todo
+Status: done
 - Acceptance: a backtick in a query file is an ordinary character; `scripts/check-query-backticks.mjs` and its guard test are deleted as unnecessary rather than disabled.
 
 ## Context
@@ -50,7 +50,16 @@ success is the reason it is tolerable rather than the reason it is fine.
       own — the RISK Phase 0 named (runtime path resolution across build/, jest and spawned workers)
       is unchanged, and nothing measured today speaks to it. It is recorded so the next reader
       weighs a gate that needs its own mutation tests, not the twenty-second annoyance of 2026-08-05
-- [>] REVISITED 2026-08-17 — deferred still, because the risk Phase 0 named is untouched while the
+- [x] DONE 2026-08-17 (ADR 0152) — the owner overrode the deferral, and the risk this todo was
+      deferred on FOUR TIMES was measured rather than reasoned about for a fifth. `import.meta.url`
+      was already in use across `src`, including inside `grammar-registry.ts`. Probed on the smallest
+      pack in all three contexts before migrating the rest: jest resolves beside the source, the
+      built CLI beside the compiled module, and a spawned pulse worker resolves correctly because the
+      anchor is the module's location and not the process's. Every compiled pattern is byte-identical
+      — 850 significant lines each side of the change, no difference — and the only content that
+      moved is backslashes inside `;;` comments, which the template literal had been eating.
+      `check-query-backticks.mjs` and its guard test are deleted, which is this todo's acceptance.
+- [>] SUPERSEDED — the reasoning that kept it deferred, kept for the record. Deferred still, because the risk Phase 0 named is untouched while the
       cost it priced was re-measured and has not grown. New evidence rather than repeated reasoning. The gate fired three more times in one
       session — writing query comments for the rust, go, c, ruby and php heritage and alias
       patterns — bringing it to 10 of 10 caught. Every one was in a `;;` COMMENT, which is
