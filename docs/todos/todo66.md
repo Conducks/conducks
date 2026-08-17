@@ -80,6 +80,16 @@ strongest wording `prune` has.
       finding that nothing declares the mapping, the honest status is NOT-YET rather than next-up —
       the cost is a bundler-config reader per framework, the risk is a wrong edge making `prune`
       confidently silent, and the evidence is one project's Electron layout
+- [x] RE-MEASURED 2026-08-17 — **still one subject.** The reopen condition is a SECOND subject, so it
+      is re-run rather than inherited. Every climbing specifier in all three subjects was resolved
+      against disk: sofie **1,096 in code, 18 unresolved**, all from `electron/` and all the shape
+      above; orchestrator **169 in code, 0 unresolved**; scraper is Python and has none. The blocker
+      holds.
+      The first run of that scan reported orchestrator as a second subject, and it was WRONG: the
+      pattern matched `Prefer importing from '../shared/types'` inside a doc comment, while the file's
+      real imports are `'../../shared/types'` and resolve. Recorded because the false positive would
+      have cleared this blocker and authorised the expensive work — a measurement that reads prose as
+      code is not a measurement, and it announced nothing. Comments are stripped before scanning now.
 
 ## Phase 1 — the measurement that decides it worked
 
