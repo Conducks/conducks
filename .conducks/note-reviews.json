@@ -19,9 +19,7 @@
     "tests/unit/core/parsing/optional-native-binding.test.ts": "ba7f05e5a933f9f0"
   },
   "docs/visuals/modules/core/parsing/languages.md": {
-    "src/lib/core/parsing/languages/typescript/queries.ts:30-32": "3db55f89df1bd55e",
-    "src/lib/core/parsing/languages/python/queries.ts:22-23": "521204228ac94c16",
-    "src/lib/core/parsing/reflector.ts:1011": "7dfc0ef7544241ff"
+    "tools/benchmark/oracle-packs.mjs": "1cf0af6c5ad696f9"
   },
   "docs/visuals/modules/core/parsing/processors.md": {
     "src/lib/core/parsing/processors/import.ts": "bb28f4242b049e3e",
@@ -45,12 +43,6 @@
   "docs/visuals/modules/core/persistence.md": {
     "src/lib/core/persistence/persistence.ts": "2b62d10e40d78114"
   },
-  "docs/visuals/modules/domain/analysis/coverage.md": {
-    "src/interfaces/cli/commands/coverage.ts:11": "fe92578cc587e09a"
-  },
-  "docs/visuals/modules/domain/analysis/docs-grammar.md": {
-    "src/resources/skills/conducks-docs.md": "2623cdf50fbb69a4"
-  },
   "docs/visuals/modules/domain/analysis/orchestrator.md": {
     "src/lib/domain/analysis/orchestrator.ts": "ffaaa577f6e2c4b0",
     "src/lib/domain/analysis/micro-pulse.ts": "6ab922f93cb4bc15"
@@ -65,38 +57,46 @@
     "src/contracts/dead-code-types.ts": "3358612b32a4a416"
   },
   "docs/visuals/modules/domain/governance/sentinel.md": {
-    "src/lib/domain/governance/index.ts:337": "96d2d06ba682de50",
+    "src/lib/domain/governance/index.ts:337": "d10b36aa74a59bcf",
     "config/sentinel.json": "152f1597f569c396",
-    "src/interfaces/cli/commands/audit.ts:82-88": "6e779c6032f1433f",
-    "src/registry/index.ts": "2ee7c9112d5fbc8d"
+    "src/interfaces/cli/commands/audit.ts:82-88": "067289b0841803fc",
+    "src/registry/index.ts": "97f920ab4aa33102"
   },
   "docs/visuals/modules/domain/governance.md": {
-    "src/lib/domain/governance/index.ts:141-212": "f47385aa4aa377d4"
+    "src/lib/domain/governance/index.ts:141-212": "b7c52b5d1dad473d"
   },
   "docs/visuals/modules/interfaces/cli.md": {
     "src/interfaces/cli/commands/mirror.ts:3": "436f0f19c8c54e3b"
   },
   "docs/visuals/modules/interfaces/tools.md": {
-    "src/lib/core/utils/logger.ts": "7519dac9e71a4fd5",
+    "src/lib/core/utils/logger.ts": "7ac78c3c6b1f0d74",
     "src/interfaces/tools/tools/kinetic.ts:267": "a50c2097e1c4d840",
-    "tests/unit/domain/stale-import.test.ts": "3aeb7ac01fe2ce3b",
-    "src/interfaces/tools/shared/resolve-symbol.ts": "efb4b5c325c1af5b",
-    "src/interfaces/tools/shared/empty-vault.ts": "e2e9ba0a58ceb671"
+    "tests/unit/domain/stale-import.test.ts": "16a694320f5285fe",
+    "src/interfaces/tools/shared/resolve-symbol.ts": "4e89c70fe0394cc4",
+    "src/interfaces/tools/shared/empty-vault.ts": "c061019a1deb7acb"
   },
   "docs/visuals/modules/registry.md": {
-    "src/registry/index.ts": "2ee7c9112d5fbc8d",
+    "src/registry/index.ts": "97f920ab4aa33102",
     "src/interfaces/tools/shared/anchor.ts": "18c31582d5f50217"
   },
   "docs/visuals/system-trace.html": {
-    "src/lib/domain/analysis/conducks-core.ts:58": "a8100dcb07ab26b4",
-    "src/lib/core/parsing/processors/call.ts:58": "2ea8f2650c3c17e4",
+    "src/lib/domain/analysis/conducks-core.ts:58": "07cbc68375403ec8",
+    "src/lib/core/parsing/processors/call.ts:58": "79e002234df4685b",
     "src/lib/core/parsing/processors/heritage.ts:38": "63ba1ed96ff6d880",
-    "src/interfaces/cli/index.ts:203-204": "6bd5f2d873d60c4c",
+    "src/interfaces/cli/index.ts:203-204": "0ae40fa7ea373a54",
     "src/lib/domain/analysis/micro-pulse.ts:68": "a2c2339691fc48fb",
-    "src/lib/core/graph/adjacency-list.ts:318": "c8e0d39aa04bbdee",
-    "src/lib/core/graph/graph-engine.ts:590": "e14ef5d22d885a03"
+    "src/lib/core/graph/adjacency-list.ts:318": "e3b0c44298fc1c14",
+    "src/lib/core/graph/graph-engine.ts:590": "8cd4e4b7e6b0ebde"
   },
-  "docs/visuals/modules/domain/analysis/docs-board.md": {
-    "src/lib/domain/analysis/module-hash.ts": "f4cf36cf5f1d202e"
+  "docs/visuals/modules/domain/coverage.md": {
+    "src/lib/domain/coverage/coverage-bind.ts": "33abc077a6621d61"
+  },
+  "docs/visuals/modules/domain/docs/docs-grammar.md": {
+    "src/resources/skills/conducks-docs.md": "d2db3a48a246b043"
+  },
+  "docs/visuals/modules/domain/docs/docs-board.md": {
+    "src/lib/domain/docs/docs-board.ts": "7c7a8b2997e9afe6",
+    "src/lib/domain/docs/docs-watcher.ts": "e9f918640551066a",
+    "src/lib/domain/analysis/module-hash.ts": "de4cb38ff431b656"
   }
 }

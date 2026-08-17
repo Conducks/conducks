@@ -460,7 +460,7 @@
         <tr><td><strong>no engine</strong></td><td><code>help</code> <code>docs-status</code> <code>docs-lint</code> <code>bootstrap-docs</code> <code>monitor</code></td><td>markdown + fs only; answerable during a write</td></tr>
         <tr><td><strong>SQL only</strong> <span class="st unver">over-pays</span></td><td><code>coverage</code> <code>coverage-view</code> <code>ledger</code> <code>supply-chain</code></td><td>never touch the graph object, yet none is bypass-listed, so each pays a full graph load</td></tr>
         <tr><td><strong>engine, no graph need</strong> <span class="st unver">over-pays</span></td><td><code>record</code> <code>setup</code> <code>uninstall</code> <code>doctor</code></td><td>pure fs/config writers that still run <code>registry.initialize()</code> — 13 grammars for nothing</td></tr>
-        <tr><td><strong>full graph</strong></td><td><code>impact</code> <code>trace</code> <code>explain</code> <code>context</code> <code>query</code> <code>audit</code> <code>advise</code> <code>prune</code> <code>flows</code> <code>drift</code> <code>guard</code> <code>diff</code> <code>entropy</code> <code>cohesion</code> <code>resonance</code> <code>entry</code> <code>list</code> <code>link</code> <code>status</code> <code>rename</code> <code>fallback</code> <code>mcp</code> <code>watch</code></td><td>the expensive tier</td></tr>
+        <tr><td><strong>full graph</strong></td><td><code>impact</code> <code>trace</code> <code>explain</code> <code>context</code> <code>query</code> <code>audit</code> <code>advise</code> <code>prune</code> <code>flows</code> <code>drift</code> <code>guard</code> <code>diff</code> <code>entropy</code> <code>cohesion</code> <code>resonance</code> <code>entry</code> <code>list</code> <code>link</code> <code>status</code> <code>rename</code> <code>mcp</code> <code>watch</code></td><td>the expensive tier</td></tr>
         <tr><td><strong>writes</strong></td><td><code>analyze</code> <code>clean</code> · and <code>rename --confirm</code> <code>monitor --dismiss</code> <code>link</code> <code>coverage --save-baseline</code> <code>bootstrap-docs</code> <code>record</code> <code>setup</code> <code>uninstall</code></td><td>only the first two get a writable handle</td></tr>
       </tbody>
     </table>
@@ -577,8 +577,9 @@
     would make the result observable is missing — not broken, <em>absent</em>. Virtual induction had no
     persist call. <code>bindNeuralCircuits</code> had no index update. <code>micro-pulse</code> had no
     guard on its success message. <code>guard</code> had no branch for "no data". The
-    <code>fallbackAnalysis</code> field still has no writer. Each is one missing line, and each
-    produces output that looks exactly like success.
+    <code>fallbackAnalysis</code> field had no writer — and that one was resolved by DELETING the
+    feature on 2026-08-17 (ADR 0151), because the detector behind it could not fire on any codebase.
+    Each of the others is one missing line, and each produces output that looks exactly like success.
     <br><br>
     Fixing them taught one more thing. <code>PULSES_TO</code> had a SECOND cause hiding behind the
     first: once the edges persisted, the capture that feeds them still never matched

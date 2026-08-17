@@ -6,7 +6,7 @@ routed through the registry, so the encoded contract (`mcp → composition, cont
 exceptions. The detector itself was removed on 2026-08-17 (ADR 0151) — it is named here without an
 anchor because the file is gone and a link to it would be a claim that cannot be checked.
 
-**Responsibility:** exposing conducks' analysis to an agent over MCP. 14 tools cover what ~38 CLI
+**Responsibility:** exposing conducks' analysis to an agent over MCP. 14 tools cover what 40 CLI
 commands do — query, impact, trace, audit, prune, coverage, docs and the rest are grouped, never one
 tool per command.
 
