@@ -1,7 +1,7 @@
 {
   "conducks": {
     "oracle": 28,
-    "missed": 28,
+    "missed": 27,
     "agreed": 0,
     "recorded": "run with --write-baseline to update"
   },
