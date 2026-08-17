@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the cli</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE CLI</h1>
+<p class="sub">interfaces/cli — 42 commands behind one dispatcher</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="argv">
+  <h3>A command word</h3>
+  <div class="where">src/interfaces/cli/index.ts::main</div>
+  <p>42 commands, each a ConducksCommand found by id</p>
+  <p class="file">on the canvas: conducks &lt;id&gt; [args]</p>
+</div>
+
+<div class="det" id="iface">
+  <h3>One contract per command</h3>
+  <div class="where">src/interfaces/cli/command.ts::ConducksCommand</div>
+  <p>`link` was imported and never instantiated, so the command answered "Unknown command" while FederatedLinker underneath worked fine. The import satisfied the compiler and no test drove the surface</p>
+  <p class="file">on the canvas: id, description, usage, execute</p>
+</div>
+
+<div class="det" id="help">
+  <h3>--help is answered CENTRALLY</h3>
+  <div class="where">src/interfaces/cli/index.ts::main</div>
+  <p>every arg parser skips unknown flags, so `query --help` fell through as an empty query, which is read as `*` and printed the whole inventory. Handled in the dispatcher because the defect was per command and the fix should not be written 39 times (ADR 0111)</p>
+  <p class="file">on the canvas: before the command runs</p>
+</div>
+
+<div class="det" id="quiet">
+  <h3>A read command says nothing else</h3>
+  <div class="where">src/lib/core/utils/logger.ts::setProcessQuiet</div>
+  <p>five boot lines used to precede every answer. Quiet is process-wide but the SETTER is not a method, so the reach is visible at the call site (ADR 0080)</p>
+  <p class="file">on the canvas: narration is off unless asked</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>A command word</td><td>One contract per command</td><td>—</td></tr>
+    <tr><td>A command word</td><td>--help is answered CENTRALLY</td><td>asked for usage</td></tr>
+    <tr><td>A command word</td><td>A read command says nothing else</td><td>—</td></tr>
+  </tbody>
+</table>
+<h2>Module notes</h2>
+<p class="sub">the authored memory of the modules this block cites — derived from the anchors above, not curated</p>
+<p>
+  <a href="interfaces/cli.html"><code>interfaces/cli</code></a>
+</p>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

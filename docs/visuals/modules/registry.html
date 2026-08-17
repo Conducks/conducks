@@ -20,5 +20,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><code>changeSet</code>/<code>impactedSymbols</code> and <code>governedCount</code> are exposed here for the same reason: the CLI must not import the domain directly, so a fact both surfaces need is reached through the registry.</p>
 <h2>Dynamic access is invisible to static analysis</h2>
 <p>Services are reached through property chains (<code>registry.evolution.watcher</code>), so the getters have no incoming edge in the graph and dead-code reports them as orphans. Four of them are permanent, known false positives. This is the price of the DI shape and is accepted; do not "fix" it by deleting a getter, and do not add a special case to dead-code for it.</p>
+<h2>On the canvas</h2>
+<p>cited by <a href="mcp.html">THE MCP SURFACE</a> · <a href="reg.html">THE REGISTRY</a> — derived from the block anchors, not curated</p>
 <footer>Source: <code>docs/visuals/modules/registry.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

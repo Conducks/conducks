@@ -109,9 +109,97 @@ export const BAND1 = {
   ],
 };
 
-export const BANDS = [BAND1];
+// ── Band 2 — how a question is answered ──────────────────────────────────────
+//
+// Everything Band 1 wrote is read here, by two surfaces over ONE composition root. The band exists
+// because the interesting facts are not in either surface: they are in what the registry refuses,
+// and in the choice between answering from SQL and materialising the graph.
+//
+// Read at `45a65be`. This band crosses `domain`, `interfaces` and `registry`, none of which has had
+// the structural pass core got — so it draws the PATH, which was read, and does not claim the layers
+// behind it are clean.
+export const BAND2 = {
+  id:'band2', title:'HOW A QUESTION IS ANSWERED',
+  sub:'two surfaces, one registry, and the choice between SQL and a 165 MB walk',
+  containers:[
+    { id:'c_cli', title:'THE CLI', sub:'interfaces/cli — 42 commands behind one dispatcher',
+      nodes:[
+        n('argv','A command word','conducks <id> [args]',
+          'src/interfaces/cli/index.ts::main — 42 commands, each a ConducksCommand found by id'),
+        n('iface','One contract per command','id, description, usage, execute',
+          'src/interfaces/cli/command.ts::ConducksCommand — `link` was imported and never instantiated, so the command answered "Unknown command" while FederatedLinker underneath worked fine. The import satisfied the compiler and no test drove the surface',
+          {cls:'n-warn'}),
+        n('help','--help is answered CENTRALLY','before the command runs',
+          'src/interfaces/cli/index.ts::main — every arg parser skips unknown flags, so `query --help` fell through as an empty query, which is read as `*` and printed the whole inventory. Handled in the dispatcher because the defect was per command and the fix should not be written 39 times (ADR 0111)',
+          {cls:'n-ok'}),
+        n('quiet','A read command says nothing else','narration is off unless asked',
+          'src/lib/core/utils/logger.ts::setProcessQuiet — five boot lines used to precede every answer. Quiet is process-wide but the SETTER is not a method, so the reach is visible at the call site (ADR 0080)'),
+      ],
+      edges:[['argv','iface'],['argv','help','asked for usage'],['argv','quiet']]},
+
+    { id:'c_mcp', title:'THE MCP SURFACE', sub:'interfaces/tools — the same answers, over stdio',
+      nodes:[
+        n('anch','Anchor to the caller’s project','not to wherever the server booted',
+          'src/interfaces/tools/shared/anchor.ts::ensureAnchor — a globally installed server boots detached, so the whole surface was unusable for any project but one until the anchor was re-resolved per call',
+          {cls:'n-hi'}),
+        n('hold','Take a hold on the vault','closed when the LAST holder releases',
+          'src/registry/index.ts::acquireVault — three independent closers ran in a single tool call and whichever finished first hung up the handle; the others got `Database was already closed` (ADR 0146)',
+          {cls:'n-ok'}),
+        n('stdio','stdout is the protocol','so every log goes to stderr',
+          'src/interfaces/tools/tools/synapse.ts — a stray stdout write is not a log here, it is a malformed JSON-RPC frame'),
+      ],
+      edges:[['anch','hold'],['hold','stdio']]},
+
+    { id:'c_reg', title:'THE REGISTRY', sub:'src/registry — composition, and the guard that made a silent failure loud',
+      nodes:[
+        n('one','One wiring point','both surfaces get the same object',
+          'src/registry/index.ts — the CLI may not import core (ADR 0005), so composition carries every edge the interfaces need'),
+        n('defer','The graph load is DEFERRED','165 MB and 146 ms a reader may not need',
+          'src/lib/core/bootstrap/registry-bootstrapper.ts — a read-only caller frequently walks no node at all',
+          {shape:'dia'}),
+        n('guard','A deferred graph would read as EMPTY','so asking for it THROWS instead',
+          'src/registry/index.ts — four of six MCP tools broke this way and three broke silently: zero nodes, zero flows, symbol-not-found, no error anywhere. The getter turns forgetting into a loud failure at the call site rather than a wrong answer downstream (CONDUCKS-13)',
+          {cls:'n-ok'}),
+        n('ro','A read handle REFUSES a write','it does not drop it quietly',
+          'src/lib/core/persistence/persistence.ts::run — a silent no-op here would be the same defect as `save()` writing no structure: a call that succeeds and stores nothing'),
+      ],
+      edges:[['one','defer'],['defer','guard','something walks the graph'],['one','ro']]},
+
+    { id:'c_answer', title:'THE ANSWER', sub:'SQL or a walk — the choice is the design',
+      nodes:[
+        n('sql','Ask the vault','no graph load at all',
+          'src/lib/core/persistence/persistence.ts::query — this is why the load is deferred, and a command that answers from SQL must NOT materialise the graph'),
+        n('filt','A typed filter, never a string','field and operator from fixed allowlists',
+          'src/lib/domain/analysis/filter-builder.ts::buildFilterQuery — values are always bound with `?`, so an operator of "; DELETE" fails the allowlist check rather than reaching a query string',
+          {cls:'n-ok'}),
+        n('walk','Or walk the graph','impact, trace, flows',
+          'src/lib/core/graph/algorithms/traversal.ts::traverseUpstream — bounded by maxDepth AND a visited set: the first stops the walk, the second is what keeps the ANSWER right when two paths reach one node'),
+        n('gov','Or ask governance','audit, arch, drift, status',
+          'src/lib/domain/governance/index.ts'),
+        n('stale','And say when it is BEHIND','the answer describes the last pulse',
+          'src/interfaces/cli/shared/stale-warning.ts::warnIfStale — an answer about a tree nobody has checked out is worse than no answer, because it looks like one',
+          {cls:'n-hi'}),
+        n('unaud','domain · interfaces · registry','no structural pass yet',
+          'src/lib/domain/analysis/project-monitor.ts::ProjectMonitor — core was declared clean and two dead subsystems were found in it afterwards. These three layers have not had that pass, so nothing here claims they are cleaner',
+          {cls:'n-no'}),
+      ],
+      edges:[['sql','filt'],['sql','stale'],['walk','stale'],['gov','stale'],['gov','unaud']]},
+  ],
+  crossEdges:[
+    ['iface','one'],['quiet','one'],
+    ['stdio','one'],['anch','one'],
+    ['guard','walk','materialised first'],
+    ['one','sql'],['one','gov'],
+  ],
+};
+
+export const BANDS = [BAND1, BAND2];
 
 // Bands are chapters of ONE drawing, and edges between them may point backwards — that is what makes
-// the picture a cycle rather than a stack. There is one band today, so this list is empty; it is
-// declared rather than omitted because the next band's first edge belongs here and nowhere else.
-export const BAND_LINKS = [];
+// the picture a CYCLE rather than a stack. Both of these do: Band 2 reads what Band 1 wrote, and the
+// staleness check reads Band 1's own freshness engine to decide whether to say so.
+export const BAND_LINKS = [
+  ['nodes','sql','every answer reads what the pulse wrote'],
+  ['fresh','stale','the same freshness engine both surfaces use'],
+  ['argv','anchor','analyze is a command like any other',{prio:10}],
+];

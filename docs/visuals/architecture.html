@@ -14,8 +14,10 @@
 
 <h1>The architecture</h1>
 <p class="sub">One canvas, grown by bands. Band 1 is the <b>analyze pulse</b> — the only path that
-writes, and the one every other command reads the output of. Scroll to zoom, drag to pan, click a
-block to trace its wiring, double-click or use the <b>i</b> to open its page.</p>
+writes. Band 2 is <b>everything that reads it</b>. It is a cycle, not a stack: two edges point
+backwards, because an answer reads what the pulse wrote and <code>analyze</code> is itself just
+another command. Scroll to zoom, drag to pan, click a block to trace its wiring, double-click or use
+the <b>i</b> to open its page.</p>
 </div>
 
 <div class="bleed">
@@ -32,324 +34,603 @@ block to trace its wiring, double-click or use the <b>i</b> to open its page.</p
       <span class="sel-count"></span>
       <span class="zoom-pct">100%</span>
     </div>
-<svg id="canvas" viewBox="0 0 834 2049" xmlns="http://www.w3.org/2000/svg">
+<svg id="canvas" viewBox="0 0 1426 3372" xmlns="http://www.w3.org/2000/svg">
 <g id="viewport">
-<rect class="band-r" id="band1" x="12" y="12" width="810" height="2025" rx="14"/>
-<text class="band-n" x="38" y="64">1</text>
-<text class="band-t" x="86" y="56">HOW A CODEBASE BECOMES A GRAPH</text>
-<text class="band-s" x="86" y="78">the analyze pulse — the only path that writes</text>
+<rect class="band-r" id="band1" x="339" y="1275" width="1034.2333333333333" height="2040" rx="14"/>
+<text class="band-n" x="365" y="1327">1</text>
+<text class="band-t" x="413" y="1319">HOW A CODEBASE BECOMES A GRAPH</text>
+<text class="band-s" x="413" y="1341">the analyze pulse — the only path that writes</text>
 <g class="cont"><a href="modules/git.html">
-<rect class="sec cont-r" x="199.8" y="98" width="592.2" height="342" rx="12"/>
-<text class="cont-t" x="219.8" y="130">DISCOVERY</text>
-<text class="cont-s" x="219.8" y="150">core/git — which files exist, asked of git itself</text>
-<text class="cont-go" x="772" y="130">open →</text></a>
+<rect class="sec cont-r" x="369" y="1366" width="592.2" height="342" rx="12"/>
+<text class="cont-t" x="389" y="1398">DISCOVERY</text>
+<text class="cont-s" x="389" y="1418">core/git — which files exist, asked of git itself</text>
+<text class="cont-go" x="941.2" y="1398">open →</text></a>
 </g>
 <g class="cont"><a href="modules/parsing.html">
-<rect class="sec cont-r" x="42" y="480" width="633.6" height="524" rx="12"/>
-<text class="cont-t" x="62" y="512">PARSING</text>
-<text class="cont-s" x="62" y="532">core/parsing — 13 language packs and one reflector</text>
-<text class="cont-go" x="655.6" y="512">open →</text></a>
+<rect class="sec cont-r" x="619.8" y="1748" width="633.6" height="524" rx="12"/>
+<text class="cont-t" x="639.8" y="1780">PARSING</text>
+<text class="cont-s" x="639.8" y="1800">core/parsing — 13 language packs and one reflector</text>
+<text class="cont-go" x="1233.4" y="1780">open →</text></a>
 </g>
 <g class="cont"><a href="modules/graph.html">
-<rect class="sec cont-r" x="178.33333333333331" y="1034" width="546.5" height="508" rx="12"/>
-<text class="cont-t" x="198.33333333333331" y="1066">THE GRAPH</text>
-<text class="cont-s" x="198.33333333333331" y="1086">core/graph — nodes, edges, and binding names to them</text>
-<text class="cont-go" x="704.8333333333333" y="1066">open →</text></a>
+<rect class="sec cont-r" x="756.1333333333333" y="2302" width="546.5" height="508" rx="12"/>
+<text class="cont-t" x="776.1333333333333" y="2334">THE GRAPH</text>
+<text class="cont-s" x="776.1333333333333" y="2354">core/graph — nodes, edges, and binding names to them</text>
+<text class="cont-go" x="1282.6333333333332" y="2334">open →</text></a>
 </g>
 <g class="cont"><a href="modules/persistence.html">
-<rect class="sec cont-r" x="319.53333333333336" y="1572" width="354.3666666666667" height="420" rx="12"/>
-<text class="cont-t" x="339.53333333333336" y="1604">THE VAULT</text>
-<text class="cont-s" x="339.53333333333336" y="1624">core/persistence — DuckDB, and one writer</text>
-<text class="cont-go" x="653.9000000000001" y="1604">open →</text></a>
+<rect class="sec cont-r" x="897.3333333333334" y="2840" width="434.9" height="420" rx="12"/>
+<text class="cont-t" x="917.3333333333334" y="2872">THE VAULT</text>
+<text class="cont-s" x="917.3333333333334" y="2892">core/persistence — DuckDB, and one writer</text>
+<text class="cont-go" x="1312.2333333333333" y="2872">open →</text></a>
 </g>
+<rect class="band-r" id="band2" x="12" y="57" width="1361.8666666666668" height="1150" rx="14"/>
+<text class="band-n" x="38" y="109">2</text>
+<text class="band-t" x="86" y="101">HOW A QUESTION IS ANSWERED</text>
+<text class="band-s" x="86" y="123">two surfaces, one registry, and the choice between SQL and a 165 MB walk</text>
+<g class="cont"><a href="modules/cli.html">
+<rect class="sec cont-r" x="438.66666666666674" y="211" width="843" height="264" rx="12"/>
+<text class="cont-t" x="458.66666666666674" y="243">THE CLI</text>
+<text class="cont-s" x="458.66666666666674" y="263">interfaces/cli — 42 commands behind one dispatcher</text>
+<text class="cont-go" x="1261.6666666666667" y="243">open →</text></a>
+</g>
+<g class="cont"><a href="modules/mcp.html">
+<rect class="sec cont-r" x="53" y="143" width="347.66666666666663" height="332" rx="12"/>
+<text class="cont-t" x="73" y="175">THE MCP SURFACE</text>
+<text class="cont-s" x="73" y="195">interfaces/tools — the same answers, over stdio</text>
+<text class="cont-go" x="380.66666666666663" y="175">open →</text></a>
+</g>
+<g class="cont"><a href="modules/reg.html">
+<rect class="sec cont-r" x="677.0666666666667" y="535" width="644.8000000000001" height="358" rx="12"/>
+<text class="cont-t" x="697.0666666666667" y="567">THE REGISTRY</text>
+<text class="cont-s" x="697.0666666666667" y="587">src/registry — composition, and the guard that made a silent failure loud</text>
+<text class="cont-go" x="1301.8666666666668" y="567">open →</text></a>
+</g>
+<g class="cont"><a href="modules/answer.html">
+<rect class="sec cont-r" x="367.26666666666677" y="923" width="920.4" height="254" rx="12"/>
+<text class="cont-t" x="387.26666666666677" y="955">THE ANSWER</text>
+<text class="cont-s" x="387.26666666666677" y="975">SQL or a walk — the choice is the design</text>
+<text class="cont-go" x="1267.6666666666667" y="955">open →</text></a>
+</g>
+<g class="e far" data-e="bl0" data-from="nodes" data-to="sql"><title>saveNodes is what stores them → Ask the vault</title>
+<path class="edge-hit" d="M1074.4,3058.0 L1078.0,3058.0 L352.0,3058.0 L352.0,990.0 L528.0,990.0 L530.3,990.0 L530.3,985.0"/>
+<path class="edge-far" d="M1074.4,3058.0 L1078.0,3058.0 L352.0,3058.0 L352.0,990.0 L528.0,990.0 L530.3,990.0 L530.3,985.0"/>
+</g>
+<text class="lbl" data-e="bl0" x="235.0" y="2028.0">every answer reads what the pulse wrote</text>
+<g class="e far" data-e="bl1" data-from="fresh" data-to="stale"><title>What changed since last time → And say when it is BEHIND</title>
+<path class="edge-hit" d="M1119.1,3234.0 L1122.0,3234.0 L1342.0,3234.0 L1342.0,1078.0 L1188.0,1078.0 L1194.5,1078.0 L1194.5,1083.0"/>
+<path class="edge-far" d="M1119.1,3234.0 L1122.0,3234.0 L1342.0,3234.0 L1342.0,1078.0 L1188.0,1078.0 L1194.5,1078.0 L1194.5,1083.0"/>
+</g>
+<text class="lbl" data-e="bl1" x="1213.0" y="2160.0">the same freshness engine both surfaces use</text>
+<g class="e far" data-e="bl2" data-from="argv" data-to="anchor"><title>A command word → Anchor on a root</title>
+<path class="edge-hit" d="M669.3,341.0 L660.0,341.0 L660.0,352.0 L418.0,352.0 L418.0,902.0 L330.0,902.0 L330.0,1430.0 L572.0,1430.0 L572.5,1430.0 L572.5,1428.0"/>
+<path class="edge-far" d="M669.3,341.0 L660.0,341.0 L660.0,352.0 L418.0,352.0 L418.0,902.0 L330.0,902.0 L330.0,1430.0 L572.0,1430.0 L572.5,1430.0 L572.5,1428.0"/>
+</g>
+<text class="lbl" data-e="bl2" x="313.0" y="631.0">analyze is a command like any other</text>
 <g class="e" data-e="band1_x0" data-from="disc" data-to="gate"><title>Ask every repository → Has this file changed?</title>
-<path class="edge-hit" d="M540.4,316.0 L540.4,326.0 L225.8,326.0 L225.8,542.0"/>
-<path class="edge" d="M540.4,316.0 L540.4,326.0 L225.8,326.0 L225.8,542.0"/>
+<path class="edge-hit" d="M625.0,1584.0 L625.0,1594.0 L934.2,1594.0 L934.2,1723.0 L858.6,1723.0 L858.6,1810.0"/>
+<path class="edge" d="M625.0,1584.0 L625.0,1594.0 L934.2,1594.0 L934.2,1723.0 L858.6,1723.0 L858.6,1810.0"/>
 </g>
-<text class="lbl" data-e="band1_x0" x="344.1" y="330.0">the file list</text>
+<text class="lbl" data-e="band1_x0" x="740.6" y="1598.0">the file list</text>
 <g class="e" data-e="band1_x1" data-from="fsfall" data-to="gate"><title>No repository? Scan the tree → Has this file changed?</title>
-<path class="edge-hit" d="M645.4,414.0 L645.4,455.0 L280.8,455.0 L280.8,542.0"/>
-<path class="edge" d="M645.4,414.0 L645.4,455.0 L280.8,455.0 L280.8,542.0"/>
+<path class="edge-hit" d="M803.6,1682.0 L803.6,1810.0"/>
+<path class="edge" d="M803.6,1682.0 L803.6,1810.0"/>
 </g>
 <g class="e" data-e="band1_x2" data-from="refl" data-to="add"><title>The reflector → Every id is lowercased</title>
-<path class="edge-hit" d="M350.8,792.0 L350.8,802.0 L648.6,802.0 L648.6,1019.0 L581.9,1019.0 L581.9,1096.0"/>
-<path class="edge" d="M350.8,792.0 L350.8,802.0 L648.6,802.0 L648.6,1019.0 L581.9,1019.0 L581.9,1096.0"/>
+<path class="edge-hit" d="M928.6,2060.0 L928.6,2070.0 L1226.4,2070.0 L1226.4,2287.0 L1159.7,2287.0 L1159.7,2364.0"/>
+<path class="edge" d="M928.6,2060.0 L928.6,2070.0 L1226.4,2070.0 L1226.4,2287.0 L1159.7,2287.0 L1159.7,2364.0"/>
 </g>
-<text class="lbl" data-e="band1_x2" x="412.7" y="806.0">a spectrum of nodes and edges</text>
+<text class="lbl" data-e="band1_x2" x="990.5" y="2074.0">a spectrum of nodes and edges</text>
 <g class="e" data-e="band1_x3" data-from="her" data-to="add"><title>Inheritance is an EDGE → Every id is lowercased</title>
-<path class="edge-hit" d="M504.6,978.0 L504.6,1096.0"/>
-<path class="edge" d="M504.6,978.0 L504.6,1096.0"/>
+<path class="edge-hit" d="M1082.4,2246.0 L1082.4,2364.0"/>
+<path class="edge" d="M1082.4,2246.0 L1082.4,2364.0"/>
 </g>
 <g class="e" data-e="band1_x4" data-from="fam" data-to="nodes"><title>Never bind across languages → saveNodes is what stores them</title>
-<path class="edge-hit" d="M581.9,1516.0 L581.9,1712.0 L544.1,1712.0 L544.1,1722.0"/>
-<path class="edge" d="M581.9,1516.0 L581.9,1712.0 L544.1,1712.0 L544.1,1722.0"/>
+<path class="edge-hit" d="M1159.7,2784.0 L1159.7,2990.0"/>
+<path class="edge" d="M1159.7,2784.0 L1159.7,2990.0"/>
 </g>
-<text class="lbl" data-e="band1_x4" x="533.9" y="1558.0">resolved targets</text>
+<text class="lbl" data-e="band1_x4" x="1111.7" y="2831.0">resolved targets</text>
 <g class="e far" data-e="band1_x5" data-from="fresh" data-to="gate"><title>What changed since last time → Has this file changed?</title>
-<path class="edge-hit" d="M501.4,1966.0 L501.4,2007.0 L734.8,2007.0 L734.8,465.0 L335.8,465.0 L335.8,542.0"/>
-<path class="edge-far" d="M501.4,1966.0 L501.4,2007.0 L734.8,2007.0 L734.8,465.0 L335.8,465.0 L335.8,542.0"/>
+<path class="edge-hit" d="M1200.4,3234.0 L1210.0,3234.0 L1210.0,3256.0 L1364.0,3256.0 L1364.0,1804.0 L924.0,1804.0 L913.6,1804.0 L913.6,1810.0"/>
+<path class="edge-far" d="M1200.4,3234.0 L1210.0,3234.0 L1210.0,3256.0 L1364.0,3256.0 L1364.0,1804.0 L924.0,1804.0 L913.6,1804.0 L913.6,1810.0"/>
 </g>
-<text class="lbl" data-e="band1_x5" x="626.8" y="1180.0">next pulse skips what did not change</text>
+<text class="lbl" data-e="band1_x5" x="1256.0" y="2534.0">next pulse skips what did not change</text>
 <g class="e" data-e="c_git_e0" data-from="anchor" data-to="disc"><title>Anchor on a root → Ask every repository</title>
-<path class="edge-hit" d="M592.9,228.0 L592.9,248.0"/>
-<path class="edge" d="M592.9,228.0 L592.9,248.0"/>
+<path class="edge-hit" d="M572.5,1496.0 L572.5,1516.0"/>
+<path class="edge" d="M572.5,1496.0 L572.5,1516.0"/>
 </g>
 <g class="e" data-e="c_git_e1" data-from="disc" data-to="quote"><title>Ask every repository → Non-ASCII names survive</title>
-<path class="edge-hit" d="M592.9,316.0 L592.9,336.0 L361.8,336.0 L361.8,346.0"/>
-<path class="edge" d="M592.9,316.0 L592.9,336.0 L361.8,336.0 L361.8,346.0"/>
+<path class="edge-hit" d="M520.0,1584.0 L520.0,1614.0"/>
+<path class="edge" d="M520.0,1584.0 L520.0,1614.0"/>
 </g>
 <g class="e" data-e="c_git_e2" data-from="disc" data-to="fsfall"><title>Ask every repository → No repository? Scan the tree</title>
-<path class="edge-hit" d="M645.4,316.0 L645.4,346.0"/>
-<path class="edge" d="M645.4,316.0 L645.4,346.0"/>
+<path class="edge-hit" d="M572.5,1584.0 L572.5,1604.0 L803.6,1604.0 L803.6,1614.0"/>
+<path class="edge" d="M572.5,1584.0 L572.5,1604.0 L803.6,1604.0 L803.6,1614.0"/>
 </g>
-<text class="lbl" data-e="c_git_e2" x="597.4" y="335.0">git said nothing</text>
+<text class="lbl" data-e="c_git_e2" x="625.0" y="1608.0">git said nothing</text>
 <g class="e" data-e="c_parsing_e0" data-from="gate" data-to="order"><title>Has this file changed? → Order by dependency</title>
-<path class="edge-hit" d="M280.8,616.0 L280.8,636.0"/>
-<path class="edge" d="M280.8,616.0 L280.8,636.0"/>
+<path class="edge-hit" d="M858.6,1884.0 L858.6,1904.0"/>
+<path class="edge" d="M858.6,1884.0 L858.6,1904.0"/>
 </g>
-<text class="lbl" data-e="c_parsing_e0" x="259.8" y="630.0">changed</text>
+<text class="lbl" data-e="c_parsing_e0" x="837.6" y="1898.0">changed</text>
 <g class="e" data-e="c_parsing_e1" data-from="order" data-to="refl"><title>Order by dependency → The reflector</title>
-<path class="edge-hit" d="M280.8,704.0 L280.8,724.0"/>
-<path class="edge" d="M280.8,704.0 L280.8,724.0"/>
+<path class="edge-hit" d="M858.6,1972.0 L858.6,1992.0"/>
+<path class="edge" d="M858.6,1972.0 L858.6,1992.0"/>
 </g>
 <g class="e" data-e="c_parsing_e2" data-from="refl" data-to="tags"><title>The reflector → A capture declares a kind</title>
-<path class="edge-hit" d="M280.8,792.0 L280.8,812.0 L504.6,812.0 L504.6,822.0"/>
-<path class="edge" d="M280.8,792.0 L280.8,812.0 L504.6,812.0 L504.6,822.0"/>
+<path class="edge-hit" d="M858.6,2060.0 L858.6,2080.0 L1082.4,2080.0 L1082.4,2090.0"/>
+<path class="edge" d="M858.6,2060.0 L858.6,2080.0 L1082.4,2080.0 L1082.4,2090.0"/>
 </g>
 <g class="e" data-e="c_parsing_e3" data-from="tags" data-to="her"><title>A capture declares a kind → Inheritance is an EDGE</title>
-<path class="edge-hit" d="M504.6,890.0 L504.6,910.0"/>
-<path class="edge" d="M504.6,890.0 L504.6,910.0"/>
+<path class="edge-hit" d="M1082.4,2158.0 L1082.4,2178.0"/>
+<path class="edge" d="M1082.4,2158.0 L1082.4,2178.0"/>
 </g>
 <g class="e" data-e="c_parsing_e4" data-from="refl" data-to="spec"><title>The reflector → Each pack resolves its own imports</title>
-<path class="edge-hit" d="M210.8,792.0 L210.8,822.0"/>
-<path class="edge" d="M210.8,792.0 L210.8,822.0"/>
+<path class="edge-hit" d="M788.6,2060.0 L788.6,2090.0"/>
+<path class="edge" d="M788.6,2060.0 L788.6,2090.0"/>
 </g>
 <g class="e" data-e="c_parsing_e5" data-from="spec" data-to="noora"><title>Each pack resolves its own imports → Nine packs have no oracle</title>
-<path class="edge-hit" d="M210.8,890.0 L210.8,910.0"/>
-<path class="edge" d="M210.8,890.0 L210.8,910.0"/>
+<path class="edge-hit" d="M788.6,2158.0 L788.6,2178.0"/>
+<path class="edge" d="M788.6,2158.0 L788.6,2178.0"/>
 </g>
-<text class="lbl" data-e="c_parsing_e5" x="150.8" y="904.0">for nine of thirteen</text>
+<text class="lbl" data-e="c_parsing_e5" x="728.6" y="2172.0">for nine of thirteen</text>
 <g class="e" data-e="c_graph_e0" data-from="add" data-to="skel"><title>Every id is lowercased → A stored node is a SKELETON</title>
-<path class="edge-hit" d="M504.6,1164.0 L504.6,1174.0 L321.2,1174.0 L321.2,1184.0"/>
-<path class="edge" d="M504.6,1164.0 L504.6,1174.0 L321.2,1174.0 L321.2,1184.0"/>
+<path class="edge-hit" d="M1082.4,2432.0 L1082.4,2442.0 L899.0,2442.0 L899.0,2452.0"/>
+<path class="edge" d="M1082.4,2432.0 L1082.4,2442.0 L899.0,2442.0 L899.0,2452.0"/>
 </g>
 <g class="e" data-e="c_graph_e1" data-from="add" data-to="kind"><title>Every id is lowercased → A capture becomes a rung</title>
-<path class="edge-hit" d="M581.9,1164.0 L581.9,1184.0"/>
-<path class="edge" d="M581.9,1164.0 L581.9,1184.0"/>
+<path class="edge-hit" d="M1159.7,2432.0 L1159.7,2452.0"/>
+<path class="edge" d="M1159.7,2432.0 L1159.7,2452.0"/>
 </g>
 <g class="e" data-e="c_graph_e2" data-from="kind" data-to="intra"><title>A capture becomes a rung → Bind the bare names</title>
-<path class="edge-hit" d="M581.9,1252.0 L581.9,1272.0"/>
-<path class="edge" d="M581.9,1252.0 L581.9,1272.0"/>
+<path class="edge-hit" d="M1159.7,2520.0 L1159.7,2540.0"/>
+<path class="edge" d="M1159.7,2520.0 L1159.7,2540.0"/>
 </g>
 <g class="e" data-e="c_graph_e3" data-from="intra" data-to="port"><title>Bind the bare names → It REFUSES to guess alone</title>
-<path class="edge-hit" d="M581.9,1340.0 L581.9,1360.0"/>
-<path class="edge" d="M581.9,1340.0 L581.9,1360.0"/>
+<path class="edge-hit" d="M1159.7,2608.0 L1159.7,2628.0"/>
+<path class="edge" d="M1159.7,2608.0 L1159.7,2628.0"/>
 </g>
 <g class="e" data-e="c_graph_e4" data-from="port" data-to="fam"><title>It REFUSES to guess alone → Never bind across languages</title>
-<path class="edge-hit" d="M581.9,1428.0 L581.9,1448.0"/>
-<path class="edge" d="M581.9,1428.0 L581.9,1448.0"/>
+<path class="edge-hit" d="M1159.7,2696.0 L1159.7,2716.0"/>
+<path class="edge" d="M1159.7,2696.0 L1159.7,2716.0"/>
 </g>
 <g class="e" data-e="c_persistence_e0" data-from="save" data-to="nodes"><title>save() writes NO structure → saveNodes is what stores them</title>
-<path class="edge-hit" d="M458.7,1702.0 L458.7,1722.0"/>
-<path class="edge" d="M458.7,1702.0 L458.7,1722.0"/>
+<path class="edge-hit" d="M1036.5,2970.0 L1036.5,2980.0 L1074.4,2980.0 L1074.4,2990.0"/>
+<path class="edge" d="M1036.5,2970.0 L1036.5,2980.0 L1074.4,2980.0 L1074.4,2990.0"/>
 </g>
-<text class="lbl" data-e="c_persistence_e0" x="377.7" y="1716.0">structure goes here instead</text>
+<text class="lbl" data-e="c_persistence_e0" x="974.5" y="2984.0">structure goes here instead</text>
 <g class="e" data-e="c_persistence_e1" data-from="nodes" data-to="purge"><title>saveNodes is what stores them → Purge a unit, not just its children</title>
-<path class="edge-hit" d="M501.4,1790.0 L501.4,1810.0"/>
-<path class="edge" d="M501.4,1790.0 L501.4,1810.0"/>
+<path class="edge-hit" d="M1159.7,3058.0 L1159.7,3078.0"/>
+<path class="edge" d="M1159.7,3058.0 L1159.7,3078.0"/>
 </g>
 <g class="e" data-e="c_persistence_e2" data-from="purge" data-to="fresh"><title>Purge a unit, not just its children → What changed since last time</title>
-<path class="edge-hit" d="M501.4,1878.0 L501.4,1898.0"/>
-<path class="edge" d="M501.4,1878.0 L501.4,1898.0"/>
+<path class="edge-hit" d="M1159.7,3146.0 L1159.7,3166.0"/>
+<path class="edge" d="M1159.7,3146.0 L1159.7,3166.0"/>
+</g>
+<g class="e" data-e="band2_x0" data-from="iface" data-to="one"><title>One contract per command → One wiring point</title>
+<path class="edge-hit" d="M1145.7,449.0 L1145.7,597.0"/>
+<path class="edge" d="M1145.7,449.0 L1145.7,597.0"/>
+</g>
+<g class="e" data-e="band2_x1" data-from="quiet" data-to="one"><title>A read command says nothing else → One wiring point</title>
+<path class="edge-hit" d="M879.3,449.0 L879.3,500.0 L1099.3,500.0 L1099.3,597.0"/>
+<path class="edge" d="M879.3,449.0 L879.3,500.0 L1099.3,500.0 L1099.3,597.0"/>
+</g>
+<g class="e" data-e="band2_x2" data-from="stdio" data-to="one"><title>stdout is the protocol → One wiring point</title>
+<path class="edge-hit" d="M249.7,449.0 L249.7,510.0 L1052.9,510.0 L1052.9,597.0"/>
+<path class="edge" d="M249.7,449.0 L249.7,510.0 L1052.9,510.0 L1052.9,597.0"/>
+</g>
+<g class="e far" data-e="band2_x3" data-from="anch" data-to="one"><title>Anchor to the caller’s project → One wiring point</title>
+<path class="edge-hit" d="M164.3,273.0 L164.3,283.0 L113.7,283.0 L113.7,520.0 L1006.5,520.0 L1006.5,597.0"/>
+<path class="edge-far" d="M164.3,273.0 L164.3,283.0 L113.7,283.0 L113.7,520.0 L1006.5,520.0 L1006.5,597.0"/>
+</g>
+<g class="e" data-e="band2_x4" data-from="guard" data-to="walk"><title>A deferred graph would read as EMPTY → Or walk the graph</title>
+<path class="edge-hit" d="M1145.7,867.0 L1145.7,985.0"/>
+<path class="edge" d="M1145.7,867.0 L1145.7,985.0"/>
+</g>
+<text class="lbl" data-e="band2_x4" x="1091.7" y="915.0">materialised first</text>
+<g class="e" data-e="band2_x5" data-from="one" data-to="sql"><title>One wiring point → Ask the vault</title>
+<path class="edge-hit" d="M1006.5,665.0 L1006.5,675.0 L703.1,675.0 L703.1,908.0 L600.3,908.0 L600.3,985.0"/>
+<path class="edge" d="M1006.5,665.0 L1006.5,675.0 L703.1,675.0 L703.1,908.0 L600.3,908.0 L600.3,985.0"/>
+</g>
+<g class="e" data-e="band2_x6" data-from="one" data-to="gov"><title>One wiring point → Or ask governance</title>
+<path class="edge-hit" d="M1052.9,665.0 L1052.9,685.0 L714.1,685.0 L714.1,908.0 L868.3,908.0 L868.3,985.0"/>
+<path class="edge" d="M1052.9,665.0 L1052.9,685.0 L714.1,685.0 L714.1,908.0 L868.3,908.0 L868.3,985.0"/>
+</g>
+<g class="e" data-e="c_cli_e0" data-from="argv" data-to="iface"><title>A command word → One contract per command</title>
+<path class="edge-hit" d="M711.3,341.0 L711.3,351.0 L1145.7,351.0 L1145.7,381.0"/>
+<path class="edge" d="M711.3,341.0 L711.3,351.0 L1145.7,351.0 L1145.7,381.0"/>
+</g>
+<g class="e" data-e="c_cli_e1" data-from="argv" data-to="help"><title>A command word → --help is answered CENTRALLY</title>
+<path class="edge-hit" d="M585.3,341.0 L585.3,381.0"/>
+<path class="edge" d="M585.3,341.0 L585.3,381.0"/>
+</g>
+<text class="lbl" data-e="c_cli_e1" x="540.3" y="365.0">asked for usage</text>
+<g class="e" data-e="c_cli_e2" data-from="argv" data-to="quiet"><title>A command word → A read command says nothing else</title>
+<path class="edge-hit" d="M627.3,341.0 L627.3,371.0 L879.3,371.0 L879.3,381.0"/>
+<path class="edge" d="M627.3,341.0 L627.3,371.0 L879.3,371.0 L879.3,381.0"/>
+</g>
+<g class="e" data-e="c_mcp_e0" data-from="anch" data-to="hold"><title>Anchor to the caller’s project → Take a hold on the vault</title>
+<path class="edge-hit" d="M249.7,273.0 L249.7,293.0"/>
+<path class="edge" d="M249.7,273.0 L249.7,293.0"/>
+</g>
+<g class="e" data-e="c_mcp_e1" data-from="hold" data-to="stdio"><title>Take a hold on the vault → stdout is the protocol</title>
+<path class="edge-hit" d="M249.7,361.0 L249.7,381.0"/>
+<path class="edge" d="M249.7,361.0 L249.7,381.0"/>
+</g>
+<g class="e" data-e="c_reg_e0" data-from="one" data-to="defer"><title>One wiring point → The graph load is DEFERRED</title>
+<path class="edge-hit" d="M1145.7,665.0 L1145.7,705.0"/>
+<path class="edge" d="M1145.7,665.0 L1145.7,705.0"/>
+</g>
+<g class="e" data-e="c_reg_e1" data-from="defer" data-to="guard"><title>The graph load is DEFERRED → A deferred graph would read as EMPTY</title>
+<path class="edge-hit" d="M1145.7,779.0 L1145.7,799.0"/>
+<path class="edge" d="M1145.7,779.0 L1145.7,799.0"/>
+</g>
+<text class="lbl" data-e="c_reg_e1" x="1070.7" y="793.0">something walks the graph</text>
+<g class="e" data-e="c_reg_e2" data-from="one" data-to="ro"><title>One wiring point → A read handle REFUSES a write</title>
+<path class="edge-hit" d="M1099.3,665.0 L1099.3,695.0 L849.4,695.0 L849.4,705.0"/>
+<path class="edge" d="M1099.3,665.0 L1099.3,695.0 L849.4,695.0 L849.4,705.0"/>
+</g>
+<g class="e" data-e="c_answer_e0" data-from="sql" data-to="filt"><title>Ask the vault → A typed filter, never a string</title>
+<path class="edge-hit" d="M530.3,1053.0 L530.3,1083.0"/>
+<path class="edge" d="M530.3,1053.0 L530.3,1083.0"/>
+</g>
+<g class="e" data-e="c_answer_e1" data-from="sql" data-to="stale"><title>Ask the vault → And say when it is BEHIND</title>
+<path class="edge-hit" d="M600.3,1053.0 L600.3,1073.0 L1048.1,1073.0 L1048.1,1083.0"/>
+<path class="edge" d="M600.3,1053.0 L600.3,1073.0 L1048.1,1073.0 L1048.1,1083.0"/>
+</g>
+<g class="e" data-e="c_answer_e2" data-from="walk" data-to="stale"><title>Or walk the graph → And say when it is BEHIND</title>
+<path class="edge-hit" d="M1145.7,1053.0 L1145.7,1083.0"/>
+<path class="edge" d="M1145.7,1053.0 L1145.7,1083.0"/>
+</g>
+<g class="e" data-e="c_answer_e3" data-from="gov" data-to="stale"><title>Or ask governance → And say when it is BEHIND</title>
+<path class="edge-hit" d="M903.3,1053.0 L903.3,1063.0 L1096.9,1063.0 L1096.9,1083.0"/>
+<path class="edge" d="M903.3,1053.0 L903.3,1063.0 L1096.9,1063.0 L1096.9,1083.0"/>
+</g>
+<g class="e" data-e="c_answer_e4" data-from="gov" data-to="unaud"><title>Or ask governance → domain · interfaces · registry</title>
+<path class="edge-hit" d="M833.3,1053.0 L833.3,1083.0"/>
+<path class="edge" d="M833.3,1053.0 L833.3,1083.0"/>
 </g>
 <g class="blk" id="blk-anchor"><a href="modules/git.html#anchor">
 <title>src/lib/core/git/chronicle-interface.ts::anchorChronicle — the door hands out `chronicle` as ReadOnlyChronicle, the class minus its one mutator, so none of the two dozen files holding it can re-anchor mid-run</title>
-<rect class="n-ok" x="470.90000000000003" y="160" width="244" height="68" rx="8"/>
-<text class="b-t" x="485.90000000000003" y="187">Anchor on a root</text>
-<text class="b-s" x="485.90000000000003" y="206">one directory for the whole process</text>
-<circle class="hint" cx="699.9000000000001" cy="175" r="6"/>
-<text class="hint-t" x="699.9000000000001" y="178.5">i</text>
-<circle class="hint-h" cx="699.9000000000001" cy="175" r="14"/>
+<rect class="n-ok" x="450.5" y="1428" width="244" height="68" rx="8"/>
+<text class="b-t" x="465.5" y="1455">Anchor on a root</text>
+<text class="b-s" x="465.5" y="1474">one directory for the whole process</text>
+<circle class="hint" cx="679.5" cy="1443" r="6"/>
+<text class="hint-t" x="679.5" y="1446.5">i</text>
+<circle class="hint-h" cx="679.5" cy="1443" r="14"/>
 </a></g>
 <g class="blk" id="blk-disc"><a href="modules/git.html#disc">
 <title>src/lib/core/git/chronicle-interface.ts::discoverFiles — `ls-files` in a root does not descend into a nested checkout. Measured on this repo: a private copy saw 575 source files, this sees 578, and the three were a nested fixture (ADR 0069)</title>
-<rect class="n-hi" x="487.90000000000003" y="248" width="210" height="68" rx="8"/>
-<text class="b-t" x="502.90000000000003" y="275">Ask every repository</text>
-<text class="b-s" x="502.90000000000003" y="294">not just the anchor’s own</text>
-<circle class="hint" cx="682.9000000000001" cy="263" r="6"/>
-<text class="hint-t" x="682.9000000000001" y="266.5">i</text>
-<circle class="hint-h" cx="682.9000000000001" cy="263" r="14"/>
+<rect class="n-hi" x="467.5" y="1516" width="210" height="68" rx="8"/>
+<text class="b-t" x="482.5" y="1543">Ask every repository</text>
+<text class="b-s" x="482.5" y="1562">not just the anchor’s own</text>
+<circle class="hint" cx="662.5" cy="1531" r="6"/>
+<text class="hint-t" x="662.5" y="1534.5">i</text>
+<circle class="hint-h" cx="662.5" cy="1531" r="14"/>
 </a></g>
 <g class="blk" id="blk-quote"><a href="modules/git.html#quote">
 <title>src/lib/core/git/chronicle-interface.ts — git quotes any path with a non-ASCII byte, so a Turkish filename came back as a 52-character escaped literal that opened nothing. Passed per-invocation because conducks must not write to a repo it is only reading</title>
-<rect class="n-warn" x="236.8" y="346" width="250" height="68" rx="8"/>
-<text class="b-t" x="251.8" y="373">Non-ASCII names survive</text>
-<text class="b-s" x="251.8" y="392">core.quotePath=false, per invocation</text>
-<circle class="hint" cx="471.8" cy="361" r="6"/>
-<text class="hint-t" x="471.8" y="364.5">i</text>
-<circle class="hint-h" cx="471.8" cy="361" r="14"/>
+<rect class="n-warn" x="395" y="1614" width="250" height="68" rx="8"/>
+<text class="b-t" x="410" y="1641">Non-ASCII names survive</text>
+<text class="b-s" x="410" y="1660">core.quotePath=false, per invocation</text>
+<circle class="hint" cx="630" cy="1629" r="6"/>
+<text class="hint-t" x="630" y="1632.5">i</text>
+<circle class="hint-h" cx="630" cy="1629" r="14"/>
 </a></g>
 <g class="blk" id="blk-fsfall"><a href="modules/git.html#fsfall">
 <title>src/lib/core/git/chronicle-interface.ts::discoverFiles — the fallback walk accepts a file by extension OR exact filename, because Rakefile and Dockerfile have no extension to match on</title>
-<rect class="n-box" x="524.8" y="346" width="241.20000000000002" height="68" rx="8"/>
-<text class="b-t" x="539.8" y="373">No repository? Scan the tree</text>
-<text class="b-s" x="539.8" y="392">the case ADR 0035 supports</text>
-<circle class="hint" cx="751" cy="361" r="6"/>
-<text class="hint-t" x="751" y="364.5">i</text>
-<circle class="hint-h" cx="751" cy="361" r="14"/>
+<rect class="n-box" x="683" y="1614" width="241.20000000000002" height="68" rx="8"/>
+<text class="b-t" x="698" y="1641">No repository? Scan the tree</text>
+<text class="b-s" x="698" y="1660">the case ADR 0035 supports</text>
+<circle class="hint" cx="909.2" cy="1629" r="6"/>
+<text class="hint-t" x="909.2" y="1632.5">i</text>
+<circle class="hint-h" cx="909.2" cy="1629" r="14"/>
 </a></g>
 <g class="blk" id="blk-gate"><a href="modules/parsing.html#gate">
 <title>src/lib/core/persistence/file-hash-gate.ts::FileHashGate — a mtime changes on checkout and says nothing about content</title>
-<rect class="n-box" x="170.8" y="542" width="220" height="74" rx="26"/>
-<text class="b-t" x="185.8" y="569">Has this file changed?</text>
-<text class="b-s" x="185.8" y="588">a content hash, not a timestamp</text>
-<circle class="hint" cx="375.8" cy="557" r="6"/>
-<text class="hint-t" x="375.8" y="560.5">i</text>
-<circle class="hint-h" cx="375.8" cy="557" r="14"/>
+<rect class="n-box" x="748.5999999999999" y="1810" width="220" height="74" rx="26"/>
+<text class="b-t" x="763.5999999999999" y="1837">Has this file changed?</text>
+<text class="b-s" x="763.5999999999999" y="1856">a content hash, not a timestamp</text>
+<circle class="hint" cx="953.5999999999999" cy="1825" r="6"/>
+<text class="hint-t" x="953.5999999999999" y="1828.5">i</text>
+<circle class="hint-h" cx="953.5999999999999" cy="1825" r="14"/>
 </a></g>
 <g class="blk" id="blk-order"><a href="modules/parsing.html#order">
 <title>src/lib/core/parsing/pipeline.ts::topologicalSort — a cycle has no valid order, and the two wrong answers are to drop those files or loop forever. They are appended as a final tier instead</title>
-<rect class="n-box" x="140.8" y="636" width="280" height="68" rx="8"/>
-<text class="b-t" x="155.8" y="663">Order by dependency</text>
-<text class="b-s" x="155.8" y="682">so a definition is parsed before its user</text>
-<circle class="hint" cx="405.8" cy="651" r="6"/>
-<text class="hint-t" x="405.8" y="654.5">i</text>
-<circle class="hint-h" cx="405.8" cy="651" r="14"/>
+<rect class="n-box" x="718.5999999999999" y="1904" width="280" height="68" rx="8"/>
+<text class="b-t" x="733.5999999999999" y="1931">Order by dependency</text>
+<text class="b-s" x="733.5999999999999" y="1950">so a definition is parsed before its user</text>
+<circle class="hint" cx="983.5999999999999" cy="1919" r="6"/>
+<text class="hint-t" x="983.5999999999999" y="1922.5">i</text>
+<circle class="hint-h" cx="983.5999999999999" cy="1919" r="14"/>
 </a></g>
 <g class="blk" id="blk-refl"><a href="modules/parsing.html#refl">
 <title>src/lib/core/parsing/reflector.ts::reflect — 1,696 lines, the single most consequential file here: a defect reaches all 35 commands</title>
-<rect class="n-hi" x="140.8" y="724" width="280" height="68" rx="8"/>
-<text class="b-t" x="155.8" y="751">The reflector</text>
-<text class="b-s" x="155.8" y="770">tree-sitter match in, nodes and edges out</text>
-<circle class="hint" cx="405.8" cy="739" r="6"/>
-<text class="hint-t" x="405.8" y="742.5">i</text>
-<circle class="hint-h" cx="405.8" cy="739" r="14"/>
+<rect class="n-hi" x="718.5999999999999" y="1992" width="280" height="68" rx="8"/>
+<text class="b-t" x="733.5999999999999" y="2019">The reflector</text>
+<text class="b-s" x="733.5999999999999" y="2038">tree-sitter match in, nodes and edges out</text>
+<circle class="hint" cx="983.5999999999999" cy="2007" r="6"/>
+<text class="hint-t" x="983.5999999999999" y="2010.5">i</text>
+<circle class="hint-h" cx="983.5999999999999" cy="2007" r="14"/>
 </a></g>
 <g class="blk" id="blk-tags"><a href="modules/parsing.html#tags">
 <title>src/lib/core/parsing/capture-tags.ts::DEFINITION_CAPTURES — one case per tag is pinned, in a language MEASURED to emit it. isClass is emitted by ONE of the thirteen grammars, so a TypeScript case would have tested isStruct and passed</title>
-<rect class="n-box" x="391.6" y="822" width="226" height="68" rx="8"/>
-<text class="b-t" x="406.6" y="849">A capture declares a kind</text>
-<text class="b-s" x="406.6" y="868">isFunction, isStruct, isBinding…</text>
-<circle class="hint" cx="602.6" cy="837" r="6"/>
-<text class="hint-t" x="602.6" y="840.5">i</text>
-<circle class="hint-h" cx="602.6" cy="837" r="14"/>
+<rect class="n-box" x="969.4" y="2090" width="226" height="68" rx="8"/>
+<text class="b-t" x="984.4" y="2117">A capture declares a kind</text>
+<text class="b-s" x="984.4" y="2136">isFunction, isStruct, isBinding…</text>
+<circle class="hint" cx="1180.4" cy="2105" r="6"/>
+<text class="hint-t" x="1180.4" y="2108.5">i</text>
+<circle class="hint-h" cx="1180.4" cy="2105" r="14"/>
 </a></g>
 <g class="blk" id="blk-her"><a href="modules/parsing.html#her">
 <title>src/lib/core/parsing/languages/php/queries.ts — @heritage must be co-captured with @name in the SAME pattern or the reflector resolves no definition node and drops it silently. PHP had no heritage pattern at all until 2026-08-17</title>
-<rect class="n-warn" x="370.6" y="910" width="268" height="68" rx="8"/>
-<text class="b-t" x="385.6" y="937">Inheritance is an EDGE</text>
-<text class="b-s" x="385.6" y="956">and it produced none in three languages</text>
-<circle class="hint" cx="623.6" cy="925" r="6"/>
-<text class="hint-t" x="623.6" y="928.5">i</text>
-<circle class="hint-h" cx="623.6" cy="925" r="14"/>
+<rect class="n-warn" x="948.4" y="2178" width="268" height="68" rx="8"/>
+<text class="b-t" x="963.4" y="2205">Inheritance is an EDGE</text>
+<text class="b-s" x="963.4" y="2224">and it produced none in three languages</text>
+<circle class="hint" cx="1201.4" cy="2193" r="6"/>
+<text class="hint-t" x="1201.4" y="2196.5">i</text>
+<circle class="hint-h" cx="1201.4" cy="2193" r="14"/>
 </a></g>
 <g class="blk" id="blk-spec"><a href="modules/parsing.html#spec">
 <title>src/lib/core/parsing/languages/typescript/resolver.ts::TypeScriptResolver — TS ESM writes a .js specifier for a .ts file, so both forms are tried or every relative import fails to bind</title>
-<rect class="n-box" x="68" y="822" width="285.6" height="68" rx="8"/>
-<text class="b-t" x="83" y="849">Each pack resolves its own imports</text>
-<text class="b-s" x="83" y="868">the one rule a pack cannot share</text>
-<circle class="hint" cx="338.6" cy="837" r="6"/>
-<text class="hint-t" x="338.6" y="840.5">i</text>
-<circle class="hint-h" cx="338.6" cy="837" r="14"/>
+<rect class="n-box" x="645.8" y="2090" width="285.6" height="68" rx="8"/>
+<text class="b-t" x="660.8" y="2117">Each pack resolves its own imports</text>
+<text class="b-s" x="660.8" y="2136">the one rule a pack cannot share</text>
+<circle class="hint" cx="916.4" cy="2105" r="6"/>
+<text class="hint-t" x="916.4" y="2108.5">i</text>
+<circle class="hint-h" cx="916.4" cy="2105" r="14"/>
 </a></g>
 <g class="blk" id="blk-noora"><a href="modules/parsing.html#noora">
 <title>src/lib/core/parsing/languages/swift/queries.ts — only typescript, tsx, javascript and python are checked against an external tool. The rest are known to PARSE and not known to capture the right things</title>
-<rect class="n-no" x="101.30000000000001" y="910" width="219" height="68" rx="8"/>
-<text class="b-t" x="116.30000000000001" y="937">Nine packs have no oracle</text>
-<text class="b-s" x="116.30000000000001" y="956">their queries are unmeasured</text>
-<circle class="hint" cx="305.3" cy="925" r="6"/>
-<text class="hint-t" x="305.3" y="928.5">i</text>
-<circle class="hint-h" cx="305.3" cy="925" r="14"/>
+<rect class="n-no" x="679.0999999999999" y="2178" width="219" height="68" rx="8"/>
+<text class="b-t" x="694.0999999999999" y="2205">Nine packs have no oracle</text>
+<text class="b-s" x="694.0999999999999" y="2224">their queries are unmeasured</text>
+<circle class="hint" cx="883.0999999999999" cy="2193" r="6"/>
+<text class="hint-t" x="883.0999999999999" y="2196.5">i</text>
+<circle class="hint-h" cx="883.0999999999999" cy="2193" r="14"/>
 </a></g>
 <g class="blk" id="blk-add"><a href="modules/graph.html#add">
 <title>src/lib/core/graph/adjacency-list.ts::addNode — treating them as two splits one symbol into two nodes, and every count then reports it twice (CONDUCKS-4)</title>
-<rect class="n-ok" x="427.26666666666665" y="1096" width="232" height="68" rx="8"/>
-<text class="b-t" x="442.26666666666665" y="1123">Every id is lowercased</text>
-<text class="b-s" x="442.26666666666665" y="1142">APFS calls two spellings one file</text>
-<circle class="hint" cx="644.2666666666667" cy="1111" r="6"/>
-<text class="hint-t" x="644.2666666666667" y="1114.5">i</text>
-<circle class="hint-h" cx="644.2666666666667" cy="1111" r="14"/>
+<rect class="n-ok" x="1005.0666666666667" y="2364" width="232" height="68" rx="8"/>
+<text class="b-t" x="1020.0666666666667" y="2391">Every id is lowercased</text>
+<text class="b-s" x="1020.0666666666667" y="2410">APFS calls two spellings one file</text>
+<circle class="hint" cx="1222.0666666666666" cy="2379" r="6"/>
+<text class="hint-t" x="1222.0666666666666" y="2382.5">i</text>
+<circle class="hint-h" cx="1222.0666666666666" cy="2379" r="14"/>
 </a></g>
 <g class="blk" id="blk-skel"><a href="modules/graph.html#skel">
 <title>src/lib/core/graph/adjacency-list.ts::addNode — a field not named in the skeleton is harvested correctly, carried through the worker correctly, and dropped at this boundary. `doc` and `instanceOf` each cost a debugging session before they were added</title>
-<rect class="n-warn" x="204.33333333333331" y="1184" width="233.8" height="68" rx="8"/>
-<text class="b-t" x="219.33333333333331" y="1211">A stored node is a SKELETON</text>
-<text class="b-s" x="219.33333333333331" y="1230">getNode and getNodesMap differ</text>
-<circle class="hint" cx="423.1333333333333" cy="1199" r="6"/>
-<text class="hint-t" x="423.1333333333333" y="1202.5">i</text>
-<circle class="hint-h" cx="423.1333333333333" cy="1199" r="14"/>
+<rect class="n-warn" x="782.1333333333333" y="2452" width="233.8" height="68" rx="8"/>
+<text class="b-t" x="797.1333333333333" y="2479">A stored node is a SKELETON</text>
+<text class="b-s" x="797.1333333333333" y="2498">getNode and getNodesMap differ</text>
+<circle class="hint" cx="1000.9333333333334" cy="2467" r="6"/>
+<text class="hint-t" x="1000.9333333333334" y="2470.5">i</text>
+<circle class="hint-h" cx="1000.9333333333334" cy="2467" r="14"/>
 </a></g>
 <g class="blk" id="blk-kind"><a href="modules/graph.html#kind">
 <title>src/contracts/taxonomy.ts::mapToCanonical — a declared rung nothing emits is not a reservation, it is a row that makes the table wrong (ADR 0100)</title>
-<rect class="n-box" x="476.1333333333333" y="1184" width="211.60000000000002" height="68" rx="8"/>
-<text class="b-t" x="491.1333333333333" y="1211">A capture becomes a rung</text>
-<text class="b-s" x="491.1333333333333" y="1230">BEHAVIOR, STRUCTURE, ATOM…</text>
-<circle class="hint" cx="672.7333333333333" cy="1199" r="6"/>
-<text class="hint-t" x="672.7333333333333" y="1202.5">i</text>
-<circle class="hint-h" cx="672.7333333333333" cy="1199" r="14"/>
+<rect class="n-box" x="1053.9333333333334" y="2452" width="211.60000000000002" height="68" rx="8"/>
+<text class="b-t" x="1068.9333333333334" y="2479">A capture becomes a rung</text>
+<text class="b-s" x="1068.9333333333334" y="2498">BEHAVIOR, STRUCTURE, ATOM…</text>
+<circle class="hint" cx="1250.5333333333333" cy="2467" r="6"/>
+<text class="hint-t" x="1250.5333333333333" y="2470.5">i</text>
+<circle class="hint-h" cx="1250.5333333333333" cy="2467" r="14"/>
 </a></g>
 <g class="blk" id="blk-intra"><a href="modules/graph.html#intra">
 <title>src/lib/core/graph/linker-intra.ts::IntraLinker — during streaming induction a call to a symbol in a later batch is stored with a bare target. This runs after the whole graph exists</title>
-<rect class="n-hi" x="476.93333333333334" y="1272" width="210" height="68" rx="8"/>
-<text class="b-t" x="491.93333333333334" y="1299">Bind the bare names</text>
-<text class="b-s" x="491.93333333333334" y="1318">once every file is known</text>
-<circle class="hint" cx="671.9333333333334" cy="1287" r="6"/>
-<text class="hint-t" x="671.9333333333334" y="1290.5">i</text>
-<circle class="hint-h" cx="671.9333333333334" cy="1287" r="14"/>
+<rect class="n-hi" x="1054.7333333333333" y="2540" width="210" height="68" rx="8"/>
+<text class="b-t" x="1069.7333333333333" y="2567">Bind the bare names</text>
+<text class="b-s" x="1069.7333333333333" y="2586">once every file is known</text>
+<circle class="hint" cx="1249.7333333333333" cy="2555" r="6"/>
+<text class="hint-t" x="1249.7333333333333" y="2558.5">i</text>
+<circle class="hint-h" cx="1249.7333333333333" cy="2555" r="14"/>
 </a></g>
 <g class="blk" id="blk-port"><a href="modules/graph.html#port">
 <title>src/lib/core/graph/linker-intra.ts::ResolveSpecifier — core/graph may not import core/parsing’s door without closing a cycle (rule 5b), so domain supplies the implementation. A default resolving nothing would be indistinguishable from a specifier that names nothing</title>
-<rect class="n-ok" x="472.43333333333334" y="1360" width="219" height="68" rx="8"/>
-<text class="b-t" x="487.43333333333334" y="1387">It REFUSES to guess alone</text>
-<text class="b-s" x="487.43333333333334" y="1406">the resolver is injected</text>
-<circle class="hint" cx="676.4333333333334" cy="1375" r="6"/>
-<text class="hint-t" x="676.4333333333334" y="1378.5">i</text>
-<circle class="hint-h" cx="676.4333333333334" cy="1375" r="14"/>
+<rect class="n-ok" x="1050.2333333333333" y="2628" width="219" height="68" rx="8"/>
+<text class="b-t" x="1065.2333333333333" y="2655">It REFUSES to guess alone</text>
+<text class="b-s" x="1065.2333333333333" y="2674">the resolver is injected</text>
+<circle class="hint" cx="1254.2333333333333" cy="2643" r="6"/>
+<text class="hint-t" x="1254.2333333333333" y="2646.5">i</text>
+<circle class="hint-h" cx="1254.2333333333333" cy="2643" r="14"/>
 </a></g>
 <g class="blk" id="blk-fam"><a href="modules/graph.html#fam">
 <title>src/lib/core/graph/import-resolver.ts::sameFamily — a single-candidate match across languages cannot be told from a correct one downstream. It fails OPEN on an unknown extension, so a new language is not silently refused</title>
-<rect class="n-box" x="465.03333333333336" y="1448" width="233.8" height="68" rx="8"/>
-<text class="b-t" x="480.03333333333336" y="1475">Never bind across languages</text>
-<text class="b-s" x="480.03333333333336" y="1494">the most confident wrong answer</text>
-<circle class="hint" cx="683.8333333333334" cy="1463" r="6"/>
-<text class="hint-t" x="683.8333333333334" y="1466.5">i</text>
-<circle class="hint-h" cx="683.8333333333334" cy="1463" r="14"/>
+<rect class="n-box" x="1042.8333333333335" y="2716" width="233.8" height="68" rx="8"/>
+<text class="b-t" x="1057.8333333333335" y="2743">Never bind across languages</text>
+<text class="b-s" x="1057.8333333333335" y="2762">the most confident wrong answer</text>
+<circle class="hint" cx="1261.6333333333334" cy="2731" r="6"/>
+<text class="hint-t" x="1261.6333333333334" y="2734.5">i</text>
+<circle class="hint-h" cx="1261.6333333333334" cy="2731" r="14"/>
 </a></g>
 <g class="blk" id="blk-save"><a href="modules/persistence.html#save">
 <title>src/lib/core/persistence/persistence.ts::SynapsePersistence — it writes metadata and the pulses row. Nodes and edges go through saveNodes and saveEdges, so the watcher’s &quot;persisting structural delta&quot; was a no-op for as long as that line existed</title>
-<rect class="n-warn" x="345.53333333333336" y="1634" width="226.4" height="68" rx="8"/>
-<text class="b-t" x="360.53333333333336" y="1661">save() writes NO structure</text>
-<text class="b-s" x="360.53333333333336" y="1680">and the call succeeds</text>
-<circle class="hint" cx="556.9333333333334" cy="1649" r="6"/>
-<text class="hint-t" x="556.9333333333334" y="1652.5">i</text>
-<circle class="hint-h" cx="556.9333333333334" cy="1649" r="14"/>
+<rect class="n-warn" x="923.3333333333334" y="2902" width="226.4" height="68" rx="8"/>
+<text class="b-t" x="938.3333333333334" y="2929">save() writes NO structure</text>
+<text class="b-s" x="938.3333333333334" y="2948">and the call succeeds</text>
+<circle class="hint" cx="1134.7333333333333" cy="2917" r="6"/>
+<text class="hint-t" x="1134.7333333333333" y="2920.5">i</text>
+<circle class="hint-h" cx="1134.7333333333333" cy="2917" r="14"/>
 </a></g>
 <g class="blk" id="blk-nodes"><a href="modules/persistence.html#nodes">
 <title>src/lib/core/persistence/persistence.ts::saveNodes</title>
-<rect class="n-box" x="373.40000000000003" y="1722" width="256" height="68" rx="8"/>
-<text class="b-t" x="388.40000000000003" y="1749">saveNodes is what stores them</text>
-<text class="b-s" x="388.40000000000003" y="1768">batched, inside the pulse transaction</text>
-<circle class="hint" cx="614.4000000000001" cy="1737" r="6"/>
-<text class="hint-t" x="614.4000000000001" y="1740.5">i</text>
-<circle class="hint-h" cx="614.4000000000001" cy="1737" r="14"/>
+<rect class="n-box" x="989.0666666666667" y="2990" width="256" height="68" rx="8"/>
+<text class="b-t" x="1004.0666666666667" y="3017">saveNodes is what stores them</text>
+<text class="b-s" x="1004.0666666666667" y="3036">batched, inside the pulse transaction</text>
+<circle class="hint" cx="1230.0666666666666" cy="3005" r="6"/>
+<text class="hint-t" x="1230.0666666666666" y="3008.5">i</text>
+<circle class="hint-h" cx="1230.0666666666666" cy="3005" r="14"/>
 </a></g>
 <g class="blk" id="blk-purge"><a href="modules/persistence.html#purge">
 <title>src/lib/core/persistence/persistence.ts::purgeUnits — matching on unitId alone left every unit row behind, and analyze then found the same units &quot;no longer discoverable&quot; on EVERY pulse</title>
-<rect class="n-box" x="354.90000000000003" y="1810" width="293" height="68" rx="8"/>
-<text class="b-t" x="369.90000000000003" y="1837">Purge a unit, not just its children</text>
-<text class="b-s" x="369.90000000000003" y="1856">or reconcile churns forever</text>
-<circle class="hint" cx="632.9000000000001" cy="1825" r="6"/>
-<text class="hint-t" x="632.9000000000001" y="1828.5">i</text>
-<circle class="hint-h" cx="632.9000000000001" cy="1825" r="14"/>
+<rect class="n-box" x="1013.2333333333333" y="3078" width="293" height="68" rx="8"/>
+<text class="b-t" x="1028.2333333333333" y="3105">Purge a unit, not just its children</text>
+<text class="b-s" x="1028.2333333333333" y="3124">or reconcile churns forever</text>
+<circle class="hint" cx="1291.2333333333333" cy="3093" r="6"/>
+<text class="hint-t" x="1291.2333333333333" y="3096.5">i</text>
+<circle class="hint-h" cx="1291.2333333333333" cy="3093" r="14"/>
 </a></g>
 <g class="blk" id="blk-fresh"><a href="modules/persistence.html#fresh">
 <title>src/lib/core/persistence/freshness.ts::classifyFreshness — this classification used to live inline in the monitor and the watcher had no way to ask for it, so a watcher started after edits was blind to every one of them</title>
-<rect class="n-box" x="379.40000000000003" y="1898" width="244" height="68" rx="8"/>
-<text class="b-t" x="394.40000000000003" y="1925">What changed since last time</text>
-<text class="b-s" x="394.40000000000003" y="1944">the shared answer, not a second one</text>
-<circle class="hint" cx="608.4000000000001" cy="1913" r="6"/>
-<text class="hint-t" x="608.4000000000001" y="1916.5">i</text>
-<circle class="hint-h" cx="608.4000000000001" cy="1913" r="14"/>
+<rect class="n-box" x="1037.7333333333333" y="3166" width="244" height="68" rx="8"/>
+<text class="b-t" x="1052.7333333333333" y="3193">What changed since last time</text>
+<text class="b-s" x="1052.7333333333333" y="3212">the shared answer, not a second one</text>
+<circle class="hint" cx="1266.7333333333333" cy="3181" r="6"/>
+<text class="hint-t" x="1266.7333333333333" y="3184.5">i</text>
+<circle class="hint-h" cx="1266.7333333333333" cy="3181" r="14"/>
+</a></g>
+<g class="blk" id="blk-argv"><a href="modules/cli.html#argv">
+<title>src/interfaces/cli/index.ts::main — 42 commands, each a ConducksCommand found by id</title>
+<rect class="n-box" x="543.2666666666668" y="273" width="210" height="68" rx="8"/>
+<text class="b-t" x="558.2666666666668" y="300">A command word</text>
+<text class="b-s" x="558.2666666666668" y="319">conducks &lt;id&gt; [args]</text>
+<circle class="hint" cx="738.2666666666668" cy="288" r="6"/>
+<text class="hint-t" x="738.2666666666668" y="291.5">i</text>
+<circle class="hint-h" cx="738.2666666666668" cy="288" r="14"/>
+</a></g>
+<g class="blk" id="blk-iface"><a href="modules/cli.html#iface">
+<title>src/interfaces/cli/command.ts::ConducksCommand — `link` was imported and never instantiated, so the command answered &quot;Unknown command&quot; while FederatedLinker underneath worked fine. The import satisfied the compiler and no test drove the surface</title>
+<rect class="n-warn" x="1035.6666666666667" y="381" width="220" height="68" rx="8"/>
+<text class="b-t" x="1050.6666666666667" y="408">One contract per command</text>
+<text class="b-s" x="1050.6666666666667" y="427">id, description, usage, execute</text>
+<circle class="hint" cx="1240.6666666666667" cy="396" r="6"/>
+<text class="hint-t" x="1240.6666666666667" y="399.5">i</text>
+<circle class="hint-h" cx="1240.6666666666667" cy="396" r="14"/>
+</a></g>
+<g class="blk" id="blk-help"><a href="modules/cli.html#help">
+<title>src/interfaces/cli/index.ts::main — every arg parser skips unknown flags, so `query --help` fell through as an empty query, which is read as `*` and printed the whole inventory. Handled in the dispatcher because the defect was per command and the fix should not be written 39 times (ADR 0111)</title>
+<rect class="n-ok" x="464.66666666666674" y="381" width="241.20000000000002" height="68" rx="8"/>
+<text class="b-t" x="479.66666666666674" y="408">--help is answered CENTRALLY</text>
+<text class="b-s" x="479.66666666666674" y="427">before the command runs</text>
+<circle class="hint" cx="690.8666666666668" cy="396" r="6"/>
+<text class="hint-t" x="690.8666666666668" y="399.5">i</text>
+<circle class="hint-h" cx="690.8666666666668" cy="396" r="14"/>
+</a></g>
+<g class="blk" id="blk-quiet"><a href="modules/cli.html#quiet">
+<title>src/lib/core/utils/logger.ts::setProcessQuiet — five boot lines used to precede every answer. Quiet is process-wide but the SETTER is not a method, so the reach is visible at the call site (ADR 0080)</title>
+<rect class="n-box" x="743.8666666666668" y="381" width="270.8" height="68" rx="8"/>
+<text class="b-t" x="758.8666666666668" y="408">A read command says nothing else</text>
+<text class="b-s" x="758.8666666666668" y="427">narration is off unless asked</text>
+<circle class="hint" cx="999.6666666666667" cy="396" r="6"/>
+<text class="hint-t" x="999.6666666666667" y="399.5">i</text>
+<circle class="hint-h" cx="999.6666666666667" cy="396" r="14"/>
+</a></g>
+<g class="blk" id="blk-anch"><a href="modules/mcp.html#anch">
+<title>src/interfaces/tools/shared/anchor.ts::ensureAnchor — a globally installed server boots detached, so the whole surface was unusable for any project but one until the anchor was re-resolved per call</title>
+<rect class="n-hi" x="79" y="205" width="256" height="68" rx="8"/>
+<text class="b-t" x="94" y="232">Anchor to the caller’s project</text>
+<text class="b-s" x="94" y="251">not to wherever the server booted</text>
+<circle class="hint" cx="320" cy="220" r="6"/>
+<text class="hint-t" x="320" y="223.5">i</text>
+<circle class="hint-h" cx="320" cy="220" r="14"/>
+</a></g>
+<g class="blk" id="blk-hold"><a href="modules/mcp.html#hold">
+<title>src/registry/index.ts::acquireVault — three independent closers ran in a single tool call and whichever finished first hung up the handle; the others got `Database was already closed` (ADR 0146)</title>
+<rect class="n-ok" x="124.66666666666666" y="293" width="250" height="68" rx="8"/>
+<text class="b-t" x="139.66666666666666" y="320">Take a hold on the vault</text>
+<text class="b-s" x="139.66666666666666" y="339">closed when the LAST holder releases</text>
+<circle class="hint" cx="359.66666666666663" cy="308" r="6"/>
+<text class="hint-t" x="359.66666666666663" y="311.5">i</text>
+<circle class="hint-h" cx="359.66666666666663" cy="308" r="14"/>
+</a></g>
+<g class="blk" id="blk-stdio"><a href="modules/mcp.html#stdio">
+<title>src/interfaces/tools/tools/synapse.ts — a stray stdout write is not a log here, it is a malformed JSON-RPC frame</title>
+<rect class="n-box" x="144.66666666666666" y="381" width="210" height="68" rx="8"/>
+<text class="b-t" x="159.66666666666666" y="408">stdout is the protocol</text>
+<text class="b-s" x="159.66666666666666" y="427">so every log goes to stderr</text>
+<circle class="hint" cx="339.66666666666663" cy="396" r="6"/>
+<text class="hint-t" x="339.66666666666663" y="399.5">i</text>
+<circle class="hint-h" cx="339.66666666666663" cy="396" r="14"/>
+</a></g>
+<g class="blk" id="blk-one"><a href="modules/reg.html#one">
+<title>src/registry/index.ts — the CLI may not import core (ADR 0005), so composition carries every edge the interfaces need</title>
+<rect class="n-box" x="960.0666666666668" y="597" width="232" height="68" rx="8"/>
+<text class="b-t" x="975.0666666666668" y="624">One wiring point</text>
+<text class="b-s" x="975.0666666666668" y="643">both surfaces get the same object</text>
+<circle class="hint" cx="1177.0666666666668" cy="612" r="6"/>
+<text class="hint-t" x="1177.0666666666668" y="615.5">i</text>
+<circle class="hint-h" cx="1177.0666666666668" cy="612" r="14"/>
+</a></g>
+<g class="blk" id="blk-defer"><a href="modules/reg.html#defer">
+<title>src/lib/core/bootstrap/registry-bootstrapper.ts — a read-only caller frequently walks no node at all</title>
+<rect class="n-box" x="1011.6666666666667" y="705" width="268" height="74" rx="26"/>
+<text class="b-t" x="1026.6666666666667" y="732">The graph load is DEFERRED</text>
+<text class="b-s" x="1026.6666666666667" y="751">165 MB and 146 ms a reader may not need</text>
+<circle class="hint" cx="1264.6666666666667" cy="720" r="6"/>
+<text class="hint-t" x="1264.6666666666667" y="723.5">i</text>
+<circle class="hint-h" cx="1264.6666666666667" cy="720" r="14"/>
+</a></g>
+<g class="blk" id="blk-guard"><a href="modules/reg.html#guard">
+<title>src/registry/index.ts — four of six MCP tools broke this way and three broke silently: zero nodes, zero flows, symbol-not-found, no error anywhere. The getter turns forgetting into a loud failure at the call site rather than a wrong answer downstream (CONDUCKS-13)</title>
+<rect class="n-ok" x="995.4666666666667" y="799" width="300.40000000000003" height="68" rx="8"/>
+<text class="b-t" x="1010.4666666666667" y="826">A deferred graph would read as EMPTY</text>
+<text class="b-s" x="1010.4666666666667" y="845">so asking for it THROWS instead</text>
+<circle class="hint" cx="1280.8666666666668" cy="814" r="6"/>
+<text class="hint-t" x="1280.8666666666668" y="817.5">i</text>
+<circle class="hint-h" cx="1280.8666666666668" cy="814" r="14"/>
+</a></g>
+<g class="blk" id="blk-ro"><a href="modules/reg.html#ro">
+<title>src/lib/core/persistence/persistence.ts::run — a silent no-op here would be the same defect as `save()` writing no structure: a call that succeeds and stores nothing</title>
+<rect class="n-box" x="725.0666666666667" y="705" width="248.60000000000002" height="68" rx="8"/>
+<text class="b-t" x="740.0666666666667" y="732">A read handle REFUSES a write</text>
+<text class="b-s" x="740.0666666666667" y="751">it does not drop it quietly</text>
+<circle class="hint" cx="958.6666666666667" cy="720" r="6"/>
+<text class="hint-t" x="958.6666666666667" y="723.5">i</text>
+<circle class="hint-h" cx="958.6666666666667" cy="720" r="14"/>
+</a></g>
+<g class="blk" id="blk-sql"><a href="modules/answer.html#sql">
+<title>src/lib/core/persistence/persistence.ts::query — this is why the load is deferred, and a command that answers from SQL must NOT materialise the graph</title>
+<rect class="n-box" x="460.26666666666677" y="985" width="210" height="68" rx="8"/>
+<text class="b-t" x="475.26666666666677" y="1012">Ask the vault</text>
+<text class="b-s" x="475.26666666666677" y="1031">no graph load at all</text>
+<circle class="hint" cx="655.2666666666668" cy="1000" r="6"/>
+<text class="hint-t" x="655.2666666666668" y="1003.5">i</text>
+<circle class="hint-h" cx="655.2666666666668" cy="1000" r="14"/>
+</a></g>
+<g class="blk" id="blk-filt"><a href="modules/answer.html#filt">
+<title>src/lib/domain/analysis/filter-builder.ts::buildFilterQuery — values are always bound with `?`, so an operator of &quot;; DELETE&quot; fails the allowlist check rather than reaching a query string</title>
+<rect class="n-ok" x="393.26666666666677" y="1083" width="274" height="68" rx="8"/>
+<text class="b-t" x="408.26666666666677" y="1110">A typed filter, never a string</text>
+<text class="b-s" x="408.26666666666677" y="1129">field and operator from fixed allowlists</text>
+<circle class="hint" cx="652.2666666666668" cy="1098" r="6"/>
+<text class="hint-t" x="652.2666666666668" y="1101.5">i</text>
+<circle class="hint-h" cx="652.2666666666668" cy="1098" r="14"/>
+</a></g>
+<g class="blk" id="blk-walk"><a href="modules/answer.html#walk">
+<title>src/lib/core/graph/algorithms/traversal.ts::traverseUpstream — bounded by maxDepth AND a visited set: the first stops the walk, the second is what keeps the ANSWER right when two paths reach one node</title>
+<rect class="n-box" x="1040.6666666666667" y="985" width="210" height="68" rx="8"/>
+<text class="b-t" x="1055.6666666666667" y="1012">Or walk the graph</text>
+<text class="b-s" x="1055.6666666666667" y="1031">impact, trace, flows</text>
+<circle class="hint" cx="1235.6666666666667" cy="1000" r="6"/>
+<text class="hint-t" x="1235.6666666666667" y="1003.5">i</text>
+<circle class="hint-h" cx="1235.6666666666667" cy="1000" r="14"/>
+</a></g>
+<g class="blk" id="blk-gov"><a href="modules/answer.html#gov">
+<title>src/lib/domain/governance/index.ts</title>
+<rect class="n-box" x="763.2666666666668" y="985" width="210" height="68" rx="8"/>
+<text class="b-t" x="778.2666666666668" y="1012">Or ask governance</text>
+<text class="b-s" x="778.2666666666668" y="1031">audit, arch, drift, status</text>
+<circle class="hint" cx="958.2666666666668" cy="1000" r="6"/>
+<text class="hint-t" x="958.2666666666668" y="1003.5">i</text>
+<circle class="hint-h" cx="958.2666666666668" cy="1000" r="14"/>
+</a></g>
+<g class="blk" id="blk-stale"><a href="modules/answer.html#stale">
+<title>src/interfaces/cli/shared/stale-warning.ts::warnIfStale — an answer about a tree nobody has checked out is worse than no answer, because it looks like one</title>
+<rect class="n-hi" x="999.2666666666668" y="1083" width="244" height="68" rx="8"/>
+<text class="b-t" x="1014.2666666666668" y="1110">And say when it is BEHIND</text>
+<text class="b-s" x="1014.2666666666668" y="1129">the answer describes the last pulse</text>
+<circle class="hint" cx="1228.2666666666669" cy="1098" r="6"/>
+<text class="hint-t" x="1228.2666666666669" y="1101.5">i</text>
+<circle class="hint-h" cx="1228.2666666666669" cy="1098" r="14"/>
+</a></g>
+<g class="blk" id="blk-unaud"><a href="modules/answer.html#unaud">
+<title>src/lib/domain/analysis/project-monitor.ts::ProjectMonitor — core was declared clean and two dead subsystems were found in it afterwards. These three layers have not had that pass, so nothing here claims they are cleaner</title>
+<rect class="n-no" x="705.2666666666668" y="1083" width="256" height="68" rx="8"/>
+<text class="b-t" x="720.2666666666668" y="1110">domain · interfaces · registry</text>
+<text class="b-s" x="720.2666666666668" y="1129">no structural pass yet</text>
+<circle class="hint" cx="946.2666666666668" cy="1098" r="6"/>
+<text class="hint-t" x="946.2666666666668" y="1101.5">i</text>
+<circle class="hint-h" cx="946.2666666666668" cy="1098" r="14"/>
 </a></g>
 </g>
 </svg>
@@ -363,26 +644,38 @@ block to trace its wiring, double-click or use the <b>i</b> to open its page.</p
 <div class="wrap">
 
 <h2 id="scope">What this band does NOT show</h2>
-<p>A boundary is not completeness (<a href="rules.md">rules.md</a> §11). Band 1 draws the write path
-through the four core features it crosses. It does not show:</p>
+<p>A boundary is not completeness (<a href="rules.md">rules.md</a> §11 — the standard, which lives in the skill). These two bands draw the
+write path and the read path. They do not show:</p>
 <ul>
-  <li><b>The 35 read commands.</b> Every one of them reads what this band produced —
-    <code>query</code>, <code>impact</code>, <code>trace</code>, <code>audit</code>, <code>prune</code>
-    — and none is drawn here. That is a future band, not an omission of this one.</li>
-  <li><b>The MCP surface.</b> Fourteen tools sit beside the CLI over the same registry.</li>
-  <li><b>The other five core features.</b> <code>contracts</code>, <code>utils</code>,
-    <code>algorithms</code>, <code>registry</code> and <code>bootstrap</code> are crossed by this
-    path but are not stages in it; each has a module note instead.</li>
-  <li><b>The watcher.</b> An incremental pulse re-enters this band mid-way rather than at the top,
-    and drawing that edge honestly needs the read band to exist first.</li>
+  <li><b>Each of the 42 commands individually.</b> Band 2 draws the dispatcher, the contract they all
+    implement, and the two places an answer can come from. It does not draw 42 boxes — that would be
+    a folder tree, not a journey.</li>
+  <li><b>The watcher.</b> An incremental pulse re-enters Band 1 mid-way rather than at the top, and
+    the edge that says so belongs to a band about evolution over time.</li>
+  <li><b>Federation.</b> Cross-repository linking exists and is reached from
+    <code>conducks link</code>; no band crosses it yet.</li>
+  <li><b>The five core features these paths cross without stopping at.</b> <code>contracts</code>,
+    <code>utils</code>, <code>algorithms</code>, <code>registry</code> and <code>bootstrap</code> each
+    have a module note instead of a container.</li>
 </ul>
+<p class="elsewhere"><b>Band 2 crosses three unaudited layers.</b> <code>domain</code>,
+<code>interfaces</code> and <code>registry</code> have not had the structural pass core got. The PATH
+drawn here was read file by file; the layers behind it were not swept. Core was declared clean and
+two dead subsystems were found in it afterwards, so nothing on this band claims those three are
+cleaner — the <code>n-no</code> block in the answer container says so on the canvas itself.</p>
 
 <h2 id="readlog">Read log</h2>
 <p>Every block on this canvas was written from a file opened during the ADR 0150 core campaign, not
 from memory — the rule that produced five corrected claims on the repo this standard came from. The
 derived list below is generated from the anchors themselves.</p>
-<p>Read at <code>d184968</code> — the campaign's own log, <code>docs/deep_clean.md</code>, records
-what was measured at each step and what each measurement cost.</p>
+<p><b>Band 1</b> read at <code>d184968</code> — every block came from a file opened during the
+ADR 0150 core campaign, whose log <code>docs/deep_clean.md</code> records what was measured at each
+step and what each measurement cost.</p>
+<p><b>Band 2</b> read at <code>45a65be</code> — the dispatcher and its command contract
+(<code>interfaces/cli</code>), the MCP anchor and vault hold (<code>interfaces/tools/shared</code>),
+the composition root and its deferred-graph guard (<code>src/registry</code>), the filter builder and
+the staleness warning. Read for this band specifically, not recalled from the core sweep, because
+none of those three layers was in it.</p>
 
 <footer>
   A visual is traced at a moment and starts rotting immediately. Anchors are checked by

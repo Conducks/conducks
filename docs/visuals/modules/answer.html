@@ -1,0 +1,80 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the answer</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE ANSWER</h1>
+<p class="sub">SQL or a walk — the choice is the design</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="sql">
+  <h3>Ask the vault</h3>
+  <div class="where">src/lib/core/persistence/persistence.ts::query</div>
+  <p>this is why the load is deferred, and a command that answers from SQL must NOT materialise the graph</p>
+  <p class="file">on the canvas: no graph load at all</p>
+</div>
+
+<div class="det" id="filt">
+  <h3>A typed filter, never a string</h3>
+  <div class="where">src/lib/domain/analysis/filter-builder.ts::buildFilterQuery</div>
+  <p>values are always bound with `?`, so an operator of "; DELETE" fails the allowlist check rather than reaching a query string</p>
+  <p class="file">on the canvas: field and operator from fixed allowlists</p>
+</div>
+
+<div class="det" id="walk">
+  <h3>Or walk the graph</h3>
+  <div class="where">src/lib/core/graph/algorithms/traversal.ts::traverseUpstream</div>
+  <p>bounded by maxDepth AND a visited set: the first stops the walk, the second is what keeps the ANSWER right when two paths reach one node</p>
+  <p class="file">on the canvas: impact, trace, flows</p>
+</div>
+
+<div class="det" id="gov">
+  <h3>Or ask governance</h3>
+  <div class="where">src/lib/domain/governance/index.ts</div>
+  <p class="file">on the canvas: audit, arch, drift, status</p>
+</div>
+
+<div class="det" id="stale">
+  <h3>And say when it is BEHIND</h3>
+  <div class="where">src/interfaces/cli/shared/stale-warning.ts::warnIfStale</div>
+  <p>an answer about a tree nobody has checked out is worse than no answer, because it looks like one</p>
+  <p class="file">on the canvas: the answer describes the last pulse</p>
+</div>
+
+<div class="det" id="unaud">
+  <h3>domain · interfaces · registry</h3>
+  <div class="where">src/lib/domain/analysis/project-monitor.ts::ProjectMonitor</div>
+  <p>core was declared clean and two dead subsystems were found in it afterwards. These three layers have not had that pass, so nothing here claims they are cleaner</p>
+  <p class="file">on the canvas: no structural pass yet</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>Ask the vault</td><td>A typed filter, never a string</td><td>—</td></tr>
+    <tr><td>Ask the vault</td><td>And say when it is BEHIND</td><td>—</td></tr>
+    <tr><td>Or walk the graph</td><td>And say when it is BEHIND</td><td>—</td></tr>
+    <tr><td>Or ask governance</td><td>And say when it is BEHIND</td><td>—</td></tr>
+    <tr><td>Or ask governance</td><td>domain · interfaces · registry</td><td>—</td></tr>
+  </tbody>
+</table>
+<h2>Module notes</h2>
+<p class="sub">the authored memory of the modules this block cites — derived from the anchors above, not curated</p>
+<p>
+  <a href="interfaces/cli.html"><code>interfaces/cli</code></a>
+</p>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

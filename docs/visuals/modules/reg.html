@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the registry</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE REGISTRY</h1>
+<p class="sub">src/registry — composition, and the guard that made a silent failure loud</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="one">
+  <h3>One wiring point</h3>
+  <div class="where">src/registry/index.ts</div>
+  <p>the CLI may not import core (ADR 0005), so composition carries every edge the interfaces need</p>
+  <p class="file">on the canvas: both surfaces get the same object</p>
+</div>
+
+<div class="det" id="defer">
+  <h3>The graph load is DEFERRED</h3>
+  <div class="where">src/lib/core/bootstrap/registry-bootstrapper.ts</div>
+  <p>a read-only caller frequently walks no node at all</p>
+  <p class="file">on the canvas: 165 MB and 146 ms a reader may not need</p>
+</div>
+
+<div class="det" id="guard">
+  <h3>A deferred graph would read as EMPTY</h3>
+  <div class="where">src/registry/index.ts</div>
+  <p>four of six MCP tools broke this way and three broke silently: zero nodes, zero flows, symbol-not-found, no error anywhere. The getter turns forgetting into a loud failure at the call site rather than a wrong answer downstream (CONDUCKS-13)</p>
+  <p class="file">on the canvas: so asking for it THROWS instead</p>
+</div>
+
+<div class="det" id="ro">
+  <h3>A read handle REFUSES a write</h3>
+  <div class="where">src/lib/core/persistence/persistence.ts::run</div>
+  <p>a silent no-op here would be the same defect as `save()` writing no structure: a call that succeeds and stores nothing</p>
+  <p class="file">on the canvas: it does not drop it quietly</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>One wiring point</td><td>The graph load is DEFERRED</td><td>—</td></tr>
+    <tr><td>The graph load is DEFERRED</td><td>A deferred graph would read as EMPTY</td><td>something walks the graph</td></tr>
+    <tr><td>One wiring point</td><td>A read handle REFUSES a write</td><td>—</td></tr>
+  </tbody>
+</table>
+<h2>Module notes</h2>
+<p class="sub">the authored memory of the modules this block cites — derived from the anchors above, not curated</p>
+<p>
+  <a href="registry.html"><code>registry</code></a>
+</p>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

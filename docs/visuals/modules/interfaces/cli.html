@@ -21,5 +21,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Judge capability, not parameter lists.</b> The first audit compared <code>inputSchema</code> properties against <code>usage</code> strings and reported <code>audit</code> as missing four modes; every one already had a CLI home under a different command name (<code>conducks advise</code>, <code>conducks guard</code>). One surface grouping five things under one tool while this one spreads them across three commands is a layout difference, not drift.</p>
 <h2>Output is a product surface</h2>
 <p>These commands are the primary way a human or an agent meets conducks, so a false finding is more expensive here than a missing one. Two habits follow: a finding that cannot be trusted should not be printed at all (see evolution's STALE_IMPORT), and any command that reports structure should be run against a <b>fresh</b> graph before its numbers are quoted, because <code>analyze</code> is incremental and stale results look identical to real ones.</p>
+<h2>On the canvas</h2>
+<p>cited by <a href="../cli.html">THE CLI</a> · <a href="../answer.html">THE ANSWER</a> — derived from the block anchors, not curated</p>
 <footer>Source: <code>docs/visuals/modules/interfaces/cli.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

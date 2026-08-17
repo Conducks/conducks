@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the mcp surface</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE MCP SURFACE</h1>
+<p class="sub">interfaces/tools — the same answers, over stdio</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="anch">
+  <h3>Anchor to the caller’s project</h3>
+  <div class="where">src/interfaces/tools/shared/anchor.ts::ensureAnchor</div>
+  <p>a globally installed server boots detached, so the whole surface was unusable for any project but one until the anchor was re-resolved per call</p>
+  <p class="file">on the canvas: not to wherever the server booted</p>
+</div>
+
+<div class="det" id="hold">
+  <h3>Take a hold on the vault</h3>
+  <div class="where">src/registry/index.ts::acquireVault</div>
+  <p>three independent closers ran in a single tool call and whichever finished first hung up the handle; the others got `Database was already closed` (ADR 0146)</p>
+  <p class="file">on the canvas: closed when the LAST holder releases</p>
+</div>
+
+<div class="det" id="stdio">
+  <h3>stdout is the protocol</h3>
+  <div class="where">src/interfaces/tools/tools/synapse.ts</div>
+  <p>a stray stdout write is not a log here, it is a malformed JSON-RPC frame</p>
+  <p class="file">on the canvas: so every log goes to stderr</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>Anchor to the caller’s project</td><td>Take a hold on the vault</td><td>—</td></tr>
+    <tr><td>Take a hold on the vault</td><td>stdout is the protocol</td><td>—</td></tr>
+  </tbody>
+</table>
+<h2>Module notes</h2>
+<p class="sub">the authored memory of the modules this block cites — derived from the anchors above, not curated</p>
+<p>
+  <a href="interfaces/tools.html"><code>interfaces/tools</code></a>
+  <a href="registry.html"><code>registry</code></a>
+</p>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>
