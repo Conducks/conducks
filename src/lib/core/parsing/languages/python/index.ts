@@ -2,7 +2,6 @@ import { NativeProvider, ImportSemantics } from "@/lib/core/parsing/providers/ba
 import { ILanguagePlugin } from "@/lib/core/parsing/language-plugin.js";
 import { PYTHON_QUERIES } from "./queries.js";
 import { PythonResolver } from "./resolver.js";
-import { PythonBindings } from "./bindings.js";
 import { PythonExtractor } from "./extractor.js";
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 
@@ -19,7 +18,6 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
   public readonly importSemantics: ImportSemantics = 'namespace';
 
   private resolver = new PythonResolver();
-  private bindings = new PythonBindings();
   private extractor = new PythonExtractor();
 
   public readonly queryScm = PYTHON_QUERIES;
@@ -40,15 +38,6 @@ export class PythonProvider extends NativeProvider implements ILanguagePlugin {
    */
   public isBoundaryModule(specifier: string): boolean {
     return this.resolver.isStdlib(specifier);
-  }
-
-  /**
-   * Extracts Python-specific named bindings for aliased imports.
-   */
-  /** The names an import statement binds locally, which is what makes a call resolvable. */
-  public extractNamedBindings(node: any): Array<{ name: string; alias?: string }> {
-    const extracted = this.bindings.extract(node);
-    return extracted.map(b => ({ name: b.exported, alias: b.local }));
   }
 
   /**

@@ -56,7 +56,6 @@ export interface ILanguagePlugin {
    * Extracts named import/export bindings with optional aliases.
    * Implemented by: TypeScript, Python, Go.
    */
-  extractNamedBindings?(node: any): Array<{ name: string; alias?: string; from?: string }>;
 
   /**
    * Normalizes class heritage names (e.g. Python MRO, Go embedding).

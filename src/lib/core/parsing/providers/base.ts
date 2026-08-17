@@ -45,7 +45,6 @@ export interface ConducksProvider {
    * Optional extractor for language-specific named bindings.
    * Transforms raw import nodes into a list of name/alias pairs.
    */
-  extractNamedBindings?(node: any): Array<{ name: string; alias?: string }>;
 
   /**
    * Optional language-specific complexity calculation (branch count/cyclomatic).

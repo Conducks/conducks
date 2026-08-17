@@ -65,14 +65,6 @@ export class GoProvider extends NativeProvider implements ILanguagePlugin {
   }
 
   /**
-   * Extracts Go-specific named bindings from short assignments (:=).
-   */
-  /** The names an import statement binds locally, which is what makes a call resolvable. */
-  public extractNamedBindings(node: any): Array<{ name: string, alias?: string }> {
-    return this.extractor.extractShortBindings(node);
-  }
-
-  /**
    * Identifies Go standard library packages.
    */
   public override isBuiltIn(name: string): boolean {

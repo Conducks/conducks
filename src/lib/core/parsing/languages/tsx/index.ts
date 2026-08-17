@@ -3,7 +3,6 @@ import { ILanguagePlugin } from "@/lib/core/parsing/language-plugin.js";
 import { TSX_QUERIES } from "./queries.js";
 import { TypeScriptResolver } from "../typescript/resolver.js";
 import { TypeScriptExtractor } from "../typescript/extractor.js";
-import { TypeScriptBindings } from "../typescript/bindings.js";
 
 /**
  * Conducks — TSX Language Provider 🏺 🟦
@@ -21,7 +20,6 @@ export class TSXProvider extends NativeProvider implements ILanguagePlugin {
 
   private resolver = new TypeScriptResolver();
   private extractor = new TypeScriptExtractor();
-  private bindings = new TypeScriptBindings();
 
   public readonly queryScm = TSX_QUERIES;
 
@@ -48,11 +46,5 @@ export class TSXProvider extends NativeProvider implements ILanguagePlugin {
   /** Public, private or protected, from whatever this language spells it with. */
   public getVisibility(node: any): 'public' | 'private' | 'protected' {
     return this.extractor.getVisibility(node);
-  }
-
-  /** The names an import statement binds locally, which is what makes a call resolvable. */
-  public extractNamedBindings(node: any): Array<{ name: string; alias?: string; from?: string }> {
-    const raw = this.bindings.extract(node);
-    return raw.map(b => ({ name: b.exported, alias: b.local === b.exported ? undefined : b.local, from: (b as any).from }));
   }
 }

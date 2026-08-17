@@ -110,45 +110,4 @@ export class GoExtractor {
     }
     return '';
   }
-
-  /** Go's `:=` declarations, which bind a name without any keyword a query could anchor on. */
-  public extractShortBindings(node: any): Array<{ name: string; alias?: string }> {
-    const bindings: Array<{ name: string; alias?: string }> = [];
-    
-    // 1. := and =
-    if (node.type === 'short_variable_declaration' || node.type === 'assignment_statement') {
-      const left = node.childByFieldName('left');
-      if (left) {
-        // The left side of a short declaration may bind several names, nested arbitrarily.
-        const findIdentifiers = (n: any) => {
-          if (!n) return;
-          if (n.type === 'identifier') {
-            bindings.push({ name: n.text });
-          }
-          for (let i = 0; i < n.childCount; i++) {
-            findIdentifiers(n.child(i));
-          }
-        };
-        findIdentifiers(left);
-      }
-    }
-
-    // 2. Keyed composite literals: User{Name: "Said"}
-    if (node.type === 'composite_literal') {
-      const body = node.childByFieldName('body');
-      if (body) {
-        for (let i = 0; i < body.childCount; i++) {
-          const child = body.child(i);
-          if (child.type === 'keyed_element') {
-            const key = child.childByFieldName('key');
-            if (key) {
-              bindings.push({ name: key.text });
-            }
-          }
-        }
-      }
-    }
-
-    return bindings;
-  }
 }
