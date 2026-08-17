@@ -39,27 +39,25 @@ const DOORS = [
   'contracts',
   'lib/core/git',
   'lib/core/graph',
+  'lib/core/parsing',
   'lib/core/persistence',
   'lib/core/utils',
 ];
 
 /**
- * `lib/core/parsing` HAS a door — `src/lib/core/parsing/index.ts`, and 31 files use it — but is NOT
- * listed above, and the reason is a decision rather than an oversight (todo68).
+ * `lib/core/parsing` is listed above as of todo68's close, and the ONE import that kept it out is
+ * worth recording, because the fix was the option that had been listed as most expensive.
  *
- * `graph/linker-intra.ts` imports `../parsing/languages/typescript/resolver.js` and constructs it to
- * resolve a specifier to a file. Every way of satisfying rule 1 here costs something real:
+ * `graph/linker-intra.ts` imported `../parsing/languages/typescript/resolver.js` and constructed it.
+ * Exporting it through parsing's door closes a cycle — parsing's door re-exports the processors and
+ * they import graph's (rule 5b). Moving it to `contracts/` puts 237 lines of TypeScript module
+ * resolution in a vocabulary layer.
  *
- *   - export it through parsing's door → graph imports parsing's door while parsing imports graph's,
- *     which is the feature cycle rule 5b exists to prevent;
- *   - move it to `contracts/` → 237 lines of TypeScript-specific module resolution in a layer that
- *     holds shared vocabulary, not language logic;
- *   - inject it → ~10 test sites construct `new IntraLinker()` bare, and a default that silently
- *     does nothing is the failure-looks-like-absence conflation this codebase keeps paying for.
- *
- * Listing it here with the violation present would fail the gate; removing the violation quietly
- * would pick one of those costs without saying so. So the door exists, the gate does not yet hold it,
- * and the choice is stated where someone will read it.
+ * So it was INVERTED. `IntraLinker` declares a `ResolveSpecifier` port and REFUSES to construct
+ * without one; domain supplies `TypeScriptResolver`, which is the layer allowed to know both doors.
+ * The cost that had been named — "~10 test sites construct it bare" — was 32, and every one now
+ * passes the real resolver rather than a stub, because a stub returning undefined would make those
+ * cases pass for the wrong reason: dangling is also what a genuinely unresolvable specifier gives.
  */
 
 /**

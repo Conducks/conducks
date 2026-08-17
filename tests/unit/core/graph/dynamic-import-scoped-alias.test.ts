@@ -1,6 +1,19 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
+import { TypeScriptResolver } from '@/lib/core/parsing/index.js';
+
+/**
+ * The real resolver, wired the way production wires it.
+ *
+ * `IntraLinker` takes its specifier resolver as an argument and REFUSES a default (ADR 0150 rule 5b
+ * â€” `core/graph` may not reach into `core/parsing` for one). A stub returning undefined would make
+ * every case here pass for the wrong reason, since dangling is also what a genuinely unresolvable
+ * specifier produces.
+ */
+const tsResolver = new TypeScriptResolver();
+const linker = () => new IntraLinker((s, f, a) => tsResolver.resolve(s, f, a));
+
 
 /**
  * todo58 â€” a destructured dynamic import INSIDE a function left the call pointing at a local.
@@ -57,7 +70,7 @@ const build = () => {
 describe('a dynamic import inside a function still reaches the real definition â€” todo58', () => {
   it('rebinds the call from the function-scoped local to the aliased definition', () => {
     const graph = build();
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
 
     // Located by source+type, not by id â€” the graph re-keys edge ids on ingest.
     const call = graph.getAllEdges().find(e => e.type === 'CALLS' && e.sourceId === `${MAIN}::handle`);
@@ -66,7 +79,7 @@ describe('a dynamic import inside a function still reaches the real definition â
 
   it('so the definition has a caller, which is what stops prune calling it dead', () => {
     const graph = build();
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
 
     const callers = graph.getAllEdges().filter(e => e.type === 'CALLS' && e.targetId === `${LOADER}::readroutingprompt`);
     expect(callers).toHaveLength(1);
@@ -78,7 +91,7 @@ describe('a dynamic import inside a function still reaches the real definition â
     graph.addNode({ id: `${MAIN}::handle.somethingelse`, label: 'SYMBOL', isShallow: false, properties: { unitId: `${MAIN}::unit`, name: 'somethingElse', filePath: MAIN, canonicalKind: 'ATOM', canonicalRank: 9 } });
     graph.addEdge({ id: 'CALLS::2', sourceId: `${MAIN}::handle`, targetId: `${MAIN}::handle.somethingelse`, type: 'CALLS', confidence: 1.0, properties: {} });
 
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     const untouched = graph.getAllEdges().filter(e => e.type === 'CALLS' && e.sourceId === `${MAIN}::handle`)
       .map(e => e.targetId);
     expect(untouched).toContain(`${MAIN}::handle.somethingelse`);
@@ -92,7 +105,7 @@ describe('a dynamic import inside a function still reaches the real definition â
     graph.addNode({ id: `${other}::run.readroutingprompt`, label: 'SYMBOL', isShallow: false, properties: { unitId: `${other}::unit`, name: 'readRoutingPrompt', filePath: other, canonicalKind: 'ATOM', canonicalRank: 9 } });
     graph.addEdge({ id: 'CALLS::3', sourceId: `${other}::run`, targetId: `${other}::run.readroutingprompt`, type: 'CALLS', confidence: 1.0, properties: {} });
 
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     const crossFile = graph.getAllEdges().find(e => e.type === 'CALLS' && e.sourceId === `${other}::run`);
     expect(crossFile?.targetId).toBe(`${other}::run.readroutingprompt`);
   });

@@ -39,6 +39,16 @@ export type { CaptureTag } from './capture-tags.js';
 export type { ILanguagePlugin } from './language-plugin.js';
 export { ConducksPrism } from './prism-core.js';
 
+/**
+ * Specifier resolution, exported because `graph`'s intra-linker needs it and may not reach inside.
+ *
+ * It crosses as a CLASS rather than through a graph-side default, because the direction matters:
+ * graph declares the port (`ResolveSpecifier`) and composition supplies this. A graph file importing
+ * this door directly would close a cycle — the door re-exports the processors, and they import
+ * graph's door (rule 5b).
+ */
+export { TypeScriptResolver } from './languages/typescript/resolver.js';
+
 export { NativeProvider } from './providers/base.js';
 export type { ConducksProvider, ImportSemantics } from './providers/base.js';
 

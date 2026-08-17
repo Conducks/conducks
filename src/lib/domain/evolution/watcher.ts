@@ -13,7 +13,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { BlastRadiusAnalyzer } from "@/lib/domain/kinetic/impact.js";
-import { IgnoreManager } from "@/lib/core/parsing/index.js";
+import { IgnoreManager, TypeScriptResolver } from "@/lib/core/parsing/index.js";
 import { FileHashGate } from "@/lib/core/persistence/index.js";
 
 /**
@@ -55,7 +55,10 @@ const WATCHED_EXTENSIONS = SOURCE_EXTENSIONS;
 export class ConducksWatcher {
   private watcher: FSWatcher | null = null;
   private linker = new GlobalSymbolLinker();
-  private intraLinker = new IntraLinker();
+  // Same wiring as the analyze path: the port is graph's, the implementation is parsing's, and
+  // domain is the layer allowed to know both (ADR 0005).
+  private tsResolver = new TypeScriptResolver();
+  private intraLinker = new IntraLinker((spec, from, all) => this.tsResolver.resolve(spec, from, all));
   private impactAnalyzer = new BlastRadiusAnalyzer();
   private ignoreManager: IgnoreManager;
   private isInitialized = false;

@@ -1,6 +1,19 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
+import { TypeScriptResolver } from '@/lib/core/parsing/index.js';
+
+/**
+ * The real resolver, wired the way production wires it.
+ *
+ * `IntraLinker` takes its specifier resolver as an argument and REFUSES a default (ADR 0150 rule 5b
+ * — `core/graph` may not reach into `core/parsing` for one). A stub returning undefined would make
+ * every case here pass for the wrong reason, since dangling is also what a genuinely unresolvable
+ * specifier produces.
+ */
+const tsResolver = new TypeScriptResolver();
+const linker = () => new IntraLinker((s, f, a) => tsResolver.resolve(s, f, a));
+
 
 /**
  * todo29#P3b — the four dangling-edge families the ADR 0071 barrel fix left open.
@@ -61,7 +74,7 @@ describe('GROUP 2 — a qualified member call resolves through the barrel that r
 
   it('binds `userrepository.create` to the defining node two import hops away', () => {
     const graph = buildGraph();
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
 
     const hit = resolved.find(r => r.id === 'calls::signup->userrepository.create');
     expect(hit).toBeDefined();
@@ -76,7 +89,7 @@ describe('GROUP 2 — a qualified member call resolves through the barrel that r
     ]);
     importEdge(graph, `${ROOT}/core/auth/server/index.ts::unit`, rival);
 
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
     expect(resolved.find(r => r.id === 'calls::signup->userrepository.create')).toBeUndefined();
   });
 });
@@ -118,7 +131,7 @@ describe('GROUP 1 — a named import of an external symbol binds under its packa
 
   it('binds the bare external binding to `<package>::<symbol>`', () => {
     const graph = buildGraph();
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
 
     const hit = resolved.find(r => r.id === 'accesses::sidebar->usersicon');
     expect(hit).toBeDefined();
@@ -137,7 +150,7 @@ describe('GROUP 1 — a named import of an external symbol binds under its packa
       targetId: 'lucide-react::usersicon', type: 'CONSTRUCTS', confidence: 0.9, properties: {},
     });
 
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
     expect(resolved.find(r => r.id === 'accesses::sidebar->usersicon')).toBeUndefined();
   });
 
@@ -150,7 +163,7 @@ describe('GROUP 1 — a named import of an external symbol binds under its packa
       type: 'ACCESSES', confidence: 0.8, properties: {},
     });
 
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
     expect(resolved.find(r => r.id === 'accesses::stranger->usersicon')).toBeUndefined();
   });
 
@@ -170,7 +183,7 @@ describe('GROUP 1 — a named import of an external symbol binds under its packa
       graph.addEdge({ id: `ACCESSES::page->${bare}`, sourceId: unit, targetId: bare, type: 'ACCESSES', confidence: 0.8, properties: {} });
     }
 
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
     for (const bare of ['next', 'glob', 'fetch']) {
       expect(resolved.find(r => r.id === `accesses::page->${bare}`)).toBeUndefined();
     }
@@ -213,7 +226,7 @@ describe('Wildcard re-export — `export * from` resolves at the target file', (
 
   it('rebinds the dangling barrel binding to the file the wildcard republishes it from', () => {
     const graph = buildGraph();
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
 
     const hit = resolved.find(r => r.id === 'imports::consumer->core-index-bsm');
     expect(hit).toBeDefined();
@@ -227,7 +240,7 @@ describe('Wildcard re-export — `export * from` resolves at the target file', (
       properties: { unitId: `${ROOT}/core/index.ts::unit`, name: 'BrowserStorageManager', filePath: `${ROOT}/core/index.ts`, canonicalKind: 'BEHAVIOR', canonicalRank: 7 },
     });
 
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
     expect(resolved.find(r => r.id === 'imports::consumer->core-index-bsm')).toBeUndefined();
   });
 });
@@ -257,7 +270,7 @@ describe('ALIASES chains — followed past one hop, and terminating on a cycle',
     graph.addEdge({ id: 'ALIASES::outer-db', sourceId: `${ROOT}/core/outer.ts::db`, targetId: 'middb', type: 'ALIASES', confidence: 1.0, properties: {} });
     graph.addEdge({ id: 'ALIASES::middle-middb', sourceId: `${ROOT}/core/middle.ts::middb`, targetId: 'coredb', type: 'ALIASES', confidence: 1.0, properties: {} });
 
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
 
     // Hop 1 is what ADR 0071 already delivered.
     const middleEdge = graph.getAllEdges().find(e => e.id === 'aliases::middle-middb')!;
@@ -281,7 +294,7 @@ describe('ALIASES chains — followed past one hop, and terminating on a cycle',
     graph.addEdge({ id: 'ALIASES::b-x', sourceId: `${ROOT}/core/b.ts::x`, targetId: `${ROOT}/core/a.ts::x`, type: 'ALIASES', confidence: 1.0, properties: {} });
 
     // The assertion that matters is that this RETURNS at all.
-    const resolved = new IntraLinker().resolve(graph);
+    const resolved = linker().resolve(graph);
     expect(Array.isArray(resolved)).toBe(true);
 
     for (const id of ['aliases::a-x', 'aliases::b-x']) {

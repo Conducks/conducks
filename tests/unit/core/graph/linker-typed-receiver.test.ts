@@ -1,6 +1,19 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
+import { TypeScriptResolver } from '@/lib/core/parsing/index.js';
+
+/**
+ * The real resolver, wired the way production wires it.
+ *
+ * `IntraLinker` takes its specifier resolver as an argument and REFUSES a default (ADR 0150 rule 5b
+ * — `core/graph` may not reach into `core/parsing` for one). A stub returning undefined would make
+ * every case here pass for the wrong reason, since dangling is also what a genuinely unresolvable
+ * specifier produces.
+ */
+const tsResolver = new TypeScriptResolver();
+const linker = () => new IntraLinker((s, f, a) => tsResolver.resolve(s, f, a));
+
 
 /**
  * todo29#P3b — a call on a variable whose type is written on its declaration.
@@ -68,7 +81,7 @@ const targetOf = (graph: ConducksAdjacencyList, id: string) =>
 describe('a call on a variable declared with new', () => {
   it('rebinds to the member of the recorded type', () => {
     const graph = buildGraph();
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph, 'CALLS::handler->registry.get')).toBe(`${REGISTRY_FILE}::serviceregistry.get`);
   });
 
@@ -79,7 +92,7 @@ describe('a call on a variable declared with new', () => {
    */
   it('leaves the edge dangling when no type was recorded', () => {
     const graph = buildGraph({ instanceOf: null });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph, 'CALLS::handler->registry.get')).toBe(`${REGISTRY_FILE}::registry.get`);
   });
 
@@ -90,14 +103,14 @@ describe('a call on a variable declared with new', () => {
    */
   it('refuses when the type has no such member', () => {
     const graph = buildGraph({ memberExists: false });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph, 'CALLS::handler->registry.get')).toBe(`${REGISTRY_FILE}::registry.get`);
   });
 
   /** A type name that names nothing in the graph is not a licence to mint an id for it. */
   it('refuses when the recorded type is not a node anywhere', () => {
     const graph = buildGraph({ instanceOf: 'externalclient' });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph, 'CALLS::handler->registry.get')).toBe(`${REGISTRY_FILE}::registry.get`);
   });
 
@@ -110,7 +123,7 @@ describe('a call on a variable declared with new', () => {
       targetId: `${REGISTRY_FILE}::serviceregistry.get`,
       type: 'CALLS', confidence: 1.0, properties: {},
     });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph, 'CALLS::handler->serviceregistry.get')).toBe(`${REGISTRY_FILE}::serviceregistry.get`);
   });
 });

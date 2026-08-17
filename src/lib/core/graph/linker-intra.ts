@@ -1,7 +1,7 @@
 import { isBuiltIn, getGlobalId } from "@/contracts/index.js";
 import { ConducksAdjacencyList, type EdgeType } from './adjacency-list.js';
 import { logger } from "@/lib/core/utils/index.js";
-import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js';
+
 
 /**
  * Conducks — Intra-Project Symbol Linker 🏺
@@ -18,6 +18,15 @@ import { TypeScriptResolver } from '../parsing/languages/typescript/resolver.js'
  *   all nodes exist. It uses the IMPORTS adjacency (already fully resolved) to scope the
  *   candidate search to files the source file actually imports.
  */
+/**
+ * Resolve an import specifier written in `fromFile` against the files the project actually has.
+ *
+ * Returns the absolute path, or undefined when the specifier names nothing here — a bare package,
+ * a typo, a file outside the project. Undefined is an ANSWER, not a failure: the linker leaves the
+ * edge dangling and something else decides whether that is external or broken.
+ */
+export type ResolveSpecifier = (specifier: string, fromFile: string, allFiles: string[]) => string | undefined;
+
 export class IntraLinker {
 
   /**
@@ -64,7 +73,29 @@ export class IntraLinker {
     (Object.keys(IntraLinker.RESOLVABLE) as EdgeType[]).filter(t => IntraLinker.RESOLVABLE[t])
   );
 
-  private resolver = new TypeScriptResolver();
+  /**
+   * Turn an import specifier into an absolute file path, or undefined when it names nothing here.
+   *
+   * A PORT, owned by the consumer. The linker used to construct `TypeScriptResolver` itself, which
+   * is the single import that kept `parsing` out of the door gate: `core/graph` reaching into
+   * `core/parsing/languages/typescript/` bypasses parsing's door, and pointing it AT the door
+   * instead closes a cycle — parsing's door re-exports the processors, which import graph's
+   * (ADR 0150 rule 5b). Inverting is the only direction with no cycle in it.
+   */
+  private readonly resolveSpecifier: ResolveSpecifier;
+
+  /**
+   * The resolver is REQUIRED, and refusing without one is deliberate.
+   *
+   * A default that resolved nothing would leave every cross-file edge dangling, and dangling is
+   * already what the linker reports for a specifier that genuinely names nothing — so a forgotten
+   * argument and a project with no matching file would produce the same output. That conflation is
+   * the exact shape of the defect this campaign found in `linker-federated`, where an optional
+   * vault-opener made a whole neighbour workspace read as empty (todo73).
+   */
+  constructor(resolveSpecifier: ResolveSpecifier) {
+    this.resolveSpecifier = resolveSpecifier;
+  }
 
   /**
    * Resolves unresolved edge targets in the graph.
@@ -135,7 +166,7 @@ export class IntraLinker {
       if (!targetUnit.includes('::')) {
         const sourceNode = graph.getNode(edge.sourceId);
         const sourceFile = sourceNode?.properties?.filePath || edge.sourceId.split('::')[0];
-        const resolved = this.resolver.resolve(targetUnit, sourceFile, allFilePaths);
+        const resolved = this.resolveSpecifier(targetUnit, sourceFile, allFilePaths);
         if (resolved) {
           targetUnit = `${resolved}::unit`;
         }
@@ -277,7 +308,7 @@ export class IntraLinker {
         const [spec, sym] = edge.targetId.split('::');
         const srcNode = graph.getNode(edge.sourceId);
         const srcFile = srcNode?.properties?.filePath || edge.sourceId.split('::')[0];
-        const abs = this.resolver.resolve(spec, srcFile, allFilePaths);
+        const abs = this.resolveSpecifier(spec, srcFile, allFilePaths);
         if (abs) {
           const candidate = `${abs.toLowerCase()}::${sym.toLowerCase()}`;
           if (graph.getNode(candidate)) {

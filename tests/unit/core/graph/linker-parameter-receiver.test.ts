@@ -1,6 +1,19 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
+import { TypeScriptResolver } from '@/lib/core/parsing/index.js';
+
+/**
+ * The real resolver, wired the way production wires it.
+ *
+ * `IntraLinker` takes its specifier resolver as an argument and REFUSES a default (ADR 0150 rule 5b
+ * — `core/graph` may not reach into `core/parsing` for one). A stub returning undefined would make
+ * every case here pass for the wrong reason, since dangling is also what a genuinely unresolvable
+ * specifier produces.
+ */
+const tsResolver = new TypeScriptResolver();
+const linker = () => new IntraLinker((s, f, a) => tsResolver.resolve(s, f, a));
+
 
 /**
  * todo42#P1 — a call on a receiver that is a TYPED PARAMETER.
@@ -58,7 +71,7 @@ describe('a receiver that is a typed parameter', () => {
 
   it('resolves the member on the declared parameter type', () => {
     const graph = build({ registry: 'Registry' });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(callEdge(graph).targetId).toBe(`${ROOT}/core/registry.ts::registry.lookup`);
   });
 
@@ -71,13 +84,13 @@ describe('a receiver that is a typed parameter', () => {
    */
   it('binds nothing when the parameter is untyped and the file imports nothing', () => {
     const graph = build(undefined, false);
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(callEdge(graph).targetId).toBe('registry.lookup');   // still dangling — stated, not guessed
   });
 
   it('refuses when the type resolves nowhere in scope', () => {
     const graph = build({ registry: 'UnknownType' }, false);
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(callEdge(graph).targetId).toBe('registry.lookup');
   });
 });

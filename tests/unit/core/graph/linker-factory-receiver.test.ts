@@ -1,6 +1,19 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
 import { IntraLinker } from '@/lib/core/graph/linker-intra.js';
+import { TypeScriptResolver } from '@/lib/core/parsing/index.js';
+
+/**
+ * The real resolver, wired the way production wires it.
+ *
+ * `IntraLinker` takes its specifier resolver as an argument and REFUSES a default (ADR 0150 rule 5b
+ * — `core/graph` may not reach into `core/parsing` for one). A stub returning undefined would make
+ * every case here pass for the wrong reason, since dangling is also what a genuinely unresolvable
+ * specifier produces.
+ */
+const tsResolver = new TypeScriptResolver();
+const linker = () => new IntraLinker((s, f, a) => tsResolver.resolve(s, f, a));
+
 
 /**
  * ADR 0084 — a call on a variable produced by a FACTORY.
@@ -90,14 +103,14 @@ const UNRESOLVED = `${BARREL}::db.query`;
 describe('a call on a variable a factory produced', () => {
   it('resolves through the alias, the return type and the parent class', () => {
     const graph = buildGraph();
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph)).toBe(`${MGR}::basedatabasemanager.query`);
   });
 
   /** Hop 2. No declared return type is the one case that genuinely IS unknowable here. */
   it('refuses when the factory declares no return type', () => {
     const graph = buildGraph({ declaredReturn: null });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph)).toBe(UNRESOLVED);
   });
 
@@ -113,7 +126,7 @@ describe('a call on a variable a factory produced', () => {
   it('refuses when the declared return type is a constructed type', () => {
     for (const declared of ['Promise<CoreDatabaseManager>', 'CoreDatabaseManager | null', 'CoreDatabaseManager[]']) {
       const graph = buildGraph({ declaredReturn: declared });
-      new IntraLinker().resolve(graph);
+      linker().resolve(graph);
       expect(targetOf(graph)).toBe(UNRESOLVED);
     }
   });
@@ -121,13 +134,13 @@ describe('a call on a variable a factory produced', () => {
   /** Hop 4. Without the heritage walk this is the 281-edge case that silently stays dangling. */
   it('refuses when no class in the chain declares the member', () => {
     const graph = buildGraph({ memberOnParent: false });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph)).toBe(UNRESOLVED);
   });
 
   it('refuses when the type has no parent and does not declare the member itself', () => {
     const graph = buildGraph({ extendsParent: false });
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph)).toBe(UNRESOLVED);
   });
 
@@ -142,7 +155,7 @@ describe('a call on a variable a factory produced', () => {
     for (const e of graph.getAllEdges()) {
       if (e.type === 'EXTENDS') graph.rebindEdgeTarget(e, 'basedatabasemanager');   // bare, as emitted
     }
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph)).toBe(`${MGR}::basedatabasemanager.query`);
   });
 });
@@ -227,13 +240,13 @@ describe('an ambiguous name is refused, not guessed', () => {
   /** One declaration, imported: resolves. This is the control — without it the refusal proves nothing. */
   it('resolves when exactly one imported unit declares the class', () => {
     const graph = buildSplit(false);
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph)).toBe(`${TYPES_A}::coredatabasemanager.query`);
   });
 
   it('refuses when two imported units declare the same class name', () => {
     const graph = buildSplit(true);
-    new IntraLinker().resolve(graph);
+    linker().resolve(graph);
     expect(targetOf(graph)).toBe(UNRESOLVED);
   });
 });

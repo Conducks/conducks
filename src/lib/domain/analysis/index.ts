@@ -2,7 +2,7 @@ import { AnalyzeOrchestrator } from "./orchestrator.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
-import { essenceLens } from "@/lib/core/parsing/index.js";
+import { essenceLens, TypeScriptResolver } from "@/lib/core/parsing/index.js";
 import { buildBoard, enforcedByPaths } from "@/lib/domain/analysis/docs-board.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import path from "node:path";
@@ -316,7 +316,10 @@ export class AnalysisService {
     // Resolves bare cross-file targetIds (e.g. "synapsepersistence") to fully-qualified
     // node IDs (e.g. "…/persistence.ts::synapsepersistence") using IMPORTS adjacency.
     // Must run after the full graph is in memory and gravity is committed.
-    const intraLinker = new IntraLinker();
+    // Domain supplies the resolver: `core/graph` declares the port and may not reach `core/parsing`
+    // for an implementation without closing a cycle (ADR 0150 rule 5b).
+    const tsResolver = new TypeScriptResolver();
+    const intraLinker = new IntraLinker((spec, from, all) => tsResolver.resolve(spec, from, all));
     const resolvedEdges = intraLinker.resolve(this.graph.getGraph());
     await this.persistence.updateEdgeTargets(resolvedEdges);
 

@@ -7,6 +7,19 @@ import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 import { IntraLinker } from "@/lib/core/graph/index.js";
+import { TypeScriptResolver } from '@/lib/core/parsing/index.js';
+
+/**
+ * The real resolver, wired the way production wires it.
+ *
+ * `IntraLinker` takes its specifier resolver as an argument and REFUSES a default (ADR 0150 rule 5b
+ * — `core/graph` may not reach into `core/parsing` for one). A stub returning undefined would make
+ * every case here pass for the wrong reason, since dangling is also what a genuinely unresolvable
+ * specifier produces.
+ */
+const tsResolver = new TypeScriptResolver();
+const linker = () => new IntraLinker((s, f, a) => tsResolver.resolve(s, f, a));
+
 
 /**
  * ADR 0071 — a barrel re-export ("export { x as y } from './z'") must not leave the per-binding
@@ -188,8 +201,7 @@ describe('IntraLinker — resolves a barrel re-export ALIASES edge to its real d
 
   it('rebinds the bare ALIASES target to the real definition in the imported file', () => {
     const graph = buildGraph();
-    const linker = new IntraLinker();
-    const resolved = linker.resolve(graph);
+    const resolved = linker().resolve(graph);
 
     const hit = resolved.find(r => r.id === 'aliases::db->coredb');
     expect(hit).toBeDefined();
