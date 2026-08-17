@@ -83,6 +83,13 @@ class MirrorServer {
     // Governance dashboard data
     this.app.get('/api/governance', async (req, res) => {
       try {
+        // This path WALKS the graph, so the deferred load (ADR 0038) has to be materialised first.
+        //
+        // Without it every request answered HTTP 500 with the guard's own message — the guard doing
+        // its job on a panel that therefore never rendered. Same defect as `audit --fallback` in ADR
+        // 0123, in a second surface: the CLI audit path was fixed and the web one was not, because
+        // nothing drives this endpoint. Found by starting the mirror and asking it for the page.
+        await registry.infrastructure.ensureGraphLoaded();
         const auditResult = registry.audit.audit();
         const recommendations = await registry.audit.advise();
         res.json({
