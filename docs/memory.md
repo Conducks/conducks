@@ -2635,3 +2635,18 @@ by construction.
   reachable is what turns coverage into a claim.
 - Applies: when a mutation survives, suspect the case before the claim. All four were the fixture
   being too weak, not the code being right for another reason.
+
+## "Keep it, it is a working capability" is a claim about VALUE, and value is measurable
+- Gotcha: `PythonMROResolver` was carried for weeks as not-dead-just-unwired, with a careful comment
+  saying it was "written and never connected" and that wiring it "needs its own measurement". The
+  comment was right about the classification and never took the measurement, so the code sat as a
+  standing ORPHAN in every audit while reading as a decision that had been made.
+- Why: measured before deciding, on the only Python subject — 52 classes inherit from an in-project
+  base and 112 inherited methods exist, but **0 of 401 `self.method()` calls reach one**, and only
+  **5 of 1,721 dangling calls** name a base-only method. That 5 is an upper bound: resolving also
+  needs the receiver's class, which Python code rarely states. So the capability would fire on at
+  most 0.3% of the dangling set, against the risk of a WRONG edge.
+- Applies: "not dead, just unwired" is only half an answer — the other half is what wiring it would
+  BUY, and that is a number. Take it before writing the comment that defers the work, or the deferral
+  becomes permanent and looks deliberate. Removed 2026-08-17 with the measurement recorded here so
+  nobody re-derives it.
