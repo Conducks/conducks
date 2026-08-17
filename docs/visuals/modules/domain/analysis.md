@@ -23,7 +23,7 @@ Adequate while the question set is known.
 
 `coverage` and `docs` are no longer parts of this module — they are their own areas,
 [coverage](coverage.md) and [docs](docs.md), split out in the ADR 0150 campaign because each has its
-own door. The link here pointed at `analysis/coverage.md` for some time after the move and resolved
+own door. The link here pointed at the old path under `analysis/` for some time after the move and resolved
 to nothing: `visuals-lint` checks that every code ANCHOR resolves and does not follow markdown links
 between notes, so a dead link between pages is invisible to it.
 

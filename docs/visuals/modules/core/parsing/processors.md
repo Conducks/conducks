@@ -46,7 +46,7 @@ the same guard — this section claimed `sameFamily()` covered every tier, and i
 - **The PARSE-time fallback in `import.ts` is guarded by UNIQUENESS and by refusal**, not by family:
   a declared dependency or a provider-declared boundary module returns undefined before it
   (<span class="anchor">src/lib/core/parsing/processors/import.ts:241</span>), and a basename that
-  matches more than one file answers nothing. `index.ts` occurs 24 times in this repository, so
+  matches more than one file answers nothing. a barrel basename occurs 24 times in this repository, so
   guessing there is right about one time in twenty-four.
 
 Refusing costs an edge; guessing costs a WRONG edge, and a wrong edge is what `impact` and `trace`

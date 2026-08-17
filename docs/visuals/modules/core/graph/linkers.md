@@ -98,7 +98,7 @@ as written *and* with `.js` stripped, then extensions, then `/index.*`. Anything
 resolution needs both forms or every relative import in the codebase silently fails to bind.
 
 **A fourth step was added on 2026-08-17 and it runs LAST** (ADR 0153): a specifier that only makes
-sense in the BUILD layout. `electron/main/index.ts` importing `'../engine/…'` names no file on disk —
+sense in the BUILD layout. a subject project's `electron/main` entry importing `'../engine/…'` names no file on disk —
 it is written against where the two halves LAND, and the project's `tsconfig` and bundler config
 declare that between them. Because it runs after everything above has refused, it can only turn an
 UNRESOLVED into a resolution and never redirect one that already worked. It answers nothing whenever
