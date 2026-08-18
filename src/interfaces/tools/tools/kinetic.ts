@@ -23,6 +23,17 @@ const TRACE_MODES = ["reachability", "execution", "path"] as const;
 const IMPACT_DIRECTIONS = ["upstream", "downstream"] as const;
 // Its declared depth bounds, enforced here rather than left in the schema.
 const IMPACT_DEPTH_BOUNDS = { min: 1, max: 10 };
+// A hard `.slice(0, 10)` with no way to raise it hid 864 of 874 affected symbols on a real subject
+// (registerIpcHandlers, downstream, sofie benchmark) — the CLI's `--json` path returns the whole
+// list. Bounded rather than left unlimited: this result lands in an LLM's context, and an unbounded
+// dump of a high-fan-out symbol is its own failure mode. Ceiling matches `PRUNE_LIMIT_BOUNDS` /
+// `QUERY_LIMIT_BOUNDS` (both 200) — the other tools whose answer is a ranked list.
+const IMPACT_LIMIT_BOUNDS = { min: 1, max: 200 };
+const IMPACT_LIMIT_DEFAULT = 20;
+// Same defect, same fix, for `conducks_trace`'s reachability mode. The CLI defaults to 15
+// (`trace.ts`'s `TRACE_LIMIT`) and accepts `--limit <n>` to raise it; the MCP tool had neither.
+const TRACE_LIMIT_BOUNDS = { min: 1, max: 200 };
+const TRACE_LIMIT_DEFAULT = 15;
 
 // The modes `conducks_diff` IMPLEMENTS. "historical" was advertised in the schema and implemented
 // nowhere: the handler branched on "drift" and let everything else fall through to the working-tree
@@ -75,19 +86,21 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
         direction: { type: "string", enum: [...IMPACT_DIRECTIONS], default: "upstream" },
         // MCP1: numeric bounds
         depth: { type: "number", default: 5, minimum: IMPACT_DEPTH_BOUNDS.min, maximum: IMPACT_DEPTH_BOUNDS.max, description: "Max structural depth." },
+        limit: { type: "number", default: IMPACT_LIMIT_DEFAULT, minimum: IMPACT_LIMIT_BOUNDS.min, maximum: IMPACT_LIMIT_BOUNDS.max, description: "Max affected symbols to return (the true count is always in `meta`/`total`)." },
         path: { type: "string", description: "Optional: The absolute project root." }
       },
       required: ["symbol"]
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ symbol, direction = "upstream", depth, path: customPath }: any) => {
+    handler: async ({ symbol, direction = "upstream", depth, limit, path: customPath }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;
 
       const badParam =
         enumErr(direction, IMPACT_DIRECTIONS, 'direction') ??
-        numErr(depth, { min: IMPACT_DEPTH_BOUNDS.min, max: IMPACT_DEPTH_BOUNDS.max }, 'depth');
+        numErr(depth, { min: IMPACT_DEPTH_BOUNDS.min, max: IMPACT_DEPTH_BOUNDS.max }, 'depth') ??
+        numErr(limit, { min: IMPACT_LIMIT_BOUNDS.min, max: IMPACT_LIMIT_BOUNDS.max }, 'limit');
       if (badParam) return badParam;
 
       try {
@@ -98,7 +111,8 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
 
         // Final Production Alignment: ImpactService returns a complex object
         const affectedNodes = (results as any).affectedNodes || [];
-        const impact = affectedNodes.slice(0, 10).map((n: any) => ({
+        const cap = limit ?? IMPACT_LIMIT_DEFAULT;
+        const impact = affectedNodes.slice(0, cap).map((n: any) => ({
           id: n.id,
           name: n.name,
           file: n.filePath,
@@ -114,9 +128,12 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
         }));
 
         // MCP7: pagination meta, MCP8: clean envelope
+        // `total` states what `truncated: true` alone could not: HOW MANY were left out, so a
+        // caller who needs more than the default 20 knows there is a `limit` param and how far it
+        // would need to go, rather than guessing from a boolean.
         return mcpOk(
-          { symbol, direction, impact, indexStaleness: registry.audit.status().staleness.stale },
-          { nodeCount: impact.length, truncated: affectedNodes.length > 10 }
+          { symbol, direction, impact, total: affectedNodes.length, indexStaleness: registry.audit.status().staleness.stale },
+          { nodeCount: impact.length, truncated: affectedNodes.length > cap }
         );
       } catch (err: any) {
         // MCP3: structured error
@@ -157,12 +174,13 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
         target: { type: "string", description: "Optional: Target symbol ID for pathfinding." },
         // "execution" kept for backward compatibility (deprecated alias of "reachability") — ADR 0066.
         mode: { type: "string", enum: ["reachability", "execution", "path"], default: "reachability" },
+        limit: { type: "number", default: TRACE_LIMIT_DEFAULT, minimum: TRACE_LIMIT_BOUNDS.min, maximum: TRACE_LIMIT_BOUNDS.max, description: "Max reachability steps to return (ignored for mode=\"path\", which is never truncated). The true count is always in `data.total`." },
         path: { type: "string", description: "Optional: The absolute project root." }
       },
       required: ["symbol"]
     },
     formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ symbol, target, mode, path: customPath }: any) => {
+    handler: async ({ symbol, target, mode, limit, path: customPath }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
       if (symbolErr) return symbolErr;
@@ -171,6 +189,8 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
       // fixed in `audit` and `prune` (todo28), never wired here (todo53#P1).
       const badMode = enumErr(mode, TRACE_MODES, 'mode');
       if (badMode) return badMode;
+      const badLimit = numErr(limit, { min: TRACE_LIMIT_BOUNDS.min, max: TRACE_LIMIT_BOUNDS.max }, 'limit');
+      if (badLimit) return badLimit;
 
       // `mode:"path"` with no target ran reachability and returned a downstream list under a request
       // for a shortest path. A missing target is a refusal, not a different question.
@@ -216,11 +236,15 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
           );
         }
         // mode is "reachability", "execution" (deprecated alias) or unset — all reachability.
+        //
+        // A hard `.slice(0, 10)` with no `limit` param hid the same class of gap `conducks_impact`
+        // had — the CLI's own default is 15 and `--limit <n>` can raise it; this tool had neither.
         const traceResults = await registry.kinetic.trace(resolvedId);
-        const steps = traceResults.slice(0, 10).map(describe);
+        const cap = limit ?? TRACE_LIMIT_DEFAULT;
+        const steps = traceResults.slice(0, cap).map(describe);
         return mcpOk(
-          { steps, indexStaleness: registry.audit.status().staleness.stale },
-          { nodeCount: steps.length, truncated: traceResults.length > 10 }
+          { steps, total: traceResults.length, indexStaleness: registry.audit.status().staleness.stale },
+          { nodeCount: steps.length, truncated: traceResults.length > cap }
         );
       } catch (err: any) {
         // MCP3: structured error
