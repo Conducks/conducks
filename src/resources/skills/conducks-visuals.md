@@ -50,7 +50,7 @@ docs/visuals/
 ├── holding.html       read and true, not yet placed (§9)
 ├── system.css         one stylesheet, shared verbatim by every repo
 ├── system.js          the canvas behaviour, shared verbatim by every repo
-├── rules.md           this file, shared verbatim by every repo
+├── rules.md           a POINTER to this skill, not the rules — see the end of §0
 └── modules/           two families sharing one folder — see §8
 ```
 
@@ -201,7 +201,7 @@ Nothing had been broken. The standard simply did not say what to *ship*.
 
 | shared byte-for-byte | repo-local |
 |---|---|
-| `rules.md` — the rules | `scripts/visuals/graph.mjs` — the architecture as data |
+| `rules.md` — the pointer to this skill | `scripts/visuals/graph.mjs` — the architecture as data |
 | `docs/visuals/system.css` — every class | `scripts/visuals/visuals.config.mjs` — the repo's name, and its hand-written containers |
 | `docs/visuals/system.js` — the canvas behaviour | |
 | `scripts/visuals/render.mjs` — layout, routing, gates | |
