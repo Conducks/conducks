@@ -78,6 +78,15 @@ export class DriftEngine {
       JOIN nodes n ON n.id = c.nodeId
       WHERE c.pulseId = ? AND p.pulseId = ?
       AND c.nodeId NOT IN (SELECT nodeId FROM node_history WHERE pulseId = ?)
+      -- The symmetric half of the guard above, and without it a rename invented a second one.
+      -- The line above establishes that the CURRENT node is new; nothing established that the
+      -- PREVIOUS node actually went away. A symbol that still exists, untouched, stayed eligible
+      -- as a rename SOURCE for any new symbol sharing its shape. MEASURED: two same-shape Python
+      -- functions, rename only get_project_root -> get_root_directory, and drift reported TWO
+      -- renames -- the real one plus get_data_dir -> get_root_directory, where get_data_dir
+      -- was never touched and is still right there in the file. A rename needs BOTH ends: a name
+      -- that appeared and a name that vanished.
+      AND p.nodeId NOT IN (SELECT nodeId FROM node_history WHERE pulseId = ?)
     `;
 
     // Sequential queries — lazy persistence closes connection between calls
@@ -94,7 +103,7 @@ export class DriftEngine {
       logger.error(`[DriftEngine] Exact drift query failed: ${err.message}`);
     }
     try {
-      moveRows = await this.persistence.query(moveQuery, [currentPulseId, targetPrevPulseId, targetPrevPulseId]);
+      moveRows = await this.persistence.query(moveQuery, [currentPulseId, targetPrevPulseId, targetPrevPulseId, currentPulseId]);
     } catch (err: any) {
       queryFailed = true;
       logger.error(`[DriftEngine] Move query failed: ${err.message}`);
@@ -128,13 +137,46 @@ export class DriftEngine {
     // vanish from `deltas` entirely, which is the "silently skipped" failure todo26 names.
     }).filter(d => Math.abs(d.velocity) > 0.001 || d.isModified || d.identityGap);
 
-    const moves = moveRows.map((row: any) => ({
-      from: row.prev_id,
-      to: row.current_id,
-      name: row.name,
-      file: row.file,
-      gravity: row.current_gravity
-    }));
+    // The join is many-to-many by construction: it pairs on shape alone, so N new symbols and M
+    // vanished symbols sharing one shape produce N*M rows, not the min(N,M) renames that actually
+    // happened. MEASURED: two same-shape functions renamed in ONE commit reported FOUR renames --
+    // every (new, old) combination, including the two pairings that are provably wrong. The
+    // disappearance guard above does not touch this: in that fixture both old symbols genuinely
+    // vanished, so all four pairs are legal as far as SQL is concerned.
+    //
+    // Each real rename consumes one end on each side, so pair greedily 1:1 and let no id be spent
+    // twice. Closest (gravity, complexity) wins first, because a renamed symbol keeps its metrics;
+    // ties break on id so the result is deterministic rather than dependent on row order.
+    //
+    // When several identical-shape symbols are renamed together there is genuinely nothing left to
+    // tell which became which -- same shape, same metrics, different names is all the graph knows.
+    // The COUNT is then right and each symbol appears exactly once, but an individual from->to in
+    // such a group is a guess. Reporting min(N,M) guesses beats reporting N*M rows that are mostly
+    // wrong, and beats dropping the group entirely: the renames did happen.
+    const cost = (row: any) =>
+      Math.abs((row.current_gravity ?? 0) - (row.prev_gravity ?? 0));
+    const usedCurrent = new Set<string>();
+    const usedPrev = new Set<string>();
+    const moves = [...moveRows]
+      .sort((a: any, b: any) => {
+        const d = cost(a) - cost(b);
+        if (d !== 0) return d;
+        return String(a.current_id).localeCompare(String(b.current_id))
+          || String(a.prev_id).localeCompare(String(b.prev_id));
+      })
+      .filter((row: any) => {
+        if (usedCurrent.has(row.current_id) || usedPrev.has(row.prev_id)) return false;
+        usedCurrent.add(row.current_id);
+        usedPrev.add(row.prev_id);
+        return true;
+      })
+      .map((row: any) => ({
+        from: row.prev_id,
+        to: row.current_id,
+        name: row.name,
+        file: row.file,
+        gravity: row.current_gravity
+      }));
     
     // STABLE has to be EARNED. Two states used to collapse into it and both read as good news:
     // a query that threw, and a pair of pulses with nothing comparable between them (this repo's
