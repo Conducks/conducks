@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
 
+const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+
 /**
  * `drift` answered "✅ Structural resonance stable … Renamed/Moved: 0" immediately after conducks
  * itself renamed a function at five call sites across three files. A false green from the command
@@ -39,8 +41,13 @@ export function boot(): number { return leafFunction(); }
   afterAll(() => rmRepo(repo));
 
   it('counts the rename instead of reporting an unqualified stable', () => {
-    const out = runCli(['drift'], { cwd: repo, allowFail: true }).combined;
-    expect(out).toMatch(/Renamed\/Moved:\s*\D*[1-9]/);
+    // Rendered output is colourised and ANSI codes contain DIGITS. The previous assertion here,
+    // `/Renamed\/Moved:\s*\D*[1-9]/`, let `\D*` consume the ESC and `[` of `\x1b[35m` and then
+    // matched the `3` of the colour code itself — so it passed on `Renamed/Moved: 0` too, and could
+    // not fail on the number it claimed to check. (The `structural rename(s) detected` assertion
+    // below was carrying this test on its own; that string is only emitted when moves.length > 0.)
+    const out = plain(runCli(['drift'], { cwd: repo, allowFail: true }).combined);
+    expect(out).toMatch(/Renamed\/Moved:\s*[1-9]/);
     expect(out).toContain('structural rename(s) detected');
   }, 180000);
 
