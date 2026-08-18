@@ -110,8 +110,22 @@ export class StatusCommand implements ConducksCommand {
       const servedFrom = (vaultStatus.staleness as any).servedFrom;
       const graph = registry.query.graph.getGraph();
 
+      // A HOTSPOT IS A SYMBOL. The rank is computed over every node in the graph, and files,
+      // directories and dependency nodes rank high by construction — a file node inherits the
+      // gravity of everything inside it.
+      //
+      // MEASURED across the subjects: sofie's #4 hotspot was `src/services/voice/daemon/daemon.py::unit`,
+      // printed exactly like a symbol id, for which `grep -ni unit daemon.py` returns nothing — it is
+      // the FILE node, suffixed `::unit`. On the orchestrator, #3 was `app/src/lib/bootstrap.ts::unit`
+      // and #5 was `ecosystem::vitest` — a test-runner dependency listed among the most structurally
+      // important things in the codebase. Two of five rows were not code.
+      //
+      // Containers and dependencies are real and rankable; they are simply not the answer to "which
+      // symbols carry this codebase", which is the question this list is captioned with.
+      const SYMBOL_KINDS = new Set(['BEHAVIOR', 'STRUCTURE', 'ATOM', 'INFRA']);
       const topGravity = Array.from(graph.getAllNodes())
         .filter(n => !isTestNode(n))   // path-derived: the parse-time flag does not survive the vault
+        .filter(n => SYMBOL_KINDS.has(String(n.properties.canonicalKind ?? n.label ?? '')))
         .sort((a, b) => (b.properties.rank || 0) - (a.properties.rank || 0))
         .slice(0, 5);
 

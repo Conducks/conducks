@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import type { Advice } from "@/contracts/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import { verdict, renderVerdict, verdictToJson } from "@/contracts/index.js";
+import { displayId } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Advise Command
@@ -43,6 +44,9 @@ export class AdviseCommand implements ConducksCommand {
         return;
       }
 
+      // Relative, real-case ids: this command prints three per finding and there were 104 findings
+      // on the orchestrator subject (ADR 0132).
+      const adviseRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
       console.log(`\n\x1b[1m--- 💎 Conducks Architecture Advisor ---\x1b[0m`);
       console.log(renderVerdict(v, {
         nothing: why => `\x1b[33m⚠ nothing was checked\x1b[0m — ${why}`,
@@ -53,7 +57,7 @@ export class AdviseCommand implements ConducksCommand {
       advice.forEach((a: Advice) => {
         const color = a.level === 'ERROR' ? '\x1b[31m' : a.level === 'WARNING' ? '\x1b[33m' : '\x1b[34m';
         console.log(`${color}- [${a.type}] ${a.message}\x1b[0m`);
-        a.nodes.slice(0, 3).forEach((n: string) => console.log(`  └─ ${n}`));
+        a.nodes.slice(0, 3).forEach((n: string) => console.log(`  └─ ${displayId(n, adviseRoot)}`));
         if (a.nodes.length > 3) console.log(`  ... and ${a.nodes.length - 3} more`);
       });
     } finally {

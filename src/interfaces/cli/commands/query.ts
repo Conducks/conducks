@@ -101,6 +101,26 @@ export class QueryCommand implements ConducksCommand {
 
     await syncGraph(registry);
 
+    // A MODE THE COMMAND DOES NOT HAVE, AND A MODE MISSING ITS ARGUMENT, BOTH SILENTLY RAN A FUZZY
+    // SEARCH — the question the caller did not ask, answered with exit 0.
+    //
+    // `status --mode banana` exits 1 naming the valid modes; `trace --mode banana` and
+    // `trace --mode path` without `--target` both refuse; `query --mode filter` without `--filter`
+    // refuses three lines below. `query` was the one surface where an unrecognised mode and a
+    // half-specified one fell through to the default: measured, `query X --mode banana` and
+    // `query X --mode template` each printed an ordinary fuzzy result set and exited 0.
+    const VALID_MODES = ['fuzzy', 'template', 'filter'];
+    if (!VALID_MODES.includes(mode)) {
+      console.error(`Error: unknown --mode "${mode}". Valid modes: ${VALID_MODES.join(', ')}.`);
+      process.exit(1);
+      return;
+    }
+    if (mode === 'template' && !templateId) {
+      console.error('Mode "template" requires --template <id>. Without one there is no pattern to run.');
+      process.exit(1);
+      return;
+    }
+
     if (mode === 'filter') {
       if (!filterJson) {
         console.error('Mode "filter" requires --filter \'{"conditions":[...]}\' (a typed filter object as JSON).');

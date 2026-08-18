@@ -66,7 +66,15 @@ export class DriftEngine {
         c.nodeId as current_id, p.nodeId as prev_id, n.name, n.file,
         c.fingerprint, c.gravity as current_gravity, p.gravity as prev_gravity
       FROM node_history c
-      JOIN node_history p ON c.fingerprint = p.fingerprint AND c.nodeId != p.nodeId
+      -- Matched on SHAPE -- the identity without the name -- so a RENAME is visible. Joining on the
+      -- fingerprint column (which hashes path|name|dna) can only find a symbol that MOVED while
+      -- keeping its name, which is why a renamed leaf function reported nothing: measured on the
+      -- orchestrator subject, conducks renamed a function at 5 sites and drift answered
+      -- "stable ... Renamed/Moved: 0". Falls back to the fingerprint column for rows written before
+      -- shape_fingerprint existed, so an old vault keeps its previous behaviour instead of blanking.
+      JOIN node_history p
+        ON COALESCE(c.shape_fingerprint, c.fingerprint) = COALESCE(p.shape_fingerprint, p.fingerprint)
+       AND c.nodeId != p.nodeId
       JOIN nodes n ON n.id = c.nodeId
       WHERE c.pulseId = ? AND p.pulseId = ?
       AND c.nodeId NOT IN (SELECT nodeId FROM node_history WHERE pulseId = ?)

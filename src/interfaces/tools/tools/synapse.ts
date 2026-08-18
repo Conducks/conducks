@@ -1,4 +1,4 @@
-import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT } from "@/contracts/index.js";
+import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT, realCasePath, splitProjectSymbols } from "@/contracts/index.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, releaseAnchor, resolveDocsRoot } from "../shared/anchor.js";
 import { resolveSymbolId } from "../shared/resolve-symbol.js";
@@ -361,7 +361,7 @@ Returns:
           kind: n.canonicalKind,
           rank: n.canonicalRank,
           location: {
-            file: n.file,
+            file: realCasePath(String(n.file ?? '')),
             // WHERE, not just which file. An agent that gets a path still has to open and scan it;
             // the vault has carried `lineStart`/`lineEnd` all along and this surface dropped both,
             // so `conducks_query` could never finish a "find X" task on its own (ADR 0109).
@@ -617,7 +617,7 @@ AFTER THIS: Use conducks_trace to see how data flows through this symbol.`,
           ...risk,
           context: node ? {
             name: node.name,
-            file: node.file,
+            file: realCasePath(String(node.file ?? '')),
             parent: node.parentName,
             container: node.className || node.namespaceName,
             kind: node.canonicalKind,
@@ -758,7 +758,7 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
             name: s.name,
             kind: s.kind,
             rank: s.rank,
-            file: s.file,
+            file: realCasePath(String(s.file ?? '')),
             line: s.line,
             depth: s.depth,
             relevance_score: s.relevance_score,
@@ -889,18 +889,28 @@ min_members (the set the page was drawn from), and "shown" is how many came back
         // The set `shown` is drawn from — reported as `matching` below. `total` counts every flow in
         // the graph and so answers a different question; publishing only `total` left a caller unable
         // to tell "20 of 2,878 flows" from "20 of the 24 that matched" (ADR 0145).
+        // The same project-symbol count the CLI filters by (ADR 0148 — one rule, both surfaces).
+        // Filtering on the raw list let a flow of built-ins satisfy `min_members`, which is the noise
+        // the parameter exists to remove.
+        const sizes = new Map<string, { project: string[]; external: string[] }>();
+        for (const [name, members] of Object.entries(processes)) {
+          sizes.set(name, splitProjectSymbols(members as string[]));
+        }
+        const projectSize = (name: string) => sizes.get(name)?.project.length ?? 0;
+
         const matched = Object.entries(processes)
-          .filter(([, members]) => (members as string[]).length >= minSize);
+          .filter(([name]) => projectSize(name) >= minSize);
 
         const flows = matched
-          .sort((a, b) => (b[1] as string[]).length - (a[1] as string[]).length)
+          .sort((a, b) => projectSize(b[0]) - projectSize(a[0]))
           .slice(0, cap)
           .map(([name, members]) => {
             const node = graph.findNodesByName(name)[0];
             return {
               name,
-              file: node?.properties?.filePath ?? null,
-              member_count: (members as string[]).length,
+              file: node?.properties?.filePath ? realCasePath(String(node.properties.filePath)) : null,
+              member_count: projectSize(name),
+              external_member_count: sizes.get(name)?.external.length ?? 0,
               top_members: (members as string[]).slice(0, 5)
             };
           });
@@ -975,7 +985,13 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
         }
 
         const cap = limit ?? 50;
-        const shown = findings.slice(0, cap);
+        // THE PATH MUST BE ONE THE READER CAN OPEN, on this surface too. Findings carry the stored
+        // path, which is lowercased (CONDUCKS-4) — repaired on the CLI side first, which left the two
+        // surfaces disagreeing about the same finding: MEASURED against a live MCP server,
+        // `conducks_prune` answered `renderer/src/components/sessionhistorypanel.tsx` where the CLI
+        // answered `SessionHistoryPanel.tsx`. Same input, two answers (ADR 0148), and this is the one
+        // an agent acts on.
+        const shown = findings.slice(0, cap).map((f: any) => ({ ...f, file: realCasePath(String(f.file ?? '')) }));
 
         // Every type, built FROM the list. Three were hard-coded here, so a summary of 95 sat beside
         // a total of 99 and the missing four were invisible rather than wrong-looking (todo53).

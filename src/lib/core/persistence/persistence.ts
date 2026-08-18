@@ -407,7 +407,12 @@ export class SynapsePersistence {
       -- An interface's members and their declared types, so a chain through one can be walked
       -- (todo36). Its own column, like the four above: dna and metadata are absent from the shallow
       -- load, and shallow is the load analyze uses.
-      member_types JSON
+      member_types JSON,
+      -- The symbol's identity WITHOUT its name, so drift can see a RENAME (see reflector.ts).
+      -- The fingerprint column hashes path|name|dna, so renaming changes it and the move query --
+      -- same fingerprint, different id -- cannot match. Its own column because the drift queries
+      -- read columns, and a value living only in the metadata blob is absent from a shallow load.
+      shape_fingerprint VARCHAR
     );`;
 
     const edgesSql = `CREATE TABLE IF NOT EXISTS edges (
@@ -449,6 +454,7 @@ export class SynapsePersistence {
       gravity REAL,
       complexity INTEGER,
       fingerprint VARCHAR,
+      shape_fingerprint VARCHAR,
       PRIMARY KEY (pulseId, nodeId)
     );`;
 
@@ -498,6 +504,8 @@ export class SynapsePersistence {
     // Kinetic columns — safe to run on existing databases (DuckDB IF NOT EXISTS)
     await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS blame_age_days INTEGER;`);
     await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS churn_count_90d INTEGER;`);
+    await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shape_fingerprint VARCHAR;`);
+    await run(`ALTER TABLE node_history ADD COLUMN IF NOT EXISTS shape_fingerprint VARCHAR;`);
     await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS entropy_score DOUBLE;`);
     await run(`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS last_author TEXT;`);
 
@@ -763,7 +771,7 @@ export class SynapsePersistence {
     if (this.readOnly) return;
     await this.ensureVaultOpen();
     const owned = !this.inPulse;
-    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'doc', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'instance_of', 'instance_of_call', 'declared_return', 'object_paths', 'param_types', 'member_types'];
+    const columns = ['id', 'pulseId', 'fingerprint', 'canonicalKind', 'canonicalRank', 'semantic_kind', 'doc', 'name', 'file', 'lineStart', 'lineEnd', 'parentId', 'rootId', 'namespaceId', 'unitId', 'structureId', 'layer_path', 'depth', 'risk', 'gravity', 'complexity', 'isEntryPoint', 'visibility', 'dna', 'signature', 'kinetic', 'metadata', 'is_route', 'is_request', 'http_method', 'http_path', 'http_url', 'instance_of', 'instance_of_call', 'declared_return', 'object_paths', 'param_types', 'member_types', 'shape_fingerprint'];
     try {
       if (owned) await this.run("BEGIN TRANSACTION");
       const rows = nodes.map(n => {
@@ -784,7 +792,8 @@ export class SynapsePersistence {
           JSON.stringify({ ...m, id: n.id, name, range: m.range }),
           m.isRoute ?? null, m.isRequest ?? null, m.method ?? null, m.path ?? null, m.url ?? null, m.instanceOf ?? null, m.instanceOfCall ?? null, m.dna?.returns ?? null, m.objectPaths ? JSON.stringify(m.objectPaths) : null,
           (() => { const ps = (m.dna?.params ?? []).filter((x: any) => x?.type); return ps.length ? JSON.stringify(Object.fromEntries(ps.map((x: any) => [String(x.name).toLowerCase(), String(x.type).toLowerCase()]))) : null; })(),
-          m.memberTypes ? JSON.stringify(m.memberTypes) : null
+          m.memberTypes ? JSON.stringify(m.memberTypes) : null,
+          m.shapeFingerprint ?? null
         ];
       });
       await this.insertBatched('nodes', columns, rows);
@@ -1189,8 +1198,9 @@ export class SynapsePersistence {
     // So the same cause rules now see the whole dangling population, and the survivors are
     // re-stamped below. `minConfidence` is kept as the parameter name and is no longer a filter —
     // it is the value an unresolved edge is downgraded TO.
-    const dangling = await this.query<{ id: string; targetId: string; ty: string; params: string | null; conf: number }>(
-      `SELECT e.id, e.targetId, e.type AS ty, sn.param_types AS params, e.confidence AS conf
+    const dangling = await this.query<{ id: string; targetId: string; ty: string; params: string | null; conf: number; srcFile: string | null }>(
+      `SELECT e.id, e.targetId, e.type AS ty, sn.param_types AS params, e.confidence AS conf,
+              sn.file AS srcFile
        FROM edges e
        LEFT JOIN nodes n  ON e.targetId = n.id
        LEFT JOIN nodes sn ON sn.id = e.sourceId
@@ -1198,7 +1208,9 @@ export class SynapsePersistence {
 
     const removable = dangling.filter(e => {
       const symbol = String(e.targetId).split('::').pop() ?? '';
-      if (isUniversalMemberCall(symbol)) return true;
+      // The CALL SITE's language decides the vocabulary: `.apply` is a built-in in JavaScript and an
+      // ordinary declared function in Python (see `isUniversalMemberCall`).
+      if (isUniversalMemberCall(symbol, e.srcFile ?? undefined)) return true;
 
       // NOT REFERENCES AT ALL — three shapes that should never have produced an edge, removed here
       // rather than left to look like resolution failures (ADR 0098).
@@ -1706,8 +1718,8 @@ export class SynapsePersistence {
   public async snapshotHistory(pulseId: string): Promise<void> {
     if (this.readOnly) return;
     await this.run(
-      `INSERT INTO node_history (pulseId, nodeId, gravity, complexity, fingerprint)
-       SELECT ?, id, gravity, complexity, fingerprint FROM nodes`, [pulseId]);
+      `INSERT INTO node_history (pulseId, nodeId, gravity, complexity, fingerprint, shape_fingerprint)
+       SELECT ?, id, gravity, complexity, fingerprint, shape_fingerprint FROM nodes`, [pulseId]);
     // Drop snapshots older than the retention window. Done here rather than as a chore because a
     // maintenance command nobody runs is a table nobody prunes (the reasoning of ADR 0037).
     await this.run(

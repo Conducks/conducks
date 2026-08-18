@@ -1,3 +1,4 @@
+import { decoratorCallee , isProjectSymbolId } from "@/contracts/index.js";
 import { ConducksAdjacencyList, NodeId, ConducksNode, IMPORT_CYCLE_IGNORED_EDGE_TYPES } from "@/lib/core/graph/index.js";
 import type { Advice } from "@/contracts/index.js";
 
@@ -48,8 +49,80 @@ export class ConducksAdvisor {
     // its two top findings, which is the same containers-outrank-code shape ADR 0103 fixed in
     // `context` (ADR 0115).
     const CONTAINERS = new Set(['ECOSYSTEM', 'REPOSITORY', 'PACKAGE', 'NAMESPACE', 'DIRECTORY', 'UNIT']);
+
+    // A SHARED TYPE IS NOT A MONOLITH. An interface, a type alias, an enum and an enum MEMBER exist
+    // to be referenced from everywhere — that is what declaring a shared contract is for, and there
+    // is no "split this" a reader could act on that would not simply duplicate the definition.
+    //
+    // MEASURED on the sofie subject: the top HUB findings were `src/engine/index.ts::tooldefinition`
+    // (52 files), `::llmresponse` (32), `::llm` (30) and `::message` (18) — every one of them an
+    // interface. On the orchestrator subject the top finding was
+    // `packages/core/base_interfaces.ts::onconflict.append` — an ENUM MEMBER, with 27 dependents.
+    // "Consider splitting `OnConflict.APPEND`" is not advice; wide reuse of a constant is the point
+    // of the constant. The rule was generated from fan-in alone, with no notion of what it was
+    // pointing at.
+    // Only a BEHAVIOR (function/method) or a STRUCTURE (class) can be split. ATOMs — constants, enum
+    // members, and the re-export BINDINGS that a barrel mints for a shared type — cannot: the advice
+    // has no action behind it, and wide reuse is the point of the declaration.
+    //
+    // Checked on canonical kind rather than on the declaration keyword, because a type re-exported
+    // through a barrel (`export type { ToolDefinition } from './types.js'`) is recorded as an ATOM
+    // binding on the export line, not as an interface — so a kind-name test sees `binding` and lets
+    // it through. Verified against the vault before choosing this discriminator.
+    const SPLITTABLE = new Set(['BEHAVIOR', 'STRUCTURE']);
+    // …and within STRUCTURE, a TYPE DECLARATION is still not splittable. An interface is kinded
+    // STRUCTURE alongside classes, and the sofie subject's loudest findings were
+    // `src/engine/types.ts::ToolDefinition` (62 files) and `::Message` (25) — both interfaces, both
+    // shared on purpose. A class is kinded `struct` and stays reportable, which is how
+    // `Hands` (scraper) and `AdminFlow` (orchestrator) remain visible.
+    const TYPE_DECLARATIONS = new Set(['interface', 'type', 'typealias', 'enum', 'union', 'alias']);
+
+    // A DATA CARRIER IS A TYPE WEARING A CLASS KEYWORD. Python has no `interface`, so its enums,
+    // dataclasses, NamedTuples, TypedDicts and Protocols are all kinded `struct` alongside real
+    // behavioural classes — and the exclusion above, which reads the declaration keyword, cannot see
+    // them. MEASURED on the scraper subject, whose four loudest hub findings were
+    // `JobConfig` (21 files), `ExtractionResult` (12), `LevelOutputType` (11) and `FeatureSet` (11):
+    // three `@dataclass` containers and one `class LevelOutputType(str, Enum)`. Splitting a shared
+    // record type only duplicates it.
+    //
+    // Decided from DECLARED evidence — the decorator the source carries, or the base it names — and
+    // never from a shape guess, so `BaseSpecialist` and `BaseExtractor` (real behavioural bases on
+    // the same subject, 20+ dependants each) stay reportable.
+    const DATA_DECORATORS = new Set(['dataclass', 'attrs', 'attr.s', 'define', 'frozen', 'model']);
+    const DATA_BASES = new Set([
+      'enum', 'intenum', 'strenum', 'flag', 'intflag', 'namedtuple', 'typeddict', 'protocol',
+      'basemodel', 'dataclass', 'tuple',
+    ]);
+    const isDataCarrier = (node: ConducksNode): boolean => {
+      const decorators = ((node.properties as any)?.dna?.decorators ?? []) as string[];
+      for (const raw of decorators) {
+        const callee = decoratorCallee(raw).split('.').pop()?.toLowerCase() ?? '';
+        if (DATA_DECORATORS.has(callee)) return true;
+      }
+      for (const e of graph.getNeighbors(node.id, 'downstream')) {
+        if (e.type !== 'EXTENDS' && e.type !== 'IMPLEMENTS') continue;
+        const target = String(e.targetId);
+        // An UNRESOLVED base is a bare name with no `::` — `class LevelOutputType(str, Enum)` leaves
+        // `enum`, not `<file>::enum`. Slicing at `lastIndexOf('::') + 2` on such an id starts at
+        // index 1 and yields `num`, which matches nothing: caught by reading the output rather than
+        // the diff, because `LevelOutputType` stayed in the report after the rule was added.
+        const sep = target.lastIndexOf('::');
+        const base = (sep >= 0 ? target.slice(sep + 2) : target).split('.').pop()?.toLowerCase() ?? '';
+        if (DATA_BASES.has(base)) return true;
+      }
+      return false;
+    };
+
     for (const node of nodes as ConducksNode[]) {
       if (CONTAINERS.has(String(node.properties?.canonicalKind ?? node.label ?? ''))) continue;
+      // YOU CANNOT SPLIT A BUILT-IN. `global::str`, `global::os` and `global::sys` were being
+      // reported as monolithic hubs on the scraper subject — they have enormous fan-in by nature and
+      // no source in this repository to divide. Surfaced only once the type-declaration noise above
+      // was removed and the list became short enough to read.
+      if (!isProjectSymbolId(String(node.id))) continue;
+      if (!SPLITTABLE.has(String(node.properties?.canonicalKind ?? node.label ?? ''))) continue;
+      if (TYPE_DECLARATIONS.has(String(node.properties?.kind ?? '').toLowerCase())) continue;
+      if (isDataCarrier(node)) continue;
       const nodeFile = node.properties.filePath;
       const crossFileCallerFiles = new Set(
         graph.getNeighbors(node.id, 'upstream')
@@ -227,8 +300,11 @@ export class ConducksAdvisor {
     const complexity = node.properties.complexity || 1;
     const debtCount = (node.properties.debtMarkers || []).length;
     const fanOut = graph.getNeighbors(node.id, 'downstream').length;
-    const resonance = node.properties.resonance || 0;
-    const entropy = node.properties.entropy || 0;
+    // Both live under `kinetic` — see the note in conducks-core.ts. Read flat, they were 0 for every
+    // symbol ever scored, so two of this function's six weighted terms contributed nothing.
+    const kinetic = (node.properties as any).kinetic ?? {};
+    const resonance = kinetic.resonance ?? (node.properties as any).resonance ?? 0;
+    const entropy = kinetic.entropy ?? (node.properties as any).entropy ?? 0;
 
     const wGravity = 0.25;
     const wComplexity = 0.35;

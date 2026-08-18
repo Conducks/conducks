@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
+import { displayId, displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Trace (Lineage) Command
@@ -146,7 +147,11 @@ export class TraceCommand implements ConducksCommand {
       return;
     }
 
-    console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${symbolId} ---\x1b[0m`);
+    // Relative, real-case display (ADR 0132): a trace prints 15 rows, each of which repeated the
+    // same ~90-character absolute lowercased prefix before the file that answers the question.
+    const traceRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
+    const rel = (p: any) => (p ? displayPath(String(p), traceRoot) : p);
+    console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${displayId(symbolId, traceRoot)} ---\x1b[0m`);
 
     try {
       if (isFlow) {
@@ -158,7 +163,7 @@ export class TraceCommand implements ConducksCommand {
         const flowLimit = stepCap;
         circuit.steps.slice(0, flowLimit).forEach((step: any, i: number) => {
           const prefix = (i + 1).toString().padStart(2, '0');
-          console.log(`${prefix}. [\x1b[36m${step.type}\x1b[0m] ${step.name} (\x1b[2m${step.filePath}\x1b[0m)`);
+          console.log(`${prefix}. [\x1b[36m${step.type}\x1b[0m] ${step.name} (\x1b[2m${rel(step.filePath)}\x1b[0m)`);
         });
         reportTruncation(circuit.steps.length, flowLimit);
       } else {
@@ -168,9 +173,9 @@ export class TraceCommand implements ConducksCommand {
           const n = registry.query.graph.getGraph().getNode(id);
           const prefix = (i + 1).toString().padStart(2, '0');
           if (n) {
-            console.log(`${prefix}. [\x1b[35m${n.label}\x1b[0m] ${n.properties.name} (\x1b[2m${n.properties.filePath}\x1b[0m)`);
+            console.log(`${prefix}. [\x1b[35m${n.label}\x1b[0m] ${n.properties.name} (\x1b[2m${rel(n.properties.filePath)}\x1b[0m)`);
           } else {
-            console.log(`${prefix}. [\x1b[90mEXTERNAL\x1b[0m] ${id} (\x1b[2mUnresolved Ghost Target\x1b[0m)`);
+            console.log(`${prefix}. [\x1b[90mEXTERNAL\x1b[0m] ${displayId(id, traceRoot)} (\x1b[2mUnresolved Ghost Target\x1b[0m)`);
           }
         });
         reportTruncation(steps.length, stepLimit);

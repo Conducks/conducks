@@ -24,6 +24,13 @@ export interface NameIndex {
   findNodesByName(name: string): Array<{ id: string; properties?: unknown }>;
   /** Optional so existing callers that only index by name still satisfy the shape. */
   getNode?(id: string): { id: string } | undefined;
+  /**
+   * Every node id, for resolving an input that IS an id rather than a name.
+   *
+   * Optional for the same reason `getNode` is: a caller that cannot supply it keeps the old
+   * name-based behaviour. See the relative-id branch below for what it fixes.
+   */
+  allNodeIds?(): Iterable<string>;
 }
 
 
@@ -108,6 +115,38 @@ export function tryResolveSymbol(input: string, graph: NameIndex, warn?: (messag
     // path — the bare-name fallback exists for exactly that (ADR 0106) and must survive.
     const looksLikePath = qualifier.includes('/') || /\.[a-z0-9]+$/.test(qualifier);
     if (looksLikePath) {
+      // MATCH THE ID, because the input IS an id. The name-based search below cannot answer two
+      // shapes that `status` and `query` print every day:
+      //
+      //   - a LOWERCASED name. Ids are lowercased on write, so the top hotspot prints as
+      //     `src/core/service/hands.py::hands` while the class is `Hands` — and the name index is
+      //     keyed by the real spelling, with a substring fallback that caps at 20 hits and can
+      //     answer with none of them in the right file.
+      //   - a DOTTED MEMBER id, `mapper_runner.py::mapperrunner.explore`. No node is NAMED
+      //     `mapperrunner.explore`; the name is `explore` and the qualifier is part of the id.
+      //
+      // MEASURED on the scraper subject: `status` printed both of those, and `trace`, `explain` and
+      // `entropy` answered SYMBOL_NOT_FOUND for both — while the same commands accepted them on the
+      // sofie subject, whose top symbol happens to be all-lowercase already. The rule this file
+      // opens with is that an id a command PRINTS must be an id its siblings ACCEPT.
+      const wantedTail = `::${bare.toLowerCase()}`;
+      const idMatches: string[] = [];
+      for (const id of graph.allNodeIds?.() ?? []) {
+        const lower = String(id).toLowerCase().replace(/\\/g, '/');
+        if (!lower.endsWith(wantedTail)) continue;
+        const idFile = lower.slice(0, lower.lastIndexOf('::')).replace(/^\/+/, '');
+        if (idFile === qualifier || idFile.endsWith(`/${qualifier}`) || qualifier.endsWith(`/${idFile}`)) {
+          idMatches.push(String(id));
+        }
+      }
+      if (idMatches.length === 1) return idMatches[0];
+      // Several ids share that tail in that file only when one is a member of another
+      // (`x.ts::foo` and `x.ts::bar.foo`); prefer the exact one the caller spelled.
+      if (idMatches.length > 1) {
+        const exact = idMatches.find(id => id.toLowerCase().endsWith(`/${qualifier}${wantedTail}`));
+        return exact ?? idMatches[0];
+      }
+
       const inFile = graph.findNodesByName(bare).filter(n => {
         const id = String(n.id).toLowerCase().replace(/\\/g, '/');
         const idFile = id.slice(0, id.lastIndexOf('::')).replace(/^\/+/, '');

@@ -60,7 +60,12 @@ export class ResonanceCommand implements ConducksCommand {
             density: pct(diff.metrics?.density),
             kinetic: pct(diff.metrics?.kinetic),
             typology: pct(diff.metrics?.typology),
+            // What the two projects are BUILT FROM, kept apart from the shape score — see
+            // `ResonanceAnalyzer.summarize` for why the two were conflated and what that claimed.
+            ecosystem: pct((diff as any).metrics?.ecosystem),
           },
+          sharedLanguages: (diff as any).sharedLanguages ?? [],
+          sharedPackages: (diff as any).sharedPackages ?? [],
         }, null, 2) + '\n');
         return;
       }
@@ -70,7 +75,15 @@ export class ResonanceCommand implements ConducksCommand {
       console.log(`- Resonance Score: ${diff.similarity ?? 0}%`);
       console.log(`- Summary: ${diff.summary ?? '(none)'}`);
       const fmt = (v: unknown) => { const p = pct(v); return p === null ? 'n/a' : `${p}%`; };
-      console.log(`\x1b[33m- Metrics: Density (${fmt(diff.metrics?.density)}), Kinetic (${fmt(diff.metrics?.kinetic)}), Typology (${fmt(diff.metrics?.typology)})\x1b[0m`);
+      console.log(`\x1b[33m- Shape metrics: Density (${fmt(diff.metrics?.density)}), Kinetic (${fmt(diff.metrics?.kinetic)}), Typology (${fmt(diff.metrics?.typology)})\x1b[0m`);
+      // The stack is reported as its own line because it is its own finding: a high shape score
+      // between projects that share no language is a coincidence of size, and the reader has to be
+      // able to see that without reading the source of the metric.
+      const langs = ((diff as any).sharedLanguages ?? []) as string[];
+      const pkgs = ((diff as any).sharedPackages ?? []) as string[];
+      console.log(`\x1b[33m- Stack overlap: ${fmt((diff as any).metrics?.ecosystem)}\x1b[0m` +
+        (langs.length ? ` \x1b[2m· shared languages: ${langs.join(', ')}\x1b[0m` : ' \x1b[2m· no shared language\x1b[0m') +
+        (pkgs.length ? ` \x1b[2m· shared packages: ${pkgs.slice(0, 6).join(', ')}${pkgs.length > 6 ? ` (+${pkgs.length - 6})` : ''}\x1b[0m` : ''));
     } catch (err) {
       // A leaked driver error is not an answer. Name what failed and exit non-zero.
       console.error(`\x1b[31mComparison failed against ${abs}: ${(err as Error).message}\x1b[0m`);

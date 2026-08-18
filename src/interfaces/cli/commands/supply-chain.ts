@@ -11,6 +11,22 @@ import path from "node:path";
  * trusted-unversioned stdlib vs versioned third-party dependencies, and which packages carry the
  * widest blast radius (most importing files). Versions are joined live from package.json.
  */
+/**
+ * Python packages whose IMPORT name is not their DISTRIBUTION name.
+ *
+ * `import yaml` is declared as `pyyaml`, `import bs4` as `beautifulsoup4`. The graph records what the
+ * code imports and the manifest records what pip installs, so without this map a correctly declared
+ * dependency is reported as undeclared — the same false alarm the root-manifest-only read produced,
+ * one layer down. Kept to the well-known cases; an unknown mismatch reads as undeclared, which is
+ * the honest answer for a name nothing in the tree declares.
+ */
+const PY_DIST_NAMES: Record<string, string> = {
+  yaml: 'pyyaml', bs4: 'beautifulsoup4', PIL: 'pillow', cv2: 'opencv-python',
+  sklearn: 'scikit-learn', dotenv: 'python-dotenv', jwt: 'pyjwt', dateutil: 'python-dateutil',
+  serial: 'pyserial', OpenSSL: 'pyopenssl', pkg_resources: 'setuptools', attr: 'attrs',
+  magic: 'python-magic', win32com: 'pywin32',
+};
+
 export class SupplyChainCommand implements ConducksCommand {
   public id = "supply-chain";
   public description = "Report the dependency / boundary surface (stdlib vs versioned deps)";
@@ -76,7 +92,7 @@ export class SupplyChainCommand implements ConducksCommand {
         packages: pkgRows.map(p => ({
           package: p.pkg,
           importers: Number(p.importers),
-          version: versions.get(p.pkg) ?? null,
+          version: versions.get(p.pkg) ?? versions.get(PY_DIST_NAMES[p.pkg] ?? '') ?? null,
           advisory: byPackage.get(p.pkg) ?? null,
         })),
         advisories: { available },
@@ -106,8 +122,11 @@ export class SupplyChainCommand implements ConducksCommand {
       const SEV = { critical: '\x1b[41m', high: '\x1b[31m', moderate: '\x1b[33m', low: '\x1b[2m' } as Record<string, string>;
 
       for (const p of pkgs) {
-        const ver = versions.get(p.pkg);
-        const verStr = ver ? `\x1b[2m${ver}\x1b[0m` : `\x1b[33m(not in package.json)\x1b[0m`;
+        const ver = versions.get(p.pkg) ?? versions.get(PY_DIST_NAMES[p.pkg] ?? '');
+        // "not in package.json" was wrong twice over: on a Python project there is no package.json,
+        // and in a monorepo the declaration lives one directory down. The manifests are all read
+        // now, so the honest word for a package none of them names is UNDECLARED.
+        const verStr = ver ? `\x1b[2m${ver}\x1b[0m` : `\x1b[33m(undeclared)\x1b[0m`;
         const adv = advisories.get(p.pkg);
         const advStr = adv ? `  ${SEV[adv.severity] ?? ''}[${adv.severity}]\x1b[0m` : '';
         console.log(`    ${p.pkg.padEnd(32)} ${String(Number(p.importers)).padStart(3)} importers  ${verStr}${advStr}`);
@@ -177,19 +196,102 @@ export class SupplyChainCommand implements ConducksCommand {
   }
 
   /** Live-read declared versions from the nearest package.json (dependencies + devDependencies). */
+  /**
+   * Every dependency this repository DECLARES, from every manifest in the tree.
+   *
+   * This used to read the ROOT `package.json` and nothing else, which is wrong in the two layouts
+   * that matter most:
+   *
+   *   - An npm WORKSPACES monorepo declares per workspace. On the orchestrator subject the root
+   *     declares two packages (`react`, `react-dom`) while `app/package.json` declares 33 and
+   *     `admin/package.json` 30 — so `next` (224 importers), `next-auth` (63) and `vitest` (115)
+   *     were all reported "(not in package.json)", two of them decorated with a `[critical]`
+   *     advisory badge. The command's loudest output was produced BY the project doing it right.
+   *
+   *   - A PYTHON project has no `package.json` at all. On the scraper subject every one of the 91
+   *     reported packages was annotated "(not in package.json)" — including its five real
+   *     `pyproject.toml` dependencies.
+   *
+   * Read from the filesystem rather than the graph because the graph does not keep declared
+   * versions: `EssenceLens` parses them and neither the ECOSYSTEM node nor the DEPENDS_ON edge
+   * retains the `version` it was given (verified against both subjects' vaults).
+   */
   private readPackageVersions(projectDir: string): Map<string, string> {
     const out = new Map<string, string>();
-    try {
-      const root = projectDir || process.cwd();
-      const pkgPath = path.join(root, "package.json");
-      if (!fs.existsSync(pkgPath)) return out;
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-      for (const block of [pkg.dependencies, pkg.devDependencies, pkg.peerDependencies]) {
-        if (block && typeof block === "object") {
-          for (const [name, ver] of Object.entries(block)) out.set(name, String(ver));
+    const root = projectDir || process.cwd();
+    const SKIP = new Set(['node_modules', '.git', '.conducks', 'dist', 'build', 'coverage',
+                          'venv', '.venv', '__pycache__', 'vendor', 'target']);
+
+    const walk = (dir: string, depth: number): void => {
+      if (depth > 4) return;
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (e.isDirectory()) {
+          if (!SKIP.has(e.name) && !e.name.startsWith('.')) walk(path.join(dir, e.name), depth + 1);
+          continue;
         }
+        const full = path.join(dir, e.name);
+        try {
+          if (e.name === 'package.json') this.mergePackageJson(full, out);
+          else if (e.name === 'requirements.txt') this.mergeRequirements(full, out);
+          else if (e.name === 'pyproject.toml') this.mergePyproject(full, out);
+        } catch { /* a manifest that will not parse declares nothing */ }
       }
-    } catch { /* best-effort — no versions if package.json is unreadable */ }
+    };
+    walk(root, 0);
     return out;
+  }
+
+  private mergePackageJson(file: string, out: Map<string, string>): void {
+    const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+    for (const block of [pkg.dependencies, pkg.devDependencies, pkg.peerDependencies]) {
+      if (block && typeof block === "object") {
+        // FIRST declaration wins, so the root's pin is not overwritten by a workspace's range.
+        for (const [name, ver] of Object.entries(block)) if (!out.has(name)) out.set(name, String(ver));
+      }
+    }
+  }
+
+  private mergeRequirements(file: string, out: Map<string, string>): void {
+    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith('#') || t.startsWith('-')) continue;
+      const name = t.split(/[<>=!~;[\s]/)[0].trim();
+      const ver = t.slice(name.length).trim() || 'declared';
+      if (name && !out.has(name)) out.set(name, ver);
+    }
+  }
+
+  /**
+   * PEP 621 / Poetry dependency declarations.
+   *
+   * Read with a scanner rather than a TOML parser because the only question here is "is this name
+   * declared, and at what constraint" — and adding a TOML dependency to answer it would be a
+   * supply-chain decision made by the supply-chain command.
+   */
+  private mergePyproject(file: string, out: Map<string, string>): void {
+    const src = fs.readFileSync(file, "utf8");
+
+    // `dependencies = ["duckdb>=1.5.4", ...]`, `dev = [...]`, `optional-dependencies` tables.
+    for (const m of src.matchAll(/^\s*(?:[\w.-]+\s*=\s*)?\[([^\]]*)\]/gms)) {
+      const body = m[1];
+      if (!body.includes('"') && !body.includes("'")) continue;
+      for (const q of body.matchAll(/["']([^"']+)["']/g)) {
+        const spec = q[1].trim();
+        const name = spec.split(/[<>=!~;[\s]/)[0].trim();
+        const ver = spec.slice(name.length).trim() || 'declared';
+        if (/^[A-Za-z][\w.-]*$/.test(name) && !out.has(name)) out.set(name, ver);
+      }
+    }
+
+    // Poetry's table form: `[tool.poetry.dependencies]` followed by `name = "^1.2"` lines.
+    const poetry = src.match(/\[tool\.poetry\.(?:dev-)?dependencies\]([\s\S]*?)(?=\n\[|$)/);
+    if (poetry) {
+      for (const line of poetry[1].split(/\r?\n/)) {
+        const m = line.match(/^\s*([A-Za-z][\w.-]*)\s*=\s*(.+)$/);
+        if (m && !out.has(m[1])) out.set(m[1], m[2].trim().replace(/^["']|["']$/g, ''));
+      }
+    }
   }
 }

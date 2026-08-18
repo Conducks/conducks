@@ -1,5 +1,5 @@
 import { isBuiltIn, getGlobalId } from "@/contracts/index.js";
-import { ConducksAdjacencyList, type EdgeType } from './adjacency-list.js';
+import { ConducksAdjacencyList, type ConducksEdge, type EdgeType } from './adjacency-list.js';
 import { logger } from "@/lib/core/utils/index.js";
 
 
@@ -565,6 +565,33 @@ export class IntraLinker {
       // target for it. One separator, two meanings.
       const looksLikeId = edge.targetId.includes('/') || edge.targetId.includes('\\');
       const constructedNs = IntraLinker.CONSTRUCTED_NAMESPACES.has(edge.targetId.split('::')[0].toLowerCase());
+
+      // ── 2c. A MODULE-QUALIFIED call: `from pkg import mod` then `mod.fn(...)` ──
+      //
+      // The target arrives id-SHAPED and yet resolves to nothing: `pkg/__init__.py::mod.fn`. The
+      // processor bound the RECEIVER — `mod` is a symbol of the package it was imported from — and
+      // then stopped, so the member was never looked up in the module that declares it. Because the
+      // id carries a path separator, the guard below read it as "already resolved" and no block ran.
+      //
+      // The receiver is a MODULE, and the fact needed to resolve it is already in the graph: an
+      // IMPORTS edge from this unit to `pkg/mod.py::unit`, whose basename IS the receiver name. No
+      // inference — a file named `mod.py` imported here, and `mod.fn` names its `fn`.
+      //
+      // MEASURED on the scraper subject: `engine.py:117-120` calls `navigator_patch.apply(...)` and
+      // three siblings, and `impact` reported 0 callers for every one while `prune` called them
+      // ORPHAN. Also `paths.get_project_root()`, called from three files, 0 callers.
+      //
+      // Scoped hard: only for a target that has NO node, only when the symbol part is dotted, and
+      // only against units this file actually imports. Ambiguity is refused, not guessed.
+      if (looksLikeId && !graph.hasNode(edge.targetId) && IntraLinker.RESOLVABLE_TYPES.has(edge.type)) {
+        const bound = this.resolveModuleQualified(graph, edge, unitImports, unitSymbols);
+        if (bound) {
+          graph.rebindEdgeTarget(edge, bound);
+          resolved.push({ id: edge.id, newTargetId: bound });
+          continue;
+        }
+      }
+
       if (edge.targetId.includes('::') && (looksLikeId || constructedNs)) continue;
       if (!IntraLinker.RESOLVABLE_TYPES.has(edge.type)) continue;
 
@@ -1153,6 +1180,61 @@ export class IntraLinker {
       if (!resolvedNodeId || resolvedNodeId === found) continue;
       if (found) return null;
       found = resolvedNodeId;
+    }
+    return found;
+  }
+
+  /**
+   * `mod.fn(...)` where `mod` is an imported MODULE — see the call site (block 2c) for why this
+   * shape reaches the linker looking like an id that already resolved.
+   *
+   * The receiver is matched against the BASENAME of a unit this file imports, which is the same fact
+   * the import statement states. Two imported units cannot share a basename in one resolution, so an
+   * ambiguous receiver is refused rather than picked.
+   */
+  private resolveModuleQualified(
+    graph: ConducksAdjacencyList,
+    edge: ConducksEdge,
+    imports: Map<string, string[]>,
+    symbols: Map<string, Map<string, string>>,
+  ): string | null {
+    const sep = edge.targetId.lastIndexOf('::');
+    if (sep < 0) return null;
+    const symbolPart = edge.targetId.slice(sep + 2);
+    const dot = symbolPart.indexOf('.');
+    if (dot < 1) return null;
+
+    const receiver = symbolPart.slice(0, dot).toLowerCase();
+    const member = symbolPart.slice(dot + 1).toLowerCase();
+    if (!receiver || !member || member.includes('.')) return null;
+
+    const sourceNode = graph.getNode(edge.sourceId);
+    const sourceUnitId =
+      (sourceNode?.properties?.unitId as string | undefined)?.toLowerCase()
+      ?? (edge.sourceId.endsWith('::unit') ? edge.sourceId.toLowerCase() : null);
+    if (!sourceUnitId) return null;
+
+    // A LOCAL of that name SHADOWS the module. `const registry = new ServiceRegistry()` in a file
+    // that also imports `registry.ts` makes `registry.get(...)` a method call on the instance, and
+    // the basename match below would answer it with whatever `registry.ts` happens to export. The
+    // typed-receiver rules (3b-bis) own that case and refuse when no type was recorded; this rule
+    // must not overrule a refusal. Pinned by tests/unit/core/graph/linker-typed-receiver.test.ts.
+    if (graph.hasNode(`${edge.targetId.slice(0, sep)}::${receiver}`)) return null;
+    if (symbols.get(sourceUnitId)?.has(receiver)) return null;
+
+    let found: string | null = null;
+    for (const unitId of imports.get(sourceUnitId) || []) {
+      const file = unitId.slice(0, unitId.lastIndexOf('::'));
+      const base = file.slice(file.lastIndexOf('/') + 1).replace(/\.[^.]+$/, '').toLowerCase();
+      if (base !== receiver) continue;
+      const candidate = symbols.get(unitId)?.get(member);
+      // `mod.fn()` names a MODULE-LEVEL symbol of that module. A candidate like
+      // `registry.ts::serviceregistry.get` is a method of a class declared there — a different
+      // fact, and binding to it would be the guess this rule exists to avoid making.
+      if (!candidate || candidate.toLowerCase() !== `${file}::${member}`) continue;
+      if (candidate === found) continue;
+      if (found) return null; // two modules of that basename declare it — refuse
+      found = candidate;
     }
     return found;
   }

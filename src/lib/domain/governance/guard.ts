@@ -29,12 +29,24 @@ export class RegressionGuard {
     const drift: DriftResult = await this.driftEngine.compare();
 
     if (drift.status === 'STABLE') {
+      // CARRY THE BLIND COUNT. `drift` states how many symbols it could not compare — "15 symbol(s)
+      // had no fingerprint on one side … not confirmed stable" — and this branch replaced that with
+      // a flat "no regression detected", so a CI gate printed a clean pass over a comparison that
+      // could see 1 of 16 symbols. That is the same "a check that ran on nothing is not a pass"
+      // rule (ADR 0044) the INSUFFICIENT_DATA branch below already keeps; a check that ran on a
+      // FRACTION is the same claim in weaker form, and the fraction is the part the reader needs.
+      const blind = (drift.deltas ?? []).filter((d: any) => d.identityGap).length;
+      const compared = (drift.summary as any)?.total_symbols ?? (drift.deltas ?? []).length;
       return {
         block: false,
         risk: 0,
-        message: 'Structural resonance is stable. No regression detected.',
+        message: blind > 0
+          ? `Structural resonance is stable. No regression detected — but ${blind} symbol(s) had no fingerprint on one side and were NOT compared.`
+          : 'Structural resonance is stable. No regression detected.',
         hotspots: [],
-        factors: []
+        factors: blind > 0
+          ? [`${blind} of ${compared} symbol(s) were not comparable — the gate covered the rest, not all of it.`]
+          : []
       };
     }
 

@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import chalk from "chalk";
 import { tryResolveSymbol } from "@/interfaces/cli/shared/error.js";
+import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Explain Command (Signal Decomposition)
@@ -124,7 +125,10 @@ export class ExplainCommand implements ConducksCommand {
 
     console.log(`\n\x1b[1m--- 🛡️ Conducks Structural Explanation ---\x1b[0m`);
     console.log(`Symbol: \x1b[35m${node.properties.name}\x1b[0m (${node.label})`);
-    console.log(`Path:   ${node.properties.filePath}`);
+    // Relative + real case, like every other command since ADR 0132 — this line was the absolute
+    // lowercased path, which is neither pasteable nor short.
+    const explainRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
+    console.log(`Path:   ${displayPath(String(node.properties.filePath ?? ''), explainRoot)}`);
     const doc = (node.properties as any)?.doc;
     if (doc) {
       console.log();

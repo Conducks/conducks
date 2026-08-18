@@ -2,6 +2,7 @@ import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from "@/lib
 // The union used to be spelled out here AND retyped in `conducks_prune`'s summary and enum, which is
 // how two of the five went missing from both (todo53). One list, in contracts.
 import type { DeadCodeType } from "@/contracts/index.js";
+import { hasRegisteringDecorator } from "@/contracts/index.js";
 
 export interface Finding {
   /**
@@ -68,6 +69,9 @@ export class DeadCodeAnalyzer {
     // others) currently emit none, so every type would look orphaned —
     // skip them entirely rather than flood the report with false positives.
     const graphTracksTypes = allEdges.some(e => e.type === 'TYPE_REFERENCE');
+
+    // See `isModuleScoped`: a declaration written inside an expression is that expression's business.
+    const isNested = (n: any): boolean => (n?.properties as any)?.dna?.nestedInExpression === true;
 
     // Cross-file usage is often recorded as a DANGLING reference edge whose
     // target is the bare symbol name (e.g. `ensureCollection`) or a wrong
@@ -220,7 +224,23 @@ export class DeadCodeAnalyzer {
       const isArchitectural = ['STRUCTURE', 'BEHAVIOR', 'INFRA'].includes(node.label) && !isSynthetic;
       const isUntrackableType = DeadCodeAnalyzer.TYPE_KINDS.has((node.properties.kind || '').toLowerCase()) && !graphTracksTypes;
       const referencedByDanglingEdge = danglingRefNames.has(node.properties.name.toLowerCase());
-      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && this.isModuleScoped(node, graph) && incomingRefs.length === 0 && !this.isEntryPoint(node)) {
+
+      // A DECORATOR IS A REFERENCE. `@deco def f()` is `f = deco(f)`: the symbol is handed to
+      // something, and that something is usually a registry that will call it later by key — which
+      // is precisely the shape a graph cannot follow.
+      //
+      // MEASURED on the scraper subject: seven `@_register_validator("...")` functions in
+      // `core/validation/validators.py` reported `[ORPHAN] defined but never referenced`, dispatched
+      // in reality through `_SHAPE_VALIDATORS.get(name, _SHAPE_VALIDATORS["non_empty_string"])`.
+      // A delete verdict on live code, in the category the reader is told is a verdict.
+      //
+      // Only REGISTERING decorators count (see contracts/decorators.ts) — `@dataclass` and
+      // `@staticmethod` hand the symbol to nobody, which is why `Tab` and `StepMetadata` stay
+      // reportable. Unknown decorators count as registering, because a project's own is exactly the
+      // one no list can enumerate.
+      const decorators = ((node.properties as any)?.dna?.decorators ?? []) as string[];
+      const isRegistered = hasRegisteringDecorator(decorators);
+      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && this.isModuleScoped(node, graph, isNested) && incomingRefs.length === 0 && !this.isEntryPoint(node)) {
         // NOTHING IMPORTS THE FILE — so the graph cannot say whether this symbol is dead. Report the
         // question instead of a verdict (oracle T28, ADR 0104). `orphan-module.ts` in the fixture is
         // exactly this: two functions in a file no one imports, previously reported as a confident
@@ -243,7 +263,7 @@ export class DeadCodeAnalyzer {
       // directories, namespaces all carry isExport but are not "exports").
       // Untrackable type declarations are skipped for the same reason as above.
       const isSymbol = ['STRUCTURE', 'BEHAVIOR', 'ATOM', 'INFRA'].includes(node.label);
-      if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && node.properties.isExport) {
+      if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && node.properties.isExport) {
         // Find if any incoming edges are 'IMPORTS' from OTHER files or 'CALLS' from other files
         const externallyUsed = incomingRefs.some((e: any) => {
           const source = graph.getNode(e.sourceId);
@@ -429,6 +449,21 @@ export class DeadCodeAnalyzer {
       // is good enough now" would be a constant asserting something that was false last week and is
       // only true today because thirteen use-positions were closed. `npm run oracle` is where that
       // claim belongs, because there it is re-measured rather than remembered.
+      // Import-site calibration, kept at STATEMENT scope after measuring the alternative.
+      //
+      // Widening it to FILE scope — "this file demonstrably uses some other import, so the extractor
+      // understands it" — closed the Python recall gap (MISSED 4 -> 1) with the parser oracle clean,
+      // and then produced TWO FALSE FINDINGS on the TypeScript subjects, which the oracle could not
+      // see because neither shape occurs in this repository:
+      //
+      //   sofie  `ExecutionReport`  — imported as a type and used only in a type annotation
+      //                               (`toReport?: (result: R) => ExecutionReport`).
+      //   orch.  `trackAction`      — imported ALIASED (`trackAction as coreTrackAction`); the local
+      //                               name is used three times, and the check reads the original.
+      //
+      // Both are extractor coverage gaps, which is exactly what this guard exists to tolerate. The
+      // recall gap stays until those two positions are captured; a missed dead import is acceptable
+      // and a wrong one is not.
       if (!statement.candidates.some(isUsed)) continue;
 
       for (const candidate of statement.candidates) {
@@ -460,12 +495,28 @@ export class DeadCodeAnalyzer {
    * Nested symbols (locals, methods) cannot be reliably proven dead from
    * the static graph, so orphan detection ignores them.
    */
-  private isModuleScoped(node: any, graph: ConducksAdjacencyList): boolean {
+  private isModuleScoped(node: any, graph: ConducksAdjacencyList, nested?: (n: any) => boolean): boolean {
     const parentId = node.properties.parentId;
     if (!parentId) return true;
     const parent = graph.getNode(parentId);
     if (!parent) return true;
-    return ['UNIT', 'NAMESPACE', 'REPOSITORY', 'ECOSYSTEM'].includes((parent as any).label);
+    if (!['UNIT', 'NAMESPACE', 'REPOSITORY', 'ECOSYSTEM'].includes((parent as any).label)) return false;
+
+    // A SYMBOL WRITTEN INSIDE ANOTHER DECLARATION IS NOT MODULE-SCOPED, whatever its parentId says.
+    //
+    // `export const adminAuthOptions = { providers: [ CredentialsProvider({ async authorize(...) {...} }) ] }`
+    // — the parser builds its scope map from function/class/method captures only, so an object
+    // literal is not a scope and the method inside it is parented to the FILE. It then reads as a
+    // module-scoped symbol nothing references, and `prune` issued `[ORPHAN] never referenced` about
+    // NextAuth's sign-in callback on the orchestrator subject (twice: `admin/src/lib/auth/nextauth-admin.ts:36`
+    // and `packages/core/auth/server/modules/nextauth.ts:47`). Deleting it removes admin login.
+    //
+    // Reachability of such a member is the CONTAINER's question, not its own, and the container is
+    // judged on its own row. The parser records the nesting (`dna.nestedInExpression`) because a
+    // variable's recorded RANGE is its identifier — `adminAuthOptions` spans line 1 of a 13-line
+    // literal — so containment is not visible from the graph's line numbers at all. Re-parenting
+    // instead would change the node's id, which every resolved edge and every stored pulse spells.
+    return !nested?.(node);
   }
 
   // Test fixtures, specs, and mocks are not product code — their symbols are never "dead".

@@ -46,7 +46,11 @@ describe('ResonanceAnalyzer Unit Tests 🎼', () => {
     const result = analyzer.analyzeResonance(g1, g2);
 
     expect(result.similarity).toBe(100);
-    expect(result.summary).toContain('Pristine Mirror');
+    // The summary states SHAPE and STACK as two findings. It used to promote a shape score into
+    // "(Same Ecosystem)" — a claim about kinship the analyzer measured nothing to support, which on
+    // the real subjects labelled a Python scraper and an Electron app as sharing an ecosystem.
+    expect(result.summary).toContain('Near-identical structural shape');
+    expect(result.summary.toLowerCase()).not.toContain('same ecosystem');
   });
 
   it('should report weak resonance for dissimilar topology and typology', () => {
@@ -57,6 +61,6 @@ describe('ResonanceAnalyzer Unit Tests 🎼', () => {
     const result = analyzer.analyzeResonance(g1, g2);
 
     expect(result.similarity).toBeLessThan(40);
-    expect(result.summary).toContain('Weak Resonance');
+    expect(result.summary).toContain('Different structural shape');
   });
 });

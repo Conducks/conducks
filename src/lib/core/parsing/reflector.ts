@@ -33,6 +33,94 @@ import fs from "node:fs";
 import { CaptureTags, DEFINITION_CAPTURES } from "@/lib/core/parsing/capture-tags.js";
 
 /**
+ * The decorators/annotations written above a declaration, as source text.
+ *
+ * Read from the TREE rather than from a per-language query, because every grammar spells this the
+ * same two ways and neither depends on the language pack: the decorator is either a SIBLING inside a
+ * wrapper node (Python's `decorated_definition`, Java's `modifiers`) or a leading CHILD of the
+ * declaration itself (TypeScript, C#'s `attribute_list`). Thirteen `queries.scm` files would have to
+ * agree to express the same fact otherwise, and twelve of them currently capture no decorator at all.
+ *
+ * Recorded because `@deco def f()` IS a reference to `f` — see `contracts/decorators.ts` for what the
+ * dead-code analyzer does with it and for the seven wrong delete verdicts that motivated this.
+ */
+const DECORATOR_NODE_TYPES = new Set([
+  'decorator', 'annotation', 'marker_annotation', 'attribute', 'attribute_list',
+]);
+
+/**
+ * Nodes that mean "this declaration is written INSIDE an expression" — an object literal, a call
+ * argument, an array element.
+ *
+ * A method declared there is a MEMBER of whatever the expression builds; it is not a module-scoped
+ * symbol, and its reachability is the container's question. The scope map is built from
+ * function/class/method captures only, so an object literal is not a scope and such a method comes
+ * out parented to the FILE, indistinguishable from a top-level declaration.
+ *
+ * MEASURED on the orchestrator subject: NextAuth's `authorize` — written inside
+ * `CredentialsProvider({ ... })` inside `export const adminAuthOptions = { providers: [ ... ] }` —
+ * was reported `[ORPHAN] Symbol is defined but never referenced` twice. It is the admin sign-in
+ * callback; deleting it removes admin login.
+ *
+ * Recorded here rather than inferred later from line ranges, because a variable's recorded range is
+ * its IDENTIFIER (`adminAuthOptions` spans line 1 of a 13-line literal), so containment is not
+ * visible downstream at all.
+ */
+const EXPRESSION_CONTAINER_TYPES = new Set([
+  'object', 'object_pattern', 'array', 'arguments', 'argument_list',
+  'object_creation_expression', 'dictionary', 'list', 'tuple', 'set',
+]);
+
+/** Stops the walk: past these, we are looking at an ordinary declaration context, not an expression. */
+const DECLARATION_BOUNDARY_TYPES = new Set([
+  'program', 'module', 'source_file', 'translation_unit',
+  'class_body', 'class_declaration', 'class_definition', 'interface_body',
+  'statement_block', 'block', 'function_declaration', 'function_definition', 'method_definition',
+]);
+
+function isNestedInExpression(declNode: any): boolean {
+  let n = declNode?.parent;
+  while (n) {
+    const type = String(n.type ?? '');
+    if (EXPRESSION_CONTAINER_TYPES.has(type)) return true;
+    if (DECLARATION_BOUNDARY_TYPES.has(type)) return false;
+    n = n.parent;
+  }
+  return false;
+}
+
+function decoratorsOf(declNode: any): string[] {
+  if (!declNode) return [];
+  const found: string[] = [];
+
+  const collect = (n: any): void => {
+    if (!n || typeof n.childCount !== 'number') return;
+    for (let i = 0; i < n.childCount; i++) {
+      const child = n.child(i);
+      if (!child) continue;
+      if (DECORATOR_NODE_TYPES.has(child.type)) {
+        const text = String(child.text ?? '').trim();
+        if (text) found.push(text);
+      } else if (child.type === 'modifiers') {
+        // Java/Kotlin park annotations inside a `modifiers` node beside `public`, `static`, …
+        collect(child);
+      }
+    }
+  };
+
+  // A wrapper that exists only to carry the decorators (Python). Guarded on the wrapper actually
+  // being one, so an ordinary parent — a class body, a module — is never scanned: its OTHER children
+  // are its other members, and collecting from there would attribute a sibling's decorator here.
+  const parent = declNode.parent;
+  if (parent && /decorated|annotated/i.test(String(parent.type ?? ''))) collect(parent);
+
+  // Decorators written as leading children of the declaration (TypeScript, C#, Java via `modifiers`).
+  collect(declNode);
+
+  return found;
+}
+
+/**
  * A file that could NOT be read structurally. Thrown, never swallowed.
  *
  * Every one of these used to fall back to a regex extractor that produced nodes and almost no edges.
@@ -296,12 +384,27 @@ export class ConducksReflector {
     const getScopeAt = (
       row: number,
       excludeName?: string,
-      self?: { startRow: number; startCol: number; endRow: number; endCol: number }
+      self?: { startRow: number; startCol: number; endRow: number; endCol: number },
+      col?: number,
     ): string => {
       // Find all scopes that organically encapsulate the row
       const enclosing = scopeMap.filter(s => {
         if (excludeName && s.name === excludeName) return false;
         if (row < s.startRow || row > s.endRow) return false;
+        // SIBLINGS ON ONE LINE ARE NOT NESTED. `{ debug() {}, info() {}, warn() {}, error() {} }`
+        // puts four scopes on one row, so the row test alone lets every one of them "enclose" a
+        // position inside any other, and the scope chain came out as `debug.info.warn.error` — a
+        // name no node has. Edges emitted from inside those methods then carried a SOURCE ID that
+        // does not exist, which `audit` reports, correctly, as "Edge from a node that does not
+        // exist": 34 such edges on the sofie subject, 2 on scraper.
+        //
+        // This is the same one-row ambiguity todo25 fixed for declarations by comparing the
+        // declaration's own span; a reference has no span of its own, but it does have a POSITION,
+        // and containment by position is exact.
+        if (col !== undefined
+            && !(atOrBefore(s.startRow, s.startCol, row, col) && atOrBefore(row, col, s.endRow, s.endCol))) {
+          return false;
+        }
         if (self && atOrBefore(self.startRow, self.startCol, s.startRow, s.startCol)
                  && atOrBefore(s.endRow, s.endCol, self.endRow, self.endCol)) {
           return false;   // s is contained by the declaration being resolved
@@ -367,6 +470,8 @@ export class ConducksReflector {
       if (!firstCapture || !firstCapture.node) continue;
 
       const currentMatchRow = firstCapture.node.startPosition.row;
+      /** The capture's COLUMN, so `getScopeAt` can tell siblings on one line apart (see its filter). */
+      const currentMatchCol = firstCapture.node.startPosition.column;
       const matchNameCap = match.captures.find((c: any) => c.name === CaptureTags.NAME || c.name === 'pulse_assignment_name');
 
       let node: any;
@@ -453,6 +558,10 @@ export class ConducksReflector {
               isExported: match.captures.some((c: any) => c.name === CaptureTags.IS_EXPORTED),
               isStatic: match.captures.some((c: any) => c.name === CaptureTags.IS_STATIC),
               params: paramsOf(match),
+              // What the source hands this symbol to before anything calls it (ADR: decorators.ts).
+              decorators: decoratorsOf(rangeNode),
+              // Written inside an object literal / call argument — a member, not a module symbol.
+              nestedInExpression: isNestedInExpression(rangeNode),
               // The DECLARED return type, or null when the source does not state one.
               //
               // This was the literal `'void'` for every function in every language — 4,267 nodes on
@@ -463,6 +572,16 @@ export class ConducksReflector {
               returns: returnTypeOf(match) };
 
             const fingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${name}|${JSON.stringify(dna)}`).digest('hex');
+            // THE SAME IDENTITY WITHOUT THE NAME, so a RENAME is visible to drift.
+            //
+            // `fingerprint` includes the name, so renaming a symbol changes it and the move query —
+            // "same fingerprint, different id" — cannot match. MEASURED on the orchestrator subject:
+            // conducks renamed `registerCorePrimitives` at 5 sites across 3 files, re-analyzed, and
+            // `drift` answered "✅ Structural resonance stable … Renamed/Moved: 0". On sofie the same
+            // experiment reported 4 renames — but every one was a CHILD symbol whose own name never
+            // changed (`registermemoryipc.now` → `registermemoryipcrenamed.now`); the renamed function
+            // itself was invisible there too. A leaf function has no children, so it went unreported.
+            const shapeFingerprint = crypto.createHash('sha256').update(`${structuralPath(file.path)}|${JSON.stringify(dna)}`).digest('hex');
 
             nodeCache.set(scopedId, {
               name,
@@ -493,6 +612,7 @@ export class ConducksReflector {
                 layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
                 depth: canonical.rank,
                 fingerprint,
+                shapeFingerprint,
                 dna,
                 signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
                 kinetic: {}
@@ -513,6 +633,7 @@ export class ConducksReflector {
                 layer_path: `${unitNode.metadata.layer_path}/${name.toLowerCase()}`,
                 depth: canonical.rank,
                 fingerprint,
+                shapeFingerprint,
                 dna,
                 signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
                 kinetic: {}
@@ -555,10 +676,17 @@ export class ConducksReflector {
               // The workspace map makes a sibling package read as internal rather than as a
               // third-party dependency — without it a monorepo reports its own modules as its
               // supply-chain surface (ADR 0108).
+              // Whether this specifier names a file in THIS repository. The importer answers it from
+              // the discovered path list, and Python's absolute-import style makes the answer
+              // load-bearing: `from foundation.base_interfaces import X` is a bare specifier naming
+              // first-party code, indistinguishable by shape from a package name (ADR 0108's case,
+              // one language over).
+              const resolvedForOrigin = this.imports.resolve(specifier, file.path, allPaths, provider, context);
               const boundary = classifyOrigin(
                 specifier,
                 undefined,
                 new Set((context?.getWorkspacePackages?.() ?? []).map(([n]) => n)),
+                { filePath: file.path, resolvesInRepo: typeof resolvedForOrigin === 'string' && !!resolvedForOrigin },
               );
 
               // Seed the Spectrum with the RAW SPECIFIER for later resolution 🏺
@@ -720,7 +848,7 @@ export class ConducksReflector {
             node.metadata.canonicalRank = canonical.rank;
             node.metadata.displayName = node.name;
 
-            const scope = getScopeAt(currentMatchRow, node.name);
+            const scope = getScopeAt(currentMatchRow, node.name, undefined, currentMatchCol);
             const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
             const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${node.name.toLowerCase()}`;
             const registryEntry = context.getGlobalSymbol(scopedId);
@@ -800,7 +928,15 @@ export class ConducksReflector {
           const explicit = cName === 'heritage_extends' ? 'EXTENDS'
             : cName === 'heritage_implements' ? 'IMPLEMENTS'
             : undefined;
-          this.heritage.process(cText, node.name, spectrum, explicit, currentMatchRow + 1);
+          // SCOPED for the reason the alias branch below gives (todo62): a class declared INSIDE a
+          // function carries its enclosing scope in its node id, so an edge built from the bare name
+          // leaves from an id nothing stores. MEASURED on the scraper subject, where both remaining
+          // "edge from a node that does not exist" findings were exactly this shape —
+          // `class MappedListLevel(MappedLevel)` declared inside a method to dodge a circular import
+          // (specialist.py:166), and `class DummyLevel(BaseLevel)` inside a test function.
+          const heritageScope = getScopeAt(currentMatchRow, node.name, undefined, currentMatchCol);
+          const heritageSource = heritageScope ? `${heritageScope}.${node.name}` : node.name;
+          this.heritage.process(cText, heritageSource, spectrum, explicit, currentMatchRow + 1);
         }
         else if (cName === 'alias' && node) {
           // QUALIFY the target where the match names its source module. A bare original name relies
@@ -818,7 +954,7 @@ export class ConducksReflector {
           // this binding carries its enclosing scope in its id, so an alias edge built from the bare
           // name points at an id nothing stores. `const { helper: doIt } = await import(...)` inside
           // `main2` stores `<file>::main2.doit` and used to emit the edge from `<file>::doit`.
-          const aliasScope = getScopeAt(currentMatchRow, node.name);
+          const aliasScope = getScopeAt(currentMatchRow, node.name, undefined, currentMatchCol);
           const aliasSourceName = aliasScope ? `${aliasScope}.${node.name}` : node.name;
           this.bindings.processAlias(aliasSourceName, resolvedPath ? `${resolvedPath}::${cText.toLowerCase()}` : cText, spectrum, currentMatchRow + 1);
 
@@ -830,7 +966,7 @@ export class ConducksReflector {
           if (resolvedPath && context) context.registerLocalBinding(node.name, resolvedPath, cText);
         }
         else if (cName === 'kinesis_target' || cName === 'kinesis_qualified_target') {
-          const scope = getScopeAt(currentMatchRow);
+          const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
 
           let finalTarget = cText;
           if (captureMap['kinesis_object']) {
@@ -858,7 +994,7 @@ export class ConducksReflector {
           // usually lives in another file that this wave may not have parsed yet. So record the call
           // and let IntraLinker read the answer once the whole graph exists. Still a READ — the
           // return type is written on the method — and it resolves to nothing when it is not.
-          pendingInstanceCall.arm(scopedVarKey(getScopeAt(currentMatchRow), cText));
+          pendingInstanceCall.arm(scopedVarKey(getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol), cText));
         }
         else if (cName === 'instance_call_target') {
           pendingInstanceCall.fire(key => {
@@ -908,7 +1044,7 @@ export class ConducksReflector {
           });
         }
         else if (cName === 'object_name') {
-          pendingObject.arm(scopedVarKey(getScopeAt(currentMatchRow), cText));
+          pendingObject.arm(scopedVarKey(getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol), cText));
         }
         else if (cName === 'object_value') {
           pendingObject.fire(key => {
@@ -932,7 +1068,7 @@ export class ConducksReflector {
           // `const client = new HttpClient()`, and every `client.x()` at module scope then resolved
           // to the WRONG class — a confidently wrong edge, which is worse than the dangling one it
           // replaced. Found by testing shadowing rather than by a failure.
-          pendingInstance.arm(scopedVarKey(getScopeAt(currentMatchRow), cText));
+          pendingInstance.arm(scopedVarKey(getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol), cText));
         }
         else if (cName === 'instance_type') {
           pendingInstance.fire(key => {
@@ -945,13 +1081,13 @@ export class ConducksReflector {
           // map). Same handling as an identifier call-arg: collect now, emit + gate after the loop.
           const a = cText.trim();
           if (/^[A-Za-z_$][\w$]*$/.test(a)) {
-            const scope = getScopeAt(currentMatchRow);
+            const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
             refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a, line: currentMatchRow + 1 });
           }
         }
         else if (cName === 'pulse_assignment_name') {
           const val = captureMap['pulse_assignment_value'] ?? 'unknown';
-          const scopeName = getScopeAt(currentMatchRow);
+          const scopeName = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
           this.flow.processAssignment(cText, val, scopeName, spectrum, currentMatchRow + 1);
         }
         // Triggered by the PATH capture, which all ten grammars already emit, rather than by a
@@ -962,10 +1098,50 @@ export class ConducksReflector {
         else if (cName === 'kinesis_route_path') {
           const pathReg = stripQuotes(cText);
           const method = normalizeHttpMethod(captureMap['route_method'] ?? captureMap['infra_method']);
-          const scopeName = getScopeAt(currentMatchRow);
+          const scopeName = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
+
+          // A ROUTE IS DECLARED WITH A HANDLER. `app.get('/x', handler)` serves a path;
+          // `app.get('/x')` CALLS one — an HTTP client, and by shape the two are identical, which is
+          // why the express pattern matched both.
+          //
+          // MEASURED on the orchestrator subject: 22 of the 314 `route` entry points came from
+          // `scripts/qa/suites/*.mjs`, which drive the running app with `app.get('/api/...')`. One of
+          // them was listed as the route `/api/experts/catalog?type=tutor` — a query string is not a
+          // path a server registers. `entry` is the answer to "what does this application serve", and
+          // a caller is not a door.
+          //
+          // Arity is the discriminator the grammar already has in hand: the argument list of a
+          // declaration carries the path AND the handler.
+          // A HANDLER IS A FUNCTION; a payload is data. `sessionA.post('/api/x', { field: 1 })` is a
+          // client call with two arguments, so arity alone still read nine of the QA suites' calls as
+          // routes. The node kinds below are the ones a route handler is never written as.
+          const NON_HANDLER = new Set([
+            'object', 'array', 'string', 'template_string', 'number', 'true', 'false', 'null',
+            'dictionary', 'list', 'set',
+          ]);
+          const routeCall = match.captures.find((c: any) => c.name === 'kinesis_route')?.node;
+          const argList = routeCall?.childForFieldName?.('arguments');
+          const argCount = argList?.namedChildCount ?? 2;   // unknown shape ⇒ keep the old behaviour
+          const lastArg = argCount >= 2 ? argList?.namedChild?.(argCount - 1) : null;
+          const payloadNotHandler = !!lastArg && NON_HANDLER.has(String(lastArg.type ?? ''));
+
+          // NOBODY AWAITS A ROUTE DECLARATION. `app.get('/x', handler)` registers a handler and
+          // returns the app for chaining; `await client.post('/api/x', body())` is an HTTP call whose
+          // response you are waiting for. The three QA-script calls that survived the arity and
+          // literal-payload rules are all of the second kind — their payload is `form()`, a CALL, and
+          // a call is a legitimate handler shape (`app.get('/x', middleware())`), so the argument
+          // itself cannot settle it. The `await` does.
+          const awaited = String(routeCall?.parent?.type ?? '') === 'await_expression';
+
+          if (argCount < 2 || payloadNotHandler || awaited) {
+            // Modelled as what it is: a request leaving this file toward that path.
+            this.flow.processRequest(pathReg, method, scopeName, spectrum, null, currentMatchRow + 1);
+            continue;
+          }
+
           this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework(), currentMatchRow + 1);
 
-          const scope = getScopeAt(currentMatchRow);
+          const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
           const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
           const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scopePrefix}${scope ? scope.toLowerCase() : 'unit'}`);
           if (targetNode) {
@@ -975,7 +1151,7 @@ export class ConducksReflector {
         else if (cName === 'kinesis_request_url') {
           const url = stripQuotes(cText);
           const method = normalizeHttpMethod(captureMap['req_method'] ?? captureMap['kinesis_method']);
-          const scopeName = getScopeAt(currentMatchRow);
+          const scopeName = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
           // The RECEIVER is what tells `processRequest` this is genuinely a network call. Omitting
           // it left the gate with no evidence for a relative URL, so every `fetch('/path')` was
           // rejected as noise. `@req_fn` / `@kinesis_object` carry it depending on call shape.
@@ -988,6 +1164,68 @@ export class ConducksReflector {
           // `ALIASES` is absent from dead-code's REFERENCE_EDGES, so a default export nobody imports
           // stays reportable. The edge exists to let a default import, which can only name
           // `<module>::default`, be rebound to the declaration that id stands for.
+          // MINT THE NODE THE EDGE COMES FROM. This pushed an edge whose source id — `<file>::default`
+          // — was never created, so `audit` reported it, correctly, as "Edge from a node that does not
+          // exist": 96 such findings on the sofie subject and 87 on the orchestrator, one per React
+          // component file, drowning the two real cycles they were listed beside. That is a finding
+          // about conducks, produced by conducks, and the honest fix is to make the node exist rather
+          // than to teach the checker to look away.
+          //
+          // Kinded ATOM and not exported on purpose: `default` is a NAME, not a declaration, so it
+          // must not become a prune candidate — the declaration it aliases is judged on its own row.
+          const defaultId = `${file.path.toLowerCase()}::default`;
+          if (!nodeCache.has(defaultId)) {
+            const aliasMeta = mapToCanonical('variable');
+            nodeCache.set(defaultId, {
+              name: 'default',
+              kind: 'alias' as any,
+              canonicalKind: aliasMeta.kind,
+              canonicalRank: aliasMeta.rank,
+              range: { start: { line: currentMatchRow + 1, column: 0 }, end: { line: currentMatchRow + 1, column: 0 } },
+              label: aliasMeta.kind,
+              isShallow: false,
+              filePath: file.path,
+              isExport: false,
+              properties: {
+                filePath: file.path,
+                name: 'default',
+                range: { start: { line: currentMatchRow + 1, column: 0 }, end: { line: currentMatchRow + 1, column: 0 } },
+                isExport: false,
+                isAlias: true,
+                canonicalKind: aliasMeta.kind,
+                canonicalRank: aliasMeta.rank,
+                parentId: fileId,
+                unitId: fileId,
+                namespaceId: unitNode.metadata.namespaceId,
+                rootId: unitNode.metadata.rootId,
+                structureId: null,
+                layer_path: `${unitNode.metadata.layer_path}/default`,
+                depth: aliasMeta.rank,
+                dna: {},
+                signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
+                kinetic: {},
+              },
+              metadata: {
+                id: defaultId,
+                isTest: isTestFile,
+                isExport: false,
+                isAlias: true,
+                canonicalKind: aliasMeta.kind,
+                canonicalRank: aliasMeta.rank,
+                parentId: fileId,
+                unitId: fileId,
+                namespaceId: unitNode.metadata.namespaceId,
+                rootId: unitNode.metadata.rootId,
+                structureId: null,
+                layer_path: `${unitNode.metadata.layer_path}/default`,
+                depth: aliasMeta.rank,
+                dna: {},
+                signature: { returnTypes: [], throwsTypes: [], sideEffects: [] },
+                kinetic: {},
+              },
+            } as any);
+          }
+
           spectrum.relationships.push({
             sourceName: 'default',
             targetName: cText.trim().toLowerCase(),
@@ -997,7 +1235,7 @@ export class ConducksReflector {
           });
         }
         else if (cName === 'pulse_type_target') {
-          const scope = getScopeAt(currentMatchRow);
+          const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
           this.calls.process(cText, scope, 'TYPE_REFERENCE', spectrum, [], context, currentMatchRow + 1);
         }
         else if (cName === CaptureTags.COMMENT) {
@@ -1018,7 +1256,7 @@ export class ConducksReflector {
         if (cName === CaptureTags.COMMENT && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
-            const scopeName = getScopeAt(currentMatchRow);
+            const scopeName = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
             const scopePrefix = scopeName ? `${scopeName.toLowerCase()}.` : '';
             const targetId = `${file.path.toLowerCase()}::${scopePrefix}${scopeName ? scopeName.toLowerCase() : 'unit'}`;
             const targetNode = nodeCache.get(targetId);

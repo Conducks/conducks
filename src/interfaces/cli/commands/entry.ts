@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
+import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Entry Command
@@ -52,13 +53,17 @@ export class EntryCommand implements ConducksCommand {
         .filter(n => n.properties?.isEntryPoint)
         .sort((a, b) => (b.properties?.rank || 0) - (a.properties?.rank || 0));
 
+      const jsonRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
       if (useJson) {
         process.stdout.write(JSON.stringify(entryPoints.map(n => ({
           // The FULL id, because this is what a caller feeds back into impact/explain/trace.
           id: n.id,
           name: n.properties?.name ?? null,
           kind: n.properties?.canonicalKind ?? n.label ?? null,
-          file: n.properties?.filePath ?? null,
+          // Case repaired so the path OPENS; absolute, because a script may run from anywhere.
+          file: n.properties?.filePath
+            ? `${jsonRoot}/${displayPath(String(n.properties.filePath), jsonRoot)}`
+            : null,
           line: n.properties?.range?.start?.line ?? n.properties?.lineStart ?? null,
           // WHY this is an entry point, so the answer can be argued with rather than trusted.
           reason: n.properties?.entryReason ?? null,
@@ -67,6 +72,10 @@ export class EntryCommand implements ConducksCommand {
         return;
       }
 
+      // The FILE column was the absolute lowercased path truncated to 52 characters, which on any
+      // real tree shows the machine's home directory and nothing else. Relative + real case makes
+      // the column carry the answer instead of the prefix (ADR 0132).
+      const entryRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
       console.log("\x1b[1m--- 🚪 Project Entry Points ---\x1b[0m");
       console.log(`- Detected: ${entryPoints.length}\n`);
 
@@ -81,7 +90,7 @@ export class EntryCommand implements ConducksCommand {
       console.log("-".repeat(112));
 
       for (const n of entryPoints) {
-        const file = String(n.properties?.filePath ?? '');
+        const file = displayPath(String(n.properties?.filePath ?? ''), entryRoot);
         const line = n.properties?.range?.start?.line ?? n.properties?.lineStart;
         console.log(
           '\x1b[33m' + col(String(n.properties?.entryReason ?? '?'), 16) + '\x1b[0m' +

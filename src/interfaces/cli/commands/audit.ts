@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { displayMessage } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Audit Command (Standardized Taxonomy)
@@ -42,6 +43,12 @@ export class AuditCommand implements ConducksCommand {
 
     const auditData = await (registry.audit as any).audit();
 
+    // Findings are built in the domain layer, where an id is the only handle it has. Rewriting the
+    // ids at the PRINT boundary keeps them ids in the data and paths in the output (ADR 0132) —
+    // three per circular finding, ~270 characters of identical absolute prefix on one line.
+    const auditRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
+    const msg = (m: string) => displayMessage(String(m ?? ''), auditRoot);
+
     // 1. Structural Orphans (Conducks Refactoring Alerts) 🏺
     if (!useJson && auditData.stats.orphans > 0) {
       console.log(`\n\x1b[31m💣 [Refactoring Alert] ${auditData.stats.orphans} Orphaned Synapses Detected:\x1b[0m`);
@@ -49,7 +56,7 @@ export class AuditCommand implements ConducksCommand {
       auditData.violations
         .filter((v: any) => v.type === 'REFACTOR')
         .slice(0, 10)
-        .forEach((v: any) => console.log(`  - ${v.message}`));
+        .forEach((v: any) => console.log(`  - ${msg(v.message)}`));
       if (auditData.stats.orphans > 10) console.log(`  ... and ${auditData.stats.orphans - 10} more.`);
     }
 
@@ -58,7 +65,7 @@ export class AuditCommand implements ConducksCommand {
       console.log(`\n\x1b[31m🔄 [Architectural Alert] ${auditData.stats.cycles} Circular Dependencies Detected:\x1b[0m`);
       auditData.violations
         .filter((v: any) => v.type === 'CIRCULAR')
-        .forEach((v: any) => console.log(`  - ${v.message}`));
+        .forEach((v: any) => console.log(`  - ${msg(v.message)}`));
     }
 
     // 2a. Mutual-call tangles (ARCH-6) — reported, never a failure. ADR 0017 took these OUT of ARCH-3
@@ -68,7 +75,7 @@ export class AuditCommand implements ConducksCommand {
     const tangles = (auditData.discoveries || []).filter((d: any) => d.type === 'TANGLE');
     if (!useJson && tangles.length > 0) {
       console.log(`\n\x1b[33m🪢 [Mutual Calls] ${tangles.length} symbol tangle(s) — informational, not a violation:\x1b[0m`);
-      tangles.slice(0, 10).forEach((d: any) => console.log(`  - ${d.message}`));
+      tangles.slice(0, 10).forEach((d: any) => console.log(`  - ${msg(d.message)}`));
       if (tangles.length > 10) console.log(`  ... and ${tangles.length - 10} more.`);
     }
 
@@ -76,12 +83,12 @@ export class AuditCommand implements ConducksCommand {
     const selfImports = auditData.violations.filter((v: any) => v.type === 'SELF_IMPORT');
     if (!useJson && selfImports.length > 0) {
       console.log(`\n\x1b[33m♻️  [Self-Import] ${selfImports.length} file(s) import/re-export from themselves:\x1b[0m`);
-      selfImports.forEach((v: any) => console.log(`  - ${v.message}`));
+      selfImports.forEach((v: any) => console.log(`  - ${msg(v.message)}`));
     }
 
     // 3. Sentinel Static Governance (Rule-based)
     const sentinel = registry.audit.createSentinel();
-    const rulesPath = path.join(registry.infrastructure.chronicle.getProjectDir(), 'config/sentinel.json');
+    const rulesPath = path.join((registry as any).infrastructure?.chronicle?.getProjectDir?.(), 'config/sentinel.json');
     // Read via rulesPath, not a cwd-relative literal: running the CLI from outside the project
     // root used to swallow ENOENT and evaluate an EMPTY rule set, so `audit` reported
     // "Governance confirmed" while checking nothing. Warn rather than pass silently.
@@ -106,7 +113,13 @@ export class AuditCommand implements ConducksCommand {
         discoveries: auditData.discoveries ?? [],
         sentinel: { success: report.success, ruleCount: rules.length, violations: report.violations },
       }, null, 2) + '\n');
-      if (!report.success || !auditData.success) process.exit(1);
+      // `process.exitCode` + `return`, never `process.exit()` — the same rule the dispatcher states
+      // at interfaces/cli/index.ts. `process.exit` does not wait for stdout to drain, and a pipe
+      // holds 64 KiB, so on any codebase with more than that much findings every caller reading
+      // this JSON through a pipe got it cut off mid-string at exactly 65536 bytes. Redirected to a
+      // FILE the whole payload arrived, which is why it survived: the benchmark's own harness read
+      // it through a pipe, caught the parse error in a bare `catch`, and printed nothing.
+      if (!report.success || !auditData.success) process.exitCode = 1;
       return;
     }
 
@@ -134,7 +147,8 @@ export class AuditCommand implements ConducksCommand {
       console.log("\x1b[31m❌ [Core] Structural regressions found — see the findings above.\x1b[0m");
     }
 
-    if (!report.success || !auditData.success) process.exit(1);
+    // Same reason as the `--json` branch above: let stdout drain, set the code, return.
+    if (!report.success || !auditData.success) process.exitCode = 1;
   }
 
 }

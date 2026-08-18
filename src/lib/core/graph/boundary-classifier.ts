@@ -38,10 +38,59 @@ const NODE_STDLIB = new Set<string>([
  * @param specifier  the raw module string, e.g. `path`, `node:fs`, `@scope/pkg/sub`, `./util`, `@/lib/x`
  * @param internalAliases  alias prefixes the repo maps to itself (e.g. `@/`, `~/`). Treated as internal.
  */
+/**
+ * Python's standard library — the modules a `.py` file imports without declaring anything.
+ *
+ * Without this every one of them read as a third-party DEPENDENCY. MEASURED on the scraper subject:
+ * `logging` (80 importers), `typing` (79), `asyncio` (50), `pathlib` (48), `json` (45) and a dozen
+ * more were listed under "Dependencies by blast radius" and annotated as undeclared — inflating a
+ * 5-dependency project to a claimed 91 and making the command unusable for the question it exists to
+ * answer. The `stdlib` bucket it should have filled held 2 entries.
+ */
+const PYTHON_STDLIB = new Set<string>([
+  'abc', 'argparse', 'array', 'ast', 'asyncio', 'base64', 'binascii', 'bisect', 'builtins', 'bz2',
+  'calendar', 'cmath', 'collections', 'colorsys', 'concurrent', 'configparser', 'contextlib', 'copy',
+  'csv', 'ctypes', 'dataclasses', 'datetime', 'decimal', 'difflib', 'dis', 'email', 'enum', 'errno',
+  'faulthandler', 'filecmp', 'fileinput', 'fnmatch', 'fractions', 'ftplib', 'functools', 'gc',
+  'getpass', 'gettext', 'glob', 'graphlib', 'gzip', 'hashlib', 'heapq', 'hmac', 'html', 'http',
+  'imaplib', 'importlib', 'inspect', 'io', 'ipaddress', 'itertools', 'json', 'keyword', 'linecache',
+  'locale', 'logging', 'lzma', 'mailbox', 'math', 'mimetypes', 'mmap', 'multiprocessing', 'netrc',
+  'numbers', 'operator', 'os', 'pathlib', 'pickle', 'pkgutil', 'platform', 'plistlib', 'pprint',
+  'profile', 'pstats', 'pty', 'queue', 'quopri', 'random', 're', 'readline', 'reprlib', 'resource',
+  'sched', 'secrets', 'select', 'selectors', 'shelve', 'shlex', 'shutil', 'signal', 'site', 'smtplib',
+  'socket', 'socketserver', 'sqlite3', 'ssl', 'stat', 'statistics', 'string', 'stringprep', 'struct',
+  'subprocess', 'symtable', 'sys', 'sysconfig', 'tarfile', 'tempfile', 'termios', 'textwrap',
+  'threading', 'time', 'timeit', 'token', 'tokenize', 'tomllib', 'trace', 'traceback', 'tracemalloc',
+  'tty', 'types', 'typing', 'unicodedata', 'unittest', 'urllib', 'uuid', 'venv', 'warnings', 'wave',
+  'weakref', 'webbrowser', 'wsgiref', 'xml', 'xmlrpc', 'zipfile', 'zipimport', 'zlib', 'zoneinfo',
+  '__future__',
+]);
+
+/** File extensions whose imports are read against Python's vocabulary rather than Node's. */
+function isPythonFile(filePath?: string): boolean {
+  return /\.pyi?$/i.test(String(filePath ?? ''));
+}
+
 export function classifyOrigin(
   specifier: string,
   internalAliases: string[] = ['@/', '~/'],
   workspacePackages?: ReadonlySet<string>,
+  opts?: {
+    /** The file the import is written in — decides which standard library applies. */
+    filePath?: string;
+    /**
+     * True when this specifier resolves to a file inside the repository.
+     *
+     * Python's absolute-import style (`from foundation.base_interfaces import X`) is a BARE
+     * specifier that names first-party code, and no amount of string inspection can tell it from a
+     * package name. The importer already resolves it against the discovered file list; passing the
+     * answer in is a READ of that, not a second guess. MEASURED on the scraper subject:
+     * `foundation.base_interfaces` (15 importers), `core.mapper.mapper_runner`,
+     * `core.browser.adaptive_manager` and others were reported as third-party dependencies of the
+     * project that declares them.
+     */
+    resolvesInRepo?: boolean;
+  },
 ): BoundaryClassification {
   const spec = (specifier || '').trim().replace(/^['"]|['"]$/g, '');
 
@@ -59,9 +108,21 @@ export function classifyOrigin(
     if (workspacePackages.has(name)) return { origin: 'internal', package: null };
   }
 
+  // RESOLVED INSIDE THE REPO — the strongest evidence available, and the only thing that separates
+  // Python's first-party absolute imports from package names.
+  if (opts?.resolvesInRepo) return { origin: 'internal', package: null };
+
   // `node:`-prefixed, or a bare Node core module → stdlib.
   if (spec.startsWith('node:')) return { origin: 'stdlib', package: null };
   const head = spec.split('/')[0];
+
+  if (isPythonFile(opts?.filePath)) {
+    // Python dots the package path: `urllib.parse` and `os.path` are the stdlib's own submodules.
+    const pyHead = spec.split('.')[0];
+    if (PYTHON_STDLIB.has(pyHead)) return { origin: 'stdlib', package: null };
+    return { origin: 'dependency', package: pyHead || spec };
+  }
+
   if (NODE_STDLIB.has(head)) return { origin: 'stdlib', package: null };
 
   // Everything else is a third-party dependency. Package = `@scope/name` or the first path segment.

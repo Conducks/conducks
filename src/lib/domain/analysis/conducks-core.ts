@@ -192,8 +192,21 @@ export class Conducks {
     if (!node) return null;
 
     // Leverage Conducks persistent signals
-    const entropyRisk = node.properties.entropy || 0;
-    const churnRisk = Math.min((node.properties.resonance || 0) / 100, 1.0);
+    // CHURN AND ENTROPY LIVE UNDER `kinetic`, and this read the flat names — which no writer sets.
+    //
+    // `reflector.ts` writes `n.metadata.kinetic = { resonance, entropy, ... }` from one `git log` per
+    // file, and persistence keeps it (`kinetic` JSON column, plus `churn_count_90d`). Nothing ever
+    // wrote `properties.resonance` or `properties.entropy`, so both terms were `|| 0` for every
+    // symbol in every project — 10% of the composite score, and a `churn: 0.00` line printed in
+    // `explain`'s breakdown as if it had been measured.
+    //
+    // MEASURED on the three subjects, all of which have deep git history: sofie 975 commits,
+    // orchestrator 288, scraper 213. `registerIpcHandlers` carries `kinetic.resonance = 116`, which
+    // is exactly `git log --oneline -- electron/main/index.ts | wc -l`. The number was in the vault
+    // the whole time, one key deeper than the reader looked.
+    const kinetic = (node.properties as any).kinetic ?? {};
+    const entropyRisk = kinetic.entropy ?? node.properties.entropy ?? 0;
+    const churnRisk = Math.min((kinetic.resonance ?? (node.properties as any).resonance ?? 0) / 100, 1.0);
     const complexityRisk = Math.min((node.properties.complexity || 1) / 20, 1.0);
     const outgoing = graph.getNeighbors(nodeId, 'downstream').length;
     const fanOutRisk = Math.min(outgoing / 10, 1.0);

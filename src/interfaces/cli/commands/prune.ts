@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { warnIfStale } from "@/interfaces/cli/shared/stale-warning.js";
 import { DEAD_CODE_TYPES } from "@/contracts/index.js";
+import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Prune Command
@@ -57,9 +58,21 @@ export class PruneCommand implements ConducksCommand {
     // The verdict/question split (ADR 0104) travels as a FIELD rather than as two arrays: a caller
     // that ignores it gets every finding, which is the safe default, and one that reads it can tell
     // "this is unused" from "the graph cannot tell".
+    // The path a finding names must be one the reader can OPEN. Ids are lowercased (CONDUCKS-4) and
+    // `file` was printed straight from the id, so `renderer/src/lib/useWorkGraph.ts` was reported as
+    // `useworkgraph.ts` — a path that resolves on APFS by luck and on Linux CI not at all, in the one
+    // command whose output is a list of files to go and edit.
+    const projectRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
+    const realFile = (f: string) => {
+      const rel = displayPath(f, projectRoot);
+      return rel === f ? f : `${projectRoot}/${rel}`;
+    };
+
     if (args.includes('--json')) {
+      // JSON keeps the ABSOLUTE path — a script may be running from anywhere — with the case repaired.
       process.stdout.write(JSON.stringify(findings.map((f: any) => ({
         ...f,
+        file: realFile(f.file),
         claim: f.type === 'UNIMPORTED_MODULE' ? 'question' : 'verdict',
       })), null, 2) + '\n');
       return;
@@ -76,16 +89,27 @@ export class PruneCommand implements ConducksCommand {
       const questions = findings.filter((f: any) => f.type === 'UNIMPORTED_MODULE');
       const verdicts = findings.filter((f: any) => f.type !== 'UNIMPORTED_MODULE');
 
+      // STATE THE DENOMINATOR, like `flows` and `context` already do. The rendered view listed rows
+      // and never said how many — so "how much dead weight is there" meant counting lines by hand,
+      // and a filtered run (`--type`, `--limit`) looked identical to a complete one. `--json` has
+      // carried the whole set all along, which is the asymmetry ADR 0148 exists to close.
+      const counts = findings.reduce((acc: Record<string, number>, f: any) => {
+        acc[f.type] = (acc[f.type] ?? 0) + 1;
+        return acc;
+      }, {});
+      const breakdown = Object.entries(counts).map(([t, n]) => `${n} ${t}`).join(' · ');
+      console.log(`${findings.length} finding(s): ${verdicts.length} verdict(s), ${questions.length} question(s)  [${breakdown}]\n`);
+
       verdicts.forEach((f: any) => {
         const color = f.type === 'UNUSED_EXPORT' ? '\x1b[33m' : '\x1b[31m';
-        console.log(`${color}- [${f.type}] ${f.symbol} (${f.file})\x1b[0m`);
+        console.log(`${color}- [${f.type}] ${f.symbol} (${displayPath(f.file, projectRoot)})\x1b[0m`);
         console.log(`  └─ ${f.message}`);
       });
 
       if (questions.length > 0) {
         console.log(`\n\x1b[1m--- ❓ Questions — not findings, and not safe to delete on this evidence ---\x1b[0m`);
         for (const f of questions) {
-          console.log(`\x1b[36m- [${f.type}] ${f.symbol} (${f.file})\x1b[0m`);
+          console.log(`\x1b[36m- [${f.type}] ${f.symbol} (${displayPath(f.file, projectRoot)})\x1b[0m`);
           console.log(`  └─ ${f.message}`);
         }
       }

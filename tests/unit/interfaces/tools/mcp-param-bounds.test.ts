@@ -59,12 +59,17 @@ const mockGraph = {
 
 // Five flows: three with 3 members, two with 1. `min_members: 2` therefore matches THREE of five —
 // the number `total` used to hide by reporting all five regardless of the filter.
+// REAL ID SHAPES. A flow member is `<absolute path>::<symbol>`; bare names like `a` are what an
+// UNPLACED reference looks like, and `min_members` now counts this project's own symbols (built-ins
+// and unresolved targets are reach, not membership). The assertions below are unchanged — only the
+// fixture stopped describing a shape the producer never emits, which is the trap
+// `scope-shadowing.test.ts` documents for hand-built graphs.
 const processes: Record<string, string[]> = {
-  alpha: ['a', 'b', 'c'],
-  beta: ['a', 'b', 'c'],
-  gamma: ['a', 'b', 'c'],
-  delta: ['a'],
-  epsilon: ['a'],
+  alpha: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'],
+  beta: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'],
+  gamma: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'],
+  delta: ['/repo/src/a.ts::a'],
+  epsilon: ['/repo/src/a.ts::a'],
 };
 
 jest.unstable_mockModule('@/registry/index.js', () => ({

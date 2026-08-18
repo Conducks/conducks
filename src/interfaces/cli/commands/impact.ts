@@ -3,7 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import chalk from "chalk";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
-import { displayPath } from "@/interfaces/cli/shared/display-path.js";
+import { displayPath, displayId } from "@/interfaces/cli/shared/display-path.js";
 import { warnIfStale } from "@/interfaces/cli/shared/stale-warning.js";
 
 /**
@@ -90,8 +90,9 @@ export class ImpactCommand implements ConducksCommand {
         return;
       }
 
+      const summaryRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
       console.log(`\n${chalk.bold.blue('Structural Diagnostic Summary:')}`);
-      console.log(`${chalk.dim('Node ID:')} ${resolvedId}`);
+      console.log(`${chalk.dim('Node ID:')} ${displayId(resolvedId, summaryRoot)}`);
       if (composite) {
         console.log(`${chalk.dim('Composite Risk Score:')} ${(composite.score * 10).toFixed(1)} / 10.0`);
         if (composite.factors && composite.factors.length > 0) {
@@ -99,14 +100,34 @@ export class ImpactCommand implements ConducksCommand {
         }
       }
 
-      console.log(`\n\x1b[1m--- Conducks ${direction.toUpperCase()} Impact Report: ${resolvedId} ---\x1b[0m`);
+      console.log(`\n\x1b[1m--- Conducks ${direction.toUpperCase()} Impact Report: ${displayId(resolvedId, summaryRoot)} ---\x1b[0m`);
       // SAY WHICH QUESTION THE NUMBER ANSWERS. The default depth is 5, so this is a TRANSITIVE blast
       // radius, and it was printed as a bare count — `createLogger` reads "409 Symbols affected"
       // where 71 of them are direct. A reader asking "who calls this" takes the headline as the
       // answer to that, and it is the answer to a different, larger question. The depth was already
       // a flag; only the label was missing (todo44#P6 fixed the flag, CONDUCKS-37 the empty case).
-      console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${impact.affectedCount} Symbols affected `
+      // SPLIT THE HEADLINE: this codebase, and everything outside it.
+      //
+      // `affectedNodes` includes every unresolved and external target the walk reached —
+      // `ipcmain.handle`, `abortsignal.timeout`, `global::set` — and they were counted in the one
+      // number a reader acts on. MEASURED on the sofie subject: of the 876 nodes reported affected by
+      // `registerIpcHandlers`, **338 (39%) had `filePath: "unknown"` or an `external://` path**. The
+      // blast radius of a change is a fact about the code you own; a built-in is not going to break.
+      //
+      // Both numbers are printed rather than the external one dropped, because "this call reaches 338
+      // things I could not place" is itself worth knowing — it is the same honesty the zero-case
+      // below already practises.
+      const affected = (impact.affectedNodes ?? []) as Array<{ filePath?: string }>;
+      const externalCount = affected.filter(n => {
+        const f = String(n.filePath ?? '');
+        return !f || f === 'unknown' || f.startsWith('external://');
+      }).length;
+      const projectCount = Math.max(Number(impact.affectedCount) - externalCount, 0);
+      console.log(`\x1b[35mWeighted Impact Coverage:\x1b[0m ${projectCount} Symbols affected in this project `
         + chalk.dim(depth === 1 ? '(direct only)' : `(up to ${depth} hops — '--depth 1' for direct callers only)`));
+      if (externalCount > 0) {
+        console.log(chalk.dim(`  + ${externalCount} external or unresolved reference(s) reached — built-ins, packages, and targets this analysis could not place.`));
+      }
 
       // A TRUE ZERO AND A BROKEN ZERO MUST NOT PRINT THE SAME OUTPUT (todo44#P6, CONDUCKS-37).
       //
@@ -168,7 +189,7 @@ export class ImpactCommand implements ConducksCommand {
         // absolute path seven times, which is most of the width and none of the information.
         const shown = impact.affectedNodes.slice(0, 10);
         const reader = registry.source.lineReader();
-        const root = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+        const root = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
         // `displayPath` rather than a slice: the id is lowercased (CONDUCKS-4), so slicing gives a
         // path that matches no file in the reader's editor. Ids are untouched; only this line is.
         const rel = (p: string) => displayPath(p, root);

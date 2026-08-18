@@ -101,13 +101,29 @@ export class ContextCommand implements ConducksCommand {
       //
       // This is rendering, not a second answer: it re-labels part of the same neighbourhood using
       // `getImpact`, which is why it does not belong in the shared domain function.
-      const callers = registry.kinetic.getImpact(resolvedId, 'upstream', 1).affectedNodes
-        .filter((n: any) => n.path.length > 0 && n.path[n.path.length - 1] === 'CALLS');
+      // A CLASS IS NOT CALLED, IT IS CONSTRUCTED — and this accepted `CALLS` alone, so for every
+      // class the section vanished silently.
+      //
+      // MEASURED on the scraper subject: `Hands` is the project's top symbol, `impact Hands upstream`
+      // reports 153 affected symbols including `Hands._annotate_groups(root)` at hands.py:1053 and
+      // `hands.ingest_blueprint(...)` at mapper_runner.py:693 — and `context Hands` printed no caller
+      // section at all. Two commands, one graph, opposite answers to "who uses this".
+      //
+      // The heading keeps the word "Called" because that is the common case and the wording is
+      // pinned by tests/integration/features/traversal-truth.test.ts; each row now names its own
+      // relation, so a construction is not reported as a call.
+      const USE_EDGES = new Set(['CALLS', 'CONSTRUCTS', 'ACCESSES', 'EXTENDS', 'IMPLEMENTS', 'TYPE_REFERENCE']);
+      // Asked at depth 2 and filtered to ONE EDGE, because the depth argument is a WEIGHTED distance:
+      // a `CONSTRUCTS` edge weighs 1.2, so `depth: 1` excluded the only user of every class even
+      // after the edge set above was widened. Path LENGTH is the honest expression of "direct user".
+      const callers = registry.kinetic.getImpact(resolvedId, 'upstream', 2).affectedNodes
+        .filter((n: any) => n.path.length === 1 && USE_EDGES.has(n.path[0]));
       if (callers.length > 0) {
-        console.log(`  Called by:`);
+        console.log(`  Called by / used by:`);
         for (const c of callers) {
           const at = c.filePath !== 'unknown' ? `${rel(c.filePath)}${c.line ? `:${c.line}` : ''}` : 'unknown';
-          console.log(`    ← ${c.name} (${at})`);
+          const relation = String(c.path[c.path.length - 1]).toLowerCase();
+          console.log(`    ← ${c.name} (${at})  \x1b[2m[${relation}]\x1b[0m`);
         }
         console.log(`  In radius:`);
       }

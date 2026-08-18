@@ -88,6 +88,22 @@ export class PythonResolver {
       currentDir = path.dirname(currentDir);
     }
 
+    // THE SRC LAYOUT. `[tool.setuptools.packages.find] where = ["src"]` (and Poetry's equivalent)
+    // puts `src/` on sys.path, so `from foundation.base_interfaces import X` names
+    // `src/foundation/base_interfaces.py` — a directory the upward walk above steps straight past,
+    // because `src` never appears in the specifier.
+    //
+    // MEASURED on the scraper subject, which is laid out exactly this way: `foundation` (20
+    // importing files), `core` (33) and `specialists` (4) resolved to nothing, so `supply-chain`
+    // reported the project's OWN packages as third-party dependencies and every call through them
+    // dangled. Tried only after the plain walk fails, so a real `src` package is never shadowed.
+    currentDir = dir;
+    while (currentDir !== '/' && currentDir !== '.') {
+      const res = this.tryExtensions(path.join(currentDir, 'src', pathLike), allFiles);
+      if (res) return res;
+      currentDir = path.dirname(currentDir);
+    }
+
     return undefined;
   }
 

@@ -40,3 +40,12 @@ export type { Advice } from './domain.js';
 // which is rule 5's definition of a contract rather than a convenience.
 export { CanonicalKind, CanonicalRank, mapToCanonical } from './taxonomy.js';
 export { isBuiltIn, getGlobalId, isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from './built-ins.js';
+// Read by PARSING (which records the decorators a declaration carries) and by the dead-code
+// analyzer (which must stop claiming a registered symbol is unreferenced) — two features, one list.
+export { decoratorCallee, isRegisteringDecorator, hasRegisteringDecorator } from './decorators.js';
+// Read by BOTH interface surfaces — the CLI renders paths for a person, the MCP tools hand them to
+// an agent, and a path that differs between them is the drift the mirror rule forbids (ADR 0148).
+export { realCasePath } from './real-path.js';
+// Read by both interface surfaces for the same reason: a count captioned as project symbols must
+// not include the built-ins and unresolved targets the graph deliberately also holds.
+export { isProjectSymbolId, splitProjectSymbols } from './project-symbol.js';

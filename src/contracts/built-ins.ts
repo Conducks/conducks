@@ -131,11 +131,49 @@ const UNIVERSAL_MEMBERS: ReadonlySet<string> = new Set([
   'keys', 'values', 'entries', 'next',
 ]);
 
-/** True when a dotted target is a universal member on a receiver this project does not declare. */
-export function isUniversalMemberCall(symbol: string): boolean {
+/**
+ * The same idea for PYTHON, and it needs its own list because the JavaScript one is WRONG here.
+ *
+ * `apply` is a Function.prototype method in JavaScript and an ordinary module-level function name in
+ * Python — `stealth/consistency.py` declares one and `engine.py` calls it four times. Sweeping the
+ * JS list over a `.py` call site deleted those four call edges, and `prune` then reported all four
+ * `apply` functions as ORPHAN: a delete verdict on the live anti-detection layer of a scraper.
+ * MEASURED on the scraper subject — 4 of its 23 orphan findings came from this one name.
+ *
+ * Same conservatism as above, applied to what Python projects actually declare: `get`, `add`,
+ * `update`, `remove`, `clear`, `copy`, `index`, `count`, `sort`, `read`, `write`, `close`, `run`
+ * and `apply` are all absent, because a project method of that name is ordinary.
+ */
+const PYTHON_UNIVERSAL_MEMBERS: ReadonlySet<string> = new Set([
+  // str
+  'strip', 'lstrip', 'rstrip', 'lower', 'upper', 'title', 'capitalize', 'casefold',
+  'startswith', 'endswith', 'splitlines', 'isdigit', 'isalpha', 'isalnum', 'isspace',
+  'zfill', 'ljust', 'rjust', 'encode', 'decode',
+  // list / set
+  'append', 'extend', 'popitem', 'setdefault',
+  // dict
+  'items', 'keys', 'values',
+]);
+
+/** Language family that decides which universal-member list applies to a call site. */
+function memberDialect(filePath?: string): 'python' | 'ecmascript' {
+  return /\.pyi?$/i.test(String(filePath ?? '')) ? 'python' : 'ecmascript';
+}
+
+/**
+ * True when a dotted target is a universal member on a receiver this project does not declare.
+ *
+ * `filePath` is the file the CALL was written in, not the file of the thing being called — the
+ * question is which language's built-in vocabulary the expression belongs to. Omitting it keeps the
+ * historical ECMAScript behaviour, which is what every non-Python caller wants.
+ */
+export function isUniversalMemberCall(symbol: string, filePath?: string): boolean {
   const dot = symbol.lastIndexOf('.');
   if (dot < 1) return false;
-  return UNIVERSAL_MEMBERS.has(symbol.slice(dot + 1).toLowerCase());
+  const member = symbol.slice(dot + 1).toLowerCase();
+  return memberDialect(filePath) === 'python'
+    ? PYTHON_UNIVERSAL_MEMBERS.has(member)
+    : UNIVERSAL_MEMBERS.has(member);
 }
 
 /**

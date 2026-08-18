@@ -39,9 +39,15 @@ import { format } from './util.js';
 export function fetchUser(id: number): string { return format(id); }
 export function orphanHelper(x: number): number { return x + 1; }
 `);
+    writeFile(repo, 'src/widget.ts', `
+/** A CLASS: constructed, never called — the shape whose users context used to omit. */
+export class Widget { value = 1; }
+`);
     writeFile(repo, 'src/main.ts', `
 import { fetchUser } from './service.js';
+import { Widget } from './widget.js';
 export function run(): string { return fetchUser(1); }
+export function useWidget(): number { return new Widget().value; }
 `);
     commit(repo, 'a chain with two orphans sharing files with it');
     runCli(['analyze', '--force', '--yes'], { cwd: repo });
@@ -76,6 +82,16 @@ export function run(): string { return fetchUser(1); }
     const out = runCli(['context', 'fetchUser'], { cwd: repo }).stdout;
     expect(out).toMatch(/Called by/i);
     expect(out).toMatch(/\brun\b/i);
+  });
+
+  it('names the users of a CLASS, which is constructed rather than called', () => {
+    // The section accepted `CALLS` alone, so for every class it vanished silently. MEASURED on the
+    // scraper subject: `impact Hands upstream` reported 153 affected symbols with exact call sites
+    // while `context Hands` printed no caller section — two commands, one graph, opposite answers to
+    // "who uses this".
+    const out = runCli(['context', 'Widget'], { cwd: repo, allowFail: true }).combined;
+    expect(out).toMatch(/Called by/i);
+    expect(out.toLowerCase()).toContain('usewidget');
   });
 
   it('impact on an UNCALLED symbol answers zero with its basis, never a bare zero', () => {

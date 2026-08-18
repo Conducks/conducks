@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
+import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Drift Command 🕵️‍♂️
@@ -80,10 +81,11 @@ export class DriftCommand implements ConducksCommand {
         console.log(`- Renamed/Moved: \x1b[35m${result.summary.move_count || 0}\x1b[0m`);
       }
 
+      const driftRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
       if (result.moves && result.moves.length > 0) {
         console.log(`\n\x1b[1m📦 Structural Renames & Moves Detected ---\x1b[0m`);
         result.moves.slice(0, 5).forEach((m: any, i: number) => {
-          console.log(`${i + 1}. \x1b[35m${m.name}\x1b[0m [${m.file}]`);
+          console.log(`${i + 1}. \x1b[35m${m.name}\x1b[0m [${displayPath(String(m.file ?? ''), driftRoot)}]`);
           console.log(`   └─ From: ${m.from.split('::').pop()}`);
           console.log(`   └─ To:   ${m.to.split('::').pop()}`);
         });

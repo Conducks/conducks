@@ -370,6 +370,12 @@ export class ConducksAdjacencyList {
         canonicalRank: node.properties.canonicalRank,
         // DNA Columns (Oracle Skeleton)
         fingerprint: node.properties.fingerprint,
+        // The identity WITHOUT the name, which is what lets `drift` see a rename. On the skeleton
+        // for the reason every comment around it gives: a field left out here is computed correctly,
+        // carried through the worker correctly, and then dropped silently at the graph boundary —
+        // the column stays NULL and the feature reads as "nothing changed". Measured exactly that
+        // way before it was added: `drift` still answered "Renamed/Moved: 0" after a rename.
+        shapeFingerprint: node.properties.shapeFingerprint,
         parentId: node.properties.parentId,
         unitId: node.properties.unitId,
         rootId: node.properties.rootId ?? undefined,
@@ -873,6 +879,14 @@ export class ConducksAdjacencyList {
    * High-fidelity structural search.
    * Performs O(1) exact lookup, falling back to O(N) fuzzy resonance if needed.
    */
+  /**
+   * Every node id. Read by `tryResolveSymbol` to resolve an input that IS an id — see the
+   * relative-id branch there for the two printed shapes the name index cannot answer.
+   */
+  public allNodeIds(): Iterable<string> {
+    return this.nodes.keys();
+  }
+
   public findNodesByName(name: string): ConducksNode[] {
     const query = name.toLowerCase();
 

@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
+import { displayId } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Cohesion Command
@@ -54,9 +55,10 @@ export class CohesionCommand implements ConducksCommand {
         process.stdout.write(JSON.stringify({ a, b, similarity: vector }, null, 2) + '\n');
         return;
       }
+      const cohesionRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
       console.log(`\n\x1b[1m--- Structural Cohesion Report ---\x1b[0m`);
-      console.log(`\x1b[2mA:\x1b[0m ${a}`);
-      console.log(`\x1b[2mB:\x1b[0m ${b}`);
+      console.log(`\x1b[2mA:\x1b[0m ${displayId(String(a ?? ''), cohesionRoot)}`);
+      console.log(`\x1b[2mB:\x1b[0m ${displayId(String(b ?? ''), cohesionRoot)}`);
       console.log(`\x1b[35mVector Similarity:\x1b[0m ${(vector * 100).toFixed(2)}%`);
       if (vector === 0) {
         console.log(`\x1b[2m- Both symbols exist and share no downstream neighbours.\x1b[0m`);

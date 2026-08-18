@@ -117,6 +117,23 @@
   (attribute object: (identifier) @ref_value)
   (list (identifier) @ref_value)
   (conditional_expression (identifier) @ref_value)
+  ;; A DICT VALUE is the dispatch table Python is written with:
+  ;;     levels = {"level1": Level1, "level2": Level2}
+  ;;     return levels.get(name, Level1)
+  ;; The name is READ there and nowhere else, so without this capture the import looked unreferenced.
+  ;; MEASURED on the scraper subject: `Level1`, `Level3`, `NameExtractor`, `RatingExtractor` and
+  ;; `ReviewCountExtractor` in `specialists/google_maps/specialist.py` are all used exactly this way,
+  ;; and every one of them was invisible — which is why widening the stale-import calibration without
+  ;; this produced 23 findings Python's own parser contradicts.
+  (dictionary (pair value: (identifier) @ref_value))
+  ;; The same name handed to a call: `levels.get(level_name, Level1)`, `register(HANDLERS)`.
+  (call arguments: (argument_list (identifier) @ref_value))
+  ;; An EXCEPTION TYPE is a read of the class: `except SpecialistNotFound:` is the only place
+  ;; `mapper_runner.py` names the exception it imports, and without this it read as an unused import.
+  ;; Both plain and `as` forms, and the tuple form `except (A, B):`.
+  (except_clause (identifier) @ref_value)
+  (except_clause (as_pattern (identifier) @ref_value))
+  (except_clause (tuple (identifier) @ref_value))
 
   ;; --- Kinetic Flow (L6: Behavior & Logic) ---
   ;; (_)* NOT (_). A bare (_) requires the argument_list to contain at least ONE node, so a

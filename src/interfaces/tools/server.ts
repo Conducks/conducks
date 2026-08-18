@@ -1,3 +1,4 @@
+import { realCasePath } from "@/contracts/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -134,7 +135,8 @@ export class ConducksMCPServer {
         const summarizeNodes = (items: any[]) => items.map(n => ({
           id: n.id,
           kind: n.label,
-          file: n.properties.filePath,
+          // Real on-disk spelling, like every other surface (see contracts/real-path.ts).
+          file: n.properties.filePath ? realCasePath(String(n.properties.filePath)) : n.properties.filePath,
           name: n.properties.name,
           risk: n.properties.risk || 0,
           gravity: n.properties.rank || 0

@@ -36,11 +36,51 @@ export class LedgerCommand implements ConducksCommand {
 
     const orphans = (registry.explain.prune() as any[]).filter(f => f.type === "ORPHAN").length;
 
+    // Edges pointing at a node that is not in the graph: the share of this codebase the analysis
+    // could not place. It is the tool's own honesty signal and belongs in a grade about how well the
+    // codebase is UNDERSTOOD, not only how it is shaped.
+    const [{ dangling }] = await q<{ dangling: number }>(
+      `SELECT COUNT(*) AS dangling FROM edges e LEFT JOIN nodes n ON e.targetId = n.id WHERE n.id IS NULL`
+    );
+    // Import cycles, counted from the same rule `audit` uses so the two commands cannot disagree.
+    let cycles = 0;
+    try { cycles = Number((await (registry.audit as any).audit())?.stats?.cycles ?? 0); } catch { cycles = 0; }
+
     // --- Grade: start at 100, deduct for each health signal, floor at 0. ---
+    //
+    // THE GRADE HAS TO DISCRIMINATE. It had two inputs — density, and a raw orphan count whose
+    // deduction saturated at 20 points from ten orphans — so every project with ten or more orphans
+    // and ordinary density scored exactly 80. MEASURED: sofie (11,267 symbols, 11 orphans),
+    // scraper (5,153 / 11) and orchestrator (7,558 / 77) all graded "B (80/100)". Three codebases of
+    // different sizes, languages and health, one number. A grade that cannot tell them apart is
+    // decoration, and the deduction list underneath was reporting a single line every time.
+    //
+    // Orphans are now counted per thousand symbols, because 11 dead symbols in 11,267 and 11 in 300
+    // are not the same fact; and two signals the vault already holds were added.
     const deductions: Array<{ why: string; pts: number }> = [];
     if (density < 1) deductions.push({ why: `low connectivity (density ${density.toFixed(2)} < 1)`, pts: 25 });
     else if (density < 2) deductions.push({ why: `thin connectivity (density ${density.toFixed(2)} < 2)`, pts: 10 });
-    if (orphans > 0) deductions.push({ why: `${orphans} orphaned symbol(s)`, pts: Math.min(orphans * 2, 20) });
+
+    if (orphans > 0) {
+      const per1000 = (orphans / Number(nodes)) * 1000;
+      const pts = Math.min(Math.round(per1000), 20);
+      deductions.push({
+        why: `${orphans} orphaned symbol(s) — ${per1000.toFixed(1)} per 1,000 symbols`,
+        pts,
+      });
+    }
+
+    const danglingRate = Number(edges) > 0 ? Number(dangling) / Number(edges) : 0;
+    if (danglingRate > 0.01) {
+      deductions.push({
+        why: `${Number(dangling).toLocaleString()} unresolved reference(s) — ${(danglingRate * 100).toFixed(1)}% of edges point at nothing this analysis could place`,
+        pts: Math.min(Math.round(danglingRate * 100), 15),
+      });
+    }
+
+    if (cycles > 0) {
+      deductions.push({ why: `${cycles} circular dependency/dependencies`, pts: Math.min(cycles * 5, 15) });
+    }
 
     const score = Math.max(0, 100 - deductions.reduce((s, d) => s + d.pts, 0));
     const grade = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : score >= 60 ? "D" : "F";
