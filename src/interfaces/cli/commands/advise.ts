@@ -3,7 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import type { Advice } from "@/contracts/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import { verdict, renderVerdict, verdictToJson } from "@/contracts/index.js";
-import { displayId } from "@/interfaces/cli/shared/display-path.js";
+import { displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Advise Command
@@ -57,7 +57,7 @@ export class AdviseCommand implements ConducksCommand {
       advice.forEach((a: Advice) => {
         const color = a.level === 'ERROR' ? '\x1b[31m' : a.level === 'WARNING' ? '\x1b[33m' : '\x1b[34m';
         console.log(`${color}- [${a.type}] ${a.message}\x1b[0m`);
-        a.nodes.slice(0, 3).forEach((n: string) => console.log(`  └─ ${displayId(n, adviseRoot)}`));
+        a.nodes.slice(0, 3).forEach((n: string) => console.log(`  └─ ${displayId(n, adviseRoot, nameLookupFrom(registry.query.graph.getGraph()))}`));
         if (a.nodes.length > 3) console.log(`  ... and ${a.nodes.length - 3} more`);
       });
     } finally {

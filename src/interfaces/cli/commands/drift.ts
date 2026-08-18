@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
-import { displayPath } from "@/interfaces/cli/shared/display-path.js";
+import { displayPath, displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Drift Command 🕵️‍♂️
@@ -86,8 +86,13 @@ export class DriftCommand implements ConducksCommand {
         console.log(`\n\x1b[1m📦 Structural Renames & Moves Detected ---\x1b[0m`);
         result.moves.slice(0, 5).forEach((m: any, i: number) => {
           console.log(`${i + 1}. \x1b[35m${m.name}\x1b[0m [${displayPath(String(m.file ?? ''), driftRoot)}]`);
-          console.log(`   └─ From: ${m.from.split('::').pop()}`);
-          console.log(`   └─ To:   ${m.to.split('::').pop()}`);
+          // `from` names a symbol that NO LONGER EXISTS — that is what makes it a rename — so the
+          // graph cannot return its real spelling and it stays as the id stored it. `to` is present
+          // and resolves. Rendering both through the same helper keeps the fallback explicit rather
+          // than pretending the old name was never available.
+          const driftNames = nameLookupFrom((registry as any).query?.graph?.getGraph?.());
+          console.log(`   └─ From: ${displayId(String(m.from), driftRoot, driftNames).split('::').pop()}`);
+          console.log(`   └─ To:   ${displayId(String(m.to), driftRoot, driftNames).split('::').pop()}`);
         });
       }
 

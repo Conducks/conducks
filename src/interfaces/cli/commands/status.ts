@@ -4,7 +4,7 @@ import path from "node:path";
 import chalk from "chalk";
 import { isTestNode } from "@/contracts/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
-import { displayPath } from "@/interfaces/cli/shared/display-path.js";
+import { displayPath, displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Status Command 🏺 🟦
@@ -203,10 +203,11 @@ export class StatusCommand implements ConducksCommand {
       const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
       // The id is lowercased (CONDUCKS-4), so slicing the root off gives a path that opens nothing.
       // `displayPath` recovers the on-disk spelling; the id itself is untouched.
-      const rel = (id: string) => {
-        const sep = id.lastIndexOf('::');
-        return sep === -1 ? id : `${displayPath(id.slice(0, sep), projectRoot)}${id.slice(sep)}`;
-      };
+      // Was a local reimplementation of `displayId` that repaired the PATH and left the SYMBOL
+      // lowercased (`::registeripchandlers`). `displayId` now repairs both, given a way to read the
+      // real spelling out of the graph.
+      const lookupName = nameLookupFrom(graph);
+      const rel = (id: string) => displayId(id, projectRoot, lookupName);
       console.log(chalk.bold(`\n--- 🚀 Top Structural Hotspots ---`));
       if (topGravity.length === 0) {
         // A bare header over no rows reads as "no hotspots" — a finding — when the truth is that

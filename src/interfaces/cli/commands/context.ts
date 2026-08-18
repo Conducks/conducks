@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph, closePersistence } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
+import { displayPath, displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Context Command
@@ -89,10 +90,14 @@ export class ContextCommand implements ConducksCommand {
 
       const reader = registry.source.lineReader();
       const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
-      const rel = (p: string) =>
-        p && p.toLowerCase().startsWith(projectRoot.toLowerCase()) ? p.slice(projectRoot.length + 1) : p;
+      // Was a bare prefix strip: it shortened the path but repaired NOTHING, so both halves came
+      // out as the lowercased id stores them. `displayPath` recovers the on-disk spelling for the
+      // file rows below, and the header — which prints an ID, not a path — goes through `displayId`
+      // so its SYMBOL half is real too. The header used to read `::registeripchandlers` while this
+      // very command printed `onToken` correctly two lines further down, off the name column.
+      const rel = (p: string) => displayPath(p, projectRoot);
 
-      console.log(`--- Context: ${rel(resolvedId)} (radius ${radius}) ---`);
+      console.log(`--- Context: ${displayId(resolvedId, projectRoot, nameLookupFrom(g))} (radius ${radius}) ---`);
 
       // CALLERS, NAMED AS SUCH — kept from the pre-todo57 command because todo38#P2 put it there for
       // a reason: `context fetchUser` once answered with six steps of containment and never named

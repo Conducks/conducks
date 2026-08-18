@@ -1,7 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
-import { displayId } from "@/interfaces/cli/shared/display-path.js";
+import { displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 import { splitProjectSymbols } from "@/contracts/index.js";
 
 /**
@@ -95,7 +95,7 @@ export class FlowsCommand implements ConducksCommand {
       const list = members as string[];
       const ext = sizes.get(name)?.external.length ?? 0;
       console.log(`\x1b[35m- ${name} Flow (${projectSize(name)} symbols${ext > 0 ? ` · ${ext} external` : ''})\x1b[0m`);
-      list.slice(0, 5).forEach((m: string) => console.log(`  └─ ${displayId(m, projectRoot)}`));
+      list.slice(0, 5).forEach((m: string) => console.log(`  └─ ${displayId(m, projectRoot, nameLookupFrom(registry.query.graph.getGraph()))}`));
       if (list.length > 5) console.log(`  ... and ${list.length - 5} more`);
     }
   }

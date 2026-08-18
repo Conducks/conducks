@@ -2,7 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { resolveSymbol } from "@/interfaces/cli/shared/error.js";
-import { displayId, displayPath } from "@/interfaces/cli/shared/display-path.js";
+import { displayId, displayPath, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Trace (Lineage) Command
@@ -151,7 +151,8 @@ export class TraceCommand implements ConducksCommand {
     // same ~90-character absolute lowercased prefix before the file that answers the question.
     const traceRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
     const rel = (p: any) => (p ? displayPath(String(p), traceRoot) : p);
-    console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${displayId(symbolId, traceRoot)} ---\x1b[0m`);
+    const traceNames = nameLookupFrom(registry.query.graph.getGraph());
+    console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${displayId(symbolId, traceRoot, traceNames)} ---\x1b[0m`);
 
     try {
       if (isFlow) {

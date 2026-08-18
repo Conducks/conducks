@@ -2,7 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { displayMessage } from "@/interfaces/cli/shared/display-path.js";
+import { displayMessage, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Audit Command (Standardized Taxonomy)
@@ -47,7 +47,7 @@ export class AuditCommand implements ConducksCommand {
     // ids at the PRINT boundary keeps them ids in the data and paths in the output (ADR 0132) —
     // three per circular finding, ~270 characters of identical absolute prefix on one line.
     const auditRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
-    const msg = (m: string) => displayMessage(String(m ?? ''), auditRoot);
+    const msg = (m: string) => displayMessage(String(m ?? ''), auditRoot, nameLookupFrom(registry.query.graph.getGraph()));
 
     // 1. Structural Orphans (Conducks Refactoring Alerts) 🏺
     if (!useJson && auditData.stats.orphans > 0) {
