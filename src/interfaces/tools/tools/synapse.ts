@@ -114,7 +114,16 @@ const FORBIDDEN_SQL_FUNCTIONS = [
  */
 const STATUS_MODES = ['health', 'map', 'manifest', 'pulse'] as const;
 /** The modes `conducks_audit` actually implements, and the values its schema advertises. */
-export const AUDIT_MODES = ['scan', 'advice', 'guard', 'archeology', 'fallback'] as const;
+// "fallback" was advertised here and in the tool's own description below, described as analyzing
+// "legacy fallbacks vs legitimate ones" — no such analysis exists anywhere in the domain layer
+// (verified: grepped every occurrence of "fallback" under src/lib/domain, all unrelated uses of the
+// plain English word). `mode:"fallback"` passed this enum's validation, matched no handler branch,
+// and fell through to "scan" silently — the exact defect class ("an unknown mode is an error, not a
+// default") the comment beside the handler below already claims is fixed, except this mode was never
+// unknown to the enum, just unimplemented. The CLI had the same capability and removed it outright
+// (there is no `conducks fallback` command); this list now agrees with that decision instead of
+// advertising a mode that quietly answers a different question.
+export const AUDIT_MODES = ['scan', 'advice', 'guard', 'archeology'] as const;
 /** The modes `conducks_query` implements. */
 const QUERY_MODES = ['fuzzy', 'template', 'filter'] as const;
 /** The layers `conducks_docs` publishes: threads + constraints, or threads alone. */
@@ -507,7 +516,7 @@ Modes:
 - advice: Professional structural improvement recommendations.
 - guard: Defensive regression check. Blocks if risk exceeds threshold.
 - archeology: Longitudinal historical analysis of structural decay over time (Window: 5 pulses).
-- fallback: Analyze fallback patterns and identify legacy fallbacks vs legitimate ones.`,
+`,
     // MCP2: tool annotations
     annotations: {
       readOnlyHint: true,

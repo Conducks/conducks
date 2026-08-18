@@ -43,7 +43,11 @@ describe('enumErr — a wrong value is refused, a missing one defaults', () => {
     expect(err).not.toBeNull();
     expect(err.error.code).toBe('INVALID_PARAM');
     // An agent that cannot see the valid values just guesses again.
-    expect(err.error.message).toMatch(/scan, advice, guard, archeology, fallback/);
+    // "fallback" removed from AUDIT_MODES: it validated as legal but matched no handler branch
+    // and silently ran "scan" — the same defect this test file exists to catch, just on the enum's
+    // own advertised list rather than an unknown value. See mcp-audit-mode-refusal.test.ts.
+    expect(err.error.message).toMatch(/scan, advice, guard, archeology/);
+    expect(err.error.message).not.toMatch(/fallback/);
     expect(err.error.message).toMatch(/nonsense/);
   });
 
