@@ -23,3 +23,16 @@
   (union_type (type_identifier) @pulse_type_target)
   (intersection_type (type_identifier) @pulse_type_target)
   (conditional_type (type_identifier) @pulse_type_target)
+
+  ;; A FUNCTION-TYPE's RETURN POSITION had no pattern. `(x: number) => Report` never captured
+  ;; `Report` — every OTHER return-type shape (`function f(): Report`, `(): Report` in a type
+  ;; annotation) already matched via `type_annotation` above, because the grammar puts THOSE under
+  ;; `type_annotation` while a `function_type` node's return sits under its own `return_type` field.
+  ;;
+  ;; MEASURED on the sofie subject: `ExecutionReport`, used only via
+  ;; `toReport?: (result: R) => ExecutionReport`, produced zero TYPE_REFERENCE edges and was one
+  ;; calibration change away from a false STALE_IMPORT finding (todo — see dead-code.ts's
+  ;; import-site calibration comment for the guard this was caught behind).
+  (function_type return_type: (type_identifier) @pulse_type_target)
+  (function_type return_type: (generic_type name: (type_identifier) @pulse_type_target))
+  (function_type return_type: (union_type (type_identifier) @pulse_type_target))

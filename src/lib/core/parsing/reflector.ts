@@ -1289,9 +1289,18 @@ export class ConducksReflector {
       // afterwards.
       const bound = context.resolveLocalBinding(name);
       if (!bound && !nodeCache.has(`${file.path.toLowerCase()}::${name}`)) continue;
+      // A RENAMED binding is DEFINED under its ORIGINAL name and read here by its LOCAL alias —
+      // `import { realFn as localAlias }` then `{ fn: localAlias }` is `<file>::realfn`, never
+      // `<file>::localalias`, the same fact `call.ts` already applies to a CALL target (ADR 0085).
+      // Without this the edge dangled on the alias spelling, `usedNamesByFile` in `dead-code.ts`
+      // never saw the original name as used, and the import read as stale despite the alias being
+      // read right here. MEASURED: `trackAction as coreTrackAction`, used as a bare value at
+      // `packages/core/log/client/index.ts:90`, on the orchestrator benchmark subject.
+      const original = bound ? context.resolveBindingOriginal?.(name) : undefined;
+      const symbol = original ?? name;
       spectrum.relationships.push({
         sourceName: scope,
-        targetName: bound ? `${bound}::${name}` : name,
+        targetName: bound ? `${bound}::${symbol}` : name,
         type: 'ACCESSES' as any,
         confidence: 0.8,
         metadata: { referenceAsValue: true, original: raw, line }
