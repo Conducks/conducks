@@ -11,7 +11,6 @@ import { ConducksFlowEngine } from "@/lib/domain/kinetic/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { GVREngine } from "@/lib/domain/evolution/index.js";
-import { ResonanceAnalyzer } from "@/lib/domain/metrics/index.js";
 import { IMPORT_CYCLE_IGNORED_EDGE_TYPES } from "@/lib/core/graph/index.js";
 import { DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
 import { ConducksAdvisor } from "@/lib/domain/governance/index.js";
@@ -35,7 +34,6 @@ export class Conducks {
   public flows = new ConducksFlowEngine(this.graph.getGraph());
   private diffEngine = new ConducksDiffEngine();
   private gvr = new GVREngine();
-  private resonance = new ResonanceAnalyzer();
   private death = new DeadCodeAnalyzer();
   private advisor = new ConducksAdvisor();
 
@@ -150,16 +148,6 @@ export class Conducks {
     return this.gvr.renameSymbol(this.graph.getGraph(), symbolId, newName);
   }
 
-  public async compare(otherPath: string): Promise<any> {
-    const otherGraph = new ConducksGraph();
-    // READ-ONLY: `compare()` only calls `load()`. Opening another project's vault read-write takes
-    // an exclusive lock on it and, since ADR 0040, publishes a reader snapshot beside it — for a
-    // read this process never writes to. Same defect as `linker-federated.ts`, same fix.
-    const otherPersistence = new SynapsePersistence(otherPath, true);
-    await otherPersistence.load(otherGraph.getGraph());
-    return this.resonance.analyzeResonance(this.graph.getGraph(), otherGraph.getGraph());
-  }
-
   public prune(): any[] { return this.death.analyze(this.graph.getGraph()); }
 
   public async advise(): Promise<any[]> {
@@ -259,15 +247,6 @@ export class Conducks {
 
 
   public getProcesses(): Record<string, string[]> { return this.flows.groupProcesses(); }
-
-  public getCohesionVector(sourceId: string, targetId: string): number {
-    const graph = this.graph.getGraph();
-    const sN = new Set(graph.getNeighbors(sourceId, 'downstream').map(n => n.targetId));
-    const tN = graph.getNeighbors(targetId, 'downstream').map(n => n.targetId);
-    const intersection = tN.filter(n => sN.has(n));
-    const union = new Set([...sN, ...tN]);
-    return union.size === 0 ? 0 : (intersection.length / union.size);
-  }
 
   public status(): any {
     const graph = this.graph.getGraph();

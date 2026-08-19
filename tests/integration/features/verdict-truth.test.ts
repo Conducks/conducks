@@ -64,17 +64,6 @@ export function alsoB(): number { return fromA(); }
     expect(r.combined).not.toMatch(/leaf\.ts.*->.*mid\.ts.*->.*leaf\.ts/);
   });
 
-  it('arch DECLINES to name a pattern on a shape that has none, and prints the shape anyway', () => {
-    const out = runCli(['arch'], { cwd: repo }).combined;
-    // ADR 0134: a verdict comes only from a measurement, and "no pattern detected" is the honest
-    // answer for five files with no adapters and no composition root. Naming the nearest label
-    // would be the confident-wrong answer the decision table exists to refuse.
-    expect(out).toMatch(/no pattern detected/i);
-    // Declining is only acceptable because the SHAPE is still reported.
-    expect(out).toMatch(/shape|cluster|flows/i);
-    expect(out).not.toMatch(/hexagonal|microkernel|clean architecture/i);
-  });
-
   it('guard reports the pre-existing cycle as a finding, and states the layer contract separately', () => {
     const r = runCli(['guard'], { cwd: repo, allowFail: true });
     // Two independent claims, and conflating them is the ADR 0044 failure: a run with findings must
@@ -86,15 +75,6 @@ export function alsoB(): number { return fromA(); }
   it('advise names the cycle as a finding rather than a generic recommendation', () => {
     const out = runCli(['advise'], { cwd: repo }).combined;
     expect(out).toMatch(/circular/i);
-  });
-
-  it('ledger grades the workspace and shows the arithmetic behind the grade', () => {
-    const out = plain(runCli(['ledger'], { cwd: repo }).combined);
-    expect(out).toMatch(/Grade:\s*[A-F]\b/);
-    expect(out).toMatch(/\(\d+\/100\)/);
-    // A grade with no deductions listed is a number nobody can check or argue with.
-    expect(out).toMatch(/Deductions/i);
-    expect(out).toMatch(/-\d+\s+\w/);
   });
 
   it('drift REFUSES on one pulse rather than calling a single sample stable', () => {

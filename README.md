@@ -204,8 +204,6 @@ conducks impact <symbolId> [upstream|downstream] [--json] [--tree]
                                   # Blast radius analysis
 conducks flows                    # List behavioral processes across the graph
 conducks entry [path]             # List detected entry points (API, CLI, Main)
-conducks cohesion <id1> <id2>     # Structural similarity between two symbols
-conducks entropy <symbolId>       # Structural risk of a symbol
 ```
 
 **Govern**
@@ -224,7 +222,6 @@ conducks fallback [--min-confidence 0.7] [--min-tenure 365] [--limit 20]
                                   # Legacy fallback-pattern analysis
 conducks supply-chain [--deps-only]
                                   # Dependency / boundary surface (stdlib vs versioned deps)
-conducks ledger                   # Workspace survey + grade
 conducks rename <symbolId> <newName> [--confirm]
                                   # Safe rename — dry-run unless --confirm
 ```
@@ -250,7 +247,6 @@ conducks record --type [vision|architecture|implementation|handover|conventions|
 ```bash
 conducks list                     # Show the anchored workspace and any linked federated projects
 conducks link <path>              # Link a foundation synapse
-conducks resonance <path>         # Compare structure to another project
 ```
 
 ---

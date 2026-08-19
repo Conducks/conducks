@@ -13,8 +13,8 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
  *   - `src/core/mapper/mapper_runner.py::mapperrunner.explore` — no node is NAMED
  *     `mapperrunner.explore`; the name is `explore` and the rest is the id's own qualifier.
  *
- * MEASURED on the scraper subject: `status` printed both, and `trace`, `explain` and `entropy`
- * answered SYMBOL_NOT_FOUND for both — while accepting the equivalent id on the sofie subject, whose
+ * MEASURED on the scraper subject: `status` printed both, and `trace` and `explain` answered
+ * SYMBOL_NOT_FOUND for both — while accepting the equivalent id on the sofie subject, whose
  * top symbol happens to be lowercase already. So the failure was invisible on two of three projects.
  *
  * Resolution now matches the input as an ID when it is shaped like one, which is what it is.
@@ -49,7 +49,7 @@ def run(target):
 
   const notFound = (s: string) => /not found|SYMBOL_NOT_FOUND/i.test(s);
 
-  it('every id status prints is accepted by explain, entropy, trace and impact', () => {
+  it('every id status prints is accepted by explain, trace and impact', () => {
     const status = runCli(['status'], { cwd: repo }).stdout;
     const ids = status
       .split('\n')
@@ -60,7 +60,7 @@ def run(target):
     expect(ids.length).toBeGreaterThan(0);   // otherwise this test asserts nothing
 
     for (const id of ids) {
-      for (const argv of [['explain', id], ['entropy', id], ['trace', id], ['impact', id, 'upstream']]) {
+      for (const argv of [['explain', id], ['trace', id], ['impact', id, 'upstream']]) {
         const { combined } = runCli(argv, { cwd: repo, allowFail: true });
         expect({ id, cmd: argv[0], notFound: notFound(combined) }).toEqual({ id, cmd: argv[0], notFound: false });
       }

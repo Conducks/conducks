@@ -1,7 +1,6 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { DeadCodeAnalyzer, type Finding } from "@/lib/domain/evolution/index.js";
-import { ResonanceAnalyzer } from "./resonance.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/index.js";
 
@@ -15,8 +14,7 @@ export class MetricsService {
 
   constructor(
     private graph: ConducksGraph,
-    private deadCode: DeadCodeAnalyzer,
-    private resonance: ResonanceAnalyzer
+    private deadCode: DeadCodeAnalyzer
   ) {}
 
   /**
@@ -147,17 +145,6 @@ export class MetricsService {
     return this.deadCode.analyze(this.graph.getGraph());
   }
 
-  /**
-   * Compares the current structural resonance with another repository.
-   * Standardizes project-loading logic within the domain service.
-   */
-  public async compare(otherPath: string) {
-    const otherGraph = new ConducksGraph();
-    const otherPersistence = new SynapsePersistence(otherPath, true);
-    await otherPersistence.load(otherGraph.getGraph());
-    
-    return this.resonance.analyzeResonance(this.graph.getGraph(), otherGraph.getGraph());
-  }
 }
 
 // `Finding` is NOT re-exported. It is evolution's type — this feature CONSUMES it, and nothing
@@ -166,4 +153,3 @@ export class MetricsService {
 // `DeadCodeAnalyzer` is NOT re-exported here. It belongs to `evolution`, and republishing another
 // feature's class makes this door a dependency edge onto that one (rule 5b) — the same thing
 // `intelligence` was doing with `FederatedLinker`. The registry takes it from evolution directly.
-export { ResonanceAnalyzer } from "./resonance.js";

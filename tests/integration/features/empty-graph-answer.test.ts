@@ -36,9 +36,9 @@ describe('an empty graph produces an answer, not a leaked guard', () => {
 
   const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
-  const GRAPH_WALKERS = ['audit', 'prune', 'arch', 'flows', 'diff'];
+  const GRAPH_WALKERS = ['audit', 'prune', 'flows', 'diff'];
 
-  it('all five graph-walking commands work on a populated vault', () => {
+  it('every graph-walking command works on a populated vault', () => {
     for (const cmd of GRAPH_WALKERS) {
       const r = runCli([cmd], { cwd: repo, allowFail: true });
       expect(`${cmd} exit`).toBe(`${cmd} exit`);
@@ -49,7 +49,7 @@ describe('an empty graph produces an answer, not a leaked guard', () => {
   describe('after the vault is emptied', () => {
     beforeAll(() => { runCli(['clean'], { cwd: repo, allowFail: true }); });
 
-    for (const cmd of ['audit', 'prune', 'arch', 'flows']) {
+    for (const cmd of ['audit', 'prune', 'flows']) {
       it(`${cmd} names the empty graph and does not leak the internal guard`, () => {
         const r = runCli([cmd], { cwd: repo, allowFail: true });
         const out = plain(r.combined);
@@ -91,9 +91,11 @@ describe('an empty graph produces an answer, not a leaked guard', () => {
     it('an UNRELATED failure is still reported as an execution error', () => {
       // The translation must be narrow: it keys on the one condition, and everything else keeps the
       // message it had. A catch-all here would hide real faults behind "run analyze".
-      const out = plain(runCli(['resonance', '/nonexistent/path/nope.ts'], { cwd: repo, allowFail: true }).combined);
+      // Was `resonance`, removed 2026-08-19. `link` serves the same purpose: it fails for a reason
+      // that has nothing to do with an unmaterialised graph, so the translation must leave it alone.
+      const out = plain(runCli(['link', '/nonexistent/path/nope'], { cwd: repo, allowFail: true }).combined);
       expect(out).not.toMatch(/Nothing to check/);
-      expect(out).toMatch(/does not exist|Error/);
+      expect(out).toMatch(/not a valid Conducks project|failed|Error/);
     });
   });
 });

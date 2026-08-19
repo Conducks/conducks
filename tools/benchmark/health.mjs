@@ -80,7 +80,6 @@ const SMOKE = [
   ['entry', []],
   ['prune', []],
   ['flows', []],
-  ['ledger', []],
   ['supply-chain', []],
   ['advise', []],
   ['query', ['--limit', '5', 'e']],
@@ -188,8 +187,14 @@ async function measure(project) {
     result.orphans = Number(a.stats?.orphans ?? 0);
     result.violations = (a.violations ?? []).length;
     result.dangling = { count: dangling, of: result.edges, pct: rate(dangling, result.edges) };
-  } catch {
-    result.auditParseFailed = true;
+  } catch (e) {
+    // The REASON, not a boolean. This was a bare `catch {}` setting a flag nothing printed, and it
+    // hid a real defect for an unknown stretch: `audit --json` truncated its payload at one pipe
+    // buffer (65536 bytes), so on the two big subjects the parse threw, every integrity metric went
+    // missing, and the run still printed `smoke 9/9 survived` and read as clean. A swallowed
+    // measurement is worse than a failed one — it looks like a pass.
+    result.auditParseFailed = e.message;
+    result.auditRaw = { code: audit.code, bytes: audit.out.length };
   }
 
   // ---- does every command survive an unfamiliar codebase ----
@@ -213,10 +218,17 @@ const COMPARED = ['nodes', 'units', 'edges', 'cycles', 'orphans', 'violations'];
 function diff(now, before) {
   const out = [];
   for (const k of COMPARED) {
+    // A metric the baseline HAS and this run does not is a measurement that stopped happening, and
+    // it is not drift. It printed as `cycles: 2 -> undefined` beside real number changes, which
+    // reads as one more moved value rather than as three checks that no longer run.
+    if (before[k] !== undefined && now[k] === undefined) { out.push(`${k}: MEASUREMENT LOST — baseline had ${before[k]}, this run has none`); continue; }
     if (before[k] !== undefined && now[k] !== before[k]) out.push(`${k}: ${before[k]} -> ${now[k]}`);
   }
   for (const k of ['documented', 'documentedBehaviors', 'located', 'dangling']) {
     const a = before[k], b = now[k];
+    // Same rule, and this branch was the worse of the two: `if (!a || !b) continue` skipped the row
+    // in SILENCE, so a lost `dangling` left no trace in the diff at all.
+    if (a && !b) { out.push(`${k}: MEASUREMENT LOST — baseline had ${a.count}/${a.of}, this run has none`); continue; }
     if (!a || !b) continue;
     if (a.count !== b.count || a.of !== b.of) out.push(`${k}: ${a.count}/${a.of} (${a.pct}%) -> ${b.count}/${b.of} (${b.pct}%)`);
   }
@@ -230,6 +242,9 @@ const chosen = CONFIG.projects.filter(p => !only || p.name === only);
 if (chosen.length === 0) { console.error(`no subject named "${only}"`); process.exit(2); }
 
 let drifted = false;
+/** A metric that did not get measured. Separate from drift: drift is a number moving, this is a
+ *  check that stopped running, and it must fail the run whether or not `--compare` was asked for. */
+let lost = false;
 for (const project of chosen) {
   let r;
   try {
@@ -246,6 +261,14 @@ for (const project of chosen) {
   console.log(`  documented      ${r.documented.count}/${r.documented.of} (${r.documented.pct}%)   behaviors ${r.documentedBehaviors.count}/${r.documentedBehaviors.of} (${r.documentedBehaviors.pct}%)`);
   console.log(`  located         ${r.located.count}/${r.located.of} (${r.located.pct}%)`);
   if (r.dangling) console.log(`  dangling        ${r.dangling.count}/${r.dangling.of} (${r.dangling.pct}%)   cycles ${r.cycles}  orphans ${r.orphans}  violations ${r.violations}`);
+  else {
+    // An ABSENT row used to be the whole report of this failure. Nothing printed, and the reader saw
+    // a subject with no integrity line next to two that had one.
+    lost = true;
+    console.log(`  dangling        \x1b[31mNOT MEASURED — \`audit --json\` gave nothing parseable\x1b[0m`);
+    console.log(`                  ${r.auditParseFailed ?? 'audit produced no output'}`);
+    if (r.auditRaw) console.log(`                  audit exited ${r.auditRaw.code}, ${r.auditRaw.bytes} bytes on stdout`);
+  }
   console.log(`  smoke           ${Object.keys(r.smoke).length - r.smokeFailures.length}/${Object.keys(r.smoke).length} survived${r.smokeFailures.length ? `  CRASHED: ${r.smokeFailures.join(', ')}` : ''}`);
 
   // A COLD baseline is a different file, and that is the whole of todo59 Phase 2. Both modes used to
@@ -279,4 +302,7 @@ for (const project of chosen) {
   }
 }
 
-process.exit(compare && drifted ? 1 : 0);
+// `lost` fails the run on its own. A missing measurement is a harness defect, and gating it behind
+// `--compare` meant the default invocation reported it as nothing at all.
+if (lost) console.log(`\n\x1b[31mFAILED — at least one metric was not measured. The numbers above are incomplete.\x1b[0m`);
+process.exit((compare && drifted) || lost ? 1 : 0);

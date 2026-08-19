@@ -7,18 +7,14 @@ import { StatusCommand } from "./commands/status.js";
 import { QueryCommand } from "./commands/query.js";
 import { ContextCommand } from "./commands/context.js";
 import { AuditCommand } from "./commands/audit.js";
-import { ArchCommand } from "./commands/arch.js";
 import { CleanCommand } from "./commands/clean.js";
 import { SetupCommand } from "./commands/setup.js";
 import { ListCommand } from "./commands/list.js";
-import { EntropyCommand } from "./commands/entropy.js";
-import { CohesionCommand } from "./commands/cohesion.js";
 import { ImpactCommand } from "./commands/impact.js";
 import { LinkCommand } from "./commands/link.js";
 import { DiffCommand } from "./commands/diff.js";
 import { FlowsCommand } from "./commands/flows.js";
 import { RenameCommand } from "./commands/rename.js";
-import { ResonanceCommand } from "./commands/resonance.js";
 import { PruneCommand } from "./commands/prune.js";
 import { AdviseCommand } from "./commands/advise.js";
 import { WatchCommand } from "./commands/watch.js";
@@ -42,7 +38,6 @@ import { DocsLintCommand } from "./commands/docs-lint.js";
 import { VisualsLintCommand } from "./commands/visuals-lint.js";
 import { InstallHooksCommand } from "./commands/install-hooks.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
-import { LedgerCommand } from "./commands/ledger.js";
 import { ConducksCommand } from "./command.js";
 
 import { fileURLToPath } from 'url';
@@ -169,7 +164,7 @@ export async function main() {
     positionalArgs.push(arg);
   }
 
-  const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'resonance', 'impact', 'entropy', 'cohesion', 'flows', 'context'].includes(commandId);
+  const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'impact', 'flows', 'context'].includes(commandId);
   const pathCandidate = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
   let targetPath = process.cwd();
@@ -214,11 +209,11 @@ export async function main() {
 
   // Registry of modular commands
   const commands: ConducksCommand[] = [
-    new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(), new ArchCommand(),
+    new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
-    new WatchCommand(), new DiffCommand(), new RenameCommand(), new ResonanceCommand(),
+    new WatchCommand(), new DiffCommand(), new RenameCommand(),
     new AdviseCommand(), new PruneCommand(),
-    new ListCommand(), new EntropyCommand(), new CohesionCommand(), new FlowsCommand(),
+    new ListCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new EntryCommand(), new McpCommand(),
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
@@ -226,7 +221,7 @@ export async function main() {
     // `link` was imported and never instantiated, so `conducks link <path>` answered
     // `Unknown command "link"` while FederatedLinker underneath worked fine. Nothing caught it:
     // the import satisfied the compiler and no test drove the command surface.
-    new SupplyChainCommand(), new LedgerCommand(), new MonitorCommand(), new LinkCommand(), new InstallHooksCommand()
+    new SupplyChainCommand(), new MonitorCommand(), new LinkCommand(), new InstallHooksCommand()
   ];
 
   commands.push(new HelpCommand(commands));

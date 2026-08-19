@@ -93,14 +93,6 @@
 - Purpose: Break a symbol's risk into named, weighted signals — gravity, complexity, authorship entropy, churn, fan-out, fallback — so the number can be argued with.
 - Intent: A single risk score is not actionable. Showing which signal dominates tells a reviewer what to fix; the weights are published (see Tunables) so nobody has to reverse-engineer them from a score.
 
-## Authorship Entropy — `conducks entropy <symbol>`
-- Purpose: Measure how concentrated a file's authorship is, as a Shannon entropy over git author distribution.
-- Intent: Single-author code is a bus-factor risk that no structural metric can see; entropy makes it comparable across a repo without reading blame by hand.
-
-## Structural Cohesion — `conducks cohesion <symbolA> <symbolB>`
-- Purpose: Score how alike two symbols' structural neighbourhoods are, as a starting point for consolidation.
-- Intent: Answers "do these two things do the same shape of work" from topology rather than from naming conventions, which lie.
-
 ## Structural Integrity Audit — `conducks audit [--history=<window>]`
 - Purpose: Run a fixed set of architectural sanity checks — import cycles, hub overload, orphan exports — plus the project's own declared rules, and report violations.
 - Intent: Encodes house rules as enforceable checks instead of tribal knowledge that erodes as a team changes. `--history` reads several past pulses so the answer can be "trending better or worse", not only "bad today".
@@ -137,10 +129,6 @@
 - Purpose: Report the dependency surface — stdlib vs third-party edges, packages ranked by how many files import them, versions joined live from the manifest, and packages imported but never declared.
 - Intent: Turns the dependency graph into an actionable view of which packages are load-bearing and which are undeclared, without a separate SCA tool.
 
-## Workspace Ledger — `conducks ledger`
-- Purpose: A workspace survey with one letter grade — size, density, kind distribution, third-party surface, orphan dead weight — with each score deduction shown.
-- Intent: A "state of the codebase" glance in one command, assembled from the pulse that already ran, with the arithmetic visible so the grade is arguable.
-
 ## Structural Diff — `conducks diff [--base <pulseId>] [--head <pulseId>]`
 - Purpose: Compare two points in history structurally — symbols added, removed, modified, plus deltas in complexity and gravity. With no arguments it scores the risk of the current working changes.
 - Intent: Reviewing a change by its lines misses shape changes; this reports what the change did to the structure.
@@ -164,10 +152,6 @@
 ## Test Coverage Overlay — `conducks coverage <coverage-final.json>`, `conducks coverage-view`
 - Purpose: Bind an existing istanbul/c8 coverage report onto function spans in the graph, so coverage is reported per function and can be compared against a saved baseline. Conducks consumes a coverage report; it does not run tests or measure coverage itself.
 - Intent: A percentage over a file says nothing about which capability is tested. Per-function fill, joined to the graph, turns coverage into "which behaviour is unverified" — and the baseline diff turns it into "which behaviour just lost its test". (ADR 0004.)
-
-## Cross-Project Resonance — `conducks resonance <path>`
-- Purpose: Score how structurally similar two codebases are from their topological signatures.
-- Intent: Lets a team ask "is this new project shaped like the ones we already run" without a line-by-line comparison.
 
 ## Federated Repo Linking — `conducks link <path>`
 - Purpose: Merge another repository's graph into the current one and resolve the edges that cross between them.

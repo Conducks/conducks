@@ -595,7 +595,3 @@ export type { Advice };
 export { ConducksAdvisor } from "./advisor.js";
 export { ConducksSentinel } from "./sentinel.js";
 
-// The ARCHITECTURE measurement, which the registry composes into the `arch` command: measure the
-// graph, decide a verdict from the measurements, and the two service-topology helpers beside them.
-export { measure, detectServiceRoots, subgraphUnder } from "./arch-detect.js";
-export { decide } from "./arch-verdict.js";

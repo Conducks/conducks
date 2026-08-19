@@ -23,7 +23,7 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "LANDSCAPE (Status)": {
-        ids: ["status", "link", "resonance"],
+        ids: ["status", "link"],
         examples: [
           "conducks status",
           "conducks status --json",
@@ -37,14 +37,13 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "METRICS (Explain)": {
-        ids: ["explain", "entropy", "cohesion", "coverage", "coverage-view"],
+        ids: ["explain", "coverage", "coverage-view"],
         examples: [
           "conducks explain UserService",
-          "conducks entropy src/services/",
         ],
       },
       "GOVERNANCE (Audit)": {
-        ids: ["audit", "arch", "fallback", "advise", "context", "guard", "drift", "ledger", "supply-chain"],
+        ids: ["audit", "advise", "context", "guard", "drift", "supply-chain"],
         examples: [
           "conducks audit",
           "conducks context UserService --max-tokens 4000",

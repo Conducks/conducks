@@ -243,7 +243,7 @@ restores the single-tree run.
   tangles (ARCH-6)**, god objects, orphans. ARCH-6 is informational and never fails the audit:
   mutual recursion is legal, a knot with no entry order is not, and only a human tells them apart
 - `guard [--threshold=N] [--force]` — layer contract, cycles, rank rules; blocks violations
-- `advise` — structural advice · `ledger` — the decision/architecture ledger
+- `advise` — structural advice
 - `drift [prevPulseId]` · `diff [--base <id>] [--head <id>]` — structural change between pulses
 - `supply-chain [--deps-only]` — the third-party surface, with each import's origin
 
@@ -253,7 +253,7 @@ restores the single-tree run.
   codebase top-down instead of searching a name you already know
 - `explain <id>` — 6-signal risk breakdown · `context <id> [--json]`
 - `impact <id> [upstream|downstream] [--tree]` · `trace <id> [--flow]` · `flows`
-- `entry` — real entry points · `cohesion <id1> <id2>` · `entropy <id>` — authorship entropy
+- `entry` — real entry points
 - `list` — the anchored workspace and any FEDERATED projects linked to it (not a symbol list)
 - `fallback` — suspicious fallback patterns
 - `prune` — dead code; advisory, under-reports. Verify by SYMBOL, never by import path
@@ -271,7 +271,7 @@ restores the single-tree run.
 - `uninstall` — remove the skills conducks installed
 - `mcp [--sse] [--root <path>]` — run the MCP server (stdio by default)
 - `watch` — live re-analysis on save · `mirror` — web dashboard on port 3333
-- `link <path>` — link a neighbouring repo · `resonance <path>` · `record --type <t> "content"`
+- `link <path>` — link a neighbouring repo · `record --type <t> "content"`
 
 ---
 

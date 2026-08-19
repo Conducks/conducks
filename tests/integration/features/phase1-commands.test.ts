@@ -2,17 +2,16 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
 
 /**
- * ADR 0115 — `flows`, `entropy`, `cohesion`, `resonance`, `advise`.
+ * ADR 0115 — `flows` and `advise`.
  *
  * Every defect here is one shape: **a confident answer where there was no answer.**
  *
- *   entropy zzzNoSuchSymbol   → 0.0000, 0 authors, 0.00% risk, exit 0
- *   cohesion zzzA zzzB        → 0.00% similarity, exit 0
- *   resonance <stale vault>   → a raw DuckDB Binder object, exit 0
  *   advise                    → a REPOSITORY and a DIRECTORY as its top "monolithic hubs"
  *
- * Zero is a legitimate value for entropy and for similarity. That is precisely why it must never be
- * printed for a symbol the graph does not hold — the reader cannot tell the two apart.
+ * ADR 0115 originally covered `entropy`, `cohesion` and `resonance` too. Those three commands were
+ * REMOVED (2026-08-19) — each emitted a score that named no action, which is the whole reason they
+ * were cut. Their cases are deleted here rather than rewritten: the rule they proved still binds on
+ * the commands that remain, and is enforced by their own tests.
  */
 describe('phase 1 commands refuse rather than fabricate', () => {
   let repo: string;
@@ -28,43 +27,6 @@ describe('phase 1 commands refuse rather than fabricate', () => {
   }, 300000);
 
   afterAll(() => rmRepo(repo));
-
-  it('entropy refuses a symbol that does not exist instead of reporting 0.0000', () => {
-    const { combined, status } = runCli(['entropy', 'zzzNoSuchSymbol'], { cwd: repo, allowFail: true });
-    expect(status).not.toBe(0);
-    expect(combined).toMatch(/not found/i);
-    expect(combined).not.toMatch(/0\.0000/);
-  }, 120000);
-
-  it('entropy resolves a bare name like every other symbol command', () => {
-    const { stdout, status } = runCli(['entropy', 'a', '--json'], { cwd: repo, allowFail: true });
-    expect(status).toBe(0);
-    const e = JSON.parse(stdout);
-    // Resolved to a real node id rather than passed through as a literal.
-    expect(e.id).toContain('::');
-    expect(e.id).toContain('a.ts');
-  }, 120000);
-
-  it('cohesion refuses when either symbol does not exist', () => {
-    const { combined, status } = runCli(['cohesion', 'a', 'zzzNoSuchSymbol'], { cwd: repo, allowFail: true });
-    expect(status).not.toBe(0);
-    expect(combined).toMatch(/not found/i);
-    expect(combined).not.toMatch(/0\.00%/);
-  }, 120000);
-
-  it('cohesion still answers for two real symbols', () => {
-    const { stdout, status } = runCli(['cohesion', 'a', 'b', '--json'], { cwd: repo, allowFail: true });
-    expect(status).toBe(0);
-    expect(typeof JSON.parse(stdout).similarity).toBe('number');
-  }, 120000);
-
-  it('resonance refuses a path that is not an analyzed project', () => {
-    const { combined, status } = runCli(['resonance', '/tmp/not-a-conducks-project-at-all'], { cwd: repo, allowFail: true });
-    expect(status).not.toBe(0);
-    expect(combined).toMatch(/does not exist|not an analyzed/i);
-    // A driver internal is not an answer.
-    expect(combined).not.toMatch(/DUCKDB_NODEJS_ERROR|Binder Error/);
-  }, 120000);
 
   it('flows offers machine-readable output, and it carries its denominator', () => {
     const { stdout, status } = runCli(['flows', '--json'], { cwd: repo, allowFail: true });

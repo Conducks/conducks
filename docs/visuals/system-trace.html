@@ -458,9 +458,9 @@
       <thead><tr><th>layer</th><th>commands</th><th>cost</th></tr></thead>
       <tbody>
         <tr><td><strong>no engine</strong></td><td><code>help</code> <code>docs-status</code> <code>docs-lint</code> <code>bootstrap-docs</code> <code>monitor</code></td><td>markdown + fs only; answerable during a write</td></tr>
-        <tr><td><strong>SQL only</strong> <span class="st unver">over-pays</span></td><td><code>coverage</code> <code>coverage-view</code> <code>ledger</code> <code>supply-chain</code></td><td>never touch the graph object, yet none is bypass-listed, so each pays a full graph load</td></tr>
+        <tr><td><strong>SQL only</strong> <span class="st unver">over-pays</span></td><td><code>coverage</code> <code>coverage-view</code> <code>supply-chain</code></td><td>never touch the graph object, yet none is bypass-listed, so each pays a full graph load</td></tr>
         <tr><td><strong>engine, no graph need</strong> <span class="st unver">over-pays</span></td><td><code>record</code> <code>setup</code> <code>uninstall</code> <code>doctor</code></td><td>pure fs/config writers that still run <code>registry.initialize()</code> — 13 grammars for nothing</td></tr>
-        <tr><td><strong>full graph</strong></td><td><code>impact</code> <code>trace</code> <code>explain</code> <code>context</code> <code>query</code> <code>audit</code> <code>advise</code> <code>prune</code> <code>flows</code> <code>drift</code> <code>guard</code> <code>diff</code> <code>entropy</code> <code>cohesion</code> <code>resonance</code> <code>entry</code> <code>list</code> <code>link</code> <code>status</code> <code>rename</code> <code>mcp</code> <code>watch</code></td><td>the expensive tier</td></tr>
+        <tr><td><strong>full graph</strong></td><td><code>impact</code> <code>trace</code> <code>explain</code> <code>context</code> <code>query</code> <code>audit</code> <code>advise</code> <code>prune</code> <code>flows</code> <code>drift</code> <code>guard</code> <code>diff</code> <code>entry</code> <code>list</code> <code>link</code> <code>status</code> <code>rename</code> <code>mcp</code> <code>watch</code></td><td>the expensive tier</td></tr>
         <tr><td><strong>writes</strong></td><td><code>analyze</code> <code>clean</code> · and <code>rename --confirm</code> <code>monitor --dismiss</code> <code>link</code> <code>coverage --save-baseline</code> <code>bootstrap-docs</code> <code>record</code> <code>setup</code> <code>uninstall</code></td><td>only the first two get a writable handle</td></tr>
       </tbody>
     </table>
@@ -468,9 +468,8 @@
   <p class="note"><span class="st">traced</span> <span class="src">src/interfaces/cli/index.ts + all 38 command files</span></p>
   <div class="callout">
     <strong>The MCP surface and the CLI have drifted.</strong> <code>conducks_graph_query</code> exists
-    only over MCP. <code>entropy</code>, <code>cohesion</code>, <code>ledger</code>,
-    <code>link</code>, <code>record</code>, <code>supply-chain</code>, <code>list</code> exist only on
-    the CLI. And <code>conducks_rename</code>'s description tells the agent to call
+    only over MCP. <code>link</code>, <code>record</code>, <code>supply-chain</code>,
+    <code>list</code> exist only on the CLI. And <code>conducks_rename</code>'s description tells the agent to call
     <code>conducks_analyze</code> afterwards — <strong>no such tool exists</strong>; three sibling
     tools phrase the same instruction correctly as the CLI's <code>conducks analyze</code>.
     <span class="st">traced</span> <span class="src">kinetic.ts:278 vs synapse.ts:694, 760, 896</span>

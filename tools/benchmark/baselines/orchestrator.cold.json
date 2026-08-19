@@ -56,11 +56,6 @@
       "ms": 1037,
       "bytes": 317291
     },
-    "ledger": {
-      "code": 0,
-      "ms": 1165,
-      "bytes": 470
-    },
     "supply-chain": {
       "code": 0,
       "ms": 1655,
