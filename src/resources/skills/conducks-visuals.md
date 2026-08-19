@@ -127,11 +127,40 @@ and markup generated from it. This is the same separation §3 states for the
 canvas and for the same reason: adding a task must be editing a list, and a page
 whose tasks live in hand-written markup stops being updated within two rounds.
 
-**6 · Progress survives the tab closing.** A pass is interrupted — `localStorage`
-against the task ids, and a visible "clear all" so the next pass starts clean.
-Say in the page which build it was written for; a tester ticking tasks against
-last week's binary is worse than an untested build, because it produces
-confidence.
+**6 · Progress survives the tab closing, and NOTHING ELSE.** A pass is
+interrupted — `localStorage` against the task ids, and a visible "clear all" so
+the next pass starts clean. Say in the page which build it was written for, and
+**refuse to restore progress saved against a different one**: a tester ticking
+tasks against last week's binary is worse than an untested build, because it
+produces confidence. Refusing is the whole value of stamping the build; a stamp
+nobody checks is decoration.
+
+**6b · The ticks are not the deliverable, so do not engineer them as if they
+were.** `localStorage` is scoped to an origin, and the page has at least two —
+opened as a `file://` path and published as an artifact are different origins
+with different stores, and clearing site data empties either. Every instinct at
+this point is to make the state durable: write a `testing-state.json` beside the
+page, commit it, reload it next pass. **Do not.** That file outlives the build it
+was ticked against, which is precisely what 6 refuses, and it makes the testing
+page accumulate — the one thing this page must never do (§0: it is an
+instrument, not a record). The durable artifact is the REPORT, copied out and
+turned into `problems.html` entries or todos. Progress is scaffolding for one
+sitting.
+
+What that permits, and what it rules out:
+
+| want | do |
+|---|---|
+| resume after closing the tab, same build, same browser | `localStorage`, keyed by build |
+| move a half-finished pass to another browser or machine | a "copy state" button putting JSON on the clipboard, and a paste-to-restore box |
+| keep the findings | copy the report out — that is the deliverable, and it leaves the page |
+| keep the ticks across builds | nothing. The build changed; the ticks are void |
+
+**Clipboard, not download.** A published artifact runs under a sandbox that makes
+page-initiated downloads inert — `<a download>`, blob URLs and script-driven
+saves all do nothing for a viewer, silently. A "save my progress" button that
+appears to work and does not is worse than no button. Copy to clipboard works in
+both places; use it in both, so the page behaves the same however it was opened.
 
 **When it is updated: every time work stops.** A page that lags the build sends
 the tester to check things that no longer exist while missing what just changed.
@@ -153,6 +182,18 @@ gets written for.
    are not.
 4. Module notes, on demand, once a module's intent stops being obvious — never to fill the set
    (`conducks-docs` §6.3).
+
+**Steps 3 and 4 wait for a reason, and the reason is somebody asking.** The order above is what to
+build FIRST when you build, not a set to complete. A repo whose need is a manual test pass has
+`system.css`, `index.html` and `testing.html` and **no canvas at all**, and that is a finished state,
+not a half-finished one — the canvas gets drawn when someone wants the picture. Reading this list as
+a checklist produces the outline-of-five-bands this file spends §2 refusing.
+
+**But everything visual lives here from the first file.** A testing page written into a scratch
+directory, or beside the code, or into a chat, is a page nobody finds twice and nothing lints — the
+four obligations above (`system.css`, a read log, a link from `index.html`, `visuals-lint`) are not
+reachable outside `docs/visuals/`. Build only what was asked for; put what you build in the one
+place. Those are not in tension: the tree grows on demand, it does not start elsewhere and move.
 
 **Never create a walk log, a progress file or a map file.** §5 already says the walk is recorded as a
 todo; this is the same rule, stated where a beginner will hit it first.
