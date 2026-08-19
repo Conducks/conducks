@@ -1,5 +1,4 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { DeadCodeAnalyzer, type Finding } from "@/lib/domain/evolution/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/index.js";

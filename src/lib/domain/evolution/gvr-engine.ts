@@ -93,8 +93,29 @@ export class GVREngine {
       if (STRUCTURAL.has(edge.type)) continue;
       const source = graph.getNode(edge.sourceId);
       if (!source?.properties?.filePath) continue;
-      const line = (edge as any).properties?.line;
-      if (!addSite(source.properties.filePath, line)) {
+      // ONE EDGE CARRIES EVERY CALL SITE (ADR 0110). Edge ids are content-hashed WITHOUT the line,
+      // so a caller that names the symbol forty times still produces ONE edge; every line it was
+      // typed on is collected into `properties.lines`, and `properties.line` was kept as the FIRST
+      // of them purely so readers written before the array kept working. This was such a reader.
+      //
+      // MEASURED on the sofie subject: `electron/main/index.ts` names `safeSend` 54 times from 5
+      // enclosing scopes. Reading the singular `line` gave 5 edges -> 5 sites, plus the declaration
+      // = 6. `rename` rewrote those 6, left 48 calls pointing at a function that no longer existed,
+      // and printed "Successfully renamed at 6 site(s)" over a guaranteed compile failure. The dry
+      // run promised the same 6 beforehand, so the preview did not protect anyone either.
+      //
+      // `impact.ts` was updated for the array when ADR 0110 landed; this file was not. Same edge,
+      // same fix — read every line, fall back to the singular field for an edge that only ever had
+      // one (or was written before the array existed).
+      const edgeProps = (edge as any).properties ?? {};
+      const lines: unknown[] = Array.isArray(edgeProps.lines) && edgeProps.lines.length > 0
+        ? edgeProps.lines
+        : [edgeProps.line];
+      // Any line this edge names that cannot be placed refuses the WHOLE rename, exactly as a
+      // single unplaceable edge did before — a partially rewritten file is the defect being fixed
+      // here, not an acceptable outcome of fixing it.
+      const placed = lines.filter(l => addSite(source.properties.filePath, l)).length;
+      if (placed !== lines.length) {
         unlocated.push(`${source.properties.filePath} (${edge.type} from ${source.properties.name ?? edge.sourceId})`);
       }
     }
