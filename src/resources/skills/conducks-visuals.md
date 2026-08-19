@@ -1,4 +1,4 @@
-<!-- description: How the rendered architecture pages are built and what the build refuses — the tree of pages, the band-by-band growth, data/layout separation, anchors and the gate, routing, occlusion, and porting the generator into a new repo. Use when creating, extending, reviewing or porting visuals, or when visuals-lint fails. -->
+<!-- description: How the rendered architecture pages are built and what the build refuses — the tree of pages, the band-by-band growth, data/layout separation, anchors and the gate, routing, occlusion, porting the generator into a new repo, and the testing page a human works through by hand. Use when creating, extending, reviewing or porting visuals, when building or updating a manual test page, or when visuals-lint fails. -->
 
 # conducks-visuals
 
@@ -48,6 +48,7 @@ docs/visuals/
 ├── architecture.html  THE canvas. One picture, grown by bands (§2)
 ├── problems.html      a defect, with evidence and an owner (§9)
 ├── holding.html       read and true, not yet placed (§9)
+├── testing.html       what a HUMAN must try, one task at a time — see §0's testing section
 ├── system.css         one stylesheet, shared verbatim by every repo
 ├── system.js          the canvas behaviour, shared verbatim by every repo
 ├── rules.md           a POINTER to this skill, not the rules — see the end of §0
@@ -81,6 +82,67 @@ Such a page still owes four things, and the one that got missed is the second:
 deliberately does not constrain the format; that permission is what let markdown look correct. Here
 it is constrained: the canvas ships static SVG (§3), the pages share `system.css`, and blocks link to
 fragments (§8). Markdown does none of that.
+
+### The testing page, and why it is TASKS rather than features
+
+`problems.html` holds a defect once someone knows about it. `testing.html` is
+where a human goes to find one. It is the page a maintainer hands over and says
+"try these"; every finding it produces becomes a `problems.html` entry or a
+todo, and **nothing accumulates on the testing page itself** — it is an
+instrument, not a record.
+
+It is not built for every repo. Build it when there is a human doing manual
+passes over something no test can reach, which is most GUI work and almost no
+library work.
+
+Six rules, every one of them written after the version without it failed.
+
+**1 · A task, not a feature.** "Tab strip" is not testable and "clicking a row
+switches to it" is. A page listing features gets a paragraph of prose back with
+no way to tell which part of it was tried. A page listing tasks gets an answer
+per task. Expect three to seven tasks per feature; a feature with one task is
+usually a feature that has not been thought about.
+
+**2 · Three states, and the third one is the one that gets lost.** A task is
+`untested`, `tested and fine`, or `tested and here is the problem`. The obvious
+design — a note box per feature — collapses the first two into "no comment", and
+**absence then reads as pass**, which is how a maintainer reports a feature
+verified that nobody ever opened. Give every task its own tick AND its own note:
+the tick means *I tried this*, the note means *and here is what happened*.
+
+**3 · Every task carries a stable id.** `F14.T3`, printed beside the task and
+carried into the report. Without it a comment arrives attached to a feature with
+four tasks and the reader has to guess which one it is about. Ids must survive
+edits to the page — append tasks, never renumber them, or a tester's saved
+progress moves to a different question.
+
+**4 · The report OMITS what was not tested.** The page is copied out and pasted
+into a conversation, so it is read by someone paying for every line. A hundred
+lines of `(NOT TESTED)` buries the four that matter. Print the tested tasks, the
+noted ones, and a single count of the rest — the count is what stops "nothing
+reported" from being mistaken for "nothing wrong".
+
+**5 · The page is data, rendered.** One array of sections → features → tasks,
+and markup generated from it. This is the same separation §3 states for the
+canvas and for the same reason: adding a task must be editing a list, and a page
+whose tasks live in hand-written markup stops being updated within two rounds.
+
+**6 · Progress survives the tab closing.** A pass is interrupted — `localStorage`
+against the task ids, and a visible "clear all" so the next pass starts clean.
+Say in the page which build it was written for; a tester ticking tasks against
+last week's binary is worse than an untested build, because it produces
+confidence.
+
+**When it is updated: every time work stops.** A page that lags the build sends
+the tester to check things that no longer exist while missing what just changed.
+This is the same rule §13 states for the canvas — the page is never trusted to be
+current — applied to the one page a human reads on purpose.
+
+It owes the four things every non-canvas page owes (above): `system.css` rather
+than a private `<style>`, a read log, a link from `index.html`'s body, and
+`visuals-lint`. The stylesheet one is the trap here specifically: a testing page
+is mostly form controls, and form controls are exactly what a private stylesheet
+gets written for.
 
 ### Day one, in this order
 
@@ -663,6 +725,7 @@ already suppressed the default, and a suppressed default does not come back.
 | **a block's hover** | the anchor and the constants | `file:line`, values, the one sentence that explains the anchor |
 | **a detail page** | what the block means, and why it is the way it is | a paragraph or three; the reasoning that will not fit on a canvas |
 | **`problems.html`** | a defect, with evidence and an owner | background, what is wrong, scope, who owns it |
+| **`testing.html`** | what a human must TRY, one task at a time | one line per task, a tick and a note per task — findings leave for `problems.html`, they do not settle here |
 | **`holding.html`** | read and true, not yet placed on a map | whatever was written when it was read |
 | **a module note** | what a module is for, what it owns, what it refuses | the authored memory — it settles arguments; see `conducks-docs` §6.3 |
 | **`index.html`** | what these pages are and the rules that bound them | short — it is a front door |
@@ -808,3 +871,4 @@ while the code logged it third — and every anchor on that block resolved perfe
 matches the data; `visuals-lint` proves the anchors resolve. Whether the sentence attached to an
 anchor is still TRUE is caught by nobody — which is why §5 forbids trusting a comment, and why every
 claim carries the `file:line` that lets the next reader check it in one keystroke.
+
