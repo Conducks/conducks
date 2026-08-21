@@ -50,7 +50,19 @@ export interface NameIndex {
  *
  * One resolution rule, two error policies — rather than a second copy of the rule that drifts.
  */
-export function tryResolveSymbol(input: string, graph: NameIndex, warn?: (message: string) => void): string | null {
+export function tryResolveSymbol(
+  input: string,
+  graph: NameIndex,
+  warn?: (message: string) => void,
+  // How to render an id in the WARN text below. Defaults to identity so a caller that does not
+  // supply one gets byte-identical output to before this parameter existed — the CLI is the only
+  // caller that has a repair to offer (`displayId`, `interfaces/cli/shared/display-path.ts`), and
+  // this module may not import it: it sits in `contracts` precisely so `mcp` and `cli` share ONE
+  // resolution rule (ADR 0005), and a direct import would recreate the drift that rule exists to
+  // prevent. Threading a formatter keeps that rule in one place while letting each surface render
+  // the ids in the warning however it renders ids everywhere else.
+  formatId: (id: string) => string = id => id,
+): string | null {
   if (input.includes('::')) {
     // Node ids are LOWERCASED on write (CONDUCKS-4, for APFS), so an id containing a real-cased
     // path — which is what a user copies out of their editor, and what every macOS temp dir has —
@@ -165,7 +177,7 @@ export function tryResolveSymbol(input: string, graph: NameIndex, warn?: (messag
       // preference rules below decide, rather than inventing a second ranking here.
     }
 
-    return tryResolveSymbol(bare, graph, warn);
+    return tryResolveSymbol(bare, graph, warn, formatId);
   }
 
   const matches = graph.findNodesByName(input);
@@ -203,9 +215,9 @@ export function tryResolveSymbol(input: string, graph: NameIndex, warn?: (messag
     // Name what was PASSED OVER, not only what was chosen (todo43). A reader who disagrees with
     // the pick needs the alternatives to disagree with — without them the warning says "trust me".
     // Capped at three: past that, `query` is the tool.
-    const passedOver = matches.filter(m => m.id !== best.id).slice(0, 3).map(m => m.id);
+    const passedOver = matches.filter(m => m.id !== best.id).slice(0, 3).map(m => formatId(m.id));
     const more = matches.length - 1 - passedOver.length;
-    warn?.(`Multiple symbols named "${input}" — using highest-gravity match: ${best.id}` +
+    warn?.(`Multiple symbols named "${input}" — using highest-gravity match: ${formatId(best.id)}` +
       (passedOver.length ? `\n  passed over: ${passedOver.join(', ')}${more > 0 ? ` (+${more} more)` : ''}` : ''));
   }
 
