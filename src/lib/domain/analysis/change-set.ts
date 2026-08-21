@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
+import { isUnitNode } from "@/lib/core/graph/index.js";
 
 /**
  * Conducks — what changed in the working tree, and which symbols those changes land on 🔍
@@ -125,23 +126,50 @@ export function collectChanges(cwd: string): FileChange[] | null {
  *
  * File equality is exact, never a suffix: `endsWith('/src/a.ts')` also matches
  * `/repo/vendor/src/a.ts`, and attributing a change to the wrong file is worse than missing it.
+ *
+ * NARROWEST symbol wins, not the first one `.find()` happens to hit (F-05). A file's whole-file
+ * unit node covers every line in the file, and `.find()` over an unsorted list let it beat any
+ * symbol nested inside it — a one-line edit to `export const sofie` was reported as a change to
+ * `::unit`, the whole file, rather than to `::sofie`. `findSymbolAtLine` (adjacency-list.ts)
+ * already carries the correct rule — smallest range first, unit node excluded only when a
+ * narrower candidate also covers the exact line — reused here as `isUnitNode` rather than
+ * reimplemented; the ranking and the exact-line filtering are replicated inline because
+ * `findSymbolAtLine` takes one file/line pair against a live graph instance and reaches into
+ * `this.nodes`, while this function is only ever handed a plain node list across many lines.
  */
 export function impactedSymbolIds(
-  nodes: Iterable<{ id: string; properties?: { filePath?: string; range?: { start?: { line?: number }; end?: { line?: number } } } }>,
+  nodes: Iterable<{ id: string; label?: string; properties?: { filePath?: string; canonicalKind?: string; range?: { start?: { line?: number }; end?: { line?: number } } } }>,
   changes: FileChange[],
 ): string[] {
   const all = Array.from(nodes);
   const impacted = new Set<string>();
 
+  const rangeSize = (n: { properties?: { range?: { start?: { line?: number }; end?: { line?: number } } } }) => {
+    const start = n.properties?.range?.start?.line;
+    const end = n.properties?.range?.end?.line;
+    return typeof start === 'number' && typeof end === 'number' ? end - start : Number.POSITIVE_INFINITY;
+  };
+  const covers = (n: { properties?: { range?: { start?: { line?: number }; end?: { line?: number } } } }, line: number) => {
+    const start = n.properties?.range?.start?.line;
+    const end = n.properties?.range?.end?.line;
+    return typeof start === 'number' && typeof end === 'number' && line >= start && line <= end;
+  };
+  const isUnit = (n: { label?: string; properties?: { canonicalKind?: string } }) =>
+    isUnitNode({ label: n.label, properties: { canonicalKind: n.properties?.canonicalKind } });
+
   for (const change of changes) {
-    const inFile = all.filter(n => n.properties?.filePath === change.file);
+    // Smallest range first, so a nested symbol is tried before the file-wide one.
+    const inFile = all.filter(n => n.properties?.filePath === change.file)
+      .sort((a, b) => rangeSize(a) - rangeSize(b));
     for (const line of change.lines) {
-      const hit = inFile.find(n => {
-        const start = n.properties?.range?.start?.line;
-        const end = n.properties?.range?.end?.line;
-        return typeof start === 'number' && typeof end === 'number' && line >= start && line <= end;
-      });
-      if (hit) impacted.add(hit.id);
+      const candidates = inFile.filter(n => covers(n, line));
+      if (candidates.length === 0) continue;
+      // The unit node is skipped ONLY when a narrower candidate also covers this exact line — a
+      // genuinely module-level change (a top-level import, a comment between functions) has no
+      // narrower candidate at that line and must still report the unit node.
+      const narrower = candidates.find(n => !isUnit(n));
+      const hit = narrower ?? candidates[0];
+      impacted.add(hit.id);
     }
   }
   return [...impacted];
