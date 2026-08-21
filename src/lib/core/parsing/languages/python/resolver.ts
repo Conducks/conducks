@@ -79,12 +79,15 @@ export class PythonResolver {
     const progeny = this.tryExtensions(path.join(dir, pathLike), allFiles);
     if (progeny) return progeny;
 
-    // Walk up to simulate sys.path root finder
+    // Walk up to simulate sys.path root finder.
+    // The project root ('.') is a valid sys.path entry too — tried last, after every nearer
+    // directory, so a nearer match still wins (F-07b, todoR#P0).
     let currentDir = dir;
-    while (currentDir !== '/' && currentDir !== '.') {
+    while (currentDir !== '/') {
       const target = path.join(currentDir, pathLike);
       const res = this.tryExtensions(target, allFiles);
       if (res) return res;
+      if (currentDir === '.') break;
       currentDir = path.dirname(currentDir);
     }
 
@@ -98,9 +101,10 @@ export class PythonResolver {
     // reported the project's OWN packages as third-party dependencies and every call through them
     // dangled. Tried only after the plain walk fails, so a real `src` package is never shadowed.
     currentDir = dir;
-    while (currentDir !== '/' && currentDir !== '.') {
+    while (currentDir !== '/') {
       const res = this.tryExtensions(path.join(currentDir, 'src', pathLike), allFiles);
       if (res) return res;
+      if (currentDir === '.') break;
       currentDir = path.dirname(currentDir);
     }
 

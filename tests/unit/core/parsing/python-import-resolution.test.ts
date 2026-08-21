@@ -58,4 +58,63 @@ describe('Python import resolution', () => {
     expect(resolver.resolve('core.logging', '/Users/Dev/Project_X/src/core/logging_setup.py', files)?.toLowerCase())
       .toBe('/users/dev/project_x/src/core/logging/__init__.py');
   });
+
+  /**
+   * F-07b — the upward walk in `resolveAbsolute` stopped BEFORE ever trying the project root
+   * ('.') as a candidate, because both loops shared the guard
+   * `while (currentDir !== '/' && currentDir !== '.')`. Any importer whose own path is not already
+   * nested under a literal `src` directory (e.g. a top-level `tests/` or `main.py`) could never
+   * resolve a src-layout absolute import and fell through to being classified as third-party.
+   *
+   * MEASURED against the compiled resolver directly (orchestrator repro): `tests/debug_x.py`,
+   * `main.py` and `deep/a/b/c.py` all resolved `specialists.google_maps.specialist` to `undefined`,
+   * while a file already nested under `src` (the control) resolved correctly.
+   */
+  describe('src-layout absolute import resolves from the project root', () => {
+    // Project-relative paths (no leading slash), matching how `allFiles` is actually populated by
+    // the pipeline. A '/repo/...'-style absolute path masks this bug entirely: '/repo' itself acts
+    // as a filesystem root the walk reaches before ever needing '.', so the missing candidate never
+    // gets exercised. Verified live: with the root candidate reverted out, a '/repo'-prefixed fixture
+    // still passed (false green); this project-relative form is the one that actually reproduces it.
+    const ROOT_FILES = [
+      'src/specialists/google_maps/specialist.py',
+      'src/specialists/__init__.py',
+      'src/x/y.py',
+    ];
+
+    it('resolves from a top-level test file with no src ancestor', () => {
+      const hit = resolver.resolve('specialists.google_maps.specialist', 'tests/debug_x.py', ROOT_FILES);
+      expect(hit).toBe('src/specialists/google_maps/specialist.py');
+    });
+
+    it('resolves from a root-level main.py', () => {
+      const hit = resolver.resolve('specialists.google_maps.specialist', 'main.py', ROOT_FILES);
+      expect(hit).toBe('src/specialists/google_maps/specialist.py');
+    });
+
+    it('resolves from a file nested several directories deep with no src ancestor', () => {
+      const hit = resolver.resolve('specialists.google_maps.specialist', 'deep/a/b/c.py', ROOT_FILES);
+      expect(hit).toBe('src/specialists/google_maps/specialist.py');
+    });
+
+    it('control: still resolves from a file already nested under src', () => {
+      const hit = resolver.resolve('specialists.google_maps.specialist', 'src/x/y.py', ROOT_FILES);
+      expect(hit).toBe('src/specialists/google_maps/specialist.py');
+    });
+
+    it('counter-test: a nearer match still wins over the root match', () => {
+      // A same-named module sits both near the importer AND at the project root under src/.
+      // The nearer one must win — the root candidate is a last resort, not a shadow.
+      const files = [
+        'pkg/sub/target.py',
+        'src/target.py',
+      ];
+      const hit = resolver.resolve('target', 'pkg/sub/importer.py', files);
+      expect(hit).toBe('pkg/sub/target.py');
+    });
+
+    it('counter-test: a genuinely external import still resolves to undefined', () => {
+      expect(resolver.resolve('requests', 'tests/debug_x.py', ROOT_FILES)).toBeUndefined();
+    });
+  });
 });
