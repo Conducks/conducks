@@ -128,6 +128,11 @@
   (dictionary (pair value: (identifier) @ref_value))
   ;; The same name handed to a call: `levels.get(level_name, Level1)`, `register(HANDLERS)`.
   (call arguments: (argument_list (identifier) @ref_value))
+  ;; The same name handed as a KEYWORD argument: `entities.sort(key=_score_entity)`. The value sits
+  ;; one level deeper, inside a `keyword_argument` node, so the plain pattern above never matches it —
+  ;; `_score_entity` (live_structure.py) reported ORPHAN in `prune` and 0 callers in `impact` despite
+  ;; being used as a sort key on the very next lines (F-02, todoR#P0).
+  (call arguments: (argument_list (keyword_argument value: (identifier) @ref_value)))
   ;; An EXCEPTION TYPE is a read of the class: `except SpecialistNotFound:` is the only place
   ;; `mapper_runner.py` names the exception it imports, and without this it read as an unused import.
   ;; Both plain and `as` forms, and the tuple form `except (A, B):`.
