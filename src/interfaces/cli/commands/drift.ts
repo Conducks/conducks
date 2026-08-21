@@ -41,6 +41,16 @@ export class DriftCommand implements ConducksCommand {
         // deltas at 10 — so a CLI that quietly printed all of them would be a different ANSWER
         // rather than a different rendering.
         const LIMIT = 10;
+        // F-06b: `deltas` is truncated to LIMIT above, in arrival order — an `improving` array
+        // built from that slice would silently miss the actual top improvers. Derive it from the
+        // full (untruncated) `result.deltas` instead, same threshold and sort as the rendered block.
+        const improving = result.deltas
+          .filter((d: any) => d.velocity < -0.01)
+          .sort((a: any, b: any) => a.velocity - b.velocity)
+          .slice(0, LIMIT)
+          .map((d: any) => ({
+            id: d.id, name: d.name, file: d.file, velocity: d.velocity, isModified: d.isModified,
+          }));
         process.stdout.write(JSON.stringify({
           status: result.status,
           message: result.message,
@@ -49,6 +59,7 @@ export class DriftCommand implements ConducksCommand {
           deltas: result.deltas.slice(0, LIMIT).map((d: any) => ({
             id: d.id, name: d.name, file: d.file, velocity: d.velocity, isModified: d.isModified,
           })),
+          improving,
           truncated: result.deltas.length > LIMIT,
         }, null, 2) + '\n');
         // The exit code stays the verdict's, exactly as the rendered path sets it below: a
@@ -97,13 +108,33 @@ export class DriftCommand implements ConducksCommand {
       }
 
       if (result.deltas && result.deltas.length > 0) {
-        console.log(`\n\x1b[1m🚀 Top Structural Decay Hotspots (Velocity) ---\x1b[0m`);
-        result.deltas.filter(d => d.velocity > 0.01).slice(0, 10).forEach((d: any, i: number) => {
-          const color = d.velocity > 0.1 ? '\x1b[31m' : '\x1b[33m';
-          console.log(`${i + 1}. ${color}${d.name}\x1b[0m [Velocity: ${d.velocity.toFixed(4)}]`);
-          console.log(`   └─ Gravity: ${d.gravity_delta > 0 ? '+' : ''}${d.gravity_delta.toFixed(4)} | Complexity: ${d.complexity_delta > 0 ? '+' : ''}${d.complexity_delta}`);
-          if (d.isModified) console.log(`   └─ \x1b[34mStructural DNA Shift Detected\x1b[0m`);
-        });
+        const decaying = result.deltas.filter(d => d.velocity > 0.01);
+        if (decaying.length > 0) {
+          console.log(`\n\x1b[1m🚀 Top Structural Decay Hotspots (Velocity) ---\x1b[0m`);
+          decaying.slice(0, 10).forEach((d: any, i: number) => {
+            const color = d.velocity > 0.1 ? '\x1b[31m' : '\x1b[33m';
+            console.log(`${i + 1}. ${color}${d.name}\x1b[0m [Velocity: ${d.velocity.toFixed(4)}]`);
+            console.log(`   └─ Gravity: ${d.gravity_delta > 0 ? '+' : ''}${d.gravity_delta.toFixed(4)} | Complexity: ${d.complexity_delta > 0 ? '+' : ''}${d.complexity_delta}`);
+            if (d.isModified) console.log(`   └─ \x1b[34mStructural DNA Shift Detected\x1b[0m`);
+          });
+        }
+
+        // F-06b: `Improving: N` printed with no per-symbol listing anywhere — the count was real
+        // but unfalsifiable. Mirrors the decay block above: same fields, sorted most-improving
+        // (most negative velocity) first, and — same as the decay block's own guard — no heading
+        // at all when nothing qualifies, so a run with zero improving symbols does not fabricate
+        // an empty section.
+        const improving = result.deltas
+          .filter(d => d.velocity < -0.01)
+          .sort((a: any, b: any) => a.velocity - b.velocity);
+        if (improving.length > 0) {
+          console.log(`\n\x1b[1m✨ Top Improving Symbols (Velocity) ---\x1b[0m`);
+          improving.slice(0, 10).forEach((d: any, i: number) => {
+            console.log(`${i + 1}. \x1b[32m${d.name}\x1b[0m [Velocity: ${d.velocity.toFixed(4)}]`);
+            console.log(`   └─ Gravity: ${d.gravity_delta > 0 ? '+' : ''}${d.gravity_delta.toFixed(4)} | Complexity: ${d.complexity_delta > 0 ? '+' : ''}${d.complexity_delta}`);
+            if (d.isModified) console.log(`   └─ \x1b[34mStructural DNA Shift Detected\x1b[0m`);
+          });
+        }
       }
 
     } catch (err: any) {
