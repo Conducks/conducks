@@ -64,7 +64,16 @@ describe('the three indexes agree with the nodes', () => {
     g.addNode(mk('/p/a.ts::thing', '/p/a.ts', 'Thing'));
     g.addNode(mk('/p/b.ts::thing', '/p/b.ts', 'THING'));
 
-    expect(g.findNodesByName('Thing')).toHaveLength(1);
+    // Was `toHaveLength(1)` — `findNodesByName` used to return EARLY on any exact-spelling hit,
+    // so a differently-cased node with the same name never entered the pool. F-01 fixed exactly
+    // that: on the orchestrator subject, the real `Registry.ts::Registry` is stored as `registry`
+    // while 4 usages are spelled `Registry`, and the declaration — gravity ~5x every candidate —
+    // never reached the pool `impact`'s highest-gravity pick draws from. `findNodesByName` now
+    // unions in any node whose name is EQUAL case-insensitively, which is exactly this fixture's
+    // shape: two real, distinct declarations that happen to share a spelling once case is folded.
+    // Case-insensitive EQUALITY only (not a broader substring scan — see adjacency-list.ts) is
+    // what keeps `getNodeIdsByLowerName` unaffected and this store's lower-name index untouched.
+    expect(g.findNodesByName('Thing')).toHaveLength(2);
     expect([...g.getNodeIdsByLowerName('thing')]).toHaveLength(2);
   });
 
