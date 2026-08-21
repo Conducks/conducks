@@ -36,6 +36,8 @@ export { FederatedLinker } from './linker-federated.js';
 export { HttpServiceLinker } from './http-service-linker.js';
 
 export { StructuralRanker } from './algorithms/ranker.js';
+export { CycleDetector, formatCycleCluster } from './algorithms/cycle-detector.js';
+export type { CycleClusterReport, CycleDetectOptions } from './algorithms/cycle-detector.js';
 
 export { classifyOrigin } from './boundary-classifier.js';
 export { clusterOf } from './cluster-rule.js';
