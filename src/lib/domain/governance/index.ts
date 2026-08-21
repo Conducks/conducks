@@ -2,7 +2,7 @@ import { ConducksAdvisor } from "./advisor.js";
 import type { Advice } from "@/contracts/index.js";
 import { ConducksSentinel } from "./sentinel.js";
 import { RegressionGuard } from "./guard.js";
-import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId } from "@/lib/core/graph/index.js";
+import { ConducksAdjacencyList, IMPORT_CYCLE_IGNORED_EDGE_TYPES, NodeId, CycleDetector, formatCycleCluster } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import fs from "node:fs";
@@ -73,7 +73,8 @@ export class GovernanceService {
     // method is resolved onto the owning class only because that parameter is type-annotated.
     // A genuine architectural cycle spans ≥2 files; a single-file loop (recursion, a type owning
     // its own members) is an implementation detail, not a module-dependency smell.
-    const cycles = this.graph.detectCycles({ ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
+    const cycleDetectOptions = { ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true };
+    const cycles = this.graph.detectCycles(cycleDetectOptions).filter(c => {
       if (c.length <= 1) return false;
       const files = new Set(c.map(id => {
         const n = this.graph.getNode(id);
@@ -83,10 +84,14 @@ export class GovernanceService {
     });
 
     for (const cycle of cycles) {
+      // F-03: `cycle` is SCC membership in DFS finish order, not an edge-following route — printing
+      // it directly invents edges. `describeCluster` re-derives every real simple cycle in the
+      // cluster from the same filtered graph and names the edge to cut.
+      const report = CycleDetector.describeCluster(this.graph, cycle, cycleDetectOptions);
       violations.push({
         id: cycle[0],
         type: 'CIRCULAR',
-        message: `ARCH-3: Circular: ${cycle.join(" -> ")}`
+        message: `ARCH-3: Circular (${cycle.length} nodes): ${formatCycleCluster(report)}`
       });
     }
 
@@ -268,7 +273,8 @@ export class GovernanceService {
     for (const rule of rules) {
       switch (rule.condition) {
         case 'has_cycles': {
-          const cycles = this.graph.detectCycles({ ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true }).filter(c => {
+          const cycleDetectOptions = { ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true };
+          const cycles = this.graph.detectCycles(cycleDetectOptions).filter(c => {
             if (c.length <= 1) return false;
             // Intra-file self-references (e.g. a singleton's class → getInstance → file-unit) are
             // not circular MODULE dependencies — only cross-file cycles are architectural smells.
@@ -279,11 +285,13 @@ export class GovernanceService {
             return files.size > 1;
           });
           for (const cycle of cycles) {
+            // F-03: same route-fabrication fix as the ARCH-3 violation above.
+            const report = CycleDetector.describeCluster(this.graph, cycle, cycleDetectOptions);
             violations.push({
               id: cycle[0],
               ruleId: rule.id,
               severity: rule.severity,
-              message: `[${rule.name}] Circular dependency: ${cycle.join(' -> ')}`,
+              message: `[${rule.name}] Circular dependency (${cycle.length} nodes): ${formatCycleCluster(report)}`,
             });
           }
           break;

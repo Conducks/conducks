@@ -11,7 +11,7 @@ import { ConducksFlowEngine } from "@/lib/domain/kinetic/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { GVREngine } from "@/lib/domain/evolution/index.js";
-import { IMPORT_CYCLE_IGNORED_EDGE_TYPES } from "@/lib/core/graph/index.js";
+import { IMPORT_CYCLE_IGNORED_EDGE_TYPES, CycleDetector, formatCycleCluster } from "@/lib/core/graph/index.js";
 import { DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
 import { ConducksAdvisor } from "@/lib/domain/governance/index.js";
 import { CoChangeEngine } from "@/lib/core/algorithms/index.js";
@@ -300,8 +300,13 @@ export class Conducks {
     const violations: string[] = [];
     // Reporting path: containment is not dependency (ADR 0010) and a type-only import is erased at
     // compile time (ADR 0016). This call site predates both and was still counting each as a cycle.
-    const cycles = graph.detectCycles({ ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true });
-    for (const cycle of cycles) violations.push(`ARCH-3: Circular: ${cycle.join(" -> ")}`);
+    const cycleDetectOptions = { ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true };
+    const cycles = graph.detectCycles(cycleDetectOptions);
+    for (const cycle of cycles) {
+      // F-03: same route-fabrication fix as governance's ARCH-3 violation (cycle-detector.ts).
+      const report = CycleDetector.describeCluster(graph, cycle, cycleDetectOptions);
+      violations.push(`ARCH-3: Circular (${cycle.length} node${cycle.length === 1 ? '' : 's'}): ${formatCycleCluster(report)}`);
+    }
     return { success: violations.length === 0, violations };
   }
 }

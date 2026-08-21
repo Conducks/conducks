@@ -27,6 +27,47 @@ const PY_DIST_NAMES: Record<string, string> = {
   magic: 'python-magic', win32com: 'pywin32',
 };
 
+/**
+ * F-07a: `PY_DIST_NAMES` above only covers IRREGULAR import/distribution pairs — it has no generic
+ * rule, so a REGULAR case misses: `import kokoro_onnx` reads as undeclared even though
+ * `requirements.txt` declares `kokoro-onnx` (MEASURED on the sofie subject; same for
+ * faster_whisper/faster-whisper). PEP 503 normalization (lowercase; collapse runs of `-`, `_`, `.`
+ * to a single `-`) is the generic rule that bridges these without a lookup table.
+ *
+ * PEP 503 forbids two distinct real PyPI packages differing only by case/`-`/`_`/`.`, so this can
+ * never wrongly merge two genuinely different packages — it only recovers the regular case the
+ * irregular table was never meant to cover. The irregular table stays as a fallback for pairs
+ * normalization cannot bridge (`yaml`/`pyyaml`, `cv2`/`opencv-python` share no normalized form).
+ */
+export function normalizePkgName(name: string): string {
+  return name.toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+/** A `pkg -> version` map keyed by PEP-503-normalized name, first declaration wins on a collision. */
+export function buildNormalizedVersions(versions: Map<string, string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [name, ver] of versions) {
+    const norm = normalizePkgName(name);
+    if (!out.has(norm)) out.set(norm, ver);
+  }
+  return out;
+}
+
+/**
+ * Resolves a declared version for an imported package name: exact match first, then the irregular
+ * import/distribution table, then PEP 503 normalization. A package that misses all three genuinely
+ * is not declared under any spelling any manifest uses.
+ */
+export function resolveDeclaredVersion(
+  pkg: string,
+  versions: Map<string, string>,
+  normalizedVersions: Map<string, string>,
+): string | undefined {
+  return versions.get(pkg)
+    ?? versions.get(PY_DIST_NAMES[pkg] ?? '')
+    ?? normalizedVersions.get(normalizePkgName(pkg));
+}
+
 export class SupplyChainCommand implements ConducksCommand {
   public id = "supply-chain";
   public description = "Report the dependency / boundary surface (stdlib vs versioned deps)";
@@ -65,6 +106,7 @@ export class SupplyChainCommand implements ConducksCommand {
     }
 
     const versions = this.readPackageVersions(registry.infrastructure.chronicle.getProjectDir());
+    const normalizedVersions = buildNormalizedVersions(versions);
 
     // `--json` was ADVERTISED in this command's usage before it existed. ADR 0119 derived each
     // command's flag set with a regex over its source, and here that pattern matched
@@ -92,7 +134,7 @@ export class SupplyChainCommand implements ConducksCommand {
         packages: pkgRows.map(p => ({
           package: p.pkg,
           importers: Number(p.importers),
-          version: versions.get(p.pkg) ?? versions.get(PY_DIST_NAMES[p.pkg] ?? '') ?? null,
+          version: resolveDeclaredVersion(p.pkg, versions, normalizedVersions) ?? null,
           advisory: byPackage.get(p.pkg) ?? null,
         })),
         advisories: { available },
@@ -122,7 +164,7 @@ export class SupplyChainCommand implements ConducksCommand {
       const SEV = { critical: '\x1b[41m', high: '\x1b[31m', moderate: '\x1b[33m', low: '\x1b[2m' } as Record<string, string>;
 
       for (const p of pkgs) {
-        const ver = versions.get(p.pkg) ?? versions.get(PY_DIST_NAMES[p.pkg] ?? '');
+        const ver = resolveDeclaredVersion(p.pkg, versions, normalizedVersions);
         // "not in package.json" was wrong twice over: on a Python project there is no package.json,
         // and in a monorepo the declaration lives one directory down. The manifests are all read
         // now, so the honest word for a package none of them names is UNDECLARED.
@@ -143,7 +185,7 @@ export class SupplyChainCommand implements ConducksCommand {
           ? `\n\x1b[31m  ⚠️  ${reached.length} imported package(s) carry advisories, reached by ${exposure} import(s).\x1b[0m`
           : `\n\x1b[32m  ✅ No advisory affects an imported package (${advisories.size} advisory/advisories exist but none is reached by this code).\x1b[0m`);
       }
-      const unpinned = pkgs.filter(p => !versions.get(p.pkg)).length;
+      const unpinned = pkgs.filter(p => !resolveDeclaredVersion(p.pkg, versions, normalizedVersions)).length;
       if (unpinned > 0) {
         console.log(`\n\x1b[33m  ⚠️  ${unpinned} imported package(s) are not declared in package.json (phantom dependency).\x1b[0m`);
       }
