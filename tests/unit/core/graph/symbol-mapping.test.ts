@@ -59,3 +59,36 @@ describe('Conducks: Kinetic Symbol Mapping Unit Tests 💎', () => {
     expect(symbol).toBeUndefined();
   });
 });
+
+// F-05 blast radius: a node built by the REAL pipeline (reflector.ts -> graph-engine.ts) never
+// carries `label: 'module'` for its file node — `label` is set to `canonicalKind`, which for the
+// file's own node is the uppercase string 'UNIT' (graph-engine.ts:488). The fixture above uses the
+// older `label: 'module'` spelling and so never exercised that shape; this block does.
+describe('Conducks: findSymbolAtLine against a REAL-shaped unit node (canonicalKind UNIT)', () => {
+  let graph: ConducksAdjacencyList;
+  const filePath = 'real.ts';
+
+  beforeEach(() => {
+    graph = new ConducksAdjacencyList();
+    graph.addNode({
+      id: 'real.ts::unit',
+      label: 'UNIT',
+      properties: { name: 'real.ts', filePath, canonicalKind: 'UNIT', range: { start: { line: 1, column: 0 }, end: { line: 100, column: 0 } } },
+    });
+    graph.addNode({
+      id: 'real.ts::sofie',
+      label: 'BEHAVIOR',
+      properties: { name: 'sofie', filePath, canonicalKind: 'BEHAVIOR', range: { start: { line: 20, column: 0 }, end: { line: 40, column: 0 } } },
+    });
+  });
+
+  it('finds the nested symbol over the whole-file UNIT node', () => {
+    const symbol = graph.findSymbolAtLine(filePath, 25);
+    expect(symbol?.properties.name).toBe('sofie');
+  });
+
+  it('COUNTER-TEST: a genuinely module-level line still falls back to the UNIT node', () => {
+    const symbol = graph.findSymbolAtLine(filePath, 5);
+    expect(symbol?.properties.name).toBe('real.ts');
+  });
+});

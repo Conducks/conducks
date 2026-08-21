@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { FilterValidationError } from "@/contracts/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
+import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Query Command
@@ -12,6 +13,10 @@ export class QueryCommand implements ConducksCommand {
   public usage = "conducks query <pattern> [--mode fuzzy|template|filter] [--template <id>] [--filter <json>] [--doc <term>] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
+    // One project root for every branch below, so every printed path goes through the same
+    // relative/real-case repair (ADR 0132) rather than each branch re-deriving (or skipping) it.
+    const queryRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+
     // SEARCH BY PURPOSE, not by name (ADR 0133, todo40#P4).
     //
     // `rg retry` finds the word wherever it appears — in a variable, in an unrelated comment, in a
@@ -58,10 +63,10 @@ export class QueryCommand implements ConducksCommand {
           : `No symbol's description mentions "${term}" (searched ${Number(n)} documented symbol(s)).`);
         return;
       }
-      const root = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
       for (const r of rows) {
-        const rel = String(r.file || '').toLowerCase().startsWith(root.toLowerCase())
-          ? String(r.file).slice(root.length + 1) : r.file;
+        // Relative AND real-case (ADR 0132) — `r.file` is the lowercased on-disk spelling
+        // (CONDUCKS-4), and slicing the prefix off it here did not repair that case.
+        const rel = displayPath(String(r.file || ''), queryRoot);
         console.log(`\n  \x1b[36m${r.name}\x1b[0m \x1b[2m${rel}:${r.lineStart}\x1b[0m`);
         console.log(`    ${String(r.doc).split('\n')[0]}`);
       }
@@ -154,7 +159,7 @@ export class QueryCommand implements ConducksCommand {
           return;
         }
         rows.forEach((r: any) => {
-          console.log(`\x1b[36m${r.name}\x1b[0m [${r.canonicalKind || '?'}] - \x1b[2m${r.file || ''}\x1b[0m`);
+          console.log(`\x1b[36m${r.name}\x1b[0m [${r.canonicalKind || '?'}] - \x1b[2m${displayPath(String(r.file || ''), queryRoot)}\x1b[0m`);
         });
       } catch (err) {
         if (err instanceof FilterValidationError) {
@@ -182,7 +187,7 @@ export class QueryCommand implements ConducksCommand {
 
         results.forEach((r: any) => {
           const name = r.name || r.id;
-          console.log(`\x1b[36m${name}\x1b[0m [${r.canonicalKind || '?'}] - \x1b[2m${r.file || r.filePath || ''}\x1b[0m`);
+          console.log(`\x1b[36m${name}\x1b[0m [${r.canonicalKind || '?'}] - \x1b[2m${displayPath(String(r.file || r.filePath || ''), queryRoot)}\x1b[0m`);
           if (r.hotspotScore) console.log(`  > Hotspot Score: \x1b[33m${r.hotspotScore.toFixed(4)}\x1b[0m`);
           if (r.anomaly) console.log(`  > \x1b[31mAnomaly Detetced: ${r.anomaly}\x1b[0m`);
         });
@@ -229,17 +234,18 @@ export class QueryCommand implements ConducksCommand {
 
         const col = (s: string, w: number) => s.substring(0, w).padEnd(w);
 
-        // RELATIVE paths and the DECLARATION LINE (ADR 0132, todo39#P3).
+        // RELATIVE, REAL-CASE paths and the DECLARATION LINE (ADR 0132, todo39#P3).
         //
         // The absolute path is ~90 characters here and was truncated to 46, so the column showed
         // `/users/saidmustafasaid/documents/gospel_of_tec` — the same prefix on every row, and the
         // part that identifies the file cut off. Relative to the project root it fits, and the
         // source line under each hit is what makes "where is X" end in one answer rather than in an
         // editor.
+        //
+        // The manual prefix-slice here did not repair CASE — `filePath` is stored lowercased
+        // (CONDUCKS-4), so this printed a path a reader could not paste even after relativising.
         const reader = registry.source.lineReader();
-        const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
-        const rel = (p: string) =>
-          p && p.toLowerCase().startsWith(projectRoot.toLowerCase()) ? p.slice(projectRoot.length + 1) : p;
+        const rel = (p: string) => displayPath(p, queryRoot);
 
         // Table header
         console.log(

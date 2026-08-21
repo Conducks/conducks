@@ -21,7 +21,7 @@
  * traversal helpers, `cluster-rule`. Callers ask for a linker or an algorithm and get its result;
  * none of them need the machinery, which is what makes `linker-intra` splittable later.
  */
-export { ConducksAdjacencyList } from './adjacency-list.js';
+export { ConducksAdjacencyList, isUnitNode } from './adjacency-list.js';
 export type { ConducksNode, ConducksEdge, NodeId, EdgeType } from './adjacency-list.js';
 export {
   STRUCTURAL_EDGE_TYPES,

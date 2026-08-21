@@ -88,3 +88,30 @@ describe('impactedSymbolIds — a changed line hits the symbol whose RANGE holds
     expect(impactedSymbolIds(rangeless as any, [{ file: '/repo/src/a.ts', lines: [5] }])).toEqual([]);
   });
 });
+
+describe('impactedSymbolIds — the NARROWEST symbol wins, not the first `.find()` hit (F-05)', () => {
+  // A file's whole-file unit node covers every line, so `.find()` over an unsorted list let it
+  // beat a nested symbol it happened to be listed before. `label`/`canonicalKind` 'UNIT' is what a
+  // real unit node carries (see `isUnitNode`, adjacency-list.ts) — 'module' is kept working too for
+  // any hand-built fixture using the older spelling.
+  const unit = { id: 'sofie/index.ts::unit', label: 'UNIT', properties: { filePath: '/repo/sofie/index.ts', canonicalKind: 'UNIT', range: { start: { line: 1 }, end: { line: 100 } } } };
+  const sofie = { id: 'sofie/index.ts::sofie', label: 'BEHAVIOR', properties: { filePath: '/repo/sofie/index.ts', canonicalKind: 'BEHAVIOR', range: { start: { line: 20 }, end: { line: 40 } } } };
+
+  it('reports the nested symbol, not the whole-file unit node, for a line inside it', () => {
+    // REPRO: editing a line inside `export const sofie` must name `::sofie`, not `::unit`.
+    const hit = impactedSymbolIds([unit, sofie] as any, [{ file: '/repo/sofie/index.ts', lines: [25] }]);
+    expect(hit).toEqual(['sofie/index.ts::sofie']);
+  });
+
+  it('COUNTER-TEST: a genuinely module-level line (no narrower candidate covers it) still reports the unit node', () => {
+    const hit = impactedSymbolIds([unit, sofie] as any, [{ file: '/repo/sofie/index.ts', lines: [5] }]);
+    expect(hit).toEqual(['sofie/index.ts::unit']);
+  });
+
+  it('does not depend on array order — unit node listed first or last gives the same answer', () => {
+    const first = impactedSymbolIds([unit, sofie] as any, [{ file: '/repo/sofie/index.ts', lines: [25] }]);
+    const last = impactedSymbolIds([sofie, unit] as any, [{ file: '/repo/sofie/index.ts', lines: [25] }]);
+    expect(first).toEqual(last);
+    expect(first).toEqual(['sofie/index.ts::sofie']);
+  });
+});

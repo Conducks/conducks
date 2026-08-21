@@ -212,6 +212,37 @@ describe('ConducksAdjacencyList', () => {
     it('returns no matches for a name that appears nowhere', () => {
       expect(graph.findNodesByName('nonexistentSymbol')).toHaveLength(0);
     });
+
+    // F-01 — an exact `nameIndex` hit used to return EARLY, so the case-insensitive scan below it
+    // never ran. On the orchestrator subject the real `Registry.ts::Registry` is stored as
+    // `registry` (lowercased), while 4 mixed-case USAGES are named exactly `Registry` — the exact
+    // index hit on those 4 returned immediately and the true declaration, gravity ~5x every
+    // candidate, never entered the pool `impact`'s highest-gravity pick draws from.
+    it('unions the exact-spelling hits with a same-name node stored under different case (F-01)', () => {
+      graph.addNode({ id: 'src/registry.ts::registry', label: 'class', properties: { name: 'registry', filePath: 'src/registry.ts', gravity: 0.9 } });
+      graph.addNode({ id: 'src/a.ts::use1', label: 'ref', properties: { name: 'Registry', filePath: 'src/a.ts', gravity: 0.1 } });
+      graph.addNode({ id: 'src/b.ts::use2', label: 'ref', properties: { name: 'Registry', filePath: 'src/b.ts', gravity: 0.1 } });
+
+      const result = graph.findNodesByName('Registry');
+      const ids = result.map(n => n.id).sort();
+      // Both the 2 exact-cased usages AND the differently-cased declaration must be in the pool.
+      expect(ids).toEqual(['src/a.ts::use1', 'src/b.ts::use2', 'src/registry.ts::registry']);
+    });
+
+    it('COUNTER-TEST: a unique name with no case-variants returns the SAME single result, same order, no extra fuzzy matches', () => {
+      // Deliberately isolated from the beforeEach fixture's `processOrder`/`processPayment` nodes:
+      // a name that shares no substring with either, so this test is not accidentally saved by
+      // them being absent.
+      graph.addNode({ id: 'src/only.ts::uniqueSymbolZzz', label: 'function', properties: { name: 'uniqueSymbolZzz', filePath: 'src/only.ts', gravity: 1 } });
+      const before = graph.findNodesByName('uniqueSymbolZzz');
+      expect(before).toHaveLength(1);
+      expect(before[0].id).toBe('src/only.ts::uniquesymbolzzz');
+
+      // Calling it again must return the identical single result in the identical order — the
+      // union must not start pulling in unrelated fuzzy substring matches for a name that has none.
+      const again = graph.findNodesByName('uniqueSymbolZzz');
+      expect(again.map(n => n.id)).toEqual(before.map(n => n.id));
+    });
   });
 
   describe('hasEdge / hasNode / stats / clear', () => {

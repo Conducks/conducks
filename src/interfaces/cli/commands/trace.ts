@@ -94,14 +94,25 @@ export class TraceCommand implements ConducksCommand {
     //
     // `resolveSymbol` also REFUSES loudly when the symbol truly does not exist, which is the half
     // this command never had: silence and absence looked identical here.
-    const symbolId = resolveSymbol(symbolInput, registry.query.graph.getGraph());
+    // Relative, real-case display (ADR 0132): a trace prints many rows, each of which repeated the
+    // same ~90-character absolute lowercased prefix before the file that answers the question.
+    //
+    // Hoisted above the PATH MODE branch below, which used to `return` before either was defined
+    // and so printed `symbolId`/`targetId`/`st.filePath` raw — the one branch of this command that
+    // skipped the repair every other branch applies.
+    const traceRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
+    const rel = (p: any) => (p ? displayPath(String(p), traceRoot) : p);
+    const traceNames = nameLookupFrom(registry.query.graph.getGraph());
+    const formatId = (id: string) => displayId(id, traceRoot, traceNames);
+
+    const symbolId = resolveSymbol(symbolInput, registry.query.graph.getGraph(), formatId);
 
     // PATH MODE — the shortest structural path to a target, the same answer `conducks_trace` gives.
     if (mode === 'path') {
       // Same resolver for the TARGET, for the same reason: an unresolved target made `findPath`
       // walk toward an id the graph does not hold and report "no structural path" — a claim about
       // the code, from a lookup that never landed.
-      const targetId = resolveSymbol(targetInput as string, registry.query.graph.getGraph());
+      const targetId = resolveSymbol(targetInput as string, registry.query.graph.getGraph(), formatId);
       const path = await registry.kinetic.findPath(symbolId, targetId);
       const steps = path.map((id: string) => {
         const n = registry.query.graph.getGraph().getNode(id);
@@ -114,11 +125,11 @@ export class TraceCommand implements ConducksCommand {
         return;
       }
       if (steps.length === 0) {
-        console.log(`\x1b[33mNo structural path from ${symbolId} to ${targetId}.\x1b[0m`);
+        console.log(`\x1b[33mNo structural path from ${formatId(symbolId)} to ${formatId(targetId)}.\x1b[0m`);
         return;
       }
       console.log(`\n\x1b[1m--- 🛤️  Shortest Structural Path ---\x1b[0m`);
-      steps.forEach((st, i) => console.log(`  ${i + 1}. ${st.resolved ? st.name : `${st.name} (unresolved)`}  \x1b[2m${st.filePath ?? ''}\x1b[0m`));
+      steps.forEach((st, i) => console.log(`  ${i + 1}. ${st.resolved ? st.name : `${st.name} (unresolved)`}  \x1b[2m${rel(st.filePath)}\x1b[0m`));
       return;
     }
 
@@ -147,12 +158,7 @@ export class TraceCommand implements ConducksCommand {
       return;
     }
 
-    // Relative, real-case display (ADR 0132): a trace prints 15 rows, each of which repeated the
-    // same ~90-character absolute lowercased prefix before the file that answers the question.
-    const traceRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
-    const rel = (p: any) => (p ? displayPath(String(p), traceRoot) : p);
-    const traceNames = nameLookupFrom(registry.query.graph.getGraph());
-    console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${displayId(symbolId, traceRoot, traceNames)} ---\x1b[0m`);
+    console.log(`\n\x1b[1m--- 🔌 Conducks Structural Trace: ${formatId(symbolId)} ---\x1b[0m`);
 
     try {
       if (isFlow) {
@@ -176,7 +182,7 @@ export class TraceCommand implements ConducksCommand {
           if (n) {
             console.log(`${prefix}. [\x1b[35m${n.label}\x1b[0m] ${n.properties.name} (\x1b[2m${rel(n.properties.filePath)}\x1b[0m)`);
           } else {
-            console.log(`${prefix}. [\x1b[90mEXTERNAL\x1b[0m] ${displayId(id, traceRoot)} (\x1b[2mUnresolved Ghost Target\x1b[0m)`);
+            console.log(`${prefix}. [\x1b[90mEXTERNAL\x1b[0m] ${formatId(id)} (\x1b[2mUnresolved Ghost Target\x1b[0m)`);
           }
         });
         reportTruncation(steps.length, stepLimit);

@@ -1,6 +1,7 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
+import { displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
  * Conducks — Diff Command (PR Risk Engine)
@@ -92,8 +93,10 @@ export class DiffCommand implements ConducksCommand {
     console.log(`\x1b[1mPR Risk Profile:\x1b[0m ${color}${avgRisk.toFixed(2)} / 10.0\x1b[0m`);
 
     console.log(`\nHigh-Risk Symbols Impacted:`);
+    const diffRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
+    const diffNames = nameLookupFrom(registry.query.graph.getGraph());
     reports.sort((a, b) => b.risk - a.risk).slice(0, 5).forEach(r => {
-      console.log(`- \x1b[35m${r.id}\x1b[0m (Risk: ${(r.risk * 10).toFixed(2)})`);
+      console.log(`- \x1b[35m${displayId(r.id, diffRoot, diffNames)}\x1b[0m (Risk: ${(r.risk * 10).toFixed(2)})`);
     });
   }
 

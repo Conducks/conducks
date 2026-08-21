@@ -195,6 +195,24 @@ const EMPTY_ID_SET: ReadonlySet<NodeId> = new Set<NodeId>();
  * to. That failure mode is why `replaceFile` and `clearFile` are separate operations with different
  * rules about incoming edges (todo67).
  */
+/**
+ * Is this the whole-file unit node, rather than a symbol declared inside the file?
+ *
+ * Shared by `findSymbolAtLine` below and by `change-set.ts`'s `impactedSymbolIds`, which needs the
+ * same rule (a file's whole-span node must not shadow a narrower symbol) but cannot call
+ * `findSymbolAtLine` itself — that method reaches into `this.nodes` on a live instance, and
+ * `impactedSymbolIds` is only ever handed a plain node list.
+ *
+ * Checks both spellings a node's unit-ness has been seen under: `label: 'module'`, set by
+ * hand-built fixtures (see `symbol-mapping.test.ts`), and `label`/`canonicalKind` `'UNIT'`, which is
+ * what a node built by the real pipeline (reflector.ts -> graph-engine.ts) actually carries — the
+ * file's own node has `label` set to its `canonicalKind`, never to the string `'module'`. A check
+ * against `'module'` alone matches nothing on any real graph.
+ */
+export function isUnitNode(n: { label?: string; properties?: { canonicalKind?: string } }): boolean {
+  return n.label === 'module' || n.label === 'UNIT' || n.properties?.canonicalKind === 'UNIT';
+}
+
 export class ConducksAdjacencyList {
   /**
    * Set while a lazy load is DEFERRED: reading this graph is a bug until it is materialised.
@@ -889,25 +907,58 @@ export class ConducksAdjacencyList {
 
   public findNodesByName(name: string): ConducksNode[] {
     const query = name.toLowerCase();
+    const results = new Map<NodeId, ConducksNode>();
 
-    // 1. Check Fast Index (Exact)
+    // 1. Fast Index (Exact spelling).
     const exactIds = this.nameIndex.get(name);
-    if (exactIds && exactIds.size > 0) {
-      return [...exactIds].map(id => this.nodes.get(id)!).filter(Boolean);
-    }
-
-    // 2. Fuzzy / Case-Insensitive Resonance (Fallback)
-    const fuzzyMatches: ConducksNode[] = [];
-    for (const node of this.nodes.values()) {
-      const nodeName = node.properties.name?.toLowerCase() || '';
-      const nodeLabel = node.label?.toLowerCase() || '';
-      if (nodeName.includes(query) || nodeLabel.includes(query)) {
-        fuzzyMatches.push(node);
+    if (exactIds) {
+      for (const id of exactIds) {
+        const node = this.nodes.get(id);
+        if (node) results.set(id, node);
       }
-      if (fuzzyMatches.length >= 20) break;
     }
 
-    return fuzzyMatches;
+    // 2. Case-insensitive EXACT-NAME union — ALWAYS run and UNION with the exact hits, rather than
+    // returning early on any exact hit (F-01).
+    //
+    // `nameIndex` is keyed by the EXACT spelling on the file, so on the orchestrator subject
+    // `Registry` (4 mixed-case usages) hit the fast index and returned right here, and the only
+    // place that matches case-insensitively never ran. The real declaration is stored as
+    // `registry` (lowercased), gravity 0.2364, ~5x every other candidate, and it never entered the
+    // pool `impact`'s highest-gravity pick draws from: the pick was true of a pool that had already
+    // discarded its winner.
+    //
+    // EQUALITY, not `.includes()` — an earlier version of this fix ran the broad SUBSTRING fuzzy
+    // scan (see step 3) unconditionally, which pulled in anything merely containing the query as a
+    // substring even when a perfectly good exact match already existed: the file's own unit node
+    // (named after the file, e.g. `widget.ts`) matched a search for `Widget`, and `usewidget`
+    // matched a search for `Widget` too — both real regressions, measured via
+    // `traversal-truth.test.ts` and `rename-repeated-call-sites.test.ts` going red. Case-insensitive
+    // EQUALITY only widens the net to true case variants, the actual shape of F-01.
+    for (const node of this.nodes.values()) {
+      if (results.has(node.id)) continue;
+      const nodeName = node.properties.name?.toLowerCase() || '';
+      if (nodeName === query) results.set(node.id, node);
+    }
+
+    // 3. Fuzzy / substring resonance — a genuine FALLBACK, run only when nothing above matched at
+    // all. This is the original behaviour for a query that is not a name anywhere in the graph
+    // (`query('process')` finding `processOrder`/`processPayment`) and must stay a last resort:
+    // running it unconditionally is exactly the regression step 2's comment describes.
+    if (results.size === 0) {
+      let fuzzyCount = 0;
+      for (const node of this.nodes.values()) {
+        if (fuzzyCount >= 20) break;
+        const nodeName = node.properties.name?.toLowerCase() || '';
+        const nodeLabel = node.label?.toLowerCase() || '';
+        if (nodeName.includes(query) || nodeLabel.includes(query)) {
+          results.set(node.id, node);
+          fuzzyCount++;
+        }
+      }
+    }
+
+    return [...results.values()];
   }
 
   /**
@@ -949,8 +1000,15 @@ export class ConducksAdjacencyList {
     for (const node of nodesInFile) {
       const range = (node as any).originalRange || node.properties.range;
       if (range && line >= range.start.line && line <= range.end.line) {
-        // Exclude generic 'module' nodes if more specific symbols exist
-        if (node.label === 'module' && nodesInFile.length > 1) continue;
+        // Exclude the whole-file unit node if more specific symbols exist.
+        //
+        // A freshly-built fixture may still set `label: 'module'` (see symbol-mapping.test.ts),
+        // but a node that came through the real pipeline (reflector.ts -> graph-engine.ts) never
+        // does: `label` is set to `canonicalKind`, which for the file's own node is the uppercase
+        // string `'UNIT'` — so this check matched nothing on any real graph and the exclusion was
+        // silently dead. Checking both spellings makes it work for real data without breaking the
+        // hand-built fixture.
+        if (isUnitNode(node) && nodesInFile.length > 1) continue;
         return node;
       }
     }
@@ -958,7 +1016,7 @@ export class ConducksAdjacencyList {
     // Fallback: Return the module node if no specific symbol matches the line.
     // nodesInFile is already filtered to the correct (normalised) path,
     // so this find() is safe and consistent with the outer filter.
-    return nodesInFile.find(n => n.label === 'module');
+    return nodesInFile.find(isUnitNode);
   }
 
   /** Counts and density. A GETTER, not a method — calling it as one threw for every caller that tried. */

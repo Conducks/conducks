@@ -18,8 +18,8 @@ export function cliWarn(message: string): void {
  * and the two drifted the moment either was fixed (todo61's mirror rule). What stays here is what
  * only the CLI owns: the exit code and the warning sink.
  */
-export function resolveSymbol(input: string, graph: NameIndex): string {
-  const resolved = tryResolveSymbol(input, graph, cliWarn);
+export function resolveSymbol(input: string, graph: NameIndex, formatId?: (id: string) => string): string {
+  const resolved = tryResolveSymbol(input, graph, cliWarn, formatId);
   if (resolved === null) {
     cliError('SYMBOL_NOT_FOUND', `No symbol matching "${input}"`,
       `Run: conducks query "${input}" to find valid symbol IDs`);
