@@ -723,7 +723,15 @@ impl Guest for Checklist {
                                 // separable: if the only way in were unticking,
                                 // looking at what you already did would destroy
                                 // the record of having done it.
-                                if click_x < ctx.x + px(PAD + 18.) {
+                                // The split is at PAD+12, and the heading's
+                                // text starts at PAD+14. It used to be PAD+18,
+                                // which put the first few pixels of the title
+                                // inside the OPEN zone — so clicking the left
+                                // edge of "F1" opened the feature instead of
+                                // marking it, which is a different action, not
+                                // a near miss. The gap between the two numbers
+                                // is deliberate: no pixel belongs to both.
+                                if click_x < ctx.x + px(PAD + 12.) {
                                     toggle_expanded(&mut state, feature);
                                 } else {
                                     let on = !feature_done(&state, feature);

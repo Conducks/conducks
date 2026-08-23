@@ -21,6 +21,8 @@ export interface Section {
 export interface ParsedTesting {
   title: string;
   provenance: string | null;
+  /** Which build this pass is against, authored in the source. */
+  build: string | null;
   sections: Section[];
 }
 export interface RenumberViolation {

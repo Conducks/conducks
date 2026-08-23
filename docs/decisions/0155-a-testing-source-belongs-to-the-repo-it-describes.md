@@ -71,7 +71,13 @@ the drift check passed, the parser tests passed. Only comparing the old page's
 controls against the new one's found it. The behaviour was ported into the shared
 renderer, in both repositories, in one change.
 
-Open: **the page keys its ticks to a hash of the source's bytes, not to the
+Resolved by making the key AUTHORED. A `Build:` line in the source names the
+commit the pass is against; the page refuses progress recorded under any other
+value, and says **unstamped** when the line is missing rather than pretending a
+source hash is a build. Both automatic answers were wrong in different
+directions, and the paragraph below is kept because it is why:
+
+Open: **the page keyed its ticks to a hash of the source's bytes, not to the
 binary under test.** `conducks-visuals` §6 wants the build, and the source hash
 under-invalidates in the direction that matters — a new binary with unchanged
 tasks keeps its ticks, which is what §6 refuses. The reason it is not simply

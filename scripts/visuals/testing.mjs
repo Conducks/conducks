@@ -37,7 +37,7 @@ import { REPO } from './visuals.config.mjs';
  * @typedef {{id: string, marker: string, text: string, pass: string | null}} Task
  * @typedef {{id: string, name: string, how: string, note: string, tasks: Task[]}} Feature
  * @typedef {{title: string, blurb: string, features: Feature[]}} Section
- * @typedef {{title: string, provenance: string | null, sections: Section[]}} ParsedTesting
+ * @typedef {{title: string, provenance: string | null, build: string | null, sections: Section[]}} ParsedTesting
  * @typedef {{id: string, text: string, movedFrom: string[]}} RenumberViolation
  */
 
@@ -61,9 +61,15 @@ export function parseTesting(md) {
   const title = titleMatch[1];
   i = 1;
   let provenance = null;
+  let build = null;
   while (i < lines.length && !lines[i].startsWith('## ')) {
     const m = lines[i].match(/^Provenance:\s*(.*)/);
     if (m) provenance = m[1];
+    // Which BUILD this pass is against — set by the person running it. See the
+    // long note at `renderTesting`: it is authored rather than derived, because
+    // both automatic answers are wrong in different ways.
+    const b = lines[i].match(/^Build:\s*(\S+)/);
+    if (b) build = b[1];
     i++;
   }
 
@@ -116,7 +122,7 @@ export function parseTesting(md) {
     }
     sections.push(section);
   }
-  return { title, provenance, sections };
+  return { title, provenance, build, sections };
 }
 
 /**
@@ -425,7 +431,26 @@ load(); refresh();
  */
 export function renderTesting(md) {
   const parsed = parseTesting(md);
-  const build = createHash('sha256').update(md).digest('hex').slice(0, 7);
+  // **The build a tester is testing, not a hash of this file.**
+  //
+  // It was the source's own hash, which voids ticks when the TASK LIST changes
+  // and keeps them when the BINARY does — backwards, and exactly what
+  // `conducks-visuals` §6 refuses: a tick carried across a build looks like
+  // proof and is not. A source hash is automatic and answers the wrong
+  // question.
+  //
+  // It is not derived from the repository either, however tempting. Baking
+  // `git rev-parse HEAD` into a generated page makes it change on every commit,
+  // so the drift gate — whose whole job is "the data changed and the page did
+  // not" — would fire for a reason unrelated to what it checks, and a gate that
+  // cries wolf is one people switch off (§0 records that exact mistake).
+  //
+  // So it is AUTHORED: a `Build:` line the person running the pass sets to
+  // whatever they are testing. A human has to bump it, which is the same
+  // discipline the page had before, and now the value is visible in the source
+  // and reviewable in a diff. Falling back to the source hash when it is absent
+  // keeps an unstamped page working rather than failing shut.
+  const build = parsed.build ?? createHash('sha256').update(md).digest('hex').slice(0, 7);
   const body = parsed.sections.map(sec => `<h2>${esc(sec.title)}</h2>
 ${sec.blurb ? `<p class="sub">${esc(sec.blurb)}</p>` : ''}
 ${sec.features.map(renderFeature).join('\n')}`).join('\n');
@@ -439,9 +464,9 @@ ${sec.features.map(renderFeature).join('\n')}`).join('\n');
 made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="index.html">&larr; back to the architecture</a>
 <h1>${esc(parsed.title)}</h1>
-<p class="sub">Build <code>${build}</code> (a hash of testing.md's own bytes, not the repository's
-commit — the same rule the derived read log already keeps). Progress is kept in this browser only,
-keyed to this build; it is void the moment the source changes.</p>
+<p class="sub">Build <code>${build}</code>${parsed.build ? '' : ' — <b>unstamped</b>, so this is a hash of the task list rather than the build you are testing. Add a <code>Build:</code> line to testing.md'}.
+Progress is kept in this browser only and keyed to that value, so it is refused the moment it changes —
+a tick carried across a build looks like proof and is not.</p>
 ${body}
 <div class="tallies" id="tallies">…</div>
 <div class="actions">
