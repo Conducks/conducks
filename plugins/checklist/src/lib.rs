@@ -76,10 +76,16 @@ struct Persisted {
 /// an absence is not a mismatch, and reporting one would tell a first-time
 /// user their ticks were dropped when none ever existed.
 fn restore_for_build(text: &str, current_build: &str) -> (Vec<String>, Vec<(String, String)>, Option<String>) {
-    let Ok(saved) = serde_json::from_str::<Persisted>(text) else {
+    let Ok(mut saved) = serde_json::from_str::<Persisted>(text) else {
         return (Vec::new(), Vec::new(), None);
     };
     if saved.build == current_build {
+        // Sorted on the way in, because `ticked` is binary-searched. A file
+        // written before that rule existed — or edited by hand — would
+        // otherwise answer "not ticked" for most of what it actually holds,
+        // and it would look like the ticks were lost rather than misread.
+        saved.ticked.sort();
+        saved.ticked.dedup();
         (saved.ticked, saved.notes, None)
     } else {
         (Vec::new(), Vec::new(), Some(saved.build))
@@ -97,12 +103,28 @@ struct State {
     scroll: f32,
     /// The row the keyboard is on. Drawn as a wash so the two ways in, mouse
     /// and keys, are never in different places.
-    cursor: usize,
+    /// **The id of the row the cursor is on, not its position in the list.**
+    ///
+    /// A feature id for a heading, a task id for a task — they cannot collide,
+    /// since a task id always carries its feature's and a `.`. It was an index,
+    /// and an index is a name for "wherever row 37 happens to be": marking a
+    /// section above the cursor collapses it, every row below shifts up, and
+    /// the cursor silently comes to rest on something else. Empty means the
+    /// first row.
+    cursor: String,
     /// A note against a task id — what the browser page calls the comment box.
     /// A tick says "I tried this". A note says what happened, and that is the
     /// half worth reading. Pairs rather than a map for the same reason
     /// `ticked` is a list: the state blob is JSON.
     notes: Vec<(String, String)>,
+    /// Feature ids the reader opened even though they are finished.
+    ///
+    /// A finished feature collapses, because 405 tasks of which 300 are done is
+    /// a list you cannot find your place in. Opening one must NOT mean unticking
+    /// it, so "open" is its own small piece of state rather than a side effect
+    /// of the ticks. It holds only the exceptions, so the common case — nothing
+    /// opened — costs nothing.
+    expanded: Vec<String>,
     /// Whether keys go INTO the note on the cursor row instead of moving
     /// between rows. Without a mode, the letters could never be typed.
     editing: bool,
@@ -144,10 +166,17 @@ enum Row<'a> {
     Task(&'a Task),
 }
 
-fn rows<'a>(features: &[&'a Feature]) -> Vec<Row<'a>> {
+fn rows<'a>(features: &[&'a Feature], state: &State) -> Vec<Row<'a>> {
     let mut out = Vec::new();
     for feature in features {
         out.push(Row::Heading(feature));
+        // A collapsed feature contributes its heading and nothing else. Skipping
+        // here rather than at the drawing is what makes the hit test, the
+        // keyboard and the picture agree — a row that is not in this list cannot
+        // be clicked, cannot be stepped onto, and cannot be drawn.
+        if collapsed(state, feature) {
+            continue;
+        }
         for task in &feature.tasks {
             out.push(Row::Task(task));
         }
@@ -164,6 +193,60 @@ const PAD: f32 = 14.;
 const NOTE_H: f32 = 16.;
 const NOTE_PAD: f32 = 10.;
 
+// **Measured, and it is why the pane was not smooth.** `wrap` asks the host to
+// measure once per WORD, and the source holds 6,802 words across 405 tasks — so
+// a frame crossed the wasm boundary and shaped a string with the real font
+// about 6,800 times, before any drawing. Parsing the 622-line source ran every
+// frame as well. Both answers are identical from one frame to the next.
+//
+// So both are cached here. This is legitimate rather than a leak of state: the
+// host keeps the instance alive between render calls, and everything in these
+// caches is DERIVED from the source and the pane width. Losing them on a hot
+// reload costs a recompute and nothing else, which is exactly the property that
+// separates a cache from state the blob has to carry (ADR 0006).
+thread_local! {
+    /// Wrapped lines, keyed by the text, the size and the width they were
+    /// wrapped to. A resize changes the width and misses every entry, which is
+    /// correct — those lines really do have to be measured again.
+    /// Keyed by a HASH of the text rather than the text: a lookup that first
+    /// copies the whole task string allocates 810 times a frame to ask a
+    /// question it then answers in nanoseconds.
+    static WRAPPED: std::cell::RefCell<std::collections::HashMap<(u64, u32, u32), Vec<String>>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+    /// The parsed source, kept for as long as the source text is unchanged.
+    /// Leaked deliberately: it must outlive the borrow the row list takes, and
+    /// the source changes only when the FILE changes, which is rare enough that
+    /// the leak is bounded by how often a person edits it.
+    /// Keyed by a HASH of the source, not its length. Length was the first
+    /// attempt and it is wrong: two sources that happen to be the same size hit
+    /// each other's entry, and the pane draws the previous file's tasks with
+    /// nothing to show it is stale. Editing a task in place without changing
+    /// the character count is exactly that case, and it is the ordinary way a
+    /// person edits one.
+    static PARSED: std::cell::RefCell<Option<(u64, &'static parser::ParsedTesting)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// The parse, done once per distinct source rather than once per frame.
+fn parsed_once(src: &str) -> Result<&'static parser::ParsedTesting, String> {
+    let fingerprint = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        src.hash(&mut h);
+        h.finish()
+    };
+    let cached = PARSED.with(|c| {
+        let slot = c.borrow();
+        slot.filter(|(seen, _)| *seen == fingerprint).map(|(_, p)| p)
+    });
+    if let Some(hit) = cached {
+        return Ok(hit);
+    }
+    let parsed: &'static parser::ParsedTesting = Box::leak(Box::new(parser::parse_testing(src)?));
+    PARSED.with(|c| *c.borrow_mut() = Some((fingerprint, parsed)));
+    Ok(parsed)
+}
+
 /// **Text does not wrap, so the plugin wraps it.**
 ///
 /// There is no text box and no wrapping primitive, only a string drawn at a
@@ -178,6 +261,21 @@ fn wrap(text: &str, size: f32, width: f32) -> Vec<String> {
     if width <= 0. {
         return vec![text.to_string()];
     }
+    let key = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        text.hash(&mut h);
+        (h.finish(), size.to_bits(), width.to_bits())
+    };
+    if let Some(hit) = WRAPPED.with(|c| c.borrow().get(&key).cloned()) {
+        return hit;
+    }
+    let out = wrap_uncached(text, size, width);
+    WRAPPED.with(|c| c.borrow_mut().insert(key, out.clone()));
+    out
+}
+
+fn wrap_uncached(text: &str, size: f32, width: f32) -> Vec<String> {
     let mut lines = Vec::new();
     let mut line = String::new();
     for word in text.split_whitespace() {
@@ -222,7 +320,7 @@ fn lay_out<'a>(
 ) -> Vec<Laid<'a>> {
     let mut out = Vec::new();
     let mut y = top;
-    for (index, row) in rows.iter().enumerate() {
+    for row in rows {
         let (height, doing, pass, note) = match row {
             Row::Heading(_) => (px(HEAD_H), Vec::new(), Vec::new(), Vec::new()),
             Row::Task(task) => {
@@ -237,7 +335,10 @@ fn lay_out<'a>(
                     Some(p) => wrap(&format!("Pass: {p}"), px(11.5), text_w),
                     None => Vec::new(),
                 };
-                let writing = state.editing && index == state.cursor;
+                // Compared by ID, not position: this runs BEFORE the cursor has
+                // a position this frame, which the index version quietly depended
+                // on being able to do.
+                let writing = state.editing && state.cursor == task.id;
                 let text = note_of(state, &task.id);
                 let note = if text.is_empty() && !writing {
                     Vec::new()
@@ -272,8 +373,42 @@ fn lay_out<'a>(
 /// Opening a note changes heights, so when one of these changes the layout is
 /// built a second time for the drawing — and only then, because building it
 /// asks the host to measure every line.
-fn layout_key(state: &State) -> (bool, usize, usize) {
-    (state.editing, state.cursor, state.notes.iter().map(|(_, n)| n.len()).sum())
+/// Where the view must scroll to so the cursor is on screen — and NOTHING when
+/// the cursor did not move.
+///
+/// **That last clause is the whole function.** This used to run every frame, and
+/// the cursor starts on row 0 at y=0, so every frame it computed "row 0 is above
+/// the view, scroll back to 0" and undid the scroll the reader had just made.
+/// The wheel worked and the list snapped back before it was ever drawn. Ten
+/// stub tasks fitted on screen, so scroll was always 0 and it never showed; the
+/// real 405-task source made it immediate.
+///
+/// Pure, so the case that was broken is a test rather than a thing to try.
+fn follow_cursor(scroll: f32, moved: bool, cursor_y: f32, cursor_h: f32, view: f32) -> f32 {
+    if !moved {
+        return scroll;
+    }
+    if cursor_y < scroll {
+        return cursor_y;
+    }
+    let bottom = cursor_y + cursor_h;
+    if bottom > scroll + view {
+        return bottom - view;
+    }
+    scroll
+}
+
+fn layout_key(state: &State) -> (bool, String, usize, usize, usize) {
+    (
+        state.editing,
+        state.cursor.clone(),
+        state.notes.iter().map(|(_, n)| n.len()).sum(),
+        // A tick can collapse or open a whole feature, so the ROW LIST changes,
+        // not merely a row's height. Both counts are here because either one
+        // moving changes what is on screen.
+        state.ticked.len(),
+        state.expanded.len(),
+    )
 }
 
 struct Builder {
@@ -352,17 +487,69 @@ fn key_hint(
     x + cap_w + px(5.) + host_api::measure_text(what, px(10.5)) + px(13.)
 }
 
+/// **`ticked` is kept SORTED, and every read is a binary search.**
+///
+/// It was a plain scan, which is fine for the ten tasks this began with and
+/// quadratic for the 405 it holds. Measured on the real source with everything
+/// ticked: `rows()` asks `feature_done` for all 54 features, each walks its own
+/// tasks, and each of those was a linear scan of the ticked list — 164,025
+/// string comparisons per call, up to twice a frame. Sorted, the same work is
+/// 405 binary searches.
+///
+/// Nothing that reads the file cares about the order, so sorting costs nothing
+/// anyone can observe.
 fn toggle(state: &mut State, id: &str) {
-    match state.ticked.iter().position(|t| t == id) {
-        Some(at) => {
+    match state.ticked.binary_search_by(|t| t.as_str().cmp(id)) {
+        Ok(at) => {
             state.ticked.remove(at);
         },
-        None => state.ticked.push(id.to_string()),
+        Err(at) => state.ticked.insert(at, id.to_string()),
     }
 }
 
 fn ticked(state: &State, id: &str) -> bool {
-    state.ticked.iter().any(|t| t == id)
+    state.ticked.binary_search_by(|t| t.as_str().cmp(id)).is_ok()
+}
+
+/// **A feature is marked exactly when every one of its tasks is.** Derived, and
+/// deliberately not stored.
+///
+/// Both directions the reader asked for fall out of this one rule: ticking the
+/// last task marks the feature because there is nothing else to check, and
+/// marking the feature ticks every task because that is the only way to make
+/// this true. A stored flag beside the ticks would be a second answer to one
+/// question, and the two would disagree the first time a task was ticked
+/// individually.
+///
+/// A feature with no tasks is NOT complete. Otherwise an empty one would draw
+/// as finished and collapse to nothing, which reads as work done.
+fn feature_done(state: &State, feature: &Feature) -> bool {
+    !feature.tasks.is_empty() && feature.tasks.iter().all(|t| ticked(state, &t.id))
+}
+
+/// Ticks or unticks every task in a feature. The one write that "mark the whole
+/// section" means.
+fn set_feature(state: &mut State, feature: &Feature, on: bool) {
+    for task in &feature.tasks {
+        let is = ticked(state, &task.id);
+        if is != on {
+            toggle(state, &task.id);
+        }
+    }
+}
+
+/// A finished feature hides its tasks unless the reader opened it.
+fn collapsed(state: &State, feature: &Feature) -> bool {
+    feature_done(state, feature) && !state.expanded.iter().any(|f| f == &feature.id)
+}
+
+fn toggle_expanded(state: &mut State, feature: &Feature) {
+    match state.expanded.iter().position(|f| f == &feature.id) {
+        Some(at) => {
+            state.expanded.remove(at);
+        },
+        None => state.expanded.push(feature.id.clone()),
+    }
 }
 
 fn note_of<'a>(state: &'a State, id: &str) -> &'a str {
@@ -384,6 +571,32 @@ fn edit_note(state: &mut State, id: &str, edit: impl FnOnce(&mut String)) {
 }
 
 /// The id of the task the cursor is on, or nothing when it is on a heading.
+/// The id a row answers to, which is what the cursor remembers.
+fn row_id<'a>(row: &Row<'a>) -> &'a str {
+    match row {
+        Row::Heading(feature) => &feature.id,
+        Row::Task(task) => &task.id,
+    }
+}
+
+/// Where the cursor's row sits in THIS frame's list.
+///
+/// The row it named may have gone — a feature collapsed and took its tasks with
+/// it. Falling back to the feature that owned the task keeps the cursor near
+/// where the reader left it rather than throwing them back to the top, which is
+/// what an index did when the list shortened under it.
+fn cursor_index(laid: &[Laid<'_>], cursor: &str) -> usize {
+    if let Some(at) = laid.iter().position(|l| row_id(&l.row) == cursor) {
+        return at;
+    }
+    if let Some((owner, _)) = cursor.split_once('.') {
+        if let Some(at) = laid.iter().position(|l| row_id(&l.row) == owner) {
+            return at;
+        }
+    }
+    0
+}
+
 fn cursor_task<'a>(laid: &[Laid<'a>], cursor: usize) -> Option<&'a str> {
     match laid.get(cursor).map(|l| l.row) {
         Some(Row::Task(task)) => Some(task.id.as_str()),
@@ -416,14 +629,14 @@ impl Guest for Checklist {
         // line of every visible row, and it keeps this function free of a
         // second cached copy of the same 405 tasks to keep in sync with the
         // one in `state.source`.
-        let parsed_source = parser::parse_testing(state.source.as_deref().unwrap_or(""));
+        let parsed_source = parsed_once(state.source.as_deref().unwrap_or(""));
         let (features, parse_error): (Vec<&Feature>, Option<&str>) = match &parsed_source {
             Ok(p) => (parser::flatten_features(p), None),
             Err(e) => (Vec::new(), Some(e.as_str())),
         };
 
         let px = |v: f32| v * ctx.scale;
-        let rows = rows(&features);
+        let rows = rows(&features, &state);
 
         // A notice line adds one row to the header: a parse error takes
         // priority (there is nothing sensible to draw until the source
@@ -444,35 +657,68 @@ impl Guest for Checklist {
         let text_x = ctx.x + px(PAD + 22.);
         let text_w = (ctx.x + ctx.width - px(PAD) - text_x).max(px(40.));
         let laid = lay_out(&rows, 0., text_w, px, &state);
-        let task_rows: Vec<usize> = laid
-            .iter()
-            .enumerate()
-            .filter(|(_, l)| matches!(l.row, Row::Task(_)))
-            .map(|(i, _)| i)
-            .collect();
+        // The cursor is an ID in the state and a POSITION for one frame. Resolved
+        // here, written back at the end — so the list may change shape underneath
+        // it without the cursor quietly moving to a different row.
+        let mut cursor = cursor_index(&laid, &state.cursor);
+
+        // EVERY row is a stop, headings included. A heading you cannot land on
+        // is a heading you cannot mark or open from the keyboard, and with a
+        // finished feature collapsed to one line it may be the only row there.
+        let nav_rows: Vec<usize> = (0..laid.len()).collect();
 
         let before = layout_key(&state);
+        // Set only by a key that steps the cursor. See `follow_cursor`.
+        let mut moved = false;
         for event in &ctx.events {
             match event {
                 Event::Scroll(delta) => state.scroll = (state.scroll - delta * px(20.)).max(0.),
                 Event::Click(point) => {
+                    // **A click arrives in the PANE's coordinates; everything
+                    // drawn is in the WINDOW's.** `ctx.x`/`ctx.y` are the pane's
+                    // position in the window and every element is placed at
+                    // `ctx.x + …`, while the host reports a click as
+                    // `pointer - pane_rect`, zero at the pane's own corner —
+                    // deliberately, and pinned by a test in the host
+                    // (`crates/shell/src/input.rs`,
+                    // `a_click_reaches_the_plugin_in_its_own_coordinates`).
+                    //
+                    // Without this line the hit test was off by exactly the
+                    // pane's distance from the top of the window, so a plugin
+                    // pane below the tab bar ticked the wrong row or no row at
+                    // all. It read as "the tick does not work".
+                    let (click_x, click_y) = (point.x + ctx.x, point.y + ctx.y);
                     // The same layout the drawing uses, offset by the same
                     // scroll. One list, one answer.
                     let hit = laid
                         .iter()
                         .position(|l| {
                             let y = top + l.y - state.scroll;
-                            point.y >= y && point.y < y + l.height
+                            click_y >= y && click_y < y + l.height
                         });
                     if let Some(index) = hit {
-                        if let Row::Task(task) = laid[index].row {
-                            let id = task.id.to_string();
-                            toggle(&mut state, &id);
-                            state.cursor = index;
-                            // A click is about the tick. Ticking a row while a
-                            // note on ANOTHER row was open would leave the
-                            // caret somewhere the user is no longer looking.
-                            state.editing = false;
+                        cursor = index;
+                        // A click is about the tick. Ticking a row while a note
+                        // on ANOTHER row was open would leave the caret
+                        // somewhere the user is no longer looking.
+                        state.editing = false;
+                        match laid[index].row {
+                            Row::Task(task) => toggle(&mut state, &task.id.clone()),
+                            Row::Heading(feature) => {
+                                // Two targets on one row, split by x. The box at
+                                // the left OPENS a finished feature without
+                                // touching a tick; anywhere else marks or
+                                // unmarks the whole thing. Opening had to be
+                                // separable: if the only way in were unticking,
+                                // looking at what you already did would destroy
+                                // the record of having done it.
+                                if click_x < ctx.x + px(PAD + 18.) {
+                                    toggle_expanded(&mut state, feature);
+                                } else {
+                                    let on = !feature_done(&state, feature);
+                                    set_feature(&mut state, feature, on);
+                                }
+                            },
                         }
                     }
                 },
@@ -481,7 +727,7 @@ impl Guest for Checklist {
                     // the movement keys rather than beside them. `j` typed into
                     // a note must be a letter, not a step down the list.
                     if state.editing {
-                        let Some(id) = cursor_task(&laid, state.cursor) else {
+                        let Some(id) = cursor_task(&laid, cursor) else {
                             state.editing = false;
                             continue;
                         };
@@ -504,28 +750,46 @@ impl Guest for Checklist {
                         }
                         continue;
                     }
-                    let at = task_rows.iter().position(|i| *i == state.cursor).unwrap_or(0);
+                    let at = nav_rows.iter().position(|i| *i == cursor).unwrap_or(0);
                     match key.as_str() {
-                        " " | "\r" => {
-                            if let Some(Row::Task(task)) = laid.get(state.cursor).map(|l| l.row) {
-                                let id = task.id.to_string();
-                                toggle(&mut state, &id);
+                        " " | "\r" => match laid.get(cursor).map(|l| l.row) {
+                            Some(Row::Task(task)) => toggle(&mut state, &task.id.clone()),
+                            // Space means the same thing everywhere: mark what
+                            // the cursor is on. On a heading, what it is on is
+                            // the whole feature.
+                            Some(Row::Heading(feature)) => {
+                                let on = !feature_done(&state, feature);
+                                set_feature(&mut state, feature, on);
+                            },
+                            None => {},
+                        },
+                        // Open or close a feature without touching a tick.
+                        //
+                        // NOT Tab. The host answers a bare Tab itself — complete,
+                        // or focus the next pane — and no pane ever sees it
+                        // (crates/shell/src/input.rs). Binding it here would be
+                        // a key this plugin documents and the window swallows.
+                        "ArrowRight" | "ArrowLeft" => {
+                            if let Some(Row::Heading(feature)) = laid.get(cursor).map(|l| l.row) {
+                                toggle_expanded(&mut state, feature);
                             }
                         },
                         // A note is the reason anyone reads a finished run, so
                         // it gets a key rather than only a mouse.
-                        "i" => state.editing = cursor_task(&laid, state.cursor).is_some(),
+                        "i" => state.editing = cursor_task(&laid, cursor).is_some(),
                         // The arrows, and ONLY the arrows. `j` and `k` were a
                         // second way to do a thing that already had one, and a
                         // key that means "down" in one mode and "the letter j"
                         // in the other is a key nobody can trust.
                         "ArrowDown" => {
-                            let next = (at + 1).min(task_rows.len().saturating_sub(1));
-                            state.cursor = task_rows.get(next).copied().unwrap_or(0);
+                            let next = (at + 1).min(nav_rows.len().saturating_sub(1));
+                            cursor = nav_rows.get(next).copied().unwrap_or(0);
+                            moved = true;
                         },
                         "ArrowUp" => {
                             let prev = at.saturating_sub(1);
-                            state.cursor = task_rows.get(prev).copied().unwrap_or(0);
+                            cursor = nav_rows.get(prev).copied().unwrap_or(0);
+                            moved = true;
                         },
                         _ => {},
                     }
@@ -536,24 +800,40 @@ impl Guest for Checklist {
         // Heights change when a note opens, closes or wraps to a new line, and
         // the drawing must use the CURRENT picture even though the hit test
         // used the previous one.
-        let laid = if layout_key(&state) == before {
-            laid
-        } else {
-            lay_out(&rows, 0., text_w, px, &state)
-        };
+        // **The ROW LIST is rebuilt too, not only the heights.** Ticking the last
+        // task of a feature collapses it, which removes rows — and `rows` was
+        // built before the events, so reusing it would draw the tasks of a
+        // feature that just closed. The shell renders on damage, so "it fixes
+        // itself next frame" is not true: there may be no next frame until the
+        // reader does something else.
+        let changed = layout_key(&state) != before;
+        // Held rather than moved: the pre-event layout still borrows the first
+        // list, and it is that layout the drawing falls back to when nothing
+        // changed. Rebuilding unconditionally would be simpler and would ask the
+        // host to measure every one of 405 rows a second time on every frame.
+        let rebuilt = changed.then(|| self::rows(&features, &state));
+        let rows: &[Row] = rebuilt.as_deref().unwrap_or(&rows);
+        let laid = if changed { lay_out(rows, 0., text_w, px, &state) } else { laid };
 
-        // A cursor below the fold is a cursor nobody can see moving, so the
-        // view follows it. The same rule the host's own explorer follows.
+        // A cursor below the fold is a cursor nobody can see moving, so the view
+        // follows it — but only when a KEY moved it, never on a plain redraw.
         let view = (ctx.height - px(56.) - dropped_h).max(px(60.));
-        if let Some(current) = laid.get(state.cursor) {
-            if current.y < state.scroll {
-                state.scroll = current.y;
-            }
-            let bottom = current.y + current.height;
-            if bottom > state.scroll + view {
-                state.scroll = bottom - view;
-            }
+        // The list may have been rebuilt since the events ran, so find the row
+        // again by name rather than trusting the position it had before.
+        let cursor = if changed { cursor_index(&laid, &state.cursor) } else { cursor };
+        if let Some(current) = laid.get(cursor) {
+            state.scroll = follow_cursor(state.scroll, moved, current.y, current.height, view);
         }
+        // Collapsing a feature shortens the list under the cursor, and a cursor
+        // past the end indexes nothing — the view would then never follow it
+        // again.
+        // Written back as an id. Nothing downstream needs the position, and
+        // storing one is what made the cursor drift when the list changed.
+        state.cursor = laid.get(cursor).map(|l| row_id(&l.row).to_string()).unwrap_or_default();
+        // The same shortening can leave the whole list above the viewport, with
+        // nothing drawn and no way back.
+        let content = laid.last().map_or(0., |l| l.y + l.height);
+        state.scroll = state.scroll.min((content - view).max(0.)).max(0.);
 
         let mut b = Builder { elements: Vec::new() };
         let root = b.push(
@@ -708,14 +988,48 @@ impl Guest for Checklist {
             }
             match l.row {
                 Row::Heading(feature) => {
+                    let done = feature_done(&state, feature);
+                    let shut = collapsed(&state, feature);
+                    if index == cursor {
+                        b.push(
+                            Kind::Rect,
+                            list,
+                            vec![
+                                num("x", ctx.x + px(4.)),
+                                num("y", y),
+                                num("w", ctx.width - px(8.)),
+                                num("h", l.height),
+                                int("color", 0x1b1f27),
+                                num("radius", px(5.)),
+                            ],
+                            None,
+                        );
+                    }
+                    // The open/shut marker, and the LEFT HALF of this row's hit
+                    // test — the click handler splits on the same x. A finished
+                    // feature can be opened from here without losing a tick.
                     b.push(
                         Kind::Text,
                         list,
                         vec![
                             num("x", ctx.x + px(PAD)),
+                            num("y", y + px(13.)),
+                            num("font-size", px(11.)),
+                            int("color", if done { 0x8fc78f } else { 0x6d7686 }),
+                        ],
+                        Some(if shut { "\u{25b8}" } else { "\u{25be}" }),
+                    );
+                    b.push(
+                        Kind::Text,
+                        list,
+                        vec![
+                            num("x", ctx.x + px(PAD + 14.)),
                             num("y", y + px(14.)),
                             num("font-size", px(12.5)),
-                            int("color", 0xe08a4b),
+                            // A finished feature goes quiet. The accent is for
+                            // what still needs doing, and on a list of 54 the
+                            // colour is the only thing that finds them.
+                            int("color", if done { 0x6f8a6f } else { 0xe08a4b }),
                         ],
                         Some(&format!("{}   {}", feature.id, feature.name)),
                     );
@@ -739,7 +1053,7 @@ impl Guest for Checklist {
                 },
                 Row::Task(task) => {
                     let on = ticked(&state, &task.id);
-                    let writing = state.editing && index == state.cursor;
+                    let writing = state.editing && index == cursor;
                     // A hairline between tasks. Four hundred rows with nothing
                     // between them is one wall of text, and the eye has to
                     // count indents to find where a task starts.
@@ -755,7 +1069,7 @@ impl Guest for Checklist {
                         ],
                         None,
                     );
-                    if index == state.cursor {
+                    if index == cursor {
                         b.push(
                             Kind::Rect,
                             list,
@@ -989,3 +1303,243 @@ mod tests {
     // pixels themselves needs the running ForgeTerm host — named as a gap
     // for the orchestrator, not silently skipped.
 }
+
+#[cfg(test)]
+mod view_tests {
+    use super::*;
+
+    fn feature_with(id: &str, tasks: &[&str]) -> Feature {
+        Feature {
+            id: id.to_string(),
+            name: format!("feature {id}"),
+            how: String::new(),
+            note: String::new(),
+            tasks: tasks
+                .iter()
+                .map(|t| Task { id: t.to_string(), text: "do it".into(), pass: None })
+                .collect(),
+        }
+    }
+
+    /// **The bug this whole change started from.** A wheel event moves `scroll`;
+    /// the frame that follows must leave it alone. It did not: the follow ran
+    /// every frame, the cursor sits on row 0 at y=0, so every frame decided the
+    /// cursor was above the view and put `scroll` back to 0.
+    ///
+    /// **Mutation proof:** delete the `if !moved { return scroll }` guard and
+    /// this fails, returning 0.
+    #[test]
+    fn a_redraw_does_not_undo_a_scroll() {
+        assert_eq!(follow_cursor(900., false, 0., 30., 400.), 900.);
+    }
+
+    /// The other half: when a KEY moved the cursor, the view must follow, or the
+    /// cursor walks off screen and nobody can see where they are.
+    ///
+    /// **Mutation proof:** make the function always return `scroll` and both of
+    /// these fail.
+    #[test]
+    fn a_moved_cursor_pulls_the_view_to_it() {
+        assert_eq!(follow_cursor(900., true, 0., 30., 400.), 0., "above the view");
+        assert_eq!(follow_cursor(0., true, 500., 30., 400.), 130., "below the view");
+        assert_eq!(follow_cursor(100., true, 200., 30., 400.), 100., "already visible, unchanged");
+    }
+
+    /// A feature is marked exactly when all its tasks are, and an EMPTY feature
+    /// is not marked — otherwise it would draw as finished and collapse to
+    /// nothing, which reads as work someone did.
+    ///
+    /// **Mutation proof:** drop the `!feature.tasks.is_empty()` clause and the
+    /// last assertion fails.
+    #[test]
+    fn a_feature_is_marked_exactly_when_every_task_is() {
+        let f = feature_with("F1", &["F1.T1", "F1.T2"]);
+        let mut state = State::default();
+        assert!(!feature_done(&state, &f), "nothing ticked");
+        toggle(&mut state, "F1.T1");
+        assert!(!feature_done(&state, &f), "half ticked is not marked");
+        toggle(&mut state, "F1.T2");
+        assert!(feature_done(&state, &f), "all ticked marks it, with nothing else stored");
+        assert!(!feature_done(&state, &feature_with("F9", &[])), "an empty feature is not done");
+    }
+
+    /// Marking the section marks every task, and unmarking clears them — the
+    /// direction the reader asked for that does not fall out for free.
+    ///
+    /// **Mutation proof:** make `set_feature` skip tasks already in the wanted
+    /// state incorrectly (e.g. always toggle) and the second half fails, because
+    /// a half-ticked feature would end up inverted rather than uniform.
+    #[test]
+    fn marking_a_section_marks_all_of_it_from_any_starting_point() {
+        let f = feature_with("F1", &["F1.T1", "F1.T2", "F1.T3"]);
+        let mut state = State::default();
+        toggle(&mut state, "F1.T2"); // start half-done, the case that catches a blind toggle
+        set_feature(&mut state, &f, true);
+        assert!(f.tasks.iter().all(|t| ticked(&state, &t.id)), "all on");
+        set_feature(&mut state, &f, false);
+        assert!(f.tasks.iter().all(|t| !ticked(&state, &t.id)), "all off");
+    }
+
+    /// A finished feature hides its tasks, and opening it does NOT untick it.
+    /// That separation is the point: if the only way to look were to unmark,
+    /// looking at what you did would destroy the record of having done it.
+    ///
+    /// **Mutation proof:** make `collapsed` ignore `expanded` and the third
+    /// assertion fails.
+    #[test]
+    fn a_finished_feature_collapses_and_can_be_opened_without_unticking() {
+        let f = feature_with("F1", &["F1.T1"]);
+        let mut state = State::default();
+        assert!(!collapsed(&state, &f), "unfinished stays open");
+        toggle(&mut state, "F1.T1");
+        assert!(collapsed(&state, &f), "finished collapses");
+        toggle_expanded(&mut state, &f);
+        assert!(!collapsed(&state, &f), "opened");
+        assert!(feature_done(&state, &f), "and still marked — opening touched no tick");
+    }
+
+    /// The row list is what the hit test, the keyboard and the drawing all walk,
+    /// so a collapsed feature must vanish from IT rather than merely be skipped
+    /// when drawing. A row that is drawn nowhere but still in the list is a row
+    /// a click can land on.
+    ///
+    /// **Mutation proof:** remove the `continue` in `rows` and the count is 4.
+    #[test]
+    fn a_collapsed_feature_contributes_one_row() {
+        let f = feature_with("F1", &["F1.T1", "F1.T2", "F1.T3"]);
+        let list = [&f];
+        let mut state = State::default();
+        assert_eq!(rows(&list, &state).len(), 4, "heading plus three tasks");
+        set_feature(&mut state, &f, true);
+        assert_eq!(rows(&list, &state).len(), 1, "collapsed: the heading alone");
+    }
+}
+
+#[cfg(test)]
+mod invariant_tests {
+    use super::*;
+
+    /// `ticked` is binary-searched, so it must be SORTED at all times. Toggling
+    /// in a scrambled order is the case that catches an insert that assumes
+    /// arrival order.
+    ///
+    /// **Mutation proof:** change `toggle`'s `Err(at) => insert(at, ..)` to
+    /// `push(..)` and this fails — the list stops being sorted and the lookups
+    /// below start missing.
+    #[test]
+    fn the_ticked_list_stays_sorted_however_it_is_built() {
+        let mut state = State::default();
+        for id in ["F9.T2", "F1.T1", "F54.T7", "F1.T10", "F2.T1"] {
+            toggle(&mut state, id);
+        }
+        let mut expected = state.ticked.clone();
+        expected.sort();
+        assert_eq!(state.ticked, expected, "sorted");
+        for id in ["F9.T2", "F1.T1", "F54.T7", "F1.T10", "F2.T1"] {
+            assert!(ticked(&state, id), "{id} must be found after an out-of-order build");
+        }
+        toggle(&mut state, "F1.T1");
+        assert!(!ticked(&state, "F1.T1"), "and untoggling still removes the right one");
+    }
+
+    /// A run file written before the sorted rule — or edited by hand — arrives
+    /// in whatever order it was in. Restoring it unsorted makes a binary search
+    /// answer "not ticked" for most of what the file holds, which reads as the
+    /// ticks having been lost rather than misread.
+    ///
+    /// **Mutation proof:** drop the `saved.ticked.sort()` in `restore_for_build`
+    /// and this fails on the entries that fall out of order.
+    #[test]
+    fn a_run_file_in_any_order_restores_every_tick() {
+        let text = r#"{"build":"b1","ticked":["F9.T2","F1.T1","F54.T7","F2.T1"],"notes":[]}"#;
+        let (ticks, _, dropped) = restore_for_build(text, "b1");
+        assert!(dropped.is_none(), "same build restores");
+        let mut state = State::default();
+        state.ticked = ticks;
+        for id in ["F9.T2", "F1.T1", "F54.T7", "F2.T1"] {
+            assert!(ticked(&state, id), "{id} was in the file and must be found");
+        }
+    }
+}
+
+#[cfg(test)]
+mod cursor_tests {
+    use super::*;
+
+    fn feature_with(id: &str, tasks: &[&str]) -> Feature {
+        Feature {
+            id: id.to_string(),
+            name: format!("feature {id}"),
+            how: String::new(),
+            note: String::new(),
+            tasks: tasks
+                .iter()
+                .map(|t| Task { id: t.to_string(), text: "do it".into(), pass: None })
+                .collect(),
+        }
+    }
+
+    /// Rows carry no y or height here — `cursor_index` only reads the row's id,
+    /// so a hand-built list is a fair stand-in for a measured one.
+    fn laid_from<'a>(rows: &'a [Row<'a>]) -> Vec<Laid<'a>> {
+        rows.iter()
+            .map(|row| Laid {
+                row,
+                y: 0.,
+                height: 0.,
+                doing: Vec::new(),
+                pass: Vec::new(),
+                note: Vec::new(),
+            })
+            .collect()
+    }
+
+    /// **The wart this replaced an index to fix.** Mark a section ABOVE where
+    /// you are working: it collapses, every row below shifts up, and an index
+    /// cursor is now pointing at a different task than the one it was on.
+    ///
+    /// **Mutation proof:** have `cursor_index` return its argument parsed as a
+    /// number, or simply 0, and this fails — the cursor lands on the wrong row.
+    #[test]
+    fn the_cursor_stays_on_its_row_when_the_list_shortens_above_it() {
+        let a = feature_with("F1", &["F1.T1", "F1.T2"]);
+        let b = feature_with("F2", &["F2.T1", "F2.T2"]);
+        let features = [&a, &b];
+        let mut state = State::default();
+        state.cursor = "F2.T2".to_string();
+
+        let open = rows(&features, &state);
+        let laid = laid_from(&open);
+        assert_eq!(cursor_index(&laid, &state.cursor), 5, "last row of six");
+
+        // Finish the feature ABOVE it. F1 collapses and takes two rows away.
+        set_feature(&mut state, &a, true);
+        let shorter = rows(&features, &state);
+        let laid = laid_from(&shorter);
+        assert_eq!(shorter.len(), 4, "F1 is one row now, F2 still three");
+        let at = cursor_index(&laid, &state.cursor);
+        assert_eq!(row_id(&laid[at].row), "F2.T2", "still on the row it was on");
+    }
+
+    /// When the row itself goes — its own feature collapsed — the cursor falls
+    /// back to that feature rather than to the top of the list. Being thrown to
+    /// row 0 in a 405-row document loses your place completely.
+    ///
+    /// **Mutation proof:** delete the `split_once('.')` fallback and this
+    /// returns 0, landing on F1's heading instead of F2's.
+    #[test]
+    fn a_cursor_whose_row_vanished_falls_back_to_its_feature() {
+        let a = feature_with("F1", &["F1.T1"]);
+        let b = feature_with("F2", &["F2.T1"]);
+        let features = [&a, &b];
+        let mut state = State::default();
+        state.cursor = "F2.T1".to_string();
+
+        set_feature(&mut state, &b, true); // the cursor's OWN feature closes
+        let shorter = rows(&features, &state);
+        let laid = laid_from(&shorter);
+        let at = cursor_index(&laid, &state.cursor);
+        assert_eq!(row_id(&laid[at].row), "F2", "fell back to the feature, not to the top");
+    }
+}
+
