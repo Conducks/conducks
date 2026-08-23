@@ -1,0 +1,991 @@
+//! The testing checklist, as a pane rather than a browser page.
+//!
+//! Moved here from ForgeTerm's `plugins/checklist` (ForgeTerm ADR 0035, this
+//! repository's ADR 0154, todo74#P3). The drawing, wrapping, hit-testing,
+//! notes and build-stamped run file below are carried over from that crate
+//! largely unchanged — they already worked. What changed is the one thing
+//! that had to: `FEATURES`, the ten compiled-in tasks, is gone. This plugin
+//! now reads the real, 54-feature, 405-task source through `load` and parses
+//! it with `parser::parse_testing` — the SAME grammar, tested against the
+//! SAME fixture, that `scripts/visuals/testing.mjs` (the browser page's
+//! renderer) is tested against. Two implementations, one owner, one fixture:
+//! that agreement is the entire point of the move (ADR 0154).
+//!
+//! **It saves, through the host, into the project** (ForgeTerm ADR 0033,
+//! amended by 0034). The ticks and the notes go into one file under `docs/`,
+//! written by the host after it has judged the path. The plugin cannot open
+//! a file itself and does not want to: it names the file, the host decides
+//! whether that name is one it will accept, and a refusal is an answer
+//! rather than a crash.
+
+mod bindings;
+mod parser;
+
+use bindings::{export, host_api, int, num, Context, Element, Event, Frame, Guest, Kind, Prop};
+use parser::{Feature, Task};
+use serde::{Deserialize, Serialize};
+
+struct Checklist;
+
+/// The authored source, relative to the project — the same path
+/// `scripts/visuals/testing.mjs` reads at the top of that file
+/// (`const src = 'docs/visuals/testing.md'`). Reusing that exact path is the
+/// whole reason to choose it: this plugin and the browser renderer read the
+/// same file at the same address, so there is one place to look when either
+/// disagrees with the other. It satisfies the host's own rule (ADR 0033/0034)
+/// on its own merits too — relative to the project, no `..`, and its
+/// `docs` path component is present.
+const TESTING_SOURCE: &str = "docs/visuals/testing.md";
+
+/// The file the run is kept in, relative to the project.
+///
+/// The host judges this path and nothing more — it never learns why this name
+/// rather than another. **That naming rule lives HERE, in the plugin, not in
+/// the host** — ForgeTerm's ADR 0033 decided that from the start ("the host
+/// judges a path and never learns the grammar behind it"), and moving the
+/// plugin does not move that decision anywhere else.
+const RUN_FILE: &str = "docs/checklist-run.json";
+
+/// **What survives the window, and only that.** The scroll position, the
+/// cursor and the editing mode are all state the NEXT session should not
+/// inherit — reopening on row 84 in the middle of a half-typed note is not
+/// resuming, it is being dropped somewhere. Splitting them here is what keeps
+/// the file to the two things a reader of the repository cares about.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+struct Persisted {
+    /// The build this record was written against — `ctx.build`, host
+    /// knowledge the plugin cannot get any other way. A tick recorded against
+    /// a different build looks like proof and is not (`conducks-visuals` §6),
+    /// which is why `restore_for_build` refuses to hand it back rather than
+    /// restoring it.
+    build: String,
+    ticked: Vec<String>,
+    notes: Vec<(String, String)>,
+}
+
+/// What a loaded run file hands back for `current_build`: the ticks and notes
+/// to restore, or a refusal naming the build they actually came from.
+///
+/// Pure and free of `host_api`, so it is testable without a running host —
+/// `render` is the only caller, and it supplies exactly what this needs:
+/// whatever `load` answered, and `ctx.build`.
+///
+/// Unparseable or missing text (a fresh project, or a file this build cannot
+/// read at all) is treated as "nothing to restore, and no build to report" —
+/// an absence is not a mismatch, and reporting one would tell a first-time
+/// user their ticks were dropped when none ever existed.
+fn restore_for_build(text: &str, current_build: &str) -> (Vec<String>, Vec<(String, String)>, Option<String>) {
+    let Ok(saved) = serde_json::from_str::<Persisted>(text) else {
+        return (Vec::new(), Vec::new(), None);
+    };
+    if saved.build == current_build {
+        (saved.ticked, saved.notes, None)
+    } else {
+        (Vec::new(), Vec::new(), Some(saved.build))
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+struct State {
+    /// Ticked task ids. A list rather than a set because the state blob is
+    /// JSON, and a set would only be a list wearing a hat.
+    ticked: Vec<String>,
+    /// How far down the list is, in pixels, the same shape `plugins/runner`
+    /// uses. There is no scroll primitive and none is needed.
+    scroll: f32,
+    /// The row the keyboard is on. Drawn as a wash so the two ways in, mouse
+    /// and keys, are never in different places.
+    cursor: usize,
+    /// A note against a task id — what the browser page calls the comment box.
+    /// A tick says "I tried this". A note says what happened, and that is the
+    /// half worth reading. Pairs rather than a map for the same reason
+    /// `ticked` is a list: the state blob is JSON.
+    notes: Vec<(String, String)>,
+    /// Whether keys go INTO the note on the cursor row instead of moving
+    /// between rows. Without a mode, the letters could never be typed.
+    editing: bool,
+    /// Exactly what the RUN file held when it was last read or written.
+    ///
+    /// It is the comparison that decides whether to write at all. Without it
+    /// every frame writes the same bytes back, and `None` is also how the first
+    /// frame of a window is told apart from every frame after it — the blob
+    /// survives a hot reload, so loading happens once per WINDOW rather than
+    /// once per build.
+    on_disk: Option<String>,
+    /// Set when the host refused the last write. Shown in the header, because
+    /// a checklist that silently stopped saving is worse than one that never
+    /// saved at all.
+    refused: bool,
+    /// Set when the run file on disk was written against a different build
+    /// than this one, naming that build. The ticks it held were dropped
+    /// rather than restored — shown in the pane, not a log, for the same
+    /// reason `refused` is: a run that quietly lost its ticks looks exactly
+    /// like one that never had any.
+    dropped_build: Option<String>,
+    /// Exactly what `load(TESTING_SOURCE)` answered, the first time this
+    /// window asked. Loaded once per window for the same reason `on_disk`
+    /// is — the source does not change under a running pane, and re-reading
+    /// it every frame would be re-parsing 405 tasks on every keystroke for no
+    /// reason. `None` is "not loaded yet"; `Some(String::new())` is "loaded,
+    /// and either the file was empty or `load` refused/found nothing" — both
+    /// of those are handled the same way `restore_for_build` handles an
+    /// absent run file: as nothing to show, not as an error.
+    source: Option<String>,
+}
+
+/// Every row on screen, in order, so the click hit test and the drawing walk
+/// the SAME list. Two walks that each work out what row three is would be two
+/// places to get it wrong, which is the mistake this file's host already made
+/// once with the explorer.
+enum Row<'a> {
+    Heading(&'a Feature),
+    Task(&'a Task),
+}
+
+fn rows<'a>(features: &[&'a Feature]) -> Vec<Row<'a>> {
+    let mut out = Vec::new();
+    for feature in features {
+        out.push(Row::Heading(feature));
+        for task in &feature.tasks {
+            out.push(Row::Task(task));
+        }
+    }
+    out
+}
+
+/// Row metrics in logical pixels, before scaling.
+const HEAD_H: f32 = 34.;
+const LINE_H: f32 = 18.;
+const PASS_H: f32 = 16.;
+const ROW_PAD: f32 = 12.;
+const PAD: f32 = 14.;
+const NOTE_H: f32 = 16.;
+const NOTE_PAD: f32 = 10.;
+
+/// **Text does not wrap, so the plugin wraps it.**
+///
+/// There is no text box and no wrapping primitive, only a string drawn at a
+/// point. A checklist is long sentences, so without this the right-hand end of
+/// every task is simply missing, which the first capture showed plainly. The
+/// host knows the font and answers `measure-text`, so the plugin can ask where
+/// a line stops fitting and break there.
+///
+/// Greedy by word. A word longer than the whole width goes on its own line
+/// rather than looping forever looking for a break that is not there.
+fn wrap(text: &str, size: f32, width: f32) -> Vec<String> {
+    if width <= 0. {
+        return vec![text.to_string()];
+    }
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        let candidate = if line.is_empty() { word.to_string() } else { format!("{line} {word}") };
+        if host_api::measure_text(&candidate, size) <= width || line.is_empty() {
+            line = candidate;
+        } else {
+            lines.push(std::mem::take(&mut line));
+            line = word.to_string();
+        }
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
+}
+
+/// One row, already measured. **Laid out once per frame and used by BOTH the
+/// hit test and the drawing**, because two walks that each work out where row
+/// three is are two places to get it wrong. The host made exactly that mistake
+/// with its own explorer, and the fix there was the same: one function.
+struct Laid<'a> {
+    row: &'a Row<'a>,
+    y: f32,
+    height: f32,
+    doing: Vec<String>,
+    pass: Vec<String>,
+    /// The note, already wrapped. Empty when there is none AND the row is not
+    /// being written into, which is what keeps an untouched list tight.
+    note: Vec<String>,
+}
+
+fn lay_out<'a>(
+    rows: &'a [Row<'a>],
+    top: f32,
+    text_w: f32,
+    px: impl Fn(f32) -> f32,
+    state: &State,
+) -> Vec<Laid<'a>> {
+    let mut out = Vec::new();
+    let mut y = top;
+    for (index, row) in rows.iter().enumerate() {
+        let (height, doing, pass, note) = match row {
+            Row::Heading(_) => (px(HEAD_H), Vec::new(), Vec::new(), Vec::new()),
+            Row::Task(task) => {
+                let doing = wrap(&task.text, px(13.), text_w);
+                // Real tasks do not all carry an explicit `— Pass:` clause —
+                // for many the task's own wording IS the pass condition
+                // (testing.mjs's own DEVIATION 2, documented at its top). The
+                // compiled-in fixture the old plugin drew always had one, so
+                // this optionality did not exist there; it is the one shape
+                // reading the real source adds to the drawing.
+                let pass = match &task.pass {
+                    Some(p) => wrap(&format!("Pass: {p}"), px(11.5), text_w),
+                    None => Vec::new(),
+                };
+                let writing = state.editing && index == state.cursor;
+                let text = note_of(state, &task.id);
+                let note = if text.is_empty() && !writing {
+                    Vec::new()
+                } else {
+                    // The caret is part of the STRING, so it wraps with the
+                    // text. Placing it at a computed point would be a second
+                    // answer to "where does this line end", and the wrapper
+                    // already owns that one.
+                    let shown = if writing { format!("{text}\u{2588}") } else { text.to_string() };
+                    wrap(&shown, px(12.), (text_w - px(14.)).max(px(40.)))
+                };
+                let mut h = px(ROW_PAD)
+                    + doing.len() as f32 * px(LINE_H)
+                    + pass.len() as f32 * px(PASS_H)
+                    + px(6.);
+                if !note.is_empty() {
+                    h += px(NOTE_PAD) + note.len() as f32 * px(NOTE_H);
+                }
+                (h, doing, pass, note)
+            },
+        };
+        out.push(Laid { row, y, height, doing, pass, note });
+        y += height;
+    }
+    out
+}
+
+/// What a row's HEIGHT depends on besides the tasks themselves.
+///
+/// The layout is built BEFORE events, because a click must be tested against
+/// the picture the user actually clicked, not the one their click creates.
+/// Opening a note changes heights, so when one of these changes the layout is
+/// built a second time for the drawing — and only then, because building it
+/// asks the host to measure every line.
+fn layout_key(state: &State) -> (bool, usize, usize) {
+    (state.editing, state.cursor, state.notes.iter().map(|(_, n)| n.len()).sum())
+}
+
+struct Builder {
+    elements: Vec<Element>,
+}
+
+impl Builder {
+    fn push(&mut self, kind: Kind, parent: u32, props: Vec<Prop>, text: Option<&str>) -> u32 {
+        let index = self.elements.len() as u32;
+        self.elements.push(Element {
+            kind,
+            parent: if parent == u32::MAX { index } else { parent },
+            props,
+            text: text.map(str::to_string),
+        });
+        index
+    }
+}
+
+/// One key drawn as a CAP with its meaning beside it, answering with the x to
+/// carry on from.
+///
+/// The hint was a grey sentence, and a grey sentence is the one line a reader's
+/// eye skips. A key that looks like a key is read, and the two halves — what to
+/// press, what it does — stop being separated only by a space.
+#[allow(clippy::too_many_arguments)]
+fn key_hint(
+    b: &mut Builder,
+    parent: u32,
+    x: f32,
+    y: f32,
+    scale: f32,
+    key: &str,
+    what: &str,
+) -> f32 {
+    let px = |v: f32| v * scale;
+    let key_w = host_api::measure_text(key, px(10.5));
+    let cap_w = key_w + px(11.);
+    b.push(
+        Kind::Rect,
+        parent,
+        vec![
+            num("x", x),
+            num("y", y),
+            num("w", cap_w),
+            num("h", px(15.)),
+            int("color", 0x232833),
+            num("radius", px(3.)),
+            num("border", px(1.)),
+            int("border-color", 0x3a414f),
+        ],
+        None,
+    );
+    b.push(
+        Kind::Text,
+        parent,
+        vec![
+            num("x", x + px(5.5)),
+            num("y", y + px(2.)),
+            num("font-size", px(10.5)),
+            int("color", 0xc8cdd6),
+        ],
+        Some(key),
+    );
+    b.push(
+        Kind::Text,
+        parent,
+        vec![
+            num("x", x + cap_w + px(5.)),
+            num("y", y + px(2.5)),
+            num("font-size", px(10.5)),
+            int("color", 0x828b9a),
+        ],
+        Some(what),
+    );
+    x + cap_w + px(5.) + host_api::measure_text(what, px(10.5)) + px(13.)
+}
+
+fn toggle(state: &mut State, id: &str) {
+    match state.ticked.iter().position(|t| t == id) {
+        Some(at) => {
+            state.ticked.remove(at);
+        },
+        None => state.ticked.push(id.to_string()),
+    }
+}
+
+fn ticked(state: &State, id: &str) -> bool {
+    state.ticked.iter().any(|t| t == id)
+}
+
+fn note_of<'a>(state: &'a State, id: &str) -> &'a str {
+    state.notes.iter().find(|(t, _)| t == id).map_or("", |(_, n)| n.as_str())
+}
+
+/// An empty note is no note. Dropping it here rather than at every reader is
+/// what lets the issue count be `notes.len()` and stay true after a backspace.
+fn edit_note(state: &mut State, id: &str, edit: impl FnOnce(&mut String)) {
+    match state.notes.iter_mut().find(|(t, _)| t == id) {
+        Some((_, text)) => edit(text),
+        None => {
+            let mut text = String::new();
+            edit(&mut text);
+            state.notes.push((id.to_string(), text));
+        },
+    }
+    state.notes.retain(|(_, text)| !text.is_empty());
+}
+
+/// The id of the task the cursor is on, or nothing when it is on a heading.
+fn cursor_task<'a>(laid: &[Laid<'a>], cursor: usize) -> Option<&'a str> {
+    match laid.get(cursor).map(|l| l.row) {
+        Some(Row::Task(task)) => Some(task.id.as_str()),
+        _ => None,
+    }
+}
+
+impl Guest for Checklist {
+    fn render(ctx: Context) -> Frame {
+        let mut state: State = serde_json::from_slice(&ctx.state).unwrap_or_default();
+        if state.source.is_none() {
+            // The first frame of this window. `load` answering `none` (a
+            // refusal, or simply no file at that path yet) is treated the
+            // same as an empty source: nothing to draw, not an error — the
+            // same rule `restore_for_build` already applies to a missing
+            // run file, applied here to a missing source.
+            state.source = Some(host_api::load(TESTING_SOURCE).unwrap_or_default());
+        }
+        if state.on_disk.is_none() {
+            let text = host_api::load(RUN_FILE).unwrap_or_default();
+            let (ticked, notes, dropped_build) = restore_for_build(&text, &ctx.build);
+            state.ticked = ticked;
+            state.notes = notes;
+            state.dropped_build = dropped_build;
+            state.on_disk = Some(text);
+        }
+
+        // Parsed fresh every frame from the loaded (and load-once-per-window)
+        // source text — cheap next to a frame that already re-measures every
+        // line of every visible row, and it keeps this function free of a
+        // second cached copy of the same 405 tasks to keep in sync with the
+        // one in `state.source`.
+        let parsed_source = parser::parse_testing(state.source.as_deref().unwrap_or(""));
+        let (features, parse_error): (Vec<&Feature>, Option<&str>) = match &parsed_source {
+            Ok(p) => (parser::flatten_features(p), None),
+            Err(e) => (Vec::new(), Some(e.as_str())),
+        };
+
+        let px = |v: f32| v * ctx.scale;
+        let rows = rows(&features);
+
+        // A notice line adds one row to the header: a parse error takes
+        // priority (there is nothing sensible to draw until the source
+        // parses), and a dropped-ticks refusal is the fallback otherwise. It
+        // never changes mid-frame, so it is safe to fold into `top` before
+        // the hit test runs — the row a click lands on is the same row it is
+        // drawn on.
+        let notice: Option<String> = parse_error.map(|e| format!("testing.md: {e}")).or_else(|| {
+            state
+                .dropped_build
+                .as_ref()
+                .map(|other| format!("Ticks from build {other} were dropped — this is build {}.", ctx.build))
+        });
+        let dropped_h = if notice.is_some() { px(16.) } else { 0. };
+
+        // The header does not scroll. Everything below it does.
+        let top = ctx.y + px(56.) + dropped_h;
+        let text_x = ctx.x + px(PAD + 22.);
+        let text_w = (ctx.x + ctx.width - px(PAD) - text_x).max(px(40.));
+        let laid = lay_out(&rows, 0., text_w, px, &state);
+        let task_rows: Vec<usize> = laid
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| matches!(l.row, Row::Task(_)))
+            .map(|(i, _)| i)
+            .collect();
+
+        let before = layout_key(&state);
+        for event in &ctx.events {
+            match event {
+                Event::Scroll(delta) => state.scroll = (state.scroll - delta * px(20.)).max(0.),
+                Event::Click(point) => {
+                    // The same layout the drawing uses, offset by the same
+                    // scroll. One list, one answer.
+                    let hit = laid
+                        .iter()
+                        .position(|l| {
+                            let y = top + l.y - state.scroll;
+                            point.y >= y && point.y < y + l.height
+                        });
+                    if let Some(index) = hit {
+                        if let Row::Task(task) = laid[index].row {
+                            let id = task.id.to_string();
+                            toggle(&mut state, &id);
+                            state.cursor = index;
+                            // A click is about the tick. Ticking a row while a
+                            // note on ANOTHER row was open would leave the
+                            // caret somewhere the user is no longer looking.
+                            state.editing = false;
+                        }
+                    }
+                },
+                Event::Key(key) => {
+                    // Writing a note takes EVERY key, so it is answered before
+                    // the movement keys rather than beside them. `j` typed into
+                    // a note must be a letter, not a step down the list.
+                    if state.editing {
+                        let Some(id) = cursor_task(&laid, state.cursor) else {
+                            state.editing = false;
+                            continue;
+                        };
+                        match key.as_str() {
+                            // Enter FINISHES a note. The host sends a carriage
+                            // return for it (crates/shell/src/input.rs), never
+                            // the word, which is also why the tick below takes
+                            // "\r" and not "Enter".
+                            "Escape" | "\r" | "\n" => state.editing = false,
+                            "Backspace" => edit_note(&mut state, id, |text| {
+                                text.pop();
+                            }),
+                            // Whatever else the host chose to send as text is a
+                            // character the user typed. A control byte is not.
+                            typed if !typed.is_empty() && !typed.chars().any(char::is_control) => {
+                                let typed = typed.to_string();
+                                edit_note(&mut state, id, |text| text.push_str(&typed));
+                            },
+                            _ => {},
+                        }
+                        continue;
+                    }
+                    let at = task_rows.iter().position(|i| *i == state.cursor).unwrap_or(0);
+                    match key.as_str() {
+                        " " | "\r" => {
+                            if let Some(Row::Task(task)) = laid.get(state.cursor).map(|l| l.row) {
+                                let id = task.id.to_string();
+                                toggle(&mut state, &id);
+                            }
+                        },
+                        // A note is the reason anyone reads a finished run, so
+                        // it gets a key rather than only a mouse.
+                        "i" => state.editing = cursor_task(&laid, state.cursor).is_some(),
+                        // The arrows, and ONLY the arrows. `j` and `k` were a
+                        // second way to do a thing that already had one, and a
+                        // key that means "down" in one mode and "the letter j"
+                        // in the other is a key nobody can trust.
+                        "ArrowDown" => {
+                            let next = (at + 1).min(task_rows.len().saturating_sub(1));
+                            state.cursor = task_rows.get(next).copied().unwrap_or(0);
+                        },
+                        "ArrowUp" => {
+                            let prev = at.saturating_sub(1);
+                            state.cursor = task_rows.get(prev).copied().unwrap_or(0);
+                        },
+                        _ => {},
+                    }
+                },
+            }
+        }
+
+        // Heights change when a note opens, closes or wraps to a new line, and
+        // the drawing must use the CURRENT picture even though the hit test
+        // used the previous one.
+        let laid = if layout_key(&state) == before {
+            laid
+        } else {
+            lay_out(&rows, 0., text_w, px, &state)
+        };
+
+        // A cursor below the fold is a cursor nobody can see moving, so the
+        // view follows it. The same rule the host's own explorer follows.
+        let view = (ctx.height - px(56.) - dropped_h).max(px(60.));
+        if let Some(current) = laid.get(state.cursor) {
+            if current.y < state.scroll {
+                state.scroll = current.y;
+            }
+            let bottom = current.y + current.height;
+            if bottom > state.scroll + view {
+                state.scroll = bottom - view;
+            }
+        }
+
+        let mut b = Builder { elements: Vec::new() };
+        let root = b.push(
+            Kind::Clip,
+            u32::MAX,
+            vec![num("x", ctx.x), num("y", ctx.y), num("w", ctx.width), num("h", ctx.height)],
+            None,
+        );
+        b.push(
+            Kind::Rect,
+            root,
+            vec![
+                num("x", ctx.x),
+                num("y", ctx.y),
+                num("w", ctx.width),
+                num("h", ctx.height),
+                int("color", 0x14161b),
+                num("radius", px(12.)),
+                num("border", px(1.)),
+                int("border-color", 0x272b34),
+            ],
+            None,
+        );
+
+        let total: usize = features.iter().map(|f| f.tasks.len()).sum();
+        let done = state.ticked.len().min(total);
+        // The browser page counts notes beside ticks, because a run that is
+        // "12 of 12" with four notes is not a pass and must not read as one.
+        let issues = state.notes.len();
+        let count = if issues > 0 {
+            format!("Testing   {done} of {total} tried   {issues} with a note")
+        } else {
+            format!("Testing   {done} of {total} tried")
+        };
+        b.push(
+            Kind::Text,
+            root,
+            vec![
+                num("x", ctx.x + px(PAD)),
+                num("y", ctx.y + px(16.)),
+                num("font-size", px(13.5)),
+                int("color", 0xe6e9ef),
+            ],
+            Some(&count),
+        );
+        // A checklist that quietly stopped saving looks exactly like one that
+        // is saving. Say which it is, where the count is already being read.
+        if state.refused {
+            let w = host_api::measure_text("not saved", px(11.));
+            b.push(
+                Kind::Text,
+                root,
+                vec![
+                    num("x", ctx.x + ctx.width - px(PAD) - w),
+                    num("y", ctx.y + px(17.)),
+                    num("font-size", px(11.)),
+                    int("color", 0xc4666f),
+                ],
+                Some("not saved"),
+            );
+        }
+        // The hint row, under the count. Right-aligning it beside the count put
+        // the two on top of each other the moment the pane was narrow, which
+        // the first capture showed.
+        //
+        // It says something DIFFERENT while a note is open, because the keys
+        // mean something different there — that is the whole reason the mode
+        // exists, and a hint that did not change would be lying about it.
+        let hint_y = ctx.y + px(31.);
+        let mut hint_x = ctx.x + px(PAD);
+        if state.editing {
+            b.push(
+                Kind::Text,
+                root,
+                vec![
+                    num("x", hint_x),
+                    num("y", hint_y + px(2.5)),
+                    num("font-size", px(10.5)),
+                    int("color", 0xe08a4b),
+                ],
+                Some("writing a note"),
+            );
+            hint_x += host_api::measure_text("writing a note", px(10.5)) + px(13.);
+            hint_x = key_hint(&mut b, root, hint_x, hint_y, ctx.scale, "esc", "done");
+            key_hint(&mut b, root, hint_x, hint_y, ctx.scale, "\u{232b}", "rub out");
+        } else {
+            hint_x = key_hint(&mut b, root, hint_x, hint_y, ctx.scale, "space", "tick this");
+            hint_x = key_hint(&mut b, root, hint_x, hint_y, ctx.scale, "i", "write a note");
+            key_hint(&mut b, root, hint_x, hint_y, ctx.scale, "\u{2191} \u{2193}", "move");
+        }
+        // The refusal or parse error, visible rather than a log line: either
+        // the run file on disk was written against a different build (its
+        // ticks were dropped rather than restored), or `testing.md` itself
+        // did not parse. Sits between the hint row and the rule, and is what
+        // `dropped_h` above reserved the room for.
+        if let Some(msg) = &notice {
+            b.push(
+                Kind::Text,
+                root,
+                vec![
+                    num("x", ctx.x + px(PAD)),
+                    num("y", ctx.y + px(50.) + px(2.5)),
+                    num("font-size", px(11.)),
+                    int("color", 0xc4666f),
+                ],
+                Some(msg),
+            );
+        }
+        // A rule under the header, so the fixed part and the part that scrolls
+        // under it are visibly two things.
+        b.push(
+            Kind::Rect,
+            root,
+            vec![
+                num("x", ctx.x + px(PAD)),
+                num("y", ctx.y + px(50.) + dropped_h),
+                num("w", (ctx.width - px(PAD * 2.)).max(0.)),
+                num("h", px(1.)),
+                int("color", 0x272b34),
+            ],
+            None,
+        );
+
+        // **The list gets its own clip, and the header is not inside it.**
+        //
+        // Every row used to hang off the whole-pane clip and be drawn AFTER the
+        // header, so a row scrolled up painted straight over the count and the
+        // hint. `clip_for` in the host intersects every ancestor clip, so one
+        // nested here is the whole fix — the rows cannot leave this rectangle
+        // no matter how far the list is scrolled.
+        let list = b.push(
+            Kind::Clip,
+            root,
+            vec![
+                num("x", ctx.x),
+                num("y", top),
+                num("w", ctx.width),
+                num("h", (ctx.y + ctx.height - top).max(0.)),
+            ],
+            None,
+        );
+
+        for (index, l) in laid.iter().enumerate() {
+            let y = top + l.y - state.scroll;
+            // Off the top or off the bottom is not built at all. A list that
+            // builds every row it has gets slower as it grows, and this one is
+            // meant to hold four hundred. The top is the LIST's top, not the
+            // pane's — a row between the header and here is clipped away, so
+            // building it is work nobody sees.
+            if y + l.height < top || y > ctx.y + ctx.height {
+                continue;
+            }
+            match l.row {
+                Row::Heading(feature) => {
+                    b.push(
+                        Kind::Text,
+                        list,
+                        vec![
+                            num("x", ctx.x + px(PAD)),
+                            num("y", y + px(14.)),
+                            num("font-size", px(12.5)),
+                            int("color", 0xe08a4b),
+                        ],
+                        Some(&format!("{}   {}", feature.id, feature.name)),
+                    );
+                    // Its own tally, right-aligned. Scrolling past a feature
+                    // otherwise says nothing about whether it was finished.
+                    let d = feature.tasks.iter().filter(|t| ticked(&state, &t.id)).count();
+                    let n = feature.tasks.len();
+                    let tally = if d == n { format!("all {n}") } else { format!("{d}/{n}") };
+                    let w = host_api::measure_text(&tally, px(11.));
+                    b.push(
+                        Kind::Text,
+                        list,
+                        vec![
+                            num("x", ctx.x + ctx.width - px(PAD) - w),
+                            num("y", y + px(15.)),
+                            num("font-size", px(11.)),
+                            int("color", if d == n { 0x8fc78f } else { 0x6d7686 }),
+                        ],
+                        Some(&tally),
+                    );
+                },
+                Row::Task(task) => {
+                    let on = ticked(&state, &task.id);
+                    let writing = state.editing && index == state.cursor;
+                    // A hairline between tasks. Four hundred rows with nothing
+                    // between them is one wall of text, and the eye has to
+                    // count indents to find where a task starts.
+                    b.push(
+                        Kind::Rect,
+                        list,
+                        vec![
+                            num("x", ctx.x + px(PAD)),
+                            num("y", y),
+                            num("w", (ctx.width - px(PAD * 2.)).max(0.)),
+                            num("h", px(1.)),
+                            int("color", 0x21252d),
+                        ],
+                        None,
+                    );
+                    if index == state.cursor {
+                        b.push(
+                            Kind::Rect,
+                            list,
+                            vec![
+                                num("x", ctx.x + px(4.)),
+                                num("y", y),
+                                num("w", ctx.width - px(8.)),
+                                num("h", l.height),
+                                int("color", 0x1b1f27),
+                                num("radius", px(5.)),
+                            ],
+                            None,
+                        );
+                    }
+                    // The tick box: a rect, filled when it is on. There is no
+                    // checkbox primitive and none is needed.
+                    b.push(
+                        Kind::Rect,
+                        list,
+                        vec![
+                            num("x", ctx.x + px(PAD)),
+                            num("y", y + px(8.)),
+                            num("w", px(13.)),
+                            num("h", px(13.)),
+                            int("color", if on { 0x8fc78f } else { 0x14161b }),
+                            num("radius", px(3.)),
+                            num("border", px(1.)),
+                            int("border-color", if on { 0x8fc78f } else { 0x4a5568 }),
+                        ],
+                        None,
+                    );
+                    // A filled square and a ticked square look the same at a
+                    // glance in a long list. The mark is what separates them.
+                    if on {
+                        b.push(
+                            Kind::Text,
+                            list,
+                            vec![
+                                num("x", ctx.x + px(PAD + 2.)),
+                                num("y", y + px(7.)),
+                                num("font-size", px(11.)),
+                                int("color", 0x14161b),
+                            ],
+                            Some("\u{2713}"),
+                        );
+                    }
+                    // The id, right-aligned and dim. It is what a tester types
+                    // when they report one of these back, so it has to be on
+                    // screen — but it is never what they read first.
+                    let id_w = host_api::measure_text(&task.id, px(10.5));
+                    b.push(
+                        Kind::Text,
+                        list,
+                        vec![
+                            num("x", ctx.x + ctx.width - px(PAD) - id_w),
+                            num("y", y + px(6.)),
+                            num("font-size", px(10.5)),
+                            int("color", 0x565e6c),
+                        ],
+                        Some(&task.id),
+                    );
+                    let mut line_y = y + px(5.);
+                    for line in &l.doing {
+                        b.push(
+                            Kind::Text,
+                            list,
+                            vec![
+                                num("x", text_x),
+                                num("y", line_y),
+                                num("font-size", px(13.)),
+                                int("color", if on { 0x767e8d } else { 0xc8cdd6 }),
+                            ],
+                            Some(line),
+                        );
+                        line_y += px(LINE_H);
+                    }
+                    for line in &l.pass {
+                        b.push(
+                            Kind::Text,
+                            list,
+                            vec![
+                                num("x", text_x),
+                                num("y", line_y),
+                                num("font-size", px(11.5)),
+                                int("color", 0x6d7686),
+                            ],
+                            Some(line),
+                        );
+                        line_y += px(PASS_H);
+                    }
+                    // The note. It is drawn in a warm colour rather than the
+                    // grey of everything else BECAUSE it is the exception —
+                    // scrolling a finished run, the notes are the only rows
+                    // worth stopping on.
+                    if !l.note.is_empty() {
+                        let box_y = line_y + px(2.);
+                        let box_h = px(5.) + l.note.len() as f32 * px(NOTE_H);
+                        b.push(
+                            Kind::Rect,
+                            list,
+                            vec![
+                                num("x", text_x - px(6.)),
+                                num("y", box_y),
+                                num("w", (text_w + px(6.)).max(0.)),
+                                num("h", box_h),
+                                int("color", 0x1c1519),
+                                num("radius", px(4.)),
+                                num("border", px(1.)),
+                                int("border-color", if writing { 0xe08a4b } else { 0xa5606a }),
+                            ],
+                            None,
+                        );
+                        let mut note_y = box_y + px(2.);
+                        for line in &l.note {
+                            b.push(
+                                Kind::Text,
+                                list,
+                                vec![
+                                    num("x", text_x),
+                                    num("y", note_y),
+                                    num("font-size", px(12.)),
+                                    int("color", 0xd9b3b8),
+                                ],
+                                Some(line),
+                            );
+                            note_y += px(NOTE_H);
+                        }
+                    }
+                },
+            }
+        }
+
+        // Written at the END of the frame, after every event has been applied,
+        // so one write carries whatever this frame did rather than one write
+        // per event. A refusal leaves `on_disk` alone, so the next frame tries
+        // again — and frames only happen when something changed, so that is a
+        // retry rather than a spin.
+        let current = serde_json::to_string(&Persisted {
+            build: ctx.build.clone(),
+            ticked: state.ticked.clone(),
+            notes: state.notes.clone(),
+        })
+        .unwrap_or_default();
+        if state.on_disk.as_deref() != Some(current.as_str()) {
+            if host_api::save(RUN_FILE, &current) {
+                state.on_disk = Some(current);
+                state.refused = false;
+            } else {
+                state.refused = true;
+            }
+        }
+
+        Frame { elements: b.elements, state: serde_json::to_vec(&state).unwrap_or_default() }
+    }
+}
+
+export!(Checklist);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The ordinary case: the run on disk was written against the SAME build
+    /// that is asking for it, so it is restored exactly, and nothing is
+    /// reported as dropped.
+    #[test]
+    fn same_build_restores_ticks() {
+        let text = serde_json::to_string(&Persisted {
+            build: "abc123".to_string(),
+            ticked: vec!["F53.T1".to_string()],
+            notes: vec![("F53.T2".to_string(), "worked".to_string())],
+        })
+        .unwrap();
+
+        let (ticked, notes, dropped) = restore_for_build(&text, "abc123");
+        assert_eq!(ticked, vec!["F53.T1".to_string()]);
+        assert_eq!(notes, vec![("F53.T2".to_string(), "worked".to_string())]);
+        assert!(dropped.is_none(), "a matching build must not be reported as dropped");
+    }
+
+    /// The property todo19#P1 exists for: a run recorded against a DIFFERENT
+    /// build is refused rather than restored, because a tick carried across a
+    /// build looks like proof and is not (`conducks-visuals` §6). The build it
+    /// actually came from is named, so the refusal can be shown in the pane.
+    ///
+    /// **Mutation proof:** replace `restore_for_build`'s
+    /// `if saved.build == current_build` branch with the unconditional
+    /// `(saved.ticked, saved.notes, None)` and this test fails — `ticked`
+    /// comes back non-empty instead of empty, and `dropped` comes back `None`
+    /// instead of `Some("old-build".to_string())`.
+    #[test]
+    fn a_different_build_is_refused_and_named() {
+        let text = serde_json::to_string(&Persisted {
+            build: "old-build".to_string(),
+            ticked: vec!["F53.T1".to_string()],
+            notes: vec![("F53.T2".to_string(), "worked".to_string())],
+        })
+        .unwrap();
+
+        let (ticked, notes, dropped) = restore_for_build(&text, "new-build");
+        assert!(ticked.is_empty(), "ticks from another build must not be restored");
+        assert!(notes.is_empty(), "notes from another build must not be restored");
+        assert_eq!(
+            dropped,
+            Some("old-build".to_string()),
+            "the refusal must name the build the run actually came from"
+        );
+    }
+
+    /// The counter-case a build-comparison bug could hide behind: no run file
+    /// exists yet (a fresh project, or `load` answering nothing). That is an
+    /// ABSENCE, not a mismatch — reporting one here would tell a first-time
+    /// user their ticks were dropped when none ever existed.
+    #[test]
+    fn a_missing_run_reports_nothing_dropped() {
+        let (ticked, notes, dropped) = restore_for_build("", "new-build");
+        assert!(ticked.is_empty());
+        assert!(notes.is_empty());
+        assert!(dropped.is_none(), "absence of a run file is not a refusal");
+    }
+
+    // `lay_out`'s new "no Pass: clause -> no pass line" branch (the one
+    // change reading the real source makes to the drawing, see its own
+    // comment above) is NOT unit tested here: `lay_out` calls `wrap`, which
+    // calls `host_api::measure_text` — a wasm import with no native
+    // implementation, so invoking it under a plain `cargo test` on this
+    // machine aborts the whole test binary (SIGABRT, "unreachable code"),
+    // exactly the way it did when tried. `rows()`/`Feature`/`Task` are
+    // exercised instead through `parser.rs`'s own tests, which cover the
+    // data this branch reads without needing the host. Verifying the drawn
+    // pixels themselves needs the running ForgeTerm host — named as a gap
+    // for the orchestrator, not silently skipped.
+}

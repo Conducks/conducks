@@ -49,7 +49,7 @@
     "oracle:python": "node tools/benchmark/oracle-python.mjs ../test-projects/scraper",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
     "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js",
-    "visuals": "node scripts/visuals/render.mjs && node scripts/visuals/detail.mjs && node scripts/visuals/notes.mjs",
+    "visuals": "node scripts/visuals/render.mjs && node scripts/visuals/detail.mjs && node scripts/visuals/notes.mjs && node scripts/visuals/testing.mjs && node scripts/visuals/pages.mjs",
     "oracle:packs": "node tools/benchmark/oracle-packs.mjs"
   },
   "dependencies": {

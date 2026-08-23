@@ -53,3 +53,14 @@ scratch/
 
 # agent worktree scratch (47M, never commit)
 .claude/
+
+# Rust build output for plugins/checklist (todo74#P3) — Cargo.lock is committed,
+# the compiled target/ tree is not, the same split every Cargo project makes.
+/plugins/checklist/target/
+
+# The checklist plugin's run file — ticks and notes, keyed to a build. Never
+# committed: a tick recorded against one build looks like proof against
+# another and is not (`conducks-visuals` §6b, ForgeTerm ADR 0035). Same entry
+# ForgeTerm's own .gitignore carries, since this repo is also a project a
+# ForgeTerm window can be pointed at.
+docs/checklist-run.json

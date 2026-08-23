@@ -1,0 +1,19 @@
+# The checklist draws a list, reads the real tasks, and keeps what you ticked.
+#
+# It places a tick box and a row of text against the host's own font, so it
+# needs to ask how wide text is.
+#
+# `save` and `load` are ForgeTerm ADR 0033 and its amendment 0034: the host
+# decides what a plugin may write, and this one writes ONE file, under docs/,
+# in the project the window is working in. It cannot reach source, `.git`, a
+# dotfile, or a second project — those refusals are the host's, not this
+# plugin's promise.
+#
+# `load` is now also how it READS its task list — `docs/visuals/testing.md` —
+# rather than drawing a slice compiled into the wasm (ADR 0154, todo74#P3).
+# Carried over unchanged from the manifest this plugin had before the move: a
+# manifest missing one of these three lines makes the plugin fail to LOAD
+# entirely, not fail at the call the missing capability would have answered.
+measure-text
+save
+load

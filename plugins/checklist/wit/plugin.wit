@@ -1,0 +1,165 @@
+// Version 0.3 of the contract, and the shape the real one is meant to keep.
+//
+// Two changes from 0.2, both from the same realisation: `scroll` and `input` were
+// never drawing primitives. Scroll is "offset the children and clip". Input is
+// "draw text, draw a caret, take keys". Both are plugin logic over props and
+// events, which are already open — so baking them in here would have forced an
+// ABI edit for every widget anyone ever wanted.
+//
+//   1. FOUR primitives, all of them things only the host can do: rasterize a
+//      rounded rect, shape and rasterize text, decode an image, clip on the GPU.
+//   2. HOST IMPORTS. A plugin can now ASK, not only answer — measure this text,
+//      spawn this process, read its output. A new capability is a new import,
+//      and still not a change to the node vocabulary.
+//
+// The rule that makes a swap invisible: a plugin never OWNS anything. The host
+// owns the process, the timer, the socket; the plugin holds an integer handle in
+// its own state blob. A replaced plugin reads the same handle back and carries on
+// against the same running process.
+package forgeterm:ui@0.3.0;
+
+interface types {
+    /// What only the host can do. Everything a user would call a widget — input,
+    /// scroll, list, tabs, tree, split — is a composition of these.
+    enum kind {
+        rect,
+        text,
+        image,
+        clip,
+    }
+
+    /// Four value shapes, kept whole even where nothing uses one yet: this is the
+    /// OPEN half of the contract, and a prop like `align: "center"` or
+    /// `focus: true` is exactly what it exists to carry.
+    variant value {
+        num(f32),
+        int(u32),
+        str(string),
+        flag(bool),
+    }
+
+    record prop {
+        key: string,
+        value: value,
+    }
+
+    record element {
+        kind: kind,
+        parent: u32,
+        props: list<prop>,
+        text: option<string>,
+    }
+
+    record point {
+        x: f32,
+        y: f32,
+    }
+
+    variant event {
+        key(string),
+        click(point),
+        scroll(f32),
+    }
+
+    type blob = list<u8>;
+
+    record context {
+        state: blob,
+        /// The plugin's own settings, as the user wrote them, read by the host
+        /// from a file beside the plugin. Empty when there is none. It arrives
+        /// here rather than through an import because granting a plugin a way
+        /// to read a path is granting it a way to read paths (ADR 0007).
+        config: string,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        scale: f32,
+        /// Which BUILD of the host this is. A plugin that keeps a record of what
+        /// a person did — ticks on a checklist, a run log — must key that record
+        /// to the binary it was made against and refuse one made against another,
+        /// because a tick carried across a build looks like proof and is not
+        /// (`conducks-visuals` §6).
+        ///
+        /// It arrives here rather than through an import for the same reason
+        /// `scale` does: it is host knowledge a plugin cannot obtain any other
+        /// way, and it grants access to nothing, so it is a field rather than a
+        /// capability.
+        build: string,
+        events: list<event>,
+    }
+
+    record frame {
+        elements: list<element>,
+        state: blob,
+    }
+}
+
+/// What a plugin may ask the host for. Everything here is a capability the host
+/// grants and can refuse; a plugin gets no ambient access to anything.
+interface host-api {
+    /// Only the host has the font, so only the host can answer this.
+    measure-text: func(text: string, size: f32) -> f32;
+
+    /// The host spawns and OWNS the process. The plugin gets a handle.
+    spawn: func(command: string, args: list<string>) -> u32;
+
+    /// Lines produced by the process, starting at `start`. The plugin keeps its own
+    /// cursor in its state blob, so a replaced plugin resumes exactly where the
+    /// old one stopped — no gap, no duplicate, no restart.
+    read-output: func(handle: u32, start: u32) -> list<string>;
+
+    /// A plugin has to be able to say "this finished" — the panel shows it.
+    running: func(handle: u32) -> bool;
+
+    log: func(message: string);
+
+    /// Milliseconds since the epoch. A plugin cannot show a time it cannot read,
+    /// and the wall clock is not a secret from a program the user installed to
+    /// run commands (ADR 0007).
+    now: func() -> u64;
+
+    /// "Draw me again in this many milliseconds." The shell renders on damage
+    /// only, so a panel with no process behind it would otherwise render once
+    /// and freeze. Deliberately not a timer: a timer would run plugin code
+    /// between frames, and every guarantee in ADR 0006 rests on a plugin
+    /// existing only during a call.
+    request-frame: func(ms: u32);
+
+    /// Copy text to the system clipboard. There is no read half, and that
+    /// asymmetry is the decision, not an omission — reading is a plugin
+    /// silently taking whatever the user last copied (ADR 0007).
+    clipboard-write: func(text: string);
+
+    /// Write a file INTO THE PROJECT, and read one back. The path is relative
+    /// to the project the window is working in — never to the plugin's own
+    /// folder, which is what `load-image` is for (ADR 0033, amended by 0034).
+    ///
+    /// The host decides what it will accept. It refuses an absolute path, a
+    /// `..`, a symlink pointing outside, anything resolving outside the
+    /// project, and anything whose path has no `docs` component — so a plugin
+    /// may write project DOCUMENTATION and nothing else. It refuses rather
+    /// than fails: `save` answers false and `load` answers none, the same rule
+    /// `load-image` follows. A plugin that ignores the answer loses data, and
+    /// that is its bug rather than a crash.
+    ///
+    /// WHERE a file goes and what it is called is the plugin's business. The
+    /// host never learns that grammar and only judges the path it is handed.
+    save: func(path: string, data: string) -> bool;
+    load: func(path: string) -> option<string>;
+
+    /// Open an image that ships beside the plugin and get a handle to it. The
+    /// name is a FILE NAME, not a path: the host joins it to the directory the
+    /// plugin was loaded from and refuses anything with a separator or `..`, so
+    /// the capability is "read your own folder" rather than "read the
+    /// filesystem" (ADR 0010). Returns 0 if it cannot be opened, which a plugin
+    /// must treat as "no image" — never a host failure.
+    load-image: func(name: string) -> u32;
+}
+
+world plugin {
+    import host-api;
+    use types.{context, frame};
+
+    export render: func(ctx: context) -> frame;
+}

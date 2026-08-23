@@ -212,3 +212,7 @@ banners started being refused. Look at what left before calling it either way. A
 ## CONDUCKS-44 — a feature is entered through its door
 - Rule: outside code imports a feature only through `<feature>/index.ts`. The feature's own files and its own tests may import internals; nothing else may. A type two features share moves to `contracts/` rather than travelling through a door.
 - Reason: a feature reachable at many paths cannot be changed without checking every one of them. `core/parsing` is imported from outside at 24 separate files, which is why `reflector.ts` sits at 1,676 lines and `linker-intra.ts` at 1,120 — splitting either would mean checking two dozen call surfaces, so nobody has. Measured on `core/git`, three greps put the count at 8, then 10; the gate found 12, because a text search shaped like one import style cannot see `../git/...`. — ADR 0150, enforced by tests/architecture/feature-doors.test.ts
+
+## CONDUCKS-45 — A visual's source belongs to the repository it describes
+- Rule: this repository owns the grammar, the parser and the renderers for a visual. The authored SOURCE lives in the repository the visual is about, never here. A renderer that ships everywhere must exit cleanly when its optional source is absent.
+- Reason: the source was put here beside the parser, and the terminal reader then asked its host for a file that did not exist in the project it was running in and drew an empty list. Every gate was green — the page rendered, drift passed, both parsers agreed. Only running it found it.
