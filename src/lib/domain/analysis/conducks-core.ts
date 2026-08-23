@@ -19,6 +19,7 @@ import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "url";
+import { RISK_WEIGHTS } from "@/contracts/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -194,7 +195,7 @@ export class Conducks {
     const fanOutRisk = Math.min(outgoing / 10, 1.0);
     const gravity = node.properties.rank || 0;
 
-    const weights = { gravity: 0.25, complexity: 0.35, entropy: 0.10, churn: 0.10, fanOut: 0.15 };
+    const weights = RISK_WEIGHTS;
 
     const score = (gravity * weights.gravity) +
                  (complexityRisk * weights.complexity) +

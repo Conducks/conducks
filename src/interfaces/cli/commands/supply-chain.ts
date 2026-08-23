@@ -187,7 +187,12 @@ export class SupplyChainCommand implements ConducksCommand {
       }
       const unpinned = pkgs.filter(p => !resolveDeclaredVersion(p.pkg, versions, normalizedVersions)).length;
       if (unpinned > 0) {
-        console.log(`\n\x1b[33m  ⚠️  ${unpinned} imported package(s) are not declared in package.json (phantom dependency).\x1b[0m`);
+        // NAME NO MANIFEST. The per-package label was corrected to `(undeclared)` for exactly this
+        // reason — on a Python project there is no package.json, and in a monorepo the declaration
+        // lives one directory down — and this summary line was missed in that pass. MEASURED on the
+        // scraper subject: every version printed above it came from pyproject.toml, and then this
+        // line sent the reader to a file the project does not have.
+        console.log(`\n\x1b[33m  ⚠️  ${unpinned} imported package(s) are declared in no manifest this project has (phantom dependency).\x1b[0m`);
       }
     }
   }

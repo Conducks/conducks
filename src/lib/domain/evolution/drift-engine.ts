@@ -1,5 +1,6 @@
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { logger } from "@/lib/core/utils/index.js";
+import { DECAY_VELOCITY_THRESHOLD } from "@/contracts/index.js";
 
 /**
  * Conducks — Structural Drift Engine 🕵️‍♂️
@@ -17,7 +18,7 @@ import { logger } from "@/lib/core/utils/index.js";
  *
  * One definition now serves both. A reader comparing the sentence to the summary sees one number.
  */
-export const DECAY_VELOCITY_THRESHOLD = 0.05;
+export { DECAY_VELOCITY_THRESHOLD } from "@/contracts/index.js";
 
 export class DriftEngine {
   constructor(private readonly persistence: SynapsePersistence) {}

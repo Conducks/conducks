@@ -49,3 +49,6 @@ export { realCasePath } from './real-path.js';
 // Read by both interface surfaces for the same reason: a count captioned as project symbols must
 // not include the built-ins and unresolved targets the graph deliberately also holds.
 export { isProjectSymbolId, splitProjectSymbols } from './project-symbol.js';
+// Read by the DOMAIN that computes a score and by the CLI that prints it. A weight or a threshold
+// duplicated at the render site is how the printed sentence drifts from the arithmetic behind it.
+export { RISK_WEIGHTS, DECAY_VELOCITY_THRESHOLD } from './scoring.js';

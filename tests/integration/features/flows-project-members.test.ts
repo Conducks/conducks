@@ -97,3 +97,52 @@ export function mostlyBuiltins(xs: number[]): string {
     expect(d.matching).toBeLessThanOrEqual(d.total);
   }, 180000);
 });
+
+/**
+ * The message printed when the filter empties the result named a threshold nobody passed.
+ *
+ * MEASURED on sofie: `flows --min-members 9999` printed "No multi-symbol flows. 4754 single-symbol
+ * flow(s) were not shown." Both halves mislead. Multi-symbol flows exist — one has 227 members —
+ * they were hidden by the floor. And the 4754 hidden are not single-symbol; they are every flow
+ * under 9999, which is all of them.
+ *
+ * The COUNT was always right (`hidden = total - matching`). Only the words were wrong, and they were
+ * wrong because they hardcoded the default floor of 2 into a sentence that has to describe any floor.
+ */
+describe('flows says which floor emptied the result', () => {
+  let repo: string;
+
+  beforeAll(() => {
+    ensureBuild();
+    repo = mkGitRepo('flows-empty-message');
+    writeFile(repo, 'src/chain.ts', `
+export function alpha(): number { return beta(); }
+export function beta(): number { return gamma(); }
+export function gamma(): number { return 3; }
+`);
+    commit(repo, 'init');
+    runCli(['analyze', '--yes'], { cwd: repo });
+  }, 300000);
+
+  afterAll(() => rmRepo(repo));
+
+  it('names the floor that hid them, not a floor of 2', () => {
+    const out = runCli(['flows', '--min-members', '9999'], { cwd: repo }).combined;
+    // The floor the caller actually passed must appear, so the sentence describes what happened.
+    expect(out).toContain('9999');
+    // The two false claims, named so this test says what it prevents.
+    expect(out).not.toMatch(/single-symbol/);
+    expect(out).not.toMatch(/No multi-symbol flows/);
+  }, 180000);
+
+  it('still reports how many were hidden', () => {
+    const out = runCli(['flows', '--min-members', '9999'], { cwd: repo }).combined;
+    const json = JSON.parse(runCli(['flows', '--json'], { cwd: repo }).stdout);
+    // `hidden` is total - matching at THIS floor, so it cannot be read off the default run; what the
+    // rendered line must not do is claim a number larger than the project has flows at all.
+    const m = /(\d+) flow\(s\)/.exec(out);
+    expect(m).not.toBeNull();
+    expect(Number(m![1])).toBeLessThanOrEqual(json.total);
+    expect(Number(m![1])).toBeGreaterThan(0);
+  }, 180000);
+});

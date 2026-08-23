@@ -3,6 +3,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import { displayPath, displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
+import { DECAY_VELOCITY_THRESHOLD } from "@/contracts/index.js";
 
 /**
  * Conducks — Drift Command 🕵️‍♂️
@@ -108,7 +109,16 @@ export class DriftCommand implements ConducksCommand {
       }
 
       if (result.deltas && result.deltas.length > 0) {
-        const decaying = result.deltas.filter(d => d.velocity > 0.01);
+        // ONE THRESHOLD, AND SORTED. This filtered at 0.01 while `summary.decay_count` counts at
+        // DECAY_VELOCITY_THRESHOLD (0.05), so the list contradicted the count printed six lines
+        // above it — measured on this repo's fixture: "Decaying: 1" over two listed rows. And it was
+        // never sorted, so a heading reading "Top" printed whatever order the deltas arrived in:
+        // on the scraper subject that put two Python built-ins at 0.026 and 0.030 above the symbol
+        // actually edited at 0.500. The improving block below has always sorted; this one was missed
+        // when that was added.
+        const decaying = result.deltas
+          .filter(d => d.velocity > DECAY_VELOCITY_THRESHOLD)
+          .sort((a: any, b: any) => b.velocity - a.velocity);
         if (decaying.length > 0) {
           console.log(`\n\x1b[1m🚀 Top Structural Decay Hotspots (Velocity) ---\x1b[0m`);
           decaying.slice(0, 10).forEach((d: any, i: number) => {

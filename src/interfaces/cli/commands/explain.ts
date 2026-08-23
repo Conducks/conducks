@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import chalk from "chalk";
 import { tryResolveSymbol } from "@/interfaces/cli/shared/error.js";
 import { displayPath } from "@/interfaces/cli/shared/display-path.js";
+import { RISK_WEIGHTS } from "@/contracts/index.js";
 
 /**
  * Conducks — Explain Command (Signal Decomposition)
@@ -142,11 +143,16 @@ export class ExplainCommand implements ConducksCommand {
     }
     console.log();
     console.log(`\x1b[1mSignal Decomposition:\x1b[0m`);
-    console.log(`  ├── \x1b[36mgravity:\x1b[0m     ${sig(breakdown.gravity)}  (centrality rank: ${node.properties.rank?.toFixed(4) || 0})`);
-    console.log(`  ├── \x1b[36mcomplexity:\x1b[0m  ${sig(breakdown.complexity)}  (largest weight in the composite score)`);
-    console.log(`  ├── \x1b[36mfan-out:\x1b[0m     ${sig(breakdown.fanOut)}  (outgoing structural dependencies)`);
-    console.log(`  ├── \x1b[36mchurn:\x1b[0m       ${sig(breakdown.churn)}  (resonance / temporal frequency)`);
-    console.log(`  └── \x1b[36mentropy:\x1b[0m     ${sig(breakdown.entropy)}  (authorship fragmentation: ${(entropyRes.entropy).toFixed(2)})`);
+    // Each line carries the signal's WEIGHT in the composite, because the reader's next question is
+    // always "which of these is driving the score". This used to print "largest weight in the
+    // composite score" beside complexity — true of the formula, and read as a claim about the symbol
+    // on screen, which made `complexity: 0.50 (largest weight)` above `fan-out: 10.00` misleading.
+    const w = (n: number) => `weight ${n.toFixed(2)}`;
+    console.log(`  ├── \x1b[36mgravity:\x1b[0m     ${sig(breakdown.gravity)}  (${w(RISK_WEIGHTS.gravity)} · centrality rank: ${node.properties.rank?.toFixed(4) || 0})`);
+    console.log(`  ├── \x1b[36mcomplexity:\x1b[0m  ${sig(breakdown.complexity)}  (${w(RISK_WEIGHTS.complexity)} · the heaviest of the five)`);
+    console.log(`  ├── \x1b[36mfan-out:\x1b[0m     ${sig(breakdown.fanOut)}  (${w(RISK_WEIGHTS.fanOut)} · outgoing structural dependencies)`);
+    console.log(`  ├── \x1b[36mchurn:\x1b[0m       ${sig(breakdown.churn)}  (${w(RISK_WEIGHTS.churn)} · resonance / temporal frequency)`);
+    console.log(`  └── \x1b[36mentropy:\x1b[0m     ${sig(breakdown.entropy)}  (${w(RISK_WEIGHTS.entropy)} · authorship fragmentation: ${(entropyRes.entropy).toFixed(2)})`);
 
     console.log(`\n\x1b[2mStructural resonance detected in ${entropyRes.authorCount} authors.\x1b[0m`);
 

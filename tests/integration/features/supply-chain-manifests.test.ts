@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import fs from 'node:fs';
+import path from 'node:path';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
 
 /**
@@ -55,6 +57,7 @@ from typing import Any
 from pathlib import Path
 
 import yaml
+import bs4
 from foundation.paths import get_project_root
 
 logger = logging.getLogger(__name__)
@@ -62,6 +65,7 @@ logger = logging.getLogger(__name__)
 async def run(cfg: Any) -> Path:
     await asyncio.sleep(0)
     yaml.safe_load(cfg)
+    bs4.BeautifulSoup("", "html.parser")
     return Path(get_project_root())
 `);
       commit(repo, 'init');
@@ -83,6 +87,23 @@ async def run(cfg: Any) -> Path:
     it('does not report the project\'s own src-layout packages as dependencies', () => {
       const out = JSON.parse(runCli(['supply-chain', '--json'], { cwd: repo }).stdout);
       expect(out.packages.map((p: any) => p.package)).not.toContain('foundation');
+    }, 180000);
+
+    /**
+     * The per-package label was fixed to say `(undeclared)` — on a Python project there is no
+     * package.json, and in a monorepo the declaration lives one directory down. The SUMMARY line was
+     * missed in that same pass and still named the JavaScript manifest.
+     *
+     * MEASURED on the scraper subject: conducks read pyproject.toml correctly (every version it
+     * printed came from it) and then told the reader to check a file the project does not have.
+     */
+    it('does not tell a Python project to check package.json', () => {
+      const out = runCli(['supply-chain'], { cwd: repo }).combined;
+      expect(fs.existsSync(path.join(repo, 'package.json'))).toBe(false);
+      // `bs4` is imported and declared nowhere, so the phantom-dependency line MUST print — without
+      // this the assertion below passes on a run that never reached the sentence under test.
+      expect(out).toMatch(/phantom dependency/);
+      expect(out).not.toMatch(/package\.json/);
     }, 180000);
 
     it('reads declared versions from pyproject.toml, through the import-name alias', () => {

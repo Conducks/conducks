@@ -85,8 +85,13 @@ export class FlowsCommand implements ConducksCommand {
     const projectRoot = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
     console.log("\x1b[1m--- 🌊 Behavioral Processes ---\x1b[0m");
     if (shown.length === 0) {
+      // NAME THE FLOOR THAT EMPTIED IT. This said "No multi-symbol flows. N single-symbol flow(s)
+      // were not shown", which hardcodes the default floor of 2 into a sentence that has to describe
+      // whatever floor was passed. MEASURED on sofie with `--min-members 9999`: it reported 4754
+      // single-symbol flows while 1074 multi-symbol flows existed, one of them 227 members deep.
+      // The count was right the whole time (`hidden = total - matching`); only the words were wrong.
       console.log(hidden > 0
-        ? `No multi-symbol flows. ${hidden} single-symbol flow(s) were not shown.`
+        ? `No flow has ${minMembers} or more project symbols. ${hidden} flow(s) below that floor were not shown.`
         : "No behavioral flows detected.");
       return;
     }
