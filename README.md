@@ -146,7 +146,7 @@ The server reads the workspace root from `--root <path>`, else from the `CONDUCK
 environment variable, else from the current working directory. The default transport is stdio; pass
 `mcp --sse` if your client needs an SSE transport instead (served on port 3001).
 
-The agent will then have access to these 14 tools:
+The agent will then have access to these 13 tools, every one of them read-only:
 
 | Tool                   | What it does                                                                                 |
 | ---------------------- | -------------------------------------------------------------------------------------------- |
@@ -162,7 +162,6 @@ The agent will then have access to these 14 tools:
 | `conducks_coverage`    | Overlay an istanbul/c8 `coverage-final.json` onto the graph — per-function fill %              |
 | `conducks_docs`        | Progress board parsed from the authored docs: todo %, ADR states, grammar violations           |
 | `conducks_diff`        | Structural diff of uncommitted changes                                                         |
-| `conducks_rename`      | Graph-verified safe rename across the codebase                                                 |
 | `conducks_graph_query` | Run a raw SELECT against the DuckDB graph store                                                |
 
 Usage guidance for agents does **not** ship as an MCP tool. It ships as eight skills that

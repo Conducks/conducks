@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
+import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo, renameByHand } from './helpers.js';
 
 /**
  * Rendered drift output is colourised, and ANSI codes contain DIGITS (`\x1b[35m`). Asserting a
@@ -48,7 +48,7 @@ export function boot(): string { return getProjectRoot() + getDataDir(); }
     runCli(['analyze', '--yes'], { cwd: repo });
 
     // Rename ONE. The sibling is deliberately left alone.
-    runCli(['rename', 'getProjectRoot', 'getRootDirectory', '--confirm'], { cwd: repo });
+    renameByHand(repo, ['src/paths.ts', 'src/main.ts'], 'getProjectRoot', 'getRootDirectory');
     runCli(['analyze', '--yes'], { cwd: repo });
   }, 300000);
 
@@ -89,8 +89,8 @@ export function boot(): string { return alphaOne() + betaTwo(); }
 
     // BOTH renamed before the next pulse — so both old ids vanish and the disappearance guard is
     // satisfied for every candidate pair. Only 1:1 pairing can bring this back to 2.
-    runCli(['rename', 'alphaOne', 'alphaRenamed', '--confirm'], { cwd: repo });
-    runCli(['rename', 'betaTwo', 'betaRenamed', '--confirm'], { cwd: repo });
+    renameByHand(repo, ['src/paths.ts', 'src/main.ts'], 'alphaOne', 'alphaRenamed');
+    renameByHand(repo, ['src/paths.ts', 'src/main.ts'], 'betaTwo', 'betaRenamed');
     runCli(['analyze', '--yes'], { cwd: repo });
   }, 300000);
 

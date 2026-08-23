@@ -2650,3 +2650,14 @@ by construction.
   BUY, and that is a number. Take it before writing the comment that defers the work, or the deferral
   becomes permanent and looks deliberate. Removed 2026-08-17 with the measurement recorded here so
   nobody re-derives it.
+
+## rename was removed — do not re-add it
+- Gotcha: `conducks rename`, `conducks_rename`, `GVREngine` and `RefactorResult` are gone (ADR 0156), and `tests/unit/adr-invariants.test.ts` fails if a `rename*.ts` or `gvr*.ts` module returns under `src/` or if any MCP tool declares `destructiveHint: true`. The idea looks obviously good and has been rebuilt-in-spirit twice; the reason it cannot work is that correct renaming needs TYPES — overloads, aliases, re-exports, structural typing, `this` binding — and conducks has a syntax graph.
+- Why: it was wrong three separate ways in two benchmark rounds, each time printing success over a tree that no longer compiles. Also worth knowing: the decision to remove it was first made on 2026-08-18 and never written down, so it was silently re-fixed instead and the same command cost another benchmark round. That is what this entry exists to prevent.
+- Applies: src/lib/domain/evolution/, src/interfaces/tools/tools/kinetic.ts — whole repo
+
+## "rename" means two unrelated things here
+- Gotcha: `drift` reports `Renamed/Moved: N` and has `drift-rename*.test.ts` files. That is DETECTION — it observes that a symbol changed name between two pulses and writes nothing. It is alive and unaffected by ADR 0156, which removed the WRITER. Do not delete drift's rename detection while cleaning up after the rename command.
+- Why: the two shared a word and nothing else. The drift tests used `conducks rename` only as a fixture to produce the renamed state; they now rename by hand through `renameByHand` in `tests/integration/features/helpers.ts`.
+- Applies: src/lib/domain/evolution/drift-engine.ts — whole repo
+

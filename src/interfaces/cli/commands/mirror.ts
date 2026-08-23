@@ -44,8 +44,8 @@ export class MirrorCommand implements ConducksCommand {
     const port = await server.start(3333, host);
     
     // 3. Start Watcher (Live Connection) - Optional (v1.12.6)
-    if (registry.rename.watcher && (args.includes('--live') || args.includes('--watch'))) {
-      registry.rename.watcher.start();
+    if (registry.evolution.watcher && (args.includes('--live') || args.includes('--watch'))) {
+      registry.evolution.watcher.start();
     }
     
     console.log("\n\x1b[32m✅ Conducks Mirror is LIVE.\x1b[0m");

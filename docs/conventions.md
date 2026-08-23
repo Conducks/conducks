@@ -216,3 +216,12 @@ banners started being refused. Look at what left before calling it either way. A
 ## CONDUCKS-45 — A visual's source belongs to the repository it describes
 - Rule: this repository owns the grammar, the parser and the renderers for a visual. The authored SOURCE lives in the repository the visual is about, never here. A renderer that ships everywhere must exit cleanly when its optional source is absent.
 - Reason: the source was put here beside the parser, and the terminal reader then asked its host for a file that did not exist in the project it was running in and drew an empty list. Every gate was green — the page rendered, drift passed, both parsers agreed. Only running it found it.
+
+## CONDUCKS-46 — a tool that edits code must be exact or must not exist
+- Rule: no conducks command writes to a file the user authored. Conducks writes its own vault, and files a user explicitly asks it to create — `.conducksignore`, git hooks, the MCP config, a coverage render, the docs scaffold. It never edits code somebody else wrote.
+- Reason: `rename` was measured wrong three separate ways in two benchmark rounds — a per-edge site count that missed 48 call sites, a TypeScript barrel import left stale, a Python parenthesised import left stale — each under a success message, and each fix local to the form that round happened to try. A rename is not a spectrum: at 100% it saves minutes, at 90% it hands back a broken tree and every earlier rename becomes suspect. Exactness needs types; conducks has a syntax graph. Removed by ADR 0156.
+
+## CONDUCKS-47 — a capability grep already provides is not worth shipping
+- Rule: before adding or keeping a command, ask what it does that `grep` cannot. If the honest answer is "the same thing, from a graph", drop it. A structural version earns its place only when it is exact enough to act on without re-checking, or answers something textual search cannot reach at all — blast radius, a call path, a cycle.
+- Reason: the fallback plan for `rename` was to keep the site list and drop the write. It went too: `grep -rn "\bSYMBOL\b"` answers that faster, with no vault, no analyze step and no staleness, and a reader already trusts it. A surface strictly worse than a tool everyone has installed is how a project accumulates commands nobody runs. Said, 2026-08-23.
+

@@ -55,10 +55,10 @@ export class HelpCommand implements ConducksCommand {
           "conducks diff --base main --head feature/my-branch",
         ],
       },
-      "MUTATIONAL (Rename)": {
-        ids: ["rename", "prune", "clean"],
+      "MUTATIONAL (Prune)": {
+        ids: ["prune", "clean"],
         examples: [
-          "conducks rename OldName NewName",
+          "conducks prune",
         ],
       },
       "VISUAL (Mirror)": {

@@ -53,7 +53,7 @@ The Conducks CLI is a powerful engine designed for deep architectural discovery 
 
 ---
 
-## 🤖 3. The 9-Tool Agentic MCP Suite
+## 🤖 3. The 13-Tool Agentic MCP Suite
 Standardized tools for autonomous AI agents to interact with Conducks intelligence.
 
 | Tool | Capability | Logical Domain |
@@ -66,7 +66,6 @@ Standardized tools for autonomous AI agents to interact with Conducks intelligen
 | `conducks_impact` | Bidirectional Blast Radius. | **Behavioral** |
 | `conducks_trace` | Weighted pathfinding (Dijkstra). | **Kinetic** |
 | `conducks_diff` | Structural drift & Historical scans. | **Evolution** |
-| `conducks_rename` | Graph-Verified Refactoring (GVR). | **Mutational** |
 
 ---
 

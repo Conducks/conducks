@@ -2,7 +2,8 @@
 Status: Accepted
 - Date: 2026-08-02
 - Builds: 0101, 0106
-- Enforced by: tests/integration/features/analyze-twice.test.ts ("a file added incrementally gets its import edges, not just its calls" — asserted through `rename`, the strictest reader of import edges), tests/integration/features/rename-safety.test.ts (the aliased-import case, which is what surfaced it)
+- Enforced by: tests/integration/features/analyze-twice.test.ts ("a file added incrementally gets its import edges, not just its calls" — the IMPORTS edge is now read straight out of `impact --json`, and the assertion is on IMPORTS specifically, because the defect this record fixed left CALLS present)
+- Amended by: 0156
 
 ## Context
 
@@ -70,3 +71,9 @@ specifier already states exactly.
 - This is the second defect in three days whose whole cause was **a cold vault being the only state
   ever measured** (ADR 0101 was the first). Both were invisible to a suite where every test analyzes
   once. The rule earned twice over: *run it twice, with an edit in between.*
+
+**Amended by 0156.** This record was proved through `rename`, which was the strictest reader of
+import edges and was removed. Both enforcing cases moved: the incremental-import assertion now reads
+the `IMPORTS` edge directly from `impact --json`, and the aliased-import case went with
+`rename-safety.test.ts`. The DECISION is unchanged and still binding — resolution runs against every
+discovered path, not the dirty set. Only what proves it changed.

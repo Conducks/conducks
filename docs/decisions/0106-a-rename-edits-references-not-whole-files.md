@@ -1,8 +1,8 @@
 # 0106 — a rename edits references, not whole files
-Status: Accepted
+Status: Superseded by 0156
 - Date: 2026-08-02
+- Superseded by: 0156
 - Builds: 0099, 0105
-- Enforced by: tests/integration/features/rename-safety.test.ts (dry run writes nothing; declaration, import and call site all rewritten; an unrelated same-named function in another file untouched; string literals and comments untouched; a colliding new name refused with nothing written; an unknown symbol refused)
 
 ## Context
 

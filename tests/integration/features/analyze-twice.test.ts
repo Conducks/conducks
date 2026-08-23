@@ -109,11 +109,18 @@ export function addedLater(): string { return 'new'; }
     const { stdout } = runCli(['query', 'late', '--json'], { cwd: repo });
     expect(JSON.parse(stdout).length).toBeGreaterThan(0);
 
-    // The rename tool is the strictest reader of import edges: it must find and rewrite the import.
-    runCli(['rename', `${repo}/src/b.ts::helper`, 'assist', '--confirm'], { cwd: repo });
-    const late = fs.readFileSync(path.join(repo, 'src/late.ts'), 'utf-8');
-    expect(late).toContain("import { assist }");
-    expect(late).toContain('assist(n)');
+    // Assert the IMPORTS edge ITSELF, not a consumer of it. `rename` used to carry this assertion —
+    // it was the strictest reader of import edges — and ADR 0156 removed it, so the edge is read
+    // straight out of the graph instead.
+    //
+    // Asserting on IMPORTS specifically is what makes this test able to fail: the defect ADR 0107
+    // fixed left the CALLS edge present (IntraLinker rebuilds it by name afterwards) while the
+    // per-binding IMPORTS edge was absent. A test that accepted either edge would have passed on the
+    // broken build.
+    const { stdout: impact } = runCli(['impact', `${repo}/src/b.ts::helper`, 'upstream', '--json'], { cwd: repo });
+    const affected = JSON.parse(impact).affectedNodes as Array<{ filePath: string; path: string[] }>;
+    const lateImports = affected.filter(n => n.filePath.endsWith('late.ts') && n.path.includes('IMPORTS'));
+    expect(lateImports.length).toBeGreaterThan(0);
   }, 300000);
 
   /**

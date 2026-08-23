@@ -48,8 +48,9 @@ describe('ConducksMCPServer Unit Tests 💎', () => {
   it('registers the full tool surface on bootstrap', async () => {
     await server.bootstrap();
     const names = Object.keys(synapseTools).concat(Object.keys(kineticTools));
-    // 14 tools ship; the count is asserted so that silently losing one fails here.
-    expect(names.length).toBe(14);
+    // 13 tools ship — 14 until ADR 0156 removed `conducks_rename`. The count is asserted so that
+    // silently losing one fails here, and it did exactly that when the rename tool went.
+    expect(names.length).toBe(13);
     expect(names).toEqual(expect.arrayContaining(['conducks_query', 'conducks_impact', 'conducks_docs']));
   });
 

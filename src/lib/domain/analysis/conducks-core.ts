@@ -10,7 +10,6 @@ import { ConducksSearch } from "@/lib/domain/intelligence/index.js";
 import { ConducksFlowEngine } from "@/lib/domain/kinetic/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
-import { GVREngine } from "@/lib/domain/evolution/index.js";
 import { IMPORT_CYCLE_IGNORED_EDGE_TYPES, CycleDetector, formatCycleCluster } from "@/lib/core/graph/index.js";
 import { DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
 import { ConducksAdvisor } from "@/lib/domain/governance/index.js";
@@ -33,7 +32,6 @@ export class Conducks {
   public search = new ConducksSearch(this.graph.getGraph());
   public flows = new ConducksFlowEngine(this.graph.getGraph());
   private diffEngine = new ConducksDiffEngine();
-  private gvr = new GVREngine();
   private death = new DeadCodeAnalyzer();
   private advisor = new ConducksAdvisor();
 
@@ -142,10 +140,6 @@ export class Conducks {
     const base = new ConducksGraph();
     await this.persistence.load(base.getGraph());
     return this.diffEngine.diff(base.getGraph(), this.graph.getGraph());
-  }
-
-  public async rename(symbolId: string, newName: string): Promise<any> {
-    return this.gvr.renameSymbol(this.graph.getGraph(), symbolId, newName);
   }
 
   public prune(): any[] { return this.death.analyze(this.graph.getGraph()); }

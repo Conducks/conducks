@@ -14,7 +14,6 @@ import { ImpactCommand } from "./commands/impact.js";
 import { LinkCommand } from "./commands/link.js";
 import { DiffCommand } from "./commands/diff.js";
 import { FlowsCommand } from "./commands/flows.js";
-import { RenameCommand } from "./commands/rename.js";
 import { PruneCommand } from "./commands/prune.js";
 import { AdviseCommand } from "./commands/advise.js";
 import { WatchCommand } from "./commands/watch.js";
@@ -164,7 +163,7 @@ export async function main() {
     positionalArgs.push(arg);
   }
 
-  const skipFirstArg = ['query', 'explain', 'rename', 'trace', 'impact', 'flows', 'context'].includes(commandId);
+  const skipFirstArg = ['query', 'explain', 'trace', 'impact', 'flows', 'context'].includes(commandId);
   const pathCandidate = skipFirstArg ? positionalArgs[1] : positionalArgs[0];
   
   let targetPath = process.cwd();
@@ -211,7 +210,7 @@ export async function main() {
   const commands: ConducksCommand[] = [
     new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
     new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
-    new WatchCommand(), new DiffCommand(), new RenameCommand(),
+    new WatchCommand(), new DiffCommand(),
     new AdviseCommand(), new PruneCommand(),
     new ListCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new EntryCommand(), new McpCommand(),

@@ -52,7 +52,7 @@ describe('every conducks_* named in agent-facing text is a real tool', () => {
     // Guard against the check silently passing because it parsed nothing, which is exactly the
     // failure mode this repository keeps rediscovering.
     expect(names.size).toBeGreaterThanOrEqual(10);
-    expect(names.has('conducks_rename')).toBe(true);
+    expect(names.has('conducks_prune')).toBe(true);
     expect(names.has('conducks_impact')).toBe(true);
   });
 
@@ -64,14 +64,6 @@ describe('every conducks_* named in agent-facing text is a real tool', () => {
     const names = registered();
     const bad = mentionedInDescriptions().filter(m => !names.has(m.name));
     expect(bad.map(b => `${b.file}: ${b.name}`)).toEqual([]);
-  });
-
-  it('rename directs the agent at the CLI, since re-indexing cannot be a tool', () => {
-    const src = readFileSync(path.join(TOOLS_DIR, 'kinetic.ts'), 'utf8');
-    const desc = /conducks_rename[\s\S]*?description:\s*`([\s\S]*?)`/.exec(src)?.[1] ?? '';
-    expect(desc).toMatch(/conducks analyze/);
-    // The specific broken instruction, so this test names what it is preventing.
-    expect(desc).not.toMatch(/conducks_analyze/);
   });
 
   it('the tool docs directory names no phantom tool either', () => {

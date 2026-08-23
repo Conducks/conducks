@@ -1,6 +1,5 @@
 import path from "node:path";
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/index.js";
-import { GVREngine, RefactorResult } from "./gvr-engine.js";
 import { ConducksWatcher } from "./watcher.js";
 import { DriftEngine, DriftResult } from "./drift-engine.js";
 import { AuditService, AuditResult } from "./audit-service.js";
@@ -29,8 +28,7 @@ export class EvolutionService {
 
   constructor(
     private graph: any,
-    private persistence: any,
-    public readonly gvr: GVREngine = new GVREngine()
+    private persistence: any
   ) {
     this.drift = new DriftEngine(this.persistence);
     this.auditService = new AuditService(this.persistence);
@@ -93,13 +91,6 @@ export class EvolutionService {
   }
 
   /**
-   * Safely renames a symbol across the entire project using Graph-Verified Refactoring.
-   */
-  public async rename(symbolId: string, newName: string, dryRun: boolean = false): Promise<RefactorResult> {
-    return this.gvr.renameSymbol(this.graph.getGraph(), symbolId as any, newName, dryRun);
-  }
-
-  /**
    * Compares the current structural state against a historical baseline.
    */
   public async compare(prevPulseId?: string): Promise<DriftResult> {
@@ -118,7 +109,7 @@ export class EvolutionService {
  * Conducks — the evolution feature's only door (ADR 0150).
  *
  * How a codebase CHANGES, and what that costs: what has decayed since the last pulse, what is no
- * longer reached, what a rename would touch, and whether anything is watching the tree at all. Every
+ * longer reached and whether anything is watching the tree at all. Every
  * other domain area answers a question about the code as it stands; this one answers questions with
  * a BEFORE in them.
  *
@@ -126,14 +117,14 @@ export class EvolutionService {
  * folder and was not on the door at all — the most-used symbol here reached by six separate leaf
  * imports. `readWatcherLiveness` and its type were the same, one place each.
  *
- * WHAT NO LONGER CROSSES: `ConducksWatcher`, `AuditService`, `RefactorResult` and `AuditResult`. Zero
- * external callers each — the watcher is reached through `EvolutionService.getWatcher`, and the two
- * result types are shapes a caller destructures rather than names.
+ * WHAT NO LONGER CROSSES: `ConducksWatcher`, `AuditService` and `AuditResult`. Zero external callers
+ * each — the watcher is reached through `EvolutionService.getWatcher`, and the result type is a shape
+ * a caller destructures rather than names. `GVREngine` and `RefactorResult` are gone entirely: ADR
+ * 0156 removed the rename command, and conducks now writes to nothing outside `.conducks/`.
  *
  * `tests/architecture/feature-doors.test.ts` fails when anything outside reaches past this file.
  */
 export type { DriftResult };
-export { GVREngine } from "./gvr-engine.js";
 export { DriftEngine } from "./drift-engine.js";
 export { DeadCodeAnalyzer } from "./dead-code.js";
 // `Finding` crosses to `metrics`, which consumes what the analyzer returns.

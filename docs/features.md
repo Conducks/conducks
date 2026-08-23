@@ -117,10 +117,6 @@
 - Purpose: Hard-block any dependency edge that runs upward across the architecture's layers — contracts → core → domain → composition → interfaces — on every run, catching imports and calls alike, type-only imports included.
 - Intent: A layer contract nobody enforces is a diagram, not a rule. Enforced since 2026-07-25, after routing 74 pre-existing illegal edges through composition to reach a clean baseline (ADR 0005).
 
-## Graph-Verified Rename — `conducks rename <symbol> <newName>`
-- Purpose: Rename a symbol across every proven caller in one operation, showing the plan before it writes.
-- Intent: Text-based renames miss references and over-match unrelated ones; verifying against the call graph first means the edit set is the one the graph can defend.
-
 ## Dead Code Detection — `conducks prune`
 - Purpose: Flag exported symbols that no proven edge reaches, as review candidates — excluding entry points and test fixtures. Exported VALUES are covered in one direction only, and deliberately: an exported constant nobody imports IS reported, because the graph now keeps its node, but a value IMPORT is never reported stale, because a bare read produces no edge and its use is invisible (todo63; reporting them was wrong more often than right — subject-c 20 → 10 findings).
 - Intent: "Nothing calls this" is normally a guess; this makes it a checkable claim you can start from. It reports candidates for a human to confirm, never a delete list. It under-reports on purpose — a missed dead symbol costs a review pass, a wrong one costs a user their build, and `prune` is scored on both directions at once (`tests/integration/features/prune-precision.test.ts`) rather than on how much it finds.

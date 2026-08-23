@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
+import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo, renameByHand } from './helpers.js';
 
 const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
@@ -34,7 +34,7 @@ export function boot(): number { return leafFunction(); }
 `);
     commit(repo, 'init');
     runCli(['analyze', '--yes'], { cwd: repo });
-    runCli(['rename', 'leafFunction', 'leafFunctionRenamed', '--confirm'], { cwd: repo });
+    renameByHand(repo, ['src/leaf.ts', 'src/main.ts'], 'leafFunction', 'leafFunctionRenamed');
     runCli(['analyze', '--yes'], { cwd: repo });
   }, 300000);
 
@@ -79,7 +79,7 @@ export function boot(): number { return leafFunction(); }
 `);
     commit(repo, 'init');
     runCli(['analyze', '--yes'], { cwd: repo });
-    runCli(['rename', 'leafFunction', 'leafFunctionRenamed', '--confirm'], { cwd: repo });
+    renameByHand(repo, ['src/leaf.ts', 'src/main.ts'], 'leafFunction', 'leafFunctionRenamed');
     runCli(['analyze', '--yes'], { cwd: repo });
   }, 300000);
 

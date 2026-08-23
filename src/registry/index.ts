@@ -9,7 +9,7 @@ import { GovernanceService, ConducksAdvisor, ConducksSentinel } from "@/lib/doma
 
 import { IntelligenceService, ConducksSearch } from "@/lib/domain/intelligence/index.js";
 import { FederatedLinker } from "@/lib/core/graph/index.js";
-import { EvolutionService, GVREngine, DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
+import { EvolutionService, DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/docs/index.js";
 import { collectChanges, impactedSymbolIds } from "@/lib/domain/analysis/index.js";
 import { lintVisuals, collectVisualPages, buildStamps, staleStamps, type VisualsViolation, type ReviewStamps } from "@/lib/domain/docs/index.js";
@@ -250,10 +250,6 @@ export const registry = {
     // error class, the limit constants) does not: it lives in `contracts`, which every layer may
     // import, because both sides need to name it. See contracts/types.ts.
     buildFilter: (filter: QueryFilter) => buildFilterQuery(filter),
-  },
-  rename: {
-    rename: (symbolId: string, newName: string, dryRun?: boolean) => evolution.rename(symbolId, newName, dryRun),
-    get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); }
   },
   explain: {
     prune: () => metrics.prune(),
@@ -561,7 +557,6 @@ export const registry = {
     createGateway: (projectRoot: string) => new GatewayService(graph, persistence, projectRoot)
   },
   evolution: {
-    rename: (symbolId: string, newName: string, dryRun?: boolean) => evolution.rename(symbolId, newName, dryRun),
     compare: (prevPulseId?: string) => evolution.compare(prevPulseId),
     audit: (window?: number) => evolution.audit(window),
     get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); }

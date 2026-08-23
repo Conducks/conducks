@@ -99,12 +99,6 @@ describe('docs and lifecycle surfaces', () => {
     expect(plain(r.combined)).toMatch(/provide a path|usage/i);
   });
 
-  it('rename refuses an unknown symbol instead of renaming nothing and reporting success', () => {
-    const r = runCli(['rename', 'noSuchSymbolAnywhere', 'newName'], { cwd: repo, allowFail: true });
-    const out = plain(r.combined);
-    expect(out).toMatch(/not found|no symbol|could not resolve|usage/i);
-  });
-
   it('install-hooks is idempotent and reports which state it reached', () => {
     const first = plain(runCli(['install-hooks'], { cwd: repo }).combined);
     expect(first).toMatch(/installed|created|refreshed/i);

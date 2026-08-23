@@ -2,7 +2,7 @@
 Status: Accepted
 - Builds: 0005, 0119
 - Date: 2026-08-10
-- Enforced by: tests/architecture/paired-surfaces.test.ts (every paired capability must reach a shared `registry.*` accessor; the one granted exception names a reason and a todo), tests/unit/interfaces/cli/commands/impact-direction.test.ts, tests/unit/interfaces/cli/commands/trace-mode.test.ts, tests/unit/interfaces/cli/commands/prune-filter.test.ts, tests/unit/interfaces/tools/rename-dry-run-default.test.ts
+- Enforced by: tests/architecture/paired-surfaces.test.ts (every paired capability must reach a shared `registry.*` accessor; the one granted exception names a reason and a todo), tests/unit/interfaces/cli/commands/impact-direction.test.ts, tests/unit/interfaces/cli/commands/trace-mode.test.ts, tests/unit/interfaces/cli/commands/prune-filter.test.ts
 
 ## Context
 

@@ -1,4 +1,4 @@
-<!-- description: Using conducks — what it is, the 14 MCP tools and the CLI, and the probe sequence for each question (explore, debug, impact, refactor, audit). Use when running conducks from the terminal or an MCP client, picking a tool, orienting in an unfamiliar codebase, or checking whether a change was safe. -->
+<!-- description: Using conducks — what it is, the 13 MCP tools and the CLI, and the probe sequence for each question (explore, debug, impact, refactor, audit). Use when running conducks from the terminal or an MCP client, picking a tool, orienting in an unfamiliar codebase, or checking whether a change was safe. -->
 
 # conducks
 
@@ -8,7 +8,7 @@ instead of from prose in a doc.
 
 **Ask the graph, then read the code.** The graph knows the shape; grep knows only the text.
 
-Two surfaces over one graph: **14 MCP tools** and **the CLI**. Same answers, different clients.
+Two surfaces over one graph: **13 MCP tools** and **the CLI**. Same answers, different clients.
 
 ---
 
@@ -40,7 +40,7 @@ Most responses carry `indexStaleness`. Stale means re-analyze before trusting th
 
 ---
 
-## §2 The 14 tools, by the question they answer
+## §2 The 13 tools, by the question they answer
 
 **Docs layer**
 
@@ -76,15 +76,12 @@ Most responses carry `indexStaleness`. Stale means re-analyze before trusting th
 
 | tool | answers |
 |---|---|
-| `conducks_audit` | cycles, god objects, violations. Modes: `scan`, `advice`, `guard` (blocks over a risk threshold), `archeology` (decay over pulses), `fallback` |
+| `conducks_audit` | cycles, god objects, violations. Modes: `scan`, `advice`, `guard` (blocks over a risk threshold), `archeology` (decay over pulses) |
 | `conducks_prune` | dead code — ORPHAN, UNUSED_EXPORT, STALE_IMPORT |
 | `conducks_coverage` | overlays an istanbul `coverage-final.json` onto function spans. A dark (0%) function with no callers is dead; one that was covered and went dark broke |
 
-**Mutation — the only tool that writes source**
-
-| tool | answers |
-|---|---|
-| `conducks_rename` | graph-verified rename across every structural reference. `dryRun` defaults to true. Re-analyze after a real run |
+**Nothing here writes to your code.** Every tool is a reader; conducks writes only its own vault
+(ADR 0156). A rename is your editor's job, because it needs types and conducks has a syntax graph.
 
 ---
 
@@ -148,7 +145,8 @@ whatever the score says. Then `conducks_trace` for the exact steps.
 ```
 
 Rename every reference in ONE change — a half-renamed symbol compiles in some languages and breaks
-in none of the places you looked.
+in none of the places you looked. Use your editor's rename, which type-checks; conducks has no
+writer (ADR 0156).
 
 Place extracted code by layer, not by convenience: shared primitives go down toward the base of the
 dependency stack, specific logic goes up toward the entry points. Dependencies point one way.
@@ -239,7 +237,7 @@ restores the single-tree run.
 - `coverage-view <cov.json> [--out x.html] [--watch]` — self-contained HTML overlay, live re-render
 
 **Architecture governance**
-- `audit [--fallback] [--history=<window>]` — cycles (ARCH-3), self-imports (ARCH-4), **mutual call
+- `audit [--history=<window>]` — cycles (ARCH-3), self-imports (ARCH-4), **mutual call
   tangles (ARCH-6)**, god objects, orphans. ARCH-6 is informational and never fails the audit:
   mutual recursion is legal, a knot with no entry order is not, and only a human tells them apart
 - `guard [--threshold=N] [--force]` — layer contract, cycles, rank rules; blocks violations
@@ -255,9 +253,7 @@ restores the single-tree run.
 - `impact <id> [upstream|downstream] [--tree]` · `trace <id> [--flow]` · `flows`
 - `entry` — real entry points
 - `list` — the anchored workspace and any FEDERATED projects linked to it (not a symbol list)
-- `fallback` — suspicious fallback patterns
 - `prune` — dead code; advisory, under-reports. Verify by SYMBOL, never by import path
-- `rename <id> <new> [--confirm]` — graph-verified rename
 
 **Lifecycle**
 - `setup` — install skills into `~/.claude/skills`, register the project, configure MCP, write

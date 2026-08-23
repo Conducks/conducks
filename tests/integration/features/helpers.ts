@@ -62,6 +62,25 @@ export function writeFile(repo: string, relPath: string, content: string): void 
   fs.writeFileSync(full, content);
 }
 
+/**
+ * Rename a symbol by hand across the fixture's files — a plain word-boundary rewrite.
+ *
+ * These fixtures used `conducks rename --confirm` to produce the renamed state that `drift` then
+ * has to detect. ADR 0156 removed that command, and it was never the subject of these tests: what
+ * is under test is drift's ability to SEE a rename, not conducks' ability to perform one. So the
+ * rename is now done the way a user does it, which also removes a fixture that depended on the
+ * behaviour of another conducks command.
+ */
+export function renameByHand(repo: string, relPaths: string[], oldName: string, newName: string): void {
+  for (const rel of relPaths) {
+    const abs = path.join(repo, rel);
+    const before = fs.readFileSync(abs, 'utf-8');
+    const after = before.replace(new RegExp(`\\b${oldName}\\b`, 'g'), newName);
+    if (after === before) throw new Error(`renameByHand: "${oldName}" not found in ${rel}`);
+    fs.writeFileSync(abs, after);
+  }
+}
+
 export function commit(repo: string, message: string): void {
   execFileSync('git', ['add', '-A'], { cwd: repo, stdio: 'ignore' });
   execFileSync('git', ['commit', '-m', message], { cwd: repo, stdio: 'ignore' });

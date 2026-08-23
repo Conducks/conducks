@@ -247,7 +247,75 @@ export const BAND3 = {
   ],
 };
 
-export const BANDS = [BAND1, BAND2, BAND3];
+// ── Band 4 — the tool surface, and what it is safe to delete ─────────────────
+//
+// Bands 1-3 are the write path. This band is everything that READS it: 35 CLI commands, 13 MCP
+// tools, and the one seam between them. Drawn because a rule was stated and nobody had checked it —
+// "one tool must not depend on another; the exception is shared logic underneath both" — and the
+// answer turned out to be yes in production and no in the tests.
+//
+// Censused 2026-08-23 by four parallel readers, every claim re-verified by the orchestrator.
+export const BAND4 = {
+  id:'band4', title:'THE TOOL SURFACE, AND WHAT IS SAFE TO DELETE',
+  sub:'35 commands · 13 tools · one seam — and the four places the rule is not enforced',
+  containers:[
+    { id:'c_surf', title:'THE TWO SURFACES', sub:'interfaces/cli + interfaces/tools — ADR 0148 says they mirror',
+      nodes:[
+        n('cli','35 commands','one file each, no command imports another',
+          'src/interfaces/cli/index.ts:210 — every command is constructed in one `const commands: ConducksCommand[]` list. Verified 2026-08-23: no file in commands/ imports another command, constructs another command class, or shells out to the conducks binary',
+          {cls:'n-ok'}),
+        n('mcp','13 tools, every one read-only','was 14 until ADR 0156 removed the writer',
+          'src/interfaces/tools/tools/kinetic.ts — every registered tool declares readOnlyHint. The one that declared destructiveHint was conducks_rename, and adr-invariants.test.ts now fails if another appears',
+          {cls:'n-ok'}),
+        n('mirror','Both must answer the same','the CLI is where a person checks what the agent did',
+          'docs/decisions/0148-every-mcp-tool-is-a-cli-command-and-they-mirror.md — the rule is one-directional: every tool is a command, not every command is a tool',
+          {cls:'n-hi'}),
+        n('gq','One tool a person cannot run','conducks_graph_query — raw SELECT, no CLI twin',
+          'src/interfaces/tools/tools/synapse.ts:796 — no command in src/interfaces/cli/commands/ exposes it. ADR 0007:21 kept it MCP-only deliberately; ADR 0148 never cites 0007, so the two records disagree and neither knows',
+          {cls:'n-warn'}),
+      ],
+      edges:[['cli','mirror'],['mcp','mirror'],['mcp','gq']]},
+
+    { id:'c_seam', title:'THE REGISTRY', sub:'registry/index.ts — 14 slices, the only legal seam',
+      nodes:[
+        n('slices','Both surfaces meet here','and nowhere else',
+          'src/registry/index.ts::registry — a command reaches the domain through registry.<slice>.<fn> and never through another command. That is what makes deleting one command safe',
+          {cls:'n-hi'}),
+        n('fan','One slice, many commands','federation is reached by seven',
+          'src/registry/index.ts::registry — doctor, install-hooks, link, list, monitor, setup and uninstall all reach registry.federation. Verified by reading each command file',
+          {cls:'n-ok'}),
+        n('share','Shared logic is the legitimate exception','one service, two slices',
+          'src/registry/index.ts:209 and :262 — GovernanceService.status() is reached by both the status slice and the audit slice. Two tools sharing a service is coupling underneath them, not between them',
+          {cls:'n-ok'}),
+        n('span','One command spans four slices','impact reaches kinetic, explain, query and source',
+          'src/interfaces/cli/commands/impact.ts — the widest consumer on the surface, and the reason a slice boundary is not a feature boundary'),
+      ],
+      edges:[['slices','fan'],['slices','share'],['slices','span']]},
+
+    { id:'c_gap', title:'WHAT NOTHING ENFORCES', sub:'each of these was found by reading, not by a gate',
+      nodes:[
+        n('skip','The mirror test skips what it cannot find','a missing CLI file is treated as nothing to check',
+          'tests/architecture/paired-surfaces.test.ts:71 — `if (!fs.existsSync(cliFile)) continue;` with the comment "MCP-only tool: nothing to drift from". It enforces that a pair MIRRORS, never that the pair EXISTS, which is how the graph_query gap survived',
+          {cls:'n-no'}),
+        n('fix','Tests borrow one tool to set up another','and the borrow only breaks when you delete',
+          'tests/integration/features/kinetic.test.ts:26 — resolveId() runs `query` purely to obtain an id that could be written as path::name. Same shape as the rename/drift coupling fixed on 2026-08-23',
+          {cls:'n-warn'}),
+        n('legit','Some borrows are not coupling','the fixture is the only way to make the state',
+          'tests/integration/features/record-command.test.ts:59 — "writes a file that passes docs-lint" runs docs-lint as the ASSERTION, not as setup. analyze appears in 118 fixtures for the same reason: nothing else writes the vault',
+          {cls:'n-ok'}),
+        n('orph','A domain service nothing reaches','MirrorEngine, 232 lines, kept alive by its own barrel',
+          'src/lib/domain/visual/index.ts:1 — the only reference is this re-export. prune does NOT flag it, because the barrel is an incoming edge, and adr-invariants.test.ts:106 asserts the file must exist as ADR 0028\'s replacement',
+          {cls:'n-no'}),
+      ],
+      edges:[['skip','fix'],['fix','legit'],['skip','orph']]},
+  ],
+  crossEdges:[
+    ['gq','skip','the gap and the reason nothing caught it'],
+    ['mirror','slices','both surfaces route through one seam'],
+  ],
+};
+
+export const BANDS = [BAND1, BAND2, BAND3, BAND4];
 
 // Bands are chapters of ONE drawing, and edges between them may point backwards — that is what makes
 // the picture a CYCLE rather than a stack. Both of these do: Band 2 reads what Band 1 wrote, and the
@@ -263,4 +331,7 @@ export const BAND_LINKS = [
   ['recon','fresh','what changed while nothing watched'],
   ['argv','ready','conducks watch'],
   ['mon','stale','and reports it per project'],
+  // Band 4 reads what Bands 1-3 wrote, and re-enters the command list it was dispatched from.
+  ['argv','cli','every surface starts at the same argv',{prio:10}],
+  ['nodes','slices','every read command answers from the vault the pulse wrote'],
 ];

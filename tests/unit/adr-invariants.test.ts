@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CanonicalKind } from "@/contracts/index.js";
@@ -104,5 +104,41 @@ describe('ADR 0028 — DAAC stays deleted', () => {
 
   it('keeps the replacement it was deleted in favour of', () => {
     expect(existsSync(path.join(SRC, 'lib/domain/visual/mirror.engine.ts'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR 0156 — conducks writes to its own vault and to nothing else.
+//
+// `rename` was measured wrong three separate ways in two benchmark rounds, each under a success
+// message, and each fix was local to the form that round happened to try. What the ADR removes is
+// not a bug but a capability: nothing here edits a user's source any more.
+//
+// Two cases, because the command coming back and a NEW writer appearing are different regressions
+// and only the second is likely. The first is ADR 0028's lesson — a deletion nobody pins returns.
+// ---------------------------------------------------------------------------
+describe('ADR 0156 — the rename writer stays deleted', () => {
+  it('has no rename or gvr module anywhere under src/', () => {
+    const offenders = allFiles(SRC)
+      .map(f => path.relative(SRC, f))
+      .filter(f => /(^|\/)(rename|gvr)[^/]*\.ts$/i.test(f));
+    expect(offenders).toEqual([]);
+  });
+
+  it('registers no MCP tool that declares itself destructive', () => {
+    // The surface promise, stated where an agent can read it. `conducks_rename` was the only tool
+    // carrying `destructiveHint: true`, and it carried it honestly — it modified source. With it
+    // gone, every tool conducks exposes is a reader, and a new writer cannot be added without
+    // either lying in its annotations or failing here.
+    //
+    // Scoped to the annotation rather than to `writeFileSync`, because conducks DOES write files a
+    // user asks it to create — `.conducksignore`, git hooks, the MCP config, coverage HTML, the
+    // docs scaffold. What ADR 0156 ends is editing code somebody else wrote.
+    const offenders: string[] = [];
+    for (const file of allFiles(path.join(SRC, 'interfaces/tools'))) {
+      const src = readFileSync(file, 'utf8');
+      if (/destructiveHint:\s*true/.test(src)) offenders.push(path.relative(SRC, file));
+    }
+    expect(offenders).toEqual([]);
   });
 });

@@ -6,7 +6,7 @@ routed through the registry, so the encoded contract (`mcp → composition, cont
 exceptions. The detector itself was removed on 2026-08-17 (ADR 0151) — it is named here without an
 anchor because the file is gone and a link to it would be a claim that cannot be checked.
 
-**Responsibility:** exposing conducks' analysis to an agent over MCP. 14 tools cover what 40 CLI
+**Responsibility:** exposing conducks' analysis to an agent over MCP. 13 tools cover what 35 CLI
 commands do — query, impact, trace, audit, prune, coverage, docs and the rest are grouped, never one
 tool per command.
 
@@ -15,11 +15,12 @@ because it exists and is used, not because it might be useful. Parity is on *cap
 defaults — where a default differs from the CLI's, the agent gets a different answer to the same
 question (see below).
 
-**Deferred / not built:** no write tools **against the vault**. Every tool opens a read-only
-connection, because the CLI holds read-write and two read-write connections deadlock DuckDB. One tool
-does mutate **source**: `conducks_rename` (`tools/kinetic.ts:267`) performs graph-verified renaming,
-is annotated `destructiveHint: true`, and defaults to `dryRun: true`. "Read-only" here means the
-graph, not the working tree.
+**Deferred / not built:** no write tools at all. Every tool opens a read-only connection to the
+vault, because the CLI holds read-write and two read-write connections deadlock DuckDB — and since
+ADR 0156 removed `conducks_rename`, nothing on this surface touches the working tree either. That
+tool was the one exception: it mutated source, was annotated `destructiveHint: true`, and defaulted
+to `dryRun: true`. `tests/unit/adr-invariants.test.ts` now fails if any tool declares itself
+destructive again, so "read-only" here covers the graph AND the tree.
 
 ## The audience is a model, so the contract is stricter
 

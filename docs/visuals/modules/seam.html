@@ -1,0 +1,66 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the registry</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE REGISTRY</h1>
+<p class="sub">registry/index.ts — 14 slices, the only legal seam</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="slices">
+  <h3>Both surfaces meet here</h3>
+  <div class="where">src/registry/index.ts::registry</div>
+  <p>a command reaches the domain through registry.&lt;slice&gt;.&lt;fn&gt; and never through another command. That is what makes deleting one command safe</p>
+  <p class="file">on the canvas: and nowhere else</p>
+</div>
+
+<div class="det" id="fan">
+  <h3>One slice, many commands</h3>
+  <div class="where">src/registry/index.ts::registry</div>
+  <p>doctor, install-hooks, link, list, monitor, setup and uninstall all reach registry.federation. Verified by reading each command file</p>
+  <p class="file">on the canvas: federation is reached by seven</p>
+</div>
+
+<div class="det" id="share">
+  <h3>Shared logic is the legitimate exception</h3>
+  <div class="where">src/registry/index.ts:209 and :262</div>
+  <p>GovernanceService.status() is reached by both the status slice and the audit slice. Two tools sharing a service is coupling underneath them, not between them</p>
+  <p class="file">on the canvas: one service, two slices</p>
+</div>
+
+<div class="det" id="span">
+  <h3>One command spans four slices</h3>
+  <div class="where">src/interfaces/cli/commands/impact.ts</div>
+  <p>the widest consumer on the surface, and the reason a slice boundary is not a feature boundary</p>
+  <p class="file">on the canvas: impact reaches kinetic, explain, query and source</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>Both surfaces meet here</td><td>One slice, many commands</td><td>—</td></tr>
+    <tr><td>Both surfaces meet here</td><td>Shared logic is the legitimate exception</td><td>—</td></tr>
+    <tr><td>Both surfaces meet here</td><td>One command spans four slices</td><td>—</td></tr>
+  </tbody>
+</table>
+<h2>Module notes</h2>
+<p class="sub">the authored memory of the modules this block cites — derived from the anchors above, not curated</p>
+<p>
+  <a href="interfaces/cli.html"><code>interfaces/cli</code></a>
+  <a href="registry.html"><code>registry</code></a>
+</p>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

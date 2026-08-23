@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { readFileSync } from 'node:fs';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
 
 // Evolution domain. STALE NAME: the todo names `conducks_evolution` — no MCP tool by that name
 // exists (grep of src/interfaces/tools/tools/*.ts confirms it). The real evolution capability is
-// registry.evolution (EvolutionService: rename/GVR, compare/drift, audit/archeology), reachable via
+// registry.evolution (EvolutionService: compare/drift, audit/archeology), reachable via
 // the MCP surface split across `conducks_diff` (mode="drift") and `conducks_audit`
-// (mode="archeology"), and via the CLI `drift`/`audit --history`/`rename` commands directly. This
+// (mode="archeology"), and via the CLI `drift`/`audit --history` commands directly. This
 // suite drives the CLI form of all three.
 //
 // PRODUCTION BUG FOUND (reported, not fixed — src/ is out of this agent's scope):
@@ -100,31 +99,4 @@ export function subtract(a: number, b: number): number { return add(a, -b); }
     expect(combined).not.toContain('No consistent structural decay patterns found');
   });
 
-  it('rename (GVR) dry-run reports the real file that would change, without writing it', () => {
-    const rows = JSON.parse(
-      runCli(['query', 'add', '--mode', 'template', '--template', 'find_by_name', '--json'], { cwd: repo }).stdout
-    );
-    const addId = rows.find((r: any) => r.name === 'add').id;
-
-    const before = readFileSync(`${repo}/src/calc.ts`, 'utf-8');
-    const { combined, status } = runCli(['rename', addId, 'addNumbers'], { cwd: repo });
-    const after = readFileSync(`${repo}/src/calc.ts`, 'utf-8');
-
-    expect(status).toBe(0);
-    expect(combined).toContain('DRY RUN');
-    expect(combined).toContain('calc.ts');
-    // Dry run must not touch the file on disk — this is the assertion that can fail.
-    expect(after).toBe(before);
-  });
-
-  it('rename with --confirm actually writes the new name to disk (proves dry-run vs confirm are different code paths)', () => {
-    const rows = JSON.parse(
-      runCli(['query', 'add', '--mode', 'template', '--template', 'find_by_name', '--json'], { cwd: repo }).stdout
-    );
-    const addId = rows.find((r: any) => r.name === 'add').id;
-
-    runCli(['rename', addId, 'plusNumbers', '--confirm'], { cwd: repo, allowFail: true });
-    const after = readFileSync(`${repo}/src/calc.ts`, 'utf-8');
-    expect(after).toContain('plusNumbers');
-  });
 });
