@@ -672,7 +672,18 @@ impl Guest for Checklist {
         let mut moved = false;
         for event in &ctx.events {
             match event {
-                Event::Scroll(delta) => state.scroll = (state.scroll - delta * px(20.)).max(0.),
+                // **Added, not subtracted, and not rescaled.** The host has
+                // already turned the gesture into "pixels, negated so that a
+                // push forward moves the content up" (crates/shell/src/input.rs
+                // sends `Scroll(-amount)` with a line already worth 20). This
+                // line negated it a second time and multiplied by 20 again, so
+                // the wheel ran backwards and about forty times too fast. The
+                // runner plugin, which scrolls correctly, is just
+                // `scroll + delta`; the only thing added here is the scale,
+                // because this layout is in device pixels and the delta is not.
+                Event::Scroll(delta) => {
+                    state.scroll = (state.scroll + delta * ctx.scale).max(0.)
+                },
                 Event::Click(point) => {
                     // **A click arrives in the PANE's coordinates; everything
                     // drawn is in the WINDOW's.** `ctx.x`/`ctx.y` are the pane's
