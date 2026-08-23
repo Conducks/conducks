@@ -2,6 +2,7 @@
 Status: Accepted
 - Builds: 0005, 0119
 - Date: 2026-08-10
+- Amended by: 0157
 - Enforced by: tests/architecture/paired-surfaces.test.ts (every paired capability must reach a shared `registry.*` accessor; the one granted exception names a reason and a todo), tests/unit/interfaces/cli/commands/impact-direction.test.ts, tests/unit/interfaces/cli/commands/trace-mode.test.ts, tests/unit/interfaces/cli/commands/prune-filter.test.ts
 
 ## Context
@@ -63,3 +64,9 @@ is not drift. State a gap as a question a user cannot ask.
 - Still open, and named rather than assumed: `status` speaks a different mode vocabulary on each side,
   and `diff` has pulse-compare on the CLI and `drift` on the tool with neither holding the other's.
   todo61 carries both.
+
+**Amended by 0157.** The rule's first half — every MCP tool is a CLI command — had no enforcement:
+the pairing test skipped any tool with no CLI file, so a tool that broke that half was exempted from
+the half that was checked. `conducks_graph_query` is the one real exception, granted by ADR 0007
+before this record was written and never cited here. The exception is now named in the test, and a
+grant that outlives its gap fails the suite.

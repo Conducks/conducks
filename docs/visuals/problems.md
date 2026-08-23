@@ -17,7 +17,7 @@ A defect, its evidence, and who owns it. A block on the canvas that IS one links
 
 **The complication.** ADR 0007:21 decided to KEEP `graph_query` MCP-only, on purpose, and pre-dates 0148. ADR 0148 never cites 0007. So the two records disagree and neither is stamped against the other. This is a decision to make, not only a test to fix: either 0148 gains a stated exception with 0007's reasoning, or `graph_query` gains a CLI twin.
 
-**Owner.** Unassigned. Found 2026-08-23 during the tool-surface census.
+**Resolved 2026-08-23 by ADR 0157.** The test now asks the question it was skipping: every MCP tool must have a CLI command or a granted reason not to, with the grant naming the record that argued it. `conducks_graph_query` is granted on ADR 0007's reasoning, which 0148 never cited. A second case fails if a granted tool later gains a CLI command, so the exception cannot outlive its gap. Both cases were run against the pre-fix list and both failed.
 
 ## p2 — a domain service that is required to exist and reached by nothing
 
@@ -29,7 +29,7 @@ A defect, its evidence, and who owns it. A block on the canvas that IS one links
 
 **Why it is not simply deleted.** An ADR-pinned test requires the file. Removing it means superseding or amending ADR 0028 first, which is a decision rather than a cleanup.
 
-**Owner.** Unassigned. Found 2026-08-23.
+**Owner.** Unassigned — this one needs a decision, not a patch. Deleting `MirrorEngine` means amending or superseding ADR 0028 first, because its enforcing test requires the file.
 
 ## p3 — a test borrows one command to set up another
 
@@ -41,7 +41,7 @@ A defect, its evidence, and who owns it. A block on the canvas that IS one links
 
 **The test that separates a violation from the exception:** *is the fixture command the only way to produce that state?* `analyze` appears in 118 fixtures and is legitimate — nothing else writes the vault. `bootstrap-docs` before `docs-lint` is legitimate for the same reason. `docs-lint` inside `record-command.test.ts:59` is not a fixture at all; it is the assertion, and the test's whole claim is that `record`'s output conforms to the grammar. `query` inside a `trace` test meets none of those.
 
-**Owner.** Unassigned. Found 2026-08-23.
+**Fixed 2026-08-23.** `resolveId()` is now `idOf(file, name)` — the partial `path::name` form every command accepts. The fixture already knew which file it wrote each symbol into, so the lookup bought nothing and cost a dependency on a third tool.
 
 What core still does not claim is on the canvas under [what this band does not show](architecture.html#scope), and in [holding](holding.html). Those are limits and unmeasured areas — not defects with an owner, which is what this page is for.
 

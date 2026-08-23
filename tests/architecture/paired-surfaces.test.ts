@@ -63,12 +63,35 @@ const mcpTools = (): Map<string, string> => {
   return out;
 };
 
+/**
+ * A tool whose CLI command is spelled differently. A name difference is not a missing surface, and
+ * treating it as one would make the existence check below unusable within a week.
+ */
+const CLI_NAME: Readonly<Record<string, string>> = {
+  docs: 'docs-status',
+};
+
+/**
+ * Tools that deliberately have NO CLI command. Every entry names the record that granted it, because
+ * the whole point of the check below is that an exception has to be argued rather than inherited
+ * from a filesystem lookup returning false.
+ */
+const MCP_ONLY: ReadonlyArray<{ tool: string; why: string }> = [
+  { tool: 'graph_query', why: 'ADR 0007 keeps raw SELECT off the CLI on purpose; ADR 0157 records why that survives 0148' },
+
+];
+
+const cliFileFor = (tool: string) => path.join(CLI_DIR, `${CLI_NAME[tool] ?? tool}.ts`);
+
 const pairs = (): Array<{ name: string; cli: Set<string>; mcp: Set<string> }> => {
   const tools = mcpTools();
   const out: Array<{ name: string; cli: Set<string>; mcp: Set<string> }> = [];
   for (const [name, toolBody] of tools) {
-    const cliFile = path.join(CLI_DIR, `${name}.ts`);
-    if (!fs.existsSync(cliFile)) continue;             // MCP-only tool: nothing to drift from
+    const cliFile = cliFileFor(name);
+    // An MCP-only tool has nothing to compare against. That it is ALLOWED to be MCP-only is a
+    // separate question, asked by the existence test below — this skip used to be the only thing
+    // standing where that question belonged.
+    if (!fs.existsSync(cliFile)) continue;
     out.push({ name, cli: accessors(fs.readFileSync(cliFile, 'utf8')), mcp: accessors(toolBody) });
   }
   return out;
@@ -77,6 +100,34 @@ const pairs = (): Array<{ name: string; cli: Set<string>; mcp: Set<string> }> =>
 describe('paired CLI/MCP surfaces answer through the same domain code', () => {
   it('finds the pairs at all — a check that scans nothing passes for the wrong reason', () => {
     expect(pairs().length).toBeGreaterThanOrEqual(10);
+  });
+
+  /**
+   * ADR 0148's rule is TWO claims, and only the second was ever enforced: every MCP tool is a CLI
+   * command, AND where both exist they mirror. `pairs()` skips a tool with no CLI file, so a tool
+   * that violated the first half was silently exempted from the second — which is how
+   * `conducks_graph_query` came to expose raw SELECT with no way for a person to run the same
+   * query, the exact thing 0148's own text forbids ("an agent must never be able to ask something
+   * a person cannot, because the CLI is where a person checks what the agent did").
+   *
+   * Found 2026-08-23 by reading the surface, not by a gate.
+   */
+  it('every MCP tool has a CLI command, or a granted reason not to', () => {
+    const granted = new Set(MCP_ONLY.map(g => g.tool));
+    const orphans = [...mcpTools().keys()]
+      .filter(t => !granted.has(t))
+      .filter(t => !fs.existsSync(cliFileFor(t)))
+      .map(t => `conducks_${t}: no CLI command at ${path.relative(process.cwd(), cliFileFor(t))}`);
+    expect(orphans).toEqual([]);
+  });
+
+  it('every granted MCP-only tool is still really MCP-only', () => {
+    // The inverse, so a grant cannot outlive the gap it was written for: if someone adds the CLI
+    // command, the exception must be deleted rather than left standing as a stale claim.
+    const stale = MCP_ONLY
+      .filter(g => fs.existsSync(cliFileFor(g.tool)))
+      .map(g => `${g.tool}: granted MCP-only, but a CLI command now exists — delete the grant`);
+    expect(stale).toEqual([]);
   });
 
   it('every pair shares at least one registry accessor', () => {
