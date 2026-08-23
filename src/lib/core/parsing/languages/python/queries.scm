@@ -1,5 +1,14 @@
   ;; --- Imports (L3-L4: Kinesis) ---
   (import_statement (dotted_name) @source) @isImport
+  ;; `import numpy as np` is an ALIASED import, and the pattern above does not match it: the
+  ;; dotted_name sits inside an (aliased_import), not directly under the statement. The
+  ;; import_from_statement branch below has always handled the alias case; this one had not, so a
+  ;; plain aliased import produced NOTHING — no ecosystem node, no DEPENDS_ON edge, no supply-chain
+  ;; row. MEASURED on a two-file fixture: `import numpy as np` beside `import asyncio` gave
+  ;; "stdlib 2 distinct" and zero dependencies, with numpy absent from every surface.
+  ;; The alias is captured as @metadata, the same way the from-import branch captures it, so the
+  ;; receiver `np` is recoverable rather than only the package name.
+  (import_statement (aliased_import (dotted_name) @source (identifier) @metadata)) @isImport
   (import_from_statement
     module_name: [(dotted_name) (relative_import)] @source
     name: [

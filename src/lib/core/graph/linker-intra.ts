@@ -265,6 +265,22 @@ export class IntraLinker {
     // A bare name is bound only where both hold and exactly one namespace answers. Built from EDGES,
     // not from nodes, because virtual induction mints those nodes AFTER this linker runs — reading
     // nodes would make the fix work on the second pulse and not the first.
+    // The external MODULES a unit imports, from the `DEPENDS_ON -> ecosystem::<pkg>` edge that
+    // `import asyncio` mints. This is the only positive evidence in the graph that a receiver names
+    // a package rather than a value, and step 3c needs it to refuse `asyncio.run` without refusing
+    // `obs.on_step_start` — see `receiverIsExternalModule`.
+    const unitExternalModules = new Map<string, Set<string>>();
+    for (const edge of graph.getAllEdges()) {
+      if (edge.type !== 'DEPENDS_ON') continue;
+      if (!edge.targetId.startsWith('ecosystem::')) continue;
+      const pkg = edge.targetId.slice('ecosystem::'.length).toLowerCase();
+      if (!pkg || pkg === 'global') continue;
+      const unit = edge.sourceId.toLowerCase();
+      let set = unitExternalModules.get(unit);
+      if (!set) { set = new Set(); unitExternalModules.set(unit, set); }
+      set.add(pkg);
+    }
+
     const unitExternalNamespaces = new Map<string, Set<string>>();
     const attestedExternal = new Map<string, Set<string>>();
     // Memoised: a unit with 40 icon references would otherwise hydrate the same source node 40
@@ -746,8 +762,35 @@ export class IntraLinker {
       // both `alpha` and `beta` as ORPHAN and found 0 callers for a function it can see being called.
       const pathSeparated = bareName.includes('::') && !bareName.includes('/');
       if (!resolvedId && (bareName.includes('.') || pathSeparated)) {
-        const method = bareName.split(pathSeparated ? '::' : '.').pop()!;
-        if (method && method !== bareName) {
+        const segments = bareName.split(pathSeparated ? '::' : '.');
+        const method = segments.pop()!;
+        // THE RECEIVER DECIDES, and this step used to discard it.
+        //
+        // Import-scoping was the stated rail: a bare method is only looked up in units this file
+        // imports, so `path.join` stays dangling because no imported unit owns a `join`. That holds
+        // until one does. `asyncio.run(main())` in a file that imports a module owning `run` bound
+        // to THAT `run` — the receiver naming the standard library had already been thrown away.
+        //
+        // MEASURED before the fix: 19 of 2,372 call sites on the scraper subject (0.80%) and 5 of
+        // 9,280 on sofie (0.05%) bound a project symbol under an external receiver. Small in the
+        // corpus, concentrated on hub names — `JobRunner.run` had one false caller of four.
+        //
+        // TypeScript never had it: `Math.min` resolves to `global::math` and `os.cpus()` to
+        // `node:os::default.cpus` before reaching here. Python arrives with nothing — `import
+        // asyncio` records a DEPENDS_ON to `ecosystem::asyncio` but no IMPORTS edge, and an ALIASED
+        // import (`import numpy as np`) records nothing at all. So the test cannot be "is the
+        // receiver a known external module"; there is no list that would contain `np`.
+        //
+        // It is the inverse instead, and it is a REFUSAL rather than an inference: fall back to the
+        // bare method only when the receiver is something this file actually has — a local, a
+        // parameter, a symbol in this unit, or an import. `asyncio` is none of those, and neither is
+        // `np`. A receiver that resolves to nothing here cannot own a symbol of ours.
+        //
+        // Scoped to the plain `receiver.method` shape. Deeper chains (`a.b.c()`) have their own
+        // typed resolution at 3b′ and are left alone rather than swept in on the same reasoning.
+        const receiverIsForeign = !pathSeparated && segments.length === 1
+          && this.receiverIsExternalModule(segments[0], sourceUnitId, unitExternalModules);
+        if (method && method !== bareName && !receiverIsForeign) {
           resolvedId =
             unitSymbols.get(sourceUnitId)?.get(method) ??
             this.resolveSymbol(method, sourceUnitId, unitImports, unitSymbols);
@@ -952,6 +995,36 @@ export class IntraLinker {
   private static readonly CONSTRUCTED_NAMESPACES = new Set(['directory', 'ecosystem', 'lib', 'route', 'global', 'unresolved']);
 
   /** Whether an id names a package rather than a file here — an external target is not a dangling one. */
+  /**
+   * Is this receiver a package this file imported, rather than a value it holds?
+   *
+   * REFUSE ONLY ON POSITIVE EVIDENCE, and the first attempt at this got the polarity backwards. It
+   * asked the opposite question — "is the receiver something this file has?" — and refused whatever
+   * could not be found. That fixed all 19 false bindings on the scraper subject and DELETED FOUR
+   * TRUE ONES with them: `obs.on_step_start(...)` where `obs` iterates `self._observers:
+   * List[BaseObserver]`, and `ext.extract(page)` where `ext` iterates a list of extractors. Loop
+   * variables are not captured as nodes — only assigned locals are — so no lookup can find them,
+   * and "not found" is not evidence of anything.
+   *
+   * The two errors are not symmetric. A false caller inflates a blast radius and the reader can
+   * check it against the line. A missing caller answers "nothing depends on this" about code that
+   * something depends on, and there is nothing to check. So the rule refuses only what it can name.
+   *
+   * `import asyncio` mints `DEPENDS_ON -> ecosystem::asyncio`, which is that name. What it does not
+   * cover is an ALIASED import: `import numpy as np` mints no edge and no node, so `np.load()` is
+   * still bound by method name alone. That is a known remaining gap, measured rather than assumed —
+   * see the test file, which asserts the aliased case as a live defect rather than pretending it is
+   * covered.
+   */
+  private receiverIsExternalModule(
+    receiver: string,
+    sourceUnitId: string,
+    unitExternalModules: Map<string, Set<string>>,
+  ): boolean {
+    if (!receiver) return false;
+    return unitExternalModules.get(sourceUnitId.toLowerCase())?.has(receiver.toLowerCase()) ?? false;
+  }
+
   private static isExternalNamespace(namespace: string): boolean {
     if (!namespace || IntraLinker.CONSTRUCTED_NAMESPACES.has(namespace)) return false;
     if (namespace.startsWith('/') || namespace.startsWith('.') || /^[a-z]:\\/.test(namespace)) return false;
