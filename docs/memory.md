@@ -2661,3 +2661,13 @@ by construction.
 - Why: the two shared a word and nothing else. The drift tests used `conducks rename` only as a fixture to produce the renamed state; they now rename by hand through `renameByHand` in `tests/integration/features/helpers.ts`.
 - Applies: src/lib/domain/evolution/drift-engine.ts — whole repo
 
+## The installed skill is a COPY — edit the source or the build eats it
+- Gotcha: `~/.claude/skills/<name>/SKILL.md` is regenerated from `src/resources/skills/<name>.md` by `scripts/sync-skills-postbuild.mjs` on every `npm run build`. Editing the installed copy looks like it worked — the skill loads with the change, the next session sees it — and the next build silently reverts it. The two files are not identical either: the source carries a one-line `<!-- description: … -->` comment and the installer converts it to YAML frontmatter, so a naive `diff` reports them different even when they agree.
+- Why: it is the same trap in both directions. Editing only the source leaves the running session on a stale skill until the next build; editing only the install loses the work. Change the SOURCE, then `npm run build`, then confirm the postbuild line says `N updated` rather than `4 current` — "current" means it decided nothing changed.
+- Applies: src/resources/skills/, scripts/sync-skills-postbuild.mjs — whole repo
+
+## A shared THRESHOLD is a second answer to a question the domain already answered
+- Gotcha: a float comparison inside `interfaces/cli/commands` or `interfaces/tools/tools` is almost always a bug, not a style problem. Two shipped as defects: `drift` counted `improvement_count` at `velocity < 0` in the engine and listed at `< -0.01` in the command, so sofie printed "Improving: 393" over an empty section; the partial-graph check lived only in `status.ts`, so `conducks_status` never warned an agent about a vault the CLI called broken.
+- Why: conducks is an octopus — `analyze` builds the graph, `registry` composes, everything after is a consumer. An arm that re-decides what the base decided produces two answers with nothing joining them, and they drift silently because no test compares them. Thresholds belong in `contracts`, read by the domain that computes and the interface that renders. `tests/architecture/no-logic-after-registry.test.ts` fails on new ones; colour selection is granted by name because it decides nothing.
+- Applies: src/interfaces/, src/contracts/scoring.ts — whole repo
+

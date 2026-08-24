@@ -1,4 +1,4 @@
-<!-- description: Putting a feature behind one public door and cleaning behind it — boundary rules, dead code, doc comments, tests that bite under mutation, and the order to do it in. Use when restructuring a module, hardening an area before changing it, splitting a file that has grown too large, or when a change means checking a dozen call sites. -->
+<!-- description: Putting a feature behind one public door and cleaning behind it — boundary rules, dead code, doc comments, tests that bite under mutation, and the order to do it in. Use when restructuring a module, hardening an area before changing it, splitting a file that has grown too large, or when a change means checking a dozen call sites. Reach for it whenever the work is tidying rather than building — even when the user never says "refactor": "clean this up", "this file is too big", "is any of this dead", "put this behind one door", "why is this imported in nine places". -->
 
 # conducks-feature-clean
 

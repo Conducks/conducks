@@ -1,4 +1,4 @@
-<!-- description: Using conducks — what it is, the 13 MCP tools and the CLI, and the probe sequence for each question (explore, debug, impact, refactor, audit). Use when running conducks from the terminal or an MCP client, picking a tool, orienting in an unfamiliar codebase, or checking whether a change was safe. -->
+<!-- description: Using conducks — what it is, the 13 MCP tools and the CLI, and the probe sequence for each question (explore, debug, impact, refactor, audit). Use when running conducks from the terminal or an MCP client, picking a tool, orienting in an unfamiliar codebase, or checking whether a change was safe. Reach for it whenever the question is structural and the answer must be TRUE rather than plausible — even when the user never says "conducks": "what breaks if I change this", "what calls this", "is anything using it", "how does X actually work", "is there a cycle". Those are graph questions, and grep answers them by coincidence. -->
 
 # conducks
 
