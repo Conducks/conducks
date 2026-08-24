@@ -906,11 +906,14 @@ An ADR cannot hold this: it is frozen, and joint status moves.
 
 **On close, in order:**
 
-1. Promote surviving facts — rule to `conventions.md`, trap to `memory.md`, capability to `features.md`.
-2. Give the ADR an `- Enforced by:` pointing at the test that now proves it. The `- Builds:` link leaves
+1. Say how the hypothesis ended (§6.8). Held, and the boxes are the whole record — write nothing.
+   Held but cost more than the tasks said, or was reached another way — the prose and the `[-]` go in
+   NOW, while you still remember, and before step 5 puts the file somewhere nothing prompts you again.
+2. Promote surviving facts — rule to `conventions.md`, trap to `memory.md`, capability to `features.md`.
+3. Give the ADR an `- Enforced by:` pointing at the test that now proves it. The `- Builds:` link leaves
    the graph with the file, so without this the ADR reports as unbuilt.
-3. Set `Status: done`.
-4. Move the file to `completed/`.
+4. Set `Status: done`.
+5. Move the file to `completed/`.
 
 **`completed/` is not scanned** (nor `legacy/`, `archive/`, `agent-runs/`). Two consequences:
 
