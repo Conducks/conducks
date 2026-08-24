@@ -737,6 +737,37 @@ eliminations.
 runs to check it. If nothing can be run, say so and say why, rather than leaving the reader to assume
 a test exists.
 
+**A phase closes with what happened, and that includes what did not work.** A checked box records
+that a thing shipped. It records nothing about the three approaches tried first, and those are the
+expensive part — the next person re-runs every one of them. When a phase's last box is checked, write
+a paragraph under its tasks saying what shipped, what was tried and dropped, and why it was dropped.
+
+§5.1 already permits this — *"date and narrative go in the paragraph under the tasks"* — and this
+makes it owed rather than allowed. It is prose, nothing counts it, and `completed/` is unlinted but
+not lost: the file stays greppable forever, which is what makes the todo the right home.
+
+```markdown
+## Phase 2 — make the daemon reachable
+- [x] serial flash over USB, verified by a boot log on the device
+
+Improv BLE provisioning was tried first and abandoned: the device advertises, the browser pairs, and
+the wifi join silently never completes — no error on either side. Serial flash worked first attempt.
+Do not spend another evening on Improv for this board.
+```
+
+**Three failures, three homes, and only the first one is this rule.**
+
+| the failure was | goes to | why there |
+|---|---|---|
+| an attempt inside THIS job that did not pan out | prose under its phase | task-scoped; it dies with the job's relevance, not before |
+| an option weighed and chosen against | the ADR's `## Decision` (§6.6) | frozen, and a later reader must see the road not taken |
+| a trap that will bite an unrelated job later | `memory.md` (§6.5) | outlives every todo |
+
+**Do not promote a task-scoped failure into `memory.md`.** It is the tempting move and it floods the
+one file every session loads at start (§7's read-once budget) with detail that mattered to one job.
+A failed elimination belongs where the job is, and `memory.md` earns an entry only when the trap is
+still true for work that has nothing to do with this todo.
+
 **A todo may carry a `## Context` section.** `- Acceptance:` is one line and one line cannot describe
 a large job — what it is for, what it rests on, what was ruled out. Put that in a `## Context`
 directly under the fields, before Phase 1. It is prose, it is not a phase, and nothing counts it.
