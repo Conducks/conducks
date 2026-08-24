@@ -6,6 +6,7 @@ import { emptyVaultAnswer } from "../shared/empty-vault.js";
 import { mcpOk, mcpErr } from "@/interfaces/tools/shared/mcp-response.js";
 import { verdict, verdictToJson } from "@/contracts/index.js";
 import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from "@/contracts/index.js";
+import { graphHealth } from "@/contracts/index.js";
 
 /**
  * Conducks — Structural Intelligence Tools (Unified Taxonomy)
@@ -444,8 +445,12 @@ Modes:
 
         if (mode === "map") {
           const hotspots = await registry.analyze.query.execute('hotspots', [10]);
+          // The same graph-health verdict the CLI prints. It lived only in `status.ts`, so a person
+          // was warned about a partial or empty vault and an agent reading the identical numbers was
+          // not — one question answered two ways, which ADR 0148 exists to stop.
           return mcpOk(
-            { status: status.status, stats: status.stats, staleness: status.staleness, hotspots },
+            { status: status.status, stats: status.stats, staleness: status.staleness, hotspots,
+              health: graphHealth(Number(status.stats?.nodeCount ?? 0), Number(status.stats?.density ?? 0)) },
             { nodeCount: status.stats?.nodeCount, truncated: false }
           );
         }

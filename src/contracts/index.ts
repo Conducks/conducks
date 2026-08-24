@@ -51,4 +51,7 @@ export { realCasePath } from './real-path.js';
 export { isProjectSymbolId, splitProjectSymbols } from './project-symbol.js';
 // Read by the DOMAIN that computes a score and by the CLI that prints it. A weight or a threshold
 // duplicated at the render site is how the printed sentence drifts from the arithmetic behind it.
-export { RISK_WEIGHTS, DECAY_VELOCITY_THRESHOLD } from './scoring.js';
+export {
+  RISK_WEIGHTS, DECAY_VELOCITY_THRESHOLD, IMPROVEMENT_VELOCITY_THRESHOLD,
+  PARTIAL_GRAPH_MIN_NODES, PARTIAL_GRAPH_MAX_DENSITY, graphHealth,
+} from './scoring.js';

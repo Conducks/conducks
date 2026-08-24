@@ -3,7 +3,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import { displayPath, displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
-import { DECAY_VELOCITY_THRESHOLD } from "@/contracts/index.js";
+import { DECAY_VELOCITY_THRESHOLD, IMPROVEMENT_VELOCITY_THRESHOLD } from "@/contracts/index.js";
 
 /**
  * Conducks — Drift Command 🕵️‍♂️
@@ -46,7 +46,7 @@ export class DriftCommand implements ConducksCommand {
         // built from that slice would silently miss the actual top improvers. Derive it from the
         // full (untruncated) `result.deltas` instead, same threshold and sort as the rendered block.
         const improving = result.deltas
-          .filter((d: any) => d.velocity < -0.01)
+          .filter((d: any) => d.velocity < IMPROVEMENT_VELOCITY_THRESHOLD)
           .sort((a: any, b: any) => a.velocity - b.velocity)
           .slice(0, LIMIT)
           .map((d: any) => ({
@@ -135,7 +135,7 @@ export class DriftCommand implements ConducksCommand {
         // at all when nothing qualifies, so a run with zero improving symbols does not fabricate
         // an empty section.
         const improving = result.deltas
-          .filter(d => d.velocity < -0.01)
+          .filter(d => d.velocity < IMPROVEMENT_VELOCITY_THRESHOLD)
           .sort((a: any, b: any) => a.velocity - b.velocity);
         if (improving.length > 0) {
           console.log(`\n\x1b[1m✨ Top Improving Symbols (Velocity) ---\x1b[0m`);

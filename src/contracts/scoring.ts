@@ -30,3 +30,42 @@ export const RISK_WEIGHTS = {
  * and `drift`'s rendered hotspot list filters with it, so the two can no longer disagree.
  */
 export const DECAY_VELOCITY_THRESHOLD = 0.05;
+
+/**
+ * Below this velocity a symbol counts as improving. The mirror of the decay threshold, and it lives
+ * here for the same reason: `drift-engine.ts` counted `improvement_count` at `velocity < 0` while
+ * `drift.ts` listed at `< -0.01`, so sofie printed "Improving: 393" over an empty improving section.
+ * Any movement below zero is PageRank redistributing after a node was added, which is arithmetic
+ * rather than improvement — the same noise the decay side excludes.
+ */
+export const IMPROVEMENT_VELOCITY_THRESHOLD = -DECAY_VELOCITY_THRESHOLD;
+
+/**
+ * A graph this sparse on a node set this large was not finished: nodes were persisted and edges
+ * lost, so it loads, looks READY, and answers every question from a partial base.
+ *
+ * Here rather than in `status.ts` because both surfaces must reach the same verdict. They did not:
+ * the CLI flagged a partial graph and `conducks_status` said nothing, so a person and an agent
+ * asking the same question about the same vault got different answers (ADR 0148).
+ */
+export const PARTIAL_GRAPH_MIN_NODES = 50;
+export const PARTIAL_GRAPH_MAX_DENSITY = 0.5;
+
+/**
+ * Whether a loaded graph can be trusted to answer from.
+ *
+ * `incomplete` means an analyze was interrupted after writing nodes and before writing edges: the
+ * vault loads, reports READY, and answers every question from a partial base. `empty` is the same
+ * problem at its limit, and it needed naming separately because the node floor excludes it by
+ * construction — a vault with nothing in it cleared no threshold and read as healthy.
+ *
+ * Exported and shared for the reason stated above `emptyOrReady`: this judgement lived in
+ * `status.ts` alone, so `conducks status` warned a person about a partial graph and
+ * `conducks_status` told an agent nothing. One question, one answer, both surfaces (ADR 0148).
+ */
+export function graphHealth(nodeCount: number, density: number): { empty: boolean; incomplete: boolean } {
+  return {
+    empty: nodeCount === 0,
+    incomplete: nodeCount > PARTIAL_GRAPH_MIN_NODES && density < PARTIAL_GRAPH_MAX_DENSITY,
+  };
+}

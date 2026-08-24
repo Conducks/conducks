@@ -34,12 +34,23 @@ function delta(name: string, velocity: number, overrides: Record<string, unknown
 describe('drift: Top Improving Symbols', () => {
   afterEach(() => { jest.restoreAllMocks(); });
 
+  /**
+   * The floor moved from a hardcoded `-0.01` to `IMPROVEMENT_VELOCITY_THRESHOLD` (-0.05), so this
+   * fixture's `barelyImproving` was raised from -0.02 to -0.08 to stay above it.
+   *
+   * The floor is the DOMAIN's, and symmetric with decay's, because there was never an agreed one for
+   * improvement: `drift-engine.ts` counted every `velocity < 0` while this block listed `< -0.01`,
+   * and sofie printed "Improving: 393" over an empty section as a result. Of those 393, every one
+   * sat inside (-0.01, 0) — so on real data the listing threshold changed nothing and the COUNT was
+   * the whole defect. The value is symmetric because a noise floor is a property of the metric, not
+   * of the direction, and -0.01 was a magic number in the interface, which is what this removes.
+   */
   it('lists improving symbols by name, most-improving first — not just a count', async () => {
     const result = {
       status: 'STABLE',
       message: 'Structural resonance stable across 3 symbols.',
       summary: { total_symbols: 3, decay_count: 0, improvement_count: 2, move_count: 0 },
-      deltas: [delta('barelyImproving', -0.02), delta('bigImprover', -0.5), delta('unchanged', 0.001)],
+      deltas: [delta('barelyImproving', -0.08), delta('bigImprover', -0.5), delta('unchanged', 0.001)],
       moves: [],
     };
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -53,7 +64,7 @@ describe('drift: Top Improving Symbols', () => {
     expect(bigIdx).toBeGreaterThan(-1);
     expect(barelyIdx).toBeGreaterThan(-1);
     expect(bigIdx).toBeLessThan(barelyIdx); // most negative velocity (most improving) printed first
-    expect(printed).not.toContain('unchanged'); // below the |0.01| threshold, not listed anywhere
+    expect(printed).not.toContain('unchanged'); // below the noise floor, not listed anywhere
   });
 
   it('prints NO "Top Improving Symbols" heading when nothing improved (no fabricated empty section)', async () => {

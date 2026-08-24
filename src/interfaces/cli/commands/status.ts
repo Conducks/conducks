@@ -5,6 +5,7 @@ import chalk from "chalk";
 import { isTestNode } from "@/contracts/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
 import { displayPath, displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
+import { graphHealth } from "@/contracts/index.js";
 
 /**
  * Conducks — Status Command 🏺 🟦
@@ -138,7 +139,9 @@ export class StatusCommand implements ConducksCommand {
       // non-trivial node set means an analyze was interrupted and persisted a PARTIAL graph
       // (nodes written, edges lost) — it loads and looks fine but is silently broken. Flag it.
       const s = status.stats;
-      const incomplete = s.nodeCount > 50 && s.density < 0.5;
+      // The verdict is the domain's. It used to be computed here, which meant `conducks_status`
+      // reached a different one — see `graphHealth`.
+      const { incomplete } = graphHealth(s.nodeCount, s.density);
       // The EMPTY case was invisible to the check above: `nodeCount > 50` excludes it by
       // construction, so a vault with nothing in it — after `conducks clean`, or before the first
       // analyze — reported READY and SYNCHRONIZED with an empty hotspot list. Nothing-checked must

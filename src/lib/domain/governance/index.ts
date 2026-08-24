@@ -26,6 +26,7 @@ function emptyOrReady(nodeCount: number): 'empty' | 'ready' {
   return nodeCount === 0 ? 'empty' : 'ready';
 }
 
+
 /**
  * Conducks — Governance Domain Service
  *

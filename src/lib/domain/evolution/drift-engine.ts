@@ -1,6 +1,6 @@
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { logger } from "@/lib/core/utils/index.js";
-import { DECAY_VELOCITY_THRESHOLD } from "@/contracts/index.js";
+import { DECAY_VELOCITY_THRESHOLD, IMPROVEMENT_VELOCITY_THRESHOLD } from "@/contracts/index.js";
 
 /**
  * Conducks — Structural Drift Engine 🕵️‍♂️
@@ -215,7 +215,7 @@ export class DriftEngine {
       summary: {
         total_symbols: exactRows.length,
         decay_count: deltas.filter(d => d.velocity > DECAY_VELOCITY_THRESHOLD).length,
-        improvement_count: deltas.filter(d => d.velocity < 0).length,
+        improvement_count: deltas.filter(d => d.velocity < IMPROVEMENT_VELOCITY_THRESHOLD).length,
         move_count: moves.length,
         identity_gap_count: deltas.filter(d => d.identityGap).length
       }
