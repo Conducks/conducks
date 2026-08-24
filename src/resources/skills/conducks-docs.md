@@ -737,36 +737,48 @@ eliminations.
 runs to check it. If nothing can be run, say so and say why, rather than leaving the reader to assume
 a test exists.
 
-**A phase closes with what happened, and that includes what did not work.** A checked box records
-that a thing shipped. It records nothing about the three approaches tried first, and those are the
-expensive part — the next person re-runs every one of them. When a phase's last box is checked, write
-a paragraph under its tasks saying what shipped, what was tried and dropped, and why it was dropped.
+**A todo is a HYPOTHESIS, and how it ends is the finding.**
 
-§5.1 already permits this — *"date and narrative go in the paragraph under the tasks"* — and this
-makes it owed rather than allowed. It is prose, nothing counts it, and `completed/` is unlinted but
-not lost: the file stays greppable forever, which is what makes the todo the right home.
+`- Acceptance:` states an outcome. The phases state what you believe will produce it. That belief is
+a hypothesis, and closing the todo tests it. Three ways it can end, and only one of them is silent:
+
+| the tasks ran and | the hypothesis was | what the record owes |
+|---|---|---|
+| the acceptance was met, nothing surprising | correct | **nothing.** Checked boxes are the whole record |
+| the acceptance was met, but it took more or other than the tasks said | incomplete | prose under the phase: what the tasks missed, and what it actually took |
+| the acceptance was met a different way entirely | wrong | `[-]` the task with its reason, then write the task that DID work, in the same todo |
+
+**Silence is a real answer.** Most work is straightforward and a clean run needs no narrative — a
+paragraph under every finished phase is noise, and noise is how a convention gets ignored. Prose is
+owed when the hypothesis did not hold, and only then.
+
+The third row is the one people get wrong. When the todo was aimed at the wrong thing, do not close
+it quietly and open a new file — the eliminations belong beside the outcome they explain. Drop the
+task with `[-] … — dropped: <reason>` (§5.2), and add the task that worked to the same phase. The
+file then reads as what happened: this was believed, it was wrong, this is what it turned out to be.
 
 ```markdown
 ## Phase 2 — make the daemon reachable
+- [-] provision over Improv BLE — dropped: device advertises and the browser pairs, but the wifi join
+      never completes and neither side reports an error
 - [x] serial flash over USB, verified by a boot log on the device
 
-Improv BLE provisioning was tried first and abandoned: the device advertises, the browser pairs, and
-the wifi join silently never completes — no error on either side. Serial flash worked first attempt.
-Do not spend another evening on Improv for this board.
+Improv cost an evening before the failure mode was clear: it fails silently on this board, so there
+is nothing to debug and no reason to try it again here.
 ```
 
-**Three failures, three homes, and only the first one is this rule.**
+**Three failures, three homes, and only the first is this rule.**
 
 | the failure was | goes to | why there |
 |---|---|---|
-| an attempt inside THIS job that did not pan out | prose under its phase | task-scoped; it dies with the job's relevance, not before |
+| an attempt inside THIS job that did not pan out | prose under its phase | task-scoped; it explains the outcome it sits beside |
 | an option weighed and chosen against | the ADR's `## Decision` (§6.6) | frozen, and a later reader must see the road not taken |
 | a trap that will bite an unrelated job later | `memory.md` (§6.5) | outlives every todo |
 
 **Do not promote a task-scoped failure into `memory.md`.** It is the tempting move and it floods the
 one file every session loads at start (§7's read-once budget) with detail that mattered to one job.
-A failed elimination belongs where the job is, and `memory.md` earns an entry only when the trap is
-still true for work that has nothing to do with this todo.
+`completed/` is unlinted but not lost — the file stays greppable — which is what makes the todo the
+right home.
 
 **A todo may carry a `## Context` section.** `- Acceptance:` is one line and one line cannot describe
 a large job — what it is for, what it rests on, what was ruled out. Put that in a `## Context`
