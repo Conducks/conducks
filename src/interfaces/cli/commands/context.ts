@@ -121,8 +121,27 @@ export class ContextCommand implements ConducksCommand {
       // Asked at depth 2 and filtered to ONE EDGE, because the depth argument is a WEIGHTED distance:
       // a `CONSTRUCTS` edge weighs 1.2, so `depth: 1` excluded the only user of every class even
       // after the edge set above was widened. Path LENGTH is the honest expression of "direct user".
-      const callers = registry.kinetic.getImpact(resolvedId, 'upstream', 2).affectedNodes
-        .filter((n: any) => n.path.length === 1 && USE_EDGES.has(n.path[0]));
+      const direct = registry.kinetic.getImpact(resolvedId, 'upstream', 2).affectedNodes
+        .filter((n: any) => n.path.length === 1);
+      const users = direct.filter((n: any) => USE_EDGES.has(n.path[0]));
+      // A VALUE HAS NO CALLERS, and answering "nobody uses this" about one is the third time this
+      // set has been too small — CALLS alone omitted classes, the weighted depth omitted
+      // constructions, and now a use-edge set without IMPORTS omits every re-exported value.
+      //
+      // MEASURED on the orchestrator subject: `db` is `export { coreDb as db }` and the project's #1
+      // hotspot. `impact db upstream` reports 212 affected, 103 of them direct with path
+      // `['IMPORTS']`, and this section printed nothing at all. A direct import would have given the
+      // consuming SYMBOL an ACCESSES edge; reaching it through the barrel leaves only the importing
+      // FILE.
+      //
+      // A FALLBACK, not a widening, and the measurement is the reason. Every IMPORTS row is a file
+      // node, so admitting them unconditionally puts the same fact in twice: on the same subject
+      // `ensureServerInitialized` has 98 real symbol callers and 78 file rows behind them. Files are
+      // shown only when no symbol used it — which is the case where the file is the only evidence
+      // there is.
+      const callers = users.length > 0
+        ? users
+        : direct.filter((n: any) => n.path[0] === 'IMPORTS');
       if (callers.length > 0) {
         console.log(`  Called by / used by:`);
         for (const c of callers) {

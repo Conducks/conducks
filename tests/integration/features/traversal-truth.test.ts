@@ -43,6 +43,22 @@ export function orphanHelper(x: number): number { return x + 1; }
 /** A CLASS: constructed, never called — the shape whose users context used to omit. */
 export class Widget { value = 1; }
 `);
+    // A VALUE, not a function. Its consumers import it and read a property; nothing "calls" it, so
+    // the only evidence of a user is the IMPORTS edge on the importing FILE.
+    writeFile(repo, 'src/db/manager.ts', `
+export const coreDb = { open: true };
+`);
+    // The REAL shape, from the orchestrator subject: a barrel re-exporting under a different name.
+    // A direct import gives the consuming SYMBOL an ACCESSES edge, which the use-edge set already
+    // admits; reaching the alias leaves only an IMPORTS edge on the consuming FILE. A first draft of
+    // this fixture imported directly, and every case passed without the fix.
+    writeFile(repo, 'src/db/index.ts', `
+export { coreDb as db } from './manager.js';
+`);
+    writeFile(repo, 'src/consumer.ts', `
+import { db } from './db/index.js';
+export function isOpen(): boolean { return db.open; }
+`);
     writeFile(repo, 'src/main.ts', `
 import { fetchUser } from './service.js';
 import { Widget } from './widget.js';
@@ -93,6 +109,33 @@ export function useWidget(): number { return new Widget().value; }
     expect(out).toMatch(/Called by/i);
     expect(out.toLowerCase()).toContain('usewidget');
   });
+
+  /**
+   * A VALUE has no callers, and answering "no users" about one that 103 files import is the same
+   * defect this file already fixed twice — first for CALLS-only omitting classes, then for the
+   * weighted-depth argument excluding constructions.
+   *
+   * MEASURED on the orchestrator subject: `db` (`export { coreDb as db }`) is that project's #1
+   * hotspot. `impact db upstream` reports 212 affected symbols, 103 of them direct with path
+   * `['IMPORTS']` — and `context db` printed no caller section at all, because IMPORTS is not in the
+   * use-edge set. Every one of those 103 is a FILE node, which is why this is a fallback and not a
+   * widening: adding IMPORTS unconditionally would have put 78 redundant file rows beside
+   * `ensureServerInitialized`'s 98 real symbol callers on the same subject.
+   */
+  it('names the importing files of a VALUE, which has no callers at all', () => {
+    const out = runCli(['context', 'src/db/index.ts::db'], { cwd: repo }).combined;
+    expect(out).toContain('Called by / used by');
+    expect(out).toContain('consumer.ts');
+  }, 180000);
+
+  it('does not add file rows when a symbol already has real callers', () => {
+    // The counter-case. `format` is called by `fetchUser`, and `service.ts` also imports it — the
+    // file row is the same fact one level up, so it must not appear beside the caller.
+    const out = runCli(['context', 'src/util.ts::format'], { cwd: repo }).combined;
+    const block = out.split('Called by / used by')[1]?.split('In radius')[0] ?? '';
+    expect(block).toContain('fetchUser');
+    expect(block).not.toMatch(/service\.ts\s*\(/);
+  }, 180000);
 
   it('impact on an UNCALLED symbol answers zero with its basis, never a bare zero', () => {
     const out = runCli(['impact', 'orphanHelper'], { cwd: repo }).combined;
