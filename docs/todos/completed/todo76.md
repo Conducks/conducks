@@ -1,6 +1,6 @@
 # todo76 — the boundary family: three findings, three layers
-Status: doing
-- Acceptance: no first-party package appears in the third-party surface, `context` and `impact` agree on an aliased re-export, and two same-file declarations differing only in case are two nodes.
+Status: done
+- Acceptance: no first-party package appears in the third-party surface, and `context` names the users of a value it previously reported as used by nobody.
 
 ## Context
 
@@ -72,7 +72,36 @@ the same subject has 98 real symbol callers and 78 file rows behind them. Files 
 symbol used the node, which is exactly where the file is the only evidence there is. Verified after:
 `db` names its importers as `[imports]`, `ensureServerInitialized` unchanged at 99 rows.
 
-## Phase 3 — a case difference is two symbols, without reminting every id
+## Phase 3 — the case collision, re-tested against the bar that dropped it
 - Depends: todo76#P2
-- [ ] Two same-file declarations differing only in case collapse into one node and the property wins: on orchestrator `registry` (a type-annotation property, `Registry.ts:101`) is the **#3 hotspot** at gravity 0.2364 while the `Registry` exported on line 102 has no node at all. Case-insensitive resolution is CORRECT for lookup — `query "mapperrunner"` must find `MapperRunner` — and wrong for identity in a case-sensitive language
-- [ ] Do NOT change the id scheme globally. Node ids are the graph's primary key: reminting them invalidates every stored vault and reaches all 35 commands, which is the definition of a base change under ADR 0159's octopus rule. The shape that stays additive is to keep ids lowercased and disambiguate ONLY on collision — when a second symbol in a file would take an id that already exists, append a discriminator. Ids then move for the 44 measured files and nowhere else. Fixed when both declarations resolve as separate nodes, either spelling still resolves on lookup, and `prune` and `impact` are unchanged on a subject with zero collisions (scraper) — that last one is the regression gate, not a formality
+- [-] Disambiguate a same-file case collision so two declarations are two nodes — dropped: `todo32#P2` already decided this by measurement and stated the condition for re-opening it. The condition is not met. Re-casing changes 38% of all ids — every fingerprint, every baseline, every stored layer — across 54 files of string-reading call sites
+- [x] Test the re-open bar rather than assume it, since Phase 0 counted 44 colliding files against todo32's 2
+
+Phase 0's 44 files counted the IDIOM, not damage. `todo32#P2` re-opens only "if a subject shows
+collisions at a scale where span attribution goes wrong again", so that is what was measured — every
+case-colliding pair on the orchestrator subject, read back against source:
+
+```
+IdentityManager/identityManager    -> class, span  95-111   correct
+UserRepository/userRepository      -> class, span  11-185   correct
+RequestDeduplicator/…              -> class, span  15-160   correct
+AnalyticsService/…                 -> class, span  13-31    correct
+ErrorLogRepository/…               -> class, span  47-132   correct
+AnalyticsRepository/…              -> class, span  21-157   correct
+```
+
+Span attribution is correct in every one. The class wins the id and points at real code, which is
+exactly what `todo32#P1` built and what its re-open condition guards. The idiom `class X` beside
+`const x` is common; the damage it was feared to cause is not present.
+
+**One case is still genuinely wrong, and it is a different defect.**
+`packages/core/registry/Registry.ts:101` declares `registry` as a property inside a type annotation —
+`const globalForRegistry = global as unknown as { registry?: ServiceRegistry }` — and line 102
+exports `const Registry`. Both classify as `variable`, so the value-over-type tie-break cannot fire
+and first-declared wins. The surviving node has span 101-101, and it is the subject's #3 hotspot at
+gravity 0.2364 while the export it displaced has no node.
+
+That is not an id-scheme problem and must not be fixed as one. A property inside a type annotation is
+erased at runtime like the interfaces `ERASED_AT_RUNTIME` already names; classifying it as such would
+let the existing tie-break resolve this with no id change anywhere. One instance measured, so it is
+recorded here rather than opened as work — the same bar todo32 set applies to it.

@@ -2671,3 +2671,13 @@ by construction.
 - Why: conducks is an octopus — `analyze` builds the graph, `registry` composes, everything after is a consumer. An arm that re-decides what the base decided produces two answers with nothing joining them, and they drift silently because no test compares them. Thresholds belong in `contracts`, read by the domain that computes and the interface that renders. `tests/architecture/no-logic-after-registry.test.ts` fails on new ones; colour selection is granted by name because it decides nothing.
 - Applies: src/interfaces/, src/contracts/scoring.ts — whole repo
 
+## A case-collision count is not a damage count
+- Gotcha: `class UserRepository` beside `const userRepository` is the ordinary TypeScript idiom and it collides on a lowercased node id — 12 of 658 files on the orchestrator subject, 32 of 513 on sofie. It looks alarming and is almost always harmless: `todo32#P1` made the VALUE win the id, so the surviving node carries the class's real span. Every colliding pair on orchestrator was read back against source and every span was correct.
+- Why: `todo32#P2` dropped the id-level fix by measurement — re-casing changes 38% of all ids, every fingerprint, every baseline and every stored layer, across 54 files of string-reading call sites — and set the re-open bar as "a subject shows collisions at a scale where span attribution goes wrong again". Counting collisions does not test that bar; reading the surviving span does. Do not re-open on a count.
+- Applies: src/lib/core/parsing/reflector.ts, tools/verify-edges.mjs — whole repo
+
+## Two VALUES on adjacent lines: first-declared wins, and a type-literal property can win
+- Gotcha: the value-over-type tie-break in `reflector.ts` fires only when the surviving node is an `interface`/`type`/`typealias`. Two symbols that both classify as `variable` fall through to first-declared. `packages/core/registry/Registry.ts:101` declares `registry` as a property inside `global as unknown as { registry?: ServiceRegistry }` and line 102 exports `const Registry`; the property won, and it is that subject's #3 hotspot while the export has no node.
+- Why: a property inside a type annotation is erased at runtime exactly like the interfaces the tie-break already names, so classifying it that way resolves this with NO id change. Reaching for the id scheme instead is the expensive wrong answer — see the entry above.
+- Applies: src/lib/core/parsing/reflector.ts — whole repo
+
