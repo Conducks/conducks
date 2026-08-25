@@ -90,6 +90,18 @@ export function classifyOrigin(
      * project that declares them.
      */
     resolvesInRepo?: boolean;
+    /**
+     * Top-level package names this repository OWNS — the first path segment of a first-party module,
+     * derived from the discovered file list rather than from any manifest.
+     *
+     * `resolvesInRepo` was Python's only first-party signal, so an import whose path is BROKEN fell
+     * through to `dependency`. Measured on the scraper subject: `specialists` is that project's own
+     * plug-in package under `src/`, imported by 11 files; ten resolve and the eleventh reads
+     * `from specialists.google_maps.extractors.reviews.reviews import X` against a file named
+     * `reviews.py`. conducks was right that it does not resolve and wrong about what that means — a
+     * package name cannot also be a directory in your source tree, and the first segment says so.
+     */
+    firstPartyRoots?: ReadonlySet<string>;
   },
 ): BoundaryClassification {
   const spec = (specifier || '').trim().replace(/^['"]|['"]$/g, '');
@@ -120,6 +132,11 @@ export function classifyOrigin(
     // Python dots the package path: `urllib.parse` and `os.path` are the stdlib's own submodules.
     const pyHead = spec.split('.')[0];
     if (PYTHON_STDLIB.has(pyHead)) return { origin: 'stdlib', package: null };
+    // AFTER stdlib on purpose. A project directory named `json` or `types` would otherwise shadow
+    // the standard library for every file in the repo, and calling a real stdlib import first-party
+    // is the worse error of the two — it removes a true row rather than adding a false one.
+
+    if (opts?.firstPartyRoots?.has(pyHead.toLowerCase())) return { origin: 'internal', package: null };
     return { origin: 'dependency', package: pyHead || spec };
   }
 

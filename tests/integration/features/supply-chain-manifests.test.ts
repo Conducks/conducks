@@ -59,6 +59,10 @@ from pathlib import Path
 import yaml
 import bs4
 from foundation.paths import get_project_root
+# A first-party import that does NOT resolve: paths is a module, paths.paths is not. Taken from the
+# scraper subject, where the same shape appears as reviews.reviews against a file named reviews.py.
+# The import is broken; that does not make it a third-party package.
+from foundation.paths.paths import missing_symbol
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +91,29 @@ async def run(cfg: Any) -> Path:
     it('does not report the project\'s own src-layout packages as dependencies', () => {
       const out = JSON.parse(runCli(['supply-chain', '--json'], { cwd: repo }).stdout);
       expect(out.packages.map((p: any) => p.package)).not.toContain('foundation');
+    }, 180000);
+
+    /**
+     * A first-party import that does not RESOLVE is still first-party.
+     *
+     * MEASURED on the scraper subject: `specialists` — that repository's own plug-in package, under
+     * `src/` — appeared in the dependency table as undeclared with 1 importer, while 11 files import
+     * it. Ten resolve; the eleventh is
+     * `from specialists.google_maps.extractors.reviews.reviews import ReviewsExtractor`, and the file
+     * is `reviews.py`, so `reviews.reviews` names nothing. conducks was right that it does not
+     * resolve and wrong about what that means: `resolvesInRepo` was the only first-party signal for
+     * Python, so an unresolvable path fell through to `dependency`.
+     *
+     * The first segment is the evidence being thrown away. `foundation` is a directory in this
+     * project, which a package name cannot be.
+     */
+    it('a broken first-party import is not a third-party package', () => {
+      const out = JSON.parse(runCli(['supply-chain', '--json'], { cwd: repo }).stdout);
+      const names = out.packages.map((p: any) => p.package);
+      // Guard: the fixture must actually import something unresolvable, or this passes vacuously.
+      expect(fs.readFileSync(path.join(repo, 'main.py'), 'utf-8')).toContain('foundation.paths.paths');
+      expect(names).not.toContain('foundation');
+      expect(names.some((n: string) => String(n).startsWith('foundation'))).toBe(false);
     }, 180000);
 
     /**

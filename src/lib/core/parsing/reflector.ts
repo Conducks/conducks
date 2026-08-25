@@ -132,6 +132,38 @@ function decoratorsOf(declNode: any): string[] {
  * The callers already record a failed file rather than aborting the pulse, so one unreadable file
  * costs that file and is counted, instead of costing the truth about every file like it.
  */
+/**
+ * The top-level package names this repository owns, from the discovered file list.
+ *
+ * A Python module directory is first-party evidence a manifest cannot give: `specialists` is a
+ * package name by shape and a directory in the tree by fact, and only the tree knows. Derived rather
+ * than configured, so it cannot drift from what is actually there.
+ *
+ * A segment counts when it is a directory that CONTAINS python files, at depth 0 or 1 — depth 1
+ * covers the `src/` layout, which is where the finding came from. Memoised on the path list, because
+ * this is called once per import statement in the pulse.
+ */
+const firstPartyRootsCache = new WeakMap<object, ReadonlySet<string>>();
+function firstPartyRootsOf(allPaths: readonly string[] | undefined): ReadonlySet<string> | undefined {
+  if (!allPaths || !allPaths.length) return undefined;
+  const key = allPaths as unknown as object;
+  const cached = firstPartyRootsCache.get(key);
+  if (cached) return cached;
+  const roots = new Set<string>();
+  for (const p of allPaths) {
+    if (!p.endsWith('.py')) continue;
+    const segs = p.split('/').filter(Boolean);
+    // The package is the directory holding the file, and the segment above it when that directory is
+    // a source root. Taking every segment would admit `tests` and `docs` as packages.
+    for (let depth = 1; depth <= 2 && depth < segs.length; depth++) {
+      const seg = segs[segs.length - 1 - depth];
+      if (seg && !seg.startsWith('.')) roots.add(seg.toLowerCase());
+    }
+  }
+  firstPartyRootsCache.set(key, roots);
+  return roots;
+}
+
 export class ParseFailure extends Error {
   /** Holds the processors; the reflector itself owns dispatch, not extraction. */
   constructor(
@@ -686,7 +718,8 @@ export class ConducksReflector {
                 specifier,
                 undefined,
                 new Set((context?.getWorkspacePackages?.() ?? []).map(([n]) => n)),
-                { filePath: file.path, resolvesInRepo: typeof resolvedForOrigin === 'string' && !!resolvedForOrigin },
+                { filePath: file.path, resolvesInRepo: typeof resolvedForOrigin === 'string' && !!resolvedForOrigin,
+                  firstPartyRoots: firstPartyRootsOf(allPaths) },
               );
 
               // Seed the Spectrum with the RAW SPECIFIER for later resolution 🏺
