@@ -4,6 +4,14 @@
   (array (identifier) @ref_value)
   (ternary_expression (identifier) @ref_value)
   (member_expression object: (identifier) @ref_value)
+  ;; The same member expression, captured with BOTH halves. The pattern above marks the OBJECT used
+  ;; and stops there, which is right for an enum or a const table — the member is not a symbol. It
+  ;; is wrong for a namespace alias, where `analytics.trackPageView` names a real exported function
+  ;; in another file and the read is that function's only reference. Measured on the monorepo
+  ;; subject: 5 exports reported ORPHAN, every one read as `<alias>.<name>` in a wrapper object and
+  ;; never called (ADR 0161). Resolved only when the object is a NAMESPACE binding; for anything
+  ;; else the property is left alone, exactly as before.
+  (member_expression object: (identifier) @ns_member_object property: (property_identifier) @ns_member_prop)
   ;; BOTH OPERANDS OF ANY BINARY EXPRESSION, not just the right side of instanceof.
   ;;
   ;; The narrow instanceof pattern was written for one shape and read as if it covered the node. It

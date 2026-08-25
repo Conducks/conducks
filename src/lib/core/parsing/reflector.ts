@@ -495,6 +495,11 @@ export class ConducksReflector {
     const pendingIface = new PendingPair();
 
     const refValueCandidates: Array<{ scope: string; name: string; raw: string; line: number }> = [];
+    // Namespace member READS (`analytics.trackPageView` used as a value, not called). Collected
+    // rather than emitted inline for the same reason refValueCandidates are: an import statement is
+    // not guaranteed to have been reflected before the member that uses it, so the binding may not
+    // be registered yet at capture time. Flushed after the loop, when it certainly is.
+    const nsMemberCandidates: Array<{ scope: string; alias: string; prop: string; line: number }> = [];
     for (const match of matches) {
       if (!match || !match.captures || match.captures.length === 0) continue;
 
@@ -818,6 +823,19 @@ export class ConducksReflector {
                 // symbol of the same name — the two differ routinely. Registered with `default` as
                 // the ORIGINAL, exactly as a renamed named import is, so the call target becomes
                 // `<module>::default`; the exporting file records which symbol that is.
+                // A NAMESPACE IMPORT binds one local name to the whole module. Registered with the
+                // resolved path so `alias.member` reaches `<module>::member`, and marked as a
+                // namespace so `CallProcessor` drops the alias from the id rather than keeping it
+                // the way a class-qualified static call keeps its class (ADR 0161).
+                //
+                // Falls back to the raw specifier exactly as the named-import branch below does, so
+                // an external `import * as fs from 'node:fs'` produces the same shape a named
+                // import of the same module already produces — parity, not a special case.
+                if (cap.name === 'namespace_import' && cap.node && context) {
+                  const resolvedNamespace = this.imports.resolve(specifier, file.path, allPaths, provider, context);
+                  context.registerNamespaceBinding(cap.node.text, resolvedNamespace || specifier);
+                  continue;
+                }
                 if (cap.name === 'default_import' && cap.node && context) {
                   const resolvedSpecifier = this.imports.resolve(specifier, file.path, allPaths, provider, context);
                   context.registerLocalBinding(cap.node.text, resolvedSpecifier || specifier, 'default');
@@ -1109,6 +1127,13 @@ export class ConducksReflector {
             instanceTypeLines.set(key, currentMatchRow + 1);
           });
         }
+        else if (cName === 'ns_member_object') {
+          const prop = captureMap['ns_member_prop'];
+          if (prop && /^[A-Za-z_$][\w$]*$/.test(cText.trim())) {
+            const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
+            nsMemberCandidates.push({ scope: (scope || 'unit').toLowerCase(), alias: cText.trim(), prop: prop.trim(), line: currentMatchRow + 1 });
+          }
+        }
         else if (cName === 'ref_value') {
           // Object-literal value `{ key: someSymbol }` — a reference-as-value (DI table / command
           // map). Same handling as an identifier call-arg: collect now, emit + gate after the loop.
@@ -1307,6 +1332,24 @@ export class ConducksReflector {
     // Emit reference-as-value edges now that nodeCache holds every definition in this file. Gate on
     // "imported here OR defined in this file" — so a local-variable arg never floods the graph or adds
     // a dangler. IntraLinker binds the bare name against imported/same-file symbols afterward.
+    // A namespace member read is an edge to the MEMBER, and only when the object really is a
+    // namespace alias. Gated on `isNamespaceBinding` on purpose: every `x.y` in the file reaches
+    // this list, and resolving the property for an enum, a const table or a local object would mint
+    // an id for something that is not a symbol — the fabrication ADR 0070 refuses. The specifier
+    // states which module the alias names, so for that one case the target is a fact.
+    for (const { scope, alias, prop, line } of nsMemberCandidates) {
+      if (!context.isNamespaceBinding?.(alias)) continue;
+      const nsPath = context.resolveLocalBinding(alias);
+      if (!nsPath) continue;
+      spectrum.relationships.push({
+        sourceName: scope,
+        targetName: `${nsPath}::${prop.toLowerCase()}`,
+        type: 'ACCESSES' as any,
+        confidence: 1.0,
+        metadata: { line, namespaceMember: true, original: `${alias}.${prop}` },
+      });
+    }
+
     for (const { scope, name, raw, line } of refValueCandidates) {
       // KEEP the resolved binding rather than using it as a yes/no gate.
       //

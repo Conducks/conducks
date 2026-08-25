@@ -26,6 +26,15 @@ export class AnalyzeContext {
   /** Local Symbol Bindings (current file only) — Maps LocalName to SourcePath */
   private localBindings: Map<string, string> = new Map();
   /**
+   * Aliases bound to a whole MODULE by `import * as x from './y'`, not to a symbol.
+   *
+   * Kept apart from `localBindings` because the two resolve differently at a call site: a symbol
+   * binding contributes its own name to the target id (`Class.method`), while a namespace alias
+   * contributes nothing — `headers.applySecurityHeaders` is `<headers.ts>::applysecurityheaders`,
+   * never `<headers.ts>::headers.applysecurityheaders`, which is an id no node is keyed by.
+   */
+  private namespaceBindings: Set<string> = new Set();
+  /**
    * A renamed binding's ORIGINAL exported name, keyed by the local name.
    *
    * `import { POST as stepAction }` means calls to `stepAction` run `POST`. Storing only the path
@@ -176,6 +185,17 @@ export class AnalyzeContext {
     }
   }
 
+  /** Registers `import * as alias from path` — the alias names the module itself. */
+  public registerNamespaceBinding(alias: string, sourcePath: string): void {
+    this.localBindings.set(alias.toLowerCase(), sourcePath.toLowerCase());
+    this.namespaceBindings.add(alias.toLowerCase());
+  }
+
+  /** Whether a local name was bound to a whole module rather than to a symbol inside one. */
+  public isNamespaceBinding(localName: string): boolean {
+    return this.namespaceBindings.has(localName.toLowerCase());
+  }
+
   /** The name a renamed binding really refers to in its source module, if it was renamed. */
   public resolveBindingOriginal(localName: string): string | undefined {
     return this.bindingOriginals.get(localName.toLowerCase());
@@ -194,6 +214,7 @@ export class AnalyzeContext {
   public clearLocalBindings(): void {
     this.localBindings.clear();
     this.bindingOriginals.clear();
+    this.namespaceBindings.clear();
   }
 
 

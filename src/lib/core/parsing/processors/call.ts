@@ -88,7 +88,13 @@ export class CallProcessor {
         // FIRST segment is a binding; a dotted target keeps the rest verbatim.
         const head = lowTarget.includes('.') ? lowTarget.slice(0, lowTarget.indexOf('.')) : lowTarget;
         const original = context.resolveBindingOriginal?.(head);
-        const symbol = original ? `${original}${lowTarget.slice(head.length)}` : lowTarget;
+        // A NAMESPACE alias names the module, so it is not part of the symbol. `headers.apply(...)`
+        // is `<headers.ts>::apply`; keeping the head would build `<headers.ts>::headers.apply`,
+        // which no node is keyed by — the same dangling shape ADR 0085 fixed for renamed bindings.
+        const isNamespace = context.isNamespaceBinding?.(head) === true && lowTarget.length > head.length;
+        const symbol = isNamespace
+          ? lowTarget.slice(head.length + 1)
+          : (original ? `${original}${lowTarget.slice(head.length)}` : lowTarget);
         targetId = `${resolvedPath}::${symbol}`;
       }
       // 2. Resolve Global Atmosphere (Built-ins like 'process', 'os')

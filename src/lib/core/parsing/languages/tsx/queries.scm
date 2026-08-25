@@ -22,6 +22,19 @@
     (import_clause (identifier) @default_import)
     source: (string) @source) @isImport
 
+  ;; NAMESPACE IMPORT — `import * as headers from './headers'`.
+  ;;
+  ;; Named and default imports each had a per-binding capture; this form had none, so the alias
+  ;; bound nothing and `headers.applySecurityHeaders(h)` resolved to no target at all. Measured on
+  ;; the monorepo subject: 8 functions reported dead by `prune` and 0 callers by `impact`, every one
+  ;; of them reached only through a barrel that namespace-imports its own siblings (ADR 0161).
+  ;;
+  ;; No is-prefix: this mints no node. It names a MODULE, and the member that follows the dot is
+  ;; resolved against that module at call time — which is a fact the specifier states, not a guess.
+  (import_statement
+    (import_clause (namespace_import (identifier) @namespace_import))
+    source: (string) @source) @isImport
+
   (export_statement "default"
     declaration: (function_declaration name: (identifier) @default_export_name))
   (export_statement "default"
