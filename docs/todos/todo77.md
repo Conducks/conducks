@@ -32,7 +32,7 @@ tool. **The hypothesis was wrong twice**, and both defects were invisible to sam
 
 | level | planted / scored | result |
 |---|---|---|
-| L1 precision | 318 verdicts across 3 subjects | **0 false positives** after two fixes |
+| L1 precision | 324 verdicts across 3 subjects | **0 false positives** |
 | L2 recall | 10 planted | **10 found** |
 | L3 counter | 8 planted | **0 flagged** |
 
@@ -73,12 +73,32 @@ Better on both axes in both languages. The lesson is the record's title: a blank
 an unknown shape cost every single-binding import in two languages, and naming the actual shape cost
 nothing.
 
+### The fourth defect — an import through a door landed on the door
+
+After 0163, 22 TS misses remained. **Three hypotheses were tested against the oracle and all three
+were wrong** — the type-only shortcut, the kind gate, and the aliased-spelling check each moved the
+number by zero. The third was kept until mutation-tested, did not bite, and instrumenting the line it
+was meant to protect showed the resolved target tail already carried the original spelling; it was
+removed as dead code.
+
+One instrumented run then named the cause: an import routed through a barrel resolves to the
+barrel's re-export node, whose kind is `binding`, and `binding` was not a prunable kind. **No import
+reached through a door could ever be judged stale.** ADR 0164 follows the alias to the declaration,
+and splits the two barrel questions — an `index.ts` is exempt when asking "is this SYMBOL dead" and
+NOT exempt when asking "is this IMPORT dead".
+
+| oracle | at the start of this phase | now |
+|---|---|---|
+| TypeScript, vs `tsc` | 26 missed / 0 extra | **4 missed / 0 extra** |
+| Python, vs `ast` | 4 missed / 0 extra | **1 missed / 0 extra** |
+
 ### What prune still misses, with the reason
 
-23 on TypeScript, 1 on Python, measured against the compilers. Two named causes, both in the parser
-layer rather than in `dead-code.ts`: **type imports**, which `isTypeOnly` treats as used because
-TypeScript emits no `TYPE_REFERENCE` edges (ADR 0016), and **`const`-kind value imports**, which
-`PRUNABLE_BINDING_KINDS` excludes deliberately. Neither is closable by this analyzer alone.
+Four on TypeScript, one on Python. All are `const`-kind value imports, which
+`PRUNABLE_BINDING_KINDS` excludes deliberately (todo63): a plain value read produces no relationship
+at all, so claiming staleness there produced a verdict telling the user to delete an import their
+code needs. Closing it means making a bare identifier read emit an edge in every language — a parser
+change, not a dead-code change.
 
 ## Phase 2 — trace
 

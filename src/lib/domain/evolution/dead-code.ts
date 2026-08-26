@@ -233,7 +233,7 @@ export class DeadCodeAnalyzer {
         // A barrel that imports something and does NOT republish it is a genuinely stale import that
         // this now misses. Accepted, on this analyzer's standing rule: a missed dead import is
         // acceptable and a wrong one is not.
-        if (DeadCodeAnalyzer.isBarrelPath(fileOfNode(e.sourceId))) return false;
+        if (DeadCodeAnalyzer.isReexportSurface(fileOfNode(e.sourceId))) return false;
         return !(usedNamesByFile.get(fileOfNode(e.sourceId))?.has(binding) === true);
       });
       const liveRefs = incomingRefs.filter((e: any) => !importOnlyRefs.includes(e));
@@ -571,7 +571,7 @@ export class DeadCodeAnalyzer {
         // Only claim staleness about a declaration the graph can fully see used (see
         // PRUNABLE_BINDING_KINDS). An unresolved target proves nothing either way.
         const target = graph.getNode(candidate.targetId) as ConducksNode | undefined;
-        const kind = (target?.properties?.kind || '').toLowerCase();
+        const kind = DeadCodeAnalyzer.declaredKindOf(graph, target);
         if (!kind || !DeadCodeAnalyzer.PRUNABLE_BINDING_KINDS.has(kind)) continue;
 
         const key = `${statement.file}::${candidate.binding}`;
@@ -620,8 +620,64 @@ export class DeadCodeAnalyzer {
   }
 
   // Test fixtures, specs, and mocks are not product code — their symbols are never "dead".
-  /** A file whose job is to re-export: a Python package init, or a JS/TS index barrel. */
+  /**
+   * A file that re-exports WITHOUT the graph being able to see it — which is `__init__.py`, and only
+   * `__init__.py`.
+   *
+   * Python states a republish in `__all__`, a list of STRING literals no reference rule reads, so a
+   * package init looks exactly like a file that imports names and never touches them. MEASURED on
+   * scraper: 54 of 56 false stale-import findings were in one.
+   *
+   * `index.ts` was in this set for one commit and is NOT a barrel for this purpose. TypeScript
+   * spells a republish `export { x }`, which the grammar already captures as a use, so the exclusion
+   * bought nothing there — and it COST five true findings on this repository, where an `index.ts` is
+   * routinely a real module with real code rather than a pure re-export file.
+   */
   private static isBarrelPath(filePath: string): boolean {
+    return filePath.toLowerCase().split(/[\\/]/).pop() === '__init__.py';
+  }
+
+  /**
+   * The kind of the DECLARATION an import really lands on, following a barrel's re-export.
+   *
+   * An import through a barrel resolves to the barrel's own re-export node, whose kind is `binding`
+   * — a name this file republishes, not a declaration. `binding` is not a prunable kind, so the
+   * candidate was dropped and NO import routed through a barrel could ever be judged stale. On a
+   * codebase that reaches everything through `index.ts` doors that is most of them: measured on this
+   * repository, it was the single largest cause of the recall gap against `tsc --noUnusedLocals`,
+   * and it hid behind three other hypotheses before instrumentation named it (ADR 0164).
+   *
+   * The re-export node ALIASES the real declaration, so following that edge asks the kind question
+   * of the thing the import actually names. Depth-capped: a chain of barrels is normal, a cycle is
+   * not, and this must not hang on one.
+   */
+  private static declaredKindOf(graph: ConducksAdjacencyList, node: ConducksNode | undefined): string {
+    let current = node;
+    for (let hop = 0; current && hop < 5; hop++) {
+      const kind = (current.properties?.kind || '').toLowerCase();
+      if (kind !== 'binding') return kind;
+      const alias = graph.getNeighbors(current.id, 'downstream')
+        .find((e: any) => e.type === 'ALIASES');
+      if (!alias) return kind;
+      current = graph.getNode(alias.targetId) as ConducksNode | undefined;
+    }
+    return (current?.properties?.kind || '').toLowerCase();
+  }
+
+  /**
+   * A file that exists to REPUBLISH what it imports — `__init__.py` and an `index` door.
+   *
+   * Wider than `isBarrelPath` on purpose, and the difference is the whole point: the two callers ask
+   * different questions. `findStaleImports` asks "is this IMPORT dead", and for that a TS `index.ts`
+   * must be judged like any other file, because `export { x }` is captured and an index door here is
+   * routinely a real module with real code — exempting them cost five true findings.
+   *
+   * This one asks "is the SYMBOL dead", and a re-export surface is exactly where a consumer becomes
+   * invisible: `export const SYSTEMS = BUILTIN_SYSTEMS` in an index door is a bare initializer read
+   * and produces no edge at all. MEASURED on sofie: narrowing this to `__init__.py` reported
+   * `BUILTIN_SYSTEMS` as an unused export while `systems/index.ts:25` was consuming it.
+   */
+  private static isReexportSurface(filePath: string): boolean {
     const base = filePath.toLowerCase().split(/[\\/]/).pop() || '';
     return base === '__init__.py' || /^index\.(ts|tsx|js|jsx|mjs|cjs)$/.test(base);
   }

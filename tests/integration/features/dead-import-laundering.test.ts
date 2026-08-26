@@ -62,12 +62,59 @@ export function spreadRead(): string[] { return [...KEYS]; }
 export function indexRead(k: string): number { return STATUS[k] || 500; }
 `);
 
+    // An ALIASED import is DEFINED under one name and READ under another, and the stale check
+    // compares the ORIGINAL. What keeps that correct is the RESOLVED TARGET TAIL: the call binds to
+    // `aliased-source.ts::originalname`, and the used-names index records the tail, so the original
+    // spelling is present even though this file never writes it.
+    //
+    // That mechanism was load-bearing and untested. Mutating the target-tail line fails this case
+    // and nothing else in the suite. Written after a redundant "also check the local name" guard was
+    // added here, failed to bite under mutation, and was removed — the protection was never the
+    // alias spelling, it was the resolved edge.
+    writeFile(repo, 'src/aliased-source.ts', `
+export function originalName(x: number): number { return x + 9; }
+`);
+    writeFile(repo, 'src/aliased-user.ts', `
+import { originalName as localAlias } from './aliased-source.js';
+export function useAlias(x: number): number { return localAlias(x); }
+`);
+
+    // ADR 0164 — an import routed through a BARREL resolves to the barrel's re-export node, whose
+    // kind is `binding`, not to the declaration. `binding` was not a prunable kind, so no import
+    // reached through a door could ever be judged stale — on a codebase built out of index doors
+    // that is most of them. Measured on this repository: the single largest cause of the recall gap
+    // against `tsc --noUnusedLocals`, 22 of 26 misses.
+    writeFile(repo, 'src/behind-door.ts', `
+export function behindDoor(x: number): number { return x + 11; }
+export function alsoBehindDoor(x: number): number { return x + 12; }
+`);
+    writeFile(repo, 'src/door.ts', `
+export { behindDoor, alsoBehindDoor } from './behind-door.js';
+`);
+    // Imports two names THROUGH the door and uses only one. The unused one must be reported.
+    writeFile(repo, 'src/door-user.ts', `
+import { behindDoor, alsoBehindDoor } from './door.js';
+export function useOne(x: number): number { return behindDoor(x); }
+`);
+
+    // An `index.ts` that is a REAL MODULE, not a pure re-export file — which is what an index door
+    // usually is in this codebase. Exempting every index from stale-import judgement cost five true
+    // findings on this repository, so the exemption is `__init__.py` only. The symbol dead here must
+    // still be reported even though the file is named index.
+    writeFile(repo, 'src/feature/index.ts', `
+import { behindDoor, alsoBehindDoor as unusedInIndex } from '../door.js';
+export function featureEntry(x: number): number { return behindDoor(x); }
+`);
+
     writeFile(repo, 'src/main.ts', `
 import { realWork } from './importer.js';
 import { viaBarrel } from './index.js';
 import { spreadRead, indexRead } from './readers.js';
+import { useAlias } from './aliased-user.js';
+import { useOne } from './door-user.js';
+import { featureEntry } from './feature/index.js';
 export function boot(): number {
-  return realWork(1) + viaBarrel(2) + spreadRead().length + indexRead('ok');
+  return realWork(1) + viaBarrel(2) + spreadRead().length + indexRead('ok') + useAlias(3) + useOne(4) + featureEntry(5);
 }
 `);
     commit(repo, 'init');
@@ -107,6 +154,28 @@ export function boot(): number {
    * import in any codebase was the one shape that could never be reported. todo77#P1 planted it
    * twice, on two languages, and prune missed it twice.
    */
+  it('does not call an aliased import stale when the file uses the alias', () => {
+    const hit = findings.filter((f: any) => f.file.includes('aliased-user'));
+    expect(hit.map((f: any) => f.type)).not.toContain('STALE_IMPORT');
+  }, 240000);
+
+  it('reports an unused import that was routed through a barrel door', () => {
+    const hit = findings.filter((f: any) => f.symbol === 'alsoBehindDoor');
+    expect(hit.map((f: any) => f.type)).toContain('STALE_IMPORT');
+  }, 240000);
+
+  it('does not report the name from the SAME door that is used', () => {
+    const hit = findings.filter(
+      (f: any) => f.symbol === 'behindDoor' && f.file.includes('door-user'),
+    );
+    expect(hit.map((f: any) => f.type)).not.toContain('STALE_IMPORT');
+  }, 240000);
+
+  it('judges an index door like any other file — it is not a Python package init', () => {
+    const hit = findings.filter((f: any) => f.file.includes('feature/index'));
+    expect(hit.map((f: any) => f.type)).toContain('STALE_IMPORT');
+  }, 240000);
+
   it('reports a single-binding unused import as stale', () => {
     expect(find('laundered').map((f: any) => f.type)).toContain('STALE_IMPORT');
   }, 240000);
