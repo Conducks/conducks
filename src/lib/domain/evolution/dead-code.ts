@@ -491,6 +491,12 @@ export class DeadCodeAnalyzer {
       if (!props.bindingName) continue;
       const file = fileOfNode(edge.sourceId);
       if (!file || DeadCodeAnalyzer.isTestPath(file)) continue;
+      // A BARREL IMPORTS IN ORDER TO REPUBLISH. Python states the republish in `__all__`, a list of
+      // STRING literals no reference rule reads, so every name an `__init__.py` re-exports looks
+      // imported-and-never-touched. MEASURED on scraper: of 56 findings the Python oracle
+      // contradicted, **54 were in `__init__.py`** — one shape accounting for 96% of them.
+      // Excluding barrels is what makes removing the calibration guard below survivable.
+      if (DeadCodeAnalyzer.isBarrelPath(file)) continue;
       const key = `${file}::${props.specifier}`;
       let statement = statements.get(key);
       if (!statement) statements.set(key, statement = { file, specifier: String(props.specifier), candidates: [] });
@@ -543,7 +549,22 @@ export class DeadCodeAnalyzer {
       // Both are extractor coverage gaps, which is exactly what this guard exists to tolerate. The
       // recall gap stays until those two positions are captured; a missed dead import is acceptable
       // and a wrong one is not.
-      if (!statement.candidates.some(isUsed)) continue;
+      // THE IMPORT-SITE CALIBRATION GUARD IS GONE, and this is the measurement that retired it.
+      //
+      // It skipped any statement where NOTHING it brings in was seen used, on the premise that the
+      // extractor might simply not cover how this file uses it. True in 2026-08-15's measurement,
+      // where removing it cost Python 77 false findings. Re-measured 2026-08-26 after the barrel
+      // exclusion above: the false findings were not spread across the language, they were 54 of 56
+      // in `__init__.py`, and the barrel rule names that shape directly instead of tolerating it
+      // with a blanket guard.
+      //
+      // What the guard cost: it skipped every SINGLE-BINDING import by construction, since "nothing
+      // in this statement is used" is always true when the statement brings in one name. That is
+      // the shape todo77#P1 planted twice and prune missed twice.
+      //
+      // Kept in place of the guard: nothing. Precision is now held by the barrel rule, the test-path
+      // rule, and the type-only rule, each of which names a REASON a file legitimately imports
+      // without using — which is what the guard was approximating.
 
       for (const candidate of statement.candidates) {
         if (isUsed(candidate)) continue;

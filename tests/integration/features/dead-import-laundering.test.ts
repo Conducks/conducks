@@ -100,6 +100,16 @@ export function boot(): number {
   it('counts a subscript as a read of the object it indexes', () => {
     expect(find('STATUS').map((f: any) => f.type)).not.toContain('ONLY_IMPORTED');
   }, 240000);
+
+  /**
+   * ADR 0163. The import-site calibration guard skipped any statement where NOTHING it brings in was
+   * used — which is true by construction of every SINGLE-BINDING import, so the commonest stale
+   * import in any codebase was the one shape that could never be reported. todo77#P1 planted it
+   * twice, on two languages, and prune missed it twice.
+   */
+  it('reports a single-binding unused import as stale', () => {
+    expect(find('laundered').map((f: any) => f.type)).toContain('STALE_IMPORT');
+  }, 240000);
 });
 
 /**
@@ -154,5 +164,16 @@ def boot():
   it('does not report a name the barrel re-exports through __all__', () => {
     const hit = findings.filter((f: any) => f.symbol === 'via_barrel');
     expect(hit.map((f: any) => f.type)).not.toContain('ONLY_IMPORTED');
+  }, 240000);
+
+  /**
+   * The same exclusion, on the other rule — and this is the one that PAID for retiring the
+   * calibration guard. Measured on scraper: of 56 findings the Python oracle contradicted, 54 were
+   * in an `__init__.py`. Naming the shape replaced a blanket guard that had cost every
+   * single-binding import in both languages.
+   */
+  it('does not report the barrel import itself as stale', () => {
+    const hit = findings.filter((f: any) => f.symbol === 'via_barrel');
+    expect(hit.map((f: any) => f.type)).not.toContain('STALE_IMPORT');
   }, 240000);
 });

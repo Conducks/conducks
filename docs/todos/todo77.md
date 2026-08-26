@@ -19,21 +19,21 @@ tool. **The hypothesis was wrong twice**, and both defects were invisible to sam
 - [x] L1 sofie — 135 verdicts scored, 13 code-hit suspects, every one a name collision or a string literal. 0 false positives
 - [x] L1 scraper — 17 verdicts scored, 3 suspects, all comment/string/docstring. 0 false positives, and the 7 ABC base classes still read as live
 - [x] L1 orchestrator — 175 verdicts scored, 61 suspects, 8 confirmed FALSE POSITIVES, all namespace imports. Fixed by 0161; 239 → 230, nothing added. Re-scored: 166 verdicts, 9 suspects gone, 0 new
-- [x] L2 scraper — 4 planted, 3 found: an orphan function, an orphan class, an unused first-party import. The miss is the calibration guard, below
-- [x] L2 sofie — 3 planted, 2 found: an orphan function, and an unused export reported as ORPHAN (a stronger claim, and true). Same import miss
+- [x] L2 scraper — 4 planted, 4 found: an orphan function, an orphan class, and an unused first-party import now reported as both ONLY_IMPORTED and STALE_IMPORT
+- [x] L2 sofie — 3 planted, 3 found: an orphan function, an unused export reported as ORPHAN (a stronger claim, and true), and a single-binding unused import now reported STALE_IMPORT
 - [x] L2 orchestrator — 3 planted one per workspace, 3 found. A monorepo miss cannot hide behind a single-package pass
 - [x] L3 scraper — 4 planted, 0 flagged: a test-only consumer, a name re-exported through `__init__.py`, a `__main__` entry point, an ABC override called through its base
 - [x] L3 sofie — 3 planted, 0 flagged: consumed only through a barrel, consumed only from a test, and a method reached only by interface dispatch
 - [x] L3 orchestrator — 1 planted, 0 flagged: an export consumed only by a SIBLING workspace, the monorepo-specific false positive
 - [x] an unused import LAUNDERS a dead symbol — fixed by 0162 as `ONLY_IMPORTED`, a question rather than a verdict
-- [ ] decide whether an unused stdlib whole-module import is in scope for STALE_IMPORT, and say so wherever the claim is stated
+- [x] decide whether an unused stdlib whole-module import is in scope for STALE_IMPORT — it is NOT: only a resolved in-project named import becomes a candidate, which `findStaleImports` states in its own header
 
 ### The three levels, totalled
 
 | level | planted / scored | result |
 |---|---|---|
 | L1 precision | 318 verdicts across 3 subjects | **0 false positives** after two fixes |
-| L2 recall | 10 planted | **8 found.** Both misses are the same shape |
+| L2 recall | 10 planted | **10 found** |
 | L3 counter | 8 planted | **0 flagged** |
 
 `UNIMPORTED_MODULE` is excluded from L1 throughout — 73 of the findings. `prune` calls those
@@ -53,13 +53,32 @@ in neither single-repo subject. Rounds 5 and 6 checked ~40 of ~400 findings and 
 it is not a wrong finding, it is a MISSING finding, and only planting the defect makes an absence
 visible. Adding one dead import took scraper from 23 findings to 22.
 
-### The known miss, stated
+### The third defect, and how the known miss was closed
 
-Both L2 misses are a single-binding unused import going unreported as `STALE_IMPORT`. The import-site
-calibration guard skips a statement where nothing at all is used, which is always true of a
-single-binding import. **The guard stays** — removing it was measured at 77 false findings on Python.
-The symbol behind such an import is now reported as `ONLY_IMPORTED`, so the consequence is closed
-even though the import itself is not named.
+Both L2 misses were the same shape — a single-binding unused import — and the import-site
+calibration guard was why, because "nothing in this statement is used" is true by construction when
+the statement brings in one name.
+
+The guard looked immovable: removing it was measured at 77 false findings on Python in 2026-08-15,
+and still 54 today. **Classifying the 54 is what moved it** — 54 of 56 were in an `__init__.py`, one
+shape accounting for 96% of the damage, and the same shape ADR 0162 had already named for a different
+rule. ADR 0163 excludes barrels and retires the guard.
+
+| oracle | MISSED before → after | EXTRA before → after |
+|---|---|---|
+| TypeScript, vs `tsc` | 26 → 23 | 0 → 0 |
+| Python, vs `ast` | 4 → 1 | 0 → 0 |
+
+Better on both axes in both languages. The lesson is the record's title: a blanket guard tolerating
+an unknown shape cost every single-binding import in two languages, and naming the actual shape cost
+nothing.
+
+### What prune still misses, with the reason
+
+23 on TypeScript, 1 on Python, measured against the compilers. Two named causes, both in the parser
+layer rather than in `dead-code.ts`: **type imports**, which `isTypeOnly` treats as used because
+TypeScript emits no `TYPE_REFERENCE` edges (ADR 0016), and **`const`-kind value imports**, which
+`PRUNABLE_BINDING_KINDS` excludes deliberately. Neither is closable by this analyzer alone.
 
 ## Phase 2 — trace
 
