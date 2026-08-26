@@ -2,6 +2,15 @@
   (pair value: (identifier) @ref_value)
   (object (shorthand_property_identifier) @ref_value)
   (array (identifier) @ref_value)
+  ;; A SPREAD is a read of the whole binding — `[...PROVIDER_KEYS]` consumes every element of it.
+  ;; The array pattern above sees a bare identifier ELEMENT and stops there, so the spread form
+  ;; produced no evidence at all. MEASURED on sofie: PROVIDER_KEYS is imported at app.ts:33 and
+  ;; spread at app.ts:267, and was the only reference — so the symbol read as never used.
+  (spread_element (identifier) @ref_value)
+  ;; A SUBSCRIPT reads the object it indexes. `ERROR_STATUS_MAP[code]` is a use of the map, whatever
+  ;; the key turns out to be. MEASURED on orchestrator: imported at errors.ts:1, indexed at
+  ;; errors.ts:11, and that index was its only reference.
+  (subscript_expression object: (identifier) @ref_value)
   (ternary_expression (identifier) @ref_value)
   (member_expression object: (identifier) @ref_value)
   ;; The same member expression, captured with BOTH halves. The pattern above marks the OBJECT used

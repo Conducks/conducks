@@ -2,7 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { warnIfStale } from "@/interfaces/cli/shared/stale-warning.js";
-import { DEAD_CODE_TYPES } from "@/contracts/index.js";
+import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from "@/contracts/index.js";
 import { displayPath } from "@/interfaces/cli/shared/display-path.js";
 
 /**
@@ -73,7 +73,7 @@ export class PruneCommand implements ConducksCommand {
       process.stdout.write(JSON.stringify(findings.map((f: any) => ({
         ...f,
         file: realFile(f.file),
-        claim: f.type === 'UNIMPORTED_MODULE' ? 'question' : 'verdict',
+        claim: DEAD_CODE_QUESTION_TYPES.includes(f.type) ? 'question' : 'verdict',
       })), null, 2) + '\n');
       return;
     }
@@ -86,8 +86,8 @@ export class PruneCommand implements ConducksCommand {
       // Questions print BELOW the findings and in a different colour, because they are a different
       // claim: a finding says "this is unused", a question says "the graph cannot tell" (ADR 0104).
       // Mixing them in one red list is what made `orphan-module.ts` read as a deletion candidate.
-      const questions = findings.filter((f: any) => f.type === 'UNIMPORTED_MODULE');
-      const verdicts = findings.filter((f: any) => f.type !== 'UNIMPORTED_MODULE');
+      const questions = findings.filter((f: any) => DEAD_CODE_QUESTION_TYPES.includes(f.type));
+      const verdicts = findings.filter((f: any) => !DEAD_CODE_QUESTION_TYPES.includes(f.type));
 
       // STATE THE DENOMINATOR, like `flows` and `context` already do. The rendered view listed rows
       // and never said how many — so "how much dead weight is there" meant counting lines by hand,

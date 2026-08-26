@@ -17,6 +17,7 @@ export const DEAD_CODE_TYPES = [
   'UNREACHABLE_LOGIC',
   'STALE_IMPORT',
   'UNIMPORTED_MODULE',
+  'ONLY_IMPORTED',
 ] as const;
 
 /** The union, derived from the list rather than restated — a second copy is how two went missing. */
@@ -30,5 +31,5 @@ export type DeadCodeType = typeof DEAD_CODE_TYPES[number];
  * second destroys a capability nobody decided to drop. The CLI has always separated these; the MCP
  * tool flattened them into one list beside the verdicts, which is the reading that gets code deleted.
  */
-export const DEAD_CODE_QUESTION_TYPES: readonly DeadCodeType[] = ['UNIMPORTED_MODULE'];
+export const DEAD_CODE_QUESTION_TYPES: readonly DeadCodeType[] = ['UNIMPORTED_MODULE', 'ONLY_IMPORTED'];
 

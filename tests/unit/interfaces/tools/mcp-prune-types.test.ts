@@ -62,12 +62,18 @@ beforeEach(() => {
 describe('the finding types are one list — todo53', () => {
   it('names every type the domain can emit', () => {
     expect([...DEAD_CODE_TYPES].sort()).toEqual(
-      ['ORPHAN', 'STALE_IMPORT', 'UNIMPORTED_MODULE', 'UNREACHABLE_LOGIC', 'UNUSED_EXPORT'],
+      // ONLY_IMPORTED added by ADR 0162: every reference to the symbol is an import the importing
+      // file never uses. A sixth type, and this list is restated by hand ON PURPOSE — that is what
+      // makes adding one reach every summary and every enum instead of landing silently.
+      ['ONLY_IMPORTED', 'ORPHAN', 'STALE_IMPORT', 'UNIMPORTED_MODULE', 'UNREACHABLE_LOGIC', 'UNUSED_EXPORT'],
     );
   });
 
   it('marks which of them are QUESTIONS rather than verdicts', () => {
-    expect(DEAD_CODE_QUESTION_TYPES).toEqual(['UNIMPORTED_MODULE']);
+    // ONLY_IMPORTED is a QUESTION: it rests on the used-names index, and that index is measurably
+    // not strong enough for a delete verdict — removing the guard built on it produced 77 false
+    // findings on Python.
+    expect(DEAD_CODE_QUESTION_TYPES).toEqual(['UNIMPORTED_MODULE', 'ONLY_IMPORTED']);
   });
 });
 

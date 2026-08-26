@@ -70,6 +70,10 @@ export class DeadCodeAnalyzer {
     // skip them entirely rather than flood the report with false positives.
     const graphTracksTypes = allEdges.some(e => e.type === 'TYPE_REFERENCE');
 
+    // Built once and shared: both the orphan/export branches below and `findStaleImports` ask the
+    // same question — "did this file use this name?" — and a second copy would drift.
+    const { usedNamesByFile, fileOfNode } = this.buildUsageIndex(graph, allEdges);
+
     // See `isModuleScoped`: a declaration written inside an expression is that expression's business.
     const isNested = (n: any): boolean => (n?.properties as any)?.dna?.nestedInExpression === true;
 
@@ -194,6 +198,48 @@ export class DeadCodeAnalyzer {
       const incomingRefs = graph.getNeighbors(node.id, 'upstream')
         .filter((e: any) => DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type));
 
+      // AN UNUSED IMPORT IS NOT A USE — and until this existed, it laundered the symbol behind it.
+      //
+      // ORPHAN requires zero incoming references, so one import edge silenced it. STALE_IMPORT
+      // would have caught the import instead, except its import-site calibration skips a statement
+      // where NOTHING is used — which is always true of a single-binding import. The symbol fell
+      // between the two rules and was reported by neither.
+      //
+      // MEASURED on the scraper subject: adding one unused `from foundation.paths import
+      // get_data_dir` took prune from 23 findings to 22 and made `get_data_dir` — an ORPHAN a moment
+      // earlier — invisible to both checks. Adding dead code LOWERED the dead-code count, which is
+      // the shape a real refactor leaves behind: the last caller goes, the import stays, and the
+      // symbol stops being reported the day it actually died.
+      //
+      // Reported as a QUESTION, never a verdict. Saying "delete this" here would rest on
+      // `usedNamesByFile`, and that index is measurably not strong enough to carry a delete verdict:
+      // removing the calibration guard that depends on it produced 77 FALSE findings on Python.
+      // The honest claim is the one this makes — every reference is an import nobody appears to use,
+      // so look at the import site.
+      const importOnlyRefs = incomingRefs.filter((e: any) => {
+        if (e.type !== 'IMPORTS') return false;
+        const binding = String(e.properties?.bindingName ?? '').toLowerCase();
+        if (!binding) return false;
+        // A BARREL IMPORTS IN ORDER TO REPUBLISH, so "it never uses the name" is its normal state
+        // and says nothing about the symbol. Python states the republish in `__all__`, a list of
+        // STRINGS the parser reads as no reference at all.
+        //
+        // MEASURED on scraper, and predicted by this todo's own L3 counter-case ("a name re-exported
+        // from __init__.py must not be flagged"): without this line the rule produced 11 findings
+        // and 8 of them were barrel re-exports — `get_logger`, `classify`, `classify_http`,
+        // `RetryDecision`, `BaseQueue` and the three exception types, every one imported by an
+        // `__init__.py` and listed in its `__all__`.
+        //
+        // A barrel that imports something and does NOT republish it is a genuinely stale import that
+        // this now misses. Accepted, on this analyzer's standing rule: a missed dead import is
+        // acceptable and a wrong one is not.
+        if (DeadCodeAnalyzer.isBarrelPath(fileOfNode(e.sourceId))) return false;
+        return !(usedNamesByFile.get(fileOfNode(e.sourceId))?.has(binding) === true);
+      });
+      const liveRefs = incomingRefs.filter((e: any) => !importOnlyRefs.includes(e));
+      const onlyImported = liveRefs.length === 0 && importOnlyRefs.length > 0;
+      const ONLY_IMPORTED_MESSAGE = `Every reference to this symbol is an import that the importing file never uses. Either the import is stale and the symbol is dead, or the use is one the parser does not see — read the import site before deleting.`;
+
       // 1. Orphaned Symbol (No callers/importers).
       // Restricted to MODULE-SCOPED architectural symbols (top-level
       // functions, classes, interfaces). The graph cannot reliably track
@@ -240,12 +286,17 @@ export class DeadCodeAnalyzer {
       // one no list can enumerate.
       const decorators = ((node.properties as any)?.dna?.decorators ?? []) as string[];
       const isRegistered = hasRegisteringDecorator(decorators);
-      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && this.isModuleScoped(node, graph, isNested) && incomingRefs.length === 0 && !this.isEntryPoint(node)) {
+      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && this.isModuleScoped(node, graph, isNested) && liveRefs.length === 0 && !this.isEntryPoint(node)) {
         // NOTHING IMPORTS THE FILE — so the graph cannot say whether this symbol is dead. Report the
         // question instead of a verdict (oracle T28, ADR 0104). `orphan-module.ts` in the fixture is
         // exactly this: two functions in a file no one imports, previously reported as a confident
         // `[ORPHAN]` alongside genuinely unreferenced symbols in reachable modules.
-        findings.push(!isOpenQuestion(node.properties.filePath) ? {
+        findings.push(onlyImported ? {
+          type: 'ONLY_IMPORTED',
+          symbol: node.properties.name,
+          file: node.properties.filePath,
+          message: ONLY_IMPORTED_MESSAGE
+        } : !isOpenQuestion(node.properties.filePath) ? {
           type: 'ORPHAN',
           symbol: node.properties.name,
           file: node.properties.filePath,
@@ -265,7 +316,9 @@ export class DeadCodeAnalyzer {
       const isSymbol = ['STRUCTURE', 'BEHAVIOR', 'ATOM', 'INFRA'].includes(node.label);
       if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && node.properties.isExport) {
         // Find if any incoming edges are 'IMPORTS' from OTHER files or 'CALLS' from other files
-        const externallyUsed = incomingRefs.some((e: any) => {
+        // liveRefs, not incomingRefs — an unused import from another file would otherwise read as
+        // external consumption and launder the export exactly as it laundered the orphan above.
+        const externallyUsed = liveRefs.some((e: any) => {
           const source = graph.getNode(e.sourceId);
           return source && (source as any).properties.filePath !== (node as any).properties.filePath;
         });
@@ -276,7 +329,12 @@ export class DeadCodeAnalyzer {
           // unreachability, and the reader cannot act on it either way. `orphanHelper` was landing
           // here — called by `orphanSecond` in the same unimported file — so one symbol of that
           // fixture read as a question and its sibling as a finding (ADR 0104).
-          findings.push(!isOpenQuestion(node.properties.filePath) ? {
+          findings.push(onlyImported ? {
+            type: 'ONLY_IMPORTED',
+            symbol: node.properties.name,
+            file: node.properties.filePath,
+            message: ONLY_IMPORTED_MESSAGE
+          } : !isOpenQuestion(node.properties.filePath) ? {
             type: 'UNUSED_EXPORT',
             symbol: node.properties.name,
             file: node.properties.filePath,
@@ -292,7 +350,7 @@ export class DeadCodeAnalyzer {
 
     }
 
-    findings.push(...this.findStaleImports(graph, allEdges));
+    findings.push(...this.findStaleImports(graph, allEdges, usedNamesByFile, fileOfNode));
 
     return findings;
   }
@@ -361,7 +419,19 @@ export class DeadCodeAnalyzer {
    *     (dependencies, stdlib) — the orchestrator only emits a per-binding edge for a resolved
    *     in-project named import (orchestrator.ts:412), so these never become candidates.
    */
-  private findStaleImports(graph: ConducksAdjacencyList, allEdges: ConducksEdge[]): Finding[] {
+  /**
+   * Every name each file was seen USING, from all evidence classes at once — plus the file-of-node
+   * helper that keys it.
+   *
+   * Hoisted out of `findStaleImports` when the ORPHAN branch needed the same answer. Two copies of
+   * "did this file use this name" would drift, and they would drift in opposite directions: one
+   * decides whether to report an import, the other whether to report the symbol behind it, so a
+   * disagreement between them is exactly the gap ONLY_IMPORTED exists to close.
+   */
+  private buildUsageIndex(graph: ConducksAdjacencyList, allEdges: ConducksEdge[]): {
+    usedNamesByFile: Map<string, Set<string>>;
+    fileOfNode: (nodeId: NodeId) => string;
+  } {
     const fileOfNode = (nodeId: NodeId): string => {
       const node = graph.getNode(nodeId) as ConducksNode | undefined;
       const fromNode = node?.properties?.filePath;
@@ -377,7 +447,6 @@ export class DeadCodeAnalyzer {
     // A resolved target is `<file>::<symbol>`; a dangling one is the raw expression text.
     const targetTail = (targetId: string): string => targetId.includes('::') ? targetId.split('::').pop()! : targetId;
 
-    // Every name the file was seen USING, from all evidence classes at once.
     const usedNamesByFile = new Map<string, Set<string>>();
     const recordUse = (file: string, name: string): void => {
       if (!file || !name) return;
@@ -400,6 +469,16 @@ export class DeadCodeAnalyzer {
         for (const argument of props.arguments) for (const token of tokensOf(argument)) recordUse(file, token);
       }
     }
+
+    return { usedNamesByFile, fileOfNode };
+  }
+
+  private findStaleImports(
+    graph: ConducksAdjacencyList,
+    allEdges: ConducksEdge[],
+    usedNamesByFile: Map<string, Set<string>>,
+    fileOfNode: (nodeId: NodeId) => string,
+  ): Finding[] {
 
     // Candidates, grouped per import statement (file + specifier).
     interface Candidate { binding: string; targetId: string; isTypeOnly: boolean }
@@ -520,6 +599,12 @@ export class DeadCodeAnalyzer {
   }
 
   // Test fixtures, specs, and mocks are not product code — their symbols are never "dead".
+  /** A file whose job is to re-export: a Python package init, or a JS/TS index barrel. */
+  private static isBarrelPath(filePath: string): boolean {
+    const base = filePath.toLowerCase().split(/[\\/]/).pop() || '';
+    return base === '__init__.py' || /^index\.(ts|tsx|js|jsx|mjs|cjs)$/.test(base);
+  }
+
   private static isTestPath(filePath: string): boolean {
     const fp = filePath.toLowerCase();
     return /(^|\/)(tests?|__tests__|__mocks__|spec|fixtures?|polyglot-verify)(\/|$)/.test(fp)

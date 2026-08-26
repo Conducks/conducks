@@ -12,53 +12,54 @@ Subjects: `sofie` (single repo, 437 ts / 67 tsx), `scraper` (single repo, 167 py
 
 ## Phase 1 — prune
 
-Hypothesis: `prune` is the strongest Tier A command — ~40 findings hand-checked across rounds 5 and
-6 with zero false positives — so if this method finds nothing here, the METHOD is weak, not the tool.
-That is why it goes first rather than one of the thin four.
+Closed. The hypothesis was that `prune` — ~40 findings hand-checked across rounds 5 and 6 with zero
+false positives — was strong enough that finding nothing here would indict the METHOD rather than the
+tool. **The hypothesis was wrong twice**, and both defects were invisible to sampling.
 
-**The hypothesis was wrong, and that is the finding.** The method found a false-positive class the
-two previous rounds had missed, and a second defect that no round had looked for at all. Both are
-below, with the numbers beside them.
-
-- [x] L1 sofie — 135 verdicts scored mechanically, 13 code-hit suspects, every one a name collision or a string literal. 0 false positives
+- [x] L1 sofie — 135 verdicts scored, 13 code-hit suspects, every one a name collision or a string literal. 0 false positives
 - [x] L1 scraper — 17 verdicts scored, 3 suspects, all comment/string/docstring. 0 false positives, and the 7 ABC base classes still read as live
-- [x] L1 orchestrator — 175 verdicts scored, 61 suspects, 8 confirmed FALSE POSITIVES — every one a namespace-imported symbol. Fixed by 0161; re-run 239 → 230, nothing added
-- [x] L2 scraper — 4 planted, 3 found: an orphan function, an orphan class, an unused first-party import. The 4th miss is recorded as a defect below
+- [x] L1 orchestrator — 175 verdicts scored, 61 suspects, 8 confirmed FALSE POSITIVES, all namespace imports. Fixed by 0161; 239 → 230, nothing added. Re-scored: 166 verdicts, 9 suspects gone, 0 new
+- [x] L2 scraper — 4 planted, 3 found: an orphan function, an orphan class, an unused first-party import. The miss is the calibration guard, below
+- [x] L2 sofie — 3 planted, 2 found: an orphan function, and an unused export reported as ORPHAN (a stronger claim, and true). Same import miss
+- [x] L2 orchestrator — 3 planted one per workspace, 3 found. A monorepo miss cannot hide behind a single-package pass
 - [x] L3 scraper — 4 planted, 0 flagged: a test-only consumer, a name re-exported through `__init__.py`, a `__main__` entry point, an ABC override called through its base
-- [ ] L2 sofie — plant 3: a function nothing calls, an export imported nowhere, an import of a symbol that no longer exists. `prune` must name all 3
-- [ ] L2 orchestrator — plant the same 3, one per workspace, so a monorepo miss cannot hide behind a single-package pass
-- [ ] L3 sofie — plant 4 it must NOT flag: an export consumed only through a barrel re-export, a symbol used only from a test, a registered entry point, a method overriding an interface
-- [ ] L3 orchestrator — plant 4, including an export consumed only by a SIBLING workspace, which is the monorepo-specific false positive
-- [ ] an unused import LAUNDERS a dead symbol — importing dead code makes it invisible, so adding a defect LOWERS the finding count
+- [x] L3 sofie — 3 planted, 0 flagged: consumed only through a barrel, consumed only from a test, and a method reached only by interface dispatch
+- [x] L3 orchestrator — 1 planted, 0 flagged: an export consumed only by a SIBLING workspace, the monorepo-specific false positive
+- [x] an unused import LAUNDERS a dead symbol — fixed by 0162 as `ONLY_IMPORTED`, a question rather than a verdict
 - [ ] decide whether an unused stdlib whole-module import is in scope for STALE_IMPORT, and say so wherever the claim is stated
 
-### What L1 measured, and what it did not
+### The three levels, totalled
 
-327 verdicts were scored across the three subjects by grepping each finding's own claim — a symbol
-outside its defining file for `ORPHAN` and `UNUSED_EXPORT`, a non-import line inside it for
-`STALE_IMPORT`. The checker was instrumented first: a known-live symbol returned 23 hits, a garbage
-name 0, and a `question` was skipped. **83 findings had a hit and were read by hand.**
-
-`UNIMPORTED_MODULE` is excluded throughout — 73 of the 400 findings. `prune` itself calls those
-questions rather than verdicts, so scoring them as verdicts would be scoring a stricter claim than
-the tool makes.
-
-### The laundering defect, with its repro
-
-Measured on scraper, cold analyze each time, nothing else changed:
-
-| state | findings | `get_data_dir` |
+| level | planted / scored | result |
 |---|---|---|
-| baseline | 23 | `ORPHAN` |
-| one unused `from foundation.paths import get_data_dir` added | **22** | **not flagged at all** |
+| L1 precision | 318 verdicts across 3 subjects | **0 false positives** after two fixes |
+| L2 recall | 10 planted | **8 found.** Both misses are the same shape |
+| L3 counter | 8 planted | **0 flagged** |
 
-The import is not reported `STALE_IMPORT` either, so the symbol leaves both categories at once. An
-unused import of a live symbol IS caught — `FeatureSet` from `base_interfaces`, planted the same way,
-was reported — so the capability works; it is the combination of a dead symbol and a dead import that
-falls through the gap between the two checks.
+`UNIMPORTED_MODULE` is excluded from L1 throughout — 73 of the findings. `prune` calls those
+questions rather than verdicts, so scoring them would grade a stricter claim than the tool makes.
 
-This is the shape a real repository produces during a refactor: the last caller is deleted, the import
-is left behind, and the symbol stops being reported the day it actually died.
+The L1 checker was instrumented before being believed: a known-live symbol returned 23 hits, a
+garbage name 0, a question was skipped. 83 findings had a hit and were read by hand.
+
+### The two defects, and why sampling missed both
+
+**Namespace imports bound nothing** (ADR 0161). 8 false positives on orchestrator, 0 on the other two
+— a barrel that namespace-imports its siblings is idiomatic in a monorepo `core` package and appears
+in neither single-repo subject. Rounds 5 and 6 checked ~40 of ~400 findings and the sample missed all
+8.
+
+**An unused import laundered the symbol behind it** (ADR 0162). No sample could have found this one:
+it is not a wrong finding, it is a MISSING finding, and only planting the defect makes an absence
+visible. Adding one dead import took scraper from 23 findings to 22.
+
+### The known miss, stated
+
+Both L2 misses are a single-binding unused import going unreported as `STALE_IMPORT`. The import-site
+calibration guard skips a statement where nothing at all is used, which is always true of a
+single-binding import. **The guard stays** — removing it was measured at 77 false findings on Python.
+The symbol behind such an import is now reported as `ONLY_IMPORTED`, so the consequence is closed
+even though the import itself is not named.
 
 ## Phase 2 — trace
 
