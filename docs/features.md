@@ -42,7 +42,7 @@
 - Intent: Finding what an accepted decision left unbuilt otherwise means reading every record bottom-up. It is a summary and a set of links, never a copy of the docs: every line is an address (`todo09#P2`) or a state, so it cannot drift into a second version of them.
 
 ## Docs Grammar Gate — `conducks docs-lint`, live via `conducks watch`
-- Purpose: Fail a doc that breaks the standard — a wrapped value, a duplicate phase number, a link pointing at a record that does not exist, a supersede that abandons unbuilt work — and report hygiene separately without failing.
+- Purpose: Fail a doc that breaks the standard — a wrapped value, a duplicate phase number, TWO RECORDS AT ONE NUMBER, a link pointing at a record that does not exist, a supersede that abandons unbuilt work — and report hygiene separately without failing.
 - Intent: A standard nothing enforces is advice. Hygiene is split from grammar because a gate that fails on housekeeping gets switched off.
 
 ## Visual Anchor Gate — `conducks visuals-lint`
@@ -51,7 +51,7 @@
 
 ## Testing Checklist — `conducks testing`
 - Purpose: Say where the manual checklist is, how much of it has been worked through, and where to open it — the chord that draws it as a pane inside ForgeTerm, the browser anywhere else.
-- Intent: It NAMES the target and never drives it (ADR 0166). ForgeTerm has no control channel, so opening a pane from out here would cost a protocol message, a new outside-in command surface, and a version bump that restarts every running shell — to save one keystroke. The count comes from the source rather than the rendered page, because a generated page is wrong for exactly as long as somebody has edited the source without re-rendering.
+- Intent: It NAMES the target and never drives it (ADR 0170). ForgeTerm has no control channel, so opening a pane from out here would cost a protocol message, a new outside-in command surface, and a version bump that restarts every running shell — to save one keystroke. The count comes from the source rather than the rendered page, because a generated page is wrong for exactly as long as somebody has edited the source without re-rendering.
 
 ## Mirror Live Sync — `conducks mirror` (with `conducks watch` running)
 - Purpose: Push graph changes to connected dashboard clients as they land, so the picture on screen matches the code on disk.

@@ -1,4 +1,11 @@
-# 0166 — a render target is named, not driven
+# 0170 — a render target is named, not driven
+
+*Numbered 0166 for one afternoon. Another session in this repository took the
+same number an hour later, and `docs-lint` did not notice — two records at one
+address, which is the one thing a number has to prevent. Renumbered here rather
+than there because the other 0166 already has a record building on it, and a
+record nobody else cites is the cheaper one to move. The gate that would have
+caught it is `no two records share a number`, added the same day.*
 
 Status: Accepted
 - Date: 2026-08-27

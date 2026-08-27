@@ -213,6 +213,12 @@ lowercased, non-alphanumerics collapsed to `-`, trimmed to roughly six words.
 **Never rename a record.** The number and slug are how everything cites it. A wrong title is
 superseded, not relabelled.
 
+**One exception, and it is a repair rather than a rename: two records at one NUMBER.** Two people
+numbering from "highest + 1" without seeing each other's work is the ordinary state of two agents in
+one repository — measured on 2026-08-27, two ADRs numbered 0166 an hour apart, with every reference
+to 0166 resolving happily because one of them always existed. Renumber the one nothing cites yet,
+never both, and say in the moved record where it used to live. `docs-lint` fails a shared number.
+
 ---
 
 ## §5 The line grammar

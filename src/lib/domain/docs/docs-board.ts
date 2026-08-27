@@ -319,6 +319,38 @@ export function treeShapeLint(root: string, isRoot: boolean): { errs: Array<{ fi
   for (const fp of walkReadmes(docsDir)) {
     errs.push({ file: path.relative(docsDir, fp), errs: ["`README.md` is not part of the standard — the docs have no map file. Put what it holds in `features.md`, or delete it"] });
   }
+
+  // **Two records at one address.** A number is how everything cites a record
+  // (§4), so two files carrying the same one make every citation to it
+  // ambiguous — including the ones already written, which is why this is an
+  // error rather than a warning.
+  //
+  // It happens when two people number from the same "highest + 1" without
+  // seeing each other's work, which is the ordinary state of two agents in one
+  // repository. Measured 2026-08-27 in this repo: two ADRs numbered 0166 an
+  // hour apart, and nothing noticed — `docs-lint` resolved every reference to
+  // 0166 happily, because one of them always existed.
+  for (const dir of ["decisions", "todos"]) {
+    const numbered = new Map<string, string[]>();
+    let entries: string[];
+    try { entries = readdirSync(path.join(docsDir, dir)); } catch { continue; }
+    for (const name of entries) {
+      const at = name.match(/^(?:todo)?(\d+)[-.]/);
+      if (!at || !name.endsWith(".md")) continue;
+      const held = numbered.get(at[1]) ?? [];
+      held.push(name);
+      numbered.set(at[1], held);
+    }
+    for (const [number, files] of numbered) {
+      if (files.length < 2) continue;
+      errs.push({
+        file: `${dir}/${files.sort()[0]}`,
+        errs: [
+          `${files.length} records share the number ${number} (${files.sort().join(", ")}) — a number is an address, and two records at one address make every citation to it ambiguous. Renumber the one nothing cites yet; never renumber both`,
+        ],
+      });
+    }
+  }
   return { errs, warns };
 }
 

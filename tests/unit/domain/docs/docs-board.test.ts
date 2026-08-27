@@ -254,6 +254,52 @@ describe('tree shape', () => {
     expect(treeShapeLint(root, true).errs[0].errs[0]).toMatch(/not part of the standard/);
   });
 
+  /**
+   * **Two records at one address.** Measured in this repository on 2026-08-27:
+   * two ADRs numbered 0166 an hour apart, by two sessions each numbering from
+   * "highest + 1" without seeing the other. Nothing caught it — every reference
+   * to 0166 resolved, because one of them always existed.
+   */
+  it('fails two records that share a number', () => {
+    const dup = mkdtempSync(path.join(tmpdir(), 'conducks-dup-'));
+    mkdirSync(path.join(dup, 'docs/decisions'), { recursive: true });
+    writeFileSync(path.join(dup, 'docs/decisions/0166-one-thing.md'), '# 0166 — one\n');
+    writeFileSync(path.join(dup, 'docs/decisions/0166-another-thing.md'), '# 0166 — another\n');
+    writeFileSync(path.join(dup, 'docs/decisions/0167-fine.md'), '# 0167 — fine\n');
+
+    const { errs } = treeShapeLint(dup, true);
+    expect(errs).toHaveLength(1);
+    expect(errs[0].errs[0]).toMatch(/share the number 0166/);
+    expect(errs[0].errs[0]).toMatch(/0166-another-thing\.md, 0166-one-thing\.md/);
+    rmSync(dup, { recursive: true, force: true });
+  });
+
+  /** Todos are numbered per tree too, and `completed/` is a different folder. */
+  it('fails two todos that share a number, and allows one that is merely closed', () => {
+    const dup = mkdtempSync(path.join(tmpdir(), 'conducks-dup-todo-'));
+    mkdirSync(path.join(dup, 'docs/todos/completed'), { recursive: true });
+    writeFileSync(path.join(dup, 'docs/todos/todo07.md'), '# todo07\n');
+    writeFileSync(path.join(dup, 'docs/todos/completed/todo07.md'), '# todo07\n');
+    expect(treeShapeLint(dup, true).errs).toEqual([]);
+
+    writeFileSync(path.join(dup, 'docs/todos/todo07-again.md'), '# todo07\n');
+    const { errs } = treeShapeLint(dup, true);
+    expect(errs).toHaveLength(1);
+    expect(errs[0].errs[0]).toMatch(/share the number 07/);
+    rmSync(dup, { recursive: true, force: true });
+  });
+
+  /** The counter-case: distinct numbers must not be reported, or the gate is noise. */
+  it('says nothing when every number is its own', () => {
+    const fine = mkdtempSync(path.join(tmpdir(), 'conducks-nodup-'));
+    mkdirSync(path.join(fine, 'docs/decisions'), { recursive: true });
+    for (const n of ['0001', '0002', '0010', '0100']) {
+      writeFileSync(path.join(fine, `docs/decisions/${n}-a-thing.md`), `# ${n} — a thing\n`);
+    }
+    expect(treeShapeLint(fine, true).errs).toEqual([]);
+    rmSync(fine, { recursive: true, force: true });
+  });
+
   it('warns rather than fails on a derived file inherited from before the standard', () => {
     rmSync(path.join(root, 'docs', 'README.md'));
     w('docs/progress.md');
