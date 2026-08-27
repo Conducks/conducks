@@ -3,7 +3,6 @@ import { ILanguagePlugin } from "@/lib/core/parsing/language-plugin.js";
 import { PYTHON_QUERIES } from "./queries.js";
 import { PythonResolver } from "./resolver.js";
 import { PythonExtractor } from "./extractor.js";
-import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 
 /**
  * Conducks — High-Fidelity Python Language Provider (Suite v3) 🏺 🟦 🐍

@@ -1,5 +1,5 @@
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
-import { NodeId } from "@/lib/core/graph/index.js";
+
 import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
 
 /**

@@ -14,7 +14,7 @@ import { FlowProcessor } from "../../core/parsing/processors/flow.js";
 import { AnalyzeContext } from "../../core/parsing/context.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/index.js";
-import { mapToCanonical, CanonicalKind, CanonicalRank } from "@/contracts/index.js";
+import { mapToCanonical } from "@/contracts/index.js";
 import {
   structuralPath,
   stripQuotes,
@@ -533,7 +533,6 @@ export class ConducksReflector {
         const scope = getScopeAt(currentMatchRow, name, declSpan);
         const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
         const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
-        
 
         const isDefinition = match.captures.some((c: any) => DEFINITION_CAPTURES.has(c.name));
 
@@ -1339,7 +1338,6 @@ export class ConducksReflector {
       }
     }
 
-
     // Emit reference-as-value edges now that nodeCache holds every definition in this file. Gate on
     // "imported here OR defined in this file" — so a local-variable arg never floods the graph or adds
     // a dangler. IntraLinker binds the bare name against imported/same-file symbols afterward.
@@ -1569,7 +1567,6 @@ export class ConducksReflector {
         n.metadata.docFirstLine = firstLineOf(text);
       }
     }
-
 
     // Conducks: Hierarchical Unification (L2-L7 Parentage)
     // [Conducks Rule] MEMBER_OF edges are no longer persisted as structural scaffolding.

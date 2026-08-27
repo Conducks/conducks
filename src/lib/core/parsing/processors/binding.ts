@@ -1,5 +1,4 @@
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
-import { NativeProvider } from "@/lib/core/parsing/providers/base.js";
 
 /**
  * Conducks — Binding Processor

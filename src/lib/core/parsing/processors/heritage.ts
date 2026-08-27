@@ -1,5 +1,4 @@
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
-import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from "@/lib/core/graph/index.js";
 
 /**
  * Conducks — Heritage Processor

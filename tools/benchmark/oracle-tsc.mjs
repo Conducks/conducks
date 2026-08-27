@@ -38,7 +38,11 @@ import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { resetVault } from './reset-vault.mjs';
 
-const projectDir = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
+// A FLAG IS NOT A PATH. This read `process.argv[2]` positionally, so
+// `npm run oracle:imports -- --write-baseline` resolved `--write-baseline` as the project directory
+// and died with `spawnSync node ENOENT` — an error naming neither the flag nor the path.
+const positionalArg = process.argv.slice(2).find(a => !a.startsWith('--'));
+const projectDir = positionalArg ? path.resolve(positionalArg) : process.cwd();
 const CLI = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../build/src/interfaces/cli/index.js');
 
 const isTestPath = (p) =>
@@ -156,15 +160,53 @@ const prev = baseline[key];
 // TS6133 and was blind to TS6192 — the diagnostic tsc emits when EVERY name in a declaration is
 // unused — so it reported a CORRECT conducks finding as a precision bug. It was wrong in the
 // direction that looks like success, which is the direction nothing catches by itself.
-if (oracle.size === 0) {
-  console.error(`\n✖ the oracle found NOTHING. tsc produced no in-project unused imports at all, ` +
-    `which almost certainly means it failed to run or its output shape changed — not that the ` +
-    `project is clean. Refusing to score against a silent oracle.\n`);
-  process.exit(1);
+/**
+ * Plant an unused import tsc MUST see, and report whether the oracle sees it.
+ *
+ * "The project is clean" and "the instrument is broken" produce the identical empty result, and both
+ * guards below used to call that a failure. Correct while conducks carried 29 stale imports of its
+ * own; deleting them made its own oracle refuse to run, then refuse again for having dropped by more
+ * than half. A gate that cannot tell success from breakage blocks the success.
+ *
+ * The specifier must be IN-PROJECT — this oracle counts only unused imports whose target is inside
+ * the repo, so a probe importing `node:fs` is filtered out and proves nothing. Written that way
+ * first, and it reported a working instrument as broken.
+ */
+function probeDetectsPlantedImport() {
+  const probe = path.join(projectDir, 'src', '__oracle_probe__.ts');
+  try {
+    writeFileSync(probe, "import { DEAD_CODE_TYPES } from './contracts/index.js';\nexport const probe = 1;\n");
+    return oracleUnusedImports().size > 0;
+  } catch {
+    return false;
+  } finally {
+    try { rmSync(probe, { force: true }); } catch { /* nothing to clean */ }
+  }
 }
-if (prev && oracle.size < prev.oracle * 0.5) {
+
+if (oracle.size === 0) {
+  // ZERO IS A LEGITIMATE ANSWER ONCE THE PROJECT HAS BEEN CLEANED — but "the project is clean" and
+  // "the oracle is broken" produce the identical empty result, and this gate used to call both a
+  // failure. That was right while conducks itself carried 29 stale imports; deleting them made its
+  // own oracle refuse to run.
+  //
+  // Distinguished by a POSITIVE CONTROL rather than by trusting the emptiness: plant one unused
+  // import that tsc must see, re-run, and require the oracle to find it. If the probe is detected
+  // the instrument works and zero is the truth; if it is not, the instrument is broken and zero
+  // means nothing. Only runs in the empty case, so it costs nothing on a project that has findings.
+  if (!probeDetectsPlantedImport()) {
+    console.error(`\n✖ the oracle found NOTHING, and a planted unused import was not detected either. ` +
+      `tsc failed to run or its output shape changed — this is a broken instrument, not a clean ` +
+      `project. Refusing to score against a silent oracle.\n`);
+    process.exit(1);
+  }
+  console.log(`\n  the oracle found nothing, and a planted probe WAS detected — so the project is ` +
+    `genuinely free of in-project unused imports.`);
+}
+if (prev && oracle.size < prev.oracle * 0.5 && !probeDetectsPlantedImport()) {
   console.error(`\n✖ the oracle found ${oracle.size}, less than half of the ${prev.oracle} it found ` +
-    `before. Treat that as the oracle breaking, not the project improving.\n`);
+    `before, and a planted unused import was not detected either. That is the oracle breaking, not ` +
+    `the project improving.\n`);
   process.exit(1);
 }
 

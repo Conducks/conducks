@@ -487,7 +487,7 @@ export class DeadCodeAnalyzer {
   ): Finding[] {
 
     // Candidates, grouped per import statement (file + specifier).
-    interface Candidate { binding: string; targetId: string; isTypeOnly: boolean }
+    interface Candidate { binding: string; raw: string; targetId: string; isTypeOnly: boolean }
     const statements = new Map<string, { file: string; specifier: string; candidates: Candidate[] }>();
 
     for (const edge of allEdges) {
@@ -508,6 +508,10 @@ export class DeadCodeAnalyzer {
       if (!statement) statements.set(key, statement = { file, specifier: String(props.specifier), candidates: [] });
       statement.candidates.push({
         binding: String(props.bindingName).toLowerCase(),
+        // The spelling the FILE wrote, which is the thing a reader has to delete. Empty when the
+        // producer did not record one — `bindingName` is FOLDED TO LOWER CASE and is not a
+        // substitute: falling back to it renamed `UnusedClass` to `unusedclass` in every finding.
+        raw: props.bindingNameRaw ? String(props.bindingNameRaw) : '',
         targetId: edge.targetId,
         isTypeOnly: props.isTypeOnly === true,
       });
@@ -585,7 +589,17 @@ export class DeadCodeAnalyzer {
         reported.add(key);
         findings.push({
           type: 'STALE_IMPORT',
-          symbol: target!.properties.name,
+          // NAME WHAT THE FILE WROTE, not what the import resolved to.
+          //
+          // This reported `target.properties.name` — the DECLARATION's name at the far end of the
+          // import. Those differ whenever a barrel republishes under another spelling or the import
+          // is aliased, and then the finding names a symbol the file does not contain.
+          //
+          // MEASURED by trying to act on it: `guard.ts:3` reads `import { logger }`, prune said
+          // `Logger` (the class the re-export resolves to), and a script deleting exactly the named
+          // symbol skipped that one file in silence. A verdict a reader cannot locate is a verdict
+          // they cannot act on.
+          symbol: candidate.raw || target!.properties.name,
           file: statement.file,
           message: `Imported from '${statement.specifier}' but never used in this file (no call, construction, access, type reference, or heritage clause).`,
         });

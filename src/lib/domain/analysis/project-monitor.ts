@@ -4,7 +4,7 @@ import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import fs from "node:fs";
 import path from "node:path";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
-import { FileHashGate } from "@/lib/core/persistence/index.js";
+
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
 import { buildBoard } from "@/lib/domain/docs/index.js";
 import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/index.js";
@@ -91,7 +91,6 @@ export interface ProjectReport {
 }
 
 /** Extensions the monitor hashes. Matching the graph exactly is not required — it needs a stable, cheap set. */
-
 
 export class ProjectMonitor {
   constructor(private readonly registry: ProjectRegistry = new ProjectRegistry()) {}

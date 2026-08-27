@@ -172,10 +172,9 @@ export interface ConducksEdge<T = any> {
 }
 
 import { CycleDetector } from "./algorithms/cycle-detector.js";
-import { StructuralRanker } from "./algorithms/ranker.js";
+
 import { GraphTraversal } from "./algorithms/traversal.js";
 import zlib from "zlib";
-
 
 /**
  * High-performance graph storage optimized for intelligence analysis.
@@ -514,7 +513,6 @@ export class ConducksAdjacencyList {
   }
 
 
-
   /**
    * Adds a relationship between two nodes.
    * Allows adding edges even if nodes don't exist yet (Neural Binding).
@@ -837,7 +835,6 @@ export class ConducksAdjacencyList {
 
     return skeleton;
   }
-
 
   /**
    * Checks if a node exists (Case-Insensitive).

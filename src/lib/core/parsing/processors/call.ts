@@ -1,4 +1,4 @@
-import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from "@/lib/core/graph/index.js";
+
 import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { isBuiltIn, getGlobalId, UNRESOLVED_CONFIDENCE } from "@/contracts/index.js";
@@ -132,7 +132,6 @@ export class CallProcessor {
     });
   }
 
-
   /**
    * Whether a captured call target names a symbol at all.
    *
@@ -166,7 +165,6 @@ export class CallProcessor {
     const withoutGenerics = path.replace(/<[^<>]*>/g, '');
     return /^[A-Za-z_$][A-Za-z0-9_$]*([.:]{1,2}[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(withoutGenerics);
   }
-
 
   /**
    * Identifies if a name-to-name call is a constructor call.

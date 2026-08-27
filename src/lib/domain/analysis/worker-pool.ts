@@ -3,7 +3,7 @@ import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
-import type { PrismSpectrum } from "@/contracts/index.js";
+
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";

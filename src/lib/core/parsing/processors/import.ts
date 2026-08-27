@@ -1,6 +1,6 @@
 import path from "node:path";
 import { canonicalize } from "@/lib/core/utils/index.js";
-import { PrismSpectrum } from "@/lib/core/parsing/prism-core.js";
+
 import { AnalyzeContext } from "@/lib/core/parsing/context.js";
 import { ConducksProvider } from "@/lib/core/parsing/providers/base.js";
 
@@ -106,7 +106,6 @@ export class ImportProcessor {
     // here. `declaredExternal` carries that one bit forward.
     const seg = specifier.split('/');
     const pkgName = specifier.startsWith('@') && seg.length >= 2 ? `${seg[0]}/${seg[1]}` : seg[0];
-
 
     // 2a. WORKSPACE PACKAGE — a bare specifier whose source is in this tree.
     //

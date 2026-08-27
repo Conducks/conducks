@@ -4,7 +4,7 @@ import path from "node:path";
 import chalk from "chalk";
 import { isTestNode } from "@/contracts/index.js";
 import { closePersistence } from "@/interfaces/cli/shared/context.js";
-import { displayPath, displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
+import { displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 import { graphHealth } from "@/contracts/index.js";
 
 /**

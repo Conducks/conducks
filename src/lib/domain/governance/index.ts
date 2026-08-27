@@ -9,7 +9,7 @@ import fs from "node:fs";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
 import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import path from "node:path";
-import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type SentinelRule } from "./sentinel-rules.js";
+import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES } from "./sentinel-rules.js";
 
 /**
  * The graph-level verdict, from the node count alone.
@@ -25,7 +25,6 @@ import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES, type Sentinel
 function emptyOrReady(nodeCount: number): 'empty' | 'ready' {
   return nodeCount === 0 ? 'empty' : 'ready';
 }
-
 
 /**
  * Conducks — Governance Domain Service

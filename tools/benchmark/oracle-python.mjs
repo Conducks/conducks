@@ -32,7 +32,11 @@ import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { resetVault } from './reset-vault.mjs';
 
-const projectDir = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
+// A FLAG IS NOT A PATH. This read `process.argv[2]` positionally, so
+// `npm run oracle:imports -- --write-baseline` resolved `--write-baseline` as the project directory
+// and died with `spawnSync node ENOENT` — an error naming neither the flag nor the path.
+const positionalArg = process.argv.slice(2).find(a => !a.startsWith('--'));
+const projectDir = positionalArg ? path.resolve(positionalArg) : process.cwd();
 const CLI = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../build/src/interfaces/cli/index.js');
 
 const isTestPath = (p) =>

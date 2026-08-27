@@ -2,7 +2,7 @@ import { Tool } from "@/contracts/index.js";
 import { registry } from "@/registry/index.js";
 import { ensureAnchor, releaseAnchor } from "../shared/anchor.js";
 import { resolveSymbolId } from "../shared/resolve-symbol.js";
-import { enumErr, numErr, boolErr } from "./synapse.js";
+import { enumErr, numErr } from "./synapse.js";
 import { mcpOk, mcpErr } from "@/interfaces/tools/shared/mcp-response.js";
 
 /**
@@ -52,7 +52,6 @@ function validateSymbol(value: string, paramName: string = 'symbol') {
   }
   return null;
 }
-
 
 export const kineticTools: Record<string, Tool> = {
 
