@@ -2,7 +2,7 @@
 Status: Accepted
 - Enforced by: tests/unit/scripts/visuals-testing-parser.test.ts
 - Date: 2026-08-22
-- Amended by: 0155
+- Amended by: 0155, 0168
 - Builds: 0011, 0139, 0140
 
 ADR 0155 moved the testing SOURCE out of this repository and into the one it

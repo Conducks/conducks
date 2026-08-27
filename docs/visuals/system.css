@@ -312,3 +312,12 @@
                     font-family:var(--mono);font-size:.7rem;color:var(--dim);
                     display:flex;flex-wrap:wrap;gap:.4rem 1.5rem}
   @media (max-width:620px){ .stage{width:152px} .wire{width:34px} }
+
+  /* A tick carried from an EARLIER build (conducks-visuals §0 rule 6). It still
+     says "I tried this"; the amber says "not on what is running now". Dropping
+     such ticks was the old rule, and a build id is a git hash — every commit
+     voided a whole pass, including one that touched only markdown. */
+  li.carried{border-left:2px solid #c7a86b;padding-left:.5rem}
+  li.carried label{opacity:.72}
+  li.carried label::after{content:" · tested on build " attr(data-carried);
+                          font-family:var(--mono);font-size:.7rem;color:#c7a86b}

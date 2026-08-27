@@ -127,13 +127,25 @@ and markup generated from it. This is the same separation §3 states for the
 canvas and for the same reason: adding a task must be editing a list, and a page
 whose tasks live in hand-written markup stops being updated within two rounds.
 
-**6 · Progress survives the tab closing, and NOTHING ELSE.** A pass is
-interrupted — `localStorage` against the task ids, and a visible "clear all" so
-the next pass starts clean. Say in the page which build it was written for, and
-**refuse to restore progress saved against a different one**: a tester ticking
-tasks against last week's binary is worse than an untested build, because it
-produces confidence. Refusing is the whole value of stamping the build; a stamp
-nobody checks is decoration.
+**6 · Progress survives the tab closing, and a rebuild MARKS it rather than
+killing it.** A pass is interrupted — `localStorage` against the task ids, and a
+visible "clear all" so the next pass starts clean. Say in the page which build it
+was written for, and **carry a tick from another build with the build it was made
+under, shown as a tick that is not this build's**: a tester ticking tasks against
+last week's binary is worse than an untested build, because it produces
+confidence, and a mark removes the confidence without removing the work.
+
+Touching a carried task settles it on the current build, whichever way it goes —
+one task never holds two answers. A note is what the tester WROTE and is never
+build-specific, so it is carried whole and unmarked.
+
+*This rule said REFUSE until 2026-08-27, and refusing was wrong for a reason
+worth keeping.* The worry is right and the instrument was far too coarse: a build
+id is a git hash, so **every commit voided a whole pass** — including a commit
+that touched nothing but markdown. Measured on ForgeTerm: eight commits in one
+afternoon, each one clearing a tester's work while they were still testing. A
+rule that makes a multi-hour pass impossible is a rule that stops the testing it
+exists to protect. The stamp still earns its place: it is what the mark NAMES.
 
 **6b · The ticks are not the deliverable, so do not engineer them as if they
 were.** `localStorage` is scoped to an origin, and the page has at least two —
@@ -141,7 +153,8 @@ opened as a `file://` path and published as an artifact are different origins
 with different stores, and clearing site data empties either. Every instinct at
 this point is to make the state durable: write a `testing-state.json` beside the
 page, commit it, reload it next pass. **Do not.** That file outlives the build it
-was ticked against, which is precisely what 6 refuses, and it makes the testing
+was ticked against and says nothing about which one, which is precisely what 6
+marks against, and it makes the testing
 page accumulate — the one thing this page must never do (§0: it is an
 instrument, not a record). The durable artifact is the REPORT, copied out and
 turned into `problems.html` entries or todos. Progress is scaffolding for one
@@ -154,7 +167,7 @@ What that permits, and what it rules out:
 | resume after closing the tab, same build, same browser | `localStorage`, keyed by build |
 | move a half-finished pass to another browser or machine | a "copy state" button putting JSON on the clipboard, and a paste-to-restore box |
 | keep the findings | copy the report out — that is the deliverable, and it leaves the page |
-| keep the ticks across builds | nothing. The build changed; the ticks are void |
+| keep the ticks across builds | they are kept and MARKED with the build that made them, and they stop counting as this build's |
 
 **Clipboard, not download.** A published artifact runs under a sandbox that makes
 page-initiated downloads inert — `<a download>`, blob URLs and script-driven

@@ -169,7 +169,9 @@ export function taskMap(parsed) {
 
 function renderTask(t) {
   const passLine = t.pass ? `<span class="pass">Pass: ${t.pass}</span>` : '';
-  return `<li data-tid="${esc(t.id)}">
+  // `data-carried` is empty until `load` finds a tick from another build. The
+  // stylesheet reads it, so the mark and the name it shows cannot disagree.
+  return `<li data-tid="${esc(t.id)}" data-carried="">
   <input type="checkbox" id="c-${esc(t.id)}">
   <label for="c-${esc(t.id)}"><b>${esc(t.id)}</b> ${t.text}${passLine}</label>
   <input type="text" id="n-${esc(t.id)}" placeholder="worked? leave blank. problem? describe it">
@@ -197,15 +199,61 @@ const KEY = "conducks-testing:" + BUILD + ":";
 const tasks = () => [...document.querySelectorAll('article > ul > li')];
 const box = t => t.querySelector('input[type=checkbox]');
 const note = t => t.querySelector('input[type=text]');
+// A tick made against ANOTHER build, and which build that was.
+//
+// It used to be invisible: the storage key carries the build, so a rebuild
+// simply looked in an empty namespace and the pass appeared to start again. The
+// worry behind that was right — a tick carried across a build looks like proof
+// and is not — but the instrument was far too coarse. A build id is a git hash,
+// so every commit voided a whole pass, including a commit that touched nothing
+// but markdown.
+//
+// So the tick is CARRIED and MARKED. The newest other build wins, because a
+// tester who ticked the same task on two older builds meant the later answer.
+function carried(tid) {
+  let best = null;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    const m = k && k.match(/^conducks-testing:(.+):(.+):c$/);
+    if (!m || m[1] === BUILD || m[2] !== tid) continue;
+    if (localStorage.getItem(k) !== '1') continue;
+    const at = Number(localStorage.getItem('conducks-testing:' + m[1] + ':at') || 0);
+    if (!best || at >= best.at) best = { build: m[1], at };
+  }
+  return best && best.build;
+}
 function load() {
+  // When this build first ran, so a later pass can tell which of two older
+  // answers was the newer one. Written once and never overwritten.
+  if (!localStorage.getItem('conducks-testing:' + BUILD + ':at')) {
+    localStorage.setItem('conducks-testing:' + BUILD + ':at', String(Date.now()));
+  }
   tasks().forEach(t => {
-    box(t).checked = localStorage.getItem(KEY + t.dataset.tid + ':c') === '1';
-    note(t).value = localStorage.getItem(KEY + t.dataset.tid + ':n') || '';
+    const tid = t.dataset.tid;
+    box(t).checked = localStorage.getItem(KEY + tid + ':c') === '1';
+    // A note is what the tester WROTE. It is never build-specific, so it is
+    // carried whole rather than marked.
+    note(t).value = localStorage.getItem(KEY + tid + ':n') || noteFromAnyBuild(tid);
+    const from = box(t).checked ? null : carried(tid);
+    t.classList.toggle('carried', !!from);
+    t.dataset.carried = from || '';
   });
+}
+function noteFromAnyBuild(tid) {
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    const m = k && k.match(/^conducks-testing:(.+):(.+):n$/);
+    if (m && m[2] === tid && localStorage.getItem(k)) return localStorage.getItem(k);
+  }
+  return '';
 }
 function save(t) {
   localStorage.setItem(KEY + t.dataset.tid + ':c', box(t).checked ? '1' : '0');
   localStorage.setItem(KEY + t.dataset.tid + ':n', note(t).value);
+  // **Touching a task settles it on THIS build, both ways.** Leaving an older
+  // build's yes beside a fresh no would put two answers on one task.
+  t.classList.remove('carried');
+  t.dataset.carried = '';
   if (typeof writeSoon === 'function') writeSoon();
 }
 function refresh() {
@@ -236,8 +284,11 @@ function report() {
       const checked = box(t).checked, txt = note(t).value.trim();
       if (checked) { d++; done++; }
       if (txt) { n++; issues++; }
-      if (!checked && !txt) return;
-      rows.push(\`- [\${checked ? 'x' : ' '}] \${t.dataset.tid} \${t.querySelector('label').textContent.replace(/^\\S+\\s*/, '')}\`);
+      const from = t.dataset.carried;
+      if (!checked && !txt && !from) return;
+      const mark = checked ? 'x' : from ? '~' : ' ';
+      const said = from ? \` (tested on build \${from}, not this one)\` : '';
+      rows.push(\`- [\${mark}] \${t.dataset.tid} \${t.querySelector('label').textContent.replace(/^\\S+\\s*/, '')}\${said}\`);
       if (txt) rows.push(\`      ⚠ \${t.dataset.tid}: \${txt}\`);
     });
     const fid = art.dataset.fid;
@@ -281,19 +332,28 @@ function progress() {
 function restore(text) {
   let data;
   try { data = JSON.parse(text); } catch { return 'That is not progress JSON.'; }
-  // The build check is the whole value of stamping the build. A stamp nobody
-  // checks is decoration (conducks-visuals §6).
-  if (!data || data.build !== BUILD) {
-    return 'That progress was made against build ' + ((data && data.build) || '?') + ', and this page is ' + BUILD + '. Refused.';
-  }
+  if (!data || !data.tasks) return 'That is not progress JSON.';
+  // **Progress from another build is CARRIED, not refused.** The stamp still
+  // earns its place — it is what the mark names — but refusing threw away a
+  // tester's whole pass every time anyone committed.
+  const other = data.build !== BUILD ? String(data.build || '?') : null;
   tasks().forEach(t => {
-    const got = data.tasks && data.tasks[t.dataset.tid];
-    box(t).checked = !!(got && got[0]);
+    const got = data.tasks[t.dataset.tid];
+    const wasTicked = !!(got && got[0]);
+    box(t).checked = other ? false : wasTicked;
     note(t).value = (got && got[1]) || '';
     save(t);
+    // save() settles a task on this build, so the mark goes on afterwards.
+    if (other && wasTicked) {
+      localStorage.setItem('conducks-testing:' + other + ':' + t.dataset.tid + ':c', '1');
+      t.classList.add('carried');
+      t.dataset.carried = other;
+    }
   });
   refresh();
-  return 'Restored.';
+  return other
+    ? 'Restored, marked as tested on build ' + other + ' rather than ' + BUILD + '.'
+    : 'Restored.';
 }
 
 // **A file, because clearing browser data is one click and an hour of work.**

@@ -54,13 +54,27 @@ const RUN_FILE: &str = "docs/checklist-run.json";
 #[derive(Serialize, Deserialize, Default)]
 #[serde(default)]
 struct Persisted {
-    /// The build this record was written against — `ctx.build`, host
-    /// knowledge the plugin cannot get any other way. A tick recorded against
-    /// a different build looks like proof and is not (`conducks-visuals` §6),
-    /// which is why `restore_for_build` refuses to hand it back rather than
-    /// restoring it.
+    /// The build this record was last written against — `ctx.build`, host
+    /// knowledge the plugin cannot get any other way.
+    ///
+    /// A tick recorded against a different build looks like proof and is not
+    /// (`conducks-visuals` §6). It used to be DROPPED for that reason, and the
+    /// reason was right while the instrument was far too coarse: the build id
+    /// is a git hash, so every commit voided the whole pass — including a
+    /// commit that touched nothing but markdown. Measured: eight commits in one
+    /// afternoon, each one clearing a tester's work.
+    ///
+    /// So a tick now survives and carries the build it was made under. Nothing
+    /// is lost, and nothing claims to be current: `stale` is what the reader
+    /// and the report both read.
     build: String,
+    /// Ticks made against `build` — this pass, on this binary.
     ticked: Vec<String>,
+    /// Ticks carried over from an earlier build, each with the build it was
+    /// made under. Absent from files written before this existed, which is
+    /// exactly what `#[serde(default)]` is for: an old file still parses, and
+    /// its ticks migrate here the first time it is read on a newer build.
+    stale: Vec<(String, String)>,
     notes: Vec<(String, String)>,
 }
 
@@ -75,21 +89,34 @@ struct Persisted {
 /// read at all) is treated as "nothing to restore, and no build to report" —
 /// an absence is not a mismatch, and reporting one would tell a first-time
 /// user their ticks were dropped when none ever existed.
-fn restore_for_build(text: &str, current_build: &str) -> (Vec<String>, Vec<(String, String)>, Option<String>) {
+fn restore_for_build(
+    text: &str,
+    current_build: &str,
+) -> (Vec<String>, Vec<(String, String)>, Vec<(String, String)>) {
     let Ok(mut saved) = serde_json::from_str::<Persisted>(text) else {
-        return (Vec::new(), Vec::new(), None);
+        return (Vec::new(), Vec::new(), Vec::new());
     };
-    if saved.build == current_build {
-        // Sorted on the way in, because `ticked` is binary-searched. A file
-        // written before that rule existed — or edited by hand — would
-        // otherwise answer "not ticked" for most of what it actually holds,
-        // and it would look like the ticks were lost rather than misread.
-        saved.ticked.sort();
-        saved.ticked.dedup();
-        (saved.ticked, saved.notes, None)
-    } else {
-        (Vec::new(), Vec::new(), Some(saved.build))
+    // Ticks already carried from an older build stay carried — the build they
+    // name is the one they were MADE under, not the one they were last read on,
+    // so it must never be overwritten with something more recent.
+    let mut stale = saved.stale;
+    if saved.build != current_build {
+        // This file's own ticks were made on that build. They are kept and
+        // marked, not dropped.
+        stale.extend(saved.ticked.drain(..).map(|id| (id, saved.build.clone())));
     }
+    // Sorted on the way in, because `ticked` is binary-searched. A file
+    // written before that rule existed — or edited by hand — would
+    // otherwise answer "not ticked" for most of what it actually holds,
+    // and it would look like the ticks were lost rather than misread.
+    saved.ticked.sort();
+    saved.ticked.dedup();
+    // A task ticked again on this build is CURRENT, so its stale entry goes:
+    // one task never holds two answers, and the fresher one wins.
+    stale.retain(|(id, _)| saved.ticked.binary_search(id).is_err());
+    stale.sort();
+    stale.dedup_by(|a, b| a.0 == b.0);
+    (saved.ticked, saved.notes, stale)
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -140,12 +167,15 @@ struct State {
     /// a checklist that silently stopped saving is worse than one that never
     /// saved at all.
     refused: bool,
-    /// Set when the run file on disk was written against a different build
-    /// than this one, naming that build. The ticks it held were dropped
-    /// rather than restored — shown in the pane, not a log, for the same
-    /// reason `refused` is: a run that quietly lost its ticks looks exactly
-    /// like one that never had any.
-    dropped_build: Option<String>,
+    /// Ticks carried over from an earlier build, each with the build it was
+    /// made under.
+    ///
+    /// They are KEPT and marked rather than dropped. The build id is a git
+    /// hash, so dropping on any mismatch voided a tester's whole pass every
+    /// time anyone committed — including a commit that touched only markdown.
+    /// A stale tick still says something ("I tried this, on that binary"); what
+    /// it must never do is read as current, which is what the mark is for.
+    stale: Vec<(String, String)>,
     /// Exactly what `load(TESTING_SOURCE)` answered, the first time this
     /// window asked. Loaded once per window for the same reason `on_disk`
     /// is — the source does not change under a running pane, and re-reading
@@ -499,6 +529,12 @@ fn key_hint(
 /// Nothing that reads the file cares about the order, so sorting costs nothing
 /// anyone can observe.
 fn toggle(state: &mut State, id: &str) {
+    // **Touching a task settles it on THIS build**, whichever way it goes.
+    // Re-ticking something carried over is the tester saying "I have tried it
+    // again, here"; unticking it is them saying it is not done — and either way
+    // the old build's answer has been superseded and must not linger beside the
+    // new one.
+    state.stale.retain(|(stale_id, _)| stale_id != id);
     match state.ticked.binary_search_by(|t| t.as_str().cmp(id)) {
         Ok(at) => {
             state.ticked.remove(at);
@@ -509,6 +545,11 @@ fn toggle(state: &mut State, id: &str) {
 
 fn ticked(state: &State, id: &str) -> bool {
     state.ticked.binary_search_by(|t| t.as_str().cmp(id)).is_ok()
+}
+
+/// The build a task was ticked under, when that was not this one.
+fn stale_build<'a>(state: &'a State, id: &str) -> Option<&'a str> {
+    state.stale.iter().find(|(stale_id, _)| stale_id == id).map(|(_, build)| build.as_str())
 }
 
 /// **A feature is marked exactly when every one of its tasks is.** Derived, and
@@ -617,10 +658,10 @@ impl Guest for Checklist {
         }
         if state.on_disk.is_none() {
             let text = host_api::load(RUN_FILE).unwrap_or_default();
-            let (ticked, notes, dropped_build) = restore_for_build(&text, &ctx.build);
+            let (ticked, notes, stale) = restore_for_build(&text, &ctx.build);
             state.ticked = ticked;
             state.notes = notes;
-            state.dropped_build = dropped_build;
+            state.stale = stale;
             state.on_disk = Some(text);
         }
 
@@ -645,10 +686,13 @@ impl Guest for Checklist {
         // the hit test runs — the row a click lands on is the same row it is
         // drawn on.
         let notice: Option<String> = parse_error.map(|e| format!("testing.md: {e}")).or_else(|| {
-            state
-                .dropped_build
-                .as_ref()
-                .map(|other| format!("Ticks from build {other} were dropped — this is build {}.", ctx.build))
+            (!state.stale.is_empty()).then(|| {
+                format!(
+                    "{} tick(s) carried from an earlier build — marked, not counted as this build's. This is {}.",
+                    state.stale.len(),
+                    ctx.build
+                )
+            })
         });
         let dropped_h = if notice.is_some() { px(16.) } else { 0. };
 
@@ -1072,6 +1116,10 @@ impl Guest for Checklist {
                 },
                 Row::Task(task) => {
                     let on = ticked(&state, &task.id);
+                    // A tick carried from an earlier build. Drawn, and drawn
+                    // DIFFERENTLY: it still says "I tried this", and it must
+                    // never be read as "I tried this on what is running now".
+                    let carried = stale_build(&state, &task.id);
                     let writing = state.editing && index == cursor;
                     // A hairline between tasks. Four hundred rows with nothing
                     // between them is one wall of text, and the eye has to
@@ -1113,16 +1161,26 @@ impl Guest for Checklist {
                             num("y", y + px(8.)),
                             num("w", px(13.)),
                             num("h", px(13.)),
+                            // Green is this build. Amber and hollow is an
+                            // older one — the colour says "answered" and the
+                            // hollowness says "not here".
                             int("color", if on { 0x8fc78f } else { 0x14161b }),
                             num("radius", px(3.)),
                             num("border", px(1.)),
-                            int("border-color", if on { 0x8fc78f } else { 0x4a5568 }),
+                            int(
+                                "border-color",
+                                match (on, carried.is_some()) {
+                                    (true, _) => 0x8fc78f,
+                                    (false, true) => 0xc7a86b,
+                                    (false, false) => 0x4a5568,
+                                },
+                            ),
                         ],
                         None,
                     );
                     // A filled square and a ticked square look the same at a
                     // glance in a long list. The mark is what separates them.
-                    if on {
+                    if on || carried.is_some() {
                         b.push(
                             Kind::Text,
                             list,
@@ -1130,9 +1188,9 @@ impl Guest for Checklist {
                                 num("x", ctx.x + px(PAD + 2.)),
                                 num("y", y + px(7.)),
                                 num("font-size", px(11.)),
-                                int("color", 0x14161b),
+                                int("color", if on { 0x14161b } else { 0xc7a86b }),
                             ],
-                            Some("\u{2713}"),
+                            Some(if on { "\u{2713}" } else { "\u{2013}" }),
                         );
                     }
                     // The id, right-aligned and dim. It is what a tester types
@@ -1150,6 +1208,24 @@ impl Guest for Checklist {
                         ],
                         Some(&task.id),
                     );
+                    // WHICH build answered it, beside the id. A mark saying
+                    // "not this build" and not saying which one is a question
+                    // the reader cannot answer without leaving the pane.
+                    if let Some(build) = carried {
+                        let short: String = build.chars().take(8).collect();
+                        let w = host_api::measure_text(&short, px(10.5));
+                        b.push(
+                            Kind::Text,
+                            list,
+                            vec![
+                                num("x", ctx.x + ctx.width - px(PAD) - id_w - w - px(8.)),
+                                num("y", y + px(6.)),
+                                num("font-size", px(10.5)),
+                                int("color", 0xc7a86b),
+                            ],
+                            Some(&short),
+                        );
+                    }
                     let mut line_y = y + px(5.);
                     for line in &l.doing {
                         b.push(
@@ -1229,6 +1305,7 @@ impl Guest for Checklist {
         let current = serde_json::to_string(&Persisted {
             build: ctx.build.clone(),
             ticked: state.ticked.clone(),
+            stale: state.stale.clone(),
             notes: state.notes.clone(),
         })
         .unwrap_or_default();
@@ -1252,62 +1329,140 @@ mod tests {
     use super::*;
 
     /// The ordinary case: the run on disk was written against the SAME build
-    /// that is asking for it, so it is restored exactly, and nothing is
-    /// reported as dropped.
+    /// that is asking for it, so it is restored exactly, and nothing is carried.
     #[test]
     fn same_build_restores_ticks() {
         let text = serde_json::to_string(&Persisted {
             build: "abc123".to_string(),
             ticked: vec!["F53.T1".to_string()],
+            stale: Vec::new(),
             notes: vec![("F53.T2".to_string(), "worked".to_string())],
         })
         .unwrap();
 
-        let (ticked, notes, dropped) = restore_for_build(&text, "abc123");
+        let (ticked, notes, stale) = restore_for_build(&text, "abc123");
         assert_eq!(ticked, vec!["F53.T1".to_string()]);
         assert_eq!(notes, vec![("F53.T2".to_string(), "worked".to_string())]);
-        assert!(dropped.is_none(), "a matching build must not be reported as dropped");
+        assert!(stale.is_empty(), "a matching build carries nothing");
     }
 
-    /// The property todo19#P1 exists for: a run recorded against a DIFFERENT
-    /// build is refused rather than restored, because a tick carried across a
-    /// build looks like proof and is not (`conducks-visuals` §6). The build it
-    /// actually came from is named, so the refusal can be shown in the pane.
+    /// **A tick from another build is KEPT and MARKED, not dropped.**
     ///
-    /// **Mutation proof:** replace `restore_for_build`'s
-    /// `if saved.build == current_build` branch with the unconditional
-    /// `(saved.ticked, saved.notes, None)` and this test fails — `ticked`
-    /// comes back non-empty instead of empty, and `dropped` comes back `None`
-    /// instead of `Some("old-build".to_string())`.
+    /// It used to be dropped, on the reasoning in `conducks-visuals` §6 — a
+    /// tick carried across a build looks like proof and is not. The reasoning
+    /// holds; the instrument did not. The build id is a git hash, so every
+    /// commit voided the whole pass, including a commit that touched only
+    /// markdown: measured at eight commits in one afternoon, each one clearing
+    /// a tester's work. Marking answers the same worry and loses nothing.
+    ///
+    /// **Mutation proof:** make the mismatch branch return empty vectors again
+    /// and `stale` comes back empty, so the first assertion fails.
     #[test]
-    fn a_different_build_is_refused_and_named() {
+    fn a_tick_from_another_build_is_carried_and_named() {
         let text = serde_json::to_string(&Persisted {
             build: "old-build".to_string(),
             ticked: vec!["F53.T1".to_string()],
+            stale: Vec::new(),
             notes: vec![("F53.T2".to_string(), "worked".to_string())],
         })
         .unwrap();
 
-        let (ticked, notes, dropped) = restore_for_build(&text, "new-build");
-        assert!(ticked.is_empty(), "ticks from another build must not be restored");
-        assert!(notes.is_empty(), "notes from another build must not be restored");
+        let (ticked, notes, stale) = restore_for_build(&text, "new-build");
         assert_eq!(
-            dropped,
-            Some("old-build".to_string()),
-            "the refusal must name the build the run actually came from"
+            stale,
+            vec![("F53.T1".to_string(), "old-build".to_string())],
+            "the tick survives, carrying the build it was made under"
+        );
+        assert!(ticked.is_empty(), "and it is NOT this build's — that is the whole distinction");
+        assert_eq!(
+            notes,
+            vec![("F53.T2".to_string(), "worked".to_string())],
+            "a note is what the tester WROTE and is never build-specific"
+        );
+    }
+
+    /// A tick carried twice keeps naming the build it was MADE under, not the
+    /// one it was last read on. Otherwise every rebuild rewrites its own hash
+    /// over the answer and the mark becomes "carried from the build before
+    /// this one", which is true of everything and says nothing.
+    #[test]
+    fn a_carried_tick_keeps_the_build_it_was_made_under() {
+        let text = serde_json::to_string(&Persisted {
+            build: "second".to_string(),
+            ticked: Vec::new(),
+            stale: vec![("F1.T1".to_string(), "first".to_string())],
+            notes: Vec::new(),
+        })
+        .unwrap();
+
+        let (_, _, stale) = restore_for_build(&text, "third");
+        assert_eq!(stale, vec![("F1.T1".to_string(), "first".to_string())]);
+    }
+
+    /// Ticked again on this build, so it is no longer carried: one task never
+    /// holds two answers, and the fresher one wins.
+    #[test]
+    fn ticking_again_on_this_build_settles_it() {
+        let text = serde_json::to_string(&Persisted {
+            build: "now".to_string(),
+            ticked: vec!["F1.T1".to_string()],
+            stale: vec![("F1.T1".to_string(), "before".to_string())],
+            notes: Vec::new(),
+        })
+        .unwrap();
+
+        let (ticked, _, stale) = restore_for_build(&text, "now");
+        assert_eq!(ticked, vec!["F1.T1".to_string()]);
+        assert!(stale.is_empty(), "the current answer supersedes the carried one");
+    }
+
+    /// **Touching a carried tick settles it, both ways.** Unticking is the
+    /// tester saying it is NOT done — leaving the old build's yes beside that
+    /// would put two answers on one task.
+    #[test]
+    fn untick_removes_a_carried_answer_too() {
+        let mut state = State {
+            ticked: Vec::new(),
+            stale: vec![("F1.T1".to_string(), "before".to_string())],
+            ..State::default()
+        };
+        toggle(&mut state, "F1.T1");
+        assert!(ticked(&state, "F1.T1"), "it is now this build's yes");
+        assert!(stale_build(&state, "F1.T1").is_none(), "and no longer carried");
+
+        toggle(&mut state, "F1.T1");
+        assert!(!ticked(&state, "F1.T1"), "off again");
+        assert!(stale_build(&state, "F1.T1").is_none(), "and the old yes did not come back");
+    }
+
+    /// An OLD run file — written before `stale` existed — still parses, and its
+    /// ticks migrate rather than vanishing. `#[serde(default)]` is what makes
+    /// this true, and a format change that silently discarded a tester's file
+    /// would be the same defect this whole change exists to remove.
+    #[test]
+    fn a_file_written_before_this_existed_still_carries_its_ticks() {
+        let old = r#"{"build":"old","ticked":["F1.T1","F1.T2"],"notes":[]}"#;
+        let (ticked, _, stale) = restore_for_build(old, "new");
+        assert!(ticked.is_empty());
+        assert_eq!(
+            stale,
+            vec![
+                ("F1.T1".to_string(), "old".to_string()),
+                ("F1.T2".to_string(), "old".to_string()),
+            ]
         );
     }
 
     /// The counter-case a build-comparison bug could hide behind: no run file
     /// exists yet (a fresh project, or `load` answering nothing). That is an
     /// ABSENCE, not a mismatch — reporting one here would tell a first-time
-    /// user their ticks were dropped when none ever existed.
+    /// user their ticks were carried when none ever existed.
     #[test]
-    fn a_missing_run_reports_nothing_dropped() {
-        let (ticked, notes, dropped) = restore_for_build("", "new-build");
+    fn a_missing_run_carries_nothing() {
+        let (ticked, notes, stale) = restore_for_build("", "new-build");
         assert!(ticked.is_empty());
         assert!(notes.is_empty());
-        assert!(dropped.is_none(), "absence of a run file is not a refusal");
+        assert!(stale.is_empty(), "absence of a run file is not a carry");
     }
 
     // `lay_out`'s new "no Pass: clause -> no pass line" branch (the one
@@ -1471,8 +1626,8 @@ mod invariant_tests {
     #[test]
     fn a_run_file_in_any_order_restores_every_tick() {
         let text = r#"{"build":"b1","ticked":["F9.T2","F1.T1","F54.T7","F2.T1"],"notes":[]}"#;
-        let (ticks, _, dropped) = restore_for_build(text, "b1");
-        assert!(dropped.is_none(), "same build restores");
+        let (ticks, _, carried) = restore_for_build(text, "b1");
+        assert!(carried.is_empty(), "same build carries nothing");
         let mut state = State::default();
         state.ticked = ticks;
         for id in ["F9.T2", "F1.T1", "F54.T7", "F2.T1"] {
