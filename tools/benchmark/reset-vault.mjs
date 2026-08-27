@@ -1,4 +1,5 @@
 import { readdirSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 /**
@@ -17,7 +18,35 @@ import path from 'node:path';
  *
  * A cold vault needs the DATABASE gone, not the directory. Anything that is not vault state stays.
  */
+/**
+ * ASK GIT WHAT IS TRACKED, rather than naming it.
+ *
+ * The hardcoded list below was derived from THIS repository's `.gitignore` carve-out, and it was
+ * correct for the two oracles that ran against conducks itself. It stopped being correct the moment
+ * an oracle was pointed at another project: `oracle-python-dead.mjs` runs against the sofie subject,
+ * which commits `.conducks/dependency-graph.html` and `.conducks/overview.html`, and the first run
+ * deleted both — the same defect this file was written to fix, recurring because the fix named files
+ * instead of asking.
+ *
+ * `git ls-files` is the exact answer, per project, and it maintains itself. The literal stays as a
+ * fallback for a project that is not a git repository at all, where nothing can be tracked and the
+ * carve-out costs nothing.
+ */
 const KEEP = new Set(['note-reviews.json']);
+
+const trackedEntries = (projectDir) => {
+  try {
+    const out = execFileSync('git', ['ls-files', '.conducks'], {
+      cwd: projectDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    // Top-level entry names only: this loop deletes entries of `.conducks`, so a tracked file nested
+    // deeper protects the directory that holds it.
+    return new Set(out.split('\n').filter(Boolean)
+      .map(rel => rel.split('/')[1]).filter(Boolean));
+  } catch {
+    return new Set();             // not a git repo, or git absent — nothing is tracked
+  }
+};
 
 export const resetVault = (projectDir) => {
   const dir = path.join(projectDir, '.conducks');
@@ -27,8 +56,9 @@ export const resetVault = (projectDir) => {
   } catch {
     return;                       // no vault yet — nothing to clear, and nothing to protect
   }
+  const keep = new Set([...KEEP, ...trackedEntries(projectDir)]);
   for (const entry of entries) {
-    if (KEEP.has(entry)) continue;
+    if (keep.has(entry)) continue;
     rmSync(path.join(dir, entry), { recursive: true, force: true });
   }
 };

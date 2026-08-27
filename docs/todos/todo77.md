@@ -145,6 +145,30 @@ point in the phase.
 The exports oracle reports 12 missed / 0 extra, and 11 of those are referenced only inside their own
 file — which `UNUSED_EXPORT` counts as consumption, since it claims "never consumed by other
 modules". Scoring them as misses would grade a stricter claim than the tool makes. The twelfth is a
+### L2 and L3 re-run on the refreshed subjects
+
+L1 was re-scored after the pull; the planted passes were not, and they had run against code roughly
+40% smaller. Re-run on the current subjects, with counter-cases added for every mechanism fixed since:
+
+| subject | L2 planted / found | L3 planted / flagged |
+|---|---|---|
+| scraper | 3 / **3** | 6 / **0** |
+| sofie | 3 / **3** | 2 / **0** |
+| orchestrator | 3 / **3** | 1 / **0** |
+
+The scraper L3 set is the one that matters, because it plants the four shapes fixed on 2026-08-27 as
+counter-cases in real code: a function reached only as `paths.l3_module_called(...)` through a module
+import, a constant read only as a class-header keyword argument, one read only through
+`_X = X`, and one read only as `x in TIERS`. None was flagged.
+
+**No new defect.** The refreshed code answered the planted passes cleanly — the four defects the
+refresh found were all found by L1, not by planting.
+
+One scoring correction: sofie's six read-position counter-cases came back `UNUSED_EXPORT`, which is
+correct and not a miss — they are exported from `app.ts` and consumed only inside it, which is what
+that verdict claims. The L3 assertion is that the read registers as a REFERENCE, and it did: had it
+not, they would have been `ORPHAN`.
+
 ### Every Python verdict now has an oracle too
 
 TypeScript had an independent checker for every verdict prune makes; Python had one for exactly one
