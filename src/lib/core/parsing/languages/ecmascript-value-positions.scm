@@ -34,6 +34,20 @@
   (binary_expression left: (identifier) @ref_value)
   (binary_expression right: (identifier) @ref_value)
   (export_statement value: (identifier) @ref_value)
+  ;; A BARE VALUE READ, in the two positions that had no pattern. `return usedValue` and
+  ;; `const x = CONFIG` hand the binding to something without calling it, indexing it, or naming a
+  ;; member of it — every other read position already had a rule and these two did not.
+  ;;
+  ;; These are the positions `PRUNABLE_BINDING_KINDS` cited when it excluded `variable`: "a plain
+  ;; value read — `return usedValue`, `= CONFIG` — produces no relationship at all, so no evidence
+  ;; of use is not evidence of no use". That was true. It is what made a `const` import unjudgeable.
+  (return_statement (identifier) @ref_value)
+  (variable_declarator value: (identifier) @ref_value)
+  (assignment_expression right: (identifier) @ref_value)
+  ;; A TEMPLATE SUBSTITUTION reads the binding. MEASURED on orchestrator: SITE_URL is imported by six
+  ;; page files and used in every one of them only as \${SITE_URL} inside a template literal, which
+  ;; made all six read as stale the moment `variable` became a prunable kind.
+  (template_substitution (identifier) @ref_value)
   ;; `for (const k in TABLE)` AND `for (const x of LIST)`.
   ;;
   ;; The tree-sitter node for both is `for_in_statement` in the ECMAScript grammars — `of` is an

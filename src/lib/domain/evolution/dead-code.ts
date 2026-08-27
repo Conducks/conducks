@@ -397,6 +397,7 @@ export class DeadCodeAnalyzer {
   private static readonly PRUNABLE_BINDING_KINDS = new Set<string>([
     'function', 'class', 'struct', 'method',
     'interface', 'enum', 'field', 'property',
+    'variable',
   ]);
 
   /**

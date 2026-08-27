@@ -128,10 +128,21 @@ const KNOWN_WRONG = {
 
 const VERDICT_TYPES = new Set(['ORPHAN', 'UNUSED_EXPORT', 'STALE_IMPORT']);
 
+/**
+ * The verdicts that are a claim about a SYMBOL, which is what `TRUTH.live` and `TRUTH.dead` declare.
+ *
+ * `STALE_IMPORT` is deliberately not one of them: it is a claim about an IMPORT SITE, and a symbol
+ * can be perfectly live while one file imports it and never uses it. `usedConstant` is exactly that
+ * — read in `main.ts`, imported and untouched in `stale.ts` — and scoring the stale finding against
+ * the symbol's liveness marked a TRUE finding as a precision failure (ADR 0165). Import-site claims
+ * are scored separately, by the twelve named shapes below.
+ */
+const SYMBOL_VERDICT_TYPES = new Set(['ORPHAN', 'UNUSED_EXPORT', 'ONLY_IMPORTED']);
+
 describe('prune precision and recall, against declared truth (todo58#P2)', () => {
   let repo: string;
   let flagged: Set<string>;
-  let allFindings: Array<{ type: string; symbol: string }>;
+  let allFindings: Array<{ type: string; symbol: string; file: string }>;
 
   beforeAll(() => {
     ensureBuild();
@@ -353,10 +364,10 @@ export default defaultExported;
     runCli(['analyze', '--yes'], { cwd: repo });
 
     const { stdout } = runCli(['prune', '--json'], { cwd: repo });
-    const findings = JSON.parse(stdout) as Array<{ type: string; symbol: string }>;
+    const findings = JSON.parse(stdout) as Array<{ type: string; symbol: string; file: string }>;
     allFindings = findings;
     flagged = new Set(
-      findings.filter(f => VERDICT_TYPES.has(f.type)).map(f => f.symbol)
+      findings.filter(f => SYMBOL_VERDICT_TYPES.has(f.type)).map(f => f.symbol)
     );
   }, 180000);
 
@@ -431,16 +442,20 @@ export default defaultExported;
     });
   });
 
-  it('does NOT report a stale VALUE import, and that is the deliberate cost of todo63', () => {
-    // `src/stale.ts` imports `usedConstant` and never uses it — genuinely stale, deliberately silent.
-    // MEASURED before the fix: reporting it also reported the USED one in `main.ts`, because a value
-    // read produces no edge and the import-site calibration is keyed per (file, specifier). This
-    // assertion exists so that trading the false positive back for this recall is a visible choice
-    // rather than an accident.
-    const staleValueFindings = allFindings.filter(
-      f => f.type === 'STALE_IMPORT' && f.symbol === 'usedConstant'
-    );
-    expect(staleValueFindings).toEqual([]);
+  it('reports a stale VALUE import — and only in the file that does not use it', () => {
+    // INVERTED from "does NOT report", which was todo63's deliberate cost. That cost was real: a
+    // value read produced no edge at all, so reporting the stale one in `src/stale.ts` also reported
+    // the USED one in `src/main.ts`, and the trade was refused.
+    //
+    // ADR 0165 captured the missing read positions — `return x`, `const y = x`, `x = y`, a class
+    // field initialiser and a template substitution — so `main.ts` now produces evidence and the two
+    // files separate. Re-measured on the same fixture: `stale.ts` is reported, `main.ts` is not.
+    // Scored per FILE rather than per symbol, because that separation is the whole claim.
+    const staleValueFiles = allFindings
+      .filter(f => f.type === 'STALE_IMPORT' && f.symbol === 'usedConstant')
+      .map(f => f.file.replace(/^.*[/\\]src[/\\]/, 'src/'));
+
+    expect(staleValueFiles).toEqual(['src/stale.ts']);
   });
 
   it('scores both directions at once, so neither can be gamed', () => {

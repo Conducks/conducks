@@ -19,6 +19,17 @@
   ;; grammar has no `as_expression`, and naming a node a grammar does not have invalidates the WHOLE
   ;; query and silently drops the language to the regex fallback (ADR 0089).
   (as_expression (identifier) @ref_value)
+  ;; A CLASS FIELD initialised to a bare binding — `public readonly queryScm = GO_QUERIES`. Its own
+  ;; node type, so `variable_declarator` never reaches it. MEASURED: this one shape was all 13 false
+  ;; findings when `variable` was first allowed into the prunable kinds — thirteen language packs,
+  ;; each holding its queries exactly this way.
+  ;;
+  ;; TS/TSX ONLY, here for the same reason as `as_expression` above: JavaScript spells the node
+  ;; `field_definition`, and naming a node a grammar does not have invalidates the WHOLE query and
+  ;; silently drops the language to the regex fallback (ADR 0089). Placed in the shared value block
+  ;; first, it broke the TypeScript pack outright — caught by the heritage canary, which exists for
+  ;; exactly this and was the only thing that failed loudly.
+  (public_field_definition value: (identifier) @ref_value)
   (type_predicate type: (type_identifier) @pulse_type_target)
   (union_type (type_identifier) @pulse_type_target)
   (intersection_type (type_identifier) @pulse_type_target)

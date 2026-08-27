@@ -32,7 +32,7 @@ tool. **The hypothesis was wrong twice**, and both defects were invisible to sam
 
 | level | planted / scored | result |
 |---|---|---|
-| L1 precision | 324 verdicts across 3 subjects | **0 false positives** |
+| L1 precision | 325 verdicts across 3 subjects | **0 false positives** |
 | L2 recall | 10 planted | **10 found** |
 | L3 counter | 8 planted | **0 flagged** |
 
@@ -92,13 +92,40 @@ NOT exempt when asking "is this IMPORT dead".
 | TypeScript, vs `tsc` | 26 missed / 0 extra | **4 missed / 0 extra** |
 | Python, vs `ast` | 4 missed / 0 extra | **1 missed / 0 extra** |
 
-### What prune still misses, with the reason
+### The fifth defect — a bare value read produced no edge
 
-Four on TypeScript, one on Python. All are `const`-kind value imports, which
-`PRUNABLE_BINDING_KINDS` excludes deliberately (todo63): a plain value read produces no relationship
-at all, so claiming staleness there produced a verdict telling the user to delete an import their
-code needs. Closing it means making a bare identifier read emit an edge in every language — a parser
-change, not a dead-code change.
+The four remaining misses were `const`-kind imports, excluded since todo63 because *a plain value
+read produces no relationship at all*. That premise was checked rather than accepted, and it was
+partly stale: `for (const x of TABLE)` had since been captured, `return x` and `const y = x` had not.
+
+ADR 0165 captures them, plus two more that only appeared once `variable` was allowed — each found by
+a measured false finding, not by reading:
+
+| position | cost of omitting it |
+|---|---|
+| class field initialiser — `public readonly queryScm = GO_QUERIES` | **13** false findings, one per language pack |
+| template substitution — `${SITE_URL}` | **6** false findings on orchestrator, one per page file |
+
+The class-field pattern is TS/TSX-only — JavaScript spells it `field_definition`, and putting it in
+the shared block broke the TypeScript pack outright (ADR 0089). The heritage canary was the only
+thing that failed loudly; bisecting five patterns named it.
+
+### Where prune ended up
+
+| oracle | at the start of this phase | now |
+|---|---|---|
+| TypeScript, vs `tsc --noUnusedLocals` | 26 missed / 0 extra | **1 missed / 0 extra** |
+| Python, vs `ast` | 4 missed / 0 extra | **1 missed / 0 extra** |
+| exports, vs `tsc` | 12 missed / 0 extra | **10 missed / 0 extra** |
+
+Precision never left zero at any point.
+
+### The one that remains, named
+
+`CanonicalKind`, imported at `reflector.ts:17` and never referenced. The used-names index is
+case-folded and name-based, and `canonicalKind` is a PROPERTY KEY at four lines in the same file, so
+the key masks the import. Closing it means keying usage by resolved edge identity rather than by
+token — a different index with its own precision risk, not attempted here.
 
 ## Phase 2 — trace
 

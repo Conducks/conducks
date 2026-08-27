@@ -106,6 +106,26 @@ import { behindDoor, alsoBehindDoor as unusedInIndex } from '../door.js';
 export function featureEntry(x: number): number { return behindDoor(x); }
 `);
 
+    // ADR 0165 — the read positions that had no pattern, each found by a measured false positive
+    // once `variable` became a prunable kind. A template substitution was six findings on
+    // orchestrator (SITE_URL, used only as a substitution in six page files); a class field
+    // initialiser was thirteen on this repository (every language pack holds its queries that way).
+    writeFile(repo, 'src/reads.ts', `
+export const TEMPLATED = 'x';
+export const FIELD_INIT = 'y';
+export const RETURNED = 'z';
+`);
+    writeFile(repo, 'src/read-shapes.ts', `
+import { TEMPLATED, FIELD_INIT, RETURNED } from './reads.js';
+
+export class Holder {
+  public readonly held = FIELD_INIT;
+}
+
+export function templated(): string { return \`value: \${TEMPLATED}\`; }
+export function returned(): string { return RETURNED; }
+`);
+
     writeFile(repo, 'src/main.ts', `
 import { realWork } from './importer.js';
 import { viaBarrel } from './index.js';
@@ -113,8 +133,9 @@ import { spreadRead, indexRead } from './readers.js';
 import { useAlias } from './aliased-user.js';
 import { useOne } from './door-user.js';
 import { featureEntry } from './feature/index.js';
+import { Holder, templated, returned } from './read-shapes.js';
 export function boot(): number {
-  return realWork(1) + viaBarrel(2) + spreadRead().length + indexRead('ok') + useAlias(3) + useOne(4) + featureEntry(5);
+  return realWork(1) + viaBarrel(2) + spreadRead().length + indexRead('ok') + useAlias(3) + useOne(4) + featureEntry(5) + new Holder().held.length + templated().length + returned().length;
 }
 `);
     commit(repo, 'init');
@@ -174,6 +195,15 @@ export function boot(): number {
   it('judges an index door like any other file — it is not a Python package init', () => {
     const hit = findings.filter((f: any) => f.file.includes('feature/index'));
     expect(hit.map((f: any) => f.type)).toContain('STALE_IMPORT');
+  }, 240000);
+
+  it.each([
+    ['a template substitution', 'TEMPLATED'],
+    ['a class field initialiser', 'FIELD_INIT'],
+    ['a bare return', 'RETURNED'],
+  ])('counts %s as a read of the binding', (_shape, symbol) => {
+    const hit = findings.filter((f: any) => f.symbol === symbol);
+    expect(hit.map((f: any) => f.type)).not.toContain('STALE_IMPORT');
   }, 240000);
 
   it('reports a single-binding unused import as stale', () => {
