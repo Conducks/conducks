@@ -24,5 +24,15 @@
     "oracle": 45,
     "missed": 6,
     "agreed": 39
+  },
+  "scraper::python-dead": {
+    "defs": 1441,
+    "dead": 12,
+    "missed": 0
+  },
+  "sofie::python-dead": {
+    "defs": 75,
+    "dead": 0,
+    "missed": 0
   }
 }

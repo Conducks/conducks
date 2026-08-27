@@ -145,6 +145,22 @@ point in the phase.
 The exports oracle reports 12 missed / 0 extra, and 11 of those are referenced only inside their own
 file — which `UNUSED_EXPORT` counts as consumption, since it claims "never consumed by other
 modules". Scoring them as misses would grade a stricter claim than the tool makes. The twelfth is a
+### Every Python verdict now has an oracle too
+
+TypeScript had an independent checker for every verdict prune makes; Python had one for exactly one
+of them — `oracle-python.mjs` scores `STALE_IMPORT` and nothing else. So every Python ORPHAN rested
+on hand-reading, which is the method that missed all eight namespace false positives.
+
+Wrong place for the gap: **three of the four defects above were Python**, and the largest was an
+ORPHAN defect worth eight false findings. It was caught by refreshing a subject, not by a check.
+
+`oracle-python-dead.mjs` (ADR 0169) scores `ORPHAN` and `ONLY_IMPORTED` against Python's own `ast`:
+scraper **1,441 definitions walked, 0 missed, 0 extra**; sofie's Python 75, 0 and 0.
+
+It is proved by catching the defect it was built for — reverting the module binding makes it report
+8 EXTRA and exit non-zero, naming each symbol with its reference count. An oracle that has never
+caught anything is a claim, not an instrument.
+
 genuine recall gap of one symbol.
 
 ### The seventh defect — fresh code, four gaps, three of them Python
