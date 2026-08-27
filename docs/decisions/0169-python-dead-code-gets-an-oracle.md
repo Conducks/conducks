@@ -55,6 +55,21 @@ others, so `MISSED` ratchets rather than being required to reach zero.
   is a claim, not an instrument.
 - Every verdict `prune` makes now has an independent checker on both benchmarked languages. The only
   category still unscored is `UNIMPORTED_MODULE` on Python, which is a question rather than a verdict.
+- **OPEN QUESTION — the word `oracle` now means two opposite things in this repository, and that is
+  a hazard rather than a nuisance.** The PRODUCT has Oracle SQL templates (`find_usages`, `hotspots`,
+  `dead_code`, `cycles`, `entry_points` in `query-service.ts`): canned queries that read the conducks
+  graph, ship to users, and therefore inherit every blind spot the graph has. The BENCHMARK oracles
+  are the inverse by construction — they must never touch that graph, because an instrument built
+  from the thing it measures agrees by construction and proves nothing.
+
+  So one meaning TRUSTS the graph and the other REFUSES to, and `dead_code` versus
+  `oracle-python-dead.mjs` is the pair a reader is most likely to confuse.
+
+  Not resolved here. The fix is to rename the TEST side — `ground-truth-*` or `verify-*` — because it
+  is not user-facing and nothing outside `package.json` scripts cites it, while the product name is
+  public. Deferred to whenever `query`'s templates are next worked on, so the rename lands beside the
+  code that owns the surviving meaning rather than as a drive-by.
+
 - `npm run oracle:python-dead` runs it. It resets the vault and re-analyzes first, for the reason
   `oracle-python.mjs` already records: a grammar change alters no file hash, so a stale vault scores
   the previous build and reports success.
