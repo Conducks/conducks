@@ -334,3 +334,95 @@ def boot():
     expect(hit.map((f: any) => f.type)).toContain('STALE_IMPORT');
   }, 240000);
 });
+
+/**
+ * Python read positions and module binding, all four found by running the fixed build against the
+ * subjects AFTER they were pulled to latest — on code conducks had never seen (ADR 0167).
+ *
+ * The value set for Python was written separately from the ecmascript one, so positions closed for
+ * TypeScript in ADR 0165 were still open here. And `from pkg import module` bound nothing, which is
+ * the Python twin of the namespace import ADR 0161 fixed for TypeScript.
+ */
+describe('python reads and module-qualified calls', () => {
+  // The MODULE BINDING that makes `page_source.capture_dom(...)` resolve is NOT asserted here.
+  // Written twice — once through `prune`, once through `impact` — and it passed with the binding
+  // mutated away both times, because in a fixture this small the intra-linker rebinds the dangling
+  // name to the only `capture_dom` in the graph. Deleted rather than kept: a test that passes either
+  // way reports as coverage and proves nothing.
+  //
+  // It is proved on the SUBJECT instead, and the measurement is in ADR 0167: mutating the binding
+  // away takes scraper from 49 findings to 57 and returns eight false ORPHANs — `capture_dom`,
+  // `restore_state`, `extract_fast_scan` among them.
+  let repo: string;
+  let findings: any[];
+  const typesOf = (symbol: string) =>
+    findings.filter((f: any) => f.symbol === symbol).map((f: any) => f.type);
+
+  beforeAll(() => {
+    ensureBuild();
+    repo = mkGitRepo('python-reads');
+
+    writeFile(repo, 'src/pkg/__init__.py', '');
+    writeFile(repo, 'src/pkg/const.py', `
+DOMAIN = "sofie"
+EXECUTABLE_TIERS = {"ok"}
+COMPOUND_TLD = {"co.uk"}
+`);
+    // The module that is IMPORTED AS A MODULE and called through its name.
+    writeFile(repo, 'src/pkg/page_source.py', `
+def capture_dom(page):
+    """Called only as page_source.capture_dom(...) from another module."""
+    return page
+`);
+    writeFile(repo, 'src/pkg/base.py', `
+class ConfigFlow:
+    pass
+`);
+    writeFile(repo, 'src/reader.py', `
+from pkg import page_source
+from pkg.base import ConfigFlow
+from pkg.const import DOMAIN, EXECUTABLE_TIERS, COMPOUND_TLD
+
+
+class SofieConfigFlow(ConfigFlow, domain=DOMAIN):
+    """DOMAIN is read as a keyword argument in the class header, and nowhere else."""
+
+
+_COMPOUND_TLD = COMPOUND_TLD
+
+
+def is_executable(status):
+    return status in EXECUTABLE_TIERS
+
+
+def grab(page):
+    return page_source.capture_dom(page)
+`);
+    writeFile(repo, 'src/main.py', `
+from reader import grab, is_executable
+
+
+def boot(page):
+    return grab(page), is_executable("ok")
+`);
+    commit(repo, 'init');
+    runCli(['analyze', '--yes'], { cwd: repo });
+    findings = JSON.parse(runCli(['prune', '--json'], { cwd: repo }).stdout);
+  }, 240000);
+
+  afterAll(() => rmRepo(repo));
+
+  it('reads a keyword argument in a CLASS header', () => {
+    // `class X(Base, domain=DOMAIN)` — an argument_list hanging off class_definition, not off a call.
+    expect(typesOf('DOMAIN')).not.toContain('STALE_IMPORT');
+  }, 240000);
+
+  it('reads a bare assignment right-hand side', () => {
+    expect(typesOf('COMPOUND_TLD')).not.toContain('STALE_IMPORT');
+  }, 240000);
+
+  it('reads a comparison operand', () => {
+    expect(typesOf('EXECUTABLE_TIERS')).not.toContain('STALE_IMPORT');
+  }, 240000);
+
+});

@@ -179,6 +179,10 @@ export class AnalyzeContext {
    * Registers a local symbol-to-source mapping for the current unit.
    */
   public registerLocalBinding(localName: string, sourcePath: string, originalName?: string): void {
+    // A NAMESPACE BINDING WINS. Python's `from pkg import submodule` reaches this loop too, and it
+    // would rebind the name to the PACKAGE — overwriting the submodule FILE registered moments
+    // earlier. The module is the more specific fact and the one the call site needs.
+    if (this.namespaceBindings.has(localName.toLowerCase())) return;
     this.localBindings.set(localName.toLowerCase(), sourcePath.toLowerCase());
     if (originalName && originalName.toLowerCase() !== localName.toLowerCase()) {
       this.bindingOriginals.set(localName.toLowerCase(), originalName.toLowerCase());

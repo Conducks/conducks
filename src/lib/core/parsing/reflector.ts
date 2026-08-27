@@ -753,6 +753,17 @@ export class ConducksReflector {
                   const subSpec = `${specifier}.${cap.node.text}`;
                   const subModule = this.imports.resolve(subSpec, file.path, allPaths, provider, context);
                   if (typeof subModule !== 'string') continue;
+                  // BIND THE MODULE, not just record the edge. `from core.mapper.runtime import
+                  // page_source` binds a MODULE, and `page_source.capture_dom(...)` names a function
+                  // inside it — the Python twin of the namespace import ADR 0161 fixed for
+                  // TypeScript, and the same machinery answers it. Without this the alias resolved
+                  // to the PACKAGE, so the call became `<__init__.py>::page_source.capture_dom`, an
+                  // id no node is keyed by, and the function read as dead.
+                  //
+                  // MEASURED on scraper once it was pulled to latest and the idiom spread: seven
+                  // ORPHAN findings across `page_source`, `navigation`, `fast_scan` and `graph_reach`
+                  // — `impact` agreed at 0 callers for a function called three lines away.
+                  context.registerNamespaceBinding(cap.node.text, subModule);
                   spectrum.relationships.push({
                     sourceName: 'unit',
                     targetName: subSpec,

@@ -125,6 +125,19 @@
   ;; what the TypeScript grammar captures.
   (attribute object: (identifier) @ref_value)
   (list (identifier) @ref_value)
+
+  ;; A BARE ASSIGNMENT — `_COMPOUND_TLD = COMPOUND_TLD`, the alias-under-a-private-name idiom. The
+  ;; right-hand side is the whole use, and nothing else in the file writes the name.
+  ;;
+  ;; A COMPARISON — `return health.status in EXECUTABLE_TIERS`. The operand of `in` / `==` / `is` is
+  ;; read, and `comparison_operator` was in no pattern at all.
+  ;;
+  ;; MEASURED on scraper after it was pulled to latest: these two shapes were all 5 findings Python's
+  ;; own parser contradicted, on code conducks had never seen (ADR 0167). Both are the Python twins of
+  ;; positions ADR 0165 had already closed for TypeScript — the same gap, in the language whose value
+  ;; set was written separately.
+  (assignment right: (identifier) @ref_value)
+  (comparison_operator (identifier) @ref_value)
   (conditional_expression (identifier) @ref_value)
   ;; A DICT VALUE is the dispatch table Python is written with:
   ;;     levels = {"level1": Level1, "level2": Level2}
@@ -142,6 +155,18 @@
   ;; `_score_entity` (live_structure.py) reported ORPHAN in `prune` and 0 callers in `impact` despite
   ;; being used as a sort key on the very next lines (F-02, todoR#P0).
   (call arguments: (argument_list (keyword_argument value: (identifier) @ref_value)))
+
+  ;; A KEYWORD ARGUMENT IN A CLASS HEADER — `class SofieConfigFlow(ConfigFlow, domain=DOMAIN)`.
+  ;;
+  ;; The superclass list is an `argument_list` like a call's, but it hangs off `class_definition`
+  ;; rather than off `call`, so the pattern above never reached it. Plain bases are captured as
+  ;; @heritage two dozen lines up; the keyword form had nothing.
+  ;;
+  ;; MEASURED on sofie after it gained a Home Assistant integration: `DOMAIN` is imported at
+  ;; `config_flow.py:12` and read at line 23 in exactly this position, and was the ONE false
+  ;; positive on 168 verdicts of previously unseen code (ADR 0167). Python's metaclass keywords
+  ;; (`metaclass=`, and every framework that follows the convention) all live here.
+  (class_definition superclasses: (argument_list (keyword_argument value: (identifier) @ref_value)))
   ;; An EXCEPTION TYPE is a read of the class: `except SpecialistNotFound:` is the only place
   ;; `mapper_runner.py` names the exception it imports, and without this it read as an unused import.
   ;; Both plain and `as` forms, and the tuple form `except (A, B):`.
