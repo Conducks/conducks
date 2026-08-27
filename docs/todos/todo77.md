@@ -7,8 +7,13 @@ Order is ADR 0160's: fixes flow forward, so a phase is never reopened by a later
 starts from a clean `git status` on all three subjects, and every injection is reverted before the
 next level runs.
 
-Subjects: `sofie` (single repo, 437 ts / 67 tsx), `scraper` (single repo, 167 py), `orchestrator`
-(npm-workspaces monorepo, 455 ts / 198 tsx). The Python-monorepo cell has no subject and stays open.
+Subjects, at their 2026-08-27 pull: `sofie` (497 ts / 69 tsx / 9 py), `scraper` (235 py / 27 js /
+6 mjs), `orchestrator` (npm-workspaces monorepo, 537 ts / 225 tsx / 28 mjs). The Python-monorepo cell
+has no subject and stays open.
+
+**A subject refresh is part of the method** (ADR 0167). Pulling all three to latest surfaced four
+defects that 326 scored verdicts, ten mutation-proved mechanisms and two exact oracles had all
+missed — a frozen subject cannot surface a shape it does not contain.
 
 ## Phase 1 — prune
 
@@ -141,6 +146,46 @@ The exports oracle reports 12 missed / 0 extra, and 11 of those are referenced o
 file — which `UNUSED_EXPORT` counts as consumption, since it claims "never consumed by other
 modules". Scoring them as misses would grade a stricter claim than the tool makes. The twelfth is a
 genuine recall gap of one symbol.
+
+### The seventh defect — fresh code, four gaps, three of them Python
+
+All three subjects were pulled to latest after the numbers above were reached. Four defects appeared
+on code conducks had never seen, and three were in Python — the language whose value-position set was
+written separately and never received ADR 0165's work.
+
+| shape | cost |
+|---|---|
+| keyword argument in a class header — `class X(Base, domain=DOMAIN)` | 1 false stale import, sofie |
+| bare assignment — `_X = X` | part of 5 on scraper |
+| comparison operand — `status in TIERS` | part of the same 5 |
+| **a module imported from its package** — `from pkg import page_source` | **8 false ORPHANs**, scraper |
+
+The fourth is ADR 0161's namespace import, in Python: the branch that recognised
+`from pkg import submodule` pushed an edge and bound nothing, so the call resolved against the
+PACKAGE and dangled. Fixed by reusing the same machinery.
+
+scraper 57 → 49, sofie 173 → 172, orchestrator 245 and **unchanged by any fix**. Both oracles stayed
+exact throughout, now against subjects roughly 40% larger.
+
+**The module binding is proved on the subject, not by a fixture.** The test was written twice,
+through `prune` and through `impact`, and passed with the mechanism mutated away both times — in a
+fixture that small the intra-linker rebinds the dangling name. Deleted per Rule 10; the proof is the
+subject measurement, which returns eight false ORPHANs when the binding is removed.
+
+### All three re-scored on refreshed code
+
+| subject | verdicts scored | false positives | note |
+|---|---|---|---|
+| scraper | 43 | 0 | 4 defects fixed to get there |
+| sofie | 167 | 0 | 1 defect fixed |
+| orchestrator | 183 | 0 | **nothing to fix** |
+
+**393 verdicts, 0 false positives.** Orchestrator — pulled last, and the only monorepo — produced no
+new defect at all. Its whole `UNUSED_EXPORT` set was re-checked against the precise claim ("no OTHER
+module imports it") rather than by name, which is what a monorepo demands: `app/` and `admin/` each
+hold their own `constants/auth.ts`, and every `@/lib/constants/...` import resolves workspace-locally,
+so the duplicate in the other workspace genuinely has no consumer. Eleven findings a name-based check
+called contradicted are correct.
 
 ## Phase 2 — trace
 
