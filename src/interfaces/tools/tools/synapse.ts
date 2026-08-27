@@ -132,9 +132,10 @@ const DOCS_LAYERS = ['all', 'board'] as const;
 /**
  * The finding types `conducks_prune` can filter to, plus the unfiltered `all`.
  *
- * Derived from the domain's list rather than retyped. It used to name three of five, so
- * `UNREACHABLE_LOGIC` and `UNIMPORTED_MODULE` findings were returned but could not be filtered to
- * and were counted in no summary bucket (todo53).
+ * Derived from the domain's list rather than retyped. It used to name three of the five that existed
+ * then, so two kinds of finding were returned but could not be filtered to and were counted in no
+ * summary bucket (todo53). Deriving it is also what let ADR 0172 REMOVE a type without leaving a
+ * filter value that matches nothing.
  */
 export const PRUNE_TYPES = [...DEAD_CODE_TYPES, 'all'] as const;
 

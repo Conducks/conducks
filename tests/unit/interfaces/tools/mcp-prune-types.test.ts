@@ -6,7 +6,7 @@
  *   total:   99
  *   findings actually contained: UNUSED_EXPORT 70, STALE_IMPORT 16, ORPHAN 9, UNIMPORTED_MODULE 4
  *
- * The domain emits FIVE types (`ORPHAN`, `UNUSED_EXPORT`, `UNREACHABLE_LOGIC`, `STALE_IMPORT`,
+ * The domain emits FIVE types (`ORPHAN`, `UNUSED_EXPORT`, `ONLY_IMPORTED`, `STALE_IMPORT`,
  * `UNIMPORTED_MODULE`). The tool hard-coded three of them into its summary AND into its `type` enum,
  * so four findings were returned in the list, counted in no bucket, and unreachable by any filter. A
  * caller reconciling `summary` against `total` finds 4 findings that exist nowhere.
@@ -62,10 +62,10 @@ beforeEach(() => {
 describe('the finding types are one list — todo53', () => {
   it('names every type the domain can emit', () => {
     expect([...DEAD_CODE_TYPES].sort()).toEqual(
-      // ONLY_IMPORTED added by ADR 0162: every reference to the symbol is an import the importing
-      // file never uses. A sixth type, and this list is restated by hand ON PURPOSE — that is what
-      // makes adding one reach every summary and every enum instead of landing silently.
-      ['ONLY_IMPORTED', 'ORPHAN', 'STALE_IMPORT', 'UNIMPORTED_MODULE', 'UNREACHABLE_LOGIC', 'UNUSED_EXPORT'],
+      // Restated by hand ON PURPOSE — that is what makes ADDING a type reach every summary and
+      // every enum instead of landing silently, and it is also what made REMOVING one land here:
+      // `UNREACHABLE_LOGIC` was declared and emitted by nothing (ADR 0172).
+      ['ONLY_IMPORTED', 'ORPHAN', 'STALE_IMPORT', 'UNIMPORTED_MODULE', 'UNUSED_EXPORT'],
     );
   });
 
@@ -86,10 +86,13 @@ describe('conducks_prune summary reconciles with its total — todo53', () => {
     });
   });
 
-  it('gives UNIMPORTED_MODULE and UNREACHABLE_LOGIC their own buckets', async () => {
+  it('gives UNIMPORTED_MODULE and ONLY_IMPORTED their own buckets', async () => {
+    // The two QUESTION types. They were the ones the MCP tool dropped from its summary (todo53), so
+    // they are the ones asserted by name — a question with no bucket cannot be filtered for, and a
+    // caller reconciling summary against total finds findings that exist nowhere.
     const res = await prune();
     expect(res.data.summary.UNIMPORTED_MODULE).toBe(1);
-    expect(res.data.summary.UNREACHABLE_LOGIC).toBe(1);
+    expect(res.data.summary.ONLY_IMPORTED).toBe(1);
   });
 
   it('separates questions from verdicts, as the CLI does', async () => {

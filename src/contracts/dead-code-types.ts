@@ -11,10 +11,13 @@
  * places, kept by memory in each of them. Adding a sixth type now reaches every summary and every
  * enum by construction.
  */
+// `UNREACHABLE_LOGIC` was here and is gone (ADR 0172). It was declared, carried through the MCP enum
+// and the CLI summary, and emitted by NOTHING — `dead-code.ts` never mentioned it. A type a tool
+// advertises and cannot produce is a lie in its contract: every subject reported 0 of them, which
+// reads as "no unreachable logic" rather than "this is not implemented".
 export const DEAD_CODE_TYPES = [
   'ORPHAN',
   'UNUSED_EXPORT',
-  'UNREACHABLE_LOGIC',
   'STALE_IMPORT',
   'UNIMPORTED_MODULE',
   'ONLY_IMPORTED',
