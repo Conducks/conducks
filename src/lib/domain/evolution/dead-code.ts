@@ -464,11 +464,16 @@ export class DeadCodeAnalyzer {
       // or the raw member expression (`graphtraversal.traverseupstream`), so both receiver and
       // member count as evidence.
       for (const token of tokensOf(props.original)) recordUse(file, token);
-      for (const token of tokensOf(targetTail(edge.targetId))) recordUse(file, token);
-      // Identifier-as-value wiring: `register(HANDLERS)` passes the binding without calling it.
-      if (Array.isArray(props.arguments)) {
-        for (const argument of props.arguments) for (const token of tokensOf(argument)) recordUse(file, token);
+      // EXPERIMENT: a RESOLVED dotted tail names a method on a receiver. Record the member, not the
+      // receiver segment.
+      const tail = targetTail(edge.targetId);
+      if (edge.type === 'CALLS' && String(edge.targetId).includes('::') && tail.includes('.')) {
+        recordUse(file, tail.split('.').pop()!.toLowerCase());
+      } else {
+        for (const token of tokensOf(tail)) recordUse(file, token);
       }
+      // Identifier-as-value wiring: `register(HANDLERS)` passes the binding without calling it.
+      // EXPERIMENT: raw argument tokens removed
     }
 
     return { usedNamesByFile, fileOfNode };

@@ -42,6 +42,11 @@
   ;; value read — `return usedValue`, `= CONFIG` — produces no relationship at all, so no evidence
   ;; of use is not evidence of no use". That was true. It is what made a `const` import unjudgeable.
   (return_statement (identifier) @ref_value)
+  ;; An ARROW BODY that IS the identifier — `() => FORGETERM_PLUGIN_CHORD`. There is no return
+  ;; keyword and the declarator's value is the arrow, so neither rule above reaches it. MEASURED on
+  ;; this repository the moment raw argument text stopped being counted as evidence: it was the one
+  ;; finding tsc contradicted.
+  (arrow_function body: (identifier) @ref_value)
   (variable_declarator value: (identifier) @ref_value)
   (assignment_expression right: (identifier) @ref_value)
   ;; A TEMPLATE SUBSTITUTION reads the binding. MEASURED on orchestrator: SITE_URL is imported by six

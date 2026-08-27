@@ -114,9 +114,10 @@ export function featureEntry(x: number): number { return behindDoor(x); }
 export const TEMPLATED = 'x';
 export const FIELD_INIT = 'y';
 export const RETURNED = 'z';
+export const ARROW_BODY = 'w';
 `);
     writeFile(repo, 'src/read-shapes.ts', `
-import { TEMPLATED, FIELD_INIT, RETURNED } from './reads.js';
+import { TEMPLATED, FIELD_INIT, RETURNED, ARROW_BODY } from './reads.js';
 
 export class Holder {
   public readonly held = FIELD_INIT;
@@ -124,6 +125,10 @@ export class Holder {
 
 export function templated(): string { return \`value: \${TEMPLATED}\`; }
 export function returned(): string { return RETURNED; }
+// No return keyword, and the declarator's value is the arrow — so neither the return rule nor the
+// variable-declarator rule reaches this. It was the one finding tsc contradicted the moment raw
+// argument text stopped counting as evidence.
+export const arrowed = () => ARROW_BODY;
 `);
 
     writeFile(repo, 'src/main.ts', `
@@ -133,9 +138,9 @@ import { spreadRead, indexRead } from './readers.js';
 import { useAlias } from './aliased-user.js';
 import { useOne } from './door-user.js';
 import { featureEntry } from './feature/index.js';
-import { Holder, templated, returned } from './read-shapes.js';
+import { Holder, templated, returned, arrowed } from './read-shapes.js';
 export function boot(): number {
-  return realWork(1) + viaBarrel(2) + spreadRead().length + indexRead('ok') + useAlias(3) + useOne(4) + featureEntry(5) + new Holder().held.length + templated().length + returned().length;
+  return realWork(1) + viaBarrel(2) + spreadRead().length + indexRead('ok') + useAlias(3) + useOne(4) + featureEntry(5) + new Holder().held.length + templated().length + returned().length + arrowed().length;
 }
 `);
     commit(repo, 'init');
@@ -201,6 +206,7 @@ export function boot(): number {
     ['a template substitution', 'TEMPLATED'],
     ['a class field initialiser', 'FIELD_INIT'],
     ['a bare return', 'RETURNED'],
+    ['an arrow expression body', 'ARROW_BODY'],
   ])('counts %s as a read of the binding', (_shape, symbol) => {
     const hit = findings.filter((f: any) => f.symbol === symbol);
     expect(hit.map((f: any) => f.type)).not.toContain('STALE_IMPORT');
@@ -274,5 +280,57 @@ def boot():
   it('does not report the barrel import itself as stale', () => {
     const hit = findings.filter((f: any) => f.symbol === 'via_barrel');
     expect(hit.map((f: any) => f.type)).not.toContain('STALE_IMPORT');
+  }, 240000);
+});
+
+/**
+ * A RECEIVER IS NOT THE NAME. `level.run()` resolves to `base.py::baselevel.run`, and the used-names
+ * index recorded every token of that tail — so the receiver segment `baselevel` marked the imported
+ * CLASS as used, while nothing in the file ever writes its name.
+ *
+ * MEASURED on scraper: this was the last finding Python's own `ast` saw and conducks did not.
+ * Narrowed to CALLS edges only — a heritage or type edge names the class outright, and dropping the
+ * receiver there produced a false positive on orchestrator (`ExpertService`, imported aliased and
+ * used as a superclass).
+ */
+describe('a call receiver does not count as a reference to the class', () => {
+  let repo: string;
+  let findings: any[];
+
+  beforeAll(() => {
+    ensureBuild();
+    repo = mkGitRepo('call-receiver');
+
+    writeFile(repo, 'src/base.py', `
+class BaseLevel:
+    def run_the_level(self):
+        return 1
+`);
+    // Imports BaseLevel and never writes the name again. The call below resolves to
+    // BaseLevel.run_the_level, whose tail carries "baselevel" as its receiver segment.
+    writeFile(repo, 'src/engine.py', `
+from base import BaseLevel
+
+
+def go(level):
+    return level.run_the_level()
+`);
+    writeFile(repo, 'src/main.py', `
+from engine import go
+
+
+def boot():
+    return go(None)
+`);
+    commit(repo, 'init');
+    runCli(['analyze', '--yes'], { cwd: repo });
+    findings = JSON.parse(runCli(['prune', '--json'], { cwd: repo }).stdout);
+  }, 240000);
+
+  afterAll(() => rmRepo(repo));
+
+  it('reports the import as stale even though a call resolves to that class', () => {
+    const hit = findings.filter((f: any) => f.symbol === 'BaseLevel');
+    expect(hit.map((f: any) => f.type)).toContain('STALE_IMPORT');
   }, 240000);
 });

@@ -32,7 +32,7 @@ tool. **The hypothesis was wrong twice**, and both defects were invisible to sam
 
 | level | planted / scored | result |
 |---|---|---|
-| L1 precision | 325 verdicts across 3 subjects | **0 false positives** |
+| L1 precision | 326 verdicts across 3 subjects | **0 false positives** |
 | L2 recall | 10 planted | **10 found** |
 | L3 counter | 8 planted | **0 flagged** |
 
@@ -110,22 +110,37 @@ The class-field pattern is TS/TSX-only — JavaScript spells it `field_definitio
 the shared block broke the TypeScript pack outright (ADR 0089). The heritage canary was the only
 thing that failed loudly; bisecting five patterns named it.
 
+### The sixth defect — a name appearing stood in for a reference
+
+The last two misses, one per language, were both marked used by evidence that a NAME appeared rather
+than that the binding was referenced. A method call resolves to `<file>::<class>.<method>`, and the
+index tokenised the whole tail — so a call's RECEIVER marked the imported class used. And the index
+tokenised raw ARGUMENT TEXT, so an object literal's KEY (`canonicalKind:`) masked an import
+(`CanonicalKind`) four lines above it.
+
+ADR 0166 drops the receiver segment for `CALLS` edges only — applied to every edge type it produced a
+false positive on orchestrator, where `ExpertService` is imported aliased and used as a superclass —
+and retires raw argument text, which the grammar's own arguments capture had already superseded.
+Verified redundant rather than assumed: removing the grammar capture fails three assertions, removing
+the raw-token path fails none.
+
+That exposed one genuinely uncaptured read — `() => X`, an arrow whose body IS the identifier — now
+captured.
+
 ### Where prune ended up
 
 | oracle | at the start of this phase | now |
 |---|---|---|
-| TypeScript, vs `tsc --noUnusedLocals` | 26 missed / 0 extra | **1 missed / 0 extra** |
-| Python, vs `ast` | 4 missed / 0 extra | **1 missed / 0 extra** |
-| exports, vs `tsc` | 12 missed / 0 extra | **10 missed / 0 extra** |
+| TypeScript, vs `tsc --noUnusedLocals` | 26 missed / 0 extra | **0 missed / 0 extra** |
+| Python, vs `ast` | 4 missed / 0 extra | **0 missed / 0 extra** |
 
-Precision never left zero at any point.
+Both stale-import oracles are exact, stable across repeated runs. Precision never left zero at any
+point in the phase.
 
-### The one that remains, named
-
-`CanonicalKind`, imported at `reflector.ts:17` and never referenced. The used-names index is
-case-folded and name-based, and `canonicalKind` is a PROPERTY KEY at four lines in the same file, so
-the key masks the import. Closing it means keying usage by resolved edge identity rather than by
-token — a different index with its own precision risk, not attempted here.
+The exports oracle reports 12 missed / 0 extra, and 11 of those are referenced only inside their own
+file — which `UNUSED_EXPORT` counts as consumption, since it claims "never consumed by other
+modules". Scoring them as misses would grade a stricter claim than the tool makes. The twelfth is a
+genuine recall gap of one symbol.
 
 ## Phase 2 — trace
 
