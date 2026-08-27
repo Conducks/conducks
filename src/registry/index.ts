@@ -14,6 +14,7 @@ import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/d
 import { collectChanges, impactedSymbolIds } from "@/lib/domain/analysis/index.js";
 import { lintVisuals, collectVisualPages, buildStamps, staleStamps, type VisualsViolation, type ReviewStamps } from "@/lib/domain/docs/index.js";
 import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/docs/index.js";
+import { readTestingPage, renderTarget, FORGETERM_PLUGIN_CHORD } from "@/lib/domain/docs/index.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
 import { assessRoot, explainScope } from "@/lib/core/utils/index.js";
@@ -286,6 +287,12 @@ export const registry = {
     // The denominator behind every claim a board makes. Exposed here rather than imported by the CLI
     // directly, because `cli -> domain` is a forbidden static edge and the boundary test enforces it.
     governedCount: (board: Parameters<typeof governedCount>[0]) => governedCount(board),
+    // The manual testing checklist: where it is, how far through it anyone is, and which surface
+    // this shell should be told to read it on. Through composition for the same reason
+    // `governedCount` is — `cli -> domain` is a forbidden static edge.
+    testingPage: (root?: string) => readTestingPage(root || chronicle.getProjectDir() || process.cwd()),
+    renderTarget: (env: NodeJS.ProcessEnv = process.env) => renderTarget(env),
+    forgetermChord: () => FORGETERM_PLUGIN_CHORD,
     // One watcher per process: `mirror` and `watch` both ask for it, neither owns it.
     get watcher() {
       docsWatcher ??= new DocsWatcher(chronicle.getProjectDir() || process.cwd());

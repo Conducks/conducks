@@ -23,4 +23,6 @@ export { DocsWatcher } from './docs-watcher.js';
 export { lintVisuals, collectVisualPages, buildStamps, staleStamps } from './visuals-lint.js';
 export type { VisualsViolation, ReviewStamps } from './visuals-lint.js';
 export { checkVisualsDrift, generatorCommandOf } from './visuals-drift.js';
+export { readTestingPage, renderTarget, FORGETERM_PLUGIN_CHORD } from './testing-page.js';
+export type { TestingPage, Target } from './testing-page.js';
 export type { DriftResult } from './visuals-drift.js';

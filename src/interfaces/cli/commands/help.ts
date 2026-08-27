@@ -68,7 +68,7 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "SYSTEM (Meta)": {
-        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "monitor", "bootstrap-docs", "docs-lint", "docs-status", "help"],
+        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "monitor", "bootstrap-docs", "docs-lint", "docs-status", "testing", "help"],
         examples: [
           "conducks setup",
           "conducks uninstall",

@@ -49,6 +49,10 @@
 - Purpose: Check every anchor a diagram makes against the working tree — the file resolves to exactly one place, the line exists, the symbol is still defined, and a constant written in the page is still the value the code assigns. An ambiguous abbreviation fails instead of resolving to a guess.
 - Intent: A picture is a claim about code at a moment, and it decays silently — the more precise it looks, the more it is trusted. The filesystem is the source of truth and not the vault, because a graph keyed to the last pulse would let a lying page report clean, and a false green is worse than no gate (ADR 0138, ADR 0035).
 
+## Testing Checklist — `conducks testing`
+- Purpose: Say where the manual checklist is, how much of it has been worked through, and where to open it — the chord that draws it as a pane inside ForgeTerm, the browser anywhere else.
+- Intent: It NAMES the target and never drives it (ADR 0166). ForgeTerm has no control channel, so opening a pane from out here would cost a protocol message, a new outside-in command surface, and a version bump that restarts every running shell — to save one keystroke. The count comes from the source rather than the rendered page, because a generated page is wrong for exactly as long as somebody has edited the source without re-rendering.
+
 ## Mirror Live Sync — `conducks mirror` (with `conducks watch` running)
 - Purpose: Push graph changes to connected dashboard clients as they land, so the picture on screen matches the code on disk.
 - Intent: A dashboard that needs a manual refresh loses the value of watch mode — the two are meant to be used together.
