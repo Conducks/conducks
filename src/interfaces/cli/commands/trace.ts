@@ -31,7 +31,7 @@ function reportTruncation(total: number, shown: number): void {
 export class TraceCommand implements ConducksCommand {
   public id = "trace";
   public description = "Trace structural dependencies (use --flow for data lineage)";
-  public usage = "conducks trace <symbol_id> [--mode reachability|path] [--target <symbol>] [--flow] [--limit <n>] [--json]";
+  public usage = "conducks trace <symbol_id> [--mode reachability|path] [--target <symbol>] [--flow] [--limit <n>] [--depth <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     const isFlow = args.includes('--flow');
@@ -65,6 +65,15 @@ export class TraceCommand implements ConducksCommand {
     const limitAt = args.indexOf('--limit');
     const limit = limitAt > -1 ? Number(args[limitAt + 1]) : TRACE_LIMIT;
     const stepCap = Number.isFinite(limit) && limit > 0 ? limit : TRACE_LIMIT;
+
+    // DEPTH IS A SECOND BOUND, and it was neither settable nor disclosed. `trace` walks a weighted
+    // graph distance capped at 10, so on the scraper subject it returned 2,057 of 2,397 reachable
+    // nodes and reported `truncated: false` — the number that says "this is the whole answer".
+    // ADR 0091 refused exactly this for the PRINT limit ("a bound that hides itself is not fine");
+    // the DEPTH limit had never been held to it (ADR 0174).
+    const depthArg = args.indexOf('--depth');
+    const depthVal = depthArg >= 0 ? Number(args[depthArg + 1]) : NaN;
+    const traceDepth = Number.isFinite(depthVal) && depthVal > 0 ? depthVal : undefined;
     // `limitAt + 1` is only a real index when the flag is PRESENT — with no --limit, limitAt is -1
     // and that expression is 0, which dropped the symbol itself and printed the usage line.
     const valueAt = limitAt > -1 ? limitAt + 1 : -1;
@@ -139,7 +148,7 @@ export class TraceCommand implements ConducksCommand {
     if (useJson) {
       const steps = isFlow
         ? registry.kinetic.flow(symbolId).steps ?? []
-        : registry.kinetic.trace(symbolId).map((id: string) => {
+        : registry.kinetic.trace(symbolId, traceDepth).map((id: string) => {
             const n = registry.query.graph.getGraph().getNode(id);
             // An unresolved target is REPORTED as unresolved rather than dropped — the human
             // branch prints it as an "Unresolved Ghost Target", and a caller that cannot see the
@@ -148,11 +157,17 @@ export class TraceCommand implements ConducksCommand {
               ? { id, name: n.properties.name, kind: n.label, filePath: n.properties.filePath, resolved: true }
               : { id, name: id, kind: 'EXTERNAL', filePath: null, resolved: false };
           });
+      // TWO bounds, reported separately, because they mean different things: `truncated` says the
+      // PRINT stopped early and the rest is one flag away, `depthBounded` says the WALK stopped and
+      // there are reachable nodes in neither list.
+      const depthBounded = !isFlow && registry.kinetic.lastTraceWasDepthBounded?.() === true;
       process.stdout.write(JSON.stringify({
         symbolId,
         mode: isFlow ? 'flow' : 'trace',
         limit: stepCap,
         truncated: steps.length > stepCap,
+        depth: isFlow ? null : (traceDepth ?? 10),
+        depthBounded,
         steps: steps.slice(0, stepCap),
       }, null, 2) + '\n');
       return;
@@ -174,7 +189,7 @@ export class TraceCommand implements ConducksCommand {
         });
         reportTruncation(circuit.steps.length, flowLimit);
       } else {
-        const steps = registry.kinetic.trace(symbolId);
+        const steps = registry.kinetic.trace(symbolId, traceDepth);
         const stepLimit = stepCap;
         steps.slice(0, stepLimit).forEach((id: string, i: number) => {
           const n = registry.query.graph.getGraph().getNode(id);
@@ -186,6 +201,12 @@ export class TraceCommand implements ConducksCommand {
           }
         });
         reportTruncation(steps.length, stepLimit);
+        // The walk's own bound, said out loud. Distinct from the print bound above: raising --limit
+        // shows more of THIS answer, raising --depth asks a bigger question.
+        if (registry.kinetic.lastTraceWasDepthBounded?.() === true) {
+          console.log(`\x1b[33m    Walk stopped at depth ${traceDepth ?? 10} — nodes beyond it are reachable and NOT listed.\x1b[0m`);
+          console.log(`\x1b[2m    Raise it with --depth <n>.\x1b[0m`);
+        }
       }
     } catch (err) {
       console.error(`Trace Error: ${(err as Error).message}`);

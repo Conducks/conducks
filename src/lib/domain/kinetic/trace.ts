@@ -101,6 +101,14 @@ export abstract class BaseAnalyzer {
    * Performs a Dijkstra traversal to find the "Shortest Weighted Path".
    * Factor in architectural relationship weights (e.g., EXTENDS > CALLS > IMPORTS).
    */
+  /**
+   * Whether the last traversal discarded a path for exceeding its depth budget.
+   *
+   * Call-scoped: reset at the top of every `dijkstra`, read immediately after. It answers one
+   * question — "is the answer you just got the whole answer?" — which no caller could ask before.
+   */
+  protected depthBoundHit = false;
+
   protected dijkstra(
     graph: ConducksAdjacencyList,
     startId: NodeId,
@@ -108,6 +116,7 @@ export abstract class BaseAnalyzer {
     weights: Record<string, number>,
     maxWeight: number = 10
   ): Map<NodeId, { weight: number; path: ConducksEdge[] }> {
+    this.depthBoundHit = false;
     const results = new Map<NodeId, { weight: number; path: ConducksEdge[] }>();
     const pq = new PriorityQueue<{ id: NodeId; weight: number; path: ConducksEdge[] }>();
     
@@ -118,7 +127,11 @@ export abstract class BaseAnalyzer {
       const { id: currentId, weight: currentWeight, path } = pq.pop()!;
 
       if (visited.has(currentId) && visited.get(currentId)! <= currentWeight) continue;
-      if (currentWeight > maxWeight) continue;
+      // THE BOUND IS RECORDED, NOT JUST APPLIED. This is the only place the depth cap discards a
+      // path, so it is the only place that can say the answer is bounded. Without it `trace` reported
+      // `truncated: false` while omitting 340 reachable nodes on the scraper subject — the exact
+      // shape ADR 0091 refused for the PRINT limit, still standing for the DEPTH limit (ADR 0174).
+      if (currentWeight > maxWeight) { this.depthBoundHit = true; continue; }
       
       visited.set(currentId, currentWeight);
 
@@ -165,6 +178,9 @@ export class TraceAnalyzer extends BaseAnalyzer {
    * graph distance (see `bfs` above). This is a REACHABILITY order, not an execution order — a
    * static graph has no notion of "runs before" between two direct calls at the same distance.
    */
+  /** Whether the last `trace` was cut short by its depth budget rather than by the graph running out. */
+  public lastTraceWasDepthBounded(): boolean { return this.depthBoundHit; }
+
   public trace(symbolId: NodeId, depth: number = 10): NodeId[] {
     const g = this.graph || (null as any);
     if (!g) return [];
@@ -175,9 +191,35 @@ export class TraceAnalyzer extends BaseAnalyzer {
     // imports are unit-scoped (`service.ts::unit -IMPORTS-> format`), so a symbol's import-carried
     // dependency is reached THROUGH its container, and cutting the edge would lose it. Containment
     // may carry a walk; it is never itself the answer.
-    return Array.from(results.entries())
+    const kept = Array.from(results.entries())
       .filter(([, data]) => data.path.length === 0 || data.path[data.path.length - 1].type !== 'MEMBER_OF')
       .map(([id]) => id);
+
+    // THE FILTER ABOVE JUDGES THE SHORTEST PATH, AND A NODE HAS MORE THAN ONE.
+    //
+    // Dijkstra keeps one route per node, so a symbol whose CHEAPEST route happens to arrive through
+    // containment is dropped even when something in the kept set genuinely CALLS it. Measured on the
+    // scraper subject against an independent BFS: 5 of 2,397 reachable nodes, among them
+    // `paths.py::resolve_project_path`, which is called outright.
+    //
+    // Re-admitted on evidence rather than by relaxing the rule: a dropped node returns only if a KEPT
+    // node reaches it by an edge that is not MEMBER_OF. Containment still never carries the answer —
+    // it just no longer hides a reference that exists (ADR 0174).
+    // To a FIXPOINT, not one pass: a node re-admitted on the second lap can be the thing that makes
+    // a third one referenced. Measured against the independent walk, a single pass left 21 nodes out
+    // across five entry points; iterating leaves only the containment-only ones the rule excludes.
+    const keptSet = new Set(kept);
+    let admittedSomething = true;
+    while (admittedSomething) {
+      admittedSomething = false;
+      for (const [id] of results.entries()) {
+        if (keptSet.has(id)) continue;
+        const referenced = g.getNeighbors(id, 'upstream')
+          .some((e: ConducksEdge) => e.type !== 'MEMBER_OF' && keptSet.has(e.sourceId));
+        if (referenced) { keptSet.add(id); kept.push(id); admittedSomething = true; }
+      }
+    }
+    return kept;
   }
 
   /**

@@ -34,5 +34,9 @@
     "defs": 75,
     "dead": 0,
     "missed": 0
+  },
+  "scraper::trace": {
+    "starts": 5,
+    "missed": 20
   }
 }

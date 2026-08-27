@@ -229,9 +229,34 @@ called contradicted are correct.
 
 ## Phase 2 — trace
 
-- [ ] L1 on all three subjects
+- [x] L1 scraper — scored against an independent BFS over the vault's own edges. Two defects, both fixed by 0174
+- [ ] L1 sofie — same walk, TS subject
+- [ ] L1 orchestrator — same walk, monorepo
 - [ ] L2 — plant call paths `trace` must walk
 - [ ] L3 — plant paths it must not invent
+
+### The first measurement found ADR 0091's own defect, in a second place
+
+`trace` caps its walk at a weighted depth of 10. On scraper: 2,397 reachable, 2,057 returned,
+`truncated: false` — and no `--depth` flag to raise it. ADR 0091 fixed exactly this for the PRINT
+limit in the same file, with the words *"a bound that hides itself is not fine"*. The walk's bound
+had never been held to it.
+
+Both bounds are now settable and reported separately: `truncated` means the print stopped,
+`depthBounded` means the walk did.
+
+The same measurement found a second defect. The MEMBER_OF exclusion was applied to each node's
+SHORTEST path, and dijkstra keeps one route per node — so a symbol whose cheapest route arrived
+through containment was dropped even when something genuinely calls it.
+`paths.py::resolve_project_path` is called outright and was absent. Re-admitted on evidence, to a
+fixpoint.
+
+Residual: 58 nodes, all reachable only through containment — the documented exclusion — and **0 that
+trace claims and a walk cannot reach**.
+
+`oracle-trace.mjs` now scores five entry points per run. Its 20 MISSED are a difference of rule, not
+a bug: it admits a node referenced from anywhere in its own walk, while trace requires the referrer
+to have been kept. Every one is a class member. Ratcheted, with the reason stated.
 
 ## Phase 3 — context
 

@@ -231,6 +231,8 @@ export const registry = {
   },
   kinetic: {
     trace: (symbolId: string, depth?: number) => kinetic.trace(symbolId, depth),
+    // Read straight after `trace`: it says whether that answer was the whole answer.
+    lastTraceWasDepthBounded: () => kinetic.lastTraceWasDepthBounded(),
     findPath: (startId: string, targetId: string) => kinetic.findPath(startId, targetId),
     getImpact: (symbolId: string, direction: 'upstream'|'downstream' = 'upstream', depth: number = 5) =>
       kinetic.getImpact(symbolId, direction, depth),

@@ -49,6 +49,11 @@ export class KineticService {
     return this.traceAnalyzer.trace(symbolId, depth);
   }
 
+  /** Whether the last `trace` stopped at its depth budget rather than at the edge of the graph. */
+  public lastTraceWasDepthBounded(): boolean {
+    return this.traceAnalyzer.lastTraceWasDepthBounded();
+  }
+
   /**
    * Calculates the blast radius of a symbol (Upstream impact).
    */
