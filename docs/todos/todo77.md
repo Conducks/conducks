@@ -301,8 +301,28 @@ in all of them at once.
 - [x] node completeness, TypeScript — `ts.createProgram` vs the graph. sofie 1,452 / 0, orchestrator 569 / 0, conducks 471 / 0
 - [x] edge precision — every CALLS edge scored against the SOURCE TEXT. scraper 9,820 / 0 misplaced, sofie 12,028 / 0, orchestrator 8,637 / 0, conducks 9,641 / 0
 - [ ] line accuracy — a node's recorded span against the declaration
-- [ ] edge RECALL — a call in source with no edge is invisible to all three base oracles
+- [x] edge RECALL — Python `ast` vs the graph, per (file, line). scraper **96.83%**, sofie **98.53%**. Ratcheted, not gated: the residue is one shape and not yet attributed (ADR 0183)
 - [x] incremental ≠ cold — DOES NOT REPRODUCE across four waves including a three-wave one with external scaffolding, and is now guarded rather than merely absent (ADR 0182)
+
+### The recall number was wrong three times, and every time it was mine
+
+Edge recall first read **60.17%** — which would have been reported as a serious defect in the base.
+Three corrections, each found by looking at a concrete case rather than at the total:
+
+| what was wrong | effect |
+|---|---|
+| universal members (`.append`, `.strip`) scored as failures, when `isUniversalMemberCall` exists to skip them | — |
+| only `lineNumber` read, when one edge carries `properties.lines` — every line that call was seen on | 60.17% → **92.00%** |
+| constructors scored as CALLS, when Python spells construction as a call and conducks records CONSTRUCTS | 92.00% → **96.83%** |
+
+`mcp_client.py` lines 11 and 13 both hold `CALLS -> global::len`, which is what made the second one
+findable: `len` was top of the failure list and its edges demonstrably existed.
+
+**When an instrument reports a large defect in something several other instruments already cover, the
+instrument is the first suspect.** Bad news feels like rigour, which is why it ships unquestioned.
+
+Proved by catching a real gap: narrowing the Python call capture to bare identifiers takes scraper to
+**42.67%** and the ratchet fires.
 
 ### Run it twice, with an edit in between
 

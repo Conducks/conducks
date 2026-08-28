@@ -103,5 +103,13 @@
   "conducks::edges": {
     "scored": 9641,
     "misplaced": 0
+  },
+  "scraper::edges-recall": {
+    "calls": 9342,
+    "missing": 296
+  },
+  "sofie::edges-recall": {
+    "calls": 955,
+    "missing": 14
   }
 }
