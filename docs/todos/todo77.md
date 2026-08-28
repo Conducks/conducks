@@ -305,6 +305,22 @@ in all of them at once.
 - [x] edge RECALL — Python `ast` vs the graph, per (file, line). scraper **96.83%**, sofie **98.53%**. Ratcheted, not gated: the residue is one shape and not yet attributed (ADR 0183)
 - [x] incremental ≠ cold — DOES NOT REPRODUCE across four waves including a three-wave one with external scaffolding, and is now guarded rather than merely absent (ADR 0182)
 
+### JavaScript was riding on TypeScript's coverage
+
+The TS oracles drove off tsconfig, and a tsconfig is the project's BUILD story rather than an
+inventory of its source. Each subject left JS out a different way: scraper has **no tsconfig at all**
+(33 js files, every TS oracle refused to run), orchestrator has no root one (45), sofie's includes
+only `src/**/*` (17).
+
+`ts-program.mjs` unions the tsconfig set with a JS walk, shared by all three oracles. scraper is now
+covered where it had nothing: 14 declarations, 0 missing, 100% lines, 98.06% recall.
+
+Proved by catching a real gap: removing the JavaScript `function_declaration` capture takes scraper
+0 → **11** missing. Same shape as ADR 0178 — filling an empty cell immediately found a defect.
+
+conducks' recall reads 94.75% rather than 96.21% because 91 JS files now count. A wider measurement,
+not a regression.
+
 ### The TypeScript half was missing, and the script names hid it
 
 `oracle:recall:sofie` and `oracle:lines:sofie` sound like TypeScript coverage. They are not — both

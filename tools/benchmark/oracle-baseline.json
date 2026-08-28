@@ -77,15 +77,15 @@
     "missing": 0
   },
   "sofie::nodes-ts": {
-    "declarations": 1452,
+    "declarations": 1493,
     "missing": 0
   },
   "orchestrator::nodes-ts": {
-    "declarations": 569,
+    "declarations": 633,
     "missing": 0
   },
   "conducks::nodes-ts": {
-    "declarations": 471,
+    "declarations": 565,
     "missing": 0
   },
   "scraper::edges": {
@@ -128,27 +128,39 @@
     "agreed": 0
   },
   "sofie::lines-ts": {
-    "scored": 1446,
+    "scored": 1487,
     "wrong": 1
   },
   "orchestrator::lines-ts": {
-    "scored": 566,
+    "scored": 630,
     "wrong": 0
   },
   "conducks::lines-ts": {
-    "scored": 467,
+    "scored": 561,
     "wrong": 0
   },
   "sofie::recall-ts": {
-    "calls": 11824,
-    "missing": 428
+    "calls": 13537,
+    "missing": 442
   },
   "orchestrator::recall-ts": {
-    "calls": 6930,
-    "missing": 134
+    "calls": 8575,
+    "missing": 148
   },
   "conducks::recall-ts": {
-    "calls": 6597,
-    "missing": 250
+    "calls": 9833,
+    "missing": 516
+  },
+  "scraper::nodes-ts": {
+    "declarations": 14,
+    "missing": 0
+  },
+  "scraper::lines-ts": {
+    "scored": 14,
+    "wrong": 0
+  },
+  "scraper::recall-ts": {
+    "calls": 977,
+    "missing": 19
   }
 }

@@ -17,30 +17,21 @@ import { DuckDBInstance } from '@duckdb/node-api';
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { buildProgram } from './ts-program.mjs';
 
 const positionalArg = process.argv.slice(2).find(a => !a.startsWith('--'));
 const projectDir = positionalArg ? path.resolve(positionalArg) : process.cwd();
 
-const configPaths = [];
-const root = path.join(projectDir, 'tsconfig.json');
-if (existsSync(root)) configPaths.push(root);
-for (const entry of readdirSync(projectDir, { withFileTypes: true })) {
-  if (!entry.isDirectory()) continue;
-  if (['node_modules', '.git', 'dist', 'build', '.conducks', '.next'].includes(entry.name)) continue;
-  const nested = path.join(projectDir, entry.name, 'tsconfig.json');
-  if (existsSync(nested)) configPaths.push(nested);
+// The file set is shared with the other TypeScript oracles — see `ts-program.mjs`. A tsconfig is the
+// project's build story, not an inventory of its source, and three subjects each left JavaScript out
+// of it a different way.
+const built = buildProgram(projectDir);
+if (!built) {
+  console.error(`\n✖ no tsconfig and no JavaScript under ${projectDir}. Nothing to score.\n`);
+  process.exit(1);
 }
-if (configPaths.length === 0) { console.error(`\n✖ no tsconfig under ${projectDir}.\n`); process.exit(1); }
+const { program, configPaths, fromConfig, jsAdded } = built;
 
-const fileNames = new Set();
-for (const cfg of configPaths) {
-  try {
-    const parsed = ts.parseJsonConfigFileContent(
-      ts.readConfigFile(cfg, ts.sys.readFile).config, ts.sys, path.dirname(cfg));
-    for (const f of parsed.fileNames) fileNames.add(f);
-  } catch { /* visible in the coverage line below */ }
-}
-const program = ts.createProgram([...fileNames], { allowJs: true, noEmit: true, skipLibCheck: true });
 const isTest = (p) => /(^|\/)(tests?|__tests__|__mocks__|spec|fixtures?)\//.test(p) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p);
 
 const decls = [];
