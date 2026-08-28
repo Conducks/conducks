@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — the benchmark</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>THE BENCHMARK</h1>
+<p class="sub">the shape an oracle cannot ask for, because the subject lacks it</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="why">
+  <h3>An oracle cannot ask for what is absent</h3>
+  <div class="where">docs/decisions/0175-a-benchmark-asks-for-the-shape-an-oracle-cannot.md</div>
+  <p>an oracle scores a subject continuously and finds only the shapes that happen to be in it. A defect nobody wrote is unscored, and that is exactly the set a tool is most likely to miss</p>
+  <p class="file">on the canvas: so real code alone can never prove recall</p>
+</div>
+
+<div class="det" id="plant">
+  <h3>Plant a defect it MUST see</h3>
+  <div class="where">tools/benchmark/bench-prune.mjs</div>
+  <p>twelve scenarios over generated projects, each one a shape prune has to name. Trace has ten and context has ten, in the files beside it</p>
+  <p class="file">on the canvas: recall, one scenario at a time</p>
+</div>
+
+<div class="det" id="counter">
+  <h3>And a case it must NOT flag</h3>
+  <div class="where">tools/benchmark/bench-context.mjs:31</div>
+  <p>every scenario states mustInclude AND its opposite, because a neighbourhood returning everything passes every inclusion assertion and one returning nothing passes every exclusion</p>
+  <p class="file">on the canvas: both halves, or the gate is half a gate</p>
+</div>
+
+<div class="det" id="mutate">
+  <h3>Break the tool, confirm the test fails</h3>
+  <div class="where">tools/benchmark/bench-trace.mjs</div>
+  <p>each mechanism is mutated in the analyzer and the scenario written for it must go red. Removing context's container filter fails 06, widening its radius fails 03 and 04, keeping the anchor in its own result fails 05</p>
+  <p class="file">on the canvas: a check that cannot fail proves nothing</p>
+</div>
+
+<div class="det" id="fixt">
+  <h3>The fixture is wrong more often than the tool</h3>
+  <div class="where">docs/decisions/0189-the-radius-is-the-claim.md</div>
+  <p>scenario 04 asserted an unrelated symbol is never a neighbour at radius 3, and it genuinely IS one three hops out. The tool was right and the claim was wrong; the first run of a new scenario set measures the fixture</p>
+  <p class="file">on the canvas: six times in one campaign</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>An oracle cannot ask for what is absent</td><td>Plant a defect it MUST see</td><td>—</td></tr>
+    <tr><td>Plant a defect it MUST see</td><td>And a case it must NOT flag</td><td>—</td></tr>
+    <tr><td>And a case it must NOT flag</td><td>Break the tool, confirm the test fails</td><td>—</td></tr>
+    <tr><td>Break the tool, confirm the test fails</td><td>The fixture is wrong more often than the tool</td><td>—</td></tr>
+  </tbody>
+</table>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

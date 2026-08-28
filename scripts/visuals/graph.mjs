@@ -315,7 +315,85 @@ export const BAND4 = {
   ],
 };
 
-export const BANDS = [BAND1, BAND2, BAND3, BAND4];
+
+// ── Band 5 — how a tool is proved ────────────────────────────────────────────
+//
+// Bands 1-4 draw what the system DOES. This one draws what makes any of it believable, and it
+// exists because for most of this project's life nothing did: a tool was "working" when its output
+// looked reasonable to whoever ran it, which is the weakest evidence available and the one that
+// always agrees with you.
+//
+// ADR 0160 is the method — a tool is proved by BREAKING the subject, at three levels. L1 scores
+// every finding's own claim against real code (precision). L2 plants defects it must see (recall).
+// L3 plants the counter-cases it must not eat. L2 and L3 are one gate, because a tool that reports
+// everything passes every recall test ever written.
+//
+// Read at `7b4a791` — every file in tools/benchmark/, and the three analyzers they score.
+export const BAND5 = {
+  id:'band5', title:'HOW A TOOL IS PROVED',
+  sub:'ADR 0160 — an oracle scores what a subject CONTAINS, a benchmark asks for what it does not',
+  containers:[
+    { id:'c_oracle', title:'THE ORACLE', sub:'a second opinion, from something that is not this tool',
+      nodes:[
+        n('indep','Ask a DIFFERENT tool','tsc\'s answer, not ours, re-asked',
+          'tools/benchmark/oracle-tsc.mjs::oracleUnusedImports — an oracle built from the analyzer\'s own machinery agrees with it by construction, which is a measurement of nothing. This one asks the TypeScript compiler and compares two independently produced sets',
+          {cls:'n-ok'}),
+        n('except','Unless the tool IS the traversal','then the graph is input, not shared machinery',
+          'tools/benchmark/oracle-context.mjs::within — trace and context ARE walks, so a walk is the only honest oracle for them. Sharing the graph is not sharing the answer: what is scored is the traversal, and the graph is what both are handed',
+          {shape:'dia'}),
+        n('probe','Probe the instrument BEFORE believing it','a reading from the wrong port is not a reading',
+          'tools/benchmark/oracle-tsc.mjs::probeDetectsPlantedImport — sofie\'s `tsc` on PATH was a joke script printing "This is not the tsc command you are looking for", and the oracle scored a perfect run against it. The probe plants an import the real compiler must flag, and refuses to report a number if it does not',
+          {cls:'n-warn'}),
+        n('prog','A tsconfig is not an inventory of the source','union every config, then walk for the rest',
+          'tools/benchmark/ts-program.mjs::buildProgram — a monorepo has one tsconfig per package and none of them lists the whole tree, and `.mjs` files are in no config at all. Scoring against one config blamed the analyzer for every file the compiler had never been shown (ADR 0186)',
+          {cls:'n-warn'}),
+        n('keep','Ask git what to preserve','never a hardcoded list of filenames',
+          'tools/benchmark/reset-vault.mjs::resetVault — the literal KEEP list was correct while the oracles only ran here, then deleted sofie\'s committed `.conducks/*.html` the first time one was pointed elsewhere. `git ls-files` is the exact answer per project and maintains itself (ADR 0171)',
+          {cls:'n-ok'}),
+      ],
+      edges:[['indep','except'],['indep','probe'],['probe','prog'],['prog','keep']]},
+
+    { id:'c_bench', title:'THE BENCHMARK', sub:'the shape an oracle cannot ask for, because the subject lacks it',
+      nodes:[
+        n('why','An oracle cannot ask for what is absent','so real code alone can never prove recall',
+          'docs/decisions/0175-a-benchmark-asks-for-the-shape-an-oracle-cannot.md — an oracle scores a subject continuously and finds only the shapes that happen to be in it. A defect nobody wrote is unscored, and that is exactly the set a tool is most likely to miss',
+          {cls:'n-hi'}),
+        n('plant','Plant a defect it MUST see','recall, one scenario at a time',
+          'tools/benchmark/bench-prune.mjs — twelve scenarios over generated projects, each one a shape prune has to name. Trace has ten and context has ten, in the files beside it'),
+        n('counter','And a case it must NOT flag','both halves, or the gate is half a gate',
+          'tools/benchmark/bench-context.mjs:31 — every scenario states mustInclude AND its opposite, because a neighbourhood returning everything passes every inclusion assertion and one returning nothing passes every exclusion',
+          {cls:'n-hi'}),
+        n('mutate','Break the tool, confirm the test fails','a check that cannot fail proves nothing',
+          'tools/benchmark/bench-trace.mjs — each mechanism is mutated in the analyzer and the scenario written for it must go red. Removing context\'s container filter fails 06, widening its radius fails 03 and 04, keeping the anchor in its own result fails 05',
+          {cls:'n-ok'}),
+        n('fixt','The fixture is wrong more often than the tool','six times in one campaign',
+          'docs/decisions/0189-the-radius-is-the-claim.md — scenario 04 asserted an unrelated symbol is never a neighbour at radius 3, and it genuinely IS one three hops out. The tool was right and the claim was wrong; the first run of a new scenario set measures the fixture',
+          {cls:'n-warn'}),
+      ],
+      edges:[['why','plant'],['plant','counter'],['counter','mutate'],['mutate','fixt']]},
+
+    { id:'c_gate', title:'WHAT ACTUALLY RUNS', sub:'and the honest account of what it does not',
+      nodes:[
+        n('gateall','`npm run gate`','build, 2,469 tests, 3 benchmarks, 36 oracle runs',
+          'package.json:87 — the whole apparatus in one command. It is the only thing that runs every oracle against every subject; anything cheaper leaves a subject unscored and reports green'),
+        n('hook','One benchmark on commit','7.9s, and only when prune\'s own files are staged',
+          'scripts/hooks/pre-commit — the full gate takes minutes and a hook nobody can afford is a hook that gets bypassed. bench:prune is the cheap half, fired on the paths that can break it',
+          {cls:'n-ok'}),
+        n('subj','Four subjects, three shapes','single-repo TS, single-repo Python, a workspaces monorepo, and conducks',
+          'tools/benchmark/projects.json — a tool proved on one project is proved on one project. The three test subjects were chosen to differ in language and in layout, because the defects found were split roughly evenly between the two axes'),
+        n('noci','There is no CI','every gate here is local, and a clean machine is untested',
+          'docs/memory.md — the pre-commit hook and `npm run gate` are the whole enforcement story, and `--no-verify` bypasses the first. A break that only appears on a machine without this node_modules is invisible until someone hits it',
+          {cls:'n-no'}),
+      ],
+      edges:[['gateall','hook'],['gateall','subj'],['gateall','noci']]},
+  ],
+  crossEdges:[
+    ['prog','plant','what real code could not cover'],
+    ['fixt','subj','every scenario runs on generated projects, not these'],
+  ],
+};
+
+export const BANDS = [BAND1, BAND2, BAND3, BAND4, BAND5];
 
 // Bands are chapters of ONE drawing, and edges between them may point backwards — that is what makes
 // the picture a CYCLE rather than a stack. Both of these do: Band 2 reads what Band 1 wrote, and the
@@ -334,4 +412,8 @@ export const BAND_LINKS = [
   // Band 4 reads what Bands 1-3 wrote, and re-enters the command list it was dispatched from.
   ['argv','cli','every surface starts at the same argv',{prio:10}],
   ['nodes','slices','every read command answers from the vault the pulse wrote'],
+  // Band 5 does not follow Band 4 — it points BACK at what it proves. The nine unmeasured grammars
+  // are the gap in Band 1 that this whole band exists to close and has not.
+  ['noora','indep','the four packs an oracle actually checks',{prio:-10}],
+  ['refl','plant','the analyzer every planted defect is aimed at',{prio:-10}],
 ];

@@ -48,3 +48,15 @@ What core still does not claim is on the canvas under [what this band does not s
 :::elsewhere
 When the read band is drawn and the first defect in it survives the walk, it lands here with an id so a block can point at it declaratively. A block that is merely NEAR a defect must never link to one — that reads as an accusation and sends the reader to the wrong page.
 :::
+
+## p4 — every Rust `#[test]` is reported as dead code
+
+**Background.** `prune` exempts a symbol invoked by convention rather than called — an entry point has no caller in the graph and is not dead (ADR 0104). The languages with an oracle behind them get this right.
+
+**What is wrong.** Rust does not. Measured 2026-08-29 on this repository: `conducks prune .` returns 10 ORPHANs, and **nine of them are `#[test]` functions** — seven in `plugins/checklist/src/parser.rs`, two in `plugins/checklist/src/bindings.rs`. That is every `#[test]` in both files and nothing else. The tenth is `FilterOperator` in `src/lib/domain/analysis/filter-builder.ts`, unrelated.
+
+**Why it is the whole of Rust's orphan report.** A `#[test]` function is invoked by the harness, which is exactly the entry-point shape conducks already exempts elsewhere. Nothing in the Rust pack marks the attribute, so the graph sees a function nobody calls and prune answers the question it was asked, correctly, from a graph that is missing a fact.
+
+**Why nothing caught it.** Rust is one of the nine grammars with no test subject and no oracle — `c cpp csharp go java php ruby rust swift`. They are known to PARSE and are not known to capture the right things (Band 1, `noora`). This is the first measured consequence of that gap rather than a new one, and it is what the gap looks like from the outside: a tool that is 0-false-positive on its four scored languages, and 90% false positives on one that is not.
+
+**Owner.** Unassigned. The fix is a language-pack capture, not a special case in `dead-code.ts`, and it should not land before Rust has a subject to score it against — a fix on an unmeasured grammar is the same unverified change as the defect. `todo77` owns the campaign that would give it one.

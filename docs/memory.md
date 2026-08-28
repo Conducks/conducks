@@ -2681,3 +2681,23 @@ by construction.
 - Why: a property inside a type annotation is erased at runtime exactly like the interfaces the tie-break already names, so classifying it that way resolves this with NO id change. Reaching for the id scheme instead is the expensive wrong answer — see the entry above.
 - Applies: src/lib/core/parsing/reflector.ts — whole repo
 
+
+## The instrument must be probed before its reading is believed — a `tsc` on PATH was a joke script
+- Gotcha: `oracle-tsc.mjs` scored a clean run against the sofie subject for as long as nobody checked what it was invoking. The `tsc` it resolved printed `This is not the tsc command you are looking for` and exited; every file compiled to nothing, so the oracle's "unused imports" set was empty and prune matched it perfectly. A perfect score and a dead instrument are the same output.
+- Why: `probeDetectsPlantedImport()` now writes an import the real compiler must flag and refuses to report a number if it does not come back. The same run also proved two other instrument defects: `EXTRA` blamed prune for files the compiler had never been shown (a tsconfig is not an inventory of the source — `ts-program.mjs::buildProgram` unions every config and then walks for `.mjs`), and the probe itself once imported a conducks-only path, so it could not have run on any other subject. ADR 0176, ADR 0186.
+- Applies: tools/benchmark/oracle-tsc.mjs, tools/benchmark/ts-program.mjs — whole repo
+
+## The benchmark fixture is wrong more often than the tool is — six times in one campaign
+- Gotcha: `bench-prune` scored 7/10 on its first run and all three failures were the fixtures, not prune. `bench-context` scenario 04 asserted an unrelated symbol is never a neighbour at radius 3, and `two → one → boot → unrelated` is three hops, so at radius 3 it genuinely IS one. The tool was right and the claim was wrong, and the claim worth making turned out to be the interesting one: not that a name never appears at any distance, but that the RADIUS BOUNDS THE ANSWER.
+- Why: the first run of a new scenario set is more likely to be measuring the fixture than the code, so read a failure as a question about the scenario before reading it as a defect. It cuts the other way too — a green scenario may be vacuous. CONDUCKS-49 makes the mutation the gate for both. Related and older: a fixture written by the same person in the same sitting from the same misunderstanding proves nothing (`## A graph-fixture test that invents its own node-id shape asserts nothing`).
+- Applies: tools/benchmark/bench-prune.mjs, tools/benchmark/bench-context.mjs, tools/benchmark/bench-trace.mjs — whole repo
+
+## A preserve list of filenames deleted another project's committed files — ask git instead
+- Gotcha: `reset-vault.mjs` cleared `.conducks/` between oracle runs and kept a hardcoded `KEEP` set. That was correct while the oracles only ran against conducks, and wrong the first time one was pointed elsewhere: the sofie subject commits `.conducks/dependency-graph.html` and `.conducks/overview.html`, and the first run deleted both.
+- Why: this is the defect the file was written to fix, recurring because the fix NAMED FILES instead of asking. `git ls-files .conducks` is the exact answer per project and maintains itself; the literal survives only as a fallback for a directory that is not a git repository, where nothing can be tracked. A list that must be edited when the subject changes is a list that will not be. ADR 0171.
+- Applies: tools/benchmark/reset-vault.mjs — whole repo
+
+## A flag written after `--` was consumed as the project path, in four oracles at once
+- Gotcha: `npm run oracle:imports -- --write-baseline` resolved `--write-baseline` as `projectDir`, so the oracle analyzed a directory of that name — which does not exist — and the baseline was written against nothing. Same bug in four scripts, because each parsed `argv[2]` positionally and the flag was added later.
+- Why: `--write-baseline` is a deliberate override of ADR 0044, which forbids recording a baseline SILENTLY rather than recording one at all — so it is exactly the argument that must be read correctly or the override records the wrong thing. Filter flags out of the positional slot before reading it; a positional parser plus a later flag is the same defect every time.
+- Applies: tools/benchmark/oracle-tsc.mjs, tools/benchmark/oracle-exports.mjs, tools/benchmark/oracle-python.mjs, tools/benchmark/oracle-nodes-python.mjs — whole repo

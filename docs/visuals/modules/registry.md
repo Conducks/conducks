@@ -41,7 +41,14 @@ import the domain directly, so a fact both surfaces need is reached through the 
 
 ## Dynamic access is invisible to static analysis
 
-Services are reached through property chains (`registry.evolution.watcher`), so the getters have no
-incoming edge in the graph and dead-code reports them as orphans. Four of them are permanent, known
-false positives. This is the price of the DI shape and is accepted; do not "fix" it by deleting a
-getter, and do not add a special case to dead-code for it.
+Services are reached through property chains (`registry.evolution.watcher`). For most of this
+module's life those getters had no incoming edge, dead-code reported four of them as orphans, and
+this note said to accept it as the price of the DI shape.
+
+**That is no longer true, and it was fixed in the parser rather than special-cased here.** Adding
+value-position captures for member expressions (ADR 0165) made a bare property read a USE, so the
+chain now binds: `conducks context src/registry/index.ts::evolution` returns three incoming
+`accesses` edges, and prune reports zero registry orphans (measured 2026-08-29). The standing advice
+survives its own premise — still do not delete a getter to quiet a tool, and still do not add a
+special case to dead-code. The right fix for a false positive was to teach the graph what a use
+looks like.

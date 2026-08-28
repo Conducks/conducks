@@ -46,7 +46,7 @@ compilation, in the ADR.** That single step would have prevented all three.
 **"Orphan" means two different things and they are both right.** Here, an orphan is a *dangling edge*
 — an edge whose target node was never induced (`governance/index.ts:141-212`, reported as ECOSYSTEM-1
 or DISCOVERY-1). In [evolution](evolution.md), an ORPHAN is a *node with no incoming edge*.
-So `conducks audit` reporting zero orphans while `conducks prune` lists 25 is not a contradiction and
+So `conducks audit` reporting zero orphans while `conducks prune` lists some (10, measured 2026-08-29) is not a contradiction and
 neither number is stale. Never quote one as the other.
 
 `conducks audit` on conducks reports zero findings, and that is validated rather than assumed: on

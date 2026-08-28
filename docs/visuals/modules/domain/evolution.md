@@ -90,14 +90,26 @@ modelling the build, and an unresolvable specifier should inflate the DANGLING c
 quietly make a symbol look dead (ADR 0070).
 
 **The finding types are one list**, in `contracts/dead-code-types.ts`: ORPHAN, UNUSED_EXPORT,
-UNREACHABLE_LOGIC, STALE_IMPORT, UNIMPORTED_MODULE. The MCP tool used to hard-code three of them into
+STALE_IMPORT, UNIMPORTED_MODULE, ONLY_IMPORTED. The MCP tool used to hard-code three of them into
 its summary and its enum, so `summary` totalled 95 against a stated `total` of 99 and two types were
-unreachable by any filter (todo53). `UNIMPORTED_MODULE` is a QUESTION, not a verdict, and both
-surfaces now say so.
+unreachable by any filter (todo53). Two types are QUESTIONS rather than verdicts —
+`UNIMPORTED_MODULE` and `ONLY_IMPORTED` — and both surfaces say so.
+
+`UNREACHABLE_LOGIC` was in this list and is gone: nothing ever emitted it, so it was a row that made
+the contract wrong (ADR 0172). `ONLY_IMPORTED` replaced it for the opposite reason — an unused import
+was silencing ORPHAN while STALE_IMPORT skipped the same statement, so a symbol could be laundered
+into looking alive by a binding nobody read (ADR 0162).
 
 ## Why dead-code got better for free
 
 Adding TypeScript type-position captures flipped this module's `graphTracksTypes` self-calibration
 on. It suppresses type-declaration reasoning entirely when the language emits no TYPE_REFERENCE
 edges — correctly, since otherwise every type would look orphaned. Once TS emitted them, real dead
-types surfaced: orphans went ~8 → 25, and the new ones are genuine.
+types surfaced: orphans went ~8 → 25, and the new ones were genuine.
+
+That number has since moved the other way, and the reason is worth more than the number. Measured
+2026-08-29: **10 orphans**, none of them in `src/`. Adding value-position captures (ADR 0165) bound
+the property-chain reads that the DI shape produces, which retired a class of false positive rather
+than finding more dead code. Nine of the ten are Rust `#[test]` functions in `plugins/checklist/`,
+invoked by a harness the graph cannot see — the same entry-point shape conducks already exempts in
+languages that HAVE an oracle, and evidence for the gap rather than a new one.

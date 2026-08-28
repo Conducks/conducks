@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — what actually runs</title>
+<link rel="stylesheet" href="../system.css">
+<div class="wrap">
+<nav class="pages">
+  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
+  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
+  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
+  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
+</nav>
+<a class="back" href="../architecture.html">&larr; back to the architecture</a>
+<h1>WHAT ACTUALLY RUNS</h1>
+<p class="sub">and the honest account of what it does not</p>
+<div class="meta">
+  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
+  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
+  render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="gateall">
+  <h3>`npm run gate`</h3>
+  <div class="where">package.json:87</div>
+  <p>the whole apparatus in one command. It is the only thing that runs every oracle against every subject; anything cheaper leaves a subject unscored and reports green</p>
+  <p class="file">on the canvas: build, 2,469 tests, 3 benchmarks, 36 oracle runs</p>
+</div>
+
+<div class="det" id="hook">
+  <h3>One benchmark on commit</h3>
+  <div class="where">scripts/hooks/pre-commit</div>
+  <p>the full gate takes minutes and a hook nobody can afford is a hook that gets bypassed. bench:prune is the cheap half, fired on the paths that can break it</p>
+  <p class="file">on the canvas: 7.9s, and only when prune's own files are staged</p>
+</div>
+
+<div class="det" id="subj">
+  <h3>Four subjects, three shapes</h3>
+  <div class="where">tools/benchmark/projects.json</div>
+  <p>a tool proved on one project is proved on one project. The three test subjects were chosen to differ in language and in layout, because the defects found were split roughly evenly between the two axes</p>
+  <p class="file">on the canvas: single-repo TS, single-repo Python, a workspaces monorepo, and conducks</p>
+</div>
+
+<div class="det" id="noci">
+  <h3>There is no CI</h3>
+  <div class="where">docs/memory.md</div>
+  <p>the pre-commit hook and `npm run gate` are the whole enforcement story, and `--no-verify` bypasses the first. A break that only appears on a machine without this node_modules is invisible until someone hits it</p>
+  <p class="file">on the canvas: every gate here is local, and a clean machine is untested</p>
+</div>
+<h2>How these connect</h2>
+<table>
+  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
+  <tbody>
+    <tr><td>`npm run gate`</td><td>One benchmark on commit</td><td>—</td></tr>
+    <tr><td>`npm run gate`</td><td>Four subjects, three shapes</td><td>—</td></tr>
+    <tr><td>`npm run gate`</td><td>There is no CI</td><td>—</td></tr>
+  </tbody>
+</table>
+<footer>
+  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
+</footer>
+</div>

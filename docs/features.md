@@ -257,6 +257,29 @@
   loading, or peak memory. An instrument that reports confidently while measuring nothing is the
   failure this replaces.
 
+## Tool Verification — `npm run gate`, `tools/benchmark/`
+
+- Purpose: every analyzer is scored at three levels (ADR 0160) before it is called working. **L1** —
+  an ORACLE asks a different tool the same question over real code and compares the two answers:
+  `oracle-tsc.mjs` against the TypeScript compiler, `oracle-python*.mjs` against a Python AST walk,
+  `oracle-nodes-*`, `oracle-edges*`, `oracle-lines*` and `oracle-recall-*` against the source bytes.
+  **L2/L3** — a BENCHMARK generates projects holding a defect the tool must name and a counter-case
+  it must not, one gate rather than two: `bench-prune.mjs` (12 scenarios), `bench-trace.mjs` (10),
+  `bench-context.mjs` (10). `npm run gate` runs the build, the suite, all three benchmarks and 36
+  oracle runs across four subjects — single-repo TS, single-repo Python, an npm-workspaces monorepo,
+  and conducks itself. `bench:prune` also runs pre-commit, at 7.9s, when prune's own files are staged.
+- Intent: "the output looks reasonable" is the weakest evidence available and it always agrees with
+  whoever ran the tool. The split is what makes the pair complete: an oracle scores what a subject
+  CONTAINS, so a defect nobody wrote is unscored — which is exactly the set a tool is most likely to
+  miss — and a benchmark asks for the shape real code does not happen to have (ADR 0175). Nothing
+  here is believed on a green run alone: each scenario is mutation-proved against the analyzer, and a
+  check that has never failed may be incapable of failing (CONDUCKS-41, CONDUCKS-49).
+- Not covered, and stated because a green gate reads as "all clear": nine of the thirteen grammars
+  (`c cpp csharp go java php ruby rust swift`) have no subject and no oracle — they are known to
+  PARSE and not known to capture the right things. `prune` never judges class members. 42 wildcard
+  re-export misses stand on the sofie exports oracle, explained and left. There is no CI, so every
+  gate here is local and `--no-verify` bypasses the hook.
+
 ## Diagnostics — env-gated, off by default
 
 - Purpose: `CONDUCKS_MEM_TRACE=1 conducks analyze` prints RSS, heap, external and native memory at
