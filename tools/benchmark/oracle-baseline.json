@@ -111,5 +111,15 @@
   "sofie::edges-recall": {
     "calls": 955,
     "missing": 14
+  },
+  "scraper::lines": {
+    "scored": 1207,
+    "wrong": 0,
+    "decorated": 0
+  },
+  "sofie::lines": {
+    "scored": 114,
+    "wrong": 0,
+    "decorated": 0
   }
 }

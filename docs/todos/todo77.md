@@ -300,9 +300,24 @@ in all of them at once.
 - [x] node completeness, Python — `ast` vs the graph. scraper 1,207 declarations / 0 missing, sofie 114 / 0
 - [x] node completeness, TypeScript — `ts.createProgram` vs the graph. sofie 1,452 / 0, orchestrator 569 / 0, conducks 471 / 0
 - [x] edge precision — every CALLS edge scored against the SOURCE TEXT. scraper 9,820 / 0 misplaced, sofie 12,028 / 0, orchestrator 8,637 / 0, conducks 9,641 / 0
-- [ ] line accuracy — a node's recorded span against the declaration
+- [x] line accuracy — `ast` lineno vs node lineStart. scraper **100%** (1,207), sofie **100%** (114) — ADR 0184
+- [ ] a TypeScript twin for recall and for lines — both need the compiler API
 - [x] edge RECALL — Python `ast` vs the graph, per (file, line). scraper **96.83%**, sofie **98.53%**. Ratcheted, not gated: the residue is one shape and not yet attributed (ADR 0183)
 - [x] incremental ≠ cold — DOES NOT REPRODUCE across four waves including a three-wave one with external scaffolding, and is now guarded rather than merely absent (ADR 0182)
+
+### Every claim the base makes is now scored
+
+| claim | oracle | result |
+|---|---|---|
+| every declaration has a node | `ast` · `ts.createProgram` | 0 missing, 5 targets |
+| every CALLS edge points at real text | the source bytes | 0 misplaced of 40,126 |
+| every call has an edge | `ast`, per (file, line) | 96.83% · 98.53%, ratcheted |
+| a node's line is the declaration's line | `ast` | 100% · 100% |
+| incremental == cold | conducks against itself | 4 waves identical |
+
+A line two out is worse than none — it looks authoritative and sends the reader elsewhere. The
+expected decorator divergence turned out not to exist: conducks records the `def` line exactly as
+`ast` does, so the tolerance written for it changed nothing and was removed.
 
 ### The recall number was wrong three times, and every time it was mine
 
