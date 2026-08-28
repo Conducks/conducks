@@ -501,8 +501,21 @@ to have been kept. Every one is a class member. Ratcheted, with the reason state
 ## Phase 3 — context
 
 - [x] L1 on all three subjects — scored against an independent radius walk, 15 runs each at r=1/2/3
-- [ ] L2 — plant neighbours it must return
-- [ ] L3 — plant non-neighbours it must not
+- [x] L2 — ten scenarios in `bench-context.mjs`, planted neighbours and bounds. 10/10
+- [x] L3 — the counter-halves are in the same ten: a two-hop neighbour absent at radius 1, an island absent at radius 2, the anchor absent from itself, no container returned, an unbounded run that says so
+
+### The radius is the claim
+
+Each mutation hits exactly the scenario written for it: returning containers fails 06, widening the
+radius fails 03 and 04, keeping the anchor fails 05. 8.6s, so it gates.
+
+**Scenario 04 was wrong before context was.** It began as "an unrelated symbol is never a neighbour"
+at radius 3 — but `two → one → boot → unrelated` is three hops, so at radius 3 it genuinely is one.
+The claim worth making is that the RADIUS BOUNDS THE ANSWER, not that a name never appears at any
+distance. Rewritten to assert absence at 2 and presence at 3.
+
+Sixth scenario this session wrong before the tool was. The first run of a new scenario set is more
+likely to be measuring the fixture than the code.
 
 ### The neighbourhood is exactly what its rules admit
 
