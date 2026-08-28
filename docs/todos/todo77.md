@@ -227,6 +227,35 @@ hold their own `constants/auth.ts`, and every `@/lib/constants/...` import resol
 so the duplicate in the other workspace genuinely has no consumer. Eleven findings a name-based check
 called contradicted are correct.
 
+### The prune benchmark — 10 scenarios, 10 passing
+
+Six oracles and three levels still left prune called finished three times and wrong twice, because an
+oracle scores what a subject CONTAINS and cannot ask for a shape that is absent. ADR 0175 adds ten
+fixtures with their ground truth written down, each one a defect this repo shipped or a rule it holds.
+
+**10 of 10 pass, and the suite is proved by mutation, not by passing** — removing the barrel rule
+fails 06, the spread/subscript captures fail 08, ONLY_IMPORTED fails 04, restoring the calibration
+guard fails 03, the TS namespace capture fails 07.
+
+Three scenarios were wrong before prune was: the first run scored 7/10 and every failure was the
+fixture. Two more passed with the defect restored and were strengthened. Scenario 07's Python half is
+asserted here but proved on the subject, and says so.
+
+`npm run bench:prune`.
+
+### Phase 1 closes
+
+| check | result |
+|---|---|
+| L1 precision | 393 verdicts, 0 false positives |
+| L2 recall | 9 planted, 9 found |
+| L3 counter-cases | 9 planted, 0 flagged |
+| oracles | TS imports 0/0 · Python imports 0/0 · Python dead 0/0 · exports 12 missed / 0 extra |
+| benchmark | 10 / 10 |
+
+Stated limits, unchanged: a class member is never judged (scenario 10 pins it), and no subject exists
+for a Python monorepo or a JavaScript-primary codebase.
+
 ## Phase 2 — trace
 
 - [x] L1 scraper — scored against an independent BFS over the vault's own edges. Two defects, both fixed by 0174
