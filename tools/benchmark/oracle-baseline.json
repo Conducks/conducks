@@ -121,5 +121,10 @@
     "scored": 114,
     "wrong": 0,
     "decorated": 0
+  },
+  "sofie::python": {
+    "oracle": 0,
+    "missed": 0,
+    "agreed": 0
   }
 }
