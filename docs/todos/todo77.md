@@ -299,9 +299,27 @@ in all of them at once.
 
 - [x] node completeness, Python — `ast` vs the graph. scraper 1,207 declarations / 0 missing, sofie 114 / 0
 - [x] node completeness, TypeScript — `ts.createProgram` vs the graph. sofie 1,452 / 0, orchestrator 569 / 0, conducks 471 / 0
-- [ ] edge precision — does every CALLS edge correspond to a real call at that line
+- [x] edge precision — every CALLS edge scored against the SOURCE TEXT. scraper 9,820 / 0 misplaced, sofie 12,028 / 0, orchestrator 8,637 / 0, conducks 9,641 / 0
 - [ ] line accuracy — a node's recorded span against the declaration
 - [ ] incremental ≠ cold on multi-wave projects (~25 nodes), the standing open defect
+
+### Edges are scored against the bytes
+
+ADR 0181. Each CALLS edge records the expression it was built from and the line it was found on —
+either that text is on that line or the edge describes something that is not there. The oracle is the
+source text: no parser, no second heuristic, nothing shared with the thing under test.
+
+That makes it the first instrument here that is **language-agnostic**, so it covers the nine grammars
+with no oracle of their own as readily as the two that have one. 40,126 edges scored across four
+projects, **0 misplaced**, nothing skipped for missing metadata.
+
+Proved by catching a line drift: adding 3 to the recorded line takes scraper from 0 to **9,372 of
+9,820**. And its loose half was removed for doing nothing — a fallback matching the last segment of a
+dotted expression changed the result by zero across 9,820 edges, so it was a line that would only ever
+have hidden a real drift.
+
+It does NOT score whether an edge points at the right target, nor recall — a call with no edge is
+invisible to it.
 
 ### The base had no completeness check
 

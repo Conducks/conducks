@@ -87,5 +87,21 @@
   "conducks::nodes-ts": {
     "declarations": 471,
     "missing": 0
+  },
+  "scraper::edges": {
+    "scored": 9820,
+    "misplaced": 0
+  },
+  "sofie::edges": {
+    "scored": 12028,
+    "misplaced": 0
+  },
+  "orchestrator::edges": {
+    "scored": 8637,
+    "misplaced": 0
+  },
+  "conducks::edges": {
+    "scored": 9641,
+    "misplaced": 0
   }
 }
