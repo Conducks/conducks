@@ -295,10 +295,29 @@ at scale.
 ## Phase 2 — trace
 
 - [x] L1 scraper — scored against an independent BFS over the vault's own edges. Two defects, both fixed by 0174
-- [ ] L1 sofie — same walk, TS subject
-- [ ] L1 orchestrator — same walk, monorepo
-- [ ] L2 — plant call paths `trace` must walk
-- [ ] L3 — plant paths it must not invent
+- [x] L1 sofie — 0 missed / 0 extra across 5 entry points
+- [x] L1 orchestrator — 0 missed / 0 extra across 5 entry points
+- [x] L2 — ten scenarios in `bench-trace.mjs`, planted chains and bounds. 10/10
+- [x] L3 — the counter-halves are in the same ten: an unreachable symbol, an excluded member, an unbounded walk that says so, a cycle that does not repeat
+- [ ] pin down why the CONTAINMENT-ONLY count is non-zero on a correct build, so it can become a gate rather than a ratchet
+
+### The rule that nothing was scoring
+
+`oracle-trace` had only ever run on scraper — the single-subject mistake ADR 0176 had just fixed for
+prune. On sofie and orchestrator it passes 0/0.
+
+Then mutation testing found what the green numbers hid: **trace's central rule — containment is
+location, not dependency — was guarded by nothing.** Deleting the filter left the benchmark 10/10,
+the suite green, and the oracle at 0 missed / 0 extra. The oracle could not see it by construction:
+its containment check only ever EXCUSED a node from MISSED, so a trace returning MORE never showed.
+
+ADR 0179 scores it in the other direction, as a ratchet rather than a gate — on a correct build the
+count is 24 / 41 / 22, because trace judges the shortest path's last edge while this counts incoming
+edges. Removing the filter takes scraper from 24 to **299**, and nothing else moves.
+
+Two of my own instruments were wrong before trace was: scenario 03 asserted only that a class was
+reached, never that an uncalled method was excluded; and the containment check used `[].every()`,
+vacuously true, so it accused a correct build.
 
 ### The first measurement found ADR 0091's own defect, in a second place
 

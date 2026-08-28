@@ -37,7 +37,8 @@
   },
   "scraper::trace": {
     "starts": 5,
-    "missed": 20
+    "missed": 21,
+    "containment": 24
   },
   "sofie": {
     "oracle": 0,
@@ -56,5 +57,15 @@
     "missed": 0,
     "agreed": 0,
     "recorded": "run with --write-baseline to update"
+  },
+  "sofie::trace": {
+    "starts": 5,
+    "missed": 0,
+    "containment": 41
+  },
+  "orchestrator::trace": {
+    "starts": 5,
+    "missed": 4,
+    "containment": 22
   }
 }

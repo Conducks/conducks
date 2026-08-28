@@ -68,8 +68,14 @@ function reachable(startId) {
 }
 
 /** trace's own exclusion: reached ONLY through containment, from inside the reachable set. */
-const containmentOnly = (id, set) =>
-  (incoming.get(id) || []).filter(e => set.has(e.from) || e.from === id).every(e => e.type === 'MEMBER_OF');
+const containmentOnly = (id, set) => {
+  const from = (incoming.get(id) || []).filter(e => set.has(e.from) || e.from === id);
+  // AT LEAST ONE, then all of them. `[].every()` is true, so a node whose only incoming edges come
+  // from OUTSIDE the walk was called containment-only — vacuously. That reported `ecosystem::uvicorn`
+  // and two others as trace breaking its own rule on a correct build, which is the direction of
+  // wrongness that looks like rigour.
+  return from.length > 0 && from.every(e => e.type === 'MEMBER_OF');
+};
 
 function traceOf(startId) {
   const raw = execFileSync('node', [CLI, 'trace', startId, '--depth', String(DEPTH), '--limit', '100000', '--json'],
@@ -81,7 +87,7 @@ function traceOf(startId) {
 const entryRaw = execFileSync('node', [CLI, 'entry', '--json'], { cwd: projectDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const entries = (JSON.parse(entryRaw).entryPoints ?? JSON.parse(entryRaw) ?? []).slice(0, 5);
 
-let missedTotal = 0, extraTotal = 0, scored = 0;
+let missedTotal = 0, extraTotal = 0, containmentTotal = 0, scored = 0;
 const rows = [];
 for (const e of entries) {
   const id = e.id ?? e.symbolId;
@@ -91,8 +97,15 @@ for (const e of entries) {
   const theirs = new Set(traceOf(id).steps.map(s => s.id));
   const missed = [...mine].filter(x => !theirs.has(x) && !containmentOnly(x, mine));
   const extra = [...theirs].filter(x => !mine.has(x));
-  rows.push({ id: String(id).split('/').pop(), mine: mine.size, theirs: theirs.size, missed: missed.length, extra: extra.length });
-  missedTotal += missed.length; extraTotal += extra.length; scored++;
+  // THE RULE, SCORED IN THE OTHER DIRECTION. `containmentOnly` was used only to EXCUSE a node from
+  // MISSED, so removing trace's MEMBER_OF filter altogether changed nothing here and the rule was
+  // guarded by nothing at all — not this oracle, not the benchmark, not a test. A node trace RETURNS
+  // whose every incoming edge from the reachable set is containment is trace breaking its own claim:
+  // "a step entered through MEMBER_OF is location, not dependency".
+  const containmentClaimed = [...theirs].filter(x => mine.has(x) && containmentOnly(x, mine));
+  rows.push({ id: String(id).split('/').pop(), mine: mine.size, theirs: theirs.size, missed: missed.length, extra: extra.length, containment: containmentClaimed.length });
+  missedTotal += missed.length; extraTotal += extra.length; containmentTotal += containmentClaimed.length; scored++;
+  for (const c of containmentClaimed.slice(0, 3)) console.log(`      CONTAINMENT-ONLY ${c.slice(-70)}`);
   for (const m of missed.slice(0, 3)) console.log(`      MISSED ${m.slice(-70)}`);
   for (const x of extra.slice(0, 3)) console.log(`      EXTRA  ${x.slice(-70)}`);
 }
@@ -102,6 +115,7 @@ for (const r of rows) console.log(`  ${r.id.padEnd(28)} walk ${String(r.mine).pa
 console.log(`  starts scored : ${scored}`);
 console.log(`  MISSED (walk reaches it by a real edge, trace silent): ${missedTotal}`);
 console.log(`  EXTRA  (trace claims it, the walk cannot reach it)   : ${extraTotal}`);
+console.log(`  CONTAINMENT-ONLY (trace returned it, reached only via MEMBER_OF): ${containmentTotal}`);
 
 if (scored === 0) {
   console.error(`\n✖ no start point produced a reachable set. That is a broken oracle, not a small graph.\n`);
@@ -115,14 +129,42 @@ const prev = baseline[key];
 
 let failed = false;
 if (extraTotal > 0) { console.error(`\n✖ ${extraTotal} node(s) trace claims are reachable and the walk cannot reach.`); failed = true; }
+// RATCHETED, NOT GATED, and the reason is written down rather than the number being quietly dropped.
+//
+// This counts nodes trace returned whose every incoming edge from inside the walk is MEMBER_OF, and
+// on a CORRECT build it is not zero. trace's own rule judges the SHORTEST PATH's last edge and then
+// re-admits on evidence (ADR 0174); this counts incoming edges instead, and the two disagree in ways
+// not yet pinned down. A gate that fires on a correct build is worse than no gate.
+//
+// It earns its place as a ratchet: removing trace's MEMBER_OF filter altogether moves this number,
+// and NOTHING ELSE in the suite noticed — not the benchmark, not a test, not this oracle's own MISSED
+// or EXTRA. The rule was unguarded, and a moving number is the first guard it has had.
+if (prev && containmentTotal > prev.containment) {
+  console.error(`\n✖ CONTAINMENT-ONLY ROSE: ${prev.containment} before, ${containmentTotal} now — trace is returning more nodes reached only through containment.`);
+  failed = true;
+}
 if (prev && missedTotal > prev.missed) {
   console.error(`\n✖ RECALL WENT BACKWARDS: ${prev.missed} missed before, ${missedTotal} now.`); failed = true;
 }
-if (failed) process.exit(1);
+// `--write-baseline` OVERRIDES a failing ratchet, deliberately.
+//
+// ADR 0044's rule is that a baseline must never be recorded SILENTLY — it is not that a number can
+// never be re-recorded. Those differ, and the difference matters when the ORACLE changes rather than
+// the tool: fixing a vacuous-truth bug in `containmentOnly` stopped excusing one node, MISSED moved
+// 20 -> 21 with trace untouched, and the gate would otherwise have been unfixable without editing
+// the JSON by hand — which is exactly the silent path the rule forbids.
+//
+// It says so out loud when it does it.
+if (failed && process.argv.includes('--write-baseline')) {
+  console.error(`\n  ⚠ recording a baseline over a FAILING ratchet, because --write-baseline was passed.`);
+  console.error(`    Do this only when the ORACLE changed. If the TOOL changed, fix the tool.\n`);
+} else if (failed) {
+  process.exit(1);
+}
 
 // A MISSING BASELINE IS NOT A PASS (ADR 0044) — the same rule every other oracle here keeps.
 if (process.argv.includes('--write-baseline')) {
-  baseline[key] = { starts: scored, missed: missedTotal };
+  baseline[key] = { starts: scored, missed: missedTotal, containment: containmentTotal };
   writeFileSync(BASELINE, JSON.stringify(baseline, null, 2) + '\n');
   console.log(`\n  baseline recorded for ${key}.\n`);
   process.exit(0);
