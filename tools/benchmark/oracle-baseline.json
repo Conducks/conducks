@@ -162,5 +162,23 @@
   "scraper::recall-ts": {
     "calls": 977,
     "missing": 19
+  },
+  "scraper::context": {
+    "runs": 15,
+    "outside": 0,
+    "missed": 0,
+    "excluded": 0
+  },
+  "sofie::context": {
+    "runs": 15,
+    "outside": 0,
+    "missed": 0,
+    "excluded": 0
+  },
+  "orchestrator::context": {
+    "runs": 15,
+    "outside": 0,
+    "missed": 0,
+    "excluded": 0
   }
 }

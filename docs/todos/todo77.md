@@ -500,9 +500,27 @@ to have been kept. Every one is a class member. Ratcheted, with the reason state
 
 ## Phase 3 — context
 
-- [ ] L1 on all three subjects
+- [x] L1 on all three subjects — scored against an independent radius walk, 15 runs each at r=1/2/3
 - [ ] L2 — plant neighbours it must return
 - [ ] L3 — plant non-neighbours it must not
+
+### The neighbourhood is exactly what its rules admit
+
+`oracle-context.mjs` scores three directions, because one is not enough: a node returned from OUTSIDE
+the radius, a returnable node inside it that was MISSED, and a container or ATOM handed back that
+neither of those can see.
+
+**Exact on all three subjects** — 0 / 0 / 0 on 45 runs. Proved by mutation both ways: removing the
+container filter returns 3,394 nodes its own rules exclude; widening the radius by one returns 12,889
+outside it.
+
+The apparent recall gap was the tool's own scope again — 75 of 105 neighbours at r=1 reads as a
+serious omission until the three exclusions are modelled: containers are where a thing lives rather
+than what is around it, ATOMs are 51% of the graph, and a dangling target has no node to return.
+Fourth time this session an instrument's big number was the tool's stated claim.
+
+The SCORE is deliberately unscored: ranking is a policy, and checking it against a second opinion
+would only compare two policies.
 
 ## Phase 4 — entry
 
