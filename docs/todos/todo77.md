@@ -299,7 +299,7 @@ at scale.
 - [x] L1 orchestrator — 0 missed / 0 extra across 5 entry points
 - [x] L2 — ten scenarios in `bench-trace.mjs`, planted chains and bounds. 10/10
 - [x] L3 — the counter-halves are in the same ten: an unreachable symbol, an excluded member, an unbounded walk that says so, a cycle that does not repeat
-- [ ] pin down why the CONTAINMENT-ONLY count is non-zero on a correct build, so it can become a gate rather than a ratchet
+- [x] pin down why the CONTAINMENT-ONLY count is non-zero on a correct build — it was this oracle's own bug, not a disagreement: `reachable()` deletes the start, so an edge FROM the start was invisible. It is 0 on all three now, and a GATE rather than a ratchet
 
 ### The rule that nothing was scoring
 
@@ -311,9 +311,11 @@ location, not dependency — was guarded by nothing.** Deleting the filter left 
 the suite green, and the oracle at 0 missed / 0 extra. The oracle could not see it by construction:
 its containment check only ever EXCUSED a node from MISSED, so a trace returning MORE never showed.
 
-ADR 0179 scores it in the other direction, as a ratchet rather than a gate — on a correct build the
-count is 24 / 41 / 22, because trace judges the shortest path's last edge while this counts incoming
-edges. Removing the filter takes scraper from 24 to **299**, and nothing else moves.
+ADR 0179 scores it in the other direction. It shipped as a ratchet against 24 / 41 / 22 and is now a
+GATE at zero: those numbers were a bug in the check, not a disagreement — `reachable()` deletes the
+start from its own result, so an edge FROM the start was invisible and a node the start CALLS looked
+containment-only. With the start counted, 0 on all three; delete trace's filter and scraper reads
+**276**.
 
 Two of my own instruments were wrong before trace was: scenario 03 asserted only that a class was
 reached, never that an uncalled method was excluded; and the containment check used `[].every()`,

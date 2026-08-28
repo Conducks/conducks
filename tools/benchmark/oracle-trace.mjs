@@ -95,14 +95,19 @@ for (const e of entries) {
   const mine = reachable(String(id).toLowerCase());
   if (mine.size === 0) continue;
   const theirs = new Set(traceOf(id).steps.map(s => s.id));
-  const missed = [...mine].filter(x => !theirs.has(x) && !containmentOnly(x, mine));
+  // THE START COUNTS AS A REFERRER. `reachable()` removes the start from its own result — correct
+  // for "what does this reach" — but the containment check then could not see an edge FROM the start,
+  // so a node the start itself calls looked as though only containment pointed at it. On scraper
+  // `recorder.py::instrument` is CALLED by `mcp_server.py::unit`, which is one of the five starts.
+  const withStart = new Set([...mine, String(id).toLowerCase()]);
+  const missed = [...mine].filter(x => !theirs.has(x) && !containmentOnly(x, withStart));
   const extra = [...theirs].filter(x => !mine.has(x));
   // THE RULE, SCORED IN THE OTHER DIRECTION. `containmentOnly` was used only to EXCUSE a node from
   // MISSED, so removing trace's MEMBER_OF filter altogether changed nothing here and the rule was
   // guarded by nothing at all — not this oracle, not the benchmark, not a test. A node trace RETURNS
   // whose every incoming edge from the reachable set is containment is trace breaking its own claim:
   // "a step entered through MEMBER_OF is location, not dependency".
-  const containmentClaimed = [...theirs].filter(x => mine.has(x) && containmentOnly(x, mine));
+  const containmentClaimed = [...theirs].filter(x => mine.has(x) && containmentOnly(x, withStart));
   rows.push({ id: String(id).split('/').pop(), mine: mine.size, theirs: theirs.size, missed: missed.length, extra: extra.length, containment: containmentClaimed.length });
   missedTotal += missed.length; extraTotal += extra.length; containmentTotal += containmentClaimed.length; scored++;
   for (const c of containmentClaimed.slice(0, 3)) console.log(`      CONTAINMENT-ONLY ${c.slice(-70)}`);
@@ -129,18 +134,20 @@ const prev = baseline[key];
 
 let failed = false;
 if (extraTotal > 0) { console.error(`\n✖ ${extraTotal} node(s) trace claims are reachable and the walk cannot reach.`); failed = true; }
-// RATCHETED, NOT GATED, and the reason is written down rather than the number being quietly dropped.
+// A GATE, at zero, and it took finding the bug in this check to earn that.
 //
-// This counts nodes trace returned whose every incoming edge from inside the walk is MEMBER_OF, and
-// on a CORRECT build it is not zero. trace's own rule judges the SHORTEST PATH's last edge and then
-// re-admits on evidence (ADR 0174); this counts incoming edges instead, and the two disagree in ways
-// not yet pinned down. A gate that fires on a correct build is worse than no gate.
+// It shipped as a ratchet against 24 / 41 / 22 because those numbers looked like a disagreement
+// between trace's rule (the shortest path's last edge, then re-admission) and this one (incoming
+// edges). They were not. `reachable()` deletes the START from its own result — correct for "what does
+// this reach" — so the check could not see an edge FROM the start, and a node the start itself CALLS
+// looked as though only containment pointed at it. On scraper, `recorder.py::instrument` is called by
+// `mcp_server.py::unit`, which is one of the five starts.
 //
-// It earns its place as a ratchet: removing trace's MEMBER_OF filter altogether moves this number,
-// and NOTHING ELSE in the suite noticed — not the benchmark, not a test, not this oracle's own MISSED
-// or EXTRA. The rule was unguarded, and a moving number is the first guard it has had.
-if (prev && containmentTotal > prev.containment) {
-  console.error(`\n✖ CONTAINMENT-ONLY ROSE: ${prev.containment} before, ${containmentTotal} now — trace is returning more nodes reached only through containment.`);
+// With the start counted as a referrer the number is 0 on all three subjects, and removing trace's
+// MEMBER_OF filter takes scraper to 276. That is a gate: it is zero when the rule holds and large
+// when it does not.
+if (containmentTotal > 0) {
+  console.error(`\n✖ ${containmentTotal} node(s) trace returned that are reached ONLY through containment — its own rule refuses these.`);
   failed = true;
 }
 if (prev && missedTotal > prev.missed) {

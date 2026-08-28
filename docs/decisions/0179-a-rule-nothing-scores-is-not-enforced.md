@@ -26,12 +26,20 @@ MISSED, so a trace returning MORE nodes never registered.
 **Score the rule in the other direction.** The oracle now counts nodes trace RETURNED whose every
 incoming edge from inside the walk is containment — the shape the rule refuses.
 
-**Ratcheted, not gated, and the reason is recorded rather than the number being quietly dropped.** On
-a correct build the count is not zero (24 on scraper, 41 on sofie, 22 on orchestrator), because
-trace's rule judges the shortest path's last edge and then re-admits on evidence, while this counts
-incoming edges — and the two disagree in ways not yet pinned down. A gate that fires on a correct
-build is worse than no gate. It earns its place as a ratchet: removing the filter takes scraper from
-**24 to 299**, and nothing else in the suite moves at all.
+**It shipped as a ratchet and became a gate, and the step between is the point.** On a correct build
+it read 24 / 41 / 22, which looked like a disagreement between trace's rule (the shortest path's last
+edge, then re-admission) and this one (incoming edges). It was not a disagreement — it was a bug in
+this check.
+
+`reachable()` deletes the START from its own result, which is correct for *"what does this reach"* and
+wrong for *"what refers to this"*: the check could not see an edge FROM the start, so a node the start
+itself CALLS looked as though only containment pointed at it. On scraper, `recorder.py::instrument` is
+called by `mcp_server.py::unit` — one of the five starts — and has 8 CALLS and 1 IMPORTS edge pointing
+at it.
+
+With the start counted as a referrer the number is **0 on all three subjects**, and deleting trace's
+MEMBER_OF filter takes scraper to **276**. That is a gate: zero when the rule holds, large when it
+does not. Fixing it also returned scraper's MISSED from 21 to 20, since the same set feeds both.
 
 ## Consequences
 
@@ -48,9 +56,13 @@ build is worse than no gate. It earns its place as a ratchet: removing the filte
   came from outside the walk was reported as trace breaking its own rule — on a correct build, in the
   direction that looks like rigour.
 - `--write-baseline` now overrides a failing ratchet, saying so loudly. ADR 0044 forbids recording a
-  baseline SILENTLY, not recording one at all — and fixing the vacuous-truth bug moved MISSED from 20
-  to 21 with trace untouched, which otherwise could only be resolved by hand-editing the JSON, the
-  exact silent path that rule exists to prevent.
+  baseline SILENTLY, not recording one at all — and fixing a bug in this oracle moved MISSED with
+  trace untouched, which otherwise could only be resolved by hand-editing the JSON, the exact silent
+  path that rule exists to prevent.
+- **Three bugs in this check, none in trace.** The vacuous `[].every()`, the missing start, and
+  scenario 03 asserting only half its claim. Every one pointed at correct code, and two of them
+  produced numbers that read as findings. An instrument is not exempt from the standard it applies —
+  the reason all three were caught is that each was mutated against and had to move.
 - `oracle-trace` now runs on all three subjects; `bench:trace` joins `npm run gate`.
 
 **The general point.** Three green instruments agreed that a deleted rule was fine. Passing is not

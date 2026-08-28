@@ -37,8 +37,8 @@
   },
   "scraper::trace": {
     "starts": 5,
-    "missed": 21,
-    "containment": 24
+    "missed": 20,
+    "containment": 0
   },
   "sofie": {
     "oracle": 0,
@@ -61,11 +61,11 @@
   "sofie::trace": {
     "starts": 5,
     "missed": 0,
-    "containment": 41
+    "containment": 0
   },
   "orchestrator::trace": {
     "starts": 5,
-    "missed": 4,
-    "containment": 22
+    "missed": 0,
+    "containment": 0
   }
 }
