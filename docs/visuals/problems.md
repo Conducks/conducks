@@ -4,7 +4,7 @@ Provenance: authored — a concern page. It makes no code claims of its own; eve
 A defect, its evidence, and who owns it. A block on the canvas that IS one links here.
 
 :::elsewhere
-**Empty on purpose, and that is a claim about process rather than about quality.** The ADR 0150 core campaign found and FIXED its defects in the same pass — inheritance producing no edge in three languages, a linker that could never run, a monitor re-implementing git, a filter that was a no-op. Each is recorded in `docs/deep_clean.md` with the measurement that found it and the mutation that proved the fix. None is open, so none is listed here.
+**This page was empty for a while, and the sentence saying so outlived it.** The ADR 0150 core campaign found and FIXED its defects in the same pass — inheritance producing no edge in three languages, a linker that could never run, a monitor re-implementing git, a filter that was a no-op. Each is in `docs/deep_clean.md` with the measurement that found it and the mutation that proved the fix, and none of them is here. What IS here is the other kind: a defect whose fix is a DECISION rather than a patch, so it cannot be closed in the pass that found it. p1 was resolved that way and is kept as the record of how.
 :::
 
 ## p1 — the mirror test enforces half its rule
