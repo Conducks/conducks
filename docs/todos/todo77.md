@@ -292,6 +292,36 @@ Stated limit, unchanged: a class member is never judged, and scenario 10 pins it
 The two fixtures prove the rules hold on those shapes; they are not a claim about a real JS codebase
 at scale.
 
+## Phase 1b — analyze, the base
+
+Not one of the twelve tool phases: `analyze` is what the other twelve read, so a hole here is a hole
+in all of them at once.
+
+- [x] node completeness, Python — `ast` vs the graph. scraper 1,207 declarations / 0 missing, sofie 114 / 0
+- [x] node completeness, TypeScript — `ts.createProgram` vs the graph. sofie 1,452 / 0, orchestrator 569 / 0, conducks 471 / 0
+- [ ] edge precision — does every CALLS edge correspond to a real call at that line
+- [ ] line accuracy — a node's recorded span against the declaration
+- [ ] incremental ≠ cold on multi-wave projects (~25 nodes), the standing open defect
+
+### The base had no completeness check
+
+Seven oracles scored what the ARMS say and none scored whether the base contains what the source
+declares. `oracle-packs` asks whether a pack's QUERIES capture what its grammar declares — a question
+about the query file; whether a capture becomes a NODE is the event every arm downstream reads.
+
+The failure is silent in a way no other is: a declaration with no node is invisible to `prune`,
+`trace`, `impact` and `context` at once, and all four look correct while missing it.
+
+Both oracles are proved by catching a dropped capture — removing Python's `function_definition`
+capture takes scraper 0 → **1,060** missing; removing TypeScript's `interface_declaration` capture
+takes sofie 0 → **69**. Removing the TS `class_declaration` capture moves it by only 1, because
+classes are minted by more than one pattern; recorded, because a mutation that barely moves is a fact
+about the captures rather than a weak check.
+
+And the oracle was wrong before analyze was, again: its first run called 14 `.mjs` declarations
+missing while the graph held 24 nodes for that file — the program walks `allowJs`, the query matched
+only `.ts*`.
+
 ## Phase 2 — trace
 
 - [x] L1 scraper — scored against an independent BFS over the vault's own edges. Two defects, both fixed by 0174

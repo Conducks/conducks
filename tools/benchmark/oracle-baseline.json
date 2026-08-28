@@ -67,5 +67,25 @@
     "starts": 5,
     "missed": 0,
     "containment": 0
+  },
+  "scraper::nodes-python": {
+    "declarations": 1207,
+    "missing": 0
+  },
+  "sofie::nodes-python": {
+    "declarations": 114,
+    "missing": 0
+  },
+  "sofie::nodes-ts": {
+    "declarations": 1452,
+    "missing": 0
+  },
+  "orchestrator::nodes-ts": {
+    "declarations": 569,
+    "missing": 0
+  },
+  "conducks::nodes-ts": {
+    "declarations": 471,
+    "missing": 0
   }
 }
