@@ -305,6 +305,24 @@ in all of them at once.
 - [x] edge RECALL — Python `ast` vs the graph, per (file, line). scraper **96.83%**, sofie **98.53%**. Ratcheted, not gated: the residue is one shape and not yet attributed (ADR 0183)
 - [x] incremental ≠ cold — DOES NOT REPRODUCE across four waves including a three-wave one with external scaffolding, and is now guarded rather than merely absent (ADR 0182)
 
+### The 42 unexplained export misses, explained — and the obvious fix rejected
+
+`sofie::exports` showed 135 missed: 93 referenced only inside their own file (not misses —
+`UNUSED_EXPORT` counts that as consumption) and **42 referenced NOWHERE**.
+
+Cause: **a wildcard re-export counts as external consumption.** `kernel/paths.ts` declares
+`export const DATA_DIR`, uses it three lines below, and `kernel/index.ts` says
+`export * from './paths.js'`. Nothing imports it. The barrel's own edge satisfies "consumed by
+another module", so in a barrelled codebase **no symbol in a wildcard-re-exported file can read as an
+unused export**.
+
+The obvious fix — exclude a re-export surface's own edge — was written, measured and **rejected**:
+sofie went 172 → 354 findings, `EXTRA` went 0 → **182**, and `DATA_DIR` was still not reported. It
+traded 42 misses for 182 false verdicts and did not fix its own target. Reverted (ADR 0187).
+
+The baseline's rise from 105 to 135 was the SUBJECT, not prune — the oracle's own total went 245 →
+288 as sofie grew.
+
 ### JavaScript was riding on TypeScript's coverage
 
 The TS oracles drove off tsconfig, and a tsconfig is the project's BUILD story rather than an

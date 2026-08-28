@@ -191,7 +191,19 @@ if (extra.length > 0) { console.error(`\n✖ ${extra.length} finding(s) python's
 if (prev && missed.length > prev.missed) {
   console.error(`\n✖ RECALL WENT BACKWARDS: ${prev.missed} missed before, ${missed.length} now.`); failed = true;
 }
-if (failed) process.exit(1);
+// `--write-baseline` OVERRIDES a failing ratchet, deliberately and loudly.
+//
+// ADR 0044 forbids recording a baseline SILENTLY; it does not forbid recording one. The difference
+// matters when the SUBJECT changes rather than the tool: sofie was pulled to latest mid-benchmark and
+// this oracle's own total went 245 -> 288, so `missed` rose with prune untouched. Without an escape
+// the only way forward is hand-editing the JSON, which is precisely the silent path the rule exists
+// to prevent (ADR 0187).
+if (failed && process.argv.includes('--write-baseline')) {
+  console.error(`\n  ⚠ recording a baseline over a FAILING ratchet, because --write-baseline was passed.`);
+  console.error(`    Do this only when the SUBJECT or the ORACLE changed. If the TOOL changed, fix the tool.\n`);
+} else if (failed) {
+  process.exit(1);
+}
 
 // A MISSING BASELINE IS NOT A PASS (ADR 0044).
 //
