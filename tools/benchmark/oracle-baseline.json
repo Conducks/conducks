@@ -38,5 +38,17 @@
   "scraper::trace": {
     "starts": 5,
     "missed": 20
+  },
+  "sofie": {
+    "oracle": 0,
+    "missed": 0,
+    "agreed": 0,
+    "recorded": "run with --write-baseline to update"
+  },
+  "admin": {
+    "oracle": 0,
+    "missed": 0,
+    "agreed": 0,
+    "recorded": "run with --write-baseline to update"
   }
 }

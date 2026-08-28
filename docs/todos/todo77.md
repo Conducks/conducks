@@ -243,6 +243,22 @@ asserted here but proved on the subject, and says so.
 
 `npm run bench:prune`.
 
+### Which project each instrument actually ran on
+
+Asked directly, the answer was uneven and unwritten: **`oracle-tsc.mjs`, the strongest instrument,
+had only ever run against conducks itself.** Pointing it at the two TypeScript subjects found three
+defects in the INSTRUMENT (ADR 0176): `npx tsc` resolving a joke package on sofie, `EXTRA` blaming
+prune for files outside the compiler's program, and a liveness probe that imported a conducks-only
+path into a directory not every project compiles.
+
+| target | imports vs tsc | exports vs tsc | python | python dead | trace |
+|---|---|---|---|---|---|
+| conducks | ✓ 0/0 | ✓ | — | — | — |
+| sofie | ✓ 0/0 | ✓ | — | ✓ 0/0 | — |
+| orchestrator/admin | ✓ 0/0 | — | — | — | — |
+| orchestrator/app | cannot — missing `@types`, tsc stops at TS2688 | ✓ | — | — | — |
+| scraper | — | — | ✓ 0/0 | ✓ 0/0 | ✓ |
+
 ### Phase 1 closes
 
 | check | result |

@@ -45,6 +45,8 @@
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
     "oracle": "node tools/benchmark/oracle-tsc.mjs && node tools/benchmark/oracle-exports.mjs && node tools/benchmark/oracle-packs.mjs",
     "oracle:imports": "node tools/benchmark/oracle-tsc.mjs",
+    "oracle:imports:sofie": "node tools/benchmark/oracle-tsc.mjs ../test-projects/sofie",
+    "oracle:imports:admin": "node tools/benchmark/oracle-tsc.mjs ../test-projects/orchestrator/admin",
     "oracle:exports": "node tools/benchmark/oracle-exports.mjs",
     "oracle:python": "node tools/benchmark/oracle-python.mjs ../test-projects/scraper",
     "oracle:python-dead": "node tools/benchmark/oracle-python-dead.mjs ../test-projects/scraper",

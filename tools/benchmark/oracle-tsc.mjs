@@ -34,7 +34,7 @@
  * (knip/ts-prune) and are out of scope here rather than silently half-covered.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { resetVault } from './reset-vault.mjs';
 
@@ -45,6 +45,48 @@ const positionalArg = process.argv.slice(2).find(a => !a.startsWith('--'));
 const projectDir = positionalArg ? path.resolve(positionalArg) : process.cwd();
 const CLI = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../build/src/interfaces/cli/index.js');
 
+/**
+ * The REAL compiler, resolved rather than looked up on PATH.
+ *
+ * This ran `npx tsc`, which resolves whatever the project happens to have. Pointed at the sofie
+ * subject it found a package that prints "This is not the tsc command you are looking for" and exits
+ * 0 — so the oracle saw no diagnostics and would have scored prune against silence. The liveness
+ * probe caught it, which is the only reason this is a fixed bug rather than a green tick.
+ *
+ * Prefers the project's own TypeScript so a subject is judged by the compiler it builds with, and
+ * falls back to this repository's, which is a devDependency and always present.
+ */
+const resolveTsc = (dir) => {
+  const local = path.join(dir, 'node_modules', 'typescript', 'bin', 'tsc');
+  if (existsSync(local)) return local;
+  return path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../node_modules/typescript/bin/tsc');
+};
+const TSC = resolveTsc(projectDir);
+
+/**
+ * The files tsc ACTUALLY COMPILED, which is not the same as the files in the repository.
+ *
+ * `EXTRA` means "conducks says stale and the compiler says used" — but a file the compiler never
+ * opened produces no diagnostic either way, and counting that as a contradiction blames prune for
+ * the oracle's blind spot. MEASURED the first time this ran on the sofie subject: its tsconfig is
+ * `include: ["src/**\/*"]`, both prune findings were in `renderer/` and `scripts/`, and the oracle
+ * reported 2 precision bugs against findings later verified true by hand.
+ */
+function compiledFiles() {
+  let out = '';
+  try {
+    out = execFileSync('node', [TSC, '--noEmit', '--listFiles', '--pretty', 'false'],
+      { cwd: projectDir, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  } catch (err) { out = String(err.stdout ?? ''); }
+  const set = new Set();
+  for (const line of out.split('\n')) {
+    const t = line.trim();
+    if (t.startsWith('/') && /\.[cm]?[jt]sx?$/.test(t)) set.add(t.toLowerCase());
+  }
+  return set;
+}
+const inProgram = compiledFiles();
+
 const isTestPath = (p) =>
   /(^|\/)(tests?|__tests__|__mocks__|spec|fixtures?)\//.test(p) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p);
 
@@ -52,7 +94,7 @@ const isTestPath = (p) =>
 function oracleUnusedImports() {
   let out = '';
   try {
-    execFileSync('npx', ['tsc', '--noUnusedLocals', '--noEmit', '--pretty', 'false'],
+    execFileSync('node', [TSC, '--noUnusedLocals', '--noEmit', '--pretty', 'false'],
       { cwd: projectDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   } catch (err) {
     // tsc exits non-zero when it reports anything — that is the normal path here, not a failure.
@@ -123,7 +165,10 @@ const oracle = oracleUnusedImports();
 const ours = conducksStaleImports();
 
 const missed = [...oracle].filter(([k]) => !ours.has(k)).map(([, v]) => v);
-const extra = [...ours].filter(([k]) => !oracle.has(k)).map(([, v]) => v);
+// Scored only over files the compiler actually compiled — see `compiledFiles`.
+const extra = [...ours]
+  .filter(([k, v]) => !oracle.has(k) && (inProgram.size === 0 || inProgram.has(String(v.file).toLowerCase())))
+  .map(([, v]) => v);
 const agreed = [...oracle].filter(([k]) => ours.has(k)).length;
 
 console.log(`\n--- prune vs tsc, in-project unused imports (${path.basename(projectDir)}) ---`);
@@ -173,14 +218,26 @@ const prev = baseline[key];
  * first, and it reported a working instrument as broken.
  */
 function probeDetectsPlantedImport() {
-  const probe = path.join(projectDir, 'src', '__oracle_probe__.ts');
+  // SELF-CONTAINED, and placed where the compiler is already looking.
+  //
+  // The first version imported `./contracts/index.js` — a path that exists in THIS repository and
+  // nowhere else — so it proved nothing the moment the oracle was pointed at another project, and
+  // reported the orchestrator subject's instrument broken. The second problem is placement: `src/`
+  // is not a compiled directory in every project, and a probe outside the program is a probe tsc
+  // never opens. Both are answered by writing a target AND its importer beside a file the compiler
+  // demonstrably compiled.
+  const anchor = [...inProgram].find(f => f.startsWith(projectDir.toLowerCase()) && !f.includes('node_modules'));
+  const dir = anchor ? path.dirname(anchor) : path.join(projectDir, 'src');
+  const target = path.join(dir, '__oracle_probe_target__.ts');
+  const probe = path.join(dir, '__oracle_probe__.ts');
   try {
-    writeFileSync(probe, "import { DEAD_CODE_TYPES } from './contracts/index.js';\nexport const probe = 1;\n");
+    writeFileSync(target, "export const PROBE_VALUE = 1;\n");
+    writeFileSync(probe, "import { PROBE_VALUE } from './__oracle_probe_target__.js';\nexport const probe = 1;\n");
     return oracleUnusedImports().size > 0;
   } catch {
     return false;
   } finally {
-    try { rmSync(probe, { force: true }); } catch { /* nothing to clean */ }
+    try { rmSync(probe, { force: true }); rmSync(target, { force: true }); } catch { /* nothing to clean */ }
   }
 }
 
