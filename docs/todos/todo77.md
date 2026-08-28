@@ -269,8 +269,28 @@ path into a directory not every project compiles.
 | oracles | TS imports 0/0 · Python imports 0/0 · Python dead 0/0 · exports 12 missed / 0 extra |
 | benchmark | 10 / 10 |
 
-Stated limits, unchanged: a class member is never judged (scenario 10 pins it), and no subject exists
-for a Python monorepo or a JavaScript-primary codebase.
+### The two empty cells are closed, and one was hiding a defect
+
+A JavaScript-primary codebase and a Python monorepo had no subject, and both were filed as
+acquisition problems. Half right: no real subject exists, but the benchmark can BUILD the shape —
+and scenario 11 failed on its first honest run.
+
+A constant read only by a JS class field (`held = FIELD`) was reported `STALE_IMPORT`. TypeScript
+spells that node `public_field_definition` and JavaScript spells it `field_definition`; ADR 0165 had
+to put the TS spelling in the TS/TSX-only block because naming a node a grammar lacks invalidates the
+whole query — **and the JS spelling was then captured nowhere.** Fixed (ADR 0178); mutating it away
+fails scenario 11 and nothing else.
+
+Scenario 12 passed first time: Python cross-package imports, the `__all__` barrel and the
+module-qualified call all resolve, so the monorepo shape was already covered — there had just been
+nothing to prove it on.
+
+**12 of 12 scenarios.** Subjects unchanged at 49 / 172 / 245, which is what proves the JS capture
+touched nothing already working.
+
+Stated limit, unchanged: a class member is never judged, and scenario 10 pins it so it cannot drift.
+The two fixtures prove the rules hold on those shapes; they are not a claim about a real JS codebase
+at scale.
 
 ## Phase 2 — trace
 

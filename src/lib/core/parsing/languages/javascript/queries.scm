@@ -181,3 +181,16 @@
   ;; shared block: naming either node in the other grammar fails query COMPILATION outright and drops
   ;; the language to the regex fallback (ADR 0089). Kept here, beside its own grammar, deliberately.
   (assignment_pattern right: (identifier) @ref_value)
+
+  ;; A CLASS FIELD initialised to a bare binding — `held = FIELD`.
+  ;;
+  ;; The JavaScript twin of the pattern ADR 0165 put in the TS/TSX-only block. It had to live there
+  ;; because TypeScript spells this node `public_field_definition` and naming a node a grammar lacks
+  ;; invalidates the WHOLE query (ADR 0089) — and the consequence nobody checked is that the JS
+  ;; spelling was then captured NOWHERE.
+  ;;
+  ;; Invisible until the benchmark grew a JavaScript scenario: the three subjects hold 4, 1 and 5
+  ;; `.js` files between them, which is configuration, so every JS claim rested on it sharing a parser
+  ;; with TypeScript. It does not. MEASURED: a constant read only by a class field was reported
+  ;; STALE_IMPORT — a verdict telling the reader to delete an import the code needs (ADR 0178).
+  (field_definition value: (identifier) @ref_value)

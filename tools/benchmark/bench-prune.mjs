@@ -167,6 +167,38 @@ const SCENARIOS = [
     mustNotFlag: ['neverCalledAnywhere'],
     note: 'asserts the DOCUMENTED blind spot, not a capability',
   },
+  {
+    name: '11 a JavaScript-primary codebase',
+    why: 'the coverage matrix had no JS subject at all — the three test projects hold 4, 1 and 5 .js files, which is configuration. Every JS claim rested on it sharing a parser with TS, and the two grammars genuinely differ: JS spells a class field `field_definition` where TS spells it `public_field_definition`',
+    files: {
+      'src/vals.mjs': `export const SPREAD = ['a'];\nexport const INDEXED = { ok: 1 };\nexport const TEMPLATED = 'x';\nexport const ARROWED = 'y';\nexport const FIELD = 'z';\nexport const RETURNED = 'w';\nexport function deadInJs() { return 0; }\n`,
+      // A REAL JS CLASS FIELD — `held = FIELD`, not a constructor assignment. JavaScript spells that
+      // node `field_definition` where TypeScript spells it `public_field_definition`, and ADR 0165
+      // captured only the TS spelling, in the TS/TSX-only block, because putting it in the shared one
+      // broke the TypeScript pack outright. So the JS half was never covered by anything.
+      'src/reads.mjs': `import { SPREAD, INDEXED, TEMPLATED, ARROWED, FIELD, RETURNED } from './vals.mjs';\nexport class Holder { held = FIELD; }\nconst arrow = () => ARROWED;\nfunction ret() { return RETURNED; }\nexport function all(k) {\n  return \`\${TEMPLATED}\${[...SPREAD].length}\${INDEXED[k] || 0}\${arrow()}\${new Holder().held}\${ret()}\`;\n}\n`,
+      'src/stale.mjs': `import { ret } from './reads.mjs';\nimport { deadInJs } from './vals.mjs';\nexport function go() { return ret(); }\n`,
+      'src/main.mjs': `import { all } from './reads.mjs';\nimport { go } from './stale.mjs';\nexport function boot(k) { return all(k) + go(); }\n`,
+    },
+    mustFlag: [['deadInJs', 'STALE_IMPORT']],
+    // `arrow` and `ret` are no longer exported — they were, and prune correctly called them
+    // UNUSED_EXPORT, which is a true finding this scenario has no business forbidding.
+    mustNotFlag: ['SPREAD', 'INDEXED', 'TEMPLATED', 'ARROWED', 'FIELD', 'RETURNED'],
+  },
+  {
+    name: '12 a Python monorepo, cross-package',
+    why: 'the matrix cell with no subject: every monorepo finding to date is TypeScript. A package that imports another package is where a shared-core layer actually lives',
+    files: {
+      'packages/core/__init__.py': `from core.util import shared_helper\n\n__all__ = ["shared_helper"]\n`,
+      'packages/core/util.py': `def shared_helper(x):\n    return x + 1\n\n\ndef never_used_anywhere(x):\n    return x + 2\n`,
+      'packages/core/config.py': `TIERS = {"ok"}\n`,
+      'packages/app/__init__.py': ``,
+      'packages/app/service.py': `from core.util import shared_helper\nfrom core.config import TIERS\nfrom core import util\n\n\ndef run(status, x):\n    ok = status in TIERS\n    return shared_helper(x) if ok else util.shared_helper(x)\n`,
+      'packages/app/main.py': `from app.service import run\n\n\ndef boot():\n    return run("ok", 1)\n`,
+    },
+    mustFlag: [['never_used_anywhere', 'ORPHAN']],
+    mustNotFlag: ['shared_helper', 'TIERS'],
+  },
 ];
 
 function runScenario(s) {
