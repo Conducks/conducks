@@ -106,6 +106,9 @@ docs/
 ├── conventions.md    binding rules, IDed, with reasons          living
 ├── memory.md         traps the code cannot show                 living
 ├── visuals/          rendered pictures — ONLY when asked for    living
+│                      the concern pages (index, problems, holding,
+│                      testing) are .md SOURCE too, rendered beside
+│                      themselves — see `conducks-visuals` §0
 │   └── modules/      per-module notes (.md SOURCE, on demand;   living
 │                      HTML beside them is DERIVED — ADR 0140)
 ├── decisions/        one ADR per numbered file                  record

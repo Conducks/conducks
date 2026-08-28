@@ -18,6 +18,8 @@ breaks them. This file explains the ones a person has to keep.
 | <span class="anchor">scripts/visuals/detail.mjs</span> | the generated detail pages |
 | <span class="anchor">scripts/visuals/notes.mjs</span> | the module-note pages, rendered from the `.md` beside them |
 | <span class="anchor">scripts/visuals/note-map.mjs</span> | which notes a container's anchors cite, derived not curated |
+| <span class="anchor">scripts/visuals/pages.mjs</span> | the three concern pages — `index`, `problems`, `holding` — rendered from the `.md` beside each |
+| <span class="anchor">scripts/visuals/testing.mjs</span> | the testing page, and the one parser for `testing.md`'s grammar |
 | <span class="anchor">scripts/visuals/_chrome.html</span> | the toolbar, the canvas wrapper, the mini-map and the `<script>` tag — the markup the page script binds to |
 | <span class="anchor">scripts/visuals/visuals.config.mjs</span> | the repo's own name, and which containers already have a hand-written page. **The only local file besides `graph.mjs`** |
 | <span class="anchor">docs/visuals/system.css</span> | every class the pages and the SVG use |
@@ -45,10 +47,12 @@ instead of a set of pages. Nothing they wrote broke a stated rule. That is the g
 ```
 docs/visuals/
 ├── index.html         Start here — what these are, and the rules that bound them
+│                      GENERATED from index.md — as are problems and holding, below
 ├── architecture.html  THE canvas. One picture, grown by bands (§2)
 ├── problems.html      a defect, with evidence and an owner (§9)
 ├── holding.html       read and true, not yet placed (§9)
 ├── testing.html       what a HUMAN must try, one task at a time — see §0's testing section
+│                      GENERATED from testing.md
 ├── system.css         one stylesheet, shared verbatim by every repo
 ├── system.js          the canvas behaviour, shared verbatim by every repo
 ├── rules.md           a POINTER to this skill, not the rules — see the end of §0
@@ -94,6 +98,18 @@ instrument, not a record.
 It is not built for every repo. Build it when there is a human doing manual
 passes over something no test can reach, which is most GUI work and almost no
 library work.
+
+**You do not build the page. You write `testing.md` and `testing.mjs` renders it**
+— that file is the one parser for the grammar and the one renderer of it, and it
+ships with the other eight (ADR 0154/0155/0168). This matters more than it looks:
+the grammar has a SECOND consumer in another repo's terminal plugin, and the two
+readers are tested against the SAME FIXTURE, so "one owner" is something a test
+checks rather than something two repos promise each other. Rule 5 below — the page
+is data, rendered — is therefore not advice you implement; it is already true, and
+writing the markup by hand is how you leave the standard.
+
+A repo with no `testing.md` renders no testing page and that is a finished state,
+not a missing one. The renderer says so and exits.
 
 Six rules, every one of them written after the version without it failed.
 
@@ -308,7 +324,7 @@ rather than rebuilding it from the paragraph above. A repo that rebuilt it from 
 markup right and shipped no script at all. `render.mjs` gate 8 refuses a page whose chrome has drifted
 from that file.
 
-### Seven shared files, two local ones
+### Nine shared files, two local ones
 
 This is the rule the rest of §0 was missing, and the one that cost the most. Two repos held a
 byte-identical `rules.md` and a byte-identical `system.css`, kept every rule in §1–§13, and still
@@ -323,6 +339,8 @@ Nothing had been broken. The standard simply did not say what to *ship*.
 | `scripts/visuals/render.mjs` — layout, routing, gates | |
 | `scripts/visuals/detail.mjs` — the detail pages | |
 | `scripts/visuals/notes.mjs` + `note-map.mjs` — the notes | |
+| `scripts/visuals/pages.mjs` — the three concern pages | |
+| `scripts/visuals/testing.mjs` — the testing page and its parser | |
 | `scripts/visuals/_chrome.html` — the toolbar and wrapper markup | |
 
 **A repo that reimplements a shared file has left the standard, even if every rule in §1–§13 still
@@ -361,6 +379,36 @@ handing it over.
 So: `system.js` and `_chrome.html` are artifacts, not prose. The rule they carry is general —
 **when a repo has to reproduce something byte-for-byte, ship the bytes; a description is what drifts.**
 
+### The concern pages are authored as `.md`, in a narrow dialect
+
+`index.html`, `problems.html` and `holding.html` were hand-written HTML once. They
+are not any more: `pages.mjs` renders each from the `.md` beside it, the same way
+`notes.mjs` renders a module note (ADR 0154). **Never edit the HTML** — it carries a
+DERIVED header for the same reason every other render does, and the next build
+discards the edit.
+
+Why a sibling renderer rather than teaching `notes.mjs` to do it: `notes.mjs` is
+shared byte-for-byte and may not be edited to add a feature one page family needs.
+A sibling with its own copy of the inline-formatting logic is the correct answer
+under that rule, and duplicated formatting logic is the price the rule charges.
+Reaching for "just add it to notes.mjs" is the fork this whole section exists to
+prevent.
+
+The grammar is plain markdown — headings, bold, code spans, links, tables,
+paragraphs — plus a `Provenance:` line (§6.13's declared form, carried to the
+rendered footer rather than buried in an HTML comment), an optional plain-prose
+line after it that becomes the page subtitle, and **four fenced blocks** markdown
+has no shape for:
+
+| block | is |
+|---|---|
+| `:::meta` | a callout box at the top |
+| `:::elsewhere` | a side note — the aside that would otherwise become a paragraph nobody reads |
+| `:::grid` / `#### [title](link)` | a card grid |
+| `:::footer` | the page's own closing footer |
+
+Inside `meta` and `elsewhere`, blank-line separated paragraphs join with `<br><br>`.
+
 ### Porting the generator into a new repo
 
 The generator is **copied, never rebuilt**. Nine files, and only two of them are yours:
@@ -369,9 +417,11 @@ The generator is **copied, never rebuilt**. Nine files, and only two of them are
    `"visuals": "node scripts/visuals/render.mjs && node scripts/visuals/detail.mjs && node scripts/visuals/notes.mjs"`.
    In a repo that is not otherwise JavaScript, say in the `description` field why Node is there and
    that nothing in `src/` depends on it. Add `node_modules/` to `.gitignore`.
-2. Copy `render.mjs`, `detail.mjs`, `notes.mjs`, `note-map.mjs`, `_chrome.html`, `system.css` and
-   `system.js` from the repo you are copying from. **Then `diff` all seven.** If any needs an edit to
-   work here, that is a bug in the shared file — fix it in both, do not fork it.
+2. Copy `render.mjs`, `detail.mjs`, `notes.mjs`, `note-map.mjs`, `pages.mjs`, `testing.mjs`,
+   `_chrome.html`, `system.css` and `system.js` from the repo you are copying from. **Then `diff` all
+   nine.** If any needs an edit to work here, that is a bug in the shared file — fix it in both, do
+   not fork it. Take `pages.mjs` even in a repo with no testing page: the three concern pages are not
+   optional, and hand-writing their HTML is what it replaced.
 3. Write `visuals.config.mjs` — `REPO` (the name that goes in a `<title>`) and `HAND_WRITTEN` (the
    containers whose detail page you author by hand; an empty `Set` in a new repo). Both used to be
    literals inside `detail.mjs`, which meant a shared file had to be edited on arrival — and a file
