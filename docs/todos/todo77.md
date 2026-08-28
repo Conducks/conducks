@@ -301,7 +301,25 @@ in all of them at once.
 - [x] node completeness, TypeScript — `ts.createProgram` vs the graph. sofie 1,452 / 0, orchestrator 569 / 0, conducks 471 / 0
 - [x] edge precision — every CALLS edge scored against the SOURCE TEXT. scraper 9,820 / 0 misplaced, sofie 12,028 / 0, orchestrator 8,637 / 0, conducks 9,641 / 0
 - [ ] line accuracy — a node's recorded span against the declaration
-- [ ] incremental ≠ cold on multi-wave projects (~25 nodes), the standing open defect
+- [ ] edge RECALL — a call in source with no edge is invisible to all three base oracles
+- [x] incremental ≠ cold — DOES NOT REPRODUCE across four waves including a three-wave one with external scaffolding, and is now guarded rather than merely absent (ADR 0182)
+
+### Run it twice, with an edit in between
+
+`analyze` is incremental by mtime, and the invariant nothing checked is that an incremental pulse must
+produce the graph a cold one does. The failure is the worst kind — a graph missing edges answers
+confidently and slightly wrongly, and nothing downstream can tell.
+
+It is also the defect a suite structurally cannot see: **every test analyzes once, from empty**, so
+every test runs the cold path. ADR 0107 stated the lesson in one line and nothing was doing it.
+
+Four waves — a new file importing an existing one, a file gaining a call, the same in Python, and
+three consecutive waves with external scaffolding. All four agree node for node and edge for edge, so
+the standing open defect **does not reproduce**.
+
+Proved by recreating ADR 0107's defect: narrowing `allDiscoveredPaths` back to `dirtyFiles` fails all
+four with the exact recorded symptom — missing IMPORTS edges, and Python CALLS landing on a dangling
+`pkg.lib::helper` the cold graph does not contain.
 
 ### Edges are scored against the bytes
 
