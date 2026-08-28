@@ -50,5 +50,11 @@
     "missed": 0,
     "agreed": 0,
     "recorded": "run with --write-baseline to update"
+  },
+  "app": {
+    "oracle": 0,
+    "missed": 0,
+    "agreed": 0,
+    "recorded": "run with --write-baseline to update"
   }
 }

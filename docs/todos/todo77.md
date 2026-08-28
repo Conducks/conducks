@@ -256,7 +256,7 @@ path into a directory not every project compiles.
 | conducks | ✓ 0/0 | ✓ | — | — | — |
 | sofie | ✓ 0/0 | ✓ | — | ✓ 0/0 | — |
 | orchestrator/admin | ✓ 0/0 | — | — | — | — |
-| orchestrator/app | cannot — missing `@types`, tsc stops at TS2688 | ✓ | — | — | — |
+| orchestrator/app | ✓ 0/0, after `npm ci` at the monorepo root | ✓ | — | — | — |
 | scraper | — | — | ✓ 0/0 | ✓ 0/0 | ✓ |
 
 ### Phase 1 closes

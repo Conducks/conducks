@@ -45,14 +45,16 @@ that depends on nothing but itself.
   | conducks | ✓ 0/0 | ✓ | — | — | — |
   | sofie | ✓ **0/0, new** | ✓ | — | ✓ 0/0 | — |
   | orchestrator/admin | ✓ **0/0, new** | — | — | — | — |
-  | orchestrator/app | **cannot** — see below | ✓ | — | — | — |
+  | orchestrator/app | ✓ **0/0, after `npm ci`** | ✓ | — | — | — |
   | scraper | — | — | ✓ 0/0 | ✓ 0/0 | ✓ |
 
-- **`orchestrator/app` cannot be scored, and that is recorded rather than worked around.** Its
-  tsconfig declares `types: ["node", "react", "react-dom", "next"]` and those `@types` packages are
-  not installed, so tsc reports `TS2688` and stops emitting the unused-import diagnostics this
-  oracle reads. The probe correctly reports the instrument as broken there. It needs
-  `npm install` in the subject, which is the subject's business, not conducks'.
+- **`orchestrator/app` needed its dependencies, and now has them.** Its tsconfig declares
+  `types: ["node", "react", "react-dom", "next"]`; the workspace had no `node_modules` at all, so tsc
+  stopped at `TS2688` and emitted none of the unused-import diagnostics this oracle reads. The probe
+  correctly called the instrument broken rather than the project clean.
+  `npm ci` at the monorepo root fixed it — the lockfile is at the root and the workspaces install
+  together. Re-run: probe detected, **0 missed / 0 extra**, baseline recorded. No tracked file in the
+  subject changed.
 - The monorepo has **no root tsconfig**: each workspace carries its own, so the oracle runs per
   workspace. That is why the historical baseline key is `app::exports` and not `orchestrator`.
 - All eight instrument runs pass, the prune benchmark is 10/10, 319 suites / 2,469 tests, all three
