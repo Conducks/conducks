@@ -301,9 +301,28 @@ in all of them at once.
 - [x] node completeness, TypeScript — `ts.createProgram` vs the graph. sofie 1,452 / 0, orchestrator 569 / 0, conducks 471 / 0
 - [x] edge precision — every CALLS edge scored against the SOURCE TEXT. scraper 9,820 / 0 misplaced, sofie 12,028 / 0, orchestrator 8,637 / 0, conducks 9,641 / 0
 - [x] line accuracy — `ast` lineno vs node lineStart. scraper **100%** (1,207), sofie **100%** (114) — ADR 0184
-- [ ] a TypeScript twin for recall and for lines — both need the compiler API
+- [x] a TypeScript twin for recall and for lines — `ts.createProgram`. lines 99.93 / 100 / 100, recall 96.38 / 98.07 / 96.21 (ADR 0185)
 - [x] edge RECALL — Python `ast` vs the graph, per (file, line). scraper **96.83%**, sofie **98.53%**. Ratcheted, not gated: the residue is one shape and not yet attributed (ADR 0183)
 - [x] incremental ≠ cold — DOES NOT REPRODUCE across four waves including a three-wave one with external scaffolding, and is now guarded rather than merely absent (ADR 0182)
+
+### The TypeScript half was missing, and the script names hid it
+
+`oracle:recall:sofie` and `oracle:lines:sofie` sound like TypeScript coverage. They are not — both
+oracles walk `.py` with `ast`, so on sofie they scored its NINE Python files rather than its 1,452
+TypeScript declarations. Two of the five claims had no TS check at all, on ~60% of the material.
+
+| target | line accuracy | edge recall |
+|---|---|---|
+| sofie | 99.93% | 96.38% |
+| orchestrator | 100% | 98.07% |
+| conducks | 100% | 96.21% |
+
+Recall lands where Python's does (96.83 / 98.53), which is the first evidence the two language paths
+behave alike rather than one being quietly worse.
+
+The line check was wrong before analyze was, from a cause this session has met twice: three of
+conducks' four "drifts" were a CASE COLLISION in my own key — `type Verdict` at verdict.ts:32 and
+`function verdict` at :52 folded to one lowercased key. Matching exactly took two targets to 100%.
 
 ### Every claim the base makes is now scored
 

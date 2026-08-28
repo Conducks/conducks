@@ -126,5 +126,29 @@
     "oracle": 0,
     "missed": 0,
     "agreed": 0
+  },
+  "sofie::lines-ts": {
+    "scored": 1446,
+    "wrong": 1
+  },
+  "orchestrator::lines-ts": {
+    "scored": 566,
+    "wrong": 0
+  },
+  "conducks::lines-ts": {
+    "scored": 467,
+    "wrong": 0
+  },
+  "sofie::recall-ts": {
+    "calls": 11824,
+    "missing": 428
+  },
+  "orchestrator::recall-ts": {
+    "calls": 6930,
+    "missing": 134
+  },
+  "conducks::recall-ts": {
+    "calls": 6597,
+    "missing": 250
   }
 }
