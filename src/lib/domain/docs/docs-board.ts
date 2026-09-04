@@ -769,7 +769,12 @@ function hygiene(board: DocsBoard): void {
     // The Status line is the author's claim; the checkboxes are the truth. The gap is the finding.
     if (claim === "done" && t.total && t.done < t.total)
       warn(board, t.file, `\`Status: done\` but ${t.total - t.done} task(s) are unchecked`);
-    if (claim === "doing" && t.total && t.done === t.total)
+    // Deferred `[>]` exempts this the same way it exempts the `todo` case below, and for the same
+    // reason: `[>]` is owed work (docs standard §5.2), so a record holding one is not finished and
+    // `doing` is the truthful claim. Measured 2026-09-04 on agent-gateway — this warned on EIGHT
+    // todos whose only remaining tasks were deferred with reasons, and the sweep reading the board
+    // could not tell them from a record whose status had simply gone stale.
+    if (claim === "doing" && t.total && t.done === t.total && !t.deferred)
       warn(board, t.file, "`Status: doing` but every task is checked");
     // The blind spot that hid FIVE finished todos for weeks: `Status: todo` with every task closed
     // evades both checks above — the board counts open tasks (zero) and the done-in-todos/ warn

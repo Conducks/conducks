@@ -531,6 +531,19 @@ describe('hygiene — the finished-but-still-open blind spot', () => {
     const board = boardFor('# todo01 — t\nStatus: todo\n- Acceptance: x.\n\n## Phase 1\n- [x] done thing\n- [>] parked — waits on a trigger\n');
     expect(board.warns.flatMap((w: any) => w.errs).join(' ')).not.toContain('every task is closed');
   });
+
+  // `doing` gets the same exemption, and did not for a long time. `[>]` is owed work (standard
+  // §5.2), so a record still holding one is not finished — `doing` is the truthful claim, not a
+  // stale one. Without the exemption this fired on eight agent-gateway todos at once.
+  it('Status: doing with every task checked and none deferred warns', () => {
+    const board = boardFor('# todo01 — t\nStatus: doing\n- Acceptance: x.\n\n## Phase 1\n- [x] done thing\n- [-] dropped — reason\n');
+    expect(board.warns.flatMap((w: any) => w.errs).join(' ')).toContain('every task is checked');
+  });
+
+  it('a deferred task parks a `doing` record too — no warn', () => {
+    const board = boardFor('# todo01 — t\nStatus: doing\n- Acceptance: x.\n\n## Phase 1\n- [x] done thing\n- [>] parked — waits on a trigger\n');
+    expect(board.warns.flatMap((w: any) => w.errs).join(' ')).not.toContain('every task is checked');
+  });
 });
 
 describe('buildState survives a todo being closed (one definition, not two)', () => {
