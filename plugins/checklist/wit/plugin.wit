@@ -59,6 +59,22 @@ interface types {
         key(string),
         click(point),
         scroll(f32),
+        /// Where the pointer is, or `none` when it has left this pane.
+        ///
+        /// **Only sent to a plugin whose manifest asks for it** (`hover`). A
+        /// variant case an older component was compiled without is one it traps
+        /// on, and the manifest is what lets a plugin built today meet a host
+        /// built tomorrow: it receives nothing it did not ask to receive.
+        ///
+        /// `none` rather than a point outside the pane, because "the pointer
+        /// left" is a different fact from "the pointer is at -1, -1", and a
+        /// plugin that has to infer the first from the second gets it wrong at
+        /// the pane's own edge.
+        ///
+        /// At most one per frame, carrying the latest position: a pointer
+        /// crossing a pane produces hundreds of moves and a plugin needs where
+        /// it ended up, not every step of the journey.
+        hover(option<point>),
     }
 
     type blob = list<u8>;
@@ -147,6 +163,24 @@ interface host-api {
     /// host never learns that grammar and only judges the path it is handed.
     save: func(path: string, data: string) -> bool;
     load: func(path: string) -> option<string>;
+
+    /// The plugin's OWN store, outside any project — notes, settings, a scratch
+    /// list, anything a plugin must remember that is not a record about the
+    /// code it is sitting next to.
+    ///
+    /// `save` above is deliberately the other thing: it writes a project
+    /// document, into the repository, where it can be read in six months
+    /// (ADR 0033). A note is not that. Kept there it would land in whichever
+    /// repository the window happened to be pointed at, so the same plugin
+    /// would show different notes in different directories, and every project
+    /// would grow a file it did not ask for.
+    ///
+    /// The name is a FILE NAME, not a path — the same rule and the same
+    /// refusals as `load-image`. The host joins it under a folder of its own
+    /// choosing, one per plugin, so no plugin can name another's store and none
+    /// of them learns where any of this lives.
+    store-save: func(name: string, data: string) -> bool;
+    store-load: func(name: string) -> option<string>;
 
     /// Open an image that ships beside the plugin and get a handle to it. The
     /// name is a FILE NAME, not a path: the host joins it to the directory the

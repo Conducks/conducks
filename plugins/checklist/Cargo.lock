@@ -18,9 +18,10 @@ checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 name = "checklist-plugin"
 version = "0.1.0"
 dependencies = [
+ "forgeterm-plugin-api",
+ "forgeterm-text",
  "serde",
  "serde_json",
- "wit-bindgen",
 ]
 
 [[package]]
@@ -34,6 +35,17 @@ name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
+
+[[package]]
+name = "forgeterm-plugin-api"
+version = "0.1.0"
+dependencies = [
+ "wit-bindgen",
+]
+
+[[package]]
+name = "forgeterm-text"
+version = "0.1.0"
 
 [[package]]
 name = "hashbrown"

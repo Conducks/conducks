@@ -18,10 +18,17 @@
 //! whether that name is one it will accept, and a refusal is an answer
 //! rather than a crash.
 
-mod bindings;
 mod parser;
 
-use bindings::{export, host_api, int, num, Context, Element, Event, Frame, Guest, Kind, Prop};
+// The authoring surface comes from ForgeTerm itself now, not from a copy of it
+// kept here. `src/bindings.rs` used to be that copy; see the comment on the
+// dependency in `Cargo.toml` for why the path to it is absolute, and why the
+// copy is what kept this pane off the theme for a release (ForgeTerm ADR 0058).
+use forgeterm_plugin_api::{
+    export, host_api, num, str, Context, Element, Event, Frame, Guest, Kind, Prop,
+};
+use forgeterm_text::keys::{Command, Erase};
+use forgeterm_text::{edit, keys};
 use parser::{Feature, Task};
 use serde::{Deserialize, Serialize};
 
@@ -441,6 +448,57 @@ fn layout_key(state: &State) -> (bool, String, usize, usize, usize) {
     )
 }
 
+/// **Every colour in this pane is the NAME of a host role, never a hex.**
+///
+/// ForgeTerm ADR 0058: a plugin sends the name of a colour role and the host
+/// resolves it against its own `Theme` at draw time. Before this the checklist
+/// carried thirty-six hand-copied hexes — each one correct on the day it was
+/// written and frozen there — so this was the one pane that did not follow the
+/// user's theme, and it sat on screen visibly brighter than the explorer beside
+/// it. The names below are the twelve ADR 0058 defines and nothing else; a name
+/// the host does not know resolves to the caller's default and paints wrong
+/// SILENTLY (ADR 0005's open prop bag), which is why `colour_tests` pins the
+/// list rather than trusting this comment.
+///
+/// Where the old hex had no role, the nearest is used and the loss is named on
+/// the const. There are no new roles: a role this pane invented would be a role
+/// the host cannot paint.
+const PANEL: &str = "panel";
+/// The card's border, the rule under the header, the hairline between tasks and
+/// the key cap's edge — every line that says "two things, not one".
+const EDGE: &str = "separator";
+/// A surface sitting ON the card: the row under the cursor, a key cap, the note
+/// box. `raised` is the host's own word for exactly that.
+///
+/// The note box loses something here. Its old `0x1c1519` was a WARM dark, so a
+/// note read as the exception in a wall of grey; no ADR 0058 token is a warm
+/// dark, and `raised` is the nearest by role. The warm signal is not gone — it
+/// moved to the box's border, which is `ALARM`.
+const WELL: &str = "raised";
+/// What still needs doing: an unfinished feature's name, and the border of a
+/// note being typed.
+const ACCENT: &str = "accent";
+/// What the eye should read first: the count, the task itself, a key cap's
+/// letter, the text of a note.
+const INK: &str = "ink.primary";
+/// Beside a name rather than instead of it: a hint, a `Pass:` line, a task
+/// already ticked, a shut feature's marker.
+const DIM: &str = "ink.tertiary";
+/// Present and deliberately not read first: a task id, an empty tick box's
+/// border.
+const FAINT: &str = "ink.quaternary";
+/// Answered on THIS build. The host's `ok`, which is the same `0x8fc78f` this
+/// pane used to spell out.
+const DONE: &str = "ok";
+/// Answered on an EARLIER build — the amber, hollow tick and the build id
+/// beside it. `warn` is the role: it is not a failure, it is an answer that
+/// cannot be trusted to be about what is running now.
+const CARRIED: &str = "warn";
+/// Something is wrong and the tester needs to know inside the pane: the run
+/// file was refused, or `testing.md` did not parse. Also the resting border of
+/// a note, which is the one thing here that is a finding rather than a fact.
+const ALARM: &str = "danger";
+
 struct Builder {
     elements: Vec<Element>,
 }
@@ -485,10 +543,10 @@ fn key_hint(
             num("y", y),
             num("w", cap_w),
             num("h", px(15.)),
-            int("color", 0x232833),
+            str("color", WELL),
             num("radius", px(3.)),
             num("border", px(1.)),
-            int("border-color", 0x3a414f),
+            str("border-color", EDGE),
         ],
         None,
     );
@@ -499,7 +557,7 @@ fn key_hint(
             num("x", x + px(5.5)),
             num("y", y + px(2.)),
             num("font-size", px(10.5)),
-            int("color", 0xc8cdd6),
+            str("color", INK),
         ],
         Some(key),
     );
@@ -510,7 +568,7 @@ fn key_hint(
             num("x", x + cap_w + px(5.)),
             num("y", y + px(2.5)),
             num("font-size", px(10.5)),
-            int("color", 0x828b9a),
+            str("color", DIM),
         ],
         Some(what),
     );
@@ -728,6 +786,13 @@ impl Guest for Checklist {
                 Event::Scroll(delta) => {
                     state.scroll = (state.scroll + delta * ctx.scale).max(0.)
                 },
+                // The checklist does not ask for hover in its manifest, so the
+                // host never sends one. Matched rather than left to a wildcard:
+                // a wildcard would also swallow the next event this plugin
+                // ought to handle, silently.
+                Event::Hover(_) => {},
+                // Not asked for either; the host selects whole elements here.
+                Event::Drag(_) => {},
                 Event::Click(point) => {
                     // **A click arrives in the PANE's coordinates; everything
                     // drawn is in the WINDOW's.** `ctx.x`/`ctx.y` are the pane's
@@ -794,20 +859,38 @@ impl Guest for Checklist {
                             state.editing = false;
                             continue;
                         };
-                        match key.as_str() {
-                            // Enter FINISHES a note. The host sends a carriage
-                            // return for it (crates/shell/src/input.rs), never
-                            // the word, which is also why the tick below takes
-                            // "\r" and not "Enter".
-                            "Escape" | "\r" | "\n" => state.editing = false,
-                            "Backspace" => edit_note(&mut state, id, |text| {
+                        // Enter FINISHES a note, and is answered before the
+                        // shared command table: this is a one-line field, so
+                        // Enter submits where in a document it would insert a
+                        // newline (ADR 0065). The host sends a carriage return
+                        // for it (crates/shell/src/input.rs), never the word,
+                        // which is also why the tick below takes "\r".
+                        if matches!(key.as_str(), "Escape" | "\r" | "\n") {
+                            state.editing = false;
+                            continue;
+                        }
+                        // **Every other key goes through the one table** (ADR
+                        // 0065). The guard this replaces asked only whether the
+                        // string held a control character, so a chord arrived
+                        // as its own NAME and was typed: `⌃K` put the five
+                        // characters `Ctrl+k` into the note.
+                        //
+                        // The caret is always at the end of this field, so the
+                        // forward deletes have nothing to do and say so.
+                        match keys::command(key) {
+                            Some(Command::Erase(Erase::Back)) => edit_note(&mut state, id, |text| {
                                 text.pop();
                             }),
-                            // Whatever else the host chose to send as text is a
-                            // character the user typed. A control byte is not.
-                            typed if !typed.is_empty() && !typed.chars().any(char::is_control) => {
-                                let typed = typed.to_string();
-                                edit_note(&mut state, id, |text| text.push_str(&typed));
+                            Some(Command::Erase(Erase::WordBack)) => {
+                                edit_note(&mut state, id, |text| {
+                                    text.truncate(edit::word_left(text, text.len()));
+                                })
+                            },
+                            Some(Command::Type(typed)) => {
+                                let typed: String = keys::printable(&typed).collect();
+                                if !typed.is_empty() {
+                                    edit_note(&mut state, id, |text| text.push_str(&typed));
+                                }
                             },
                             _ => {},
                         }
@@ -913,10 +996,10 @@ impl Guest for Checklist {
                 num("y", ctx.y),
                 num("w", ctx.width),
                 num("h", ctx.height),
-                int("color", 0x14161b),
+                str("color", PANEL),
                 num("radius", px(12.)),
                 num("border", px(1.)),
-                int("border-color", 0x272b34),
+                str("border-color", EDGE),
             ],
             None,
         );
@@ -938,7 +1021,7 @@ impl Guest for Checklist {
                 num("x", ctx.x + px(PAD)),
                 num("y", ctx.y + px(16.)),
                 num("font-size", px(13.5)),
-                int("color", 0xe6e9ef),
+                str("color", INK),
             ],
             Some(&count),
         );
@@ -953,7 +1036,7 @@ impl Guest for Checklist {
                     num("x", ctx.x + ctx.width - px(PAD) - w),
                     num("y", ctx.y + px(17.)),
                     num("font-size", px(11.)),
-                    int("color", 0xc4666f),
+                    str("color", ALARM),
                 ],
                 Some("not saved"),
             );
@@ -975,7 +1058,7 @@ impl Guest for Checklist {
                     num("x", hint_x),
                     num("y", hint_y + px(2.5)),
                     num("font-size", px(10.5)),
-                    int("color", 0xe08a4b),
+                    str("color", ACCENT),
                 ],
                 Some("writing a note"),
             );
@@ -1000,7 +1083,7 @@ impl Guest for Checklist {
                     num("x", ctx.x + px(PAD)),
                     num("y", ctx.y + px(50.) + px(2.5)),
                     num("font-size", px(11.)),
-                    int("color", 0xc4666f),
+                    str("color", ALARM),
                 ],
                 Some(msg),
             );
@@ -1015,7 +1098,7 @@ impl Guest for Checklist {
                 num("y", ctx.y + px(50.) + dropped_h),
                 num("w", (ctx.width - px(PAD * 2.)).max(0.)),
                 num("h", px(1.)),
-                int("color", 0x272b34),
+                str("color", EDGE),
             ],
             None,
         );
@@ -1062,7 +1145,7 @@ impl Guest for Checklist {
                                 num("y", y),
                                 num("w", ctx.width - px(8.)),
                                 num("h", l.height),
-                                int("color", 0x1b1f27),
+                                str("color", WELL),
                                 num("radius", px(5.)),
                             ],
                             None,
@@ -1078,7 +1161,7 @@ impl Guest for Checklist {
                             num("x", ctx.x + px(PAD)),
                             num("y", y + px(13.)),
                             num("font-size", px(11.)),
-                            int("color", if done { 0x8fc78f } else { 0x6d7686 }),
+                            str("color", if done { DONE } else { DIM }),
                         ],
                         Some(if shut { "\u{25b8}" } else { "\u{25be}" }),
                     );
@@ -1092,7 +1175,12 @@ impl Guest for Checklist {
                             // A finished feature goes quiet. The accent is for
                             // what still needs doing, and on a list of 54 the
                             // colour is the only thing that finds them.
-                            int("color", if done { 0x6f8a6f } else { 0xe08a4b }),
+                            // A finished feature goes quiet: the muted green
+                            // this was is not a role, and the reason it was
+                            // chosen was quietness, not hue. `DIM` keeps the
+                            // reason; the green is still on the marker beside
+                            // it, which is where it reads from.
+                            str("color", if done { DIM } else { ACCENT }),
                         ],
                         Some(&format!("{}   {}", feature.id, feature.name)),
                     );
@@ -1109,7 +1197,7 @@ impl Guest for Checklist {
                             num("x", ctx.x + ctx.width - px(PAD) - w),
                             num("y", y + px(15.)),
                             num("font-size", px(11.)),
-                            int("color", if d == n { 0x8fc78f } else { 0x6d7686 }),
+                            str("color", if d == n { DONE } else { DIM }),
                         ],
                         Some(&tally),
                     );
@@ -1132,7 +1220,7 @@ impl Guest for Checklist {
                             num("y", y),
                             num("w", (ctx.width - px(PAD * 2.)).max(0.)),
                             num("h", px(1.)),
-                            int("color", 0x21252d),
+                            str("color", EDGE),
                         ],
                         None,
                     );
@@ -1145,7 +1233,7 @@ impl Guest for Checklist {
                                 num("y", y),
                                 num("w", ctx.width - px(8.)),
                                 num("h", l.height),
-                                int("color", 0x1b1f27),
+                                str("color", WELL),
                                 num("radius", px(5.)),
                             ],
                             None,
@@ -1164,15 +1252,15 @@ impl Guest for Checklist {
                             // Green is this build. Amber and hollow is an
                             // older one — the colour says "answered" and the
                             // hollowness says "not here".
-                            int("color", if on { 0x8fc78f } else { 0x14161b }),
+                            str("color", if on { DONE } else { PANEL }),
                             num("radius", px(3.)),
                             num("border", px(1.)),
-                            int(
+                            str(
                                 "border-color",
                                 match (on, carried.is_some()) {
-                                    (true, _) => 0x8fc78f,
-                                    (false, true) => 0xc7a86b,
-                                    (false, false) => 0x4a5568,
+                                    (true, _) => DONE,
+                                    (false, true) => CARRIED,
+                                    (false, false) => FAINT,
                                 },
                             ),
                         ],
@@ -1188,7 +1276,7 @@ impl Guest for Checklist {
                                 num("x", ctx.x + px(PAD + 2.)),
                                 num("y", y + px(7.)),
                                 num("font-size", px(11.)),
-                                int("color", if on { 0x14161b } else { 0xc7a86b }),
+                                str("color", if on { PANEL } else { CARRIED }),
                             ],
                             Some(if on { "\u{2713}" } else { "\u{2013}" }),
                         );
@@ -1204,7 +1292,7 @@ impl Guest for Checklist {
                             num("x", ctx.x + ctx.width - px(PAD) - id_w),
                             num("y", y + px(6.)),
                             num("font-size", px(10.5)),
-                            int("color", 0x565e6c),
+                            str("color", FAINT),
                         ],
                         Some(&task.id),
                     );
@@ -1221,7 +1309,7 @@ impl Guest for Checklist {
                                 num("x", ctx.x + ctx.width - px(PAD) - id_w - w - px(8.)),
                                 num("y", y + px(6.)),
                                 num("font-size", px(10.5)),
-                                int("color", 0xc7a86b),
+                                str("color", CARRIED),
                             ],
                             Some(&short),
                         );
@@ -1235,7 +1323,7 @@ impl Guest for Checklist {
                                 num("x", text_x),
                                 num("y", line_y),
                                 num("font-size", px(13.)),
-                                int("color", if on { 0x767e8d } else { 0xc8cdd6 }),
+                                str("color", if on { DIM } else { INK }),
                             ],
                             Some(line),
                         );
@@ -1249,7 +1337,7 @@ impl Guest for Checklist {
                                 num("x", text_x),
                                 num("y", line_y),
                                 num("font-size", px(11.5)),
-                                int("color", 0x6d7686),
+                                str("color", DIM),
                             ],
                             Some(line),
                         );
@@ -1270,10 +1358,10 @@ impl Guest for Checklist {
                                 num("y", box_y),
                                 num("w", (text_w + px(6.)).max(0.)),
                                 num("h", box_h),
-                                int("color", 0x1c1519),
+                                str("color", WELL),
                                 num("radius", px(4.)),
                                 num("border", px(1.)),
-                                int("border-color", if writing { 0xe08a4b } else { 0xa5606a }),
+                                str("border-color", if writing { ACCENT } else { ALARM }),
                             ],
                             None,
                         );
@@ -1286,7 +1374,7 @@ impl Guest for Checklist {
                                     num("x", text_x),
                                     num("y", note_y),
                                     num("font-size", px(12.)),
-                                    int("color", 0xd9b3b8),
+                                    str("color", INK),
                                 ],
                                 Some(line),
                             );
@@ -1323,6 +1411,102 @@ impl Guest for Checklist {
 }
 
 export!(Checklist);
+
+#[cfg(test)]
+mod colour_tests {
+    use super::*;
+
+    /// The twelve role names ForgeTerm ADR 0058 defines, copied here on purpose.
+    ///
+    /// A copy of a list is normally the thing that drifts, and that is exactly
+    /// what this test is for: this plugin builds in a DIFFERENT repository from
+    /// the host, so nothing else here can fail when the host's list changes.
+    /// `forgeterm/plugins/plugin-api/src/lib.rs` documents the same twelve on
+    /// `str`, and `crates/shell/src/render/mod.rs::Theme::token` answers them —
+    /// when those move, this array is the line that has to move with them, and
+    /// a name that is no longer a role fails here instead of painting the
+    /// caller's fallback in silence (ADR 0005's prop bag never refuses).
+    const ROLES: &[&str] = &[
+        "bg",
+        "panel",
+        "raised",
+        "separator",
+        "accent",
+        "ink.primary",
+        "ink.secondary",
+        "ink.tertiary",
+        "ink.quaternary",
+        "danger",
+        "warn",
+        "ok",
+    ];
+
+    /// Every colour this pane names is one the host can paint.
+    ///
+    /// **Mutation:** change any const above `Builder` to a name that reads fine
+    /// and is not a role — `WELL` to `"surface"`, `DIM` to `"ink.dim"` — and
+    /// this fails. Nothing else in this crate would: the host resolves an
+    /// unknown name to the caller's default, so the pane would draw, and draw
+    /// in the wrong colour, with no error anywhere.
+    #[test]
+    fn every_colour_const_names_a_role_the_host_paints() {
+        for role in [PANEL, EDGE, WELL, ACCENT, INK, DIM, FAINT, DONE, CARRIED, ALARM] {
+            assert!(ROLES.contains(&role), "{role} is not one of ADR 0058's twelve roles");
+        }
+    }
+
+    /// **No colour in this file is a number or a hex string.**
+    ///
+    /// A test that only checked the consts above would pass while a new call
+    /// site handed `int` a packed number straight past them — which is how the
+    /// thirty-six literals this change removed got here in the first place, one
+    /// reasonable call site at a time. So this reads the source itself, the same
+    /// check `docs/conventions.md` FORGETERM-13 states in words.
+    ///
+    /// Neither forbidden form is spelled out anywhere in this module, comments
+    /// included: the scan reads the whole file, so an example of the thing it
+    /// bans would fail it.
+    ///
+    /// The needles are built at runtime rather than written out, so this test's
+    /// own body is not a match for itself.
+    ///
+    /// **Mutation:** put any one of the old literals back — the card's packed
+    /// panel colour, or the note box's warm dark as a hex string — and this
+    /// fails. Removing the `str` import instead does not reach here; it fails to
+    /// compile, which is the same wall one step earlier.
+    #[test]
+    fn no_call_site_paints_its_own_colour() {
+        let source = include_str!("lib.rs");
+
+        for key in ["color", "border-color"] {
+            let packed = format!("int({key:?}");
+            assert!(
+                !source.contains(&packed),
+                "{packed}…) sends a packed integer: a colour this pane owns and \
+                 the user's theme cannot reach. Send a role with `str` instead."
+            );
+        }
+
+        // A `"#rrggbb"` literal — the escape hatch ADR 0058 keeps for a wash no
+        // token names. `notes` has three and has earned them; this pane has
+        // none, and every colour it draws had a nearest role. Six hex digits
+        // after the `#` is what tells a colour from a raw string's `"#`
+        // terminator, which is the only other place those two characters meet
+        // in this file.
+        let bytes: Vec<char> = source.chars().collect();
+        for i in 1..bytes.len() {
+            if bytes[i] != '#' || bytes[i - 1] != '"' {
+                continue;
+            }
+            let six = &bytes[i + 1..(i + 7).min(bytes.len())];
+            assert!(
+                !(six.len() == 6 && six.iter().all(|c| c.is_ascii_hexdigit())),
+                "a hex colour literal is back at byte {i}: {}",
+                six.iter().collect::<String>()
+            );
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

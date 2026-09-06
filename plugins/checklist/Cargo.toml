@@ -13,7 +13,30 @@ license = "MIT OR Apache-2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-wit-bindgen = "0.60"
+# ForgeTerm's plugin-authoring crate, by ABSOLUTE path.
+#
+# Every other plugin writes `path = "../plugin-api"`, because every other plugin
+# lives inside the ForgeTerm repository. This one does not (ForgeTerm ADR 0035,
+# this repository's ADR 0154): it sits in conducks, and the host sits in
+# forgeterm, two checkouts with no fixed relationship to each other. A relative
+# path would encode where the two happen to be cloned beside each other on ONE
+# machine — it is not shorter, it is wrong somewhere else. An absolute path is
+# honest about being machine-local, and the build fails loudly rather than
+# resolving to some other crate.
+#
+# It replaces `src/bindings.rs`, which was a hand copy of this crate made when
+# the plugin moved out. A copy is what let this pane keep painting its own hexes
+# after ForgeTerm ADR 0058 gave every plugin colour roles: the copy had `num` and
+# `int` and never grew `str`, so there was nothing here to call. Depending on the
+# real crate is what makes that drift impossible rather than merely noticed.
+forgeterm-plugin-api = { path = "/Users/saidmustafasaid/Documents/Gospel_Of_Technology/forgeterm/plugins/plugin-api" }
+# The one text engine, shared with the host and every other plugin (ADR 0065).
+# Absolute for the same reason the line above is: this plugin lives in another
+# repository, so a relative path would encode one machine's layout.
+forgeterm-text = { path = "/Users/saidmustafasaid/Documents/Gospel_Of_Technology/forgeterm/crates/text" }
+# `wit-bindgen` was a DIRECT dependency only because `src/bindings.rs` called
+# `wit_bindgen::generate!` itself. `forgeterm-plugin-api` calls it now, exactly
+# once, so this crate no longer names it.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
