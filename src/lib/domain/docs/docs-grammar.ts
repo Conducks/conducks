@@ -130,9 +130,23 @@ export function readStatus(raw: string | null): { status: string | null; state: 
   return { status: raw, state: m ? m[1] : null, statusRefs: refs };
 }
 
-/** `todo09.md` → `todo09`. The stem other files address phases through. */
+/**
+ * `todo09.md` → `todo09`, and `todo09_the-slug.md` → `todo09`. The stem other files address phases
+ * through.
+ *
+ * THE SLUG IS STRIPPED, and it has to be: §4 of the standard REQUIRES the slug
+ * (`todoNN_kebab-title.md`) while §6.7 says the address is the bare `todoNN#PN`. Keeping the whole
+ * basename made a phase register as `todo09_the-slug#P1`, so every correctly written
+ * `- Depends: todo09#P1` resolved to nothing and was reported as pointing at a phase that does not
+ * exist — including, with a certain symmetry, a paragraph describing the bug.
+ *
+ * It was invisible here because every fixture in `docs-grammar.test.ts` names its file `todo01.md`,
+ * the one shape where the whole basename and the bare id are the same string. Found 2026-09-11 in a
+ * repo that follows §4: the feature had never worked there, which is why that repo contained no
+ * phase reference at all.
+ */
 function todoId(file: string): string {
-  return path.basename(file).replace(/\.md$/i, "");
+  return path.basename(file).replace(/\.md$/i, "").split("_")[0];
 }
 
 /** Leading ADR refs on a relation/link field — `0016, 0017 (why)` → ["0016","0017"], prose ignored. */

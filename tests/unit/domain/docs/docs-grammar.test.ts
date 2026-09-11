@@ -117,6 +117,25 @@ describe('docs-grammar — line-atomic values', () => {
     expect(crossCheckDecisions([adr('0001', { 'Amended by': '0002' }), adr('0002', { 'Amends': '0001' })])).toEqual([]);
   });
 
+  // §4 REQUIRES a slug on a todo filename; §6.7 says the address is the bare `todoNN#PN`. Every
+  // fixture here names its file `todo01.md` — the one shape where the whole basename and the bare id
+  // are the same string — so the mismatch was invisible to this suite for as long as it existed. In a
+  // repo that follows §4, `- Depends: todo09#P1` resolved to nothing and was reported as pointing at
+  // a phase that does not exist, so the feature had never worked there at all.
+  it('addresses a phase by the BARE todo id, with the slug the standard requires stripped', () => {
+    const src = '# todo09 — x\nStatus: doing\n\n## Phase 1 — a\n- [ ] a\n\n## Phase 2 — b\n- [ ] b\n';
+    const slugged = shape('todo', parseBody(src), 'todos/todo09_a-required-slug.md');
+    // A slugged filename leaking into the address is the whole bug: every correctly written
+    // reference to it then resolves to nothing.
+    expect(slugged.phases.map((p: { addr: string }) => p.addr)).toEqual(['todo09#P1', 'todo09#P2']);
+  });
+
+  it('an UNSLUGGED filename addresses the same way — the fix changed nothing for it', () => {
+    const src = '# todo01 — x\nStatus: doing\n\n## Phase 1 — a\n- [ ] a\n';
+    expect(shape('todo', parseBody(src), 'todos/todo01.md').phases.map((p: { addr: string }) => p.addr))
+      .toEqual(['todo01#P1']);
+  });
+
   it('surfaces the live phase and the next open task, not just the total %', () => {
     const src = '# todo01 — x\nStatus: doing\n\n## Phase 1 — done bit\n- [x] a\n\n## Phase 2 — live bit\n- [x] b\n- [ ] the next thing\n';
     const t = shape('todo', parseBody(src), 'todos/todo01.md');
