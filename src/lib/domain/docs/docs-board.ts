@@ -421,7 +421,12 @@ function phaseAddrsIncludingCompleted(docsDir: string): Set<string> {
     for (const e of entries) {
       const fp = path.join(dir, e);
       if (statSync(fp).isDirectory()) { scan(fp); continue; }
-      const todo = e.match(/^(todo\d+)\.md$/);
+      // `todo09.md` AND `todo09_the-slug.md`. The slug is optional here and REQUIRED by §4, so
+      // matching only the bare form skipped every todo in a repo that follows the standard — leaving
+      // this set empty, so the prose check reported every correctly written phase reference as
+      // pointing at nothing. The same defect `todoId` had, in a second function: a filename carries
+      // the slug and an ADDRESS does not.
+      const todo = e.match(/^(todo\d+)(?:_[^.]*)?\.md$/);
       if (!todo) continue;
       for (const m of readFileSync(fp, "utf8").matchAll(/^## Phase (\d+)\b/gm)) out.add(`${todo[1]}#P${m[1]}`);
     }

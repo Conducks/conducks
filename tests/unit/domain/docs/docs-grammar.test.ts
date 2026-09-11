@@ -130,6 +130,10 @@ describe('docs-grammar — line-atomic values', () => {
     expect(slugged.phases.map((p: { addr: string }) => p.addr)).toEqual(['todo09#P1', 'todo09#P2']);
   });
 
+  // The prose check builds its own address set in `docs-board.ts::phaseAddrsIncludingCompleted`, by
+  // matching FILENAMES — and it had the same bug independently, matching only the bare form. Two
+  // functions, one wrong assumption: the filename carries the slug and the address does not. Fixing
+  // only `todoId` moved the failure from `- Depends:` to prose instead of removing it.
   it('an UNSLUGGED filename addresses the same way — the fix changed nothing for it', () => {
     const src = '# todo01 — x\nStatus: doing\n\n## Phase 1 — a\n- [ ] a\n';
     expect(shape('todo', parseBody(src), 'todos/todo01.md').phases.map((p: { addr: string }) => p.addr))
