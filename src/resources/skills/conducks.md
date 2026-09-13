@@ -12,6 +12,19 @@ Two surfaces over one graph: **13 MCP tools** and **the CLI**. Same answers, dif
 
 ---
 
+**Owns:** which tool answers which structural question · the probe sequence per question · the CLI.
+**Does not own:** where a fact goes and the doc grammar → `conducks-docs` · how a visual is built,
+anchored and gated → `conducks-visuals` · doors, dead code and tests that bite →
+`conducks-feature-clean` · running several agents at once → `multi-agent-protocol`.
+
+**One owner per fact, across all four skills.** Everywhere else is a pointer. A rule repeated on
+purpose — because it must bind when the owning skill is NOT loaded — is a **restatement**: one or two
+lines, ending in `→ owner`, never a second copy of the mechanics. The test is whether you can name
+the one file to edit when the rule changes. If you cannot, it is a duplicate, and it gets fixed at
+the owner rather than reconciled in both.
+
+---
+
 ## §1 Two layers, and why it decides what works right now
 
 | layer | reads | needs `conducks analyze` first? |
@@ -231,6 +244,16 @@ without it they are guessed from which folders hold a `docs/`.
 reported 43 docs clean and exited 0 while a broken phase sat unread in `app/docs/`. `--root-only`
 restores the single-tree run.
 
+**Visuals** (the `conducks-visuals` standard)
+- `visuals-lint [path]` — every `file:line` resolves to exactly one tracked file, every `::symbol` is
+  defined, every `NAME=value` still matches the code. Where a generator is declared it also
+  re-renders and fails on any byte of drift. **Exits 1** on violation — the second CI gate beside
+  `docs-lint`. It reads the working tree, never the vault
+- `visuals-lint --stamp <page>` — record that a human re-read that page's claims against the code.
+  Bare `--stamp` asserts you re-read EVERY page. A run prints three separate numbers — anchors
+  resolving, anchors flagged stale, pages NEVER stamped — and collapsing them is how a rotten page
+  reads as clean
+
 **Coverage and drift**
 - `coverage <coverage-final.json> [--all] [--json]` — per-function fill % and branch coverage
 - `coverage --save-baseline` / `--vs-baseline` — snapshot, then "was 86% → now 0% (BROKE)"
@@ -268,6 +291,27 @@ restores the single-tree run.
 - `mcp [--sse] [--root <path>]` — run the MCP server (stdio by default)
 - `watch` — live re-analysis on save · `mirror` — web dashboard on port 3333
 - `link <path>` — link a neighbouring repo · `record --type <t> "content"`
+
+### §5.1 Every gate, and which of them actually blocks a commit
+
+Six checklists live across these skills and nothing said which ones run by themselves. Two do.
+
+| gate | runs | refuses | owner |
+|---|---|---|---|
+| `docs-lint` | pre-commit, CI | the doc line grammar — every tree, fails if ANY tree fails | `conducks-docs` §5.4 |
+| `visuals-lint` | pre-commit, CI | a broken anchor · a stale `NAME=value` · a byte of render drift | `conducks-visuals` §4 |
+| the build's own gates | `npm run visuals` | overlap, an escaped block, a diagonal segment, a block drawn on the canvas, a dead selector, chrome drift, a missing read log | `conducks-visuals/references/layout.md` §4 |
+| `guard` / `audit` | on demand | cycles, layer violations, god objects | `conducks` §3 |
+| the band checklist | **a person** | 13 checks, before calling a band done | `conducks-visuals/references/setup.md` §8 |
+| the stylesheet checklist | **a person** | 9 things, before a shared-file change ships everywhere | `conducks-visuals/references/design.md` §6 |
+| the clean rule table | **a person** | every rule stated PASS, n/a or OPEN with a reason | `conducks-feature-clean` |
+
+**The bottom three are kept by a person and nothing catches them being skipped.** Say which checks
+were scripted and which were run by hand — a list where one of four is automated is useful to write
+down; presenting all four as "checked" is not.
+
+**Every gate must refuse on an empty parse.** A selector matching nothing reports zero problems over
+a page that failed to render. Two real instances are recorded in `references/layout.md` §4.
 
 ---
 

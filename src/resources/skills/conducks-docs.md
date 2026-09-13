@@ -6,6 +6,12 @@
 decided, what bites you, what a module is for. Wiring is queried, never written — it is wrong by the
 next commit.
 
+**Owns:** where a fact goes · the line grammar · what `docs-lint` fails on · WHEN a visual may exist
+and what it must declare (§6.13) · what a module note CONTAINS (§6.3).
+**Does not own:** how a visual is built, anchored, stamped or gated → `conducks-visuals` · doors,
+dead code and mutation-tested tests → `conducks-feature-clean` · which tool answers a structural
+question → `conducks`. One owner per fact — see `conducks` for the restatement rule.
+
 | question | ask |
 |---|---|
 | cycles, dead code | `conducks audit`, `conducks prune` |
@@ -454,10 +460,9 @@ repeat a rule in a module note? It belongs in `architecture.md`.
 
 Module notes live INSIDE the visuals pipeline (ADR 0140). The `.md` is **SOURCE** — authored,
 authoritative, it settles arguments, and §6.13's "a visual is never the source of truth" applies to
-RENDERS, not to these files. Where the repo declares a generator (`conducks.json` →
-`visuals.generate`, ADR 0139), each note is rendered into the styled page a human opens from the
-canvas; the generated HTML carries a visible `DERIVED — edit <name>.md` header and is never edited
-directly (ADR 0011). Without a generator the notes are plain markdown — still anchor-checked by
+RENDERS, not to these files. Where the repo declares a generator, each note is rendered into the
+styled page a human opens from the canvas, and that render is DERIVED and never edited — §6.13 holds
+the rule and the ADRs. Without a generator the notes are plain markdown — still anchor-checked by
 `visuals-lint`, just not rendered. There is no separate `docs/modules/` folder; a repo still carrying
 one holds a legacy tree.
 
@@ -484,17 +489,14 @@ Three tiers of rot, three answers:
 | the cited code CHANGED since last read | same line, different logic | a review stamp — warn: "re-read, then re-stamp" |
 | the claim is false about unchanged code | was never true | only a reader |
 
-`conducks visuals-lint --stamp <page>` records a hash of each cited span in that page as
-reviewed-now; the next runs flag exactly the claims whose span changed — a short, precise re-read
-list. Bare `--stamp` re-stamps EVERY page, which asserts you re-read everything — use the per-page
-form unless that is true (ADR 0142). Stamps are keyed by the resolved span, so rewording an anchor
-keeps its review; a deleted claim orphans its stamp visibly. The store
-(`.conducks/note-reviews.json`) is COMMITTED — a stamp is a shared assertion, and a PR that
-re-stamps 40 claims invites the question whether 40 claims were read. To claim a constant in a
-note, put it in the same backtick as its file: `` `daemon.py:169 TTS_DRAIN_SEC=0.4` ``. Two rules no
-machinery holds: **re-stamp only after actually re-reading** (stamping unread claims is lying to
-the gate), and **clear flags before closing the todo that touched the code** — a flag nobody clears
-is wallpaper.
+`conducks visuals-lint --stamp <page>` records that you re-read that page's claims against the
+code. Two rules no machinery holds: **stamp only what you actually read** — a stamp is a signature,
+and stamping unread claims is lying to the gate — and **clear flags before closing the todo that
+touched the code**, because a flag nobody clears is wallpaper.
+
+→ The stamp store, per-page versus bare `--stamp`, the exemption register and the three counts a run
+prints are `conducks-visuals/references/anchoring.md` §5. It owns them; this section owns only when a
+note is stamped and by whom.
 
 ```markdown
 # <module> — <one line: what it is>
@@ -963,6 +965,12 @@ system, a product surface, a pricing shape. It may be `.html`, `.svg`, `.md` wit
 whatever renders. This is the one folder the standard does not constrain by content or file type,
 because what makes it a visual is that it is *looked at*, not that it is about code.
 
+**`conducks-visuals` NARROWS this, and that narrowing wins.** A project built to the canvas standard
+ships HTML: the canvas is static SVG, the pages share one stylesheet, blocks link to fragments, and
+markdown does none of that. This permission is what let a whole canvas ship as a markdown walk log
+once. It stands for a visual on any OTHER subject; for the architecture pages themselves, read
+`conducks-visuals/references/pages.md` §2 and §3.
+
 **What `architecture.md` will not hold.** `architecture.md` is anatomy — the parts and which arrows
 between them are legal, and §6.2 says nothing else. A detailed runtime trace is physiology: what
 happens on one path, in order, what each step hands the next, and what each fallback decides when the
@@ -1026,7 +1034,9 @@ be the value the code assigns (ADR 0138). If the pages are GENERATED, declare th
 `conducks.json` — `{"visuals": {"generate": "npm run visuals"}}` — and the same command also re-runs
 it and fails on any byte of drift, restoring the tree afterwards (ADR 0139); a generated page must
 say `DERIVED — edit <source>` in its own text, or an agent edits the render and the next render
-discards the edit (ADR 0011). It checks the working tree, never the vault.
+discards the edit (ADR 0011) — and the skip must match the marker a GENERATOR writes, never a word a
+person can type (`conducks-visuals/references/anchoring.md` §5). It checks the working tree, never
+the vault.
 
 **A page with no anchors must declare `Provenance: authored`** — brand, concept, product, no code
 claims — in its own text, and then passes honestly. The declaration is structured; the bare word

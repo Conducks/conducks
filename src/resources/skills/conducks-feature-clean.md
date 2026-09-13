@@ -4,6 +4,12 @@
 
 **One door per feature. Clean behind it. Leaves first.**
 
+**Owns:** the door and the gate that holds it · the boundary rules · dead code judged by reading ·
+tests that bite under mutation · the order a clean runs in.
+**Does not own:** where the result gets written down — the ADR, the todo, the module note →
+`conducks-docs` · drawing what you found → `conducks-visuals` · measuring the blast radius before you
+touch it → `conducks`. Rules restated from those skills are marked; the mechanics live there.
+
 Needs no conducks — 14 of these 16 rules are about module boundaries and testing discipline, and
 apply to any language. The two that name conducks say so.
 

@@ -52,7 +52,7 @@ function citations(): Array<{ file: string; section: string }> {
       const fp = path.join(dir, e);
       if (statSync(fp).isDirectory()) { walk(fp); continue; }
       if (!/\.(ts|tsx|js|md)$/.test(e) || fp === STANDARD) continue;
-      for (const m of readFileSync(fp, 'utf8').matchAll(/conducks-docs(?:\s+skill)?\s+§(\d+(?:\.\d+)?)/g))
+      for (const m of readFileSync(fp, 'utf8').matchAll(/conducks-docs`?(?:\s+skill)?\s+§(\d+(?:\.\d+)?)/g))
         out.push({ file: path.relative(ROOT, fp), section: m[1] });
     }
   };
