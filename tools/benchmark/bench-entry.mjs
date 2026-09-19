@@ -118,6 +118,24 @@ const SCENARIOS = [
     mustNotFindWithReason: [['mid.ts', 'root-module']],
   },
   {
+    name: '11 a Next.js route file is an entry, reported as a route',
+    why: 'rule 1 — the only rule the bench could not reach. Every other route shape needs a framework the parser recognises naming its own path; Next.js declares one by FILE POSITION, so a two-file repo is enough. `app/api/hello/route.ts` exporting GET is served, not called, and the route group `(admin)` in the second path must vanish from the URL',
+    files: {
+      'app/api/hello/route.ts': `export async function GET(): Promise<number> { return 1; }\n`,
+      'app/(admin)/api/users/[id]/route.ts': `export async function POST(): Promise<number> { return 2; }\n`,
+    },
+    mustFind: [['ROUTE::/api/hello::GET', 'route'], ['ROUTE::/api/users/:id::POST', 'route']],
+  },
+  {
+    name: '12 a lowercase handler and a page are not routes',
+    why: 'the counter-half of 11. Next.js treats only an UPPERCASE export as a handler, and `page.tsx` is UI — a rule reading the directory alone would invent an endpoint for every file under app/',
+    files: {
+      'app/api/quiet/route.ts': `export async function get(): Promise<number> { return 1; }\n`,
+      'app/dashboard/page.tsx': `export default function Page(): number { return 1; }\n`,
+    },
+    mustNotFind: ['ROUTE::/api/quiet::GET', 'ROUTE::/api/quiet::get', 'ROUTE::/dashboard::GET'],
+  },
+  {
     name: '10 a leaf that imports nothing is not a root module',
     why: 'rule 3 needs BOTH halves — no importers AND an import of its own. An isolated file has no importers either, and a rule reading only the first half would call every orphan a way in',
     files: {

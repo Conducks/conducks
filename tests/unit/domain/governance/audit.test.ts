@@ -159,3 +159,39 @@ describe('GovernanceService Audit', () => {
     expect(self.length).toBe(0);
   });
 });
+
+/**
+ * The single-node cluster — the shape both cycle rules drop before looking at anything else.
+ *
+ * todo77#P6 deferred this on the premise that `detectCycles` returns no cluster at all for a
+ * self-loop, so the `length <= 1` guards were unreachable. Read against
+ * `algorithms/cycle-detector.ts:89-96`, that premise is wrong: a one-node SCC IS pushed when the
+ * node carries an edge to itself. So the guards are reachable, and these are the cases that reach
+ * them — a file importing itself (the `export * from './self'` stub, which is ARCH-4's job, not
+ * ARCH-3's) and the same shape through the rule engine.
+ */
+describe('a self-loop is one node, and neither cycle rule reports it', () => {
+  const selfImporting = () => {
+    const graph = new ConducksAdjacencyList();
+    graph.addNode({ id: 'self.ts::unit', label: 'UNIT', properties: { name: 'self.ts', filePath: '/repo/self.ts', canonicalKind: 'UNIT', canonicalRank: 1 } } as never);
+    graph.addEdge({ id: 'loop', sourceId: 'self.ts::unit', targetId: 'self.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: {} } as never);
+    return graph;
+  };
+
+  // The instrument first: if the detector returned nothing here, the two tests below would pass
+  // without ever reaching the guard they exist to pin — which is exactly how this got deferred.
+  it('the detector DOES return the one-node cluster', () => {
+    expect(selfImporting().detectCycles()).toEqual([['self.ts::unit']]);
+  });
+
+  it('audit() drops it — ARCH-3 is a cycle between files, and this is one file', () => {
+    const service = new GovernanceService(selfImporting(), {} as any, {} as any, {} as any);
+    expect(service.audit().violations.filter(v => v.type === 'CIRCULAR')).toHaveLength(0);
+  });
+
+  it('the has_cycles rule drops it too — the same guard, one evaluator over', () => {
+    const service = new GovernanceService(selfImporting(), {} as any, {} as any, {} as any);
+    const report = service.auditWithRules('/nonexistent-conducks-test-root');
+    expect(report.violations.filter(v => v.ruleId === 'no_cycles')).toHaveLength(0);
+  });
+});

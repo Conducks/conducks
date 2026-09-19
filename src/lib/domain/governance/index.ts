@@ -9,7 +9,7 @@ import fs from "node:fs";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
 import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import path from "node:path";
-import { loadSentinelRules, LAYER_FRAGMENTS, ALLOWED_DEPENDENCIES } from "./sentinel-rules.js";
+import { loadSentinelRules, loadLayerContract } from "./sentinel-rules.js";
 
 /**
  * The graph-level verdict, from the node count alone.
@@ -75,7 +75,9 @@ export class GovernanceService {
     // its own members) is an implementation detail, not a module-dependency smell.
     const cycleDetectOptions = { ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true };
     const cycles = this.graph.detectCycles(cycleDetectOptions).filter(c => {
-      if (c.length <= 1) return false;
+      // A one-node cluster (a self-loop) is dropped by the file count below — it spans one file by
+      // definition. No separate length guard: one that cannot change an answer reads as a second
+      // rule and hides which one is load-bearing (todo77#P6).
       const files = new Set(c.map(id => {
         const n = this.graph.getNode(id);
         return String(n?.properties.filePath || n?.properties.file || id);
@@ -275,7 +277,7 @@ export class GovernanceService {
         case 'has_cycles': {
           const cycleDetectOptions = { ignoreTypes: IMPORT_CYCLE_IGNORED_EDGE_TYPES, ignoreTypeOnly: true };
           const cycles = this.graph.detectCycles(cycleDetectOptions).filter(c => {
-            if (c.length <= 1) return false;
+            // One-node clusters are dropped by the file count below, same as in `audit()` above.
             // Intra-file self-references (e.g. a singleton's class → getInstance → file-unit) are
             // not circular MODULE dependencies — only cross-file cycles are architectural smells.
             const files = new Set(c.map(id => {
@@ -348,7 +350,24 @@ export class GovernanceService {
 
         case 'layer_boundaries': {
           // Clean-Architecture guard (ADR 0005): an import edge from layer A to layer B is legal
-          // only if B ∈ ALLOWED_DEPENDENCIES[A]. Same-layer edges are always legal.
+          // only if B ∈ contract.allowed[A]. Same-layer edges are always legal. The contract is
+          // this project's own when `.conducks/sentinel.yml` declares `layers:`, and conducks'
+          // builtin one otherwise.
+          const contract = loadLayerContract(projectRoot);
+          // A declared contract that does not parse checks NOTHING. Reported as an error rather
+          // than a fall back to the builtin fragments, which describe a different repository — a
+          // verdict computed from someone else's directory names is worse than no verdict.
+          if (contract.errors.length > 0) {
+            for (const problem of contract.errors) {
+              violations.push({
+                id: 'layer_boundaries',
+                ruleId: rule.id,
+                severity: 'error',
+                message: `[${rule.name}] NOT CHECKED — the \`layers:\` contract in .conducks/sentinel.yml is unusable: ${problem}`,
+              });
+            }
+            break;
+          }
           const layerOf = (file: string): string | null => {
             if (!file) return null;
             const f = file.toLowerCase();
@@ -358,7 +377,7 @@ export class GovernanceService {
             // through the registry to satisfy the rule would convert every unit test into an
             // integration test, which is a worse codebase bought with a greener gate.
             if (/(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f)) return null;
-            for (const [name, frag] of LAYER_FRAGMENTS) if (f.includes(frag)) return name; // order matters
+            for (const [name, frag] of contract.fragments) if (f.includes(frag)) return name; // order matters
             return null;
           };
           // THE CONTRACT IS ABOUT IMPORTS. The comment above has always said so, and the loop
@@ -379,11 +398,11 @@ export class GovernanceService {
           // gate exempts it — the two must agree or this is back where it started.
           const DEPENDENCY_EDGES = new Set(['IMPORTS', 'EXTENDS', 'IMPLEMENTS', 'DEPENDS_ON']);
           const seen = new Set<string>();
-          // How many files this contract could speak about at all. `LAYER_FRAGMENTS` holds THIS
-          // repository's directory names, and `sentinel.yml` can express rules but not layers — so
-          // on any other project nothing matches, no edge is ever judged, and the check used to
-          // report a clean pass. A rule that examined nothing must say so rather than read as a
-          // green verdict (todo77#P7).
+          // How many files this contract could speak about at all. The builtin fragments hold THIS
+          // repository's directory names, so on any other project that declares no `layers:` of its
+          // own nothing matches, no edge is ever judged, and the check used to report a clean pass.
+          // A rule that examined nothing must say so rather than read as a green verdict
+          // (todo77#P7).
           // Counted over NODES, not over dependency edges: whether this project HAS layers is a
           // question about its files. Counting inside the edge loop made a project whose only edges
           // are CALLS report zero mapped files and claim it was never checked.
@@ -399,7 +418,7 @@ export class GovernanceService {
             const s = layerOf(String(src.properties.filePath || src.properties.file || ''));
             const t = layerOf(String(tgt.properties.filePath || tgt.properties.file || ''));
             if (!s || !t || s === t) continue;
-            if (!(ALLOWED_DEPENDENCIES[s] || []).includes(t)) {
+            if (!(contract.allowed[s] || []).includes(t)) {
               const key = `${s}->${t}`;
               if (seen.has(key)) continue; // one violation per illegal layer-pair, not per edge
               seen.add(key);
@@ -420,9 +439,12 @@ export class GovernanceService {
               ruleId: rule.id,
               severity: 'warning',
               message: `[${rule.name}] NOT CHECKED — no file in this project maps to a layer. `
-                + `The contract is conducks' own (${LAYER_FRAGMENTS.map(([n]) => n).join(', ')}), `
-                + `matched by directory name, and sentinel.yml cannot yet declare layers for another `
-                + `project. Nothing was examined, so nothing is claimed.`,
+                + `The contract ${contract.source === 'builtin' ? "is conducks' own" : 'comes from .conducks/sentinel.yml'} `
+                + `(${contract.fragments.map(([n, frag]) => `${n}=${frag}`).join(', ')}), matched by path fragment. `
+                + (contract.source === 'builtin'
+                  ? `Declare a \`layers:\` list in .conducks/sentinel.yml to check this project instead. `
+                  : `Check the \`path\` fragments against this project's directories. `)
+                + `Nothing was examined, so nothing is claimed.`,
             });
           }
           break;

@@ -128,6 +128,51 @@ const SCENARIOS = [
     mustSay: ['NOT ASSESSED', 'this is not a pass'],
     mustNotSay: ['Structural resonance is within safe limits'],
   },
+  {
+    name: '08 a foreign project with no declared layers is NOT CHECKED, and is not blocked',
+    why: 'the builtin fragments are conducks\' own directory names, so nothing here classifies. Saying "clean" over zero examined edges was the G1 gap; saying NOT CHECKED is the honest answer, and it must NOT block — a project that never declared a contract is not in violation of one',
+    files: {
+      'app/models/user.py': 'def user():\n    return 1\n',
+      'app/db/engine.py': 'from app.models.user import user\n\ndef engine():\n    return user()\n',
+    },
+    mustExit: 0,
+    mustSay: ['NOT CHECKED', 'sentinel.yml'],
+    mustNotSay: ['Layer contract clean'],
+  },
+  {
+    name: '09 a project declares its own layers, and its own breach blocks',
+    why: 'ADR 0197. The layer names here (`api`, `store`) appear in NO builtin fragment, so a verdict about them can only have come from .conducks/sentinel.yml — this is the scenario the gate did not have before, and the reason guard was unusable off this repository',
+    files: {
+      '.conducks/sentinel.yml': `version: 1\nlayers:\n  - name: store\n    path: /app/store\n  - name: api\n    path: /app/api\n    allow: store\n`,
+      'app/store/db.ts': `import { serve } from '../api/routes.js';\nexport function load(): number { return serve(); }\n`,
+      'app/api/routes.ts': `export function serve(): number { return 1; }\n`,
+    },
+    mustExit: 1,
+    mustSay: ['store → api'],
+  },
+  {
+    name: '10 the same repo passes once `allow` names the target layer',
+    why: 'the counter-half of 09 — one word changed in the config, same files, same edge. Without it, 09 would pass on the mere presence of a cross-directory import',
+    files: {
+      '.conducks/sentinel.yml': `version: 1\nlayers:\n  - name: store\n    path: /app/store\n    allow: api\n  - name: api\n    path: /app/api\n`,
+      'app/store/db.ts': `import { serve } from '../api/routes.js';\nexport function load(): number { return serve(); }\n`,
+      'app/api/routes.ts': `export function serve(): number { return 1; }\n`,
+    },
+    mustExit: 0,
+    mustSay: ['Layer contract clean'],
+  },
+  {
+    name: '11 an unusable `layers:` blocks, and is not counted as a dependency breach',
+    why: 'a typo in `allow` forbids every use of that layer, so falling back to the builtin fragments would judge this code by another repository\'s directory names. It blocks — nothing was examined, which is not a pass — and the summary must say what kind of problem it is rather than reporting a cross-layer dependency that was never found',
+    files: {
+      '.conducks/sentinel.yml': `version: 1\nlayers:\n  - name: store\n    path: /app/store\n  - name: api\n    path: /app/api\n    allow: stroe\n`,
+      'app/store/db.ts': `export function load(): number { return 1; }\n`,
+      'app/api/routes.ts': `import { load } from '../store/db.js';\nexport function serve(): number { return load(); }\n`,
+    },
+    mustExit: 1,
+    mustSay: ['NOT CHECKED', 'stroe', 'Nothing was examined'],
+    mustNotSay: ['illegal cross-layer dependency'],
+  },
 ];
 
 /**
@@ -135,16 +180,6 @@ const SCENARIOS = [
  * belongs in the report, not in a green tick that says the behaviour is intended.
  */
 const KNOWN_GAPS = [
-  {
-    name: 'G1 the hard gate is a no-op on any project that is not conducks',
-    why: 'LAYER_FRAGMENTS (sentinel-rules.ts:53) is hardcoded to `/lib/core`, `/lib/domain`, `/registry`, `/interfaces/cli|tools|web`, `/contracts`. A project laid out any other way classifies NO file, so no edge is examined and guard prints "✅ Layer contract clean." over zero subjects. Measured on the real subjects by oracle-guard.mjs: scraper 0 classifiable edges, orchestrator 0, sofie 62 — and sofie only because it happens to have a directory called `registry`',
-    files: {
-      'app/models/user.py': 'def user():\n    return 1\n',
-      'app/db/engine.py': 'from app.models.user import user\n\ndef engine():\n    return user()\n',
-    },
-    expectToday: out => out.includes('Layer contract clean'),
-    verdict: 'guard tells a project with no layers that its layer contract is clean',
-  },
   {
     name: 'G2 renaming the rule in .conducks/sentinel.yml silently disarms the gate',
     why: 'guard.ts:32 filters on `ruleId === "layer_boundaries"`, but governance/index.ts dispatches on `rule.condition`. A sentinel.yml that keeps the condition and changes the id still EVALUATES the contract — the violations are computed — and guard then files them under "Other structural findings (pre-existing, tracked)" and exits 0. The identical breach that blocks in scenario 02 ships',

@@ -55,10 +55,23 @@ export class GuardCommand implements ConducksCommand {
       }
 
       // The layer contract is the hard gate — it's the one this guard was built to enforce.
-      if (layerViolations.length > 0) {
+      //
+      // A CONFIG error is not a breach and must not be counted as one: a `layers:` block that names
+      // an undeclared layer examined nothing, so summing it into "N illegal cross-layer
+      // dependencies" tells the reader their code is broken when their config is. Both still block
+      // — an unusable contract checked nothing, which is not a pass (ADR 0197).
+      const configErrors = layerViolations.filter(v => v.message.includes('NOT CHECKED'));
+      const breaches = layerViolations.filter(v => !v.message.includes('NOT CHECKED'));
+      if (configErrors.length > 0) {
+        console.error('\n❌ Layer contract NOT CHECKED — the declared contract is unusable:');
+        for (const v of configErrors) console.error(`  - ${v.message}`);
+        console.error(`\n${configErrors.length} problem(s) in .conducks/sentinel.yml. Nothing was examined. Blocked.`);
+        process.exit(1);
+      }
+      if (breaches.length > 0) {
         console.error('\n❌ Layer contract violated (ADR 0005):');
-        for (const v of layerViolations) console.error(`  - ${v.message}`);
-        console.error(`\n${layerViolations.length} illegal cross-layer dependency(ies). Blocked.`);
+        for (const v of breaches) console.error(`  - ${v.message}`);
+        console.error(`\n${breaches.length} illegal cross-layer dependency(ies). Blocked.`);
         process.exit(1);
       }
       if (layerNotChecked.length > 0) {

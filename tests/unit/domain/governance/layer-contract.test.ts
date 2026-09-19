@@ -1,4 +1,7 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, afterAll } from '@jest/globals';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { getDefaultRules, ALLOWED_DEPENDENCIES } from '@/lib/domain/governance/sentinel-rules.js';
 import { GovernanceService } from '@/lib/domain/governance/index.js';
 import { ConducksAdvisor } from '@/lib/domain/governance/advisor.js';
@@ -223,5 +226,108 @@ describe('layer_boundaries — synthetic upward edge is blocked', () => {
     const violations = report.violations.filter(v => v.ruleId === 'layer_boundaries');
     expect(violations).toHaveLength(1);
     expect(violations[0].message).toMatch(/cli → domain/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Per-project layers. The contract used to be conducks' own directory names and nothing else,
+//    so `guard` on any other project examined zero edges (todo77#P7). A project now declares its
+//    own layers in `.conducks/sentinel.yml`, and the pairs below are named `api`/`db` — words that
+//    appear in NO builtin fragment, so a verdict about them can only have come from the file.
+// ---------------------------------------------------------------------------
+describe('layer_boundaries — a project declares its own layers', () => {
+  const roots: string[] = [];
+  afterAll(() => { for (const r of roots) rmSync(r, { recursive: true, force: true }); });
+
+  /** Writes `.conducks/sentinel.yml` into a fresh temp root and returns the root. */
+  const rootWith = (yaml: string): string => {
+    const root = mkdtempSync(path.join(tmpdir(), 'conducks-layers-'));
+    roots.push(root);
+    mkdirSync(path.join(root, '.conducks'), { recursive: true });
+    writeFileSync(path.join(root, '.conducks', 'sentinel.yml'), yaml, 'utf8');
+    return root;
+  };
+
+  /** One import edge, `/app/api/routes.ts` → `/app/db/client.ts`. */
+  const apiImportsDb = () => {
+    const graph = new ConducksAdjacencyList();
+    const add = (id: string, name: string, filePath: string) =>
+      graph.addNode({ id, label: 'UNIT', properties: { name, filePath, canonicalKind: 'UNIT' } } as never);
+    add('/app/api/routes.ts::unit', 'routes.ts', '/app/api/routes.ts');
+    add('/app/db/client.ts::unit', 'client.ts', '/app/db/client.ts');
+    graph.addEdge({ id: 'e1', sourceId: '/app/api/routes.ts::unit', targetId: '/app/db/client.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: {} } as never);
+    return graph;
+  };
+
+  const layersOf = (graph: ConducksAdjacencyList, root: string) =>
+    new GovernanceService(graph, new ConducksAdvisor(), new ConducksSentinel())
+      .auditWithRules(root).violations.filter(v => v.ruleId === 'layer_boundaries');
+
+  const DECLARED = `version: 1
+layers:
+  - name: api
+    path: /app/api
+    allow: ALLOW_LIST
+  - name: db
+    path: /app/db
+`;
+
+  it('blocks an edge its own contract forbids, naming its own layers', () => {
+    const findings = layersOf(apiImportsDb(), rootWith(DECLARED.replace('ALLOW_LIST', '')));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('error');
+    expect(findings[0].message).toMatch(/api → db/);
+  });
+
+  // The counter-case. Same graph, same file, one word changed — if this also blocked, the test
+  // above would be passing on the mere presence of an edge rather than on the declared rule.
+  it('does not block the same edge once `allow` names the target layer', () => {
+    expect(layersOf(apiImportsDb(), rootWith(DECLARED.replace('ALLOW_LIST', 'db')))).toHaveLength(0);
+  });
+
+  // An `allow` pointing at a layer nobody declared is a typo that silently forbids every use of it.
+  // It must fail loudly, and must NOT fall back to conducks' own fragments — a verdict computed
+  // from another repository's directory names is worse than no verdict.
+  it('checks nothing and reports an error when a declared layer is unusable', () => {
+    const findings = layersOf(apiImportsDb(), rootWith(DECLARED.replace('ALLOW_LIST', 'databse')));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('error');
+    expect(findings[0].message).toMatch(/NOT CHECKED/);
+    expect(findings[0].message).toMatch(/databse/);
+    expect(findings[0].message).not.toMatch(/api → db/);
+  });
+
+  // A sentinel.yml that declares only rules keeps the builtin contract: this is how conducks
+  // guards itself, and how every project that has not declared layers still gets the NOT CHECKED
+  // warning rather than an accidental pass.
+  it('keeps the builtin contract when the file declares no `layers:`', () => {
+    const root = rootWith(`version: 1
+rules:
+  - id: layer_boundaries
+    name: Layer contract
+    condition: layer_boundaries
+    severity: error
+    enabled: true
+`);
+    const graph = new ConducksAdjacencyList();
+    const add = (id: string, name: string, filePath: string) =>
+      graph.addNode({ id, label: 'UNIT', properties: { name, filePath, canonicalKind: 'UNIT' } } as never);
+    add('/repo/src/lib/core/x.ts::unit', 'x.ts', '/repo/src/lib/core/x.ts');
+    add('/repo/src/lib/domain/y.ts::unit', 'y.ts', '/repo/src/lib/domain/y.ts');
+    graph.addEdge({ id: 'e1', sourceId: '/repo/src/lib/core/x.ts::unit', targetId: '/repo/src/lib/domain/y.ts::unit', type: 'IMPORTS', confidence: 1.0, properties: {} } as never);
+
+    const findings = layersOf(graph, root);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toMatch(/core → domain/);
+  });
+
+  // The NOT CHECKED warning is what a foreign project sees before it declares anything. It must
+  // now say what to DO about it, or it is the same dead end it was before.
+  it('tells a project with no mapped file how to declare layers', () => {
+    const findings = layersOf(apiImportsDb(), mkdtempSync(path.join(tmpdir(), 'conducks-nolayers-')));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('warning');
+    expect(findings[0].message).toMatch(/NOT CHECKED/);
+    expect(findings[0].message).toMatch(/sentinel\.yml/);
   });
 });

@@ -522,12 +522,10 @@ export class ChronicleInterface {
    * The repo-relative path, case-agnostically — critical on macOS and Windows, where a path may
    * differ from its root only by case and `path.relative` would then return a `../..` chain.
    *
-   * THREE call sites still inline this by hand instead of calling it: `readSingleFile`,
-   * `getAuthorDistribution` and `getBlameData`. The comment that used to sit
-   * here claimed the duplication had been removed; it had not, and a comment is held to the same bar
-   * as any other doc (conducks-docs §8). Collapsing them changes behaviour on the case-insensitive
-   * path, and behaviour does not change during a clean — it is recorded in this feature's note
-   * (`docs/visuals/modules/core/git.md`) and needs its own commit with its own measurement.
+   * Every call site routes through here: `readSingleFile`, `getContent`, `getAuthorDistribution`
+   * and `getBlameData`. An earlier comment said three of them still inlined the logic by hand —
+   * measured 2026-09-19, none do. A comment is held to the same bar as any other doc, which is why
+   * this one names what was checked rather than repeating what it used to say.
    */
   private toRepoRelative(filePath: string, root?: string): string {
     const fixedPath = path.resolve(filePath);
