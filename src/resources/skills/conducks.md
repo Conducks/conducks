@@ -32,7 +32,8 @@ the owner rather than reconciled in both.
 | **docs** | authored markdown under `docs/` | **no** — any folder, no database, no lock |
 | **code** | the structural graph in `.conducks/` | **yes** — an unanalyzed project has nothing to answer from |
 
-Docs layer: `conducks_docs` · `docs-status` · `docs-lint` · `monitor` · `bootstrap-docs` · `help`.
+Docs layer: `conducks_docs` · `docs-status` · `docs-lint` · `glossary` · `features` · `monitor` ·
+`bootstrap-docs` · `help`.
 Everything else is the code layer. Each MCP tool's description is prefixed `[docs layer]` or
 `[code layer]`, so the split survives into any client.
 
@@ -93,8 +94,15 @@ Most responses carry `indexStaleness`. Stale means re-analyze before trusting th
 | `conducks_prune` | dead code — ORPHAN, UNUSED_EXPORT, STALE_IMPORT |
 | `conducks_coverage` | overlays an istanbul `coverage-final.json` onto function spans. A dark (0%) function with no callers is dead; one that was covered and went dark broke |
 
-**Nothing here writes to your code.** Every tool is a reader; conducks writes only its own vault
-(ADR 0156). A rename is your editor's job, because it needs types and conducks has a syntax graph.
+**Nothing here writes to your code.** Every tool is a reader; conducks writes only its own vault.
+A rename is your editor's job, because it needs types and conducks has a syntax graph.
+
+**A capability grep already provides is not worth shipping.** Before adding or keeping a command,
+ask what it does that `grep` cannot. If the honest answer is "the same thing, from a graph", drop it.
+A structural surface earns its place only when it is exact enough to act on without re-checking, or
+answers something textual search cannot reach at all — blast radius, a call path, a cycle. A surface
+strictly worse than a tool everyone already has installed is how a project accumulates commands
+nobody runs.
 
 ---
 
@@ -159,7 +167,7 @@ whatever the score says. Then `conducks_trace` for the exact steps.
 
 Rename every reference in ONE change — a half-renamed symbol compiles in some languages and breaks
 in none of the places you looked. Use your editor's rename, which type-checks; conducks has no
-writer (ADR 0156).
+writer.
 
 Place extracted code by layer, not by convenience: shared primitives go down toward the base of the
 dependency stack, specific logic goes up toward the entry points. Dependencies point one way.
@@ -222,7 +230,15 @@ Every command takes an optional trailing `[path]`, defaulting to the current dir
 **Docs** (the `conducks-docs` grammar)
 - `docs-status [--json] [--all] [--root-only]` — open work: each ADR with unfinished phases, the next
   task, what is blocked
-- `docs-lint [--root-only]` — validate against the grammar; **exits 1** on violation (the CI gate)
+- `docs-lint [--root-only]` — validate against the grammar AND run `visuals-lint`; **exits 1** on
+  violation. This is the whole docs gate in one command — the grammar half and the
+  visuals half report separately, so a reader can tell which failed. Module notes are the fourth
+  linted type: four `**...:**` fields, `## Features` and `## Glossary` present even when empty
+- `glossary [path]` — walks every module note's `## Glossary` and reports any term two or more
+  features define. The collision is DERIVED, so it cannot go stale
+- `features [path]` — the same walk over `## Features`, printed as a tree. **Both print how many
+  notes carry no such section**, because "0 collisions" over a corpus nobody has filled in reads
+  exactly like "0 collisions" over a complete one
 - `bootstrap-docs [name] [--service]` — scaffold the file set into `docs/`; `--service` omits the
   root-only files
 - `monitor [--json] [--stale]` — every registered project: graph freshness, docs violations,
@@ -247,8 +263,9 @@ restores the single-tree run.
 **Visuals** (the `conducks-visuals` standard)
 - `visuals-lint [path]` — every `file:line` resolves to exactly one tracked file, every `::symbol` is
   defined, every `NAME=value` still matches the code. Where a generator is declared it also
-  re-renders and fails on any byte of drift. **Exits 1** on violation — the second CI gate beside
-  `docs-lint`. It reads the working tree, never the vault
+  re-renders and fails on any byte of drift. **Exits 1** on violation. `docs-lint` now runs this
+  itself, so CI needs the one command; this stays callable alone for `--stamp`, which is per-page
+  and not a gate. It reads the working tree, never the vault
 - `visuals-lint --stamp <page>` — record that a human re-read that page's claims against the code.
   Bare `--stamp` asserts you re-read EVERY page. A run prints three separate numbers — anchors
   resolving, anchors flagged stale, pages NEVER stamped — and collapsing them is how a rotten page
@@ -294,12 +311,13 @@ restores the single-tree run.
 
 ### §5.1 Every gate, and which of them actually blocks a commit
 
-Six checklists live across these skills and nothing said which ones run by themselves. Two do.
+Six checklists live across these skills and nothing said which ones run by themselves. One does,
+and it carries the other inside it.
 
 | gate | runs | refuses | owner |
 |---|---|---|---|
-| `docs-lint` | pre-commit, CI | the doc line grammar — every tree, fails if ANY tree fails | `conducks-docs` §5.4 |
-| `visuals-lint` | pre-commit, CI | a broken anchor · a stale `NAME=value` · a byte of render drift | `conducks-visuals` §4 |
+| `docs-lint` | pre-commit, CI | the doc line grammar for all four linted types — every tree, fails if ANY tree fails — AND everything in the row below, which it runs itself | `conducks-docs` §5.4 |
+| `visuals-lint` | inside `docs-lint`; alone only for `--stamp` | a broken anchor · a stale `NAME=value` · a byte of render drift | `conducks-visuals` §4 |
 | the build's own gates | `npm run visuals` | overlap, an escaped block, a diagonal segment, a block drawn on the canvas, a dead selector, chrome drift, a missing read log | `conducks-visuals/references/layout.md` §4 |
 | `guard` / `audit` | on demand | cycles, layer violations, god objects | `conducks` §3 |
 | the band checklist | **a person** | 13 checks, before calling a band done | `conducks-visuals/references/setup.md` §8 |
@@ -322,8 +340,9 @@ SEPARATELY as `{monorepo: true, trees: {"(root)": …, "app": …}}`. A single r
 unwrapped, so the common shape never changes. `scope="root"` or `scope="app"` reads one tree.
 
 They are not merged on purpose: `todo01#P2` is an address inside its own tree, and two units may each
-hold a `todo01`. Read the tree that owns the work. Decisions and todos live at the repository root;
-the living docs — features, conventions, memory, architecture — live in the unit they describe.
+hold a `todo01`. Read the tree that owns the work. Decisions, todos and the handover live at the
+repository root; what a unit DOES lives in the module notes under its own `visuals/modules/`, one
+per feature (the four per-tree living files were dissolved into them).
 
 ---
 

@@ -5,6 +5,14 @@ import { ConducksAdjacencyList, NodeId, ConducksNode } from "@/lib/core/graph/in
  * 
  * High-fidelity execution flow tracing across the graph.
  */
+/** One behavioural process: the symbol execution begins at, its display name, and what it reaches. */
+export interface FlowProcess {
+  /** The entry symbol's id. Unique — two entries may share a name, and used to collide when they did. */
+  id: string;
+  name: string;
+  members: string[];
+}
+
 export class ConducksFlowEngine {
 
   constructor(private readonly graph: ConducksAdjacencyList) {}
@@ -30,7 +38,36 @@ export class ConducksFlowEngine {
   /**
    * Groups symbols into logical "Processes" based on reachability from entry points.
    */
-  public groupProcesses(): Record<string, string[]> {
+  /**
+   * A CROSS-SERVICE call, identified by what the linker STAMPS rather than by how confident it is.
+   *
+   * The rule below used to read `confidence < 1`, meaning "an HTTP call between services is not a
+   * local caller". No CALLS edge is ever emitted at 1. MEASURED 2026-09-05 across the three
+   * benchmark subjects: scraper has 9,820 CALLS edges — 5,571 at 0.85, 4,249 at 0.40, none at 1 —
+   * and sofie has 12,029 with exactly one. So the exception was always true and the "nothing calls
+   * it" half of the rule never ran, admitting 1,327 genuinely-called symbols on scraper alone.
+   *
+   * The confidences mean something else entirely: 0.85 is a RESOLVED call and 0.40 an unresolved
+   * guess (ADR 0046), and `adjacency-list.ts:578` promotes a guess back to 0.85 once it rebinds.
+   * `http-service-linker.ts:99` stamps a real cross-service edge `tier: 'service'` and gives it 0.8,
+   * a value that appears in none of scraper's CALLS at all. The stamp is the fact; the number never
+   * was.
+   */
+  private static isCrossService(e: { properties?: Record<string, unknown> }): boolean {
+    return e.properties?.tier === 'service';
+  }
+
+  /**
+   * One process per entry point, keyed by the entry's ID.
+   *
+   * It used to be keyed by the entry's bare NAME, so two entries called `run` in different files
+   * collapsed into one and the second silently overwrote the first. MEASURED: 2,842 of scraper's
+   * entry points (35%), 5,231 of sofie's (48%) and 2,854 of orchestrator's (44%) were discarded
+   * before any caller saw them, and WHICH one survived depended on iteration order. The MCP surface
+   * then looked the entry back up with `findNodesByName(name)[0]`, so it could report an entry id
+   * belonging to a different node than the flow was built from.
+   */
+  public groupProcesses(): FlowProcess[] {
     const nodes = Array.from(this.graph.getAllNodes());
     const entryPoints = nodes.filter((n: ConducksNode) => {
       // Only structural/behavioral code nodes — skip files, directories, config, virtual nodes
@@ -39,22 +76,18 @@ export class ConducksFlowEngine {
       const name = (n.properties.name as string) || '';
       // Skip file-level nodes (names with extensions like .yml, .ts, .py etc.)
       if (/\.\w{2,5}$/.test(name)) return false;
-      // Entry point: 0 incoming CALLS edges, OR only HTTP cross-service CALLS (confidence < 1)
+      // Nothing calls it, or the only things that call it are other services over HTTP — the far
+      // side of a cross-service call is where execution begins for that service.
       const incoming = this.graph.getNeighbors(n.id, 'upstream').filter(e => e.type === 'CALLS');
       if (incoming.length === 0) return true;
-      return incoming.every(e => (e.confidence ?? 1) < 1);
+      return incoming.every(e => ConducksFlowEngine.isCrossService(e));
     });
 
-    const processes: Record<string, string[]> = {};
-
-    for (const entry of entryPoints) {
-      const processName = entry.properties.name;
+    return entryPoints.map((entry) => {
       const members = new Set<string>();
       this.collectDownstream(entry.id, members, new Set());
-      processes[processName] = Array.from(members);
-    }
-
-    return processes;
+      return { id: entry.id, name: String(entry.properties.name), members: Array.from(members) };
+    });
   }
 
   private collectDownstream(currentId: NodeId, members: Set<string>, visited: Set<NodeId>): void {

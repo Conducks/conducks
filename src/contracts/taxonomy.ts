@@ -15,8 +15,9 @@
  *
  * Cut (ADR 0100): STATEMENT and BRANCH are answered by `edges.lineNumber` — a sub-line position is
  * a number on the edge, not a node (ADR 0099). DATA is answered by `dna.params` on the parent
- * (ADR 0086). NAMESPACE was REPAIRED rather than cut, because four consumers already read it
- * (cluster-rule, http-service-linker, mirror.engine, dead-code) and its sources existed.
+ * (ADR 0086). NAMESPACE was REPAIRED rather than cut, because consumers already read it — the
+ * record counted four, of which mirror.engine has since been deleted (ADR 0190), and eight files
+ * read the kind today — and its sources existed.
  *
  * INFRA is language-gated, not absent: Java, JavaScript, Ruby, Rust and C# tag `@isInfra`, and
  * C/C++ tag `@isMacro`. It is 0 on a TypeScript-only vault and real on a polyglot one — the same

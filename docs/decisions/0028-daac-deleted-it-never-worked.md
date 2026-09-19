@@ -5,6 +5,9 @@ Status: Accepted
 - Amends: 0026
 - Date: 2026-07-26
 - Promoted: docs/memory.md (the corrected claim, and the fixture-shaped-to-the-bug trap)
+- Amended by: 0190
+
+0190 repoints this record's invariant. The `- Enforced by:` line below still names the right test, but the parenthetical describes what it checked in 2026-07: `mirror.engine.ts` still there. ADR 0079 moved the clustering rule out of that file into `core/graph/cluster-rule.ts`, and 0190 then deleted the emptied engine, so the invariant now asserts the RULE exists rather than the file that once held it. The decision below — DAAC is deleted, and a fixture shaped to a misunderstanding confirms the misunderstanding — is unchanged and still binding.
 
 ## Context
 ADR 0026 left two questions open on purpose, and this is one of them. It described

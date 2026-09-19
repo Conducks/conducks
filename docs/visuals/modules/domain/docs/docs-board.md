@@ -1,5 +1,7 @@
 # domain/docs/docs-board — the links between docs
 
+**Layer:** domain (part of `domain/docs`).
+
 **Part of:** [domain/docs](../docs.md). Sits on top of
 [docs-grammar](docs-grammar.md); backs `conducks docs-status`, `conducks_docs` and the
 mirror's /api/docs. `docs/docs-board.ts` and `docs/docs-watcher.ts` are documented here together — the watcher is a thin trigger on this
@@ -19,6 +21,35 @@ reported rather than detected. Proving a decision is implemented from the code i
 `- Enforced by:` into the graph and check the symbol exists and its test passes) is the obvious next
 step and is deliberately not built — it needs the graph, which would put a code-layer dependency
 into a module that is currently docs-only.
+
+**Uses:** [docs-grammar](docs-grammar.md)'s per-file parse for every doc under `docs/`; nothing from the
+graph or the vault. Backs `conducks docs-status`, the MCP `conducks_docs` tool, and the mirror's
+`/api/docs`.
+
+## Features
+
+- **Docs board** (`conducks docs-status`, MCP `conducks_docs`) — the open threads in the authored docs:
+  which decision still owes work, the todo phases building it, the next task in each, and what is
+  blocked by what, without opening every file. Every line is an address (`todo09#P2`) or a state, never
+  a copy of the docs, so it cannot drift into a second version of them.
+- **Agent projection** (`agentView`) — a read-once/read-often split of the same board: conventions and
+  memory-equivalent context loaded once per session (`layer: "board"` drops them after), the open work
+  kept on every call. Cut the payload from 17.9k to 3.7k tokens at session start and 1.4k after, on
+  conducks' own docs.
+- **Module doc review** (`conducks monitor --dismiss`, surfaced by `docs-status`) — flags a module note
+  whose code changed since it was last reviewed, using the module-hash comparison below; a dismissal is
+  bound to the hash it was checked against, so it expires the next time the module changes.
+- **There is no progress file.** `docs/legacy/progress.md` was replaced by this board and is kept only
+  as an archived record, never read by any tool.
+
+## Glossary
+
+- **Board** — the full projection: every open decision, todo phase and unlinked record.
+- **Agent projection** — the trimmed, read-once/read-often view of the same data (`agentView`).
+- **Unlinked** — a decision no `- Builds:` phase currently points at; a distinct state from `resolved`
+  or `proven`, not a failure state by itself.
+- **Module hash** — the single comparison (`moduleHashOf`, `analysis/module-hash.ts`) a reviewed note
+  is checked against to detect drift; see the module-hash section below.
 
 ## Why the projection exists, and why it is not just a smaller board
 
@@ -42,7 +73,7 @@ are finished.
 
 A phase's state is its checkboxes. Blocked is an unmet `- Depends:`. An ADR's build state is the
 phases that claim it. None of it is authored anywhere, so none of it can drift (ADR 0019, 0020, and
-CONDUCKS-19/20). The one authored claim that survives — a todo's `Status:` — is deliberately NOT
+enforced by `tests/unit/domain/docs/docs-grammar.test.ts`). The one authored claim that survives — a todo's `Status:` — is deliberately NOT
 trusted: `hygiene()` compares it against the checkboxes and reports the gap.
 
 `unlinked` is a distinct build state, and the distinction is load-bearing. An ADR that nobody

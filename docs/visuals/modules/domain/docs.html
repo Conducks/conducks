@@ -10,7 +10,28 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Layer:</b> domain. <code>domain/docs/docs-board.ts</code>, <code>docs-grammar.ts</code>, <code>docs-watcher.ts</code>, <code>service-docs.ts</code>, <code>visuals-lint.ts</code>, <code>visuals-drift.ts</code>.</p>
 <p><b>Read at <code>8d4e7ff</code>.</b> This area did not exist until 2026-08-17. All six files lived under <code>domain/analysis</code>, which held twenty-three files and four unrelated subjects.</p>
 <p><b>Responsibility:</b> whether the documentation obeys its own rules. What the docs tree contains, whether each file conforms to the conducks-docs grammar, whether every <code>file:line</code> a visual claims still resolves, and whether a generated page still matches a fresh render.</p>
-<p><b>Boundaries:</b> it reads the TREE, never the vault. A docs check that needed a graph would be a check you cannot run before analyzing, which is exactly when you most want it (ADR 0058).</p>
+<p><b>Boundaries:</b> it reads the TREE, never the vault. A docs check that needed a graph would be a check you cannot run before analyzing, which is exactly when you most want it (ADR 0058). A docs-layer tool never touches the graph — enforced by <code>tests/unit/interfaces/tools/docs-layer.test.ts</code>, which reads as a dependency boundary: the docs/code split (ADR 0023) means a docs tool must answer with no graph and no DuckDB open at all.</p>
+<p><b>Uses:</b> nothing below it but the filesystem — this area is a leaf against the graph, which is what lets it run before <code>analyze</code> ever does. <a href="docs/docs-grammar.html">docs-grammar</a> and <a href="docs/docs-board.html">docs-board</a> are its two parts; see those notes for what each answers.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Docs grammar gate</b> (<code>conducks docs-lint</code>) — see <a href="docs/docs-grammar.html">docs-grammar</a>.</li>
+<li><b>Docs board</b> (<code>conducks docs-status</code>, MCP <code>conducks_docs</code>) — see <a href="docs/docs-board.html">docs-board</a>.</li>
+<li><b>Visual anchor gate</b> (<code>conducks visuals-lint</code>) — checks every anchor a diagram makes against the</li>
+</ul>
+<p>  working tree: the file resolves to exactly one place, the line exists, the symbol is still defined,   and a constant written in the page still matches the value the code assigns. An ambiguous   abbreviation fails rather than resolving to a guess. Runs against the filesystem, never the vault —   a graph keyed to the last pulse would let a lying page report clean (ADR 0138, ADR 0035).</p>
+<ul>
+<li><b>Drift check</b> (<code>visuals-drift.ts</code>) — flags a generated page that no longer matches a fresh render.</li>
+</ul>
+<p>  Anchors resolving and content being true are different claims; this is the second half <code>visuals-lint</code>   does not cover.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>Anchor</b> — a <code>file:line</code> (or symbol) claim a visual page makes, checked to still resolve.</li>
+</ul>
+<p>  <b>Not the anchor <a href="../core/bootstrap.html">core/bootstrap</a> means</b> — that one is the resolved project   root. Same word, unrelated things; <code>conducks glossary</code> reports the pair on purpose.</p>
+<ul>
+<li><b>Drift</b> (docs sense) — a generated page whose content no longer matches what a fresh render would</li>
+</ul>
+<p>  produce, distinct from an anchor that fails to resolve at all.</p>
 <h2>Why it is a feature, and the measurement that decided it</h2>
 <p><code>analysis</code> was 23 files. Grouping them by subject and counting imports BETWEEN the groups gave five cross-group edges in total — and these six files import nothing else in that folder. Only two files imported back, both taking <code>buildBoard</code>.</p>
 <p>A folder holding four unrelated subjects is not a feature; it is a place things were put. The decision was made from that count rather than from how the names read.</p>

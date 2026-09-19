@@ -48,7 +48,7 @@ export function siblingB(): number {
 }
 
 // A CASE COLLISION: the imported class is \`Widget\`, the local is \`widget\`. Ids are lowercased
-// (CONDUCKS-4) so both are \`…::widget\` — indistinguishable without comparing the names as written.
+// (see docs/visuals/modules/contracts.md) so both are \`…::widget\` — indistinguishable without comparing the names as written.
 export function makesWidget(): number {
   const widget = 5;
   return new Widget().n + widget;
@@ -79,7 +79,7 @@ export function makesWidget(): number {
   }, 180000);
 
   it('does not rebind across a case difference, which ids alone cannot see', () => {
-    // Ids are lowercased for APFS (CONDUCKS-4), so the imported class `Widget` and the local `widget`
+    // Ids are lowercased for APFS (see docs/visuals/modules/contracts.md), so the imported class `Widget` and the local `widget`
     // share one id shape. The first cut of this fix matched on the lowered id and rebound 37 edges on
     // the python subject — `pathlib::Path` onto a local `path`, `graph.py::Node` onto a local `node`.
     // The names as WRITTEN are compared now, so `makesWidget` must still reach `Widget`.

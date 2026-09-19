@@ -44,7 +44,8 @@ describe('every external node hangs off one root', () => {
 
 describe('external ids are lowercased, so one dependency is one node', () => {
   it('collapses spellings of a package name', () => {
-    // CONDUCKS-4 applies to these ids too: two spellings would be two nodes for one dependency,
+    // The canonical-lowercase-id rule (see docs/visuals/modules/contracts.md) applies to these
+    // ids too: two spellings would be two nodes for one dependency,
     // and every count that groups by package would be wrong by the number of spellings in use.
     expect(ecosystemId('Lodash')).toBe('ecosystem::lodash');
     expect(ecosystemId('lodash')).toBe('ecosystem::lodash');

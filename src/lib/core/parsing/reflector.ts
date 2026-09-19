@@ -542,7 +542,7 @@ export class ConducksReflector {
           }
 
           // TWO SYMBOLS, ONE ID: `interface MergeImpact` and `function mergeImpact` both lowercase
-          // to `merge-impact.ts::mergeimpact`. Ids are lowercased for APFS (CONDUCKS-4), and
+          // to `merge-impact.ts::mergeimpact`. Ids are lowercased for APFS (see docs/visuals/modules/contracts.md), and
           // TypeScript separates its type and value namespaces BY CASE, so this is ordinary code —
           // a type beside its factory, a class beside its singleton. Six files on this repository.
           //

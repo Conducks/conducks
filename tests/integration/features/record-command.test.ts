@@ -34,21 +34,35 @@ describe('record writes what was asked, where it was asked', () => {
   afterAll(() => rmRepo(repo));
 
   it('honours --type when it is not the first argument', () => {
-    runCli(['record', 'never use console.log in production', '--type', 'conventions'], { cwd: repo });
-    expect(fs.existsSync(docs('conventions.md'))).toBe(true);
-    expect(fs.readFileSync(docs('conventions.md'), 'utf8')).toMatch(/never use console\.log/);
+    runCli(['record', 'never use console.log in production', '--type', 'vision'], { cwd: repo });
+    expect(fs.existsSync(docs('vision.md'))).toBe(true);
+    expect(fs.readFileSync(docs('vision.md'), 'utf8')).toMatch(/never use console\.log/);
   }, 120000);
 
   it('records the note, not the flag value', () => {
-    runCli(['record', '--type', 'memory', 'the vault locks during a pulse'], { cwd: repo });
-    const body = fs.readFileSync(docs('memory.md'), 'utf8');
+    runCli(['record', '--type', 'implementation', 'the vault locks during a pulse'], { cwd: repo });
+    const body = fs.readFileSync(docs('implementation.md'), 'utf8');
     expect(body).toMatch(/the vault locks during a pulse/);
-    // The old version stored the LAST argument, which for `--type memory <note>` order was the note
-    // but for `<note> --type memory` was the word "memory".
-    expect(body.trim()).not.toMatch(/^memory$/m);
+    // The old version stored the LAST argument, which for `--type implementation <note>` order was
+    // the note but for `<note> --type implementation` was the word "implementation".
+    expect(body.trim()).not.toMatch(/^implementation$/m);
   }, 120000);
 
-  it('refuses a type that is not one of the documented seven', () => {
+  /**
+   * ADR 0193 dissolved `architecture`, `conventions` and `memory` into the module notes. The risk
+   * is not that the flag errors — it is that it SUCCEEDS and recreates a file this repo deleted,
+   * in a tree the standard no longer defines. The refusal has to name where the fact belongs, or
+   * the user simply loses the note they were trying to keep.
+   */
+  it.each(['conventions', 'memory', 'architecture'])('refuses --type %s and says where the fact goes now', (dissolved) => {
+    const { combined, status } = runCli(['record', '--type', dissolved, 'x'], { cwd: repo, allowFail: true });
+    expect(status).not.toBe(0);
+    expect(fs.existsSync(docs(`${dissolved}.md`))).toBe(false);
+    expect(combined).toMatch(/dissolved into the module notes/);
+    expect(combined).toMatch(/ADR 0193/);
+  }, 120000);
+
+  it('refuses a type the standard does not define', () => {
     const { combined, status } = runCli(['record', '--type=nonsensetype', 'x'], { cwd: repo, allowFail: true });
     expect(status).not.toBe(0);
     expect(combined).toMatch(/nonsensetype/);
@@ -57,9 +71,9 @@ describe('record writes what was asked, where it was asked', () => {
 
   /** The docs standard is this project's own, and `record` is the command that writes into it. */
   it('writes a file that passes docs-lint', () => {
-    runCli(['record', '--type', 'memory', 'a second note'], { cwd: repo });
+    runCli(['record', '--type', 'implementation', 'a second note'], { cwd: repo });
     const { combined, status } = runCli(['docs-lint'], { cwd: repo, allowFail: true });
-    expect(combined).not.toMatch(/memory\.md/);
+    expect(combined).not.toMatch(/implementation\.md/);
     expect(status).toBe(0);
   }, 180000);
 });

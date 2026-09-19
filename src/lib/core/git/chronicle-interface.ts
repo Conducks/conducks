@@ -67,7 +67,7 @@ let discoverySurface: DiscoverySurface | undefined;
 
 /**
  * Derives what the FS fallback accepts from what the language providers actually declare
- * (CONDUCKS-2: `extensions: string[]` per provider). The old hardcoded list silently dropped most
+ * (docs/visuals/modules/core/parsing.md: `extensions: string[]` per provider). The old hardcoded list silently dropped most
  * supported languages (.rs .tsx .jsx .cs .c .cpp .h .hpp .php .swift) while listing .kt, for which
  * no provider or grammar exists.
  *
@@ -239,7 +239,7 @@ export class ChronicleInterface {
   }
 
   /**
-   * The ONLY way this class runs git (ADR 0047, CONDUCKS-35).
+   * The ONLY way this class runs git (ADR 0047, see docs/visuals/modules/core/git.md).
    *
    * Arguments are passed as an ARRAY, so no value can reach a shell. Every command here used to be
    * a template string run through `execSync`, which is `/bin/sh -c` — and the interpolated value
@@ -526,8 +526,8 @@ export class ChronicleInterface {
    * `getAuthorDistribution` and `getBlameData`. The comment that used to sit
    * here claimed the duplication had been removed; it had not, and a comment is held to the same bar
    * as any other doc (conducks-docs §8). Collapsing them changes behaviour on the case-insensitive
-   * path, so it is recorded in `docs/deep_clean.md` rather than done inside a clean (ADR 0150
-   * rule 16).
+   * path, and behaviour does not change during a clean — it is recorded in this feature's note
+   * (`docs/visuals/modules/core/git.md`) and needs its own commit with its own measurement.
    */
   private toRepoRelative(filePath: string, root?: string): string {
     const fixedPath = path.resolve(filePath);
@@ -693,7 +693,7 @@ export class ChronicleInterface {
    * **There is no third step, and `main` is never assumed.** When neither resolves, or when step 2
    * is AMBIGUOUS — two branches sharing the winning fork point, which is exactly what `develop`
    * sitting on the same commit as `main` looks like — this returns null and the caller refuses. A
-   * diff against the wrong baseline is the failure this project keeps shipping (CONDUCKS-13); a
+   * diff against the wrong baseline is the failure docs/visuals/modules/domain/governance.md warns against; a
    * silently-wrong baseline is worse than no answer.
    *
    * The resolved `commit` is the FORK POINT, not the target ref's tip. Diffing against the tip

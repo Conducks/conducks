@@ -270,7 +270,7 @@ export class ConducksGraph {
             // The assignment edge records its right-hand side in `value`; matching that against the
             // calls in this same scope recovers the producing call. When it cannot be recovered the
             // edge is NOT written: a handover whose producer is unknown is a guess, and an edge from
-            // a non-existent node is worse than a missing edge (ADR 0046, CONDUCKS-32).
+            // a non-existent node is worse than a missing edge (ADR 0046, see docs/visuals/modules/core/graph.md).
             const rhs = String(producer.properties?.value ?? '').toLowerCase().replace(/\(.*$/, '').trim();
             const producingCall = rhs ? callsByOriginal.get(rhs) : undefined;
             if (!producingCall) continue;

@@ -24,7 +24,7 @@ export const BAND1 = {
   id:'band1', title:'HOW A CODEBASE BECOMES A GRAPH',
   sub:'the analyze pulse — the only path that writes',
   containers:[
-    { id:'c_git', title:'DISCOVERY', sub:'core/git — which files exist, asked of git itself',
+    { id:'c_parsing', anchor:"src/lib/core/parsing/index.ts — the parsing feature's only door (ADR 0150): 69 files, 8.8k lines, thirteen language packs and the reflector behind one export", title:'PARSING', sub:'core/parsing — 13 language packs and one reflector',
       nodes:[
         n('anchor','Anchor on a root','one directory for the whole process',
           'src/lib/core/git/chronicle-interface.ts::anchorChronicle — the door hands out `chronicle` as ReadOnlyChronicle, the class minus its one mutator, so none of the two dozen files holding it can re-anchor mid-run',
@@ -37,11 +37,6 @@ export const BAND1 = {
           {cls:'n-warn'}),
         n('fsfall','No repository? Scan the tree','the case ADR 0035 supports',
           'src/lib/core/git/chronicle-interface.ts::discoverFiles — the fallback walk accepts a file by extension OR exact filename, because Rakefile and Dockerfile have no extension to match on'),
-      ],
-      edges:[['anchor','disc'],['disc','quote'],['disc','fsfall','git said nothing']]},
-
-    { id:'c_parsing', title:'PARSING', sub:'core/parsing — 13 language packs and one reflector',
-      nodes:[
         n('gate','Has this file changed?','a content hash, not a timestamp',
           'src/lib/core/persistence/file-hash-gate.ts::FileHashGate — a mtime changes on checkout and says nothing about content',
           {shape:'dia'}),
@@ -62,12 +57,12 @@ export const BAND1 = {
           {cls:'n-no'}),
       ],
       edges:[['gate','order','changed'],['order','refl'],['refl','tags'],['tags','her'],
-             ['refl','spec'],['spec','noora','for nine of thirteen']]},
+             ['refl','spec'],['spec','noora','for nine of thirteen'],['anchor','disc'],['disc','quote'],['disc','fsfall','git said nothing']]},
 
-    { id:'c_graph', title:'THE GRAPH', sub:'core/graph — nodes, edges, and binding names to them',
+    { id:'c_graph', anchor:"src/lib/core/graph/index.ts — the graph feature's only door (ADR 0150): the adjacency store, the linkers, and ADR 0028's clustering rule", title:'THE GRAPH', sub:'core/graph — nodes, edges, and binding names to them',
       nodes:[
         n('add','Every id is lowercased','APFS calls two spellings one file',
-          'src/lib/core/graph/adjacency-list.ts::addNode — treating them as two splits one symbol into two nodes, and every count then reports it twice (CONDUCKS-4)',
+          'src/lib/core/graph/adjacency-list.ts::addNode — treating them as two splits one symbol into two nodes, and every count then reports it twice (canonical lowercase node ids — see docs/visuals/modules/contracts.md)',
           {cls:'n-ok'}),
         n('skel','A stored node is a SKELETON','getNode and getNodesMap differ',
           'src/lib/core/graph/adjacency-list.ts::addNode — a field not named in the skeleton is harvested correctly, carried through the worker correctly, and dropped at this boundary. `doc` and `instanceOf` each cost a debugging session before they were added',
@@ -85,7 +80,7 @@ export const BAND1 = {
       ],
       edges:[['add','skel'],['add','kind'],['kind','intra'],['intra','port'],['port','fam']]},
 
-    { id:'c_persistence', title:'THE VAULT', sub:'core/persistence — DuckDB, and one writer',
+    { id:'c_persistence', anchor:"src/lib/core/persistence/index.ts — the persistence feature's only door (ADR 0150). Every other feature is written against the shape this file hands out, which is what makes it a contract rather than a peer", kind:'contract', title:'THE VAULT', sub:'core/persistence — DuckDB, and one writer',
       nodes:[
         n('save','save() writes NO structure','and the call succeeds',
           'src/lib/core/persistence/persistence.ts::SynapsePersistence — it writes metadata and the pulses row. Nodes and edges go through saveNodes and saveEdges, so the watcher’s "persisting structural delta" was a no-op for as long as that line existed',
@@ -122,7 +117,7 @@ export const BAND2 = {
   id:'band2', title:'HOW A QUESTION IS ANSWERED',
   sub:'two surfaces, one registry, and the choice between SQL and a 165 MB walk',
   containers:[
-    { id:'c_cli', title:'THE CLI', sub:'interfaces/cli — 42 commands behind one dispatcher',
+    { id:'c_cli', anchor:'src/interfaces/cli/index.ts:121::main — one dispatcher, and every command constructed in a single list so no command can reach another', title:'THE CLI', sub:'interfaces/cli — 42 commands behind one dispatcher',
       nodes:[
         n('argv','A command word','conducks <id> [args]',
           'src/interfaces/cli/index.ts::main — 42 commands, each a ConducksCommand found by id'),
@@ -134,10 +129,16 @@ export const BAND2 = {
           {cls:'n-ok'}),
         n('quiet','A read command says nothing else','narration is off unless asked',
           'src/lib/core/utils/logger.ts::setProcessQuiet — five boot lines used to precede every answer. Quiet is process-wide but the SETTER is not a method, so the reach is visible at the call site (ADR 0080)'),
+        n('cli','35 commands','one file each, no command imports another',
+          'src/interfaces/cli/index.ts:210 — every command is constructed in one `const commands: ConducksCommand[]` list. Verified 2026-08-23: no file in commands/ imports another command, constructs another command class, or shells out to the conducks binary',
+          {cls:'n-ok'}),
+        n('mirror','Both must answer the same','the CLI is where a person checks what the agent did',
+          'docs/decisions/0148-every-mcp-tool-is-a-cli-command-and-they-mirror.md — the rule is one-directional: every tool is a command, not every command is a tool',
+          {cls:'n-hi'})
       ],
-      edges:[['argv','iface'],['argv','help','asked for usage'],['argv','quiet']]},
+      edges:[['argv','iface'],['argv','help','asked for usage'],['argv','quiet'],['argv','cli'],['cli','mirror']]},
 
-    { id:'c_mcp', title:'THE MCP SURFACE', sub:'interfaces/tools — the same answers, over stdio',
+    { id:'c_mcp', anchor:'src/interfaces/tools/index.ts::main — the same answers over stdio, every registered tool read-only since ADR 0156', title:'THE MCP SURFACE', sub:'interfaces/tools — the same answers, over stdio',
       nodes:[
         n('anch','Anchor to the caller’s project','not to wherever the server booted',
           'src/interfaces/tools/shared/anchor.ts::ensureAnchor — a globally installed server boots detached, so the whole surface was unusable for any project but one until the anchor was re-resolved per call',
@@ -147,10 +148,13 @@ export const BAND2 = {
           {cls:'n-ok'}),
         n('stdio','stdout is the protocol','so every log goes to stderr',
           'src/interfaces/tools/tools/synapse.ts — a stray stdout write is not a log here, it is a malformed JSON-RPC frame'),
+        n('mcp','13 tools, every one read-only','was 14 until ADR 0156 removed the writer',
+          'src/interfaces/tools/tools/kinetic.ts — every registered tool declares readOnlyHint. The one that declared destructiveHint was conducks_rename, and adr-invariants.test.ts now fails if another appears',
+          {cls:'n-ok'})
       ],
-      edges:[['anch','hold'],['hold','stdio']]},
+      edges:[['anch','hold'],['hold','stdio'],['stdio','mcp']]},
 
-    { id:'c_reg', title:'THE REGISTRY', sub:'src/registry — composition, and the guard that made a silent failure loud',
+    { id:'c_reg', anchor:'src/registry/index.ts:205::registry — 14 slices, the only legal seam. Change its shape and every feature above it moves, which is the test that makes it a contract', kind:'contract', title:'THE REGISTRY', sub:'registry/index.ts — 14 slices, the only legal seam, and the guard that made a silent failure loud',
       nodes:[
         n('one','One wiring point','both surfaces get the same object',
           'src/registry/index.ts — the CLI may not import core (ADR 0005), so composition carries every edge the interfaces need'),
@@ -158,14 +162,26 @@ export const BAND2 = {
           'src/lib/core/bootstrap/registry-bootstrapper.ts — a read-only caller frequently walks no node at all',
           {shape:'dia'}),
         n('guard','A deferred graph would read as EMPTY','so asking for it THROWS instead',
-          'src/registry/index.ts — four of six MCP tools broke this way and three broke silently: zero nodes, zero flows, symbol-not-found, no error anywhere. The getter turns forgetting into a loud failure at the call site rather than a wrong answer downstream (CONDUCKS-13)',
+          'src/registry/index.ts — four of six MCP tools broke this way and three broke silently: zero nodes, zero flows, symbol-not-found, no error anywhere. The getter turns forgetting into a loud failure at the call site rather than a wrong answer downstream (every finding declares its edge types — see docs/visuals/modules/domain/governance.md)',
           {cls:'n-ok'}),
         n('ro','A read handle REFUSES a write','it does not drop it quietly',
           'src/lib/core/persistence/persistence.ts::run — a silent no-op here would be the same defect as `save()` writing no structure: a call that succeeds and stores nothing'),
-      ],
-      edges:[['one','defer'],['defer','guard','something walks the graph'],['one','ro']]},
 
-    { id:'c_answer', title:'THE ANSWER', sub:'SQL or a walk — the choice is the design',
+        n('slices','Both surfaces meet here','and nowhere else',
+          'src/registry/index.ts::registry — a command reaches the domain through registry.<slice>.<fn> and never through another command. That is what makes deleting one command safe',
+          {cls:'n-hi'}),
+        n('fan','One slice, many commands','federation is reached by seven',
+          'src/registry/index.ts::registry — doctor, install-hooks, link, list, monitor, setup and uninstall all reach registry.federation. Verified by reading each command file',
+          {cls:'n-ok'}),
+        n('share','Shared logic is the legitimate exception','one service, two slices',
+          'src/registry/index.ts:209 and :262 — GovernanceService.status() is reached by both the status slice and the audit slice. Two tools sharing a service is coupling underneath them, not between them',
+          {cls:'n-ok'}),
+        n('span','One command spans four slices','impact reaches kinetic, explain, query and source',
+          'src/interfaces/cli/commands/impact.ts — the widest consumer on the surface, and the reason a slice boundary is not a feature boundary'),
+      ],
+      edges:[['one','defer'],['defer','guard','something walks the graph'],['one','ro'],['slices','fan'],['slices','share'],['slices','span']]},
+
+    { id:'c_answer', anchor:'src/lib/domain/analysis/index.ts — the analysis door. The feature is the CHOICE it makes: answer from SQL, or materialise 165 MB of graph and walk it', title:'THE ANSWER', sub:'SQL or a walk — the choice is the design',
       nodes:[
         n('sql','Ask the vault','no graph load at all',
           'src/lib/core/persistence/persistence.ts::query — this is why the load is deferred, and a command that answers from SQL must NOT materialise the graph'),
@@ -205,7 +221,7 @@ export const BAND3 = {
   id:'band3', title:'HOW IT KEEPS UP, AND HOW IT CROSSES A REPOSITORY',
   sub:'the watcher re-enters the write path; federation reaches into a neighbour',
   containers:[
-    { id:'c_watch', title:'THE WATCHER', sub:'domain/evolution — one file at a time, on save',
+    { id:'c_watch', anchor:'src/lib/domain/evolution/index.ts — the evolution door. It re-enters the write path rather than following it, which is why it needs the whole file list handed to it', title:'THE WATCHER', sub:'domain/evolution — one file at a time, on save',
       nodes:[
         n('ready','Wait for the BASELINE','before announcing, and before reconciling',
           'src/lib/domain/evolution/watcher.ts::whenReady — a reconcile finishing before the watcher is genuinely watching leaves a window where a new file is neither reported as an event nor caught by the sweep (todo55)',
@@ -224,7 +240,7 @@ export const BAND3 = {
       ],
       edges:[['ready','recon','baseline established'],['recon','univ'],['univ','rebind'],['ready','beat']]},
 
-    { id:'c_fed', title:'FEDERATION', sub:'domain/federation — many projects, one machine',
+    { id:'c_fed', anchor:"src/lib/domain/federation/index.ts — the federation feature's only door (ADR 0150): conducks' relationship to the machine and to other projects, rather than to one tree", title:'FEDERATION', sub:'domain/federation — many projects, one machine',
       nodes:[
         n('roster','A list of project roots','plain JSON, hand-editable on purpose',
           'src/lib/domain/federation/project-registry.ts::ProjectRegistry — without it every project is an island and nothing can answer "which of my repos has fallen behind its code". A corrupt or missing file degrades to "no projects" rather than an error, because nothing depends on it',
@@ -256,104 +272,10 @@ export const BAND3 = {
 //
 // Censused 2026-08-23 by four parallel readers, every claim re-verified by the orchestrator.
 export const BAND4 = {
-  id:'band4', title:'THE TOOL SURFACE, AND WHAT IS SAFE TO DELETE',
-  sub:'35 commands · 13 tools · one seam — and the four places the rule is not enforced',
-  containers:[
-    { id:'c_surf', title:'THE TWO SURFACES', sub:'interfaces/cli + interfaces/tools — ADR 0148 says they mirror',
-      nodes:[
-        n('cli','35 commands','one file each, no command imports another',
-          'src/interfaces/cli/index.ts:210 — every command is constructed in one `const commands: ConducksCommand[]` list. Verified 2026-08-23: no file in commands/ imports another command, constructs another command class, or shells out to the conducks binary',
-          {cls:'n-ok'}),
-        n('mcp','13 tools, every one read-only','was 14 until ADR 0156 removed the writer',
-          'src/interfaces/tools/tools/kinetic.ts — every registered tool declares readOnlyHint. The one that declared destructiveHint was conducks_rename, and adr-invariants.test.ts now fails if another appears',
-          {cls:'n-ok'}),
-        n('mirror','Both must answer the same','the CLI is where a person checks what the agent did',
-          'docs/decisions/0148-every-mcp-tool-is-a-cli-command-and-they-mirror.md — the rule is one-directional: every tool is a command, not every command is a tool',
-          {cls:'n-hi'}),
-        n('gq','One tool a person cannot run','conducks_graph_query — raw SELECT, no CLI twin',
-          'src/interfaces/tools/tools/synapse.ts:796 — no command in src/interfaces/cli/commands/ exposes it. ADR 0007:21 kept it MCP-only deliberately; ADR 0148 never cites 0007, so the two records disagree and neither knows',
-          {cls:'n-warn'}),
-      ],
-      edges:[['cli','mirror'],['mcp','mirror'],['mcp','gq']]},
-
-    { id:'c_seam', title:'THE REGISTRY', sub:'registry/index.ts — 14 slices, the only legal seam',
-      nodes:[
-        n('slices','Both surfaces meet here','and nowhere else',
-          'src/registry/index.ts::registry — a command reaches the domain through registry.<slice>.<fn> and never through another command. That is what makes deleting one command safe',
-          {cls:'n-hi'}),
-        n('fan','One slice, many commands','federation is reached by seven',
-          'src/registry/index.ts::registry — doctor, install-hooks, link, list, monitor, setup and uninstall all reach registry.federation. Verified by reading each command file',
-          {cls:'n-ok'}),
-        n('share','Shared logic is the legitimate exception','one service, two slices',
-          'src/registry/index.ts:209 and :262 — GovernanceService.status() is reached by both the status slice and the audit slice. Two tools sharing a service is coupling underneath them, not between them',
-          {cls:'n-ok'}),
-        n('span','One command spans four slices','impact reaches kinetic, explain, query and source',
-          'src/interfaces/cli/commands/impact.ts — the widest consumer on the surface, and the reason a slice boundary is not a feature boundary'),
-      ],
-      edges:[['slices','fan'],['slices','share'],['slices','span']]},
-
-    { id:'c_gap', title:'WHAT NOTHING ENFORCES', sub:'each of these was found by reading, not by a gate',
-      nodes:[
-        n('skip','The mirror test skips what it cannot find','a missing CLI file is treated as nothing to check',
-          'tests/architecture/paired-surfaces.test.ts:71 — `if (!fs.existsSync(cliFile)) continue;` with the comment "MCP-only tool: nothing to drift from". It enforces that a pair MIRRORS, never that the pair EXISTS, which is how the graph_query gap survived',
-          {cls:'n-no'}),
-        n('fix','Tests borrow one tool to set up another','and the borrow only breaks when you delete',
-          'tests/integration/features/kinetic.test.ts:26 — resolveId() runs `query` purely to obtain an id that could be written as path::name. Same shape as the rename/drift coupling fixed on 2026-08-23',
-          {cls:'n-warn'}),
-        n('legit','Some borrows are not coupling','the fixture is the only way to make the state',
-          'tests/integration/features/record-command.test.ts:59 — "writes a file that passes docs-lint" runs docs-lint as the ASSERTION, not as setup. analyze appears in 118 fixtures for the same reason: nothing else writes the vault',
-          {cls:'n-ok'}),
-        n('orph','A domain service nothing reaches','MirrorEngine, 232 lines, kept alive by its own barrel',
-          'src/lib/domain/visual/index.ts:1 — the only reference is this re-export. prune does NOT flag it, because the barrel is an incoming edge, and adr-invariants.test.ts:106 asserts the file must exist as ADR 0028\'s replacement',
-          {cls:'n-no'}),
-      ],
-      edges:[['skip','fix'],['fix','legit'],['skip','orph']]},
-  ],
-  crossEdges:[
-    ['gq','skip','the gap and the reason nothing caught it'],
-    ['mirror','slices','both surfaces route through one seam'],
-  ],
-};
-
-
-// ── Band 5 — how a tool is proved ────────────────────────────────────────────
-//
-// Bands 1-4 draw what the system DOES. This one draws what makes any of it believable, and it
-// exists because for most of this project's life nothing did: a tool was "working" when its output
-// looked reasonable to whoever ran it, which is the weakest evidence available and the one that
-// always agrees with you.
-//
-// ADR 0160 is the method — a tool is proved by BREAKING the subject, at three levels. L1 scores
-// every finding's own claim against real code (precision). L2 plants defects it must see (recall).
-// L3 plants the counter-cases it must not eat. L2 and L3 are one gate, because a tool that reports
-// everything passes every recall test ever written.
-//
-// Read at `7b4a791` — every file in tools/benchmark/, and the three analyzers they score.
-export const BAND5 = {
-  id:'band5', title:'HOW A TOOL IS PROVED',
+  id:'band4', title:'HOW A TOOL IS PROVED',
   sub:'ADR 0160 — an oracle scores what a subject CONTAINS, a benchmark asks for what it does not',
   containers:[
-    { id:'c_oracle', title:'THE ORACLE', sub:'a second opinion, from something that is not this tool',
-      nodes:[
-        n('indep','Ask a DIFFERENT tool','tsc\'s answer, not ours, re-asked',
-          'tools/benchmark/oracle-tsc.mjs::oracleUnusedImports — an oracle built from the analyzer\'s own machinery agrees with it by construction, which is a measurement of nothing. This one asks the TypeScript compiler and compares two independently produced sets',
-          {cls:'n-ok'}),
-        n('except','Unless the tool IS the traversal','then the graph is input, not shared machinery',
-          'tools/benchmark/oracle-context.mjs::within — trace and context ARE walks, so a walk is the only honest oracle for them. Sharing the graph is not sharing the answer: what is scored is the traversal, and the graph is what both are handed',
-          {shape:'dia'}),
-        n('probe','Probe the instrument BEFORE believing it','a reading from the wrong port is not a reading',
-          'tools/benchmark/oracle-tsc.mjs::probeDetectsPlantedImport — sofie\'s `tsc` on PATH was a joke script printing "This is not the tsc command you are looking for", and the oracle scored a perfect run against it. The probe plants an import the real compiler must flag, and refuses to report a number if it does not',
-          {cls:'n-warn'}),
-        n('prog','A tsconfig is not an inventory of the source','union every config, then walk for the rest',
-          'tools/benchmark/ts-program.mjs::buildProgram — a monorepo has one tsconfig per package and none of them lists the whole tree, and `.mjs` files are in no config at all. Scoring against one config blamed the analyzer for every file the compiler had never been shown (ADR 0186)',
-          {cls:'n-warn'}),
-        n('keep','Ask git what to preserve','never a hardcoded list of filenames',
-          'tools/benchmark/reset-vault.mjs::resetVault — the literal KEEP list was correct while the oracles only ran here, then deleted sofie\'s committed `.conducks/*.html` the first time one was pointed elsewhere. `git ls-files` is the exact answer per project and maintains itself (ADR 0171)',
-          {cls:'n-ok'}),
-      ],
-      edges:[['indep','except'],['indep','probe'],['probe','prog'],['prog','keep']]},
-
-    { id:'c_bench', title:'THE BENCHMARK', sub:'the shape an oracle cannot ask for, because the subject lacks it',
+    { id:'c_bench', anchor:'package.json:116 — the `gate` script. It is the only thing that runs every oracle against every subject; anything cheaper leaves a subject unscored and still reports green', title:'THE BENCHMARK', sub:'the shape an oracle cannot ask for, because the subject lacks it',
       nodes:[
         n('why','An oracle cannot ask for what is absent','so real code alone can never prove recall',
           'docs/decisions/0175-a-benchmark-asks-for-the-shape-an-oracle-cannot.md — an oracle scores a subject continuously and finds only the shapes that happen to be in it. A defect nobody wrote is unscored, and that is exactly the set a tool is most likely to miss',
@@ -369,11 +291,21 @@ export const BAND5 = {
         n('fixt','The fixture is wrong more often than the tool','six times in one campaign',
           'docs/decisions/0189-the-radius-is-the-claim.md — scenario 04 asserted an unrelated symbol is never a neighbour at radius 3, and it genuinely IS one three hops out. The tool was right and the claim was wrong; the first run of a new scenario set measures the fixture',
           {cls:'n-warn'}),
-      ],
-      edges:[['why','plant'],['plant','counter'],['counter','mutate'],['mutate','fixt']]},
-
-    { id:'c_gate', title:'WHAT ACTUALLY RUNS', sub:'and the honest account of what it does not',
-      nodes:[
+        n('indep','Ask a DIFFERENT tool','tsc\'s answer, not ours, re-asked',
+          'tools/benchmark/oracle-tsc.mjs::oracleUnusedImports — an oracle built from the analyzer\'s own machinery agrees with it by construction, which is a measurement of nothing. This one asks the TypeScript compiler and compares two independently produced sets',
+          {cls:'n-ok'}),
+        n('except','Unless the tool IS the traversal','then the graph is input, not shared machinery',
+          'tools/benchmark/oracle-context.mjs::within — trace and context ARE walks, so a walk is the only honest oracle for them. Sharing the graph is not sharing the answer: what is scored is the traversal, and the graph is what both are handed',
+          {shape:'dia'}),
+        n('probe','Probe the instrument BEFORE believing it','a reading from the wrong port is not a reading',
+          'tools/benchmark/oracle-tsc.mjs::probeDetectsPlantedImport — sofie\'s `tsc` on PATH was a joke script printing "This is not the tsc command you are looking for", and the oracle scored a perfect run against it. The probe plants an import the real compiler must flag, and refuses to report a number if it does not',
+          {cls:'n-warn'}),
+        n('prog','A tsconfig is not an inventory of the source','union every config, then walk for the rest',
+          'tools/benchmark/ts-program.mjs::buildProgram — a monorepo has one tsconfig per package and none of them lists the whole tree, and `.mjs` files are in no config at all. Scoring against one config blamed the analyzer for every file the compiler had never been shown (ADR 0186)',
+          {cls:'n-warn'}),
+        n('keep','Ask git what to preserve','never a hardcoded list of filenames',
+          'tools/benchmark/reset-vault.mjs::resetVault — the literal KEEP list was correct while the oracles only ran here, then deleted sofie\'s committed `.conducks/*.html` the first time one was pointed elsewhere. `git ls-files` is the exact answer per project and maintains itself (ADR 0171)',
+          {cls:'n-ok'}),
         n('gateall','`npm run gate`','build, 2,469 tests, 3 benchmarks, 36 oracle runs',
           'package.json:87 — the whole apparatus in one command. It is the only thing that runs every oracle against every subject; anything cheaper leaves a subject unscored and reports green'),
         n('hook','One benchmark on commit','7.9s, and only when prune\'s own files are staged',
@@ -383,17 +315,18 @@ export const BAND5 = {
           'tools/benchmark/projects.json — a tool proved on one project is proved on one project. The three test subjects were chosen to differ in language and in layout, because the defects found were split roughly evenly between the two axes'),
         n('noci','There is no CI','every gate here is local, and a clean machine is untested',
           'docs/memory.md — the pre-commit hook and `npm run gate` are the whole enforcement story, and `--no-verify` bypasses the first. A break that only appears on a machine without this node_modules is invisible until someone hits it',
-          {cls:'n-no'}),
+          {cls:'n-no'})
       ],
-      edges:[['gateall','hook'],['gateall','subj'],['gateall','noci']]},
-  ],
+      edges:[['why','plant'],['plant','counter'],['counter','mutate'],['mutate','fixt'],['indep','except'],['indep','probe'],['probe','prog'],['prog','keep'],['gateall','hook'],['gateall','subj'],['gateall','noci']]},
+
+    ],
   crossEdges:[
     ['prog','plant','what real code could not cover'],
     ['fixt','subj','every scenario runs on generated projects, not these'],
   ],
 };
 
-export const BANDS = [BAND1, BAND2, BAND3, BAND4, BAND5];
+export const BANDS = [BAND1, BAND2, BAND3, BAND4];
 
 // Bands are chapters of ONE drawing, and edges between them may point backwards — that is what makes
 // the picture a CYCLE rather than a stack. Both of these do: Band 2 reads what Band 1 wrote, and the

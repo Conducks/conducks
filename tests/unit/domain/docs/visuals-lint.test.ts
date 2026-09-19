@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   lintVisuals, resolveAnchor, definesSymbol, constantValue, collectVisualPages,
-  buildStamps, staleStamps,
+  buildStamps, staleStamps, unstampedExemptionsOf,
   type VisualPage,
 } from "@/lib/domain/docs/visuals-lint.js";
 
@@ -139,8 +139,10 @@ describe("lintVisuals", () => {
   });
 
   it("ignores docs-standard filenames written as prose", () => {
-    const r = lintVisuals([page('<span class="file">see architecture.md and MODULE.md</span>')], FILES, read);
-    // No anchor claims were made, so the page reports as unverifiable — not as four broken anchors.
+    // architecture.md is dissolved (ADR 0193) and dropped from PROSE_DOC_NAMES — a name nothing in
+    // the standard writes any more needs no exemption, so it is deliberately not used here.
+    const r = lintVisuals([page('<span class="file">see handover.md and MODULE.md</span>')], FILES, read);
+    // No anchor claims were made, so the page reports as unverifiable — not as broken anchors.
     expect(r.violations.every(v => !v.reason.includes("no such file"))).toBe(true);
   });
 
@@ -302,6 +304,82 @@ describe("review stamps — the second tier of rot (ADR 0141)", () => {
     const two = [note("see `src/daemon.py::run`"), { path: "docs/visuals/modules/other.md", text: "see `src/daemon.py:1`" }];
     const stamps = buildStamps(two, files, readSrc, "docs/visuals/modules/voice.md");
     expect(Object.keys(stamps)).toEqual(["docs/visuals/modules/voice.md"]);
+  });
+
+  // A never-stamped page raises no stale flag, because a flag needs a stamp to compare against. So
+  // "0 stale" on a repo that has never stamped anything read as clean — the rot this cannot see.
+  const REASON = "the daemon must be running to read this value, so it cannot be checked from source";
+
+  it("a page nobody ever stamped is reported, and stamping it clears the report", () => {
+    const pages = [note("see `src/daemon.py::run`")];
+    expect(staleStamps(pages, files, readSrc, {}).unstamped).toEqual(["docs/visuals/modules/voice.md"]);
+    const stamps = buildStamps(pages, files, readSrc);
+    expect(staleStamps(pages, files, readSrc, stamps).unstamped).toEqual([]);
+  });
+
+  it("a page with NO resolving anchor is never demanded — it could not clear the flag if it wanted to", () => {
+    const pages = [note("this note makes no checkable claim at all")];
+    expect(staleStamps(pages, files, readSrc, {}).unstamped).toEqual([]);
+  });
+
+  it("a GENERATED page is not demanded — its .md source is the page a person reads", () => {
+    const src = { path: "docs/visuals/modules/voice.md", text: "see `src/daemon.py::run`" };
+    // An HTML page marks a claim with <title>/class="file"/data-anchor — plain backticks are prose
+    // there, so a fixture without one produces no anchor and would pass this test either way.
+    const claim = '<title>src/daemon.py::run</title>';
+    const rendered = { path: "docs/visuals/modules/voice.html", text: `<b>DERIVED</b>${claim}` };
+    const authored = { path: "docs/visuals/architecture.html", text: claim };
+
+    // Guard the fixture itself: both HTML pages must really carry a stampable anchor, or the
+    // assertion below is vacuous.
+    expect(Object.keys(buildStamps([rendered, authored], files, readSrc))).toHaveLength(2);
+
+    const r = staleStamps([src, rendered, authored], files, readSrc, {});
+    expect(r.unstamped).toEqual(["docs/visuals/architecture.html", "docs/visuals/modules/voice.md"]);
+  });
+
+  it("a page that merely TALKS about derivation is not excused by the word", () => {
+    // The bug this replaced: `\bDERIVED\b` matched prose. A hand-maintained page saying "the SVG is
+    // DERIVED, the shell around it is by hand" excused itself from every check below.
+    const prose = {
+      path: "docs/visuals/architecture.html",
+      text: '<!-- the SVG here is DERIVED, the shell is hand-maintained --><title>src/daemon.py::run</title>',
+    };
+    const rendered = {
+      path: "docs/visuals/modules/voice.html",
+      text: '<div class="meta"><b>DERIVED</b> — rendered from voice.md</div><title>src/daemon.py::run</title>',
+    };
+    expect(Object.keys(buildStamps([prose, rendered], files, readSrc))).toHaveLength(2);
+    const r = staleStamps([prose, rendered], files, readSrc, {});
+    expect(r.unstamped).toEqual(["docs/visuals/architecture.html"]);
+  });
+
+  it("an exemption excuses the page, but only with a real reason", () => {
+    const pages = [note("see `src/daemon.py::run`")];
+    const ok = staleStamps(pages, files, readSrc, {}, { "docs/visuals/modules/voice.md": REASON });
+    expect(ok.unstamped).toEqual([]);
+    expect(ok.exemptErrors).toHaveLength(0);
+
+    const shrug = staleStamps(pages, files, readSrc, {}, { "docs/visuals/modules/voice.md": "later" });
+    expect(shrug.exemptErrors).toHaveLength(1);
+    expect(shrug.exemptErrors[0].severity).toBe("error");
+    // The excuse failed, so the page is still owed a stamp — a bad reason must not buy silence.
+    expect(shrug.unstamped).toEqual(["docs/visuals/modules/voice.md"]);
+  });
+
+  it("an exemption on a page that IS stamped is an error telling you to delete the row", () => {
+    const pages = [note("see `src/daemon.py::run`")];
+    const stamps = buildStamps(pages, files, readSrc);
+    const r = staleStamps(pages, files, readSrc, stamps, { "docs/visuals/modules/voice.md": REASON });
+    expect(r.exemptErrors).toHaveLength(1);
+    expect(r.exemptErrors[0].reason).toMatch(/delete its row/);
+  });
+
+  it("reads the exemption map off conducks.json, and shrugs off anything malformed", () => {
+    expect(unstampedExemptionsOf('{"visuals":{"unstamped":{"a.md":"why"}}}')).toEqual({ "a.md": "why" });
+    expect(unstampedExemptionsOf('{"visuals":{}}')).toEqual({});
+    expect(unstampedExemptionsOf("not json")).toEqual({});
+    expect(unstampedExemptionsOf(null)).toEqual({});
   });
 });
 

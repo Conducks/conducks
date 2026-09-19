@@ -76,7 +76,7 @@ describe('impact prints the call site', () => {
    * Measured on the frozen scraper subject: `impact classify` said `0 Symbols affected` and was
    * RIGHT — nobody calls it. `impact resolve_project_path` said the same and was WRONG — ten callers
    * existed, every one sitting in the graph's unresolved bucket. The reader could not tell the
-   * honest empty from the resolution failure, which is CONDUCKS-37 in its most expensive form.
+   * honest empty from the resolution failure, which is the confident-empty-result rule (docs/visuals/modules/domain/governance.md) in its most expensive form.
    * An empty answer now states what was examined and how many unresolved references share the
    * symbol's name — the number that decides whether the zero is trustworthy.
    */

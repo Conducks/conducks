@@ -10,7 +10,8 @@ import { ConducksAdjacencyList } from '@/lib/core/graph/index.js';
  * `audit` exists to find them — so an unvisited-set bug here is a product that stops responding.
  *
  * Driven through `ConducksAdjacencyList`, which is how every caller reaches it, rather than through
- * the static directly: the id-lowercasing (CONDUCKS-4) happens on the way in, and a test that
+ * the static directly: the id-lowercasing (canonical lowercase ids: docs/visuals/modules/contracts.md)
+ * happens on the way in, and a test that
  * skipped it would pass while every real caller failed.
  */
 const node = (id: string, layer = 0) => ({
@@ -75,7 +76,8 @@ describe('traverseUpstream — who is affected if this changes', () => {
   });
 
   it('keys the START node by its lowercased id, because ids are lowercased on write', () => {
-    // CONDUCKS-4. A user pastes a real-cased path out of their editor and every macOS temp dir has
+    // Canonical lowercase ids (see docs/visuals/modules/contracts.md). A user pastes a
+    // real-cased path out of their editor and every macOS temp dir has
     // one. Asserted on the START key specifically: every OTHER key comes from an edge, which is
     // already lowercase, so a test that checked a neighbour would pass without the lowercasing and
     // hide the one id that needs it. Mutation caught exactly that.

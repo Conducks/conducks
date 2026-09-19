@@ -6,7 +6,7 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 
 // Multi-workspace domain: cross-project linking (FederatedLinker,
 // src/lib/core/graph/linker-federated.ts). No MCP tool exists for this — MCP is read-only by
-// design (CONDUCKS-8) and linking writes `.conducks/links.json`, so it was always meant to be
+// design (see docs/visuals/modules/interfaces/tools.md) and linking writes `.conducks/links.json`, so it was always meant to be
 // CLI-only, same as `setup`.
 //
 // This suite was written against a production bug, now FIXED: `conducks link` was unreachable.

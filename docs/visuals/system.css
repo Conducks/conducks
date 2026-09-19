@@ -1,19 +1,92 @@
+  /* Every colour on every page comes from a name below. A raw hex written past this
+     block cannot be re-themed, which is how this sheet spent 323 lines with no light
+     mode and 29 raw values scattered through it (conducks-visuals references/design.md §1).
 
+     Roles, not colour names: --ink-2 survives a palette change, --grey does not.
+     The meaning hues each carry three slots — the hue itself, a -soft ground to sit a
+     pill on, and a -line for its border. */
   :root{
-    --bg:#0b0d10; --panel:#12161b; --line:#222a33; --txt:#dfe6ee; --mut:#8b98a8; --dim:#5c6875;
-    --ok:#3fb950; --no:#f85149; --cond:#d29922; --sofie:#3fb9a8; --accent:#58a6ff; --warn:#f0883e;
+    /* ground */
+    --bg:#f7f8fa; --panel:#ffffff; --sunk:#eef1f5; --deep:#e8ecf2; --field:#ffffff;
+    /* ink */
+    --txt:#14161c; --mut:#4d5563; --dim:#77808f;
+    /* rules */
+    --line:#dde2ea; --line-2:#c6cdd8; 
+    /* meaning — hue, its ground, its border */
+    --ok:#1a7f45;   --ok-soft:#e3f4ea;   --ok-line:#a8d8bd;
+    --no:#c0272d;   --no-soft:#fdeaea;   --no-line:#eeb4b6;
+    --cond:#8a5a00; --cond-soft:#fbf0da; --cond-line:#e3c68a;
+    --warn:#9a5b00; --warn-soft:#fdf0dc; --warn-line:#e6c48f;
+    --sig:#0f7d6f;  --sig-soft:#dff3ef;  --sig-line:#9ad3c9;
+    --accent:#2f5fd0; --accent-soft:#e6edfb; --accent-line:#adc2ee;
+    --dead:#6b4fa8; --dead-soft:#efe9fa; --dead-line:#c4b2e6;
+    --gold:#8a6d28;
+    /* the canvas — its own grounds, so the drawing can sit deeper than the page */
+     --band:#ffffff; --band-line:#dde2ea;
+    --cont:#fbfcfe; --cont-line:#ccd4df;
+    --edge:#8b95a4; --hint:#b3bcc8; --mini:#c3ccd8;
+    --scrim:rgba(255,255,255,.92); --scrim-2:rgba(255,255,255,.94);
+    --vp:rgba(15,125,111,.13);
+    /* faces — display for headings, sans for prose, mono for every receipt */
     --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+    --sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    /* The display role is a stack, not a download. These pages are static files opened from
+       disk, and a webfont link would make the headings depend on a network the rest of the
+       page does not need. So --disp prefers a face if the reader has one and otherwise
+       resolves to the same family as --sans, where the role is carried by weight, size and
+       tracking instead. Vendor a face and this becomes a real second family with no other
+       change. */
+    --disp:"Archivo",Inter,-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  /* Dark is a re-declaration of the same names, never a second set. A colour whose only
+     definition lives inside a media block has no value in the other theme. */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#0b0d10; --panel:#12161b; --sunk:#0f1318; --deep:#0a0c0f; --field:#0c1015;
+    --txt:#dfe6ee; --mut:#8b98a8; --dim:#5c6875;
+    --line:#222a33; --line-2:#2f3945; 
+    --ok:#4bb573;   --ok-soft:#0f2015;   --ok-line:#1f6b32;
+    --no:#e5626b;   --no-soft:#2a1216;   --no-line:#7a2b30;
+    --cond:#d3a04a; --cond-soft:#241708; --cond-line:#7a4a1f;
+    --warn:#e0913f; --warn-soft:#241708; --warn-line:#7a4a1f;
+    --sig:#3fb9a8;  --sig-soft:#0f2a26;  --sig-line:#2b6f64;
+    --accent:#6f9dea; --accent-soft:#0d1a26; --accent-line:#1f4f79;
+    --dead:#a98fd8; --dead-soft:#1a1226; --dead-line:#4a3570;
+    --gold:#c7a86b;
+     --band:#0a0d11; --band-line:#242c36;
+    --cont:#0d1117; --cont-line:#2f3945;
+    --edge:#3a4552; --hint:#39434f; --mini:#2b3441;
+    --scrim:rgba(12,16,20,.92); --scrim-2:rgba(10,13,17,.94);
+    --vp:rgba(63,185,168,.13);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0b0d10; --panel:#12161b; --sunk:#0f1318; --deep:#0a0c0f; --field:#0c1015;
+    --txt:#dfe6ee; --mut:#8b98a8; --dim:#5c6875;
+    --line:#222a33; --line-2:#2f3945; 
+    --ok:#4bb573;   --ok-soft:#0f2015;   --ok-line:#1f6b32;
+    --no:#e5626b;   --no-soft:#2a1216;   --no-line:#7a2b30;
+    --cond:#d3a04a; --cond-soft:#241708; --cond-line:#7a4a1f;
+    --warn:#e0913f; --warn-soft:#241708; --warn-line:#7a4a1f;
+    --sig:#3fb9a8;  --sig-soft:#0f2a26;  --sig-line:#2b6f64;
+    --accent:#6f9dea; --accent-soft:#0d1a26; --accent-line:#1f4f79;
+    --dead:#a98fd8; --dead-soft:#1a1226; --dead-line:#4a3570;
+    --gold:#c7a86b;
+     --band:#0a0d11; --band-line:#242c36;
+    --cont:#0d1117; --cont-line:#2f3945;
+    --edge:#3a4552; --hint:#39434f; --mini:#2b3441;
+    --scrim:rgba(12,16,20,.92); --scrim-2:rgba(10,13,17,.94);
+    --vp:rgba(63,185,168,.13);
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);
-       font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+       font:15px/1.65 var(--sans);
+       -webkit-font-smoothing:antialiased;
        padding:40px 24px 90px}
   .wrap{max-width:1180px;margin:0 auto}
-  h1{font-size:27px;margin:0 0 6px;letter-spacing:-.02em}
-  h2{font-size:19px;margin:52px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line);letter-spacing:-.01em}
-  h3{font-size:14px;margin:26px 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.09em}
+  h1{font-family:var(--disp);font-size:31px;font-weight:700;margin:0 0 6px;letter-spacing:-.025em}
+  h2{font-family:var(--disp);font-size:22px;font-weight:600;margin:52px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line-2);letter-spacing:-.015em}
+  h3{font-family:var(--disp);font-size:16px;font-weight:600;margin:26px 0 10px;color:var(--txt);letter-spacing:-.01em}
   p{margin:12px 0}
-  code{font-family:var(--mono);font-size:12.5px;background:#1a2028;padding:1.5px 5px;border-radius:4px;color:#a9c7e8}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1.5px 5px;border-radius:4px;color:var(--accent)}
   .sub{color:var(--mut);font-size:14px;margin-bottom:26px}
   .meta{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
         border-radius:6px;padding:14px 18px;margin:22px 0;font-size:13.5px;color:var(--mut)}
@@ -21,18 +94,23 @@
   table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px}
   th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
   th{color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;
-     background:#0f1318;position:sticky;top:0}
-  tbody tr:hover{background:#11161c}
-  .y{color:var(--ok);font-weight:700} .n{color:var(--no);font-weight:700} .c{color:var(--cond);font-weight:700}
+     background:var(--sunk);position:sticky;top:0}
+  tbody tr:hover{background:var(--sunk)}
+  .y,.n,.c{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+           font-weight:600;padding:2px 7px;border-radius:3px;border:1px solid;white-space:nowrap;
+           display:inline-block;line-height:1.5}
+  .y{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-line)}
+  .n{color:var(--no);background:var(--no-soft);border-color:var(--no-line)}
+  .c{color:var(--cond);background:var(--cond-soft);border-color:var(--cond-line)}
   .file{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
   .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:1.5px 7px;border-radius:20px;
        border:1px solid;margin-right:6px;vertical-align:1px}
-  .t-traced{color:var(--ok);border-color:#1f6b32;background:#0f2015}
-  .t-measured{color:var(--accent);border-color:#1f4f79;background:#0d1a26}
-  .t-open{color:var(--warn);border-color:#7a4a1f;background:#241708}
+  .t-traced{color:var(--ok);border-color:var(--ok-line);background:var(--ok-soft)}
+  .t-measured{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+  .t-open{color:var(--warn);border-color:var(--warn-line);background:var(--warn-soft)}
   .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));margin:16px 0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:15px 17px}
-  .card h4{margin:0 0 7px;font-size:14px;color:var(--sofie)}
+  .card h4{margin:0 0 7px;font-size:14px;color:var(--sig)}
   .card p{margin:5px 0;font-size:13px;color:var(--mut)}
   .prob{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--no);
         border-radius:6px;padding:14px 18px;margin:13px 0}
@@ -40,24 +118,24 @@
   .prob h4{margin:0 0 6px;font-size:14.5px;color:var(--txt)}
   .prob p{margin:6px 0;font-size:13.5px;color:var(--mut)}
   .owner{float:right;font-family:var(--mono);font-size:11px;color:var(--accent);
-         border:1px solid #1f4f79;border-radius:4px;padding:2px 8px}
+         border:1px solid var(--accent-line);border-radius:4px;padding:2px 8px}
   svg{max-width:100%;height:auto;display:block;margin:18px 0}
   .n-box{fill:var(--panel);stroke:var(--line)}
-  .n-hi{fill:#0f2a26;stroke:#2b6f64}
-  .n-warn{fill:#241708;stroke:#7a4a1f}
-  .n-t{fill:var(--txt);font:12px -apple-system,sans-serif}
+  .n-hi{fill:var(--sig-soft);stroke:var(--sig-line)}
+  .n-warn{fill:var(--warn-soft);stroke:var(--warn-line)}
+  .n-t{fill:var(--txt);font:12px var(--sans)}
   .n-s{fill:var(--mut);font:10.5px var(--mono)}
-  .edge{stroke:#3a4552;stroke-width:1.5;fill:none;marker-end:url(#a)}
-  .edge-d{stroke:#3a4552;stroke-width:1.5;fill:none;stroke-dasharray:4 4;marker-end:url(#a)}
-  .edge-b{stroke:#5b4a7d;stroke-width:1.6;fill:none;marker-end:url(#b)}
-  .edge-u{stroke:#7a4a1f;stroke-width:1.4;fill:none;stroke-dasharray:5 4;marker-end:url(#c)}
-  .n-bg{fill:#1a1226;stroke:#4a3570}
-  .n-ok{fill:#0f2015;stroke:#1f6b32}
-  .sec{fill:none;stroke:#2a323c;stroke-width:1;stroke-dasharray:3 3}
+  .edge{stroke:var(--edge);stroke-width:1.5;fill:none;marker-end:url(#a)}
+  .edge-d{stroke:var(--edge);stroke-width:1.5;fill:none;stroke-dasharray:4 4;marker-end:url(#a)}
+  .edge-b{stroke:var(--dead-line);stroke-width:1.6;fill:none;marker-end:url(#b)}
+  .edge-u{stroke:var(--warn-line);stroke-width:1.4;fill:none;stroke-dasharray:5 4;marker-end:url(#c)}
+  .n-bg{fill:var(--dead-soft);stroke:var(--dead-line)}
+  .n-ok{fill:var(--ok-soft);stroke:var(--ok-line)}
+  .sec{fill:none;stroke:var(--line-2);stroke-width:1;stroke-dasharray:3 3}
   .sec-t{fill:var(--dim);font:10.5px var(--mono);letter-spacing:.08em}
   .lbl{fill:var(--dim);font:10.5px var(--mono)}
-  .b-t{fill:var(--txt);font:13.5px -apple-system,sans-serif;font-weight:600}
-  .b-s{fill:var(--mut);font:11px -apple-system,sans-serif}
+  .b-t{fill:var(--txt);font:13.5px var(--sans);font-weight:600}
+  .b-s{fill:var(--mut);font:11px var(--sans)}
   .blk{cursor:pointer}
   /* The i marker is the only part that OPENS on a single click; the rest of the block selects.
      Its hit disc is transparent but must still take the pointer, so fill:transparent not none —
@@ -65,16 +143,16 @@
   .hint-h{fill:transparent;cursor:pointer}
   .hint-h:hover{fill:var(--accent);fill-opacity:.16}
   .blk:hover rect{stroke:var(--accent);stroke-width:1.8}
-  .hint{fill:none;stroke:#39434f}
+  .hint{fill:none;stroke:var(--hint)}
   .blk:hover .hint{stroke:var(--accent)}
   .hint-t{fill:var(--dim);font:9px var(--mono);text-anchor:middle}
   .blk:hover .hint-t{fill:var(--accent)}
-  .fg{color:var(--ok);font-weight:600} .bgk{color:#a98fd8;font-weight:600}
+  .fg{color:var(--ok);font-weight:600} .bgk{color:var(--dead);font-weight:600}
   .warn{color:var(--warn)}
   .todo{color:var(--warn);font-size:13px;border-left:3px solid var(--warn);padding-left:12px}
   footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
   footer.readlog{font:11.5px var(--mono);line-height:1.7;color:var(--dim)}
-  footer.readlog code{color:var(--sofie)}
+  footer.readlog code{color:var(--sig)}
   a{color:var(--accent)}
 
   /* ── page nav (added at the 3-page split) ── */
@@ -84,44 +162,44 @@
               background:var(--panel);text-decoration:none;color:var(--mut);font-size:13px;line-height:1.35}
   nav.pages a b{display:block;color:var(--txt);font-weight:600;font-size:13.5px}
   nav.pages a:hover{border-color:var(--accent)}
-  nav.pages a.here{border-color:var(--sofie);background:#0f2a26}
-  nav.pages a.here b{color:var(--sofie)}
+  nav.pages a.here{border-color:var(--sig);background:var(--sig-soft)}
+  nav.pages a.here b{color:var(--sig)}
   .elsewhere{color:var(--mut);font-size:13px;margin:0 0 30px}
   .elsewhere b{color:var(--txt)}
   .anchors td:first-child{white-space:nowrap}
-  .prob:target{border-left-color:var(--accent);background:#0d1a26}
+  .prob:target{border-left-color:var(--accent);background:var(--accent-soft)}
 
   /* ── containers are clickable: a container opens its entry page ── */
-  .cont-r{fill:#0d1117;stroke:#2f3945;stroke-dasharray:none;stroke-width:1.2}
+  .cont-r{fill:var(--cont);stroke:var(--cont-line);stroke-dasharray:none;stroke-width:1.2}
   .cont a{cursor:pointer}
-  .cont:hover .cont-r{stroke:var(--sofie)}
+  .cont:hover .cont-r{stroke:var(--sig)}
   .cont-t{fill:var(--txt);font:14px var(--mono);letter-spacing:.10em;font-weight:600}
-  .cont-s{fill:var(--dim);font:11px -apple-system,sans-serif}
+  .cont-s{fill:var(--dim);font:11px var(--sans)}
   .cont-go{fill:var(--dim);font:11px var(--mono);text-anchor:end}
-  .cont:hover .cont-go{fill:var(--sofie)}
-  .cont:hover .cont-t{fill:var(--sofie)}
+  .cont:hover .cont-go{fill:var(--sig)}
+  .cont:hover .cont-t{fill:var(--sig)}
   .blk a{cursor:pointer}
   /* a block deep-linked from the architecture highlights itself on arrival */
   .det.fixed{border-left-color:var(--ok);opacity:.72}
-  .det:target{border-left-color:var(--sofie);background:#0f2a26}
+  .det:target{border-left-color:var(--sig);background:var(--sig-soft)}
   .det{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
        border-radius:7px;padding:15px 18px;margin:14px 0}
   .det h3{margin:0 0 4px;font-size:15px;color:var(--txt);text-transform:none;letter-spacing:0}
   .det .where{font-family:var(--mono);font-size:11.5px;color:var(--accent);margin:2px 0 9px}
   .det p{margin:7px 0;font-size:13.5px;color:var(--mut)}
   .back{display:inline-block;margin:0 0 18px;font-size:13px}
-  .edge-plain{stroke:#3a4552;stroke-width:1.5;fill:none}
+  .edge-plain{stroke:var(--edge);stroke-width:1.5;fill:none}
 
   /* ── layer nav: navigation WITHIN the architecture, not a top-level tab ── */
   nav.layers{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 30px}
   nav.layers a{padding:7px 13px;border:1px solid var(--line);border-radius:6px;background:var(--panel);
                text-decoration:none;color:var(--mut);font-size:12.5px}
   nav.layers a b{color:var(--txt);font-weight:600;margin-right:6px}
-  nav.layers a:hover{border-color:var(--sofie)}
-  h2[id^="layer"]{border-bottom:2px solid var(--sofie);margin-top:64px}
+  nav.layers a:hover{border-color:var(--sig)}
+  h2[id^="layer"]{border-bottom:2px solid var(--sig);margin-top:64px}
 
   /* ── the canvas: one picture, zoom and pan ── */
-  .canvas-wrap{position:relative;border:1px solid var(--line);border-radius:10px;background:#0a0c0f;
+  .canvas-wrap{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--deep);
                margin:22px 0;overflow:hidden}
   .canvas-wrap svg{display:block;width:100%;height:80vh;cursor:grab;margin:0}
   /* fullscreen — the API path and the overlay fallback land in the same place */
@@ -132,26 +210,26 @@
   .canvas-wrap.is-full .zoom-bar{top:16px;right:16px}
   .canvas-wrap svg.grabbing{cursor:grabbing}
   .zoom-bar{position:absolute;top:12px;right:12px;z-index:5;display:flex;align-items:center;gap:6px;
-            background:rgba(12,16,20,.92);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+            background:var(--scrim);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
   .zoom-bar button{background:var(--panel);color:var(--txt);border:1px solid var(--line);
                    border-radius:5px;font:12px var(--mono);padding:3px 9px;cursor:pointer}
-  .zoom-bar button:hover{border-color:var(--sofie);color:var(--sofie)}
+  .zoom-bar button:hover{border-color:var(--sig);color:var(--sig)}
   .zoom-hint{color:var(--dim);font:11px var(--mono);margin-left:4px}
-  .zoom-pct{color:var(--sofie);font:11px var(--mono);min-width:42px;text-align:right}
-  .band-n{fill:var(--sofie);font:600 34px var(--mono)}
-  .band-t{fill:var(--txt);font:600 19px -apple-system,sans-serif;letter-spacing:.02em}
-  .band-s{fill:var(--mut);font:13px -apple-system,sans-serif}
+  .zoom-pct{color:var(--sig);font:11px var(--mono);min-width:42px;text-align:right}
+  .band-n{fill:var(--sig);font:600 34px var(--mono)}
+  .band-t{fill:var(--txt);font:600 19px var(--sans);letter-spacing:.02em}
+  .band-s{fill:var(--mut);font:13px var(--sans)}
 
   /* full-bleed: the canvas uses the whole window width, the prose stays readable */
   .bleed{width:100vw;margin-left:calc(50% - 50vw);padding:0 18px 4px}
-  .band-r{fill:#0a0d11;stroke:#242c36;stroke-width:1.2}
+  .band-r{fill:var(--band);stroke:var(--band-line);stroke-width:1.2}
 
 
   /* a long edge is drawn in full, but reads as a deliberate span; hover to trace it */
-  .edge-far{stroke:var(--sofie);stroke-width:1.6;fill:none;opacity:.45;marker-end:url(#a)}
+  .edge-far{stroke:var(--sig);stroke-width:1.6;fill:none;opacity:.45;marker-end:url(#a)}
   .e{cursor:crosshair}
   .e:hover .edge-far{opacity:1;stroke-width:2.6}
-  .e:hover .edge{stroke:var(--sofie);stroke-width:2.6}
+  .e:hover .edge{stroke:var(--sig);stroke-width:2.6}
 
   /* selecting an edge: a fat invisible path makes a 1.5px line clickable */
   .edge-hit{stroke:transparent;stroke-width:14;fill:none;pointer-events:stroke}
@@ -166,19 +244,19 @@
 
   /* find, block selection and the mini-map */
   .zoom-bar{flex-wrap:wrap;max-width:min(96vw,920px)}
-  .find{background:#0c1015;border:1px solid var(--line);border-radius:5px;color:var(--txt);
+  .find{background:var(--field);border:1px solid var(--line);border-radius:5px;color:var(--txt);
         font:12px var(--mono);padding:4px 9px;width:148px;outline:none}
-  .find:focus{border-color:var(--sofie)}
-  .find-n{color:var(--sofie);font:11px var(--mono);min-width:34px}
+  .find:focus{border-color:var(--sig)}
+  .find-n{color:var(--sig);font:11px var(--mono);min-width:34px}
   .blk.hit rect{stroke:var(--warn);stroke-width:3}
   svg.has-sel .blk.on rect{stroke:var(--warn);stroke-width:2.4}
   svg.has-sel .blk.pick rect{stroke:var(--warn);stroke-width:3.4}
   svg.has-sel .cont-r{opacity:.45}
   .minimap{position:absolute;right:12px;bottom:12px;width:148px;height:206px;z-index:6;
-           background:rgba(10,13,17,.94);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+           background:var(--scrim-2);border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .minimap svg{width:100%;height:100%;display:block;margin:0;cursor:crosshair}
-  #mini-g rect{fill:#2b3441}
-  #mini-vp{fill:rgba(63,185,168,.13);stroke:var(--sofie);stroke-width:8;vector-effect:non-scaling-stroke}
+  #mini-g rect{fill:var(--mini)}
+  #mini-vp{fill:var(--vp);stroke:var(--sig);stroke-width:8;vector-effect:non-scaling-stroke}
 
   /* ── trace pages ──────────────────────────────────────────────────────────────
      A visual on a DIFFERENT SUBJECT from the canvas — a runtime trace, which
@@ -186,14 +264,14 @@
      page in this folder, so its classes live in this file.
 
      They did not. `system-trace.html` shipped 180 lines of private <style> with a
-     second palette (--signal, --good, --dead against --sofie, --ok, --accent), so
+     second palette (--signal, --good, --dead against what were then --sofie, --ok, --accent), so
      the one page in the folder that nothing shared was also the one nothing could
      restyle. Same failure as a second renderer, one layer down.
 
      Everything is scoped to `.tracepage` so none of it can reach the canvas. */
-  .tracepage{--r:4px; --panel-2:#1a2028; --line-soft:#1a212a; --sig-soft:#0f2a26;
-             --ok-soft:#0f2015; --warn-soft:#241708; --no-soft:#2a1216;
-             --dead:#a98fd8; --dead-soft:#1a1226}
+  .tracepage{--r:4px; --panel-2:var(--sunk); --line-soft:var(--line); --sig-soft:var(--sig-soft);
+             --ok-soft:var(--ok-soft); --warn-soft:var(--warn-soft); --no-soft:var(--no-soft);
+             --dead:var(--dead); --dead-soft:var(--dead-soft)}
   .tracepage h1{font-size:clamp(1.9rem,5vw,2.6rem);line-height:1.1;margin:0}
   .tracepage h2{font-size:clamp(1.2rem,3vw,1.5rem);margin:0;padding:0;border:0}
   .tracepage h3{font-size:1rem;margin:0;color:var(--txt);text-transform:none;letter-spacing:-.01em}
@@ -214,11 +292,11 @@
         text-transform:uppercase;padding:.1rem .34rem;border-radius:2px;white-space:nowrap;
         vertical-align:.12em}
   .prov.traced{background:var(--ok-soft);color:var(--ok)}
-  .prov.measured{background:var(--sig-soft);color:var(--sofie)}
+  .prov.measured{background:var(--sig-soft);color:var(--sig)}
   .prov.queried{background:var(--panel-2);color:var(--mut)}
   .prov.authored{background:var(--dead-soft);color:var(--dead)}
   .prov.unver{background:var(--no-soft);color:var(--no)}
-  .provenance{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--sofie);
+  .provenance{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--sig);
               border-radius:var(--r);padding:1rem 1.15rem;display:flex;flex-direction:column;gap:.7rem}
   .provenance dl{margin:0;display:grid;gap:.3rem 1rem;grid-template-columns:max-content 1fr;font-size:.83rem}
   .provenance dt{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
@@ -229,12 +307,12 @@
                 border-radius:var(--r);padding:1.3rem 1rem}
   .mermaid{min-width:720px}
 
-  .claim{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--sig,var(--sofie));
+  .claim{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--sig,var(--sig));
          border-radius:var(--r);padding:1.05rem 1.1rem;display:flex;flex-direction:column;gap:.5rem}
   .claim.ok{--sig:var(--ok)} .claim.no{--sig:var(--no)}
   .claim h3{font-size:.95rem} .claim p{font-size:.9rem;color:var(--mut)}
   .verdict{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
-           color:var(--sig,var(--sofie))}
+           color:var(--sig,var(--sig))}
   .thesis{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 
   /* a flow lane — one path, left to right, with what each step hands the next */
@@ -242,7 +320,7 @@
   .lane+.lane{margin-top:1.15rem}
   .lane-head{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap;padding:.7rem 1rem;
              background:var(--panel-2);border-bottom:1px solid var(--line)}
-  .lane-head .n{font-family:var(--mono);font-size:.7rem;color:var(--sofie);letter-spacing:.1em;font-weight:400}
+  .lane-head .n{font-family:var(--mono);font-size:.7rem;color:var(--sig);letter-spacing:.1em;font-weight:400}
   .lane-head h3{font-size:.98rem}
   .lane-head .trigger{font-family:var(--mono);font-size:.72rem;color:var(--dim)}
   .track{overflow-x:auto;padding:1.15rem 1rem 1.3rem}
@@ -251,7 +329,7 @@
          border-radius:var(--r);padding:.6rem .7rem;display:flex;flex-direction:column;gap:.32rem}
   .stage .fn{font-family:var(--mono);font-size:.76rem;color:var(--txt);font-weight:600}
   .stage .what{font-size:.76rem;color:var(--mut);line-height:1.4}
-  .stage.emit{border-color:var(--sofie);background:var(--sig-soft)}
+  .stage.emit{border-color:var(--sig);background:var(--sig-soft)}
   .stage.oracle{border-color:var(--ok);background:var(--ok-soft)}
   .stage.risk{border-color:var(--no);background:var(--no-soft)}
   .wire{flex:0 0 auto;width:44px;display:flex;flex-direction:column;align-items:center;
@@ -261,7 +339,7 @@
                border-left:5px solid var(--line);border-top:4px solid transparent;
                border-bottom:4px solid transparent}
   .wire .payload{position:relative;z-index:1;background:var(--panel);font-family:var(--mono);
-                 font-size:.6rem;color:var(--sofie);padding:.1rem .2rem;text-align:center;
+                 font-size:.6rem;color:var(--sig);padding:.1rem .2rem;text-align:center;
                  line-height:1.25;border-radius:2px}
   .lane-foot{border-top:1px dashed var(--line);padding:.7rem 1rem .85rem;font-size:.82rem;
              color:var(--mut);display:flex;flex-direction:column;gap:.3rem}
@@ -280,7 +358,7 @@
   .pill.warn{background:var(--warn-soft);color:var(--warn)}
   .pill.bad{background:var(--no-soft);color:var(--no)}
   .pill.dead{background:var(--dead-soft);color:var(--dead)}
-  .pill.sig{background:var(--sig-soft);color:var(--sofie)}
+  .pill.sig{background:var(--sig-soft);color:var(--sig)}
 
   /* small prose inside a trace section — six places had it as an inline font-size, in three
      sizes that nobody chose deliberately. One class, one size. */
@@ -317,7 +395,97 @@
      says "I tried this"; the amber says "not on what is running now". Dropping
      such ticks was the old rule, and a build id is a git hash — every commit
      voided a whole pass, including one that touched only markdown. */
-  li.carried{border-left:2px solid #c7a86b;padding-left:.5rem}
+  li.carried{border-left:2px solid var(--gold);padding-left:.5rem}
   li.carried label{opacity:.72}
   li.carried label::after{content:" · tested on build " attr(data-carried);
-                          font-family:var(--mono);font-size:.7rem;color:#c7a86b}
+                          font-family:var(--mono);font-size:.7rem;color:var(--gold)}
+
+  /* ── the substrate strip ──────────────────────────────────────────────────
+     A contract is not a feature and gets no box among them (conducks-visuals
+     SKILL.md §2). It sits under the drawing, named, with no edges — because a
+     contract is read by nearly everything, so drawing those edges would put the
+     densest region of the picture on its least interesting node. Dashed, so it
+     reads as ground rather than as another box in the flow. */
+  .sub-r{fill:var(--sunk);stroke:var(--line-2);stroke-dasharray:6 4}
+  .sub-c:hover .sub-r{stroke:var(--sig);stroke-dasharray:none}
+
+  /* ── the testing page ─────────────────────────────────────────────────────
+     Carried in EVERY project built to these rules, including the ones that
+     render no testing page. `system.css` is shared byte-for-byte (conducks-
+     visuals references/setup.md §1), and a file that only holds what the
+     current project happens to render is not shared — it is a fork waiting
+     for the day someone writes a testing.md and finds the page unstyled. */
+  /* ── testing.html ──────────────────────────────────────────────────────────
+     A manual test pass: features, their tasks, a tick and a note per task.
+     Scoped under .testpage because it is one page's furniture, and because a
+     testing page is mostly form controls — which is exactly what a private
+     stylesheet gets written for, and why this block is here instead. */
+  .testpage .build{font-family:var(--mono);font-size:11.5px;color:var(--warn)}
+  .testpage .tallies{display:flex;gap:18px;flex-wrap:wrap;align-items:center;
+                     font-family:var(--mono);font-size:12px;color:var(--mut);
+                     font-variant-numeric:tabular-nums}
+  .testpage .tallies b{color:var(--txt)}
+  .testpage .tallies .bad{color:var(--no)}
+  .testpage .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 0}
+  .testpage button{font-family:var(--mono);font-size:12px;border:1px solid var(--line);
+                   background:var(--panel);color:var(--txt);padding:7px 13px;border-radius:6px;
+                   cursor:pointer}
+  .testpage button:hover{border-color:var(--accent)}
+  .testpage button.go{border-color:var(--sig);color:var(--sig)}
+  .testpage .said{font-family:var(--mono);font-size:11.5px;color:var(--ok);opacity:0;
+                  transition:opacity .2s}
+  .testpage .said.on{opacity:1}
+  /* Clearing everything is not an action anybody comes here to do, so it does
+     not look like one. Last in the row, quiet, and it still asks first. */
+  .testpage .wipe{margin-left:auto;font-size:12px;color:var(--dim);text-decoration:none;
+    border-bottom:1px dotted var(--line)}
+  .testpage .wipe:hover{color:var(--no);border-bottom-color:currentColor}
+
+  .testpage .feat{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+                  margin:11px 0;padding:13px 17px}
+  .testpage .feat.all{border-left:3px solid var(--ok)}
+  .testpage .feat.bad{border-left:3px solid var(--no)}
+  .testpage .feat-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .testpage .feat-h h4{margin:0;font-size:14.5px;color:var(--txt);flex:1 1 14rem}
+  .testpage .fid{font-family:var(--mono);font-size:11.5px;color:var(--sig)}
+  .testpage .tally{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap}
+  .testpage .tally.all{color:var(--ok)} .testpage .tally.bad{color:var(--no)}
+  .testpage .how{margin:7px 0 0;font-size:13px;color:var(--mut)}
+  .testpage .how.warn{color:var(--warn)}
+
+  .testpage ul.tasks{list-style:none;margin:9px 0 0;padding:0}
+  .testpage li.task{border-top:1px solid var(--line);padding:8px 0 6px}
+  .testpage .row{display:flex;gap:9px;align-items:flex-start}
+  /* Drawn by hand, not by the browser. A native checkbox keeps its own paint size
+     and ignores width/height in Safari, so the tick sat away from the box you press. */
+  .testpage .task input[type=checkbox]{appearance:none;-webkit-appearance:none;margin:3px 0 0;
+                                       width:17px;height:17px;flex:none;cursor:pointer;
+                                       background:var(--sunk);border:1px solid var(--line);
+                                       border-radius:4px;position:relative}
+  .testpage .task input[type=checkbox]:hover{border-color:var(--mut)}
+  .testpage .task input[type=checkbox]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .testpage .task input[type=checkbox]:checked{background:var(--ok);border-color:var(--ok)}
+  .testpage .task input[type=checkbox]:checked::after{content:"";position:absolute;
+                                       left:5px;top:1px;width:4px;height:9px;
+                                       border:solid var(--sunk);border-width:0 2px 2px 0;
+                                       transform:rotate(45deg)}
+  .testpage .tid{font-family:var(--mono);font-size:11px;color:var(--dim);flex:none;padding-top:1px}
+  .testpage .task label{flex:1;font-size:13.5px;cursor:pointer}
+  .testpage .task.on label{color:var(--mut)}
+  /* What a pass looks like, under the action rather than inside it. */
+  .testpage .task .pass{display:block;margin-top:3px;font-size:12.5px;color:var(--dim)}
+  .testpage .task.on .pass{opacity:.55}
+  .testpage .task input[type=text]{width:100%;margin:6px 0 0 26px;background:var(--sunk);
+                                   color:var(--txt);border:1px solid var(--line);border-radius:5px;
+                                   padding:6px 9px;font-size:13px}
+  .testpage .task input[type=text]:focus{outline:none;border-color:var(--accent)}
+  .testpage .task input[type=text]:not(:placeholder-shown){border-color:var(--no)}
+
+  /* A tick carried from an EARLIER build (conducks-visuals §0 rule 6). It still
+     says "I tried this"; the amber says "not on what is running now". Dropping
+     such ticks was the old rule, and a build id is a git hash — every commit
+     voided a whole pass, including one that touched only markdown. */
+  li.carried{border-left:2px solid var(--gold);padding-left:.5rem}
+  li.carried label{opacity:.72}
+  li.carried label::after{content:" · tested on build " attr(data-carried);
+                          font-family:var(--mono);font-size:.7rem;color:var(--gold)}

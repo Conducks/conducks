@@ -4,7 +4,7 @@
  * The vault, and the two things that decide whether it is worth re-reading: a content hash per file,
  * and the comparison between those hashes and what is on disk.
  *
- * CONDUCKS-5 already said "all persistence goes through the driver interface, direct DuckDB calls
+ * docs/visuals/modules/core/persistence.md already says "all persistence goes through the driver interface, direct DuckDB calls
  * are forbidden outside this layer". This door is that rule made checkable rather than remembered —
  * `getRawConnection` is exported because two callers legitimately need it, and now every one of them
  * is visible in one place instead of anywhere an import can be written.

@@ -22,6 +22,12 @@ tool was the one exception: it mutated source, was annotated `destructiveHint: t
 to `dryRun: true`. `tests/unit/adr-invariants.test.ts` now fails if any tool declares itself
 destructive again, so "read-only" here covers the graph AND the tree.
 
+**`pulseId` is always system-injected, never accepted as a tool parameter.** No tool's input schema
+declares a `pulseId` property — an agent cannot ask for a stale structural snapshot, the system
+always resolves to the latest pulse. This holds trivially today, by the parameter's absence, rather
+than by an active guard; a one-line schema scan ("no tool input schema may declare `pulseId`") would
+make it a real gate and does not exist yet.
+
 ## The audience is a model, so the contract is stricter
 
 A human reading CLI output can discount a suspicious finding; an agent will act on it. That raises
@@ -65,6 +71,13 @@ carrying:
   zero symbols until `shared/empty-vault.ts` gave them a `nothing-to-check` answer.
 - **A step that is not a node says so.** `trace` returned dangling edge targets styled exactly like
   symbols; they now carry `resolved: false` and `kind: UNRESOLVED`.
+- **An enum value can be advertised and implemented NOWHERE.** `conducks_diff`'s schema published
+  `mode: ["uncommitted", "historical", "drift"]`; the handler branched on `"drift"` and let everything
+  else, including `"historical"`, fall through to the working-tree path — byte-identical to
+  `mode:"uncommitted"`. Not a wrong value silently accepted, a documented one that never existed. Fixed
+  by shrinking the schema to what is real: `DIFF_MODES` (`src/interfaces/tools/tools/kinetic.ts:43`)
+  now lists only `["uncommitted", "drift"]`, and the schema spreads that same constant so the two
+  cannot drift apart again.
 
 Tool calls no longer serialise. ADR 0146's queue is gone (ADR 0147) once both races behind it were
 closed at their source.
@@ -73,3 +86,43 @@ closed at their source.
 
 Importing the server entry starts the process as a side effect, so tests must not import it
 directly — mock it or defer the import. This has bitten the suite before.
+
+**Importing anything from `src/interfaces/tools/**` boots the registry singletons** (grammar
+registry, persistence), which raced with the parsing suites and made `type-only-imports` fail
+intermittently with `isTypeOnly: undefined`. `tests/unit/interfaces/tools/
+skills-tool-surface.test.ts` derives the MCP tool surface by reading `name:` fields as TEXT off the
+tool definition files instead of importing the tool modules, so the check touches no runtime state.
+
+**The tree-sitter native addon serves ONE JS-wrapper per process.** The second test file to load a
+grammar in the same process gets a wrapper whose `tree.rootNode` is undefined and fails at random.
+`jest.config.js`'s `workerIdleMemoryLimit: '1KB'` (`jest.config.js:39`) recycles the worker after
+every test file for this reason, which is a narrower fix than the suite used to carry: `maxWorkers`
+runs at 2, not 1 — the suite went PARALLEL once `todo65` found the real cause of the failures years of
+comments blamed on "a shared DuckDB lock" was actually `conducks clean` matching processes by entry
+point and SIGTERM'ing every conducks process on the machine, including a sibling suite's. Do not cite
+a single-writer DB lock as the reason tests run serially — they no longer do, and the DB lock was
+never the reason.
+
+**A tool description is a CONTRACT with the agent, and nothing checked it against the registered
+surface until `tool-names-are-real.test.ts` existed.** `conducks_rename`'s description used to end
+"AFTER THIS: Run conducks_analyze to refresh the structural resonance graph" — there was never a
+`conducks_analyze` tool, so an agent that had just mutated source was sent to a call guaranteed to
+fail. (`rename` is gone entirely since ADR 0156 — see [domain/evolution](../domain/evolution.md)'s
+Traps — so this specific instance no longer exists, but the class of defect does: "a documented
+feature nothing implements".) `tests/unit/interfaces/tools/tool-names-are-real.test.ts` now parses
+tool ids from the source that defines them and fails on any `conducks_*` named in a description or in
+`resources/tools/*.md` that is not registered, and asserts the parse found at least 10 tools so it
+cannot pass by scanning nothing.
+
+**Uses:** takes an MCP JSON-RPC request, resolves any symbol id through the shared
+`resolveSymbolId` helper (`shared/resolve-symbol.ts`), asks the same wired registry the CLI uses for
+the domain service that answers it, and returns the result shaped as a tool response — read-only,
+mirroring the CLI's answer to the same question (see `interfaces/cli`'s "Every MCP tool is a CLI
+command" for the mirror rule itself).
+
+## Features
+none — 13 tools grouping 35 CLI commands' capability, with no sub-notes of their own.
+
+## Glossary
+- **parity** — matching CLI *capability*, never matching defaults; a tool may default differently
+  than its CLI counterpart and still be at parity.

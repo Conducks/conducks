@@ -36,7 +36,7 @@ export class CleanCommand implements ConducksCommand {
       const targetPatterns = [
         "build/src/interfaces/cli/index.js",
         "build/src/interfaces/tools/server.js",
-        "build/src/interfaces/web/mirror-server.js",
+        "build/src/interfaces/web/mirror/server.js",
         "src/interfaces/cli/index.ts" // ts-node fallback
       ];
 

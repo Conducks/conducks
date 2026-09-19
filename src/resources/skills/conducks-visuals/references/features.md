@@ -91,6 +91,15 @@ and say whether the sharing is one implementation used twice or one implementati
 That third container is usually the most useful one on the page, because it is the only place the
 question "are these really the same?" gets an answer.
 
+### This classification decides a note's path too
+
+`conducks-docs` §6.3: a module note lives at the FEATURE's path with container segments elided —
+`src/lib/core/graph` is `visuals/modules/core/graph.md`; `lib/` and `core` never get one, because they
+are containers, not features. The census in §3 is what makes that call: a candidate this section marks
+`feature` gets a note at its own path; a `util` or `contract` gets no note of its own, its content
+living inside the notes of the features that use it. There is no second boundary test for note
+placement — the pile decides both questions at once.
+
 ## 2 · What an internal feature is
 
 One step inside a main feature: a decision the code actually asks, a transform, a gate, a hand-off, a

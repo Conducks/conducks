@@ -43,10 +43,10 @@ data/layout split, obeyed the link rules, obeyed the page rules, and produced a 
 be compared to any other. Two engines drift by construction; that is the whole reason these files are
 shared and not described.
 
-**Do not write a second renderer, at any size.** An older wording said to port "the moment the drawing
-is big enough that a person can no longer see a collision", which reads as permission to build
-something meanwhile. A project took it: 400 lines of its own renderer, all correct, all thrown away
-the day the shared one was copied in over the top.
+**Port the shared renderer instead of writing your own, at any size.** An older wording said to port
+"the moment the drawing is big enough that a person can no longer see a collision", which reads as
+permission to build something meanwhile. A project took it: 400 lines of its own renderer, all
+correct, all thrown away the day the shared one was copied in over the top.
 
 ## 2 · Porting, in order
 
@@ -57,7 +57,8 @@ The generator is **copied, never rebuilt.** Under an hour.
    In a project that is not otherwise JavaScript, say in the package description why Node is there
    and that nothing in the source depends on it.
 2. **Copy the nine shared files** from the project you are copying from. **Then diff all nine.** If
-   one needs an edit to work here, that is a bug in the shared file — fix it in both, do not fork it.
+   one needs an edit to work here, that is a bug in the shared file — fix it in both, so the two stay
+   one file, not a fork.
    Take the concern-page renderer even with no testing page: the three concern pages are not
    optional, and hand-writing their HTML is what it replaced.
 3. **Write the config** — the project's name, and the set of pages you author by hand (empty in a new
@@ -88,8 +89,8 @@ Allowed. Forking is not.
 new gate, a new control? Add it everywhere at once, so the copies stay identical.
 
 Before changing one, find the other copies and diff them. If they have **already** drifted, say so
-out loud and reconcile deliberately — do not layer a new change on top of an unrecorded old one and
-call the result shared.
+out loud and reconcile deliberately, folding the old drift into the same change — a new change layered
+on top of an unrecorded old one is not what "shared" means.
 
 The accent colour variable keeps one name in every project for this reason, whatever the project is
 called, and the project's own name lives in the config rather than in the three renderers that print
@@ -125,8 +126,8 @@ nothing.
 A canvas is not a bare `<svg>`. It needs the wrapper the pan/zoom writes its transform onto, the
 toolbar, the mini-map, and the script tag.
 
-**Paste the chrome file. Do not rebuild it from a description.** A project that rebuilt it from a
-paragraph got the markup right and shipped **no script at all** — every control dead, the drawing
+**Paste the chrome file rather than rebuilding it from a description.** A project that rebuilt it from
+a paragraph got the markup right and shipped **no script at all** — every control dead, the drawing
 perfect the whole time.
 
 The behaviour file exists for the same reason. For a long time it did not: the script lived only
@@ -143,7 +144,7 @@ opposite directions, so the mapping is written down rather than remembered.
 
 | gesture | does | why this one |
 |---|---|---|
-| **single click** a block | highlights its connections | the common act is *reading the wiring*, and it must not navigate away |
+| **single click** a block | highlights its connections | the common act is *reading the wiring*, so it stays in place rather than navigating away |
 | **double click** a block | opens its page | the shortcut, anywhere on the block |
 | click the **`i`** marker | opens its page | an explicit target, so a single click there is unambiguous |
 | single click an edge | traces it | an edge has no page — selecting is all it can do |
@@ -177,7 +178,7 @@ refusing.
 directory, or beside the code, or into a chat, is a page nobody finds twice and nothing lints. Build
 only what was asked for; put what you build in the one place.
 
-**Never create a walk log, a progress file or a map file.** A walk is recorded as a todo.
+A walk is recorded as a todo, not as a walk log, a progress file or a map file.
 
 ## 7 · The bootstrap window, and when it closes
 
@@ -243,7 +244,7 @@ It is a skill, not a document inside one project. It was one before — copied i
 the copies **drifted**: one carried a rule added after measurement and another still described the
 behaviour that rule replaced. That is the whole argument for one installed copy.
 
-Local facts do not go in a local copy. They go where the standard already puts them:
+Local facts go where the standard already puts them, not into a local copy:
 
 | the local fact is | goes to |
 |---|---|

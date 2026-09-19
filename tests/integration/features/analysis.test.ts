@@ -4,7 +4,7 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 // Analysis domain: `conducks analyze` (AnalyzeOrchestrator -> AnalysisService -> real tree-sitter
 // parse -> ConducksAdjacencyList -> DuckDB vault) driven end to end via the built CLI, then read
 // back through `conducks status --json`. Real symbols, real graph, real vault — no hand-built
-// fixture graph (CONDUCKS-28 does not apply: nothing here constructs node ids by hand).
+// fixture graph (the producer's-id-shape rule, docs/visuals/modules/core/graph.md, does not apply: nothing here constructs node ids by hand).
 describe('Analysis domain integration', () => {
   let repo: string;
 

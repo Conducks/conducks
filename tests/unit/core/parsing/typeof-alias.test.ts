@@ -26,7 +26,7 @@ describe('typeof alias capture', () => {
 
   /**
    * DISTINCT names on purpose. `type Registry = typeof registry` — the common spelling — lowercases
-   * both to ONE id (CONDUCKS-4), the value wins the node, and the merged node already carries the
+   * both to ONE id (see docs/visuals/modules/contracts.md), the value wins the node, and the merged node already carries the
    * object paths, so no hop is needed there at all. The typeof chain earns its keep exactly when
    * the names differ and the type node would otherwise be a leaf owning nothing.
    */

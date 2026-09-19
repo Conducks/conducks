@@ -7,7 +7,7 @@
 // Spawning a fresh `node` process per CLI call sidesteps that poisoning entirely, and is also
 // the most honest "real component wiring" test: CLI entry -> registry -> graph -> vault -> back.
 //
-// Vault isolation (docs/conventions.md CONDUCKS-29 / memory.md "pulse locks the vault"): each
+// Vault isolation — a pulse locks the vault, so each
 // suite gets its own mkdtemp'd fixture repo(s) under the OS temp dir, never shared, never reused
 // across suites, cleaned up in afterAll.
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -23,7 +23,7 @@ export const cliPath = path.resolve('build/src/interfaces/cli/index.js');
  * It used to check only for absence, so an integration test would happily run against a build
  * compiled before the fix it was written to prove. That happened twice in one session: a test
  * appeared to pass, and the code under it had never been compiled. A test proving nothing is worse
- * than no test, because it reports as coverage (CONDUCKS-34).
+ * than no test, because it reports as coverage (see test-master skill, reference/advanced.md).
  *
  * Staleness is newest-source-mtime vs the built CLI. It costs one directory walk per suite and
  * removes an entire class of false green.

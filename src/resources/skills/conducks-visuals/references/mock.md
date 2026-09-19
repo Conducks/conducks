@@ -2,7 +2,7 @@
 
 **Read this when** you are about to draw or change a design mock, move an editable canvas into the
 project, or someone reports white on a board. A mock is a visual under the docs standard (§6.13:
-"a product surface, a brand system") and it is `authored` — it makes no claim about the code, so the
+"a brand system, a product surface") and it is `authored` — it makes no claim about the code, so the
 anchor gate has nothing to check. Everything else that keeps it honest is in this file.
 
 Every rule here has a failure behind it. All of them come from one afternoon's session on one
@@ -122,8 +122,8 @@ message — "it should not get lost" — was the moment it moved into the projec
 | | the published canvas itself, re-seeded from the artboards |
 
 The generator's header carries the re-seed command and the canvas URL; the page names the canvas as
-a derived copy. Change the generator, rebuild, re-seed. Never edit the canvas and call it done — the
-next rebuild discards the edit, and the page and the canvas start to disagree.
+a derived copy. Change the generator, rebuild, re-seed — edit the canvas directly and the next
+rebuild discards the edit, and the page and the canvas start to disagree.
 
 **The generator is project-local, like `graph.mjs`.** Its content is the product's own surface, so
 there is nothing to share. Its emitted chrome — nav, provenance box, the `system.css` link, the
@@ -138,7 +138,7 @@ opened none. Say that on the page rather than leaving the slot empty.
 ## 8 · Seeing it
 
 Render each board standalone and look at it. When the canvas editor cannot be rendered headless,
-**ask for a screenshot** — do not push browser tooling on a reviewer who has declined it. A
+**ask for a screenshot instead of pushing browser tooling on a reviewer who has declined it.** A
 screenshot of the reviewer's screen showed both causes of the "white" report in one image; two
 rounds of guessing had not.
 

@@ -46,50 +46,24 @@ export class ManifestEngine {
    * nested per-project dirs. AUTHORED intent ONLY — conducks no longer emits a static architecture
    * doc; wiring is queried live from the graph (audit/impact/trace), never written to a file.
    *
-   * Two shapes, because root and service trees hold different files. `conventions.md`, `memory.md`
-   * and `handover.md` are ROOT-ONLY: constraints load once per session, and split across services an
-   * agent cannot know it has them all.
+   * `features.md` and `architecture.md` are DISSOLVED (ADR 0193): a capability's purpose and a
+   * module's shape now live in the feature's own note under `visuals/modules/`, never in a
+   * bootstrapped file. `handover.md` is the one file left that is ROOT-ONLY: it loads once per
+   * session, and split across services an agent cannot know it has them all.
    *
-   * Scaffolded here only what the standard calls create-now. `conventions.md`, `memory.md` and every
-   * `modules/<path>/MODULE.md` are create-when-first-needed — a placeholder rule that lints clean but
-   * states nothing true is worse than an absent file, because it reads as an answer.
+   * Scaffolded here only what the standard calls create-now. `visuals/modules/<path>.md` is
+   * create-when-first-needed, same as it always was — a placeholder note that lints clean but states
+   * nothing true is worse than an absent file, because it reads as an answer (conducks-docs §3.3).
    */
   private grammarFiles(projectName: string, kind: TreeKind): Array<{ name: string; content: string }> {
     const files = [
-      { name: 'features.md', content: `# Features — ${projectName}\n\n## Example Capability — \`the command or entry point that runs it\`\n- Purpose: what this is FOR — one line the code can't tell you\n- Intent: why it exists / the tradeoff it makes\n` },
-      { name: 'architecture.md', content: this.architectureSkeleton(projectName) },
       { name: path.join('todos', 'todo01.md'), content: `# todo01 — first milestone\nStatus: todo\n- Acceptance: one line, testable\n\n## Phase 1 — setup\n- [ ] first task\n` },
     ];
     if (kind === 'root') {
       // Dated on write: a handover that cannot say when it was written cannot be judged stale.
-      files.push({ name: 'handover.md', content: `# Handover — ${new Date().toISOString().slice(0, 10)}\nStatus: stale\n\n## Where it stands\nBootstrapped; nothing recorded yet.\n\n## Next, in order\n1. Fill features.md and architecture.md from the code as it stands.\n` });
+      files.push({ name: 'handover.md', content: `# Handover — ${new Date().toISOString().slice(0, 10)}\nStatus: stale\n\n## Where it stands\n\`${projectName}\` bootstrapped; nothing recorded yet.\n\n## Next, in order\n1. Write a module note under \`visuals/modules/\` for the first feature that earns one, as the code stands.\n` });
     }
     return files;
-  }
-
-  /**
-   * The graph, and the rules its arrows obey — nothing else. Authored from here on: naming the parts
-   * is judgement, so conducks scaffolds the shape and a person fills it. Fenced, so docs-grammar
-   * skips the diagram rather than reading its arrows as fields.
-   */
-  private architectureSkeleton(projectName: string): string {
-    return [
-      `# Architecture — ${projectName}`,
-      '',
-      '```mermaid',
-      'flowchart TD',
-      '  entry[entry point] --> core[core]',
-      '```',
-      '',
-      '| node | note |',
-      '|---|---|',
-      '| `core` | link to modules/core/MODULE.md once it earns a note |',
-      '',
-      '## Contract',
-      '1. State a dependency rule the arrows above obey.',
-      '- Enforced by: name the test that proves it',
-      '',
-    ].join('\n');
   }
 
   /**

@@ -12,10 +12,39 @@
 <a class="back" href="../architecture.html">&larr; back to the architecture</a>
 <h1>PARSING</h1>
 <p class="sub">core/parsing — 13 language packs and one reflector</p>
+<div class="det"><h3>Where this feature begins</h3><p class="where">src/lib/core/parsing/index.ts — the parsing feature's only door (ADR 0150): 69 files, 8.8k lines, thirteen language packs and the reflector behind one export</p></div>
 <div class="meta">
   <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
   so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
   render. <b>Arrived by clicking a block?</b> It is highlighted below.
+</div>
+
+<div class="det" id="anchor">
+  <h3>Anchor on a root</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts::anchorChronicle</div>
+  <p>the door hands out `chronicle` as ReadOnlyChronicle, the class minus its one mutator, so none of the two dozen files holding it can re-anchor mid-run</p>
+  <p class="file">on the canvas: one directory for the whole process</p>
+</div>
+
+<div class="det" id="disc">
+  <h3>Ask every repository</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts::discoverFiles</div>
+  <p>`ls-files` in a root does not descend into a nested checkout. Measured on this repo: a private copy saw 575 source files, this sees 578, and the three were a nested fixture (ADR 0069)</p>
+  <p class="file">on the canvas: not just the anchor’s own</p>
+</div>
+
+<div class="det" id="quote">
+  <h3>Non-ASCII names survive</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts</div>
+  <p>git quotes any path with a non-ASCII byte, so a Turkish filename came back as a 52-character escaped literal that opened nothing. Passed per-invocation because conducks must not write to a repo it is only reading</p>
+  <p class="file">on the canvas: core.quotePath=false, per invocation</p>
+</div>
+
+<div class="det" id="fsfall">
+  <h3>No repository? Scan the tree</h3>
+  <div class="where">src/lib/core/git/chronicle-interface.ts::discoverFiles</div>
+  <p>the fallback walk accepts a file by extension OR exact filename, because Rakefile and Dockerfile have no extension to match on</p>
+  <p class="file">on the canvas: the case ADR 0035 supports</p>
 </div>
 
 <div class="det" id="gate">
@@ -76,6 +105,9 @@
     <tr><td>A capture declares a kind</td><td>Inheritance is an EDGE</td><td>—</td></tr>
     <tr><td>The reflector</td><td>Each pack resolves its own imports</td><td>—</td></tr>
     <tr><td>Each pack resolves its own imports</td><td>Nine packs have no oracle</td><td>for nine of thirteen</td></tr>
+    <tr><td>Anchor on a root</td><td>Ask every repository</td><td>—</td></tr>
+    <tr><td>Ask every repository</td><td>Non-ASCII names survive</td><td>—</td></tr>
+    <tr><td>Ask every repository</td><td>No repository? Scan the tree</td><td>git said nothing</td></tr>
   </tbody>
 </table>
 <footer>

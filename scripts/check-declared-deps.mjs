@@ -134,11 +134,19 @@ const ALSO_SCANNED = ["tools", "scripts"];
 // it would change what it reproduces. It is run by hand after `npm i --no-save duckdb`.
 const EXCLUDED = ["tools/upstream-duckdb-repro"];
 
+// The mirror's vendored browser bundles are copied verbatim from a CDN and loaded by a <script>
+// tag, never imported by Node. Their minified bodies still carry the specifier strings of the
+// packages they were BUILT from — `d3-dispatch`, `d3-timer` — and the scanner reads those as
+// imports the install would need. It cannot: nothing resolves them at runtime, because they are
+// already inlined in the file that names them. Declaring them would add two dependencies to satisfy
+// a string inside an asset. See src/interfaces/web/mirror/public/vendor/README.md.
+const EXCLUDED_FROM_BUILD = ["build/src/interfaces/web/mirror/public/vendor"];
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const root = process.cwd();
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   const missing = [
-    ...findUndeclaredImports(path.resolve(root, "build", "src"), pkg),
+    ...findUndeclaredImports(path.resolve(root, "build", "src"), pkg, { excluded: EXCLUDED_FROM_BUILD }),
     ...ALSO_SCANNED.flatMap(dir =>
       findUndeclaredImports(path.resolve(root, dir), pkg, { excluded: EXCLUDED, allowDev: true })),
   ];

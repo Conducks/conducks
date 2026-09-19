@@ -11,6 +11,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Read at <code>7c11bc4</code>.</b> Until 2026-08-17 this was a loose file at the core root with no door, reached directly by composition — the third of three features the campaign's census missed.</p>
 <p><b>Responsibility:</b> environment discovery, grammar initialisation, and anchor resolution. Which directory is the project root, is a native grammar available, which vault does this checkout use. Kept out of the composition root so that root stays a wiring point rather than a procedure.</p>
 <p><b>Boundaries:</b> it sets things up and answers nothing. No query goes through here.</p>
+<p><b>Uses:</b> imports and wires <a href="graph.html">core/graph</a> (<code>ConducksGraph</code>, <code>FederatedLinker</code>), <a href="persistence.html">core/persistence</a> (<code>SynapsePersistence</code>), <a href="git.html">core/git</a> (<code>chronicle</code>, <code>anchorChronicle</code>), <a href="../parsing.html">core/parsing</a> (<code>grammars</code>, <code>IgnoreManager</code>) and <a href="utils.html">core/utils</a> (<code>logger</code>, <code>traceMemory</code>, <code>isNeverAProjectRoot</code>) — every other core door at once, which is what makes it the one feature core must never import back.</p>
 <h2>It sits ON TOP of every other core door</h2>
 <p>It imports graph, persistence, git, parsing and utils. That makes it the one feature in core that must never be imported BY them, and the door gate is what keeps that true — nothing in core does, and its single consumer is <code>src/registry/index.ts</code>.</p>
 <h2>A tension, recorded rather than resolved</h2>
@@ -19,5 +20,27 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <h2>The lazy graph is the part worth knowing</h2>
 <p><code>registry-bootstrapper.ts</code> carries <code>pendingLoad</code>, the deferral that lets a read-only command answer without materialising the graph. Materialising costs roughly 165 MB and 146 ms for 2,381 nodes, and a read-only caller frequently walks no node at all.</p>
 <p>The trap it holds: a deferred graph reads as an EMPTY one. Four of six MCP tools broke that way and three broke silently — no error, just zero results. Anything that WALKS must call <code>ensureGraphLoaded()</code> first, and the registry's <code>graphEngine</code> getter makes forgetting a loud failure at the call site instead of a wrong answer downstream.</p>
+<h2>Features</h2>
+<ul>
+<li>none — this is setup, not a queryable capability</li>
+</ul>
+<h2>Glossary</h2>
+<ul>
+<li><b>pendingLoad</b> — the deferral <code>registry-bootstrapper.ts</code> carries so a read-only command can answer</li>
+</ul>
+<p>  without materialising the graph; cleared only inside the re-anchor branch, never on every call.</p>
+<ul>
+<li><b>anchor</b> — the directory <code>bootstrap</code> resolves as the project root before anything else runs;</li>
+</ul>
+<p>  distinct from <code>anchorChronicle</code>, the <a href="git.html">core/git</a> operation that points the chronicle at it.   <b>Not the anchor <a href="../domain/docs.html">domain/docs</a> means</b> — that one is a <code>file:line</code> claim in a   visual. Same word, unrelated things; <code>conducks glossary</code> reports the pair on purpose.</p>
+<h2>Traps</h2>
+<ul>
+<li><b><code>initialize()</code> used to clear <code>pendingLoad</code> on every call, including ones that changed nothing.</b></li>
+</ul>
+<p>  It sat at the top of <code>RegistryBootstrapper.initialize</code>, which runs on every tool call, and clobbered   an already-armed deferred load. It got away with it only because the same call then fell through a   re-init path that re-armed it — once that path stopped running for an unchanged anchor, the graph   stayed deferred forever and every tool answered as though the graph were empty. <code>pendingLoad</code> is now   cleared only inside the re-anchor branch.</p>
+<ul>
+<li><b>A staleness-bypass flag that guards the WARNING does not mean the load was skipped.</b> Commands</li>
+</ul>
+<p>  read as "skip the graph" from <code>isStalenessBypass</code>'s name, and they do not — <code>registry.initialize()</code>   runs its own <code>persistence.load(graph)</code> before the bypass is even checked, so every one of those   commands still loads the whole graph, one call earlier than the flag can see. A command that truly   skips graph work must be in the separate <code>NEEDS_NO_REGISTRY</code> set, which skips <code>initialize</code> entirely.</p>
 <footer>Source: <code>docs/visuals/modules/core/bootstrap.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

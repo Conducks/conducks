@@ -22,9 +22,10 @@ not in this file.
 
 Everything else is situational. These are not.
 
-**Numbers are ADR 0150's and never change.** Fourteen citations across the todos, the clean log and
-`conventions.md` address these rules by number, so the tiering here regroups them and renumbers
-nothing — a citation that silently points at the wrong rule is worse than no citation.
+**Numbers are ADR 0150's and never change.** Fourteen citations across the todos and the clean log
+address these rules by number, so the tiering here regroups them and renumbers nothing — a citation
+that silently points at the wrong rule is worse than no citation. (The deleted conventions file cited
+them too; these numbers are unaffected.)
 
 ### Rule 1 · One door
 
@@ -89,8 +90,8 @@ reverted — one of them would have made a stale answer permanent.
 
 ## The boundary rules
 
-**Rule 4 ·** A door exports operations and types. Never mutable state, never a singleton a caller can
-mutate.
+**Rule 4 ·** A door exports operations and types only — it excludes mutable state and any singleton a
+caller can mutate.
 
 > **This rule has failed on every feature it has met.** Two process-wide sinks — a git anchor and a
 > logger — are each genuinely process-wide, and the second's static flag is static ON PURPOSE: a
@@ -100,7 +101,7 @@ mutate.
 **Rule 5 ·** A type two features share moves to a shared contracts layer. It does not travel through a
 door.
 
-**Rule 3 ·** Inside is private — a feature's own files and its own tests may reach its internals, nobody else may. A feature never reaches another's internals to "just get one thing". Ask the door, or move
+**Rule 3 ·** Inside is private — a feature's own files and its own tests may reach its internals, nobody else may. When a feature needs just one thing from another's internals, ask the door, or move
 the thing to contracts.
 
 ---
@@ -145,8 +146,10 @@ self-reference · wrong order · re-entry · the dependency absent entirely.
 adversarial suite covered *no binary at all*, *an empty answer*, *a name containing the path
 separator*, *a response that is not the expected shape* — none of which nine existing suites touched.
 
-**Rule 15, and stated with it ·** A test asserts the claim the code actually makes, not a stricter one that is easier to
-check. State what the test did NOT cover, beside the number.
+**Stated with every test, and carrying no rule number ·** A test asserts the claim the code actually
+makes, not a stricter one that is easier to check. State what the test did NOT cover, beside the
+number. This rule set has sixteen rules and this is none of them — it belongs to the global `CLAUDE.md`
+§4, and it is written here because Rule 11's adversarial cases are where it bites.
 
 *Why.* A checker that scores a stricter claim reports failures that are not failures, and one that
 scores a looser claim reports a pass that is not a pass. Both read as rigour.
@@ -159,7 +162,11 @@ scores a looser claim reports a pass that is not a pass. Both read as rigour.
 to the FIXES as much as the features. Injecting into a file that has no tests yet is how a regression
 becomes unattributable.
 
-**Rule 14 — one unit per commit**, in order: read → door → clean → tests → gates → log.
+**Rule 14 — one unit per commit**, in order: **test → clean → gates → log**, unchanged from the
+original order. Reading the unit and settling its door come BEFORE that sequence and are not part of
+it. The order is not cosmetic: the test comes first so there is a green baseline to restructure
+against, and a regression after the clean is then attributable to the clean. This file previously
+listed `clean → tests`, which inverts exactly that.
 **Rule 15 — gates after every unit**: the full suite, every oracle or benchmark the project has, typecheck,
 lint. All green, or the unit is not done.
 

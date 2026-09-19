@@ -7,10 +7,42 @@
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>domain/governance/sentinel — the rule engine</h1>
+<p><b>Layer:</b> domain (part of <code>domain/governance</code>).</p>
 <p><b>Part of:</b> <a href="../governance.html">domain/governance</a>. <code>sentinel.ts</code> (the static policy evaluator), <code>sentinel-rules.ts</code> (graph rules + the layer contract), <code>guard.ts</code> (<code>RegressionGuard</code> — the drift threshold, a separate gate that shares the CI entry point), <code>config-detector.ts</code> (project anchors and entry points).</p>
 <p><b>Responsibility:</b> evaluating declarative rules against the graph. Each rule is data — a condition kind, a target, a limit — so adding a constraint is editing a rule file, not writing an analyzer. The <code>conducks guard</code> CLI command is the CI-facing entry point and runs three independent checks: the layer rule, the other loaded graph rules, and the regression threshold.</p>
 <p><b>Boundaries:</b> it evaluates; it does not compute structure. Every input is already in the graph. Two rule *sources* meet here and are easy to confuse: graph rules (<code>sentinel-rules.ts</code>, YAML, keyed by <code>condition</code>) and static policy rules (<code>sentinel.ts</code>, JSON, keyed by <code>type</code> — <code>require_heritage</code>, <code>require_export</code>, <code>max_fans</code>, <code>require_file</code>). They share a name and nothing else.</p>
-<p><b>Deferred / not built:</b> no per-rule severity. Everything a rule reports is a violation, which is why a finding that cannot be trusted must be removed rather than downgraded — and why ADR 0017's "call cycle" finding has nowhere to live yet. Also no per-project layer config: <code>LAYER_FRAGMENTS</code> and <code>ALLOWED_DEPENDENCIES</code> are hardcoded because the minimal YAML parser has no nested maps, so the contract guards conducks itself and nobody else.</p>
+<p><b>Deferred / not built:</b> no per-rule severity. Everything a rule reports is a violation, which is why a finding that cannot be trusted must be removed rather than downgraded — and why ADR 0017's "call cycle" finding has nowhere to live yet (it is now reported separately as ARCH-6, a DISCOVERY, not folded into this engine — see <a href="../governance.html">governance</a>). Also no per-project layer config: <code>LAYER_FRAGMENTS</code> and <code>ALLOWED_DEPENDENCIES</code> are hardcoded because the minimal YAML parser has no nested maps, so the contract guards conducks itself and nobody else.</p>
+<p><b>Uses:</b> <a href="../../core/graph.html">core/graph</a> for every edge <code>layer_boundaries</code> and the other graph rules walk. Loaded by <code>conducks guard</code> (CI-facing) and <code>conducks audit</code>; the parent <a href="../governance.html">governance</a> note carries the contract's prose, this note carries how it is evaluated and where it broke.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Layer contract</b> (<code>layer_boundaries</code> sentinel rule, <code>conducks guard</code>) — hard-blocks any upward</li>
+</ul>
+<p>  cross-layer edge, imports and calls alike, type-only included. See below for what is actually   encoded versus what ADR 0005's prose said.</p>
+<ul>
+<li><b>Graph rules</b> (<code>has_cycles</code>, <code>rank_violation</code>, <code>dead_code</code>, <code>high_churn</code>, <code>deep_nesting</code>) — the</li>
+</ul>
+<p>  other declarative conditions <code>conducks guard</code> evaluates alongside the layer rule.</p>
+<ul>
+<li><b>Static policy rules</b> (<code>sentinel.ts</code>, <code>config/sentinel.json</code>) — <code>require_heritage</code>,</li>
+</ul>
+<p>  <code>require_export</code>, <code>max_fans</code>, <code>require_file</code>, loaded by <code>AuditCommand</code> for <code>conducks audit</code>.</p>
+<ul>
+<li><b>Regression guard</b> (<code>guard.ts</code>) — the drift-threshold gate, a separate check sharing the same CI</li>
+</ul>
+<p>  entry point as the two rule engines above.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>Sentinel rule</b> (<code>sentinel-rules.ts</code>) — a graph-wide structural condition, YAML-loadable, keyed by</li>
+</ul>
+<p>  <code>condition</code>. Unrelated to the next term despite the shared file-name root.</p>
+<ul>
+<li><b>Policy rule</b> (<code>sentinel.ts</code>) — a per-node JSON rule keyed by <code>type</code>, evaluated separately by</li>
+</ul>
+<p>  <code>conducks audit</code>.</p>
+<ul>
+<li><b>Layer fragment</b> — a path substring (<code>LAYER_FRAGMENTS</code>) used to classify a file into one of the</li>
+</ul>
+<p>  seven layers; order-sensitive, most specific first.</p>
 <h2>The layer contract lives and is enforced here</h2>
 <p><code>ALLOWED_DEPENDENCIES</code> (<code>sentinel-rules.ts</code>) encodes ADR 0005's downward-only stack, and the <code>layer_boundaries</code> condition (<code>governance/index.ts:337</code>) reports one violation per illegal layer-pair. Layers are matched by path fragment and <b>order matters</b> — <code>/lib/core</code> precedes <code>/registry</code> so <code>lib/core/registry/</code> classifies as core, not composition.</p>
 <p><b>Enforced as a default since 2026-07-25.</b> For its first year the rule existed but never loaded: <code>loadSentinelRules</code> read <code>.conducks/sentinel.yml</code> (absent), fell back to defaults that lacked <code>layer_boundaries</code>, and <code>guard</code> filtered for a rule that never ran — printing "Layer contract clean" vacuously while the repo carried 74 illegal cross-layer edges. Those edges were routed through composition (registry facades; a lazy <code>import()</code> in <code>pulse-worker</code> for the core → domain edge, which cannot be constructor-injected because the worker is a standalone process) and the rule was added to <code>getDefaultRules()</code>. Non-vacuousness was proven both directions: a raw cross-layer edge dump returns zero, and a deliberately re-injected <code>cli → core</code> import blocks the gate.</p>

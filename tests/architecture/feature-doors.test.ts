@@ -62,7 +62,7 @@ const DOORS = [
   'lib/domain/kinetic',
   'lib/domain/manifest',
   'lib/domain/metrics',
-  'lib/domain/visual',
+  'lib/domain/mirror',
 ];
 
 /**

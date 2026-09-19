@@ -1,4 +1,4 @@
-import { isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from "@/contracts/index.js";
+import { VAULT_DIR, VAULT_DB_FILENAME, isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from "@/contracts/index.js";
 import { createHash } from "node:crypto";
 import { clusterOf } from "@/lib/core/graph/index.js";
 import fs from "node:fs";
@@ -21,7 +21,7 @@ import type { ConducksComponent } from "@/contracts/index.js";
 
 /**
  * The vault — every read and write of the analysed graph, and the only place DuckDB is spoken to
- * (CONDUCKS-5).
+ * (see docs/visuals/modules/core/persistence.md).
  *
  * ONE WRITER, MANY READERS, and that is the constraint most of this file exists to serve. A write
  * takes an exclusive lock, so a reader arriving mid-pulse is served the PREVIOUS pulse's snapshot
@@ -117,7 +117,7 @@ export class SynapsePersistence {
 
   /** The vault file every process agrees on. Readers open this; a pulse writes it. */
   private dbFile(): string {
-    return path.join(path.resolve(this.vaultPath, '.conducks'), 'conducks-synapse.db');
+    return path.join(path.resolve(this.vaultPath, VAULT_DIR), VAULT_DB_FILENAME);
   }
 
   /**
@@ -983,7 +983,7 @@ export class SynapsePersistence {
   /**
    * The stored content hash for a file, or undefined if it has never been analyzed.
    *
-   * Keys are lowercased absolute paths, matching `nodes.file` (CONDUCKS-4 — ids and paths are
+   * Keys are lowercased absolute paths, matching `nodes.file` (docs/visuals/modules/contracts.md — ids and paths are
    * lowercase-normalized for APFS). A caller passing a differently-cased path gets a miss, which
    * costs a re-parse rather than a wrong answer.
    */
@@ -1037,7 +1037,7 @@ export class SynapsePersistence {
     await this.run("DELETE FROM file_hashes WHERE file = ?", [file.toLowerCase()]);
   }
 
-  /** Writes PageRank back after the ranker runs — computed in memory, persisted once (CONDUCKS-6). */
+  /** Writes PageRank back after the ranker runs — computed in memory, persisted once. */
   public async updateRanks(nodeRanks: Array<{ id: string, gravity: number, isEntryPoint?: boolean }>): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
@@ -1087,7 +1087,7 @@ export class SynapsePersistence {
     }
   }
 
-  /** Recomputes the risk column from what is already stored, in SQL rather than row by row (CONDUCKS-7). */
+  /** Recomputes the risk column from what is already stored, in SQL rather than row by row (see docs/visuals/modules/core/persistence.md). */
   public async updateRisks(): Promise<void> {
     if (this.readOnly) return;
     await this.run(`UPDATE nodes SET risk = LEAST(COALESCE(complexity, 1) / 50.0, 1.0) WHERE canonicalKind IN ('BEHAVIOR', 'STRUCTURE', 'ATOM')`);
@@ -1572,7 +1572,7 @@ export class SynapsePersistence {
   /**
    * The DuckDB connection itself, for the two callers that genuinely need it. Exported through the
    * door so every such caller is visible in one place rather than wherever an import can be written
-   * (CONDUCKS-5).
+   * (see docs/visuals/modules/core/persistence.md).
    */
   public async getRawConnection(): Promise<DuckDBConnection> {
     return await this.ensureVaultOpen();

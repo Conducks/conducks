@@ -12,7 +12,8 @@ import { buildBoard } from '@/lib/domain/docs/index.js';
  * bound to, and the docs board's private `moduleHashOf` reads it back to decide whether an
  * architecture note has drifted. ADR 0031 calls them "deliberately identical and deliberately
  * separate" — identical so the board and the command never disagree about the same module, separate
- * so the docs layer does not import the code layer (CONDUCKS-24).
+ * so the docs layer does not import the code layer (gate:
+ * tests/unit/interfaces/tools/docs-layer.test.ts).
  *
  * "Deliberately identical" is an unenforced promise, and this is what enforces it. The two are
  * tested through their PUBLIC surfaces rather than by comparing the functions, because that is how

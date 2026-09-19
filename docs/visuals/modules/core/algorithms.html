@@ -11,6 +11,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Read at <code>7c11bc4</code>.</b> This module had no door and no note until 2026-08-17; it was one of three core features an audit of "six features" never looked at, because nobody had established that six was the whole list.</p>
 <p><b>Responsibility:</b> everything else in core answers *what does this code say*. These two answer *what has happened to it*. Entropy reads the author distribution of a unit and turns it into an ownership risk; the co-change engine reads the commit log for files that change together while nothing in the code links them.</p>
 <p><b>Boundaries:</b> pure computation over inputs someone else gathered. Neither opens a vault or a repository of its own — <code>CoChangeEngine</code> takes an optional <code>historyExtractor</code>, and the analyze path hands it a connection rather than making one.</p>
+<p><b>Uses:</b> <code>CoChangeEngine.discoverHiddenCoupling</code> takes a <code>ConducksAdjacencyList</code> from <a href="graph.html">core/graph</a> (to ask <code>!hasEdge</code>) and a DuckDB handle from <a href="persistence.html">core/persistence</a> (to run the vectorized commit-pair query), plus raw git log output — either injected via <code>historyExtractor</code> or read directly with <code>execSync('git log …')</code> (&lt;span class="anchor"&gt;src/lib/core/algorithms/cochange-engine.ts:1-30&lt;/span&gt;). <code>entropy.ts</code> takes a plain author-to-commit-count distribution built upstream — <a href="../parsing.html">core/parsing</a>'s reflector assembles it from <a href="git.html">core/git</a>'s chronicle (<code>getFileHistory</code>/<code>getBlameData</code>) and calls <code>calculateShannonEntropy</code>/<code>normalizeEntropyRisk</code> directly; this module never touches git itself.</p>
 <p>They share no code, and that is fine. A feature here is a BOUNDARY, not a cluster of similar functions.</p>
 <h2>The threshold is the feature</h2>
 <p><code>cochange-engine.ts</code> reports a pair only when it appears together in MORE than three commits. Two files touched in one commit is a coincidence, and a tool that reported it would bury its real findings under noise.</p>
@@ -19,5 +20,23 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <h2>Entropy is normalised against the author count, not an absolute</h2>
 <p><code>normalizeEntropyRisk</code> divides by <code>log2(authorCount)</code>, so "many authors, equal shares" is 1.0 whatever the team size. A raw Shannon score would make a large team look permanently risky and a two-person module permanently safe.</p>
 <p>A single author is 0 by an explicit guard, not by the arithmetic — <code>log2(1)</code> is zero and the division would be undefined.</p>
+<h2>Features</h2>
+<ul>
+<li><b>hidden-coupling detection</b> — surfaced by <code>conducks advise</code>: files that keep changing together</li>
+</ul>
+<p>  in git history despite having no structural edge between them, so a reader sees coupling the code   graph is blind to.</p>
+<ul>
+<li><b>ownership-risk scoring</b> — the authorship-entropy signal folded into <code>conducks explain</code>'s</li>
+</ul>
+<p>  composite risk score, and compared against a historical baseline by <code>conducks guard</code> to catch   structural decay before it merges.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>temporal coupling</b> — two files that change together across commits with no import, call or</li>
+</ul>
+<p>  other structural edge linking them; what <code>cochange-engine.ts</code> measures.</p>
+<ul>
+<li><b>ownership entropy</b> — the Shannon entropy of a unit's per-author commit distribution, normalised</li>
+</ul>
+<p>  against the author count so a large team is not permanently flagged risky.</p>
 <footer>Source: <code>docs/visuals/modules/core/algorithms.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

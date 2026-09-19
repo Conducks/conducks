@@ -13,7 +13,18 @@ everything above consumes. Nothing upstream of this module knows what language a
 
 **Boundaries:** it produces a spectrum, never a graph, and it works one file at a time. Cross-file
 resolution belongs to the [orchestrator](../domain/analysis/orchestrator.md); judgement
-belongs to [governance](../domain/governance.md).
+belongs to [governance](../domain/governance.md). Every language provider declares
+`readonly extensions: string[]`, `readonly langId`, `readonly queryScm` and `readonly importSemantics`
+(<span class="anchor">src/lib/core/parsing/providers/base.ts:10</span>) — there is no `reflect()`
+method on the provider interface; `resolveImport`, `isBoundaryModule`, `calculateComplexity`,
+`extractDebt`, `normalizeHeritage`, `isBuiltIn`, `getVisibility` and `extractDocs` are optional.
+
+**Uses:** reads `core/git`'s chronicle for a file's commit history and blame data, and hands the
+per-author commit distribution to `core/algorithms`' `calculateShannonEntropy` /
+`normalizeEntropyRisk` to score each file's ownership risk while building its spectrum
+(<span class="anchor">src/lib/core/parsing/reflector.ts:1582-1587</span>). It reads `contracts` for
+the taxonomy and built-ins. It hands the finished spectrum to the orchestrator, which does the
+cross-file work this module refuses to do.
 
 **Deferred / not built:** language parity. Support is deliberately uneven — TypeScript and TSX are
 first-class, Go and Python close behind, the rest have definitions and calls but shallower semantics.
@@ -74,3 +85,41 @@ own root. Method detection is case-sensitive because Next.js only treats an uppe
 handler.
 
 Anything else declared by convention rather than by an expression belongs here on the same terms.
+
+## Features
+- [languages](parsing/languages.md) — per-language tree-sitter queries
+- [processors](parsing/processors.md) — capture to relationship
+- [grammar-registry](parsing/grammar-registry.md) — native grammar loading
+- [taxonomy](parsing/taxonomy.md) — the canonical kind vocabulary
+- [reflector](parsing/reflector.md) — the match loop that builds a file's spectrum
+
+## Glossary
+- **spectrum** — the language-agnostic intermediate form parsing produces: nodes with canonical
+  kinds and ranges, plus relationships. Nothing above this module knows what language a file was
+  written in.
+- **`properties.isTest`** — set per file by the reflector at parse time
+  (`src/lib/core/parsing/reflector.ts:293,660,1278`) and does NOT survive the vault: the persisted
+  `metadata` column carries no such key, so it is `undefined` on every graph loaded from the vault —
+  which is every graph a read command sees. `src/contracts/test-path.ts:42` treats it only as "the
+  parse-time flag, when the graph is still in memory" and falls back to a path-based check
+  (`isTestPath`) for the persisted case. A filter written against the flag alone is a silent no-op
+  once the pulse ends.
+- **ParseFailure** — what a missing parser, an unparseable file or an empty-compiling query throws
+  since ADR 0089. There is no silent degrade below this: a language that cannot be read is a reported
+  failure, not fewer nodes.
+
+## Traps
+- **One parseable-extension list, not four.** The list of extensions worth parsing used to exist
+  three times verbatim across separate consumers, and a fourth was about to be added. It now lives
+  once in `contracts/source-extensions.ts`; a language missing from one copy used to be invisible to
+  that one consumer, which then reported "nothing changed" rather than "not looked at".
+- **A worker parses in its OWN process — main-thread state it is not explicitly sent does not
+  exist there.** Every file is parsed in a subprocess that builds a fresh context from an
+  EXPLICITLY-PASSED subset of state (`context.ts`'s `exportState()`/`mergeState()`, consumed by
+  `pulse-worker` and `worker-pool`). Registering something on the main thread and not adding it to
+  that exported/merged set means the feature is live exactly where no parsing happens — the ADR 0108
+  workspace fix produced byte-identical numbers before and after its first attempt on a real subject
+  for exactly this reason. Any new resolver input needs adding in all of: context state, the worker
+  pool's run signature, the fork's JSON payload, and the in-process fallback path. Verify by
+  re-running on a real subject and checking the number actually MOVED — "the code looks right" cannot
+  see a process boundary.

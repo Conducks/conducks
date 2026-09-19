@@ -5,19 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mirror — Exclusive v3.0</title>
   
-  <!-- Core Engines -->
-  <script src="https://unpkg.com/d3@7"></script>
-  <script src="https://unpkg.com/force-graph"></script>
-  
-  <!-- Visual DNA -->
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- Core engines, vendored — see vendor/README.md. Local because the dashboard rendered
+       nothing without a network, and force-graph was loaded with no version pin at all. -->
+  <script src="vendor/d3-force.min.js"></script>
+  <script src="vendor/force-graph.min.js"></script>
+
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <!-- 🛰️ LOADING -->
   <div id="loading-overlay">
     <div class="spinner"></div>
-    <div class="text-dim text-xs uppercase tracking-[0.3em] font-light mt-8">Establishing Synapse</div>
+    <div class="overlay-caption">Reading the vault</div>
   </div>
 
   <!-- 🎮 UNIFIED COMMAND DECK (Conducks v0.8.0) -->
@@ -27,7 +26,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
       </button>
       <div class="rail-divider"></div>
-      <button class="dock-item active" id="dock-discovery" title="Discovery">
+      <button class="dock-item active" id="dock-discovery" title="Find">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
       </button>
       <button class="dock-item" id="dock-physics" title="Forces">
@@ -42,19 +41,15 @@
       <button class="dock-item" id="dock-governance" title="Governance">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
       </button>
-      <div class="rail-spacer"></div>
-      <button class="dock-item" id="btn-settings" title="Settings">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1V15a2 2 0 0 1-2-2 2 2 0 0 1 2-2v-.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-      </button>
     </nav>
 
     <div class="deck-content custom-scrollbar">
       <!-- DISCOVERY -->
-      <div id="slate-discovery" class="slate-active">
+      <div id="slate-discovery">
         <header class="slate-header">
           <div class="search-shield">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="origin-search" placeholder="Search Symbols..." autocomplete="off">
+            <input type="text" id="origin-search" placeholder="Search symbols" autocomplete="off">
             <button id="btn-clear-search" class="search-clear-btn" style="display: none;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
@@ -65,7 +60,7 @@
         <div class="slate-body">
           <section class="deck-section">
             <div class="section-header">
-              <span class="section-title">Structural Layers</span>
+              <span class="section-title">Layers</span>
               <div class="section-badge" id="layer-count">7</div>
             </div>
             <div id="layer-filters" class="filter-grid"></div>
@@ -73,7 +68,7 @@
 
           <section class="deck-section">
             <div class="section-header">
-              <span class="section-title">Active Clusters</span>
+              <span class="section-title">Clusters</span>
               <div class="section-badge" id="cluster-count">...</div>
             </div>
             <div id="cluster-filters" class="cluster-stack"></div>
@@ -84,11 +79,11 @@
       <!-- FORCES -->
       <div id="slate-physics" style="display: none;">
         <header class="slate-header">
-          <h2 class="slate-title">Energy Distribution</h2>
+          <h2 class="slate-title">Forces</h2>
         </header>
         <div class="slate-body">
            <section class="deck-section">
-              <p class="text-[9px] text-dim uppercase font-bold tracking-[0.2em] mb-4">Conducks Presets</p>
+              <p class="field-label">Presets</p>
               <div class="preset-grid">
                 <button class="preset-btn" data-preset="hubs">Hubs</button>
                 <button class="preset-btn" data-preset="depth">Depth</button>
@@ -107,7 +102,7 @@
              
              <div class="control-row">
               <div class="control-meta">
-                <span class="control-label">Arena Spread</span>
+                <span class="control-label">Spread</span>
                 <span id="label-spread" class="control-value">2000</span>
               </div>
               <input type="range" id="ctrl-spread" class="deck-slider" min="500" max="10000" step="100" value="2000">
@@ -122,7 +117,7 @@
           <h2 class="slate-title">Docs</h2>
         </header>
         <div class="slate-body" id="docs-panel">
-          <p class="text-dim text-[10px] uppercase tracking-wider">Loading...</p>
+          <p class="panel-state">Opens when you select this panel.</p>
         </div>
       </div>
 
@@ -132,27 +127,27 @@
           <h2 class="slate-title">Governance</h2>
         </header>
         <div class="slate-body" id="governance-panel">
-          <p class="text-dim text-[10px] uppercase tracking-wider">Loading...</p>
+          <p class="panel-state">Opens when you select this panel.</p>
         </div>
       </div>
 
       <!-- TRACE -->
       <div id="slate-trace" style="display: none;">
         <header class="slate-header">
-          <h2 class="slate-title">Behavioral Trace</h2>
+          <h2 class="slate-title">Trace</h2>
         </header>
         <div class="slate-body">
           <section class="deck-section">
-            <p class="text-[10px] text-dim mb-4 uppercase tracking-wider font-bold">Resonance Direction</p>
+            <p class="field-label">Direction</p>
             <div class="shield-select">
               <select id="trace-direction">
-                <option value="downstream">Impact flow (Downstream)</option>
-                <option value="upstream">Lineage path (Upstream)</option>
-                <option value="bidirectional">Full Circuit</option>
+                <option value="downstream">Downstream — what this reaches</option>
+                <option value="upstream">Upstream — what reaches this</option>
+                <option value="bidirectional">Both directions</option>
               </select>
               <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
-            <button id="btn-clear-isolation" class="action-btn-primary mt-8">Clear Structural isolation</button>
+            <button id="btn-clear-isolation" class="action-btn-primary">Clear focus</button>
           </section>
         </div>
       </div>
@@ -160,18 +155,19 @@
   </aside>
 
   <div class="fixed-bottom-status">
-    <div class="flex items-center gap-4">
+    <div class="status-row">
        <div class="status-pill">
          <div class="pulse-dot"></div>
-         <span id="sync-status" class="uppercase tracking-wider">Synced</span>
+         <span id="sync-status">Synced</span>
        </div>
-       <span class="text-[9px] text-white/20 uppercase tracking-[0.3em] font-bold">Conducks v0.8.0</span>
+       <span id="wave-scope" class="wave-scope"></span>
+       <span class="status-version">Conducks v0.8.0</span>
     </div>
   </div>
 
   <div id="focus-indicator" class="focus-indicator" style="display: none;">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-    <span class="text-[10px] font-bold uppercase tracking-widest">Active Focus</span>
+    <span class="focus-label">Focused</span>
   </div>
 
   <!-- 🧊 MAIN GRAPH -->
@@ -180,10 +176,10 @@
   <!-- 🔪 DETAIL PANEL (v3.0.0 Exclusive Glass) -->
   <section id="node-inspector">
     <div class="inspector-hero">
-      <div class="flex justify-between items-start">
-        <div style="max-width: 80%;">
-          <h3 id="ins-name" class="font-bold text-3xl tracking-tighter text-white" style="margin:0; line-height: 1;">Symbol</h3>
-          <p id="ins-type" class="text-blue-400 text-[10px] font-light uppercase tracking-[0.3em] mt-4">KIND</p>
+      <div class="inspector-hero-row">
+        <div class="inspector-ident">
+          <h3 id="ins-name" class="inspector-name">Symbol</h3>
+          <p id="ins-type" class="inspector-kind">Kind</p>
         </div>
         <div id="ins-level" class="badge">Layer</div>
       </div>
@@ -192,21 +188,21 @@
     <div class="inspector-body custom-scrollbar">
       <!-- SKELETON -->
       <div class="skeleton-container">
-        <div class="skeleton-box w-full h-10 mb-8"></div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="skeleton-box w-full h-20"></div>
-          <div class="skeleton-box w-full h-20"></div>
+        <div class="skeleton-box is-bar"></div>
+        <div class="metric-pair">
+          <div class="skeleton-box is-block"></div>
+          <div class="skeleton-box is-block"></div>
         </div>
       </div>
 
       <!-- CONTENT -->
       <div class="content-container">
-        <div style="padding: var(--spacing-md) 0; border-bottom: 1px solid var(--glass-border);">
-          <p class="text-dim text-[9px] uppercase tracking-[0.2em] font-bold mb-2">Structural Location</p>
-          <span id="ins-cluster" class="text-blue-400 font-mono text-[11px] truncate block opacity-70">-</span>
+        <div class="inspector-field">
+          <p class="field-label">Lives in</p>
+          <span id="ins-cluster" class="field-value">-</span>
         </div>
-        
-        <div class="grid grid-cols-2 gap-4 mt-8">
+
+        <div class="metric-pair">
           <div class="metric-pill">
             <p class="metric-label">Degree</p>
             <span id="ins-degree" class="metric-value">0</span>
@@ -217,20 +213,20 @@
           </div>
         </div>
 
-        <div id="ins-meat" class="mt-8 pt-8 opacity-0">
-          <p class="text-dim text-[10px] uppercase tracking-[0.2em] font-bold mb-4">Structural Data</p>
-          <div class="grid grid-cols-1 gap-3">
-            <div class="metric-pill flex-row items-center justify-between" style="padding: 18px;">
-              <p class="metric-label" style="margin:0">Entropy</p>
-              <span id="ins-entropy" class="metric-value" style="font-size: 16px;">-</span>
+        <div id="ins-meat" class="inspector-deep opacity-0">
+          <p class="field-label">Measured on the node</p>
+          <div class="metric-list">
+            <div class="metric-pill is-row">
+              <p class="metric-label">Entropy</p>
+              <span id="ins-entropy" class="metric-value">-</span>
             </div>
-            <div class="metric-pill flex-row items-center justify-between" style="padding: 18px;">
-              <p class="metric-label" style="margin:0">Complexity</p>
-              <span id="ins-complexity" class="metric-value" style="font-size: 16px;">-</span>
+            <div class="metric-pill is-row">
+              <p class="metric-label">Complexity</p>
+              <span id="ins-complexity" class="metric-value">-</span>
             </div>
-            <div class="metric-pill flex-row items-center justify-between" style="padding: 18px;">
-              <p class="metric-label" style="margin:0">Resonance</p>
-              <span id="ins-resonance" class="metric-value" style="font-size: 16px;">-</span>
+            <div class="metric-pill is-row">
+              <p class="metric-label">Resonance</p>
+              <span id="ins-resonance" class="metric-value">-</span>
             </div>
           </div>
         </div>
@@ -238,7 +234,7 @@
     </div>
 
     <div class="inspector-footer">
-       <button id="btn-reset-view-panel" class="action-btn-hd" style="background: rgba(255,255,255,0.05); color: var(--exclusive-text-muted); border: 1px solid var(--glass-border);">Exit Focus Mode</button>
+       <button id="btn-reset-view-panel" class="action-btn-hd" style="background: rgba(255,255,255,0.05); color: var(--exclusive-text-muted); border: 1px solid var(--glass-border);">Clear focus</button>
     </div>
   </section>
 

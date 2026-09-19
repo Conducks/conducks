@@ -53,14 +53,14 @@ describe('the docs tooling separates clean from empty', () => {
   }, 120000);
 
   /**
-   * `bootstrap-docs` writes `features.md`, `handover.md` and `todos/todo01.md` — three governed
-   * types — and `docs-lint` then counted 2. A file the standard governs and the linter does not see
-   * is a file nothing checks.
+   * `bootstrap-docs` writes `handover.md` and `todos/todo01.md` — two governed types (`features.md`
+   * and `architecture.md` are dissolved, ADR 0193) — and `docs-lint` must count both. A file the
+   * standard governs and the linter does not see is a file nothing checks.
    */
   it('lints every governed file bootstrap-docs creates', () => {
-    const created = ['features.md', 'handover.md', path.join('todos', 'todo01.md')]
+    const created = ['handover.md', path.join('todos', 'todo01.md')]
       .filter(f => fs.existsSync(path.join(boot, 'docs', f)));
-    expect(created.length).toBe(3);
+    expect(created.length).toBe(2);
 
     const { combined } = runCli(['docs-lint'], { cwd: boot, allowFail: true });
     const n = Number(combined.match(/(\d+) governed docs?/)?.[1] ?? 0);

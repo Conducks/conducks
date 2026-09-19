@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { GatewayService } from '@/lib/domain/analysis/index.js';
+import { GatewayService } from '@/lib/domain/mirror/index.js';
 
 /**
  * todo48#P1 — the wave cap is a DEFAULT, not a contract.
@@ -28,7 +28,7 @@ describe('the visual wave cap can be overridden', () => {
 
   it('a per-request limit reaches persistence', async () => {
     let seen: number | undefined;
-    await gatewayWith(l => { seen = l; }).getWave(undefined, undefined, undefined, false, 5000);
+    await gatewayWith(l => { seen = l; }).getWave(undefined, undefined, 5000);
     expect(seen).toBe(5000);
   });
 
@@ -38,7 +38,7 @@ describe('the visual wave cap can be overridden', () => {
     g.setWaveCap(4000);
     await g.getWave();
     expect(seen).toBe(4000);
-    await g.getWave(undefined, undefined, undefined, false, 9000);
+    await g.getWave(undefined, undefined, 9000);
     expect(seen).toBe(9000);
   });
 });

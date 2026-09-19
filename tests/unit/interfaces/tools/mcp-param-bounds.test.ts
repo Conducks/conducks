@@ -64,13 +64,17 @@ const mockGraph = {
 // and unresolved targets are reach, not membership). The assertions below are unchanged — only the
 // fixture stopped describing a shape the producer never emits, which is the trap
 // `scope-shadowing.test.ts` documents for hand-built graphs.
-const processes: Record<string, string[]> = {
-  alpha: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'],
-  beta: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'],
-  gamma: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'],
-  delta: ['/repo/src/a.ts::a'],
-  epsilon: ['/repo/src/a.ts::a'],
-};
+/**
+ * `getProcesses` returns one entry per FLOW, carrying the entry's id (ADR 0191). It was a
+ * `Record<name, members>`, which could not represent two entries sharing a name.
+ */
+const processes = [
+  { id: '/repo/src/a.ts::alpha', name: 'alpha', members: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'] },
+  { id: '/repo/src/a.ts::beta', name: 'beta', members: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'] },
+  { id: '/repo/src/a.ts::gamma', name: 'gamma', members: ['/repo/src/a.ts::a', '/repo/src/b.ts::b', '/repo/src/c.ts::c'] },
+  { id: '/repo/src/a.ts::delta', name: 'delta', members: ['/repo/src/a.ts::a'] },
+  { id: '/repo/src/a.ts::epsilon', name: 'epsilon', members: ['/repo/src/a.ts::a'] },
+];
 
 jest.unstable_mockModule('@/registry/index.js', () => ({
   registry: {

@@ -379,6 +379,18 @@ export class GovernanceService {
           // gate exempts it — the two must agree or this is back where it started.
           const DEPENDENCY_EDGES = new Set(['IMPORTS', 'EXTENDS', 'IMPLEMENTS', 'DEPENDS_ON']);
           const seen = new Set<string>();
+          // How many files this contract could speak about at all. `LAYER_FRAGMENTS` holds THIS
+          // repository's directory names, and `sentinel.yml` can express rules but not layers — so
+          // on any other project nothing matches, no edge is ever judged, and the check used to
+          // report a clean pass. A rule that examined nothing must say so rather than read as a
+          // green verdict (todo77#P7).
+          // Counted over NODES, not over dependency edges: whether this project HAS layers is a
+          // question about its files. Counting inside the edge loop made a project whose only edges
+          // are CALLS report zero mapped files and claim it was never checked.
+          let mapped = 0;
+          for (const n of this.graph.getAllNodes()) {
+            if (layerOf(String(n.properties.filePath || n.properties.file || ''))) { mapped++; break; }
+          }
           for (const edge of this.graph.getAllEdges()) {
             if (!DEPENDENCY_EDGES.has(String(edge.type))) continue;
             const src = this.graph.getNode(edge.sourceId);
@@ -398,6 +410,20 @@ export class GovernanceService {
                 message: `[${rule.name}] Illegal layer dependency: ${s} → ${t} (e.g. ${src.properties.name} → ${tgt.properties.name})`,
               });
             }
+          }
+          // Nothing mapped: the contract does not describe this project. Reported as a violation of
+          // the rule's own scope rather than silence, because "no illegal edges found" and "no edges
+          // were examined" are the same output otherwise, and the second one is not a pass.
+          if (mapped === 0) {
+            violations.push({
+              id: 'layer_boundaries',
+              ruleId: rule.id,
+              severity: 'warning',
+              message: `[${rule.name}] NOT CHECKED — no file in this project maps to a layer. `
+                + `The contract is conducks' own (${LAYER_FRAGMENTS.map(([n]) => n).join(', ')}), `
+                + `matched by directory name, and sentinel.yml cannot yet declare layers for another `
+                + `project. Nothing was examined, so nothing is claimed.`,
+            });
           }
           break;
         }

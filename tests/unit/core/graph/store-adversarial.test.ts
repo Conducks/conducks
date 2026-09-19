@@ -23,7 +23,8 @@ const edge = (id: string, from: string, to: string) => ({
 
 describe('the three indexes agree with the nodes', () => {
   it('finds a node by name, lower-name and file — and stores the id LOWERCASED', () => {
-    // The id is lowercased on write (CONDUCKS-4, for APFS) while the NAME keeps its real spelling.
+    // The id is lowercased on write (canonical lowercase ids: docs/visuals/modules/contracts.md,
+    // for APFS) while the NAME keeps its real spelling.
     // Written expecting the id back verbatim, and the store corrected it — worth pinning, because a
     // caller that assumes the id it passed is the id it gets looks up nothing.
     const g = new ConducksAdjacencyList();
@@ -59,7 +60,7 @@ describe('the three indexes agree with the nodes', () => {
   });
 
   it('keeps two nodes whose ids differ only by CASE apart in the lower-name index', () => {
-    // Ids are lowercased on write (CONDUCKS-4), so this is about the NAME index, which is not.
+    // Ids are lowercased on write (see docs/visuals/modules/contracts.md), so this is about the NAME index, which is not.
     const g = new ConducksAdjacencyList();
     g.addNode(mk('/p/a.ts::thing', '/p/a.ts', 'Thing'));
     g.addNode(mk('/p/b.ts::thing', '/p/b.ts', 'THING'));

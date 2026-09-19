@@ -1,68 +1,71 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Conducks — the benchmark</title>
+<title>Conducks — bench — the benchmark</title>
 <link rel="stylesheet" href="../system.css">
 <div class="wrap">
-<nav class="pages">
-  <a href="../index.html"><b>Start here</b>what these pages are, and the rules that bound them</a>
-  <a href="../architecture.html"><b>Architecture</b>the whole wiring, one canvas</a>
-  <a href="../problems.html"><b>Problems</b>what is broken, and who owns it</a>
-  <a href="../holding.html"><b>Holding</b>read, true, not yet placed</a>
-</nav>
+<div class="meta"><b>DERIVED</b> — rendered from <code>bench.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../architecture.html">&larr; back to the architecture</a>
-<h1>THE BENCHMARK</h1>
-<p class="sub">the shape an oracle cannot ask for, because the subject lacks it</p>
-<div class="meta">
-  <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
-  so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
-  render. <b>Arrived by clicking a block?</b> It is highlighted below.
-</div>
-
-<div class="det" id="why">
-  <h3>An oracle cannot ask for what is absent</h3>
-  <div class="where">docs/decisions/0175-a-benchmark-asks-for-the-shape-an-oracle-cannot.md</div>
-  <p>an oracle scores a subject continuously and finds only the shapes that happen to be in it. A defect nobody wrote is unscored, and that is exactly the set a tool is most likely to miss</p>
-  <p class="file">on the canvas: so real code alone can never prove recall</p>
-</div>
-
-<div class="det" id="plant">
-  <h3>Plant a defect it MUST see</h3>
-  <div class="where">tools/benchmark/bench-prune.mjs</div>
-  <p>twelve scenarios over generated projects, each one a shape prune has to name. Trace has ten and context has ten, in the files beside it</p>
-  <p class="file">on the canvas: recall, one scenario at a time</p>
-</div>
-
-<div class="det" id="counter">
-  <h3>And a case it must NOT flag</h3>
-  <div class="where">tools/benchmark/bench-context.mjs:31</div>
-  <p>every scenario states mustInclude AND its opposite, because a neighbourhood returning everything passes every inclusion assertion and one returning nothing passes every exclusion</p>
-  <p class="file">on the canvas: both halves, or the gate is half a gate</p>
-</div>
-
-<div class="det" id="mutate">
-  <h3>Break the tool, confirm the test fails</h3>
-  <div class="where">tools/benchmark/bench-trace.mjs</div>
-  <p>each mechanism is mutated in the analyzer and the scenario written for it must go red. Removing context's container filter fails 06, widening its radius fails 03 and 04, keeping the anchor in its own result fails 05</p>
-  <p class="file">on the canvas: a check that cannot fail proves nothing</p>
-</div>
-
-<div class="det" id="fixt">
-  <h3>The fixture is wrong more often than the tool</h3>
-  <div class="where">docs/decisions/0189-the-radius-is-the-claim.md</div>
-  <p>scenario 04 asserted an unrelated symbol is never a neighbour at radius 3, and it genuinely IS one three hops out. The tool was right and the claim was wrong; the first run of a new scenario set measures the fixture</p>
-  <p class="file">on the canvas: six times in one campaign</p>
-</div>
-<h2>How these connect</h2>
-<table>
-  <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
-  <tbody>
-    <tr><td>An oracle cannot ask for what is absent</td><td>Plant a defect it MUST see</td><td>—</td></tr>
-    <tr><td>Plant a defect it MUST see</td><td>And a case it must NOT flag</td><td>—</td></tr>
-    <tr><td>And a case it must NOT flag</td><td>Break the tool, confirm the test fails</td><td>—</td></tr>
-    <tr><td>Break the tool, confirm the test fails</td><td>The fixture is wrong more often than the tool</td><td>—</td></tr>
-  </tbody>
-</table>
-<footer>
-  Every anchor on this page is checked by <code>conducks visuals-lint</code>.
-</footer>
+<h1>bench — the benchmark</h1>
+<p><b>Layer:</b> none. Dev tooling outside the layer contract (<code>sentinel-rules.ts</code>) — it drives the built CLI (the <code>conducks</code> bin, <code>package.json:18</code>, compiled from <a href="interfaces/cli.html">interfaces/cli</a>) as a subprocess, exactly as a real user or agent would, and never imports <code>src/lib/**</code> directly.</p>
+<p><b>Responsibility:</b> proving conducks' analysis correct and fast against shapes real code does not reliably contain (<code>docs/decisions/0175-a-benchmark-asks-for-the-shape-an-oracle-cannot.md</code>), and against frozen real subjects a live codebase would otherwise drift out from under. <code>npm run gate</code> (<code>package.json:116</code>) is the one command that runs every scenario and every oracle against every subject; anything cheaper leaves a subject unscored while still reporting green.</p>
+<p><b>Boundaries:</b> a benchmark scenario is not believed until it has been seen RED. Every scenario in <code>tools/benchmark/bench-*.mjs</code> scores a specific mechanism in the analyzer it targets, and that mechanism must be mutated — the guard removed, the filter widened, the anchor left in its own result — and the SPECIFIC scenario written for it must fail, not some other scenario in the set going red by coincidence. <code>mutate-cli-smoke.mjs</code>'s own opening comment states the rule generally ("a check written after its fix has never been seen red, and one that cannot go red is a false positive wearing a tick"), and <code>bench-context.mjs</code>/<code>bench-trace.mjs</code> carry it out concretely: removing context's container filter fails scenario 06 ("a container is never returned"), widening its radius fails 03 and 04, and keeping the anchor in its own result fails 05 — each break named to the one scenario it breaks. Six scenarios were found wrong (measuring the fixture, not the tool) before this discipline caught them (<code>docs/decisions/0189-the-radius-is-the-claim.md</code>). No oracle is allowed to judge the analyzer with the analyzer's own machinery — <code>oracle-tsc.mjs</code> and <code>oracle-context.mjs</code> each ask an independently produced answer (the real <code>tsc</code>, or a hand-rolled graph walk) rather than re-deriving one from conducks' own output.</p>
+<p><b>Uses:</b> <a href="core/persistence.html">core/persistence</a> and <a href="domain/analysis.html">domain/analysis</a> only indirectly, through the built CLI it spawns as a child process against fixture repos it builds on the fly (<code>bench-*.mjs</code>) or against three frozen real subjects pinned by git SHA in <code>tools/benchmark/projects.json</code> (<code>oracle-*.mjs</code>, <code>health.mjs</code>).</p>
+<h2>Features</h2>
+<ul>
+<li><b>Plant benchmarks</b> (`tools/benchmark/bench-{prune,trace,context,drift,guard,advise,diff,doctor,</li>
+</ul>
+<p>  entry,flows,audit,list}.mjs<code>) — each builds small synthetic git repos and asks the built CLI a   question, per scenario. Every scenario states both halves: what the command MUST find (recall) and   what it must NOT find (precision) — a neighbourhood returning everything passes every inclusion   check and one returning nothing passes every exclusion check, so a scenario missing either half is   half a gate (</code>bench-context.mjs:31`). Counts measured directly: trace 10, context 10, prune 12,   drift 10, entry 10, doctor 12, list 10, diff 8, audit 8, flows 7, guard 7, advise 5.</p>
+<ul>
+<li><b>Oracles</b> (<code>tools/benchmark/oracle-*.mjs</code>) — score conducks against a SECOND, independently</li>
+</ul>
+<p>  produced answer on the three frozen subjects, never against itself: <code>oracle-tsc.mjs</code> asks the real   TypeScript compiler which imports are unused (<code>oracleUnusedImports</code>, <code>oracle-tsc.mjs:94</code>) and scores   MISSED (conducks silent, a recall gap) against EXTRA (conducks wrong, the dangerous precision bug);   <code>oracle-context.mjs</code> and <code>oracle-trace.mjs</code> build their own graph walk (<code>within</code>,   <code>oracle-context.mjs:46</code>) because trace and context ARE walks, so sharing the underlying graph while   scoring the traversal independently is the only honest oracle for them; <code>oracle-packs.mjs</code> walks   every tree-sitter grammar's own node-types manifest, which ships inside the grammar package rather than in this repo (the grammar author's declared node list) to check a   language pack's queries against a source neither party wrote.</p>
+<ul>
+<li><b>The liveness probe</b> (<code>oracle-tsc.mjs::probeDetectsPlantedImport</code>, <code>oracle-tsc.mjs:220</code>) — plants</li>
+</ul>
+<p>  an import the real compiler must flag and refuses to report a score if it does not. Written after a   subject's <code>tsc</code> on <code>PATH</code> turned out to be a joke script printing "This is not the tsc command you   are looking for," which the oracle had scored as a perfect run.</p>
+<ul>
+<li><b><code>tools/benchmark/ts-program.mjs::buildProgram</code></b> (<code>ts-program.mjs:56</code>) — unions every tsconfig in</li>
+</ul>
+<p>  a workspace before walking the rest of the tree, because a monorepo has one tsconfig per package,   none of them lists the whole tree, and scoring against a single config blamed the analyzer for every   file the compiler had never been shown (ADR 0186).</p>
+<ul>
+<li><b><code>tools/benchmark/reset-vault.mjs::resetVault</code></b> (<code>reset-vault.mjs:51</code>) — clears a subject's</li>
+</ul>
+<p>  <code>.conducks/</code> between runs without deleting the directory or anything git tracks in it, asking   <code>git ls-files .conducks</code> per project rather than a hardcoded filename list (ADR 0171).</p>
+<ul>
+<li><b><code>tools/benchmark/health.mjs</code></b> — Benchmark B: shape, integrity and cost against the frozen</li>
+</ul>
+<p>  subjects, never correctness of an individual answer (that is the plant benchmarks' job). Every rate   is printed together with its count, because a rate improves when the denominator is destroyed   (ADR 0077).</p>
+<ul>
+<li><b><code>tools/benchmark/doc-truth.mjs</code></b> — scores whether missing doc coverage is a TOOL gap or an AUTHOR</li>
+</ul>
+<p>  gap, per symbol, against the language's own compiler/AST rather than against conducks' own vault.</p>
+<ul>
+<li><b><code>tools/benchmark/mutate-cli-smoke.mjs</code></b> — proves every check in <code>cli-smoke.mjs</code> can go red: for</li>
+</ul>
+<p>  each listed mutation it patches the analyzer source, rebuilds, reruns the harness, records which   checks flipped, then restores from git. A mutation that flips nothing is the finding.</p>
+<ul>
+<li><b><code>tools/benchmark/cli-smoke.mjs</code></b> — every CLI command re-run against every DISCOVERED subject</li>
+</ul>
+<p>  under <code>../test-projects/</code> (never a hardcoded subject list, so a fourth subject is not silently   skipped), asserting the SPECIFIC fix each check exists for, not just a zero exit code.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>oracle</b> — an independently produced second answer (a real compiler, a hand-rolled walk, a</li>
+</ul>
+<p>  grammar's own node-type list) that a conducks answer is scored against. An oracle built from   conducks' own machinery agrees with it by construction and measures nothing.</p>
+<ul>
+<li><b>MISSED / EXTRA</b> — an oracle's two disagreement directions: MISSED is conducks silent where the</li>
+</ul>
+<p>  oracle found something (a recall gap), EXTRA is conducks reporting something the oracle disagrees   with (a precision bug, the dangerous one).</p>
+<ul>
+<li><b>plant</b> — a scenario built specifically to contain a shape the analyzer must handle, because real</li>
+</ul>
+<p>  code cannot be relied on to contain every shape a tool must be scored against.</p>
+<h2>Traps</h2>
+<p><b>No benchmark runs on <code>git commit</code>.</b> <code>scripts/hooks/pre-commit</code> runs <code>conducks docs-lint</code> only, on doc changes — <code>npm run hooks</code>'s own description states this explicitly (<code>package.json:43</code>: <code>"pre-commit runs conducks docs-lint"</code>). An earlier version of this note (reconstructed from the existing render) described a <code>bench:prune</code> pre-commit stage; that no longer exists. <code>npm run gate</code> (build, full test suite, all plant benchmarks and every oracle run against every subject) is the only enforcement of benchmark correctness, and it is not wired into any git hook or CI — there is no <code>.github/workflows</code> directory in this repository, so a clean machine is untested until someone runs <code>npm run gate</code> on it by hand.</p>
+<p><b><code>results-baseline.txt</code> measures nothing — do not cite it.</b> Two of its three subjects recorded the wrong tree, <code>nodes=0</code> read a vault path that never existed, <code>peak_cpu=0%</code> sampled the subshell rather than the work, and the one real number (<code>subject-b</code>'s wall time) varied 139s–193s across identical runs. It was produced once by a harness since fixed, and nothing in the file says so — a stale number with a plausible filename outranks a correct number nobody wrote down, which is how it kept getting quoted. Current measured figures for <code>analyze</code> live in ADR 0060 (memory) and ADR 0061 (parse time), each with the run that produced it.</p>
+<p><b>A flag written after <code>--</code> was consumed as the project path, in four oracles at once.</b> <code>npm run oracle:imports -- --write-baseline</code> resolved <code>--write-baseline</code> as <code>projectDir</code> because each script (<code>oracle-tsc.mjs</code> and three others) parsed <code>argv[2]</code> positionally before the flag existed. Filter flags out of the positional slot before reading it — a positional parser plus a later flag is the same defect every time it happens. <code>oracle-tsc.mjs</code>'s <code>positionalArg</code> derivation (<code>oracle-tsc.mjs:41</code>) is the current fix.</p>
+<p><b>A preserve list of filenames deleted another project's committed files — ask git instead.</b> <code>reset-vault.mjs</code> used to clear a subject's <code>.conducks/</code> with a hardcoded <code>KEEP</code> set derived from this repository's own <code>.gitignore</code> carve-out. That was correct only while every oracle ran against conducks itself; the first time one was pointed at the sofie subject it deleted sofie's own committed <code>.conducks/dependency-graph.html</code> and <code>.conducks/overview.html</code>. <code>git ls-files .conducks</code> is now the answer, per project, and it needs no maintenance when the subject changes (ADR 0171).</p>
+<p><b>The instrument must be probed before its reading is believed.</b> See the liveness probe under <code>## Features</code> — a <code>tsc</code> resolved from <code>PATH</code> rather than from the project's own <code>node_modules</code> can be a joke script, and an oracle that trusts it silently scores a perfect run against nothing.</p>
+<footer>Source: <code>docs/visuals/modules/bench.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

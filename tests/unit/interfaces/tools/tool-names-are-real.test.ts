@@ -24,7 +24,10 @@ describe('every conducks_* named in agent-facing text is a real tool', () => {
   const HERE = path.dirname(fileURLToPath(import.meta.url));
   const TOOLS_DIR = path.resolve(HERE, '../../../../src/interfaces/tools/tools');
 
-  /** Tool ids, read from the source that defines them — never a hand-maintained list (CONDUCKS-9). */
+  /**
+   * Tool ids, read from the source that defines them — never a hand-maintained list.
+   * This file is the gate for "one source of truth for the MCP tool surface".
+   */
   const registered = (): Set<string> => {
     const names = new Set<string>();
     for (const f of readdirSync(TOOLS_DIR).filter(f => f.endsWith('.ts'))) {

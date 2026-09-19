@@ -35,6 +35,8 @@ import { DocsStatusCommand } from "./commands/docs-status.js";
 import { MonitorCommand } from "./commands/monitor.js";
 import { DocsLintCommand } from "./commands/docs-lint.js";
 import { VisualsLintCommand } from "./commands/visuals-lint.js";
+import { GlossaryCommand } from "./commands/glossary.js";
+import { FeaturesCommand } from "./commands/features.js";
 import { TestingCommand } from "./commands/testing.js";
 import { InstallHooksCommand } from "./commands/install-hooks.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
@@ -54,7 +56,7 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
 export const STALENESS_BYPASS = new Set([
   'analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror',
   'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
-  'visuals-lint', 'install-hooks', 'testing',
+  'visuals-lint', 'install-hooks', 'testing', 'glossary', 'features',
 ]);
 
 /**
@@ -74,7 +76,7 @@ export const STALENESS_BYPASS = new Set([
  */
 export const NEEDS_NO_REGISTRY = new Set([
   'help', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor', 'visuals-lint',
-  'install-hooks', 'testing',
+  'install-hooks', 'testing', 'glossary', 'features',
 ]);
 
 /**
@@ -218,6 +220,7 @@ export async function main() {
     new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
     new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
     new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(), new VisualsLintCommand(),
+    new GlossaryCommand(), new FeaturesCommand(),
     new TestingCommand(),
     // `link` was imported and never instantiated, so `conducks link <path>` answered
     // `Unknown command "link"` while FederatedLinker underneath worked fine. Nothing caught it:

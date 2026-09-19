@@ -11,6 +11,24 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Read at <code>8d4e7ff</code>.</b> Split out of <code>domain/analysis</code> on 2026-08-17, for the same measured reason as <code>domain/docs</code>: these two files import nothing else in that folder.</p>
 <p><b>Responsibility:</b> parse what a test run measured, range-join it onto node spans, and compare a run against a recorded baseline.</p>
 <p><b>Boundaries:</b> it does not decide what is covered. It reads a report and binds it.</p>
+<p><b>Uses:</b> <a href="../core/graph.html">core/graph</a> for node spans to range-join the report onto, and <a href="../core/persistence.html">core/persistence</a> to store and re-read the baseline it compares a run against. Consumed by <code>conducks coverage</code> / <code>conducks coverage-view</code>.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Coverage binding</b> (<code>conducks coverage &lt;coverage-final.json&gt;</code>) — range-joins an istanbul/c8 report</li>
+</ul>
+<p>  onto function spans, reporting coverage per function rather than per file.</p>
+<ul>
+<li><b>Baseline diff</b> (<code>conducks coverage-view</code>) — compares a run against a recorded baseline so a</li>
+</ul>
+<p>  coverage change reads as "which behaviour just lost its test", not just a percentage.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>Bound</b> — a report line successfully range-joined onto a graph node's span.</li>
+<li><b>Considered</b> — the candidate set a join was checked against; published beside the bound count so a</li>
+</ul>
+<p>  zero result can be told apart from "nothing to find" (see Traps).</p>
+<h2>Traps</h2>
+<p>A coverage report whose files match nothing in the graph used to return the same payload as a fully covered codebase — <code>{functions: [], summary: {total: 0, full: 0, dark: 0}}</code>, zero read as good news (todo53#P1). <code>bindCoverage</code> walks the graph's functions and marks each bound or not, so <code>results.length</code> is the candidate set and <code>bound.length</code> is the answer — only the second was published. Fixed by adding <code>Verdict</code> fields (<code>status</code>/<code>checked</code>/<code>why</code>) and <code>summary.considered</code> beside <code>summary.total</code>: when a tool joins two sets, publish both sizes, because the join's output alone cannot distinguish "they agreed on nothing" from "there was nothing to find".</p>
 <h2>Reading a report rather than inferring coverage IS the feature</h2>
 <p>There was another way of answering this, and it ran on every analyze for months. <code>TestAligner</code> walked from every test node to depth 5 and marked whatever it reached as covered-by-that-test — a structural guess, not a measurement.</p>
 <p>It was removed on 2026-08-17, for two reasons that were each sufficient. It wrote <code>coveredBy</code> onto the object <code>getNode</code> RETURNS, which is a merged copy rather than the node the graph holds, so the write was lost; and nothing read the property either way. <code>mirror.engine</code> had read it until the visual wave moved to SQL (ADR 0054), and the reader went without the writer.</p>

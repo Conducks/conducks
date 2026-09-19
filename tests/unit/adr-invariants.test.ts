@@ -15,7 +15,8 @@ import { CanonicalKind } from "@/contracts/index.js";
  * bookkeeping that reads as a gate.
  *
  * Deletions come back. `daac.ts` was deleted once and its archived test was GREEN while testing
- * nothing (CONDUCKS-28). Nothing would notice it returning.
+ * nothing (the producer's-id-shape fixture agreement failure, see docs/visuals/modules/core/graph.md).
+ * Nothing would notice it returning.
  */
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src');
@@ -92,7 +93,14 @@ describe('ADR 0011 — no static doc generator comes back', () => {
 // ADR 0028 — DAAC deleted. Not unwired code: code that never worked. It looked
 // up edges by file path in a graph keyed by node id, so it returned 501
 // clusters for 501 files, and its test passed because the fixture set `id`
-// equal to `filePath`. `mirror.engine.detectCluster()` is the replacement.
+// equal to `filePath`.
+//
+// The replacement it names moved twice. ADR 0079 lifted the rule out of
+// `mirror.engine.detectCluster()` into `core/graph/cluster-rule.ts`, leaving the
+// engine delegating to it; ADR 0190 then deleted the engine, which had been dead
+// on the live path since ADR 0054 put the wave in SQL. So the file this asserted
+// is gone and the RULE it was kept for is what is pinned here — the half of 0028
+// that still binds. The anti-resurrection half is unchanged.
 // ---------------------------------------------------------------------------
 describe('ADR 0028 — DAAC stays deleted', () => {
   it('has no daac module anywhere under src/', () => {
@@ -102,8 +110,12 @@ describe('ADR 0028 — DAAC stays deleted', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('keeps the replacement it was deleted in favour of', () => {
-    expect(existsSync(path.join(SRC, 'lib/domain/visual/mirror.engine.ts'))).toBe(true);
+  it('keeps the clustering rule it was deleted in favour of (ADR 0079, ADR 0190)', () => {
+    expect(existsSync(path.join(SRC, 'lib/core/graph/cluster-rule.ts'))).toBe(true);
+  });
+
+  it('and the engine that rule outlived does not come back (ADR 0190)', () => {
+    expect(existsSync(path.join(SRC, 'lib/domain/visual'))).toBe(false);
   });
 });
 

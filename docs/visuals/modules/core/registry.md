@@ -13,6 +13,11 @@ composition and two domain services each keep one.
 does, and it never constructs one — `src/registry/index.ts` builds the provider list and hands them
 over in precedence order, first claimant keeping a pattern.
 
+**Uses:** takes provider registrations from `core/parsing` (one per language, keyed by file
+extension) and component instances from `core/persistence`, composition and two domain services, and
+answers "which provider parses this file" / "which component is registered under this id" from what
+it was given — a pure lookup, nothing more.
+
 ## Why the BOOTSTRAPPER is not in here, though the names say it should be
 
 `RegistryBootstrapper` fills a registry, so `core/registry` reads like its home. It has its own door
@@ -30,3 +35,8 @@ That is not a hypothetical. The graph door closed exactly this kind of cycle onc
 compile, and a single unrelated test failed instead. Rule 5b exists because of it.
 
 So this door stays a LEAF: one class, one import, safe for anything in core to hold.
+
+## Features
+none — one file, `synapse-registry.ts`, with no sub-features.
+
+## Glossary

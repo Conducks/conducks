@@ -2,7 +2,8 @@
 //
 // `conducks setup` is pull: skills refresh only when someone re-runs it, so an edit to
 // src/resources/skills/ silently leaves ~/.claude/skills serving the previous generation —
-// guidance from an older version that reads as current (CONDUCKS-15). This closes the loop:
+// guidance from an older version that reads as current — enforced by
+// tests/unit/domain/federation/installer-scope.test.ts. This closes the loop:
 // every build re-syncs, so the installed copy can never lag the code it describes.
 //
 // Deliberately conditional: it syncs ONLY where a conducks skill is already installed. A machine

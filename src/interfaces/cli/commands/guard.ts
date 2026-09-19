@@ -30,7 +30,14 @@ export class GuardCommand implements ConducksCommand {
       // 2. Layer-contract check (ADR 0005) — Clean-Architecture boundaries via sentinel rules
       logger.info('🛡️ [Guard] Checking layer boundaries...');
       const ruleReport = (registry.audit as any).rules() as { violations: Array<{ ruleId: string; severity: string; message: string }> };
-      const layerViolations = ruleReport.violations.filter(v => v.ruleId === 'layer_boundaries');
+      // A `warning` on this rule is the rule reporting its own SCOPE, not a breach: it fires when
+      // no file in the project maps to a layer at all, because the contract is conducks' own
+      // directory shape. That must be said out loud and must not block — a foreign project is not
+      // in violation of a contract that never applied to it, and blocking every one of them would
+      // be a worse answer than the clean pass this replaced.
+      const layerFindings = ruleReport.violations.filter(v => v.ruleId === 'layer_boundaries');
+      const layerViolations = layerFindings.filter(v => v.severity !== 'warning');
+      const layerNotChecked = layerFindings.filter(v => v.severity === 'warning');
 
       // Other enabled sentinel rules (cycles, rank inversions) are surfaced as findings, not
       // hard-blocked here — they are tracked separately and predate the layer split.
@@ -54,7 +61,11 @@ export class GuardCommand implements ConducksCommand {
         console.error(`\n${layerViolations.length} illegal cross-layer dependency(ies). Blocked.`);
         process.exit(1);
       }
-      console.log('✅ Layer contract clean.');
+      if (layerNotChecked.length > 0) {
+        for (const v of layerNotChecked) console.log(`⚠️  ${v.message}`);
+      } else {
+        console.log('✅ Layer contract clean.');
+      }
 
       // 3. Structural Regression Scan
       logger.info(`🛡️ [Guard] Scanning structural delta (Threshold: ${threshold})...`);

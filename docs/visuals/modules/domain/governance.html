@@ -10,13 +10,56 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Layer:</b> domain. Imports core + contracts.</p>
 <p><b>Responsibility:</b> turning structural facts into findings — ARCH-1 hub overload, ARCH-3 circular dependency, ARCH-4 self-import, layer-boundary violations — and owning the thresholds that define them.</p>
 <p><b>Boundaries:</b> it computes nothing about the code itself. Every input comes from the graph, so a wrong finding is fixed either by the filter here or the data in core — never by a special case in the reporting path.</p>
-<p><b>Deferred / not built:</b> symbol-level mutual-call tangles. ADR 0017 removed them from ARCH-3 deliberately — they are real properties of the code but not circular *dependencies* — and the separate "call cycle" finding that should carry them is not built. They are reported nowhere today. Deferred, not dropped.</p>
+<p><b>Uses:</b> <a href="../core/graph.html">core/graph</a> for every edge and cycle it reasons about — this module computes no structure of its own, it only judges what the graph already holds — plus a stored pulse history via <a href="../core/persistence.html">core/persistence</a> for the drift/guard baseline. Read by <code>conducks audit</code>, <code>conducks advise</code>, <code>conducks guard</code> and <code>conducks explain</code>.</p>
+<h2>The layer contract — what the code actually enforces</h2>
+<p><code>architecture.md</code>'s prose copy of this contract is retired; the executable copy is <code>src/lib/domain/governance/sentinel-rules.ts</code> plus <code>tests/architecture/boundaries.test.ts</code>, detailed in <a href="governance/sentinel.html">sentinel</a>. Stated here because ADR 0193 moves the PROSE to this note:</p>
+<p>1. Dependencies run downward only: <code>contracts</code> ← <code>core</code> ← <code>domain</code> ← <code>composition</code> (registry) ←    interfaces (<code>cli</code>, <code>mcp</code>, <code>web</code>). 2. <code>contracts</code> imports nothing. <code>core</code> imports <code>contracts</code> only. <code>domain</code> imports <code>core</code> + <code>contracts</code>.    <code>composition</code> (the registry) is the only composition point and imports <code>domain</code> + <code>core</code> +    <code>contracts</code>. 3. Interfaces never import each other directly, <b>with three encoded sibling edges, all launchers, not    logic coupling</b> — read from <code>sentinel-rules.ts:70-76</code> directly, since <code>architecture.md</code> stated only    two and had already drifted from the code: <code>cli → web</code> (the <code>mirror</code> command starts the visual    server), <code>cli → mcp</code> (the <code>conducks mcp</code> command starts the MCP stdio server), and <code>web → domain</code>/    <code>core</code> (the mirror dashboard reads structure directly rather than through the registry). 4. The structural graph is not materialised by <code>registry.initialize()</code>. A path that walks it calls    <code>ensureGraphLoaded()</code> first (deferred-graph-guard, <code>tests/unit/core/deferred-graph-guard.test.ts</code>);    <code>governance</code>, <code>search</code>, <code>kinetic</code> and <code>metrics</code> capture <code>graph.getGraph()</code> at construction and never    touch the accessor, which is exactly why the guard defaults to assuming a caller needs the graph    rather than trusting each one to ask.</p>
+<p>Enforcement is <a href="governance/sentinel.html">sentinel</a>'s to detail — this note only carries the rule.</p>
 <h2>Parts</h2>
 <ul>
-<li><b><a href="governance/sentinel.html">sentinel/</a></b> — the declarative rule engine, the layer contract (encoded but</li>
+<li><b><a href="governance/sentinel.html">sentinel/</a></b> — the declarative rule engine, the layer contract (now</li>
 </ul>
-<p>  <b>not currently loaded at runtime</b> — read this before trusting a green <code>guard</code>), <code>conducks guard</code>.</p>
+<p>  <b>enforced by default since 2026-07-25</b> — see that note for the year it was not), <code>conducks guard</code>.</p>
 <p><code>advisor</code> produces prioritized recommendations; <code>index</code> hosts the audit that assembles findings for <code>conducks audit</code>.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Structural integrity audit</b> (<code>conducks audit [--history=&lt;window&gt;]</code>) — a fixed set of architectural</li>
+</ul>
+<p>  sanity checks (import cycles, hub overload, orphan exports) plus the project's own declared rules   (<code>config/sentinel.json</code>). <code>--history</code> reads several past pulses so the answer can trend, not just be   "bad today".</p>
+<ul>
+<li><b>Mutual call tangles — ARCH-6</b> (<code>governance/index.ts:98-121</code>) — groups of symbols calling each other</li>
+</ul>
+<p>  in a loop (<code>a → b → a</code>), including tangles inside a single file. Removed from ARCH-3 deliberately   (ADR 0017: a module cycle and two functions calling each other are different facts) and reported here   under its own name as a DISCOVERY, never a violation — mutual recursion is legal, and only a human can   tell a normal shape from a real tangle.</p>
+<ul>
+<li><b>Structural advisory</b> (<code>conducks advise</code>) — turns metrics into concrete suggestions: split</li>
+</ul>
+<p>  candidates, hidden coupling, unpinned or heavy dependencies, stability risks.</p>
+<ul>
+<li><b>Co-change / architectural lies detection</b> (<code>conducks advise</code>) — finds files that keep changing</li>
+</ul>
+<p>  together in git history despite having no structural edge between them; coupling the code graph is   blind to.</p>
+<ul>
+<li><b>Policy verification</b> (<code>conducks audit</code>) — checks the graph against <code>config/sentinel.json</code>'s</li>
+</ul>
+<p>  declared rules and gives a yes/no answer.</p>
+<ul>
+<li><b>CI regression guard</b> (<code>conducks guard [--threshold=N]</code>) — compares structural entropy against a</li>
+</ul>
+<p>  historical baseline and exits non-zero past a team-picked threshold.</p>
+<ul>
+<li><b>Layer contract enforcement</b> (<code>conducks guard</code>) — see above.</li>
+</ul>
+<p><b>A verdict is earned by a comparison that actually happened.</b> A CLI drift report (fed by <code>guard</code>/<code>advisor</code>'s comparison path) used to check <code>result.deltas.some(...)</code>, which is <code>false</code> on an empty array — indistinguishable from "compared and found nothing decayed". It now checks <code>result.deltas &amp;&amp; result.deltas.length &gt; 0</code> explicitly, so "nothing to compare" and "compared, all clean" cannot collapse into the same silent pass (<code>src/interfaces/cli/commands/drift.ts:111</code>). Every finding in this module declares which edge types it traversed and whether each survives compilation — see "the one lesson" below — and every "clean" verdict states what it examined rather than staying silent about scope: an empty rule set (missing <code>config/sentinel.json</code>) now warns rather than passing quietly (see <a href="governance/sentinel.html">sentinel</a>).</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>Finding</b> — a judged fact ARCH-1..6 or a layer violation, always traced to specific edges.</li>
+<li><b>Discovery</b> — a finding class that is reported but never fails an audit (ARCH-6 tangles); the</li>
+</ul>
+<p>  code has an opinion, the tool does not have a verdict.</p>
+<ul>
+<li><b>Orphan</b> (this module's sense) — a *dangling edge*, one whose target was never induced. See</li>
+</ul>
+<p>  <a href="evolution.html">evolution</a> for the other sense of the same word.</p>
 <h2>The one lesson this module keeps relearning</h2>
 <p>Every false-positive hunt here had the same root cause: <b>the finding counted a relationship that is not the relationship it claims to measure.</b></p>
 <ul>

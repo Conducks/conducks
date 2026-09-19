@@ -9,8 +9,24 @@ read-only vs read-write mode and teardown.
 
 **Boundaries:** no logic. If a behaviour lives here rather than in a domain service, it is misplaced.
 
+**No circular imports across `core/` and `registry/`.** The rule as originally written names both
+trees together, and the incident it exists for was a door-to-door cycle between `core/graph` and
+`core/parsing` (`core/graph/index.ts:8-14`) — TypeScript compiled it fine because no single FILE
+closed the loop, only the two doors together did. The claimed enforcement was the general cycle
+detector (`domain/governance/advisor.ts`); it is the mechanism that actually MISSED this class of
+bug, because the closing leg was a type-only import the detector ignores by design. What actually
+catches a door-to-door cycle today is `tests/architecture/feature-doors.test.ts` (a feature reached
+past another's door) together with `tests/architecture/boundaries.test.ts` (the layer contract). The
+fix for the original incident was structural, not a gate: shared types moved to `contracts/` so
+neither door needed the other.
+
 **Deferred / not built:** no splitting by domain. This was recommended once and is now explicitly
 withdrawn — see below.
+
+**Uses:** takes concrete constructors from core, domain and contracts and wires them into one object
+— the persistence handle, the graph, and the analysis/governance services — then hands that single
+wired object to whichever interface (CLI or MCP) asked for it. It also holds the vault ref-count
+(below) so multiple callers can safely share one open handle.
 
 ## It looks like a hub and is not
 
@@ -52,3 +68,13 @@ chain now binds: `conducks context src/registry/index.ts::evolution` returns thr
 survives its own premise — still do not delete a getter to quiet a tool, and still do not add a
 special case to dead-code. The right fix for a false positive was to teach the graph what a use
 looks like.
+
+## Features
+none — one file, `src/registry/index.ts`, composing everything else rather than offering its own
+capability.
+
+## Glossary
+- **composition root** — the one place allowed to construct concrete instances of core/domain
+  services and hand them to interfaces; every other layer receives, never constructs.
+- **vault hold** — `acquireVault`/`releaseVault`'s ref-count on the shared DuckDB handle; it closes
+  only when the last holder releases.

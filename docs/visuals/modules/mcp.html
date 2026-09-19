@@ -12,6 +12,7 @@
 <a class="back" href="../architecture.html">&larr; back to the architecture</a>
 <h1>THE MCP SURFACE</h1>
 <p class="sub">interfaces/tools — the same answers, over stdio</p>
+<div class="det"><h3>Where this feature begins</h3><p class="where">src/interfaces/tools/index.ts::main — the same answers over stdio, every registered tool read-only since ADR 0156</p></div>
 <div class="meta">
   <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
   so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
@@ -38,12 +39,20 @@
   <p>a stray stdout write is not a log here, it is a malformed JSON-RPC frame</p>
   <p class="file">on the canvas: so every log goes to stderr</p>
 </div>
+
+<div class="det" id="mcp">
+  <h3>13 tools, every one read-only</h3>
+  <div class="where">src/interfaces/tools/tools/kinetic.ts</div>
+  <p>every registered tool declares readOnlyHint. The one that declared destructiveHint was conducks_rename, and adr-invariants.test.ts now fails if another appears</p>
+  <p class="file">on the canvas: was 14 until ADR 0156 removed the writer</p>
+</div>
 <h2>How these connect</h2>
 <table>
   <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
   <tbody>
     <tr><td>Anchor to the caller’s project</td><td>Take a hold on the vault</td><td>—</td></tr>
     <tr><td>Take a hold on the vault</td><td>stdout is the protocol</td><td>—</td></tr>
+    <tr><td>stdout is the protocol</td><td>13 tools, every one read-only</td><td>—</td></tr>
   </tbody>
 </table>
 <h2>Module notes</h2>

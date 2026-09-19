@@ -17,7 +17,8 @@ const __dirname = path.dirname(__filename);
  * 
  * This registry ONLY augments the descriptions of the static tools it is handed —
  * it never creates, adds, or removes a tool. The surface is defined by what server.ts
- * registers; the count is derived there, never restated (CONDUCKS-9).
+ * registers; the count is derived there, never restated (enforced by
+ * tests/unit/interfaces/tools/tool-names-are-real.test.ts).
  * with high-fidelity documentation from markdown files. It does NOT create
  * new dynamic tools. All legacy documentation tools have been migrated to
  * the skills/ framework, accessible via `conducks_system(mode: 'skill')`.

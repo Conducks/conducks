@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — interfaces/web — the mirror</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>web.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>interfaces/web — the mirror</h1>
+<p><b>Layer:</b> interfaces. Legally imports composition, domain, core and contracts (<code>sentinel-rules.ts:70-72</code>). Reached from the CLI through exactly one launcher edge: <code>cli → web</code> (<code>interfaces/cli/commands/mirror.ts:3</code> imports <code>initGlobalMirror</code>), the deliberate exception the layer contract encodes rather than routing a process entry point through composition (<code>src/lib/domain/governance/sentinel-rules.ts:66-72</code>; the CLI side of this same edge is documented in <a href="cli.html">interfaces/cli</a>).</p>
+<p><b>Responsibility:</b> the mirror — a live visual dashboard over the analysed codebase. This note covers both halves: <code>src/interfaces/web/mirror/server.ts</code> (an express server, <code>MirrorServer</code>) and, beside it, <code>src/interfaces/web/mirror/public/</code> (the page itself: <code>index.html</code>, <code>ui.js</code>, <code>resonance.js</code>, <code>styles.css</code>, a <code>vendor/</code> folder for <code>d3-force</code> and <code>force-graph</code>). The DATA half — answering the visual wave and hydrating a node — is <code>GatewayService</code>, <code>src/lib/domain/mirror/</code>, a domain door the web server holds by composition, not by inheritance.</p>
+<p><b>Boundaries:</b> the domain door may not hold an interface asset, so the mirror genuinely spans two layers — the express server and static page live in <code>interfaces/web</code>, the data service lives in <code>domain/mirror</code>, and <code>tests/architecture/feature-doors.test.ts:65</code> fails the build if anything outside <code>src/lib/domain/mirror/</code> reaches past its door (<code>src/lib/domain/mirror/index.ts</code>, which re-exports <code>GatewayService</code> from <code>src/lib/domain/mirror/gateway.ts</code>). The API routes (<code>/api/synapse</code>, <code>/api/node/:id</code>, <code>/api/governance</code>, <code>/api/docs</code>, <code>/api/pulse</code>) are unauthenticated; <code>MirrorServer.start</code> defaults to binding loopback only and warns loudly if a caller opts into a wider host (<code>src/interfaces/web/mirror/server.ts</code>, <code>start()</code>).</p>
+<p><b>Uses:</b> <code>registry.mirror.createGateway(projectRoot)</code> (<code>src/registry/index.ts:571-576</code>) wires <code>GatewayService</code> against the composition-owned graph and persistence singletons; the gateway itself reads <code>core/graph</code> and <code>core/persistence</code> (<code>getVisualWave</code>, <code>fetchNodeDeep</code>) and answers the wave from SQL, never by walking the in-memory graph (ADR 0054). The Docs panel reads <code>registry.docs.board()</code> through <code>/api/docs</code>, the same source <code>conducks docs-status</code> uses — the graph is not touched for that route. The Governance panel calls <code>registry.audit.audit()</code> / <code>registry.audit.advise()</code> through <code>/api/governance</code>. Live updates ride one SSE channel (<code>/api/pulse</code>): the evolution watcher and the docs watcher both subscribe their pulses to <code>MirrorServer.broadcastPulse</code> (<code>initGlobalMirror</code>, <code>src/interfaces/web/mirror/server.ts:193-209</code>) — dependency inversion so <code>domain/evolution</code> and <code>domain/docs</code> do not import web themselves.</p>
+<p><b>Deferred / not built:</b> the data half is mid-refactor as of 2026-09-18. <code>src/lib/domain/visual/</code> and its <code>MirrorEngine</code> are deleted (ADR 0190, see Traps below); <code>src/lib/domain/mirror/</code> is the new door, currently just <code>index.ts</code> + <code>gateway.ts</code>. The gateway's own code comments (<code>getWave</code>) still narrate the old <code>MirrorEngine.getVisualWave</code> / broken <code>getCompactWave</code> cast as history, not as a live path — read <code>src/lib/domain/mirror/gateway.ts</code> directly rather than this note if a claim here goes stale, since this area is actively moving and was not committed at the time this note was written.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Live force-graph dashboard</b> (<code>conducks mirror</code>) — <code>MirrorServer</code> serves the static page from</li>
+</ul>
+<p>  <code>src/interfaces/web/mirror/public/</code> and the <code>/api/synapse</code> wave; the page renders it with   <code>vendor/force-graph.min.js</code> / <code>vendor/d3-force.min.js</code>.</p>
+<ul>
+<li><b>Node hydration on demand</b> — <code>/api/node/:id</code> calls <code>GatewayService.hydrateNode</code>, which merges</li>
+</ul>
+<p>  in-memory node properties with a deeper DuckDB read (complexity, entropy, resonance) rather than   shipping the full deep payload for every node in the wave.</p>
+<ul>
+<li><b>Governance panel</b> — <code>/api/governance</code> surfaces <code>registry.audit.audit()</code> and</li>
+</ul>
+<p>  <code>registry.audit.advise()</code> in the browser; the same audit the CLI runs.</p>
+<ul>
+<li><b>Docs panel</b> — <code>/api/docs</code> surfaces <code>registry.docs.board()</code> (todo progress, ADR states) parsed</li>
+</ul>
+<p>  from the authored markdown grammar; see Traps for its coverage gap.</p>
+<ul>
+<li><b>Live pulse (SSE)</b> — <code>/api/pulse</code> pushes a reload signal to every connected browser tab when the</li>
+</ul>
+<p>  vault changes (<code>GatewayService.watchSynapse</code>, a <code>fs.watch</code> on the DuckDB file with a 1250ms debounce   for in-flight multi-stage writes) or when a doc is saved (the docs watcher).</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>wave</b> — the shallow <code>{nodes, links, clusters, truncated, totalNodes}</code> payload <code>getVisualWave</code></li>
+</ul>
+<p>  answers for the dashboard; capped by default (<code>--wave-cap</code>, <code>mirror.ts</code>) because an unreadable   ten-thousand-node graph is not useful, not because the rest is uninteresting. <b>The page SAYS when   it is capped</b> — the status bar reads "N of M nodes" whenever the wave truncates, so a partial   picture cannot be mistaken for the whole graph (ADR 0054). That is why <code>truncated</code> and <code>totalNodes</code>   are in the payload at all: a cap nobody is told about is a wrong answer delivered confidently.</p>
+<ul>
+<li><b>pulse</b> — a <code>{type: 'PULSE', timestamp}</code> (or docs-watcher) event broadcast over <code>/api/pulse</code></li>
+</ul>
+<p>  telling every open mirror tab to re-fetch, never carrying the changed data itself. <b>Not the pulse   <a href="../domain/analysis.html">domain/analysis</a> means</b> — that one is an analyze run. This is only the   notification that one finished.</p>
+<h2>Traps</h2>
+<ul>
+<li><b>The Docs panel has no automated coverage of what it renders, deliberately.</b> <code>loadDocs()</code></li>
+</ul>
+<p>  (<code>src/interfaces/web/mirror/public/ui.js:107</code>) builds the panel's DOM from the <code>/api/docs</code>   payload, and nothing in the suite exercises what it *builds*:   <code>tests/unit/interfaces/tools/docs-layer.test.ts</code> covers only the <code>/api/docs</code> payload itself, and   <code>tests/unit/interfaces/mirror-frontend-is-wired.test.ts</code> checks the page STRUCTURALLY — every id   the scripts reach exists, every class they set is defined, no external resource, every cross-file   call resolves — but asserts nothing about what <code>loadDocs</code>, <code>loadGovernance</code> or   <code>window.onDocsPulse</code> (<code>ui.js:33</code>, <code>ui.js:40-46</code>) actually render. A prior hand-written DOM shim   used to check the rendered output and was deliberately not kept: it would pass because its author   read the renderer, and keep passing after a change that breaks a real browser. Verify any change   to <code>loadDocs</code> / <code>loadGovernance</code> / <code>window.onDocsPulse</code> by running <code>conducks mirror</code> and looking   at a real browser — do not simulate one.</p>
+<ul>
+<li><b><code>MirrorEngine</code> and <code>src/lib/domain/visual/</code> are deleted — do not re-add them.</b> ADR 0190 removed</li>
+</ul>
+<p>  both; the visual wave has been answered from SQL since ADR 0054   (<code>GatewayService.getWave</code>, <code>src/lib/domain/mirror/gateway.ts</code>), and nothing on any live path calls   the old engine. It survived earlier sweeps because a barrel re-export counted as an incoming edge   to <code>prune</code> and because <code>tests/unit/adr-invariants.test.ts</code> once asserted the FILE existed rather   than the rule it carried; that invariant now asserts <code>domain/visual</code> does NOT exist. If a   refactor of this area reaches for an in-memory graph walk to answer the wave, that is the same   mistake returning — the SQL path is the one to extend.</p>
+<footer>Source: <code>docs/visuals/modules/interfaces/web.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

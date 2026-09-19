@@ -58,7 +58,7 @@ describe('save() and the structure it does not write', () => {
   });
 
   it('lowercases the id on write, so two spellings of one path cannot split a symbol', async () => {
-    // CONDUCKS-4. Asserted here rather than assumed, because every id in the vault depends on it.
+    // Canonical lowercase ids (see docs/visuals/modules/contracts.md). Asserted here rather than assumed, because every id in the vault depends on it.
     const p = new SynapsePersistence(mkVault());
     await p.saveNodes([node('/P/A.ts::Thing', '/P/A.ts', 'Thing')], 'pulse_test');
 

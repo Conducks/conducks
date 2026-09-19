@@ -21,6 +21,9 @@ import {
 import { resolveDocsTrees } from "./service-docs.js";
 import { moduleHashOf } from "@/lib/domain/analysis/index.js";
 import { verdict, verdictToJson } from "@/contracts/index.js";
+import { collectModuleNotes } from "./module-notes.js";
+import { buildGlossaryReport, type GlossaryReport } from "./glossary.js";
+import { buildFeaturesReport, type FeaturesReport } from "./features.js";
 
 export interface DocsBoard {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,6 +47,13 @@ export interface DocsBoard {
    * no single tree can know what another one holds.
    */
   crossRefs: Array<{ file: string; addr: string }>;
+  /**
+   * ADR 0193's two COMPUTED cross-module views, walked from `visuals/modules/` at the same time as
+   * everything else on the board — what `conducks_docs` now returns in place of the dissolved
+   * `features.md`/`memory.md`/`conventions.md` (ADR 0194). Undefined on a tree with no notes folder.
+   */
+  glossary?: GlossaryReport;
+  features?: FeaturesReport;
 }
 
 /**
@@ -54,12 +64,6 @@ export interface DocsBoard {
  * else. The tree label is the service path as conducks prints it (`app`, `packages/core`) or
  * `(root)`.
  */
-/**
- * Byte budgets for the constraint set shipped by `layer: "all"`. Split per list so a long memory file
- * cannot crowd out the conventions, which are RULES rather than lessons.
- */
-const CONSTRAINT_BYTES = { conventions: 6000, memory: 9000 };
-
 /** Grammar findings shipped in `health`. The COUNT is authoritative; `docs-lint` prints them all. */
 const HEALTH_FINDINGS_SHOWN = 10;
 
@@ -82,9 +86,9 @@ export function governedCount(board: DocsBoard): number {
  * constraints an agent must not break. NOT a copy of the docs — every entry is an address
  * (`todo09#P2`, a file path) or a state, so the agent still opens the doc it decides to act on.
  *
- * Read-once vs read-often is the whole point of `layer`: constraints (conventions, memory) are
- * loaded at session start and kept, so shipping them on every call is the bulk of the cost — on
- * conducks itself the full board is ~14.7k tokens and this is well under a tenth of it.
+ * Read-once vs read-often is the whole point of `layer`: the module-note summary (ADR 0193's two
+ * computed views) is loaded at session start and kept, so shipping it on every call is the bulk of
+ * the cost — on conducks itself the full board is ~14.7k tokens and this is well under a tenth of it.
  */
 export function agentView(board: DocsBoard, layer: "all" | "board" = "all", recentCount = 4): Record<string, unknown> {
   const phase = (p: PhaseLike) => ({
@@ -172,54 +176,19 @@ export function agentView(board: DocsBoard, layer: "all" | "board" = "all", rece
   };
 
   if (layer === "all") {
-    // Compact: the rule and the gotcha, not their reasoning. Open the file when you need the why.
-    const entries = (type: string, keys: string[]) =>
-      (board.other.find(o => o.type === type)?.entries ?? [])
-        .map((e: Record<string, string>) => `${e.name} — ${keys.map(k => e[k]).find(Boolean) ?? ""}`.trim());
-
-    const conventions = entries("conventions", ["Rule"]);
-    const memory = entries("memory", ["Gotcha"]);
-
-    // BOUNDED, and it says what it dropped.
-    //
-    // Measured on this repo before the cap: the default response was 48,966 bytes and 47,488 of them
-    // were this block — 159 memory entries at 31,087 bytes and 41 conventions at 16,286. That is twice
-    // the size of the raw board todo54 capped, on the layer that is the DEFAULT, and it grows every
-    // time a lesson is written down. `coverage` documents ~25 KB as what an MCP response carries.
-    //
-    // NEWEST first, because these files are appended to and a gotcha recorded today is likelier to bite
-    // than one from months ago. Silently dropping them is not an option — the omitted counts and the
-    // file to read are part of the payload, since a truncated rule set that does not say so is exactly
-    // the lie this codebase keeps paying for (ADR 0124).
-    const budget = { conventions: CONSTRAINT_BYTES.conventions, memory: CONSTRAINT_BYTES.memory };
-    const takeNewest = (list: string[], bytes: number) => {
-      const kept: string[] = [];
-      let used = 0;
-      for (let i = list.length - 1; i >= 0; i--) {
-        const size = list[i].length + 4;
-        if (kept.length > 0 && used + size > bytes) break;
-        kept.unshift(list[i]);
-        used += size;
-      }
-      return kept;
-    };
-
-    const keptConventions = takeNewest(conventions, budget.conventions);
-    const keptMemory = takeNewest(memory, budget.memory);
-    const omittedConventions = conventions.length - keptConventions.length;
-    const omittedMemory = memory.length - keptMemory.length;
-
+    // ADR 0193/0194: `features.md`, `memory.md` and `conventions.md` are dissolved, and what they held
+    // now lives in each feature's own module note — a binding rule in `**Boundaries:**`, a name
+    // collision computed by `glossary`, a capability's purpose in `## Features`. So `layer: "all"`
+    // ships a COMPACT summary of the two computed views plus which notes exist, never their full text
+    // — an agent opens the note itself for the reasoning, same as it always had to for a rule's why.
     view.constraints = {
-      conventions: keptConventions,
-      memory: keptMemory,
-      note: "Rules and gotchas only. Reasons, features and architecture: open the file.",
-      ...(omittedConventions || omittedMemory ? {
-        omitted: {
-          conventions: omittedConventions,
-          memory: omittedMemory,
-          why: "the newest are kept and the rest held back to stay inside the response budget — read docs/conventions.md and docs/memory.md in full for the older entries",
-        },
-      } : {}),
+      glossary: board.glossary
+        ? { collisions: board.glossary.collisions.length, notesWithNoSection: board.glossary.notesWithNoSection, totalNotes: board.glossary.totalNotes }
+        : null,
+      features: board.features
+        ? { notesWithNoSection: board.features.notesWithNoSection, totalNotes: board.features.totalNotes }
+        : null,
+      note: "Rules, gotchas and capability intent now live in each feature's own module note — open it for the why. `conducks glossary` / `conducks features` print the full computed views.",
     };
   }
   return view;
@@ -276,11 +245,22 @@ export function buildBoard(root: string): DocsBoard {
   proseRefLint(board, docsDir, sources);
   hygiene(board);
   board.reviews = driftedReviews(root);
+  // ADR 0193's two computed views, over the SAME notes `walkDocs` above just parsed as type "note" —
+  // a second, purpose-built walk rather than reshaping `board.other`'s generic `{type, unit, file,
+  // title}` shape back into a `ModuleNote`.
+  const notes = collectModuleNotes(root);
+  if (notes.length) {
+    board.glossary = buildGlossaryReport(notes);
+    board.features = buildFeaturesReport(notes);
+  }
   return board;
 }
 
-/** Files that exist at most once in a repo, at the ROOT tree. */
-const ROOT_ONLY = ["conventions.md", "memory.md", "handover.md"];
+/**
+ * Files that exist at most once in a repo, at the ROOT tree. `conventions.md` and `memory.md` are
+ * dissolved (ADR 0193) and dropped from this list; `handover.md` is the one root-only file left.
+ */
+const ROOT_ONLY = ["handover.md"];
 
 /** Derived output that must never be authored — what shipped is already carried by ADRs and todos. */
 const DERIVED_FILES = ["progress.md", "map.md", "drift.md"];
@@ -317,7 +297,7 @@ export function treeShapeLint(root: string, isRoot: boolean): { errs: Array<{ fi
   // A README duplicates what the standard already says, drifts from it, and is skipped by every read —
   // so it is the one doc guaranteed to be both wrong and unnoticed.
   for (const fp of walkReadmes(docsDir)) {
-    errs.push({ file: path.relative(docsDir, fp), errs: ["`README.md` is not part of the standard — the docs have no map file. Put what it holds in `features.md`, or delete it"] });
+    errs.push({ file: path.relative(docsDir, fp), errs: ["`README.md` is not part of the standard — the docs have no map file. Put what it holds in the owning feature's module note (`## Features`), or delete it"] });
   }
 
   // **Two records at one address.** A number is how everything cites a record
@@ -566,7 +546,7 @@ export function buildTrees(root: string, opts?: { rootOnly?: boolean }): Labelle
  * "changed since the last pulse" wants `conducks monitor`, which has the vault to answer it.
  *
  * Reads `.conducks/doc-reviews.json` and hashes files. No DuckDB, no registry, no anchor — the docs
- * layer takes no connection (CONDUCKS-24).
+ * layer takes no connection (enforced by tests/unit/interfaces/tools/docs-layer.test.ts).
  */
 function driftedReviews(root: string): Array<{ module: string; moduleDoc: string; intent?: string }> {
   let reviews: Record<string, string>;

@@ -11,8 +11,9 @@ import { IntelligenceService, ConducksSearch } from "@/lib/domain/intelligence/i
 import { FederatedLinker } from "@/lib/core/graph/index.js";
 import { EvolutionService, DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
 import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/docs/index.js";
+import { collectModuleNotes, buildGlossaryReport, buildFeaturesReport } from "@/lib/domain/docs/index.js";
 import { collectChanges, impactedSymbolIds } from "@/lib/domain/analysis/index.js";
-import { lintVisuals, collectVisualPages, buildStamps, staleStamps, type VisualsViolation, type ReviewStamps } from "@/lib/domain/docs/index.js";
+import { lintVisuals, collectVisualPages, buildStamps, staleStamps, unstampedExemptionsOf, isDerivedPage, type VisualsViolation, type ReviewStamps } from "@/lib/domain/docs/index.js";
 import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/docs/index.js";
 import { readTestingPage, renderTarget, FORGETERM_PLUGIN_CHORD } from "@/lib/domain/docs/index.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
@@ -27,7 +28,7 @@ import { DocsWatcher } from "@/lib/domain/docs/index.js";
 import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/coverage/index.js";
 import { SourceLineReader } from "@/lib/core/utils/index.js";
 import { firstLineOf } from "@/lib/core/parsing/index.js";
-import { GatewayService } from "@/lib/domain/analysis/index.js";
+import { GatewayService } from "@/lib/domain/mirror/index.js";
 import { ConducksInstaller } from "@/lib/domain/federation/index.js";
 import { installHook, type HookInstallResult } from "@/lib/domain/federation/index.js";
 import { MCPConfigurator } from "@/lib/domain/federation/index.js";
@@ -93,7 +94,7 @@ let ignoreManager = new IgnoreManager(process.cwd());
 // 2. Bridge Layer (Registry Infrastructure)
 const synapseRegistry = new SynapseRegistry();
 
-// Dispatch is DERIVED from each provider's own `extensions` array (CONDUCKS-2 guarantees the field).
+// Dispatch is DERIVED from each provider's own `extensions` array (docs/visuals/modules/core/parsing.md guarantees the field).
 // The hand-written list this replaces had drifted from the providers: CPPProvider declares
 // .cxx/.hxx but neither was registered, so once FS discovery started finding those files they were
 // dispatched to nothing and silently dropped.
@@ -289,6 +290,15 @@ export const registry = {
     // The denominator behind every claim a board makes. Exposed here rather than imported by the CLI
     // directly, because `cli -> domain` is a forbidden static edge and the boundary test enforces it.
     governedCount: (board: Parameters<typeof governedCount>[0]) => governedCount(board),
+    // The two COMPUTED cross-module views (ADR 0193): a term defined in two features is a
+    // collision, and the feature tree is walked rather than written down. Both carry their own
+    // honesty count — how many notes hold no such section — because a clean run over a corpus
+    // nobody has filled in reads exactly like a clean run over one that is complete (ADR 0124).
+    // Through composition for the same reason `governedCount` is: `cli -> domain` is forbidden.
+    glossary: (root?: string) =>
+      buildGlossaryReport(collectModuleNotes(root || chronicle.getProjectDir() || process.cwd())),
+    features: (root?: string) =>
+      buildFeaturesReport(collectModuleNotes(root || chronicle.getProjectDir() || process.cwd())),
     // The manual testing checklist: where it is, how far through it anyone is, and which surface
     // this shell should be told to read it on. Through composition for the same reason
     // `governedCount` is — `cli -> domain` is a forbidden static edge.
@@ -338,19 +348,29 @@ export const registry = {
      * record every resolving anchor's span hash as reviewed-now. The store is `.conducks/
      * note-reviews.json` — beside `doc-reviews.json`, its module-level ancestor.
      */
-    review: async (root?: string): Promise<{ flags: VisualsViolation[]; orphans: Array<{ page: string; key: string }>; stamped: number }> => {
+    review: async (root?: string): Promise<{
+      flags: VisualsViolation[];
+      orphans: Array<{ page: string; key: string }>;
+      unstamped: string[];
+      exemptErrors: VisualsViolation[];
+      stamped: number;
+    }> => {
       const dir = root || chronicle.getProjectDir() || process.cwd();
       const pages = collectVisualPages(dir);
       let stamps: ReviewStamps = {};
       try { stamps = JSON.parse(fs.readFileSync(path.join(dir, ".conducks", "note-reviews.json"), "utf8")); } catch { /* never stamped */ }
       const stamped = Object.values(stamps).reduce((n, a) => n + Object.keys(a).length, 0);
-      if (stamped === 0) return { flags: [], orphans: [], stamped };
+      // NO early return on `stamped === 0`. A repo that has never stamped anything is the one this
+      // check exists for: it has no flags, so silence here reported it as clean.
+      if (pages.length === 0) return { flags: [], orphans: [], unstamped: [], exemptErrors: [], stamped };
+      let confText: string | null = null;
+      try { confText = fs.readFileSync(path.join(dir, "conducks.json"), "utf8"); } catch { /* no declaration */ }
       const abs = await chronicle.discoverFiles();
       const rel = abs.map(f => path.relative(dir, f)).filter(f => f.length > 0 && !f.startsWith('..'));
       const read = (p: string): string | null => {
         try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
       };
-      return { ...staleStamps(pages, rel, read, stamps), stamped };
+      return { ...staleStamps(pages, rel, read, stamps, unstampedExemptionsOf(confText)), stamped };
     },
     /**
      * `only` (a page path) stamps ONE page's anchors, merged over the store — reviewing one note
@@ -426,7 +446,7 @@ export const registry = {
       // teaches everyone to ignore the warning.
       const derivedHeaderMissing = collectVisualPages(dir)
         .filter(p => !/\.md$/i.test(p.path)
-          && !/\bDERIVED\b/.test(p.text)
+          && !isDerivedPage(p.text)
           && !/provenance\b\W{0,4}(?:<\/?\w+>)?\W{0,4}(?:authored|hand-written)\b/i.test(p.text))
         .map(p => p.path);
       return { ...result, derivedHeaderMissing };
@@ -488,7 +508,7 @@ export const registry = {
 
     get graphEngine() {
       // A deferred graph reads as an EMPTY one, and every caller then reports zero nodes, zero
-      // flows, symbol-not-found — with no error anywhere. That is CONDUCKS-13 at full size, and it
+      // flows, symbol-not-found — with no error anywhere. That is the failure docs/visuals/modules/domain/governance.md warns against, at full size, and it
       // was measured: four of six MCP tools broke this way and three broke silently. Anything that
       // WALKS the graph must `await registry.infrastructure.ensureGraphLoaded()` first; this makes
       // forgetting a loud failure at the call site instead of a wrong answer downstream.

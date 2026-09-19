@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
  *
  * Nothing could have caught it. The import satisfied the compiler, `tsc` saw a used symbol, and no
  * test drove the command surface. It is exactly the shape this codebase keeps producing: a
- * declaration that is silently never wired to anything (CONDUCKS-13).
+ * declaration that is silently never wired to anything.
  *
  * Reads the source rather than the module, because the failure IS the gap between what the file
  * imports and what it registers — running the module would only show the half that got wired.

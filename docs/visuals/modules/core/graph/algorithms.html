@@ -7,10 +7,13 @@
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>core/graph/algorithms — cycle detection, ranking, traversal</h1>
+<p><b>Layer:</b> core, same as its parent <a href="../graph.html">core/graph</a>.</p>
 <p><b>Part of:</b> <a href="../graph.html">core/graph</a>. Three static classes: <code>CycleDetector</code> (<code>graph/algorithms/cycle-detector.ts</code>), <code>StructuralRanker</code> (<code>graph/algorithms/ranker.ts</code>), <code>GraphTraversal</code> (<code>graph/algorithms/traversal.ts</code>).</p>
 <p><b>Responsibility:</b> graph math, and only graph math. Tarjan SCC for cycles, damped PageRank for gravity plus entry-point detection, BFS/A* for traversal and blast radius.</p>
 <p><b>Boundaries:</b> they answer "what is connected how", never "is that acceptable". <code>detect()</code> returns SCCs; whether an SCC is an ARCH-3 violation is <a href="../../domain/governance.html">governance</a>'s call. That separation is why the same detector serves the audit, the advisor and the guard with three different filters.</p>
+<p><b>Uses:</b> takes the adjacency list <code>core/graph</code> has built and returns pure graph-shape facts — SCCs, gravity scores, traversal paths — to whoever asked (governance, the CLI, MCP). It reads nothing from the vault and writes nothing back; every call is a computation over the graph already in memory.</p>
 <p><b>Deferred / not built:</b> no incremental recomputation. Ranking runs over the whole graph each pulse; fine at current scale, and the obvious thing to revisit if it stops being fine.</p>
+<p><b>Not here: weighted Dijkstra.</b> A rule once filed against this module ("impact analysis must use weighted Dijkstra, not BFS/DFS") describes code that does not live in <code>core/graph/algorithms</code> — <code>GraphTraversal</code> here uses BFS/A* (see below). Dijkstra is NOT implemented here — it lives in <code>domain/kinetic</code> (<code>trace.ts</code>, <code>impact.ts</code>), and its weights are that feature's business, stated once in <a href="../../domain/kinetic.html">domain/kinetic</a>. A rule assigning weighted Dijkstra to this module was wrong about where the code is.</p>
 <h2>They look like a circular dependency and are not</h2>
 <p><code>adjacency-list</code> imports all three; all three name <code>ConducksAdjacencyList</code> in their signatures. That reads as a cycle in any source-level tool — <code>madge</code> on TS source reports exactly this.</p>
 <p>It is not one. Each algorithm uses the type <b>only as a static-method parameter annotation</b> — no <code>new</code>, no <code>instanceof</code>, no static access — so TypeScript erases the import entirely. The compiled <code>algorithms/*.js</code> import nothing from <code>adjacency-list.js</code>, and <code>madge</code> on compiled JS agrees there is no cycle.</p>
@@ -21,5 +24,16 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <h2>Gravity needs ANCHORS, and it had none</h2>
 <p>PageRank here is seeded from anchor nodes, and the filter that picks them reads <code>properties.canonicalKind</code>. It listed only kinds that never appear on the nodes it was walking, so on 2026-08-17 the ranker was measured seeding from <b>zero</b> anchors — every symbol scored the same damping floor, and <code>query</code>, <code>impact</code> and <code>context</code> ranked their answers by a constant while looking entirely healthy. A rank that is uniform is indistinguishable from a rank nobody looked at.</p>
 <p>The filter now accepts <code>STRUCTURE</code>, <code>FUNCTION</code>, <code>BEHAVIOR</code>, <code>INFRA</code>, plus <code>isModule</code> and the <code>module</code> and <code>unit</code> labels. When touching it, assert the ANCHOR COUNT, not the scores: scores come out of a run with no anchors too.</p>
+<h2>Features</h2>
+<p>none — this is a sub-feature of <a href="../graph.html">core/graph</a>, not a set of its own capabilities.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>SCC</b> — a strongly connected component, Tarjan's output. An unordered SET, not an ordered path;</li>
+</ul>
+<p>  walking it as <code>c[i] → c[i+1]</code> inspects non-edges.</p>
+<ul>
+<li><b>gravity</b> — the damped-PageRank score, seeded from anchor nodes (<code>STRUCTURE</code>, <code>FUNCTION</code>,</li>
+</ul>
+<p>  <code>BEHAVIOR</code>, <code>INFRA</code>, <code>isModule</code>, <code>module</code>, <code>unit</code>). Zero anchors makes every score the same damping   floor — uniform, not meaningful.</p>
 <footer>Source: <code>docs/visuals/modules/core/graph/algorithms.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

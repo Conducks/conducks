@@ -241,7 +241,7 @@ export class Conducks {
   }
 
 
-  public getProcesses(): Record<string, string[]> { return this.flows.groupProcesses(); }
+  public getProcesses() { return this.flows.groupProcesses(); }
 
   public status(): any {
     const graph = this.graph.getGraph();

@@ -1,5 +1,7 @@
 # domain/docs/docs-grammar — the docs standard, enforced
 
+**Layer:** domain (part of `domain/docs`).
+
 **Part of:** [domain/docs](../docs.md). Backs `conducks docs-lint`, `docs-status` and
 `bootstrap-docs`.
 
@@ -13,6 +15,30 @@ todo has `Status:` and `## Phase N —`; it has no opinion about whether the con
 **Deferred / not built:** the grammar accepts a bare `Status:` line only. Other projects using this
 standard (subject-c) write `**Status 2026-07-17:** …` — richer information in a form the linter rejects.
 Whether to loosen the check or conform the docs is unresolved.
+
+**Uses:** nothing — this module parses ONE file at a time from disk and has no idea any other doc
+exists; that is [docs-board](docs-board.md)'s job. Backs `conducks docs-lint`, `docs-status` and
+`bootstrap-docs`, and runs live inside `conducks watch` via the docs watcher.
+
+## Features
+
+- **Doc-value grammar** (`tests/unit/domain/docs/docs-grammar.test.ts`) — a doc's value is one whole
+  line. A value wrapped onto the next line is silently dropped by anything that reads it, so wrapping
+  fails the lint rather than reading as valid.
+- **ADR state grammar** — an ADR carries its own `Status:` and its own `Amended by`/`Amends` stamp on
+  both ends of a supersede; nothing outside the record restates that state, so there is no index to
+  drift out of sync with it.
+- **Phase linkage grammar** — the phase is the unit of linkage: `- Builds:` and `- Depends:` are
+  checked per phase, and `- Depends:` is rejected if it crosses a docs tree — cross-service coupling
+  must go through a root epic, or the other tree ships blind to being depended on.
+
+## Glossary
+
+- **Governed doc** — a doc type this module classifies and lints (todo, decision, handover, module
+  note); free-form types (architecture docs, `product/`, `business/`, `design/`, `brand/`) are never
+  linted.
+- **Living vs record** — see the section below; a living file is overwritten in place, a record is
+  appended and never mutated.
 
 ## Why the standard is enforced by the tool that ships it
 

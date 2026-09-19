@@ -20,6 +20,9 @@ const fakeRegistry = {
     // it fails both commands at the call, not at an assertion.
     governedCount,
   },
+  // ADR 0194: `docs-lint` also runs `visuals-lint` unconditionally. This fixture has no
+  // `docs/visuals/`, so the real command's own "0 pages, nothing was checked" path is what runs.
+  visuals: { lint: async () => ({ violations: [], checked: 0, pagesWithAnchors: 0, pages: 0 }) },
 } as never;
 
 /**

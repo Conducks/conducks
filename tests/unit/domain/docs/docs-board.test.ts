@@ -224,7 +224,7 @@ describe('cross-tree addresses', () => {
 
 /**
  * Where a file SITS, as opposed to what is inside it. `walkDocs` skips README entirely and a
- * `conventions.md` in a service tree parses perfectly — so neither is reachable from the grammar.
+ * `handover.md` in a service tree parses perfectly — so neither is reachable from the grammar.
  */
 describe('tree shape', () => {
   let root: string;
@@ -238,10 +238,10 @@ describe('tree shape', () => {
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
   it('fails a root-only file sitting in a service tree', () => {
-    w('docs/conventions.md');
-    w('docs/memory.md');
+    // conventions.md and memory.md are dissolved (ADR 0193) — ROOT_ONLY is `["handover.md"]` only.
+    w('docs/handover.md');
     const { errs } = treeShapeLint(root, false);
-    expect(errs.map(e => e.file).sort()).toEqual(['conventions.md', 'memory.md']);
+    expect(errs.map(e => e.file).sort()).toEqual(['handover.md']);
     expect(errs[0].errs[0]).toMatch(/ROOT-ONLY/);
   });
 

@@ -12,6 +12,7 @@
 <a class="back" href="../architecture.html">&larr; back to the architecture</a>
 <h1>THE CLI</h1>
 <p class="sub">interfaces/cli — 42 commands behind one dispatcher</p>
+<div class="det"><h3>Where this feature begins</h3><p class="where">src/interfaces/cli/index.ts:121::main — one dispatcher, and every command constructed in a single list so no command can reach another</p></div>
 <div class="meta">
   <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
   so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
@@ -45,6 +46,20 @@
   <p>five boot lines used to precede every answer. Quiet is process-wide but the SETTER is not a method, so the reach is visible at the call site (ADR 0080)</p>
   <p class="file">on the canvas: narration is off unless asked</p>
 </div>
+
+<div class="det" id="cli">
+  <h3>35 commands</h3>
+  <div class="where">src/interfaces/cli/index.ts:210</div>
+  <p>every command is constructed in one `const commands: ConducksCommand[]` list. Verified 2026-08-23: no file in commands/ imports another command, constructs another command class, or shells out to the conducks binary</p>
+  <p class="file">on the canvas: one file each, no command imports another</p>
+</div>
+
+<div class="det" id="mirror">
+  <h3>Both must answer the same</h3>
+  <div class="where">docs/decisions/0148-every-mcp-tool-is-a-cli-command-and-they-mirror.md</div>
+  <p>the rule is one-directional: every tool is a command, not every command is a tool</p>
+  <p class="file">on the canvas: the CLI is where a person checks what the agent did</p>
+</div>
 <h2>How these connect</h2>
 <table>
   <thead><tr><th>from</th><th>to</th><th>when</th></tr></thead>
@@ -52,6 +67,8 @@
     <tr><td>A command word</td><td>One contract per command</td><td>—</td></tr>
     <tr><td>A command word</td><td>--help is answered CENTRALLY</td><td>asked for usage</td></tr>
     <tr><td>A command word</td><td>A read command says nothing else</td><td>—</td></tr>
+    <tr><td>A command word</td><td>35 commands</td><td>—</td></tr>
+    <tr><td>35 commands</td><td>Both must answer the same</td><td>—</td></tr>
   </tbody>
 </table>
 <h2>Module notes</h2>

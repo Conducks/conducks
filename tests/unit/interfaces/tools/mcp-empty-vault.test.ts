@@ -37,7 +37,7 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
       audit: () => ({ success: true, violations: [], discoveries: [], stats: {} }),
     },
     explain: { prune: () => [] },
-    kinetic: { getProcesses: () => ({}) },
+    kinetic: { getProcesses: () => [] },
     analyze: { query: { execute: async () => [], listTemplates: () => [] } },
     query: { buildFilter: () => ({ sql: 'SELECT 1', params: [] }) },
   },

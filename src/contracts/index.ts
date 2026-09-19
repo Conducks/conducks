@@ -16,6 +16,7 @@
  * `source-extensions`, `test-path`, `verdict` and `symbol-resolution` each replaced two or more
  * copies of the same rule. That is what a contract is for — one answer, not a convenient home.
  */
+export { VAULT_DIR, VAULT_DB_FILENAME } from './vault.js';
 export { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from './dead-code-types.js';
 export type { DeadCodeType } from './dead-code-types.js';
 

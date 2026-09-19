@@ -113,10 +113,17 @@ The last row is the whole reason §5 exists. An anchor proves a line EXISTS. It 
 sentence attached to it is still true. One block said a call was logged first while the code logged it
 third, and every anchor on it resolved perfectly.
 
-**So a green gate is not a true page, and never say it is.** When reporting on a page, report the two
-things separately: what the gate proved, and what a person re-read.
+**So a green gate is not a true page — report the two things separately**: what the gate proved, and
+what a person re-read, since one block once said a call was logged first while the code logged it
+third and every anchor on it still resolved.
 
 ## 5 · The stamp, and the re-anchor pass
+
+**An anchored claim is not always just a description.** A module note's
+`**Boundaries:**` line can be a binding rule, anchored like any other claim. A stale anchor under a
+description is a wrong sentence; a stale anchor under a boundary rule is a rule nobody knows has
+stopped being enforced. The stamp discipline below is unchanged either way, but what a broken one
+costs is not.
 
 ### What a stamp is
 

@@ -11,6 +11,12 @@ Kept out of the composition root so that root stays a wiring point rather than a
 
 **Boundaries:** it sets things up and answers nothing. No query goes through here.
 
+**Uses:** imports and wires [core/graph](graph.md) (`ConducksGraph`, `FederatedLinker`),
+[core/persistence](persistence.md) (`SynapsePersistence`), [core/git](git.md) (`chronicle`,
+`anchorChronicle`), [core/parsing](../parsing.md) (`grammars`, `IgnoreManager`) and
+[core/utils](utils.md) (`logger`, `traceMemory`, `isNeverAProjectRoot`) — every other core door at
+once, which is what makes it the one feature core must never import back.
+
 ## It sits ON TOP of every other core door
 
 It imports graph, persistence, git, parsing and utils. That makes it the one feature in core that
@@ -37,3 +43,27 @@ The trap it holds: a deferred graph reads as an EMPTY one. Four of six MCP tools
 three broke silently — no error, just zero results. Anything that WALKS must call
 `ensureGraphLoaded()` first, and the registry's `graphEngine` getter makes forgetting a loud failure
 at the call site instead of a wrong answer downstream.
+
+## Features
+- none — this is setup, not a queryable capability
+
+## Glossary
+- **pendingLoad** — the deferral `registry-bootstrapper.ts` carries so a read-only command can answer
+  without materialising the graph; cleared only inside the re-anchor branch, never on every call.
+- **anchor** — the directory `bootstrap` resolves as the project root before anything else runs;
+  distinct from `anchorChronicle`, the [core/git](git.md) operation that points the chronicle at it.
+  **Not the anchor [domain/docs](../domain/docs.md) means** — that one is a `file:line` claim in a
+  visual. Same word, unrelated things; `conducks glossary` reports the pair on purpose.
+
+## Traps
+- **`initialize()` used to clear `pendingLoad` on every call, including ones that changed nothing.**
+  It sat at the top of `RegistryBootstrapper.initialize`, which runs on every tool call, and clobbered
+  an already-armed deferred load. It got away with it only because the same call then fell through a
+  re-init path that re-armed it — once that path stopped running for an unchanged anchor, the graph
+  stayed deferred forever and every tool answered as though the graph were empty. `pendingLoad` is now
+  cleared only inside the re-anchor branch.
+- **A staleness-bypass flag that guards the WARNING does not mean the load was skipped.** Commands
+  read as "skip the graph" from `isStalenessBypass`'s name, and they do not — `registry.initialize()`
+  runs its own `persistence.load(graph)` before the bypass is even checked, so every one of those
+  commands still loads the whole graph, one call earlier than the flag can see. A command that truly
+  skips graph work must be in the separate `NEEDS_NO_REGISTRY` set, which skips `initialize` entirely.

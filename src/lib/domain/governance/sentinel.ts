@@ -77,7 +77,7 @@ export class ConducksSentinel {
       }
 
       // A `matchLabel` naming something the taxonomy does not produce matches NOTHING, and a rule
-      // that matches nothing reports success — the failure mode CONDUCKS-13 exists to refuse. Both
+      // that matches nothing reports success — the failure mode docs/visuals/modules/domain/governance.md exists to refuse. Both
       // of this repo's own shipped rules said `"class"`, a raw language token, while nodes carry the
       // canonical kind (`STRUCTURE`). They were permanent no-ops and `conducks audit` said clean.
       // Raise it rather than evaluate a rule that cannot fire.

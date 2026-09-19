@@ -20,7 +20,8 @@ import { createHash } from "node:crypto";
  * later ADVISE (a rename is a graph question, ADR 0085); it may never decide.
  *
  * PURE BY CONSTRUCTION. Everything here takes its pages, its file list and its reader as arguments.
- * Discovery lives in the caller. The docs layer takes no connection (CONDUCKS-24) and this keeps the
+ * Discovery lives in the caller. The docs layer takes no connection (enforced by
+ * tests/unit/interfaces/tools/docs-layer.test.ts) and this keeps the
  * rule while staying trivially testable — every case below is a unit test, not a fixture repo.
  */
 
@@ -56,8 +57,9 @@ export interface VisualsReport {
  * because a real anchor into a prompt file (`SYSTEM.md:14`) IS a claim worth checking.
  */
 const PROSE_DOC_NAMES = new Set([
-  "MODULE.md", "architecture.md", "memory.md", "conventions.md",
-  "handover.md", "features.md", "README.md", "CLAUDE.md",
+  // `architecture.md`, `memory.md` and `conventions.md` are dissolved (ADR 0193) and dropped here —
+  // a name nothing in the standard writes any more needs no exemption.
+  "MODULE.md", "handover.md", "features.md", "README.md", "CLAUDE.md",
 ]);
 
 /** Extensions an anchor may point at. Anything else in prose is not a file reference. */
@@ -133,6 +135,20 @@ function contextsOf(page: VisualPage): AnchorContext[] {
     while ((m = re.exec(page.text)) !== null) out.push({ text: stripTags(m[1]) });
   }
   return out;
+}
+
+/**
+ * A page the RENDERER wrote, told apart from a page that merely talks about rendering.
+ *
+ * The marker is the bold form every generator here emits (`<div class="meta"><b>DERIVED</b> — …`),
+ * never the bare word. A bare `\bDERIVED\b` matched prose: `docs/visuals/architecture.html` is
+ * hand-maintained around a generated SVG and says so in an HTML comment, and three module notes
+ * mention "carries a DERIVED header" in a sentence. Every one of them excused itself from the
+ * checks below by using the word — and a checker that errs toward excusing is worse than one that
+ * errs toward flagging, because nothing is left to notice.
+ */
+export function isDerivedPage(text: string): boolean {
+  return /<b>\s*DERIVED\s*<\/b>/i.test(text);
 }
 
 function stripTags(s: string): string {
@@ -334,7 +350,7 @@ export function lintVisuals(
     // A DERIVED render is exempt from declare-or-fail: its claims live in the SOURCE beside it,
     // which IS checked, and the drift gate (ADR 0139) proves the render matches a fresh pass over
     // that source. Requiring anchors of the render would double every finding without adding one.
-    else if (/\bDERIVED\b/.test(page.text)) { /* covered by its source + the drift gate */ }
+    else if (isDerivedPage(page.text)) { /* covered by its source + the drift gate */ }
     else if (!/provenance\b\W{0,4}(?:<\/?\w+>)?\W{0,4}authored\b/i.test(page.text)) {
       // A visual with no anchor at all cannot be checked by anything, ever. That is not a pass —
       // it is the exact state this command exists to make visible (the ADR 0044 / 0124 shape:
@@ -488,6 +504,12 @@ export function buildStamps(
 }
 
 /**
+ * A reason short enough to be a shrug is not a reason. Forty characters is roughly a sentence, and
+ * the point of the floor is that "wip" and "later" cannot clear the check.
+ */
+const EXEMPT_REASON_MIN = 40;
+
+/**
  * Anchors whose cited span changed since the recorded stamp. WARN, never error: the claim may still
  * be true — only a reader can say — so the flag's job is to make the re-read list short and
  * precise. Cleared by re-stamping after the re-read; a flag nobody clears is wallpaper, which is a
@@ -503,7 +525,13 @@ export function staleStamps(
   files: string[],
   read: (repoRelPath: string) => string | null,
   stamps: ReviewStamps,
-): { flags: VisualsViolation[]; orphans: Array<{ page: string; key: string }> } {
+  exempt: Record<string, string> = {},
+): {
+  flags: VisualsViolation[];
+  orphans: Array<{ page: string; key: string }>;
+  unstamped: string[];
+  exemptErrors: VisualsViolation[];
+} {
   const current = buildStamps(pages, files, read);
   const flags: VisualsViolation[] = [];
   const orphans: Array<{ page: string; key: string }> = [];
@@ -518,5 +546,50 @@ export function staleStamps(
       });
     }
   }
-  return { flags, orphans };
+
+  // A page nobody has EVER stamped raises zero flags, so it reads exactly like a page reviewed
+  // yesterday — the one rot this gate could not see. `current` is every page holding at least one
+  // RESOLVING anchor, so a page with nothing to stamp is never demanded here: it could not clear
+  // the flag if it wanted to.
+  const exemptErrors: VisualsViolation[] = [];
+  const excused = new Set<string>();
+  for (const [page, reason] of Object.entries(exempt)) {
+    const why = typeof reason === "string" ? reason.trim() : "";
+    if (why.length < EXEMPT_REASON_MIN) {
+      exemptErrors.push({
+        page, anchor: "visuals.unstamped", severity: "error",
+        reason: `exempt from stamping, with ${why.length} characters of reason (needs ${EXEMPT_REASON_MIN}) — say what makes this page uncheckable, or stamp it`,
+      });
+      continue;
+    }
+    if (stamps[page] !== undefined) {
+      exemptErrors.push({
+        page, anchor: "visuals.unstamped", severity: "error",
+        reason: "this page IS stamped — delete its row from conducks.json → visuals.unstamped",
+      });
+      continue;
+    }
+    excused.add(page);
+  }
+  // A GENERATED page is not a source of truth, so demanding a stamp on it demands the same reading
+  // twice: `modules/x.html` is rendered from `modules/x.md` beside it, and the .md is what a person
+  // actually reads. Counting both counts one fact twice. The marker is the renderer's own — the same
+  // bold `DERIVED` header the drift gate requires of every generated page — see isDerivedPage.
+  const derived = new Set(pages.filter(pg => isDerivedPage(pg.text)).map(pg => pg.path));
+  const unstamped = Object.keys(current)
+    .filter(p => stamps[p] === undefined && !excused.has(p) && !derived.has(p))
+    .sort();
+
+  return { flags, orphans, unstamped, exemptErrors };
+}
+
+/** Exemptions declared in `conducks.json` → `visuals.unstamped`: page path → why it cannot be stamped. */
+export function unstampedExemptionsOf(conducksJsonText: string | null): Record<string, string> {
+  if (conducksJsonText === null) return {};
+  try {
+    const v = JSON.parse(conducksJsonText)?.visuals?.unstamped;
+    return v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, string> : {};
+  } catch {
+    return {};
+  }
 }

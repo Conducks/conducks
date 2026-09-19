@@ -64,7 +64,7 @@ export function tryResolveSymbol(
   formatId: (id: string) => string = id => id,
 ): string | null {
   if (input.includes('::')) {
-    // Node ids are LOWERCASED on write (CONDUCKS-4, for APFS), so an id containing a real-cased
+    // Node ids are LOWERCASED on write (see docs/visuals/modules/contracts.md, for APFS), so an id containing a real-cased
     // path — which is what a user copies out of their editor, and what every macOS temp dir has —
     // matched nothing and the command reported "not found" for a symbol that exists. Try the
     // verbatim id first so nothing that worked before changes, then the lowercased form, then fall

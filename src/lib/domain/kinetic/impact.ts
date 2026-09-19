@@ -1,4 +1,4 @@
-import { BaseAnalyzer } from './trace.js';
+import { EDGE_DISTANCE, BaseAnalyzer } from './trace.js';
 import { ConducksAdjacencyList, NodeId } from "@/lib/core/graph/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
 
@@ -20,21 +20,7 @@ export class BlastRadiusAnalyzer extends BaseAnalyzer implements ConducksCompone
    * direction: 'upstream' (who is affected by ME) or 'downstream' (what impacts ME)
    */
   public analyzeImpact(graph: ConducksAdjacencyList, startId: NodeId, direction: 'upstream' | 'downstream' = 'upstream', maxWeight: number = 5) {
-    const weights: Record<string, number> = {
-      'EXTENDS': 0.5,      // Critical impact
-      'IMPLEMENTS': 0.7,   // High impact
-      'CALLS': 1.0,        // Standard impact
-      'CONSTRUCTS': 1.2,   // instantiation
-      'MEMBER_OF': 1.5,    // membership
-      'IMPORTS': 2.0,      // Low/Indirect impact
-      'DEPENDS_ON': 2.5,   // Minimal impact
-      // A re-export is a pass-through, not a hop worth penalising: `export { x } from './y'` means
-      // every consumer of the barrel is a consumer of `y::x`. Weighted BELOW a call so a caller
-      // reached through a barrel still ranks with the callers reached directly — without this the
-      // edge existed and the traversal ignored it, and "who uses this" answered with only the
-      // consumers who happened to import from the origin file (ADR 0109).
-      'ALIASES': 0.5
-    };
+    const weights = EDGE_DISTANCE;
 
     const findings = this.dijkstra(graph, startId, direction, weights, maxWeight);
 

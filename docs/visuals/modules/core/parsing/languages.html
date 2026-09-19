@@ -8,8 +8,10 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>core/parsing/languages — one tree-sitter query per language</h1>
 <p><b>Part of:</b> <a href="../parsing.html">core/parsing</a>. 50 files across 13 language folders. Each folder owns a <code>queries.ts</code> (the tree-sitter query, an S-expression string — there are <b>no <code>.scm</code> files</b>; the query language is scm, the container is TypeScript), an <code>index.ts</code> provider, and usually a <code>resolver.ts</code> / <code>extractor.ts</code> / <code>bindings.ts</code>.</p>
+<p><b>Layer:</b> core.</p>
 <p><b>Responsibility:</b> declaring what a language's syntax means in conducks' vocabulary — which node is a definition, a call, an import, a type position. This is where language support actually lives; the reflector is generic over it.</p>
 <p><b>Boundaries:</b> a query declares captures and nothing else. Any logic about what a capture *implies* belongs in <a href="processors.html">processors</a>.</p>
+<p><b>Uses:</b> takes the compiled parser handed back by <a href="grammar-registry.html">grammar-registry</a> and nothing else — a query has no runtime dependency of its own, it is a pattern the registry compiles and the reflector runs.</p>
 <p><b>Deferred / not built:</b> type-position captures exist only for TypeScript, TSX and Go (<code>@pulse_type_target</code>). Python, Rust, Java and C# are type-blind, so <code>isTypeOnly</code> never fires for them and any type-driven analysis silently yields nothing. Adding them is per-language work tracked in todo10.</p>
 <h2>The all-or-nothing trap — read before editing any <code>queries.ts</code></h2>
 <p>A tree-sitter query compiles as a unit. <b>One unrecognized node type fails the whole query</b>, and every file in that language is then unreadable. Since ADR 0089 that is a reported <code>ParseFailure</code> rather than a silent drop to the regex fallback — but the counts still fall, and the older habit of reading a drop as "that language has fewer symbols" is the one to unlearn.</p>
@@ -26,5 +28,68 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>The name is NOT read from a field. Eleven grammars disagree about which field holds it — <code>pattern</code>, <code>name</code>, <code>declarator</code>, or nothing at all — so the annotation is carved out of the parameter's own span instead and whatever remains is the name. That keeps <code>*args</code>, <code>&amp;blk</code>, <code>k:</code>, <code>&amp;$c</code> and <code>...$rest</code> intact, which a field lookup silently dropped.</p>
 <p>Both gaps this note used to state are CLOSED (ADR 0088). Swift's parameters are captured through a second form, <code>@params_inline</code>, which tags the FUNCTION and filters its children by node type — tree-sitter-swift has no parameter-list node to tag. Generators have their own pattern in all three JS-family files; before that a starred function produced no node at all, which was a missing function rather than a missing signature.</p>
 <p>What remains: a single unparenthesised arrow parameter (<code>const f = a =&gt; a</code>) has no parameter node in the grammar at all, in either JavaScript or TypeScript, so it cannot be captured under either form.</p>
+<h2>Features</h2>
+<ul>
+<li>one query set per language: C, C++, C#, Go, Java, JavaScript, PHP, Python, Ruby, Rust, Swift,</li>
+</ul>
+<p>  TypeScript, TSX — each captures the constructs that carry that language's own structure rather   than a shared lowest common denominator (Go's goroutines as spawner-to-spawned edges, Rust's trait   impls as IMPLEMENTS, Ruby's <code>attr_accessor</code>/<code>define_method</code> as its own shape)</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>query</b> — the tree-sitter S-expression that declares which nodes a language's grammar produces</li>
+</ul>
+<p>  are a definition, a call, an import or a type position. Declares captures only; what a capture   *implies* is a processor's job.</p>
+<ul>
+<li><b>provider</b> — the per-language <code>index.ts</code> implementing <code>ConducksProvider</code>: the query plus the</li>
+</ul>
+<p>  optional resolution hooks (<code>resolveImport</code>, <code>isBoundaryModule</code>, …).</p>
+<h2>Traps</h2>
+<ul>
+<li><b>A query that compiles is not a query that matches.</b> PHP calls a double-quoted literal</li>
+</ul>
+<p>  <code>encapsed_string</code>, not <code>string</code>; a PHP <code>variable_name</code>'s text INCLUDES the leading <code>$</code>, so an   anchored predicate that escapes it matches nothing while the unanchored form works. Neither a   compile nor a typecheck catches this — probe the AST before writing the pattern.</p>
+<ul>
+<li><b>A <code>#match?</code> predicate over an unbound optional capture fails, it is not vacuously true.</b></li>
+</ul>
+<p>  <code>(modifiers (visibility_modifier) @cap (#match? @cap "..."))?</code> silently drops every declaration   with NO modifier — the optional group leaves <code>@cap</code> unbound and the predicate rejects the whole   match instead of passing. The fix is an anonymous-token alternation inside the optional group so   the capture only binds for the listed keywords.</p>
+<ul>
+<li><b>The same capture name means different things in different grammars.</b> A blanket</li>
+</ul>
+<p>  <code>(scoped_type_identifier) @pulse_type_target</code> is correct for Rust (one path segment, one capture)   and wrong for Java, whose grammar nests <code>java.util.Optional</code> as containing <code>java.util</code> as a child   <code>scoped_type_identifier</code> — the same blanket pattern there fires twice per dotted type. Copying a   working pattern from one language to another is not safe without checking whether the grammar   nests the node.</p>
+<ul>
+<li><b>Type positions have no common shape across grammars.</b> Python wraps every annotation in a</li>
+</ul>
+<p>  uniform <code>(type …)</code> node; C#'s <code>type</code> is a hidden supertype with no concrete node, so <code>type:</code>/   <code>returns:</code> fields point straight at <code>identifier</code>/<code>generic_name</code>; Rust and Java need field anchors   because a bare <code>(type_identifier)</code> also matches the struct or class's own declaration name. A   query that matches nothing does not error — it silently yields zero forever.</p>
+<ul>
+<li><b>A <code>(string)</code> capture includes its quotes.</b> <code>'/users'</code> captured from a route path is not equal to</li>
+</ul>
+<p>  <code>'/users'</code> captured the same way elsewhere unless both are stripped first.</p>
+<ul>
+<li><b>A backtick inside a query file's comment terminates the template literal.</b> <code>queries.ts</code> holds</li>
+</ul>
+<p>  the SCM query in a JS template literal; <code>tsc</code> then reports <code>';' expected</code> on the FOLLOWING line,   pointing at the pattern rather than the comment that broke it. Write those comments in words, never   with a code fragment in backticks.</p>
+<ul>
+<li><b>Swift reuses one grammar field id for two different things.</b> <code>return_type</code> and the function's</li>
+</ul>
+<p>  own <code>name</code> alias onto the same field id in tree-sitter-swift 0.7.1, so <code>return_type: (user_type)</code>   compiles and matches nothing; the working form writes <code>name:</code> twice in one pattern, disambiguated by   node type.</p>
+<ul>
+<li><b>A verb captured as dotted text will not match <code>^get$</code>.</b> Python's route pattern matched</li>
+</ul>
+<p>  <code>@infra_method</code> against <code>^(get|post|...)$</code>, but Flask's <code>@app.get('/x')</code> gave the capture the text   <code>app.get</code>, which never matched — the pattern only worked for a bare <code>@get('/x')</code>, which nobody   writes. Fixed by capturing the ATTRIBUTE node directly   (&lt;span class="anchor"&gt;src/lib/core/parsing/languages/python/queries.scm:83&lt;/span&gt;), whose text is   the bare verb. Any language where a verb can appear as a method on an object needs its capture   checked against a real framework snippet, not just against the predicate.</p>
+<ul>
+<li><b>A tree-sitter query naming two fields must use the GRAMMAR's field order, not alphabetical.</b></li>
+</ul>
+<p>  <code>(method_declaration name: (identifier) @name type: (_) @return_type)</code> COMPILES and then throws   <code>TSQueryErrorStructure</code> when a match is created; swapping to <code>type: ... name: ...</code> — the order the   grammar declares — works   (&lt;span class="anchor"&gt;src/lib/core/parsing/languages/java/queries.scm:17&lt;/span&gt;,   &lt;span class="anchor"&gt;src/lib/core/parsing/languages/csharp/queries.scm:25&lt;/span&gt;). The error surfaces   at MATCH time, not compile time, so it reads as a caller bug rather than a malformed query, and   a grammar's node-types manifest lists fields alphabetically — copying the order from there is the natural thing to   do and is wrong. Probe with a real <code>query.matches()</code> call, never compile-success alone.</p>
+<ul>
+<li><b>Only NAMED imports had a per-binding capture, so a default import bound nothing.</b></li>
+</ul>
+<p>  <code>import SessionsPage from './SessionsPage'</code> reaching <code>export default function OrgSessionsPage</code>   produced no link: the per-binding capture matched <code>named_imports</code> only   (&lt;span class="anchor"&gt;src/lib/core/parsing/languages/typescript/queries.scm:6&lt;/span&gt;), so the local   name was never registered and the exported declaration was left with no incoming edge — reported   ORPHAN. This is the ordinary React/Next shape of a route importing the component beside it. The two   halves join through <code>default</code>: the import binds its local to that name, the exporting file records   which symbol it is, and alias-chain resolution does the rest — no linker change needed once both   facts existed.</p>
+<ul>
+<li><b>A dynamic import is an import whatever surrounds it — anchor on the CALL, not on what wraps it.</b></li>
+</ul>
+<p>  The only dynamic form once captured was <code>const { X } = await import('...')</code>, anchored on the   <code>variable_declarator</code>. The shape that matters in real code awaits nothing and destructures nothing —   <code>React.lazy(() =&gt; import('./PluginView'))</code>   (&lt;span class="anchor"&gt;src/lib/core/parsing/languages/ecmascript-positions.ts:46&lt;/span&gt;) — so a file   importing many plugin components this way had every one reported UNIMPORTED_MODULE. Capturing the   file alone made it WORSE (the module became reachable, so its own symbols were then judged unused);   the fix also needed the unbound form to CONSUME the target's <code>default</code>, matching <code>React.lazy</code>'s real   contract. Half of this fix is worse than none: capture the call, and bind what it actually consumes.</p>
+<ul>
+<li><b>A test that uses the EASIER form of a shape proves nothing about the form real code uses.</b> An</li>
+</ul>
+<p>  <code>export const fmt = (n) =&gt; ...</code> and the unexported <code>const fmt = ...</code> match the same   <code>variable_declarator</code>, but where a language keeps a dedicated <code>export_statement</code>-wrapped pattern   alongside the plain one (&lt;span class="anchor"&gt;src/lib/core/parsing/languages/typescript/queries.scm:297&lt;/span&gt;   next to the plain form at line 123), only one of the two races to create the node and may carry   fewer captures. Real code exports; a unit test covering only the unexported shape can pass while the   exported shape silently loses signature captures. Grep for <code>export_statement</code> in a language's   queries file and check both forms record the same thing.</p>
 <footer>Source: <code>docs/visuals/modules/core/parsing/languages.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

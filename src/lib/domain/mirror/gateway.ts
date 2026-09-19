@@ -3,6 +3,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import fs from "node:fs";
 import path from "node:path";
+import { VAULT_DIR, VAULT_DB_FILENAME } from "@/contracts/index.js";
 
 const logger = new Logger("GatewayService");
 
@@ -26,7 +27,7 @@ export class GatewayService {
    * When a change is detected, it triggers a PULSE to all connected mirrors.
    */
   public watchSynapse(callback: (data: any) => void) {
-    const dbPath = path.join(this.projectRoot, '.conducks', 'conducks-synapse.db');
+    const dbPath = path.join(this.projectRoot, VAULT_DIR, VAULT_DB_FILENAME);
     
     if (this.watcher) this.watcher.close();
 
@@ -81,7 +82,7 @@ export class GatewayService {
   private waveCap: number | undefined;
   public setWaveCap(limit: number): void { this.waveCap = limit; }
 
-  public async getWave(layers?: number[], _clusters?: string[], spread?: number, _compact: boolean = false, limit?: number) {
+  public async getWave(layers?: number[], spread?: number, limit?: number) {
     try {
       // The cap is OVERRIDABLE (todo48#P1). It exists because a force graph of ten thousand nodes is
       // unreadable, not because the rest is uninteresting — measured on a five-service monorepo the

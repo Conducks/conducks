@@ -10,7 +10,9 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Layer:</b> composition. Imports core + domain + contracts; imported by every interface. It is the only place allowed to know about everything.</p>
 <p><b>Responsibility:</b> dependency injection and lifecycle. It constructs the persistence handle, the graph, the analysis and governance services, and hands interfaces a single wired object. It owns read-only vs read-write mode and teardown.</p>
 <p><b>Boundaries:</b> no logic. If a behaviour lives here rather than in a domain service, it is misplaced.</p>
+<p><b>No circular imports across <code>core/</code> and <code>registry/</code>.</b> The rule as originally written names both trees together, and the incident it exists for was a door-to-door cycle between <code>core/graph</code> and <code>core/parsing</code> (<code>core/graph/index.ts:8-14</code>) — TypeScript compiled it fine because no single FILE closed the loop, only the two doors together did. The claimed enforcement was the general cycle detector (<code>domain/governance/advisor.ts</code>); it is the mechanism that actually MISSED this class of bug, because the closing leg was a type-only import the detector ignores by design. What actually catches a door-to-door cycle today is <code>tests/architecture/feature-doors.test.ts</code> (a feature reached past another's door) together with <code>tests/architecture/boundaries.test.ts</code> (the layer contract). The fix for the original incident was structural, not a gate: shared types moved to <code>contracts/</code> so neither door needed the other.</p>
 <p><b>Deferred / not built:</b> no splitting by domain. This was recommended once and is now explicitly withdrawn — see below.</p>
+<p><b>Uses:</b> takes concrete constructors from core, domain and contracts and wires them into one object — the persistence handle, the graph, and the analysis/governance services — then hands that single wired object to whichever interface (CLI or MCP) asked for it. It also holds the vault ref-count (below) so multiple callers can safely share one open handle.</p>
 <h2>It looks like a hub and is not</h2>
 <p>The audit flagged <code>src/registry/index.ts</code> at 74 and 77 upstream connections against a limit of 50, and the obvious reading — "composition-root god object, split it by domain" — was wrong. Measured after type-only imports were excluded: <b>74 raw → 14 runtime, 77 → 37</b>, both well under the limit.</p>
 <p>38 of its 50 importers are CLI commands, and every one of the 38 imports the registry purely to *type* its handler, so the compiler erases all of them. The registry is a DI type contract, not a runtime hub. Do not split it on fan-in evidence, and be suspicious of any future coupling metric here that has not excluded type imports (ADR 0016).</p>
@@ -21,7 +23,18 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <h2>Dynamic access is invisible to static analysis</h2>
 <p>Services are reached through property chains (<code>registry.evolution.watcher</code>). For most of this module's life those getters had no incoming edge, dead-code reported four of them as orphans, and this note said to accept it as the price of the DI shape.</p>
 <p><b>That is no longer true, and it was fixed in the parser rather than special-cased here.</b> Adding value-position captures for member expressions (ADR 0165) made a bare property read a USE, so the chain now binds: <code>conducks context src/registry/index.ts::evolution</code> returns three incoming <code>accesses</code> edges, and prune reports zero registry orphans (measured 2026-08-29). The standing advice survives its own premise — still do not delete a getter to quiet a tool, and still do not add a special case to dead-code. The right fix for a false positive was to teach the graph what a use looks like.</p>
+<h2>Features</h2>
+<p>none — one file, <code>src/registry/index.ts</code>, composing everything else rather than offering its own capability.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>composition root</b> — the one place allowed to construct concrete instances of core/domain</li>
+</ul>
+<p>  services and hand them to interfaces; every other layer receives, never constructs.</p>
+<ul>
+<li><b>vault hold</b> — <code>acquireVault</code>/<code>releaseVault</code>'s ref-count on the shared DuckDB handle; it closes</li>
+</ul>
+<p>  only when the last holder releases.</p>
 <h2>On the canvas</h2>
-<p>cited by <a href="mcp.html">THE MCP SURFACE</a> · <a href="reg.html">THE REGISTRY</a> · <a href="seam.html">THE REGISTRY</a> — derived from the block anchors, not curated</p>
+<p>cited by <a href="mcp.html">THE MCP SURFACE</a> · <a href="reg.html">THE REGISTRY</a> — derived from the block anchors, not curated</p>
 <footer>Source: <code>docs/visuals/modules/registry.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

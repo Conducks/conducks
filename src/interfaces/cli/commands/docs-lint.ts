@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import chalk from "chalk";
+import { VisualsLintCommand } from "@/interfaces/cli/commands/visuals-lint.js";
 
 /**
  * Conducks — Docs Lint Command 📄🛡️
@@ -17,10 +18,16 @@ import chalk from "chalk";
  * gate. Now every tree is linted and ANY failure fails the run.
  *
  * A single-repo project has exactly one tree, so its output is unchanged.
+ *
+ * THE COMBINED GATE (ADR 0194). This also runs `visuals-lint`, so `conducks docs-lint` is the whole
+ * docs gate and there is no second command a session can forget. The two halves print under their own
+ * headers and set `process.exitCode` independently, so either failing fails the run and a reader can
+ * always tell which half broke. `visuals-lint` stays callable on its own for `--stamp`, which is
+ * per-page and not a gate.
  */
 export class DocsLintCommand implements ConducksCommand {
   public id = "docs-lint";
-  public description = "Validate authored docs against the conducks-docs grammar (CI gate)";
+  public description = "Validate authored docs against the conducks-docs grammar, plus visuals-lint (CI gate)";
   public usage = "conducks docs-lint [--root-only] [path]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
@@ -55,39 +62,44 @@ export class DocsLintCommand implements ConducksCommand {
             `\n  ⚠️  No governed docs found under ${root} — nothing was linted, which is not the same as clean.\n` +
             `     Create the tree with \`conducks bootstrap-docs\`.\n`));
           process.exitCode = 1;
-          return;
+        } else {
+          console.log(chalk.green(`\n  ✓ docs-lint clean — ${governed} governed docs conform to the grammar.\n`));
         }
-        console.log(chalk.green(`\n  ✓ docs-lint clean — ${governed} governed docs conform to the grammar.\n`));
-        return;
+      } else {
+        console.log(chalk.bold("\n--- 📄🛡️  Conducks Docs Lint — grammar ---\n"));
+        for (const l of board.lint) {
+          console.log(chalk.red(`  ⚠ ${l.file}`) + chalk.dim(` [${l.type}]`));
+          for (const e of l.errs) console.log(`      ${e}`);
+        }
+        console.log(chalk.red(`\n  ${board.lint.length} file(s) violate the grammar.\n`));
+        process.exitCode = 1;
       }
-      console.log(chalk.bold("\n--- 📄🛡️  Conducks Docs Lint ---\n"));
-      for (const l of board.lint) {
-        console.log(chalk.red(`  ⚠ ${l.file}`) + chalk.dim(` [${l.type}]`));
-        for (const e of l.errs) console.log(`      ${e}`);
-      }
-      console.log(chalk.red(`\n  ${board.lint.length} file(s) violate the grammar.\n`));
-      process.exitCode = 1;
-      return;
-    }
-
-    console.log(chalk.bold(`\n--- 📄🛡️  Conducks Docs Lint — ${trees.length} docs trees ---\n`));
-    for (const { label, board, governed } of reports) {
-      if (board.lint.length === 0) {
-        console.log(chalk.green(`  ✓ ${label.padEnd(18)}`) + chalk.dim(`${governed} governed docs conform to the grammar.`));
-        continue;
-      }
-      console.log(chalk.red(`  ✖ ${label.padEnd(18)}`) + chalk.dim(`${board.lint.length} file(s) violate the grammar:`));
-      for (const l of board.lint) {
-        console.log(chalk.red(`      ⚠ ${l.file}`) + chalk.dim(` [${l.type}]`));
-        for (const e of l.errs) console.log(`          ${e}`);
-      }
-    }
-
-    if (violations === 0) {
-      console.log(chalk.green(`\n  ✓ clean across ${trees.length} docs trees.\n`));
     } else {
-      console.log(chalk.red(`\n  ${violations} file(s) violate the grammar across ${trees.length} docs trees.\n`));
-      process.exitCode = 1;
+      console.log(chalk.bold(`\n--- 📄🛡️  Conducks Docs Lint — grammar, ${trees.length} docs trees ---\n`));
+      for (const { label, board, governed } of reports) {
+        if (board.lint.length === 0) {
+          console.log(chalk.green(`  ✓ ${label.padEnd(18)}`) + chalk.dim(`${governed} governed docs conform to the grammar.`));
+          continue;
+        }
+        console.log(chalk.red(`  ✖ ${label.padEnd(18)}`) + chalk.dim(`${board.lint.length} file(s) violate the grammar:`));
+        for (const l of board.lint) {
+          console.log(chalk.red(`      ⚠ ${l.file}`) + chalk.dim(` [${l.type}]`));
+          for (const e of l.errs) console.log(`          ${e}`);
+        }
+      }
+
+      if (violations === 0) {
+        console.log(chalk.green(`\n  ✓ clean across ${trees.length} docs trees.\n`));
+      } else {
+        console.log(chalk.red(`\n  ${violations} file(s) violate the grammar across ${trees.length} docs trees.\n`));
+        process.exitCode = 1;
+      }
     }
+
+    // Second half of the combined gate (ADR 0194): visuals/ anchors, drift and review stamps. Its own
+    // header and its own `process.exitCode` write keep this half distinguishable from the grammar
+    // half above — a reader can tell which one failed without re-running either command alone.
+    console.log(chalk.bold("--- 🖼️🛡️  Conducks Docs Lint — visuals ---"));
+    await new VisualsLintCommand().execute(posArg ? [posArg] : [], registry);
   }
 }

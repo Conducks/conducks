@@ -944,7 +944,7 @@ export class IntraLinker {
       const local = graph.getNode(localId);
       if (!local) continue;                                  // nothing declares it here — the import stands
 
-      // CASE-SENSITIVE, and this is not fussiness. Ids are lowercased for APFS (CONDUCKS-4), so
+      // CASE-SENSITIVE, and this is not fussiness. Ids are lowercased for APFS (see docs/visuals/modules/contracts.md), so
       // `Path` imported from pathlib and a local variable `path` share one id shape. The first cut of
       // this block matched on the lowered id and rebound 37 edges on the python subject — including
       // `pathlib::Path` onto a local `path`, and `graph.py::Node` onto a local `node`. Those are

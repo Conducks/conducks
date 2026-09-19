@@ -5,7 +5,7 @@ import { canonicalize, getProjectRelativePath } from '@/lib/core/utils/index.js'
 /**
  * `path-utils` had NO test, and it decides what a node id is (todo71#P3).
  *
- * Every node id in the vault is `canonicalize(file) + '::' + name` (CONDUCKS-4). So any input this
+ * Every node id in the vault is `canonicalize(file) + '::' + name` (canonical lowercase ids: docs/visuals/modules/contracts.md). So any input this
  * function maps to two different strings becomes two nodes for one symbol, and every edge between
  * them dangles — the fragmentation the lowercasing exists to prevent, reintroduced by the function
  * that prevents it. Thirteen parsing files depend on it, which is why it is pinned before parsing is

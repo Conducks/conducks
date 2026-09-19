@@ -6,7 +6,8 @@
  *
  * Each test gets its own temp vault (mkdtempSync) — DuckDB's file lock is exclusive, so sharing a
  * vault across tests would serialize on real contention rather than testing logic. Uses real
- * SynapsePersistence + real DuckDB throughout, per CONDUCKS-5 (no persistence mock) and the vault
+ * SynapsePersistence + real DuckDB throughout, per the driver-only persistence rule
+ * (see docs/visuals/modules/core/persistence.md) — no persistence mock — and the vault
  * lock note in docs/memory.md.
  */
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
@@ -347,7 +348,9 @@ describe('SynapsePersistence', () => {
   // File hash gate storage
   // ---------------------------------------------------------------------------------------------
   describe('file hashes', () => {
-    it('round-trips a hash and reports it case-insensitively (CONDUCKS-4)', async () => {
+    // Node ids are canonical lowercase (see docs/visuals/modules/contracts.md); file hash
+    // lookups must honor that same case-insensitivity.
+    it('round-trips a hash and reports it case-insensitively', async () => {
       await persistence.setFileHash('/Repo/Src/A.ts', 'abc123', 42);
       expect(await persistence.getFileHash('/repo/src/a.ts')).toBe('abc123');
     });

@@ -30,7 +30,7 @@ export interface SourceLine {
  *
  * A LINE THAT CANNOT BE READ SAYS SO. A vault older than the working tree points at a line that has
  * moved or gone, and printing whatever now sits at that number is a confident wrong answer — the
- * shape CONDUCKS-37 exists to prevent.
+ * shape docs/visuals/modules/domain/governance.md warns against.
  */
 export class SourceLineReader {
   /** path -> lines, or null when the file could not be read. Absence means "not yet attempted". */
@@ -63,7 +63,7 @@ export class SourceLineReader {
 
     let lines: string[] | null = null;
     try {
-      // Node ids and the `file` column are LOWERCASED on write (CONDUCKS-4, for APFS), so on a
+      // Node ids and the `file` column are LOWERCASED on write (see docs/visuals/modules/contracts.md, for APFS), so on a
       // case-insensitive filesystem this path opens the real file. On a case-sensitive one it will
       // not, and the honest answer is `unreadable` rather than a guess at the original casing —
       // recovering it belongs to todo32, which owns the id-casing question.

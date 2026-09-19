@@ -14,7 +14,7 @@ import { SourceLineReader } from '@/lib/core/utils/source-line.js';
  *
  * The two honesty cases matter as much as the happy one. A vault older than the working tree points
  * at a line that has moved or gone, and printing whatever now sits at that number would be a
- * confident wrong answer — the failure this project has fixed five times (CONDUCKS-37).
+ * confident wrong answer — the failure this project has fixed five times (the confident-empty-result rule, docs/visuals/modules/domain/governance.md).
  */
 describe('SourceLineReader', () => {
   let dir: string;

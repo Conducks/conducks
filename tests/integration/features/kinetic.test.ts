@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
 
 // Kinetic domain: `conducks impact` and `conducks trace` (KineticService -> Weighted Dijkstra,
-// CONDUCKS-6) driven end to end over a real call graph: `caller` calls `helper`.
+// see docs/visuals/modules/domain/kinetic.md) driven end to end over a real call graph:
+// `caller` calls `helper`.
 describe('Kinetic domain integration', () => {
   let repo: string;
 

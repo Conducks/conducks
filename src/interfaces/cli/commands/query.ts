@@ -55,7 +55,7 @@ export class QueryCommand implements ConducksCommand {
 
       console.log(`\n\x1b[1m--- Symbols whose PURPOSE mentions "${term}" ---\x1b[0m`);
       if (rows.length === 0) {
-        // An empty result here has two causes and they are not the same fact (CONDUCKS-37).
+        // An empty result here has two causes and they are not the same fact (see docs/visuals/modules/domain/governance.md).
         const [{ n }] = await registry.infrastructure.persistence.query<{ n: number }>(
           'SELECT count(*) AS n FROM nodes WHERE doc IS NOT NULL');
         console.log(Number(n) === 0
@@ -65,7 +65,7 @@ export class QueryCommand implements ConducksCommand {
       }
       for (const r of rows) {
         // Relative AND real-case (ADR 0132) — `r.file` is the lowercased on-disk spelling
-        // (CONDUCKS-4), and slicing the prefix off it here did not repair that case.
+        // (see docs/visuals/modules/contracts.md), and slicing the prefix off it here did not repair that case.
         const rel = displayPath(String(r.file || ''), queryRoot);
         console.log(`\n  \x1b[36m${r.name}\x1b[0m \x1b[2m${rel}:${r.lineStart}\x1b[0m`);
         console.log(`    ${String(r.doc).split('\n')[0]}`);
@@ -243,7 +243,7 @@ export class QueryCommand implements ConducksCommand {
         // editor.
         //
         // The manual prefix-slice here did not repair CASE — `filePath` is stored lowercased
-        // (CONDUCKS-4), so this printed a path a reader could not paste even after relativising.
+        // (see docs/visuals/modules/contracts.md), so this printed a path a reader could not paste even after relativising.
         const reader = registry.source.lineReader();
         const rel = (p: string) => displayPath(p, queryRoot);
 

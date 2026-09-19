@@ -92,10 +92,10 @@ spot:**
 invisible elements — two edge labels painted over by a block, and a container subtitle 9 px under
 one.
 
-**Do not hand the engine label boxes.** Reserving space for a label cost, measured on one graph, 11%
-more ink, 38% more width and **more than double** the direction reversals. The reserved boxes shove
-nodes apart and force detours. Labels are placed afterwards by the occlusion resolver, which is
-better at it anyway.
+**Let the occlusion resolver place labels after layout — not the engine, up front.** Reserving space
+for a label cost, measured on one graph, 11% more ink, 38% more width and **more than double** the
+direction reversals. The reserved boxes shove nodes apart and force detours, and the resolver is
+better at placing them anyway.
 
 ## 4 · The gates — what the build refuses
 
@@ -152,11 +152,11 @@ Read the reason literally; each one names the two things involved.
 | `block X escapes its container` | X is declared in one container and edged from another that also claims it |
 | `nowhere free to put label "…"` | the region is too dense — shorten the label, or the two blocks it sits between want more space |
 | `edge E does not start on X` | the edge names an endpoint that is not where it thinks it is — usually an id typo that still resolves to a real node |
-| `title overflows X` | the title is too long for the box the width formula gave it. Shorten the title; do not widen the box |
+| `title overflows X` | the title is too long for the box the width formula gave it. Shorten the title — the box's width comes from the formula, not from you |
 | `container A overlaps B` | two containers claim the same feature's blocks |
 | `N blocks drawn on the canvas` | the canvas renderer is drawing container children. They belong on the feature page — see `references/authoring.md` §1 |
 | gate 7, a missing selector | the chrome was edited, or the splice dropped a wrapper |
 | gate 8, chrome drift | a shared file was edited locally. See `references/setup.md` |
 
-**Do not fix a refusal by relaxing the gate.** Every one of these was added after the failure it
-names shipped.
+**Fix what triggered the refusal, not the gate that caught it.** Every one of these gates was added
+after the failure it names shipped.

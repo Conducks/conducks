@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conducks — domain/kinetic — movement through the graph</title>
+<link rel="stylesheet" href="../../system.css">
+<div class="wrap">
+<div class="meta"><b>DERIVED</b> — rendered from <code>kinetic.md</code> beside this file.
+An edit made here is discarded by the next render; edit the .md.</div>
+<a class="back" href="../../architecture.html">&larr; back to the architecture</a>
+<h1>domain/kinetic — movement through the graph</h1>
+<p><b>Layer:</b> domain. Imports core + contracts.</p>
+<p><b>Responsibility:</b> everything about MOVEMENT through the graph rather than its shape: what a change reaches (<code>impact</code>), what reaches a symbol (<code>trace</code>), the scored neighbourhood around one (<code>context</code>), and the flow of data between symbols (<code>flows</code>). <code>KineticService</code> (<code>kinetic/index.ts</code>) is the feature's only door (ADR 0150).</p>
+<p><b>Boundaries:</b> a LEAF — it imports nothing else in <code>domain</code>. <code>TraceAnalyzer</code> and <code>ContextAnalyzer</code> deliberately do not cross the door: the only place naming them directly outside this folder is this feature's own test, which the door rule allows. <code>tests/architecture/feature-doors.test.ts</code> fails the build if anything else reaches past <code>index.ts</code>.</p>
+<p><b>Uses:</b> <a href="../core/graph.html">core/graph</a>'s adjacency list (<code>getNode</code>, <code>getNeighbors</code>) for every traversal — this module computes no structure, it only walks what the graph already holds — and <code>contracts</code> for the <code>ConducksComponent</code> id/type <code>BlastRadiusAnalyzer</code> registers under. Reached from the CLI (<code>impact</code>, <code>trace</code>, <code>context</code>, <code>flows</code> commands) and MCP (<code>tools/kinetic.ts</code>, <code>tools/synapse.ts</code>) only through <code>registry.kinetic.*</code> — never <code>KineticService</code>'s internals directly.</p>
+<p><b>Deferred / not built:</b> no severity or confidence beyond <code>impactScore</code>'s own risk band; a caller that wants the CLI's separate composite 0–10 risk score gets it from <code>domain/analysis</code>'s <code>explain</code>, not from here (see Traps).</p>
+<h2>Features</h2>
+<ul>
+<li><b>Impact / blast radius analysis</b> (<code>conducks impact &lt;symbol&gt; [upstream|downstream]</code>) —</li>
+</ul>
+<p>  <code>BlastRadiusAnalyzer.analyzeImpact</code> answers "what breaks if I touch this" with affected symbols   ordered by structural distance. Depth is a cumulative edge-weight budget, not a hop count: a chain of   cheap inheritance edges reaches further than a chain of imports.</p>
+<ul>
+<li><b>Path tracing</b> (MCP <code>conducks_trace</code> with <code>mode: "path"</code>) — <code>TraceAnalyzer.findPath</code>, the shortest</li>
+</ul>
+<p>  weighted bridge between two named symbols.</p>
+<ul>
+<li><b>Reachability trace</b> (<code>conducks trace &lt;symbol&gt;</code>) — <code>TraceAnalyzer.trace</code>, every symbol reachable</li>
+</ul>
+<p>  downstream, nearest-first by risk-weighted graph distance. A REACHABILITY order, not an execution   order — a static graph has no "runs before" between two direct calls at the same distance.</p>
+<ul>
+<li><b>Symbol neighbourhood</b> (<code>conducks context &lt;symbol&gt;</code>, MCP <code>conducks_context</code>) —</li>
+</ul>
+<p>  <code>ContextAnalyzer.neighbourhood</code>, the scored area around a symbol. One implementation behind both   surfaces since 2026-08-13 (todo57) — before that date the CLI and MCP ran two different   implementations under the same name and agreed on only 44 of 2,407 nodes on the same symbol.</p>
+<ul>
+<li><b>Execution and data flow</b> (<code>conducks trace &lt;symbol&gt; --flow</code>, <code>conducks flows</code>) — <code>ConducksFlowEngine</code></li>
+</ul>
+<p>  groups symbols into named execution units and follows where a value comes from and where it goes.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>edge distance</b> — how far apart two symbols are per edge type, from the single <code>EDGE_DISTANCE</code></li>
+</ul>
+<p>  table (&lt;span class="anchor"&gt;src/lib/domain/kinetic/trace.ts:81&lt;/span&gt;). LOWER means a TIGHTER   relationship, so Dijkstra reaches tightly-coupled symbols first. One table for the whole feature:   <code>impact</code> and <code>trace</code> ask the same question and a second copy drifts (ADR 0196).</p>
+<ul>
+<li><b>Weighted Dijkstra</b> — every traversal in this module (<code>BaseAnalyzer.dijkstra</code>) is Dijkstra over</li>
+</ul>
+<p>  edge-type weights, never plain BFS/DFS: a hop's cost depends on what KIND of edge it is, not just that   an edge exists.</p>
+<ul>
+<li><b>Depth-bound hit</b> (<code>depthBoundHit</code> / <code>lastTraceWasDepthBounded()</code>) — whether the last traversal</li>
+</ul>
+<p>  discarded a path for exceeding its weight budget; the only place that can say an answer is a partial   one.</p>
+<ul>
+<li><b>Distance</b> vs <b>depth</b> — <code>dijkstra</code> returns a cumulative weighted <code>weight</code>; <code>bfs</code> (used by <code>trace</code>)</li>
+</ul>
+<p>  rounds that into an integer <code>depth</code> for display, which is a presentation choice, not a second metric.</p>
+<h2>Traps</h2>
+<p><b>The computed impact risk band never reaches a user.</b> <code>analyzeImpact</code> returns <code>risk: 'LOW'|'MEDIUM'|'HIGH'|'CRITICAL'</code> (<code>domain/kinetic/impact.ts:47</code>, thresholds on <code>impactScore</code> in <code>getRiskLevel</code>), and <code>KineticResult</code> declares the field — but no surface prints it. The MCP handler returns only <code>{symbol, direction, impact, indexStaleness}</code>; the CLI prints <code>affectedCount</code>, the shortest path and <code>impactScore</code>, plus a *different* <code>explain.calculateCompositeRisk</code> score computed elsewhere. Don't quote "impact risk = HIGH" — nobody has ever seen it rendered, and its bands are score-based, not comparable to the composite 0–10 risk.</p>
+<p>(<code>getRiskLevel</code> is defined at <code>domain/kinetic/impact.ts:58-63</code>, cited here with its full path because a bare <code>impact.ts</code> now resolves ambiguously against <code>interfaces/cli/commands/impact.ts</code> — see Traps below.)</p>
+<p><b>Containment is one-way.</b> A <code>MEMBER_OF</code> edge runs child → container. Followed forward it is a real claim (change the function, the file changed); followed backward from <code>upstream</code> traversal it claims every OTHER symbol in that file was affected too, which is co-location, not dependency. <code>dijkstra</code> explicitly skips <code>MEMBER_OF</code> when walking <code>upstream</code> for exactly this reason. <code>trace</code>'s downstream walk still lets containment CARRY a path (an import is unit-scoped, so a dependency is reached through its container) but never lets a <code>MEMBER_OF</code> edge be the last hop of a kept result — and re-admits a dropped node to a fixpoint if something already kept reaches it by a non-<code>MEMBER_OF</code> edge, because Dijkstra keeps only the cheapest of possibly several real routes to the same node.</p>
+<p><b>An edge type missing from the weight table does not fail — it becomes a standard hop.</b> <code>BaseAnalyzer.dijkstra</code> reads <code>weights[edge.type] || 1.0</code> (&lt;span class="anchor"&gt;src/lib/domain/kinetic/trace.ts:158&lt;/span&gt;), so an unweighted type silently costs the same as a call. That is correct for a type nobody has weighted yet and was a live defect for one that should have been weighted: <code>findPath</code> carried its own table with no <code>ALIASES</code> entry, so a barrel re-export cost as much as a direct call, against the rule that a re-export is a pass-through and must rank with the direct consumers. Two tables existed for the same concept and differed by up to 5x; there is now one, <code>EDGE_DISTANCE</code>, and a test asserts every type the traversal can meet is in it (ADR 0196).</p>
+<footer>Source: <code>docs/visuals/modules/domain/kinetic.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
+</div>

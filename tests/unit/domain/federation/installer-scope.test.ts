@@ -12,8 +12,10 @@ import { ConducksInstaller } from '@/lib/domain/federation/conducks-installer.js
  *
  *  - sync installs globally and PRUNES a local copy, because a duplicate is a defect
  *  - it never touches a skill conducks does not own, in either scope
- *  - the global copy is refreshed in place, never deleted and recreated (CONDUCKS-15 — a stale skill
- *    that still loads is worse than none)
+ *  - the global copy is refreshed in place, never deleted and recreated (a stale skill
+ *    that still loads is worse than none) — this file is one of the two gates for
+ *    "skills name only live tools, and only one copy is editable"
+ *    (the other is tests/unit/interfaces/tools/skills-tool-surface.test.ts)
  */
 describe('conducks-installer — global is the only scope', () => {
   let project = '';
@@ -53,6 +55,19 @@ describe('conducks-installer — global is the only scope', () => {
     expect(reports[0].updated).toEqual([]);
     expect(existsSync(globalSkill('conducks-docs'))).toBe(true);
     expect(existsSync(path.join(project, '.claude', 'skills'))).toBe(false);
+  });
+
+  it('ships a skill\'s reference files beside its SKILL.md, and refreshes them in place', async () => {
+    const inst = installerFor(project);
+    await inst.sync();
+    const ref = path.join(home, '.claude', 'skills', 'conducks-visuals', 'references', 'pages.md');
+    expect(existsSync(ref)).toBe(true);
+
+    writeFileSync(ref, 'stale');
+    const [report] = await inst.sync();
+    expect(report.updated).toContain('conducks-visuals');
+    expect(readFileSync(ref, 'utf-8')).not.toBe('stale');
+    expect((await inst.sync())[0].unchanged).toContain('conducks-visuals');
   });
 
   it('claims no work it did not do on a second run', async () => {

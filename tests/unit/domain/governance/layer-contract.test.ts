@@ -7,7 +7,7 @@ import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 /**
  * Layer contract (ADR 0005), enforced by the `layer_boundaries` sentinel rule
- * (CONDUCKS-22). This rule existed as prose (ADR 0005) plus a DISABLED sentinel rule for
+ * (`sentinel-rules.ts` + `tests/architecture/boundaries.test.ts`). This rule existed as prose (ADR 0005) plus a DISABLED sentinel rule for
  * months. Nobody caught it because nothing exercised the rule, only the ADR — the contract
  * was true on paper and false in the graph, and ~71 illegal edges (cli->core 32, cli->domain
  * 29, mcp->core 5, mcp->domain 3, cli->mcp 2) accumulated silently in that window. This file
@@ -61,7 +61,7 @@ describe('ALLOWED_DEPENDENCIES — downward-only shape', () => {
 // 3. The two sanctioned launcher exceptions (cli->web for `mirror`, cli->mcp for `mcp`)
 //    must stay present AND narrow. If someone widens them into a general interface-to-
 //    interface allowance (e.g. gives mcp/web a reciprocal edge, or adds a third), this
-//    must fail — that would reopen exactly the cli->mcp coupling CONDUCKS-22 counted.
+//    must fail — that would reopen exactly the cli->mcp coupling `layer_boundaries` counted.
 // ---------------------------------------------------------------------------
 describe('the two launcher exceptions stay narrow', () => {
   it('cli -> web (mirror command) and cli -> mcp (mcp command) are present', () => {
@@ -88,8 +88,9 @@ describe('the two launcher exceptions stay narrow', () => {
 // 4. The rule evaluation itself, on a synthetic in-memory graph — no DuckDB, no vault.
 //    GovernanceService.auditWithRules() takes a ConducksAdjacencyList directly, so this
 //    exercises the real evaluator (governance/index.ts, case 'layer_boundaries'), not a
-//    reimplementation of it. Node ids follow the producer's shape (CONDUCKS-28:
-//    `<file>::unit`) rather than a bare file path, so this isn't the daac.test.ts trap
+//    reimplementation of it. Node ids follow the producer's shape (docs/visuals/modules/core/
+//    parsing/reflector.md's `**Boundaries:**`: `<file>::unit`) rather than a bare file path, so
+//    this isn't the daac.test.ts trap
 //    (id === filePath) that made a broken lookup look correct by coincidence.
 // ---------------------------------------------------------------------------
 describe('layer_boundaries — synthetic upward edge is blocked', () => {
@@ -126,8 +127,8 @@ describe('layer_boundaries — synthetic upward edge is blocked', () => {
   it('does not block cli -> web — the sanctioned mirror-launcher exception stays legal', () => {
     const { graph, addNode, addEdge } = build();
     addNode('/repo/src/interfaces/cli/commands/mirror.ts::unit', 'mirror.ts', '/repo/src/interfaces/cli/commands/mirror.ts');
-    addNode('/repo/src/interfaces/web/mirror-server.ts::unit', 'mirror-server.ts', '/repo/src/interfaces/web/mirror-server.ts');
-    addEdge('e1', '/repo/src/interfaces/cli/commands/mirror.ts::unit', '/repo/src/interfaces/web/mirror-server.ts::unit');
+    addNode('/repo/src/interfaces/web/mirror/server.ts::unit', 'server.ts', '/repo/src/interfaces/web/mirror/server.ts');
+    addEdge('e1', '/repo/src/interfaces/cli/commands/mirror.ts::unit', '/repo/src/interfaces/web/mirror/server.ts::unit');
 
     const report = auditOf(graph);
     expect(report.violations.filter(v => v.ruleId === 'layer_boundaries')).toHaveLength(0);

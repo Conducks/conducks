@@ -10,7 +10,7 @@ import { ChronicleInterface } from '@/lib/core/git/chronicle-interface.js';
  *
  * The thing under test is as much what it REFUSES as what it resolves. ADR 0035 rejected pinning
  * `main` because it is wrong for anyone branching off `develop` or stacking branches, and
- * CONDUCKS-13 is the record of what a wrong baseline costs: a diff that looks right and is not. So
+ * a wrong baseline costs a diff that looks right and is not. So
  * "cannot tell" must come back as null and never as a guess.
  */
 

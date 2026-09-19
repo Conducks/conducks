@@ -6,7 +6,7 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
  * What a command PRINTS must be a path the reader can open, and must not repeat the machine's home
  * directory on every row.
  *
- * Ids are lowercased absolute paths (CONDUCKS-4, for APFS), and the commands here printed them raw:
+ * Ids are lowercased absolute paths (see docs/visuals/modules/contracts.md, for APFS), and the commands here printed them raw:
  *
  *  - `prune` named `renderer/src/lib/useworkgraph.ts` for a file called `useWorkGraph.ts`. That is the
  *    one command whose entire output is a list of files to go and edit, and on a case-sensitive

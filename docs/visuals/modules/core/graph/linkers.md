@@ -1,5 +1,7 @@
 # core/graph/linkers — binding names to symbols across files
 
+**Layer:** core, same as its parent [core/graph](../graph.md).
+
 **Part of:** [core/graph](../graph.md). `core/graph/import-resolver.ts`,
 `core/graph/linker-intra.ts`, `core/graph/linker-federated.ts`, `core/graph/http-service-linker.ts`.
 
@@ -16,6 +18,13 @@ every file is known. `linker-intra` handles same-repo symbol references; `linker
 **Boundaries:** binding only — they never invent nodes or decide meaning. An unbindable reference is
 left dangling on purpose; dead-code reads danglers as evidence of use rather than treating the target
 as orphaned, which keeps it under-reporting.
+
+**Uses:** takes the unresolved specifiers and bare-name targets that parsing emits, plus the node set
+`core/graph` has already ingested, and turns each into either a bound edge or a deliberate dangling
+edge. For the one case it cannot resolve on its own — a specifier written against the BUILD layout —
+it declares a `ResolveSpecifier` port rather than importing `core/parsing`'s TypeScript resolver
+directly, because that import would close a door-to-door cycle (ADR 0150 rule 5b); domain wires the
+real implementation in.
 
 **Deferred / not built:** dynamic dispatch, meaning a COMPUTED key — `handlers[key]()` names no
 symbol at parse time and is refused. It is verified rather than assumed: handlers registered in
@@ -52,7 +61,7 @@ import of the same name must win: `context.localBindings` is keyed by name per F
 `import { realTarget as shadowed }` made every `shadowed()` in the file resolve to the import. 3c
 rebinds such a call to `<file>::<scope>.<name>` when that node exists — decided by existence, with two
 guards that measurement forced. The names are compared CASE-SENSITIVELY, because ids are lowercased
-(CONDUCKS-4) and `pathlib::Path` against a local `path` is one id — matching on the id alone rebound
+(the canonical-id rule, [contracts](../../contracts.md)) and `pathlib::Path` against a local `path` is one id — matching on the id alone rebound
 37 python edges wrongly. And a node carrying an outgoing ALIASES edge is skipped, because a
 destructured import binding IS the import rather than a declaration shadowing one.
 
@@ -124,3 +133,12 @@ example is now history rather than a live hazard. The rule outlives it, because 
 answers generously can land a specifier back on its own file. The audit matches only the explicit
 `self::` edge marker (<span class="anchor">src/lib/domain/governance/index.ts:133</span>), never a
 generic unit → unit self-loop.
+
+## Features
+none — this is a sub-feature of [core/graph](../graph.md), not a set of its own capabilities.
+
+## Glossary
+- **dangling** — a reference the linker could not bind to a node; left unresolved on purpose rather
+  than invented, and read by dead-code as evidence of use, not as an orphan.
+- **sameFamily** — the surviving cross-language single-candidate match; the only piece of the old
+  fuzzy-resolution tier that outlived it. Fails open on an unknown extension.

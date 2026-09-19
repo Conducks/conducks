@@ -537,54 +537,332 @@ would only compare two policies.
 
 ## Phase 4 — entry
 
-- [ ] L1 on all three subjects
-- [ ] L2 — plant real entry points it must find
-- [ ] L3 — plant near-misses it must not call entry points
+- [x] L1 on all three subjects — `oracle-entry.mjs` re-derives ADR 0113's three rules as set operations over the vault. 408 verdicts, EXACT: 0 missed / 0 extra / 0 reason-mismatch on scraper 19, sofie 7, orchestrator 382
+- [x] L2 — ten scenarios in `bench-entry.mjs`, planted entries and near-misses. 10/10
+- [x] L3 — the counter-halves are in the same ten: a barrel, a test file nothing imports, a scratch script that is otherwise a perfect root module, a conventional filename inside a test tree, a module a real file imports, and a leaf that imports nothing
+- [x] the oracle scores a THIRD direction — both sides agree it is an entry and disagree WHY. ADR 0113 made `reason` a printed audited field, and the first mutation produced 10 rows a missed/extra-only oracle would have scored as agreement
+- [>] plant a framework ROUTE at L2 — deferred: routes need a framework the parser recognises, and a fixture small enough to run in the bench did not produce one. Route is scored at L1 only, where orchestrator carries 147 and deleting the rule shows all 147 as MISSED
+
+### Every rule fires, and each mutation lands on its own scenario
+
+All three of 0113's rules are exercised by the subjects: `root-module` 258, `route` 147,
+`entry-filename` 3. Both instruments were proven able to fail before either green was believed —
+eight mutations of `ranker.ts`, each rebuilt and each landing where it should.
+
+| mutation | oracle (orchestrator) | bench |
+|---|---|---|
+| `index.ts` added to the entry filenames | 20 EXTRA + 10 REASON | 05 |
+| the `route` rule deleted | 147 MISSED | — |
+| TEST importers counted again | 52 MISSED | 04 |
+| `isScratch` dropped | 21 EXTRA | 07 |
+| `isTest` dropped | — | 04, 06, 08 |
+| the `entry-filename` rule removed | — | 01, 02 |
+| the "imports something itself" half dropped | — | 10 |
+| the `root-module` rule removed | — | 03, 04, 09 |
+
+The third mutation is ADR 0113's own headline — counting test importers is what hid this
+repository's bin, the only real entry point it had.
+
+### Scenario 09 was vacuous, and only a mutation could show it
+
+It claimed to test that a NON-test importer disqualifies a root module. Its middle file imported
+nothing, so rule 3 excluded it on the *other* half — scenario 10's claim — and it passed with the
+importer check removed entirely. The fixture now has the middle file import a leaf, so a non-test
+importer is its only disqualifier, and the same mutation turns it red.
+
+Fourth time in this campaign a scenario was wrong before the tool was.
+
+### The pin file scored a corpus nobody measured
+
+`tools/benchmark/projects.json` calls its SHA "the contract" and still named the pre-refresh commits:
+ADR 0167 pulled all three subjects on 2026-08-27 and the pin file was never updated with them. The
+counts on disk match this todo's own stated pull exactly — sofie 497/69/9, scraper 235/27/6,
+orchestrator 537/225/28 — and did not match the SHAs it pinned. Anyone re-pinning from that file
+would have silently scored a different corpus and read every moved number as a conducks regression.
+Re-pinned, with the reason in the file.
+
+All three subjects were re-analysed with a freshly built binary before scoring; the vaults on disk
+were nine days old and conducks' own predated the current schema entirely.
 
 ## Phase 5 — flows
 
-- [ ] L1 on all three subjects
-- [ ] L2 — plant a flow it must name
-- [ ] L3 — plant a non-flow it must not
+- [x] L1 on all three subjects — `oracle-flows.mjs` re-derives the grouping rule as a closure over the vault. EXACT on all three: scraper 1703, sofie 1212, orchestrator 667, with 0 missed / 0 extra / 0 member-mismatch
+- [x] L2 — seven scenarios in `bench-flows.mjs`, planted chains, an ACCESSES-only member, a built-in-only flow, and the floor
+- [x] L3 — the counter-halves are in the same seven: a lone symbol that is not a process, a flow whose members are all built-ins, a floor that empties the list and still states its denominator
+- [x] decide what an entry point of a FLOW is, now that the confidence test is known not to work — ADR 0191: a cross-service call is the `tier: 'service'` stamp the linker writes, never a confidence. Entry points 8,170 → 6,843 on scraper, 10,789 → 8,099 on sofie, 6,538 → 5,140 on orchestrator
+- [x] decide whether a flow may be keyed by a bare NAME — ADR 0191: keyed by the entry's ID, `name` kept as a label. Both surfaces carry the id, and the MCP tool stops recovering the entry with `findNodesByName(name)[0]`
+- [x] re-score after the fix — EXACT again on all three: scraper 1174, sofie 481, orchestrator 388, 0 missed / 0 extra / 0 member-mismatch
+
+### The confidence exception swallows the rule it is an exception to
+
+`groupProcesses` admits an entry when it has no incoming CALLS **or** when every incoming CALLS edge
+carries `confidence < 1` — the comment says why: a cross-service HTTP call is not a local caller.
+
+**No CALLS edge is ever emitted at 1.** Measured: scraper has 9,820 of them, 5,571 at 0.85 and 4,249
+at 0.40, and none at 1. sofie has 12,029 and exactly ONE at 1. ACCESSES does emit 1 — 4,462 of them —
+so the vault stores the value fine; CALLS simply never receives it. The exception is therefore always
+true, the "no incoming calls" half never runs, and any named STRUCTURE/BEHAVIOR/ATOM with a file
+becomes an entry point: **8,170 of them on scraper, 10,789 on sofie, 6,538 on orchestrator.**
+
+The confidences do not mean what the rule reads them as. `http-service-linker.ts:99` stamps a
+cross-service call 0.8 — a value that appears in none of scraper's CALLS — and
+`adjacency-list.ts:578` PROMOTES anything below 0.6 back up to 0.85. So "less than 1" identifies
+nothing in particular.
+
+Caught by `bench-flows.mjs` scenario 02 on a three-file fixture, which is the smallest possible
+repro: `head` calls `b`, and `b` is reported as its own flow. The scenario is kept RED and marked
+`knownDefect` rather than deleted — a scenario removed because it fails is a defect deleted — so the
+bench states it on every run and still gates the six claims that do hold.
+
+**Fixed by ADR 0191**, with the record because it changes what a flow IS: every flow count on every
+subject moves. Scraper 1,703 → 1,174, sofie 1,212 → 481, orchestrator 667 → 388. Both movements are
+real — fewer symbols are wrongly admitted, and a flow a name collision used to absorb now stands on
+its own and mostly falls below the two-member floor instead of inflating another flow's closure.
+
+The magnitude stated first was wrong and is corrected here. "Nearly every named symbol becomes an
+entry" is the MECHANISM; the measured effect is 1,327 wrongly-admitted symbols on scraper (16%),
+2,690 on sofie (25%) and 1,398 on orchestrator (21%), because most candidate symbols have no callers
+at all and would have been entries either way.
+
+**Two unit tests asserted the broken rule and passed.** One built an edge at confidence 0.5 to mean
+"cross-service" and one at 1 to mean "local"; the producer emits neither for a CALLS edge. ADR 0028's
+trap in a second place — a fixture built from the same misunderstanding as the code confirms it —
+recorded there about node ids, and true here about edge confidence.
+
+### The oracle was wrong before the tool was, again
+
+Its first run reported 8 missed flows and 473 member mismatches on scraper. All of it was the
+oracle: `collectDownstream` WALKS THROUGH a target whether or not a node exists for it and COUNTS it
+only if one does, and the oracle counted every edge target — inflating each closure by its dangling
+ends and pushing 8 flows over a floor they do not reach. Corrected, all three subjects are exact.
+
+Fifth time in this campaign an instrument was wrong before the code it measures. The tell was the
+shape: the tool's total was 5,328 and the oracle's distinct-entry count was 5,328 exactly, so the
+entry sets already agreed and only the closures did not.
 
 ## Phase 6 — audit
 
-- [ ] L1 on all three subjects
-- [ ] L2 — plant a cycle, a self-import and a god object
-- [ ] L3 — plant legal shapes that resemble each, including mutual recursion with a clear entry order
+- [x] L1 on all three subjects — `oracle-audit.mjs` re-derives both cycle rules by MUTUAL REACHABILITY rather than the SCC the tool runs. Agrees on every count: scraper 0 ARCH-3 / 1 ARCH-6, sofie 1 / 6, orchestrator 2 / 1
+- [x] L2 — six scenarios in `bench-audit.mjs`: a two-file cycle, a three-file cycle reported as ONE violation, and a same-file mutual call reported as ARCH-6
+- [x] L3 — the counter-halves are in the same six: a clean two-file dependency, a single-file loop that is not a module cycle, and self-recursion that is neither
+- [x] state what is NOT scored, per rule rather than per command — three of the rules have no reachable instance and are pinned by outcome only
+- [x] give the spans-two-files filter a case that reaches it — two classes in ONE file extending each other. EXTENDS is module coupling, so a cluster genuinely forms and the filter is what rejects it; loosening the filter turns the scenario red
+- [>] give the two `length > 1` guards a case — deferred: `detectCycles` returns no cluster at all for a self-loop, so nothing can reach them from outside. Reaching them means changing the detector, which is a different job from scoring it
+
+### Two rules are unexercised by every subject, and the bench cannot reach them either
+
+Measured, not assumed. Each mutation was applied, confirmed present in the BUILT output, and run
+against all three subjects:
+
+| mutation of `governance/index.ts` | oracle | bench |
+|---|---|---|
+| ARCH-3 stops ignoring containment/erased/local edges | sofie 1 → **2, DISAGREE** | — |
+| ARCH-3 drops the spans-two-files filter | no movement on any subject | 6/6 still |
+| ARCH-6 follows ACCESSES as well as CALLS | no movement on any subject | 6/6 still |
+| ARCH-3 drops the spans-two-files filter, **against scenario 07** | — | **07 RED** |
+| either `length > 1` guard loosened to accept a singleton | — | 8/8 still |
+
+The first bites. **The spans-two-files filter was unreachable until a scenario was built for it**:
+two classes in one file extending each other. EXTENDS is module coupling, so a genuine cluster forms
+— the vault holds exactly `EXTENDS alpha -> beta` and `EXTENDS beta -> alpha` and nothing else — and
+the filter is what rejects it. Loosening the filter turns scenario 07 red, so the rule is now scored
+even though no real subject exercises it. ARCH-6's CALLS-only restriction remains unscored: adding
+sofie's 8,327 ACCESSES edges creates no cluster CALLS did not already form.
+
+The `length > 1` guards are stranger and worth writing down: `detectCycles` returns **no cluster at
+all** for a self-loop, so neither guard ever receives one. They are defensive against a detector that
+could start returning singletons, not against anything it does today. Verified directly on a
+one-function fixture — `fact` calling itself gives 0 violations, 0 discoveries, `cycles: 0`.
+
+### Three bench scenarios pass, and not for the reason they first named
+
+Scenario 02 pins that a single-file loop is not an ARCH-3 violation, and the spans-two-files filter
+is not what makes that true — two functions in one file produce CALLS edges, and ARCH-3 traverses
+module coupling only, so there is no cluster for the filter to reject. That is what scenario 07 was
+added for. Scenario 04 pins that recursion is not a defect, and the size guards are not what makes
+that true either. Scenario 08 claimed to prove ARCH-3 traverses EXTENDS and does not: its cluster is
+carried by the two `import` statements, and ignoring EXTENDS leaves it green. 07 proves that instead.
+
+Both are kept, because the OUTCOME is worth pinning and a reader changing either rule wants to know
+it stayed true. Both now say in their own `why` what they do not prove. A scenario that passes for
+the wrong reason and does not say so is the vacuous test this campaign keeps finding — this is the
+same finding, caught before it was recorded as a pass rather than after.
+
+### The oracle read the gate's own exit as a crash
+
+`audit` exits 1 when it finds a violation, which is the entire point of it. The first version used a
+plain `execFileSync` and threw on exactly the two subjects that have something to report — scoring
+nothing on the runs that mattered and passing on the clean one. Sixth instrument in this campaign
+wrong before the code it measures.
+
+It was also under-specified twice: it modelled neither the cluster-of-one exclusion nor the
+spans-two-files rule, and agreed on all three subjects anyway. Right answers, wrong reasons, and only
+reading `governance/index.ts:63` rather than trusting `conducks-core.ts::audit()` showed it.
+
+### There are two ARCH-3 implementations, and the CLI uses neither the one that looks canonical
+
+`conducks-core.ts::audit()` runs the same cycle detection with the same options and is called by
+NOTHING — every surface (`audit`, `status`, the MCP tools, the mirror's governance panel) goes
+through `registry.audit.audit()` → `governance.audit()`, which has two filters the core copy lacks.
+The first three mutations of this phase were applied to the core copy and changed nothing, which is
+how it was found. Not removed here: deleting a second implementation of an audited rule is its own
+change with its own measurement.
 
 ## Phase 7 — guard
 
-- [ ] L1 on all three subjects
-- [ ] L2 — plant a layer violation it must block
-- [ ] L3 — plant a legal edge it must pass
+- [x] L1 — `oracle-guard.mjs` re-derives the layer contract from the vault by SQL join and compares to the pairs `guard` prints plus its exit code. EXACT on conducks (1425 classifiable edges, 0 illegal) and sofie
+- [x] L2 — seven scenarios in `bench-guard.mjs`: an illegal upward edge blocks and names the pair, cli→composition passes while cli→domain blocks in the same tree, one line per illegal pair not per edge
+- [x] L3 — the counter-halves are in the same seven: a legal downward edge, a same-layer edge, a test file exempt, a single pulse that says NOT ASSESSED and refuses the safe-limits line
+- [x] decide whether the layer contract should be per-project, or say in the output that it is not — DECIDED 2026-09-19: say it is not, and make the output say it. `LAYER_FRAGMENTS` matches this repository's own directory names (`/lib/core`, `/lib/domain`, `/contracts`) and `sentinel.yml` can express rules but not layers, so on any other project nothing maps, no edge is judged, and the check printed a clean pass — the "0 checked, exit 0" shape this repo already refuses elsewhere. `governance/index.ts` now counts how many endpoints mapped to a layer and, at zero, emits a `NOT CHECKED` warning naming the layers it looked for and why none matched
+- [x] Per-project layers were NOT built, and the reason is recorded rather than deferred silently: it is a real feature — a YAML schema for fragments and allowed edges, validation, and docs — and the minimal parser currently reads only `rules:`. The honest interim is a gate that refuses to claim a pass it did not earn
+
+### `guard`'s hard gate is a no-op on any project that is not conducks
+
+`LAYER_FRAGMENTS` (`src/lib/domain/governance/sentinel-rules.ts:52`) is hardcoded to conducks' own
+paths — `/lib/core`, `/lib/domain`, `/registry`, `/interfaces/*`, `/contracts`. On scraper and
+orchestrator **zero** dependency edges classify into any layer, and `guard` still prints
+`✅ Layer contract clean.` and exits 0.
+
+Verified by running it: a tick over nothing, which is ADR 0044's shape. The rule's own comment admits
+the scope — *"this guards conducks itself; per-project layer config is a future enhancement"* — so
+the code knows and the output does not say so. The resonance half of the same output DOES declare
+what it skipped ("1017 symbol(s) had no fingerprint … were NOT compared"). One half is honest.
+
+Sofie is worse than a no-op rather than better: its 62 classifiable edges are all `src/registry/...`,
+classified as the `composition` layer by coincidence of a directory name in an unrelated project.
+
+**This is todo06's defect in a second form.** The comment at `sentinel-rules.ts:186` records the
+first: `guard` "filtered for a rule that was never loaded and printed Layer contract clean without
+checking anything". The rule loads now. It classifies nothing, and prints the same sentence.
+
+`oracle-guard` is registered against conducks only, where it is EXACT and meaningful. Pointing it at
+a subject returns NOT ASSESSED and exits non-zero by design — that disagreement IS the finding, and
+registering it as a script would hand CI a red nobody can clear until the contract is per-project.
+
+### Renaming the rule in config silently disarms the gate
+
+`guard.ts:33` filters `v.ruleId === 'layer_boundaries'` while `governance/index.ts:274` dispatches on
+`rule.condition` and sets `ruleId: rule.id`. A rule with `condition: layer_boundaries` and any other
+`id` still computes its violations — `guard` then files them under "Other structural findings" and
+exits 0. The id-to-filter coupling is already carried by a comment; `bench-guard` is the first thing
+that tests it.
+
+### `DEPENDENCY_EDGES` is declared twice
+
+`governance/index.ts:315` and `:380` each define the same four-type Set. Found by an assert refusing
+a mutation whose anchor was claimed unique and was not. Two copies of one rule drift; not fixed here,
+because it is its own change with its own measurement.
 
 ## Phase 8 — advise
 
-- [ ] L1 on all three subjects
-- [ ] L2 — plant a condition it must advise on
-- [ ] L3 — plant a healthy shape it must stay silent about
+- [x] L1 on all three subjects and conducks — `oracle-advise.mjs` re-derives the denominator and the Monolithic-Hub exclusion ladder from the vault. EXACT on all four: `checked` matches the vault symbol count exactly (9822 / 8936 / 13596 / 9085), 0 missed / 0 extra
+- [x] L2 — five scenarios in `bench-advise.mjs`: a behavioural class is a hub, a Python class is, the `--json` shape carries its denominator
+- [x] L3 — the counter-halves are in the same five: an interface with identical fan-in is not a hub, a `@dataclass` and an `Enum` are not, containers and built-ins are never hubs, same-file callers do not count. Each pair sits in ONE repo with identical fan-in, so the graph-derived threshold cancels out instead of drifting between fixtures
+- [x] the CONTAINERS exclusion is UNEXERCISED — measured, not assumed
+
+### Seven of advise's eight rules are unscored, and that is stated rather than discovered
+
+Only the Monolithic-Hub ladder and the denominator are scored. CIRCULAR, INTUITION, HIDDEN_COUPLING,
+the composite risk score, unpinned dependencies, SplitScore and external coupling are covered only by
+the `--json` shape assertion. Five of them are weighted policies over hand-picked constants, and
+scoring a policy against a second opinion compares two opinions.
+
+### The CONTAINERS exclusion has no instances
+
+Removing `if (CONTAINERS.has(...)) continue;` from `advisor.ts` changes NOTHING on any of the four
+corpora — verified present in the compiled output, then measured: advice count 3 before and after,
+on all four. No container node reaches the hub threshold, so the guard never fires. Same shape as
+ARCH-6's ACCESSES restriction in Phase 6: a rule that is correct, and unreachable.
+
+Worth its own look later: `advise` emits exactly 3 advice on four projects of wildly different size
+and language, and ZERO Monolithic-Hub advice on any of them, while the ladder admits 36 / 13 / 20 /
+46 candidates. Not investigated here.
 
 ## Phase 9 — diff
 
-- [ ] L1 on all three subjects
-- [ ] L2 — make structural changes it must report
-- [ ] L3 — make non-structural changes it must not
+- [x] L1 on all three subjects — `oracle-diff.mjs` asks DuckDB for one relational FULL OUTER JOIN where `diff` builds two JavaScript Maps and diffs them with `Map.has`. EXACT on all three: scraper 8785 changed, sofie 13103 changed + 6 removed, orchestrator 8371 changed, 0 missed / 0 extra / 0 value mismatch
+- [x] L2 — eight scenarios in `bench-diff.mjs`: a symbol that appeared, one that vanished, growth attributed to the symbol that grew, `--head` honoured
+- [x] L3 — the counter-halves are in the same eight: an untouched neighbour is not reported, a pulse pair with no structural change reports nothing, an empty base is refused rather than answered
+
+### The premise this phase was briefed with was wrong, and the agent refused it
+
+The brief asserted every subject holds ONE pulse, so `diff` and `drift` could not be scored against
+them. That came from counting `SELECT COUNT(DISTINCT pulseId) FROM nodes`, which holds only the
+CURRENT pulse. `node_history` is the per-pulse table and holds **2 / 2 / 3**. The agent checked
+read-only, refuted the premise from the vault, and ran the L1 it had been told was impossible.
+
+Read the method whose name you are trusting — applied to a table name.
 
 ## Phase 10 — drift
 
-- [ ] L1 on all three subjects
-- [ ] L2 — produce decay across two pulses it must detect
-- [ ] L3 — produce a stable pair it must call stable
+- [x] L1 on all three subjects — `oracle-drift.mjs` re-derives the verdict, decay count, move count and identity gap. EXACT on all three: STABLE, decay 0, moves 0, gaps 1017 / 2469 / 2271
+- [x] L2 — ten scenarios in `bench-drift.mjs`, including a rename the engine must pair and a decaying symbol it must rank
+- [x] L3 — the counter-halves are in the same ten: a stable pair called stable, a shape collision that must not invent a move, a single pulse that says INSUFFICIENT_DATA
+- [x] reconcile `drift` reporting STABLE while `diff` reports 13103 changed symbols on the identical pulse pair — NOT a contradiction, and neither command is wrong. `diff` counts a symbol changed on `gravityShift !== 0 || complexityBloat !== 0 || dnaShift` with NO threshold (`src/interfaces/cli/commands/diff.ts:169`); `gravity` is damped PageRank, which is global, so one new edge perturbs every node's score by some epsilon and 13,103 reads as "the graph changed at all". `drift` says `DECAYING` only above `DECAY_VELOCITY_THRESHOLD = 0.05` (`src/contracts/scoring.ts:32`), so STABLE means "nothing decayed meaningfully". Two different questions wearing similar words; recorded rather than "fixed", because changing either would make it answer a question nobody asked
+
+### `drift` says STABLE over 11,127 fingerprint changes
+
+Measured on the same pulse pairs the oracles used: sofie has **11,127 fingerprint changes and 6,871
+gravity changes** across 13,596 comparable symbols, and `drift` reports `STABLE` with
+`decay_count: 0`. `isModified` is computed per row and never reaches the summary or the verdict —
+there is no modified-count field at all. `diff` calls 13,103 of those same symbols changed.
+
+Both are right by their own rules and they read as contradictory to anyone running them side by side.
+
+### `drift --json`'s `deltas` is unusable to a machine caller
+
+It is `result.deltas.slice(0, 10)` in ARRIVAL order — unfiltered, unsorted — so on a fixture with
+`decay_count: 1` the array holds ten velocity-0 rows and the decaying symbol is absent. `improving`,
+two fields away, IS filtered and sorted: the F-06b fix was applied to one side only. The rendered
+path sorts correctly. `truncated: true` is set, so it does not lie — it just cannot be used.
+
+### `analyze` is deletion-blind
+
+Two files → analyze → delete one → analyze prints "No changes detected. Structural Synapse is already
+at 100% resonance" and writes NO second pulse. A deletion is invisible to change detection, which is
+why `bench-diff` scenario 02 has to co-edit a surviving file to obtain a pulse pair at all.
 
 ## Phase 11 — doctor
 
-- [ ] L1 on all three subjects
-- [ ] L2 — break the environment, not the source: a stale vault, an absent native binding
-- [ ] L3 — a healthy environment it must not warn about
+- [x] L1 — `oracle-doctor.mjs` scores the ONE claim doctor makes that can be re-derived behaviourally: it says 13 grammars are available; the oracle plants one file per language, runs a real analyze, and asks the vault whether a symbol from INSIDE each file arrived. AGREES — 13 promised, 13 proved, 0 overpromised, 0 underpromised
+- [x] L2 — twelve planted environments in `bench-doctor.mjs`: no vault, empty vault, vault with db, mtimes at 12 minutes / 3 hours / 5 days asserting the UNIT switches, the legacy db name, git genuinely absent from PATH
+- [x] L3 — the counter-halves are in the same twelve: a healthy environment it must not warn about, a non-candidate file it must not read as a vault, git present
+- [x] decide whether `doctor` should exit non-zero when a check fails — DECIDED 2026-09-19: yes. Measured before: no vault, every check `[✗]`, exit 0 — so it could not gate CI or a git hook and every failure marker was decoration. `fail()` now increments a counter and a non-zero count sets `process.exitCode = 1`. Verified both ways: an empty directory exits 1 naming the failure, this repository exits 0
+- [x] A WARNING deliberately does not fail: "an update is available" and "could not reach GitHub" are states of the world, not of the installation, and failing on them would make the gate unusable offline or one release behind
+- [x] The `[✗]` branches were this phase's unscored half. `tests/unit/interfaces/cli/commands/doctor-exit-code.test.ts` pins the wiring — a failure counts, a warning does not, the count decides the exit, and no early `process.exit` hides the remaining checks. Broken deliberately: removing the increment fails two of its four cases. It asserts the WIRING, not that each individual check judges its subject correctly; `bench-doctor.mjs` owns that half
+
+### `doctor` always exits 0
+
+Measured: no vault, and it still exits 0. It cannot gate CI or a git hook — every `[✗]` is cosmetic.
+Not asserted as correct in the bench; recorded here as a decision someone has to make.
+
+Its `[✗]` branches are also unscored, and that is stated rather than hidden: reaching them means
+removing packages from `node_modules`. The `[✓]` half is proved true; nothing proves the failure path
+works at all.
 
 ## Phase 12 — list
 
-- [ ] L1 on all three subjects
-- [ ] L2 — break the registry, not the source: a linked project whose path is gone
-- [ ] L3 — a correct registry it must report unchanged
+- [x] L2 — ten planted registries in `bench-list.mjs`: an absent file, a live link to a really-analyzed workspace, a gone path, a never-analyzed path, all three mixed with the "2 of 3" count, corrupt JSON, a wrong shape, a non-string array, the legacy db name, and `CONDUCKS_WORKSPACE_ROOT` with two disagreeing link files
+- [x] L3 — the counter-halves are in the same ten, and the exit codes are asserted: 1 for corrupt and wrong-shape, 0 otherwise
+- [-] L1 with an oracle — dropped: `list` reads `links.json` and does two `fs.existsSync` calls per entry, so an "independent" re-derivation is those same two calls written a second time. Stated in the bench header rather than left implicit
+- [x] reconcile what `doctor` and `list` each count as a vault — a REAL inconsistency, now fixed. `persistence.ts:120` writes exactly one filename and always has; `list` checked that one; `doctor` also accepted `synapse.db` and `conducks.db`, names nothing writes and nothing migrates. So a `.conducks/` holding only a legacy name made `doctor` print "last pulse: N ago" while `list` called the same project `not-analyzed`. Eight sites held the literal; it is now `VAULT_DIR` / `VAULT_DB_FILENAME` in `src/contracts/vault.ts`, read by all of them
+- [x] Pinned by `tests/unit/contracts/vault-filename-is-one-contract.test.ts`: the name appears in no source but its own declaration, and neither command carries a name of its own. Broken deliberately — a legacy name put back into `doctor` fails the third case
+
+### `doctor` and `list` disagree about what a vault is
+
+`doctor.ts:82` accepts three db filenames; `list.ts:42` accepts only `conducks-synapse.db`. Verified
+in one directory at one moment:
+
+```
+doctor: [✓] Vault at .conducks/ (last pulse: 0 minutes ago)
+list  : [No Vault] … holds no synapse yet
+```
+
+### `list` refuses to run without a vault it does not need
+
+Measured: in a repo with no `.conducks/`, `list` exits with `[No Vault] … Run conducks analyze`. It
+reads a JSON file and stats paths — it needs no graph at all. A user whose workspace is not analyzed
+cannot see the links they created, and the error names an unrelated cause.
+
+`CONDUCKS_WORKSPACE_ROOT` is also half-honoured: it changes which `links.json` is read but not where
+the bootstrapper anchors, so `list` prints one root while the process is anchored on another.

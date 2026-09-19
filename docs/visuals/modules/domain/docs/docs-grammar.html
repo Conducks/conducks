@@ -7,10 +7,34 @@
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>domain/docs/docs-grammar — the docs standard, enforced</h1>
+<p><b>Layer:</b> domain (part of <code>domain/docs</code>).</p>
 <p><b>Part of:</b> <a href="../docs.html">domain/docs</a>. Backs <code>conducks docs-lint</code>, <code>docs-status</code> and <code>bootstrap-docs</code>.</p>
 <p><b>Responsibility:</b> classifying every file under <code>docs/</code> by type — todo, decision, features, conventions, memory, progress, handover, architecture — and checking that each conforms to the per-type skeleton. It is the mechanism that keeps the conducks-docs standard from being advice.</p>
 <p><b>Boundaries:</b> structure only. It checks that an ADR has Context/Decision/Consequences and that a todo has <code>Status:</code> and <code>## Phase N —</code>; it has no opinion about whether the content is any good.</p>
 <p><b>Deferred / not built:</b> the grammar accepts a bare <code>Status:</code> line only. Other projects using this standard (subject-c) write <code><b>Status 2026-07-17:</b> …</code> — richer information in a form the linter rejects. Whether to loosen the check or conform the docs is unresolved.</p>
+<p><b>Uses:</b> nothing — this module parses ONE file at a time from disk and has no idea any other doc exists; that is <a href="docs-board.html">docs-board</a>'s job. Backs <code>conducks docs-lint</code>, <code>docs-status</code> and <code>bootstrap-docs</code>, and runs live inside <code>conducks watch</code> via the docs watcher.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Doc-value grammar</b> (<code>tests/unit/domain/docs/docs-grammar.test.ts</code>) — a doc's value is one whole</li>
+</ul>
+<p>  line. A value wrapped onto the next line is silently dropped by anything that reads it, so wrapping   fails the lint rather than reading as valid.</p>
+<ul>
+<li><b>ADR state grammar</b> — an ADR carries its own <code>Status:</code> and its own <code>Amended by</code>/<code>Amends</code> stamp on</li>
+</ul>
+<p>  both ends of a supersede; nothing outside the record restates that state, so there is no index to   drift out of sync with it.</p>
+<ul>
+<li><b>Phase linkage grammar</b> — the phase is the unit of linkage: <code>- Builds:</code> and <code>- Depends:</code> are</li>
+</ul>
+<p>  checked per phase, and <code>- Depends:</code> is rejected if it crosses a docs tree — cross-service coupling   must go through a root epic, or the other tree ships blind to being depended on.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>Governed doc</b> — a doc type this module classifies and lints (todo, decision, handover, module</li>
+</ul>
+<p>  note); free-form types (architecture docs, <code>product/</code>, <code>business/</code>, <code>design/</code>, <code>brand/</code>) are never   linted.</p>
+<ul>
+<li><b>Living vs record</b> — see the section below; a living file is overwritten in place, a record is</li>
+</ul>
+<p>  appended and never mutated.</p>
 <h2>Why the standard is enforced by the tool that ships it</h2>
 <p>Conducks defines the docs standard and is also its first consumer, so <code>docs-lint</code> runs against conducks' own docs on every change. A standard its author's repo violates is not a standard. The canonical text lives in <code>src/resources/skills/conducks-docs.md</code> and the installed skill is generated from it — one source, so the rule and the enforcement cannot drift apart.</p>
 <h2>Governed vs free-form is a deliberate two-tier design</h2>

@@ -1,5 +1,7 @@
 # core/graph/algorithms — cycle detection, ranking, traversal
 
+**Layer:** core, same as its parent [core/graph](../graph.md).
+
 **Part of:** [core/graph](../graph.md). Three static classes: `CycleDetector`
 (`graph/algorithms/cycle-detector.ts`), `StructuralRanker` (`graph/algorithms/ranker.ts`),
 `GraphTraversal` (`graph/algorithms/traversal.ts`).
@@ -12,8 +14,19 @@ SCCs; whether an SCC is an ARCH-3 violation is [governance](../../domain/governa
 call. That separation is why the same detector serves the audit, the advisor and the guard with
 three different filters.
 
+**Uses:** takes the adjacency list `core/graph` has built and returns pure graph-shape facts — SCCs,
+gravity scores, traversal paths — to whoever asked (governance, the CLI, MCP). It reads nothing from
+the vault and writes nothing back; every call is a computation over the graph already in memory.
+
 **Deferred / not built:** no incremental recomputation. Ranking runs over the whole graph each pulse;
 fine at current scale, and the obvious thing to revisit if it stops being fine.
+
+**Not here: weighted Dijkstra.** A rule once filed against this module ("impact analysis must use
+weighted Dijkstra, not BFS/DFS") describes code that does not live in `core/graph/algorithms` —
+`GraphTraversal` here uses BFS/A* (see below). Dijkstra is NOT implemented here — it lives in
+`domain/kinetic` (`trace.ts`, `impact.ts`), and its weights are that feature's business, stated once
+in [domain/kinetic](../../domain/kinetic.md). A rule assigning weighted Dijkstra to this module was
+wrong about where the code is.
 
 ## They look like a circular dependency and are not
 
@@ -51,4 +64,14 @@ entirely healthy. A rank that is uniform is indistinguishable from a rank nobody
 The filter now accepts `STRUCTURE`, `FUNCTION`, `BEHAVIOR`, `INFRA`, plus `isModule` and the `module`
 and `unit` labels. When touching it, assert the ANCHOR COUNT, not the scores: scores come out of a
 run with no anchors too.
+
+## Features
+none — this is a sub-feature of [core/graph](../graph.md), not a set of its own capabilities.
+
+## Glossary
+- **SCC** — a strongly connected component, Tarjan's output. An unordered SET, not an ordered path;
+  walking it as `c[i] → c[i+1]` inspects non-edges.
+- **gravity** — the damped-PageRank score, seeded from anchor nodes (`STRUCTURE`, `FUNCTION`,
+  `BEHAVIOR`, `INFRA`, `isModule`, `module`, `unit`). Zero anchors makes every score the same damping
+  floor — uniform, not meaningful.
 

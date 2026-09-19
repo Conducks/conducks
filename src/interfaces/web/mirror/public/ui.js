@@ -20,12 +20,10 @@ function initUI() {
 
       document.querySelectorAll('.deck-content > div').forEach(slate => {
         slate.style.display = 'none';
-        slate.classList.remove('slate-active');
       });
       const slateEl = document.getElementById(targetSlate);
       if (slateEl) {
         slateEl.style.display = 'block';
-        slateEl.classList.add('slate-active');
       }
 
       if (item.id === 'dock-governance') {
@@ -47,91 +45,104 @@ function initUI() {
     if (stamp) stamp.textContent = pulse.filePath + ' \u2192 ' + (pulse.violations ? pulse.violations + ' violation(s)' : 'clean');
   };
 
+
+  /**
+   * Build an element. The two panels below used to call `document.createElement`
+   * and then assign `style.cssText` for every row — 78 of them — which meant a
+   * restyle was a JavaScript edit and the two panels drifted apart. Class names
+   * now, styles in styles.css.
+   */
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+
+  /** A titled block with an optional count, shared by both panels. */
+  const section = (title, count) => {
+    const s = el('section', 'deck-section');
+    const h = el('div', 'section-header');
+    h.appendChild(el('span', 'section-title', title));
+    if (count !== undefined) h.appendChild(el('div', 'section-badge', String(count)));
+    s.appendChild(h);
+    return s;
+  };
+
+  /**
+   * Empty and failure are different answers and must not look alike. A panel that
+   * cannot reach its endpoint says so and names the command that shows the same
+   * data; a panel with genuinely nothing in it says what that means.
+   */
+  const state = (headline, detail, kind) => {
+    const p = el('div', 'panel-state' + (kind === 'error' ? ' is-error' : ''));
+    p.appendChild(el('strong', null, headline));
+    if (detail) {
+      const d = el('span');
+      // Split on backticks so a command name renders as one, without innerHTML.
+      String(detail).split(/`([^`]+)`/).forEach((part, i) =>
+        d.appendChild(i % 2 ? el('code', null, part) : document.createTextNode(part)));
+      p.appendChild(d);
+    }
+    return p;
+  };
+
+  /** Fetch JSON, or render the failure into the panel and report it handled. */
+  const load = async (url, panel, what) => {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(resp.status + ' ' + resp.statusText);
+      return await resp.json();
+    } catch (err) {
+      panel.appendChild(state(
+        'Cannot read ' + what + '.',
+        String(err.message || err) + '. The server is still running — this one endpoint failed. Run `conducks mirror` again, or read the same data with `conducks docs-status`.',
+        'error'));
+      return null;
+    }
+  };
+
   // 1a. 📄 DOCS PANEL — what is in flight (todo phases) and which decisions still bind.
   // Reads /api/docs, the same board `conducks docs-status` prints. Nothing here touches the graph.
   async function loadDocs() {
     const panel = document.getElementById('docs-panel');
     if (!panel) return;
-    panel.innerHTML = '';
+    panel.replaceChildren();
 
-    const stamp = document.createElement('p');
+    const stamp = el('p', 'panel-stamp', 'Live — re-reads when a doc is saved');
     stamp.id = 'docs-stamp';
-    stamp.style.cssText = 'font-size:10px;opacity:.4;margin-bottom:8px;';
-    stamp.textContent = 'live \u2014 re-lints on write';
     panel.appendChild(stamp);
 
-    let data;
-    try {
-      const resp = await fetch('/api/docs');
-      data = await resp.json();
-    } catch (err) {
-      const errMsg = document.createElement('p');
-      errMsg.textContent = 'Failed to load docs board.';
-      errMsg.style.color = '#e53e3e';
-      panel.appendChild(errMsg);
-      return;
-    }
+    const data = await load('/api/docs', panel, 'the docs board');
+    if (!data) return;
 
-    const section = (title, count) => {
-      const s = document.createElement('section');
-      s.className = 'deck-section';
-      const h = document.createElement('div');
-      h.className = 'section-header';
-      const t = document.createElement('span');
-      t.className = 'section-title';
-      t.textContent = title;
-      h.appendChild(t);
-      if (count !== undefined) {
-        const b = document.createElement('div');
-        b.className = 'section-badge';
-        b.textContent = String(count);
-        h.appendChild(b);
-      }
-      s.appendChild(h);
-      return s;
+    const COLOUR = {
+      done: 'var(--state-done)', blocked: 'var(--state-blocked)',
+      doing: 'var(--state-doing)', todo: 'var(--state-todo)',
     };
 
-    const STATE_COLOUR = { done: '#48bb78', blocked: '#e53e3e', doing: '#d69e2e', todo: '#4299e1' };
-
-    const phaseRow = (p, colour) => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;gap:8px;align-items:baseline;padding:4px 0 4px 12px;';
-      const addr = document.createElement('span');
-      addr.textContent = p.addr;
-      addr.style.cssText = 'font-size:10px;font-family:monospace;opacity:.8;flex-shrink:0;color:' + colour + ';';
-      const count = document.createElement('span');
-      count.textContent = p.done + '/' + p.total;
-      count.style.cssText = 'font-size:10px;opacity:.45;flex-shrink:0;';
-      const text = document.createElement('span');
-      if (p.state === 'blocked') {
-        text.textContent = '\u26d4 waits ' + (p.blockedBy || []).join(', ');
-        text.style.color = STATE_COLOUR.blocked;
-      } else {
-        text.textContent = p.next ? '\u2192 ' + p.next : '\u2192 (no open task)';
-      }
-      text.style.cssText += ';font-size:10px;opacity:.7;line-height:1.4;';
-      row.appendChild(addr); row.appendChild(count); row.appendChild(text);
+    /** One phase: its address, how far it has got, and what is next or what blocks it. */
+    const phaseRow = (ph, colour) => {
+      const row = el('div', 'record-line');
+      const addr = el('span', 'record-addr', ph.addr);
+      addr.style.setProperty('--rec-color', colour);
+      row.appendChild(addr);
+      row.appendChild(el('span', 'record-count', ph.done + '/' + ph.total));
+      row.appendChild(el('span', 'record-note record-wrap',
+        ph.state === 'blocked'
+          ? 'Waits on ' + (ph.blockedBy || []).join(', ')
+          : ph.next ? ph.next : 'No open task'));
       return row;
     };
 
-    const groupCard = (headline, tag, tagColour, phases) => {
-      const item = document.createElement('div');
-      item.className = 'metric-pill';
-      item.style.cssText = 'display:block;padding:10px 12px;margin-bottom:6px;';
-      const top = document.createElement('div');
-      top.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      const name = document.createElement('span');
-      name.textContent = headline;
-      name.style.cssText = 'font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-      top.appendChild(name);
-      if (tag) {
-        const badge = document.createElement('span');
-        badge.textContent = tag;
-        badge.style.cssText = 'font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:4px;color:white;flex-shrink:0;background:' + tagColour + ';';
-        top.appendChild(badge);
-      }
-      item.appendChild(top);
-      phases.forEach(p => item.appendChild(phaseRow(p, tagColour)));
+    const record = (headline, tag, colour, phases) => {
+      const item = el('div', 'record');
+      item.style.setProperty('--rec-color', colour);
+      const head = el('div', 'record-head');
+      head.appendChild(el('span', 'record-title', headline));
+      if (tag) head.appendChild(el('span', 'record-tag', tag));
+      item.appendChild(head);
+      phases.forEach(ph => item.appendChild(phaseRow(ph, colour)));
       return item;
     };
 
@@ -141,268 +152,141 @@ function initUI() {
       const s = section('Decisions with open work', owing.length);
       owing.forEach(d => {
         const dead = /^superseded$/i.test(d.state || '');
-        const tag = dead ? 'superseded \u00b7 ' + d.buildState : d.buildState;
-        const card = groupCard(d.id + '  ' + String(d.title).replace(/^\d+\s*\u2014\s*/, ''), tag,
-          dead ? STATE_COLOUR.blocked : STATE_COLOUR.doing,
-          (d.builtBy || []).filter(p => p.state !== 'done'));
-        if (d.enforcedBy) {
-          const e = document.createElement('div');
-          e.textContent = 'enforced by: ' + d.enforcedBy;
-          e.style.cssText = 'font-size:10px;opacity:.45;padding:4px 0 0 12px;';
-          card.appendChild(e);
-        }
+        const card = record(
+          d.id + '  ' + String(d.title).replace(/^\d+\s*—\s*/, ''),
+          dead ? 'superseded · ' + d.buildState : d.buildState,
+          dead ? COLOUR.blocked : COLOUR.doing,
+          (d.builtBy || []).filter(ph => ph.state !== 'done'));
+        if (d.enforcedBy) card.appendChild(el('div', 'record-meta record-wrap', 'Enforced by ' + d.enforcedBy));
         s.appendChild(card);
       });
       panel.appendChild(s);
     }
 
     // OPEN WORK NOBODY LINKED TO A DECISION — valid, but it should be a deliberate choice.
-    const unlinkedWork = (data.todos || [])
+    const unlinked = (data.todos || [])
       .filter(t => !/^done$/i.test(t.state || ''))
-      .map(t => ({ t: t, phases: (t.phases || []).filter(p => p.state !== 'done' && !(p.builds || []).length) }))
+      .map(t => ({ t, phases: (t.phases || []).filter(ph => ph.state !== 'done' && !(ph.builds || []).length) }))
       .filter(x => x.phases.length);
-    if (unlinkedWork.length) {
-      const s = section('Open work, no decision linked', unlinkedWork.length);
-      unlinkedWork.forEach(x => s.appendChild(groupCard(
-        x.t.id + '  ' + String(x.t.title).replace(/^\S+\s*\u2014\s*/, ''),
-        x.t.done + '/' + x.t.total, STATE_COLOUR.todo, x.phases)));
+    if (unlinked.length) {
+      const s = section('Open work, no decision linked', unlinked.length);
+      unlinked.forEach(x => s.appendChild(record(
+        x.t.id + '  ' + String(x.t.title).replace(/^\S+\s*—\s*/, ''),
+        x.t.done + '/' + x.t.total, COLOUR.todo, x.phases)));
       panel.appendChild(s);
     }
 
-    if (!owing.length && !unlinkedWork.length) {
+    if (!owing.length && !unlinked.length) {
       const s = section('Open work', 0);
-      const ok = document.createElement('p');
-      ok.textContent = 'Nothing open. Every phase is finished.';
-      ok.style.cssText = 'font-size:11px;opacity:.5;margin-top:8px;';
-      s.appendChild(ok);
+      s.appendChild(state('Nothing open.',
+        'Every phase in every todo is finished and every decision has its build link.'));
       panel.appendChild(s);
     }
 
     // HYGIENE — true findings that do not break the grammar, so they never fail the gate.
     const warns = data.warns || [];
-    if (warns.length || (data.unlinked || []).length) {
+    const unlinkedAdrs = data.unlinked || [];
+    if (warns.length || unlinkedAdrs.length) {
       const s = section('Hygiene', warns.reduce((a, w) => a + w.errs.length, 0));
       warns.forEach(w => w.errs.forEach(e => {
-        const row = document.createElement('div');
-        row.style.cssText = 'font-size:10px;opacity:.6;line-height:1.4;margin-bottom:4px;';
-        const f = document.createElement('span');
-        f.textContent = w.file + ': ';
-        f.style.opacity = '.6';
-        row.appendChild(f);
-        row.appendChild(document.createTextNode(e));
+        const row = el('div', 'record-meta record-wrap');
+        row.appendChild(el('span', 'record-addr', w.file));
+        row.appendChild(document.createTextNode(' ' + e));
         s.appendChild(row);
       }));
-      if ((data.unlinked || []).length) {
-        const row = document.createElement('div');
-        row.textContent = data.unlinked.length + ' ADR(s) with no build link or enforcing test: ' + data.unlinked.join(' ');
-        row.style.cssText = 'font-size:10px;opacity:.5;line-height:1.4;margin-top:6px;';
-        s.appendChild(row);
+      if (unlinkedAdrs.length) {
+        s.appendChild(el('div', 'record-meta record-wrap',
+          unlinkedAdrs.length + ' decision(s) with no build link and no enforcing test: ' + unlinkedAdrs.join(' ')));
       }
       panel.appendChild(s);
     }
 
     // GRAMMAR — a violating doc is a doc the board is reading wrong, so it is stated here.
     const lint = data.lint || [];
-    const lintSection = section('Grammar', lint.length);
+    const s = section('Grammar', lint.length);
     if (lint.length) {
       lint.forEach(l => {
-        const item = document.createElement('div');
-        item.className = 'metric-pill';
-        item.style.cssText = 'display:block;padding:8px 12px;margin-bottom:4px;';
-        const f = document.createElement('div');
-        f.textContent = l.file;
-        f.style.cssText = 'font-size:10px;color:#e53e3e;font-weight:700;';
-        item.appendChild(f);
-        (l.errs || []).forEach(e => {
-          const p = document.createElement('div');
-          p.textContent = e;
-          p.style.cssText = 'font-size:10px;opacity:.6;line-height:1.4;margin-top:2px;';
-          item.appendChild(p);
-        });
-        lintSection.appendChild(item);
+        const item = el('div', 'record');
+        item.style.setProperty('--rec-color', COLOUR.blocked);
+        item.appendChild(el('div', 'record-title record-wrap', l.file));
+        (l.errs || []).forEach(e => item.appendChild(el('div', 'record-note record-wrap', e)));
+        s.appendChild(item);
       });
     } else {
-      const ok = document.createElement('p');
-      ok.textContent = 'Grammar clean — run `conducks docs-lint` in CI.';
-      ok.style.cssText = 'font-size:11px;opacity:.5;margin-top:8px;';
-      lintSection.appendChild(ok);
+      s.appendChild(state('Grammar clean.', 'Every governed doc parses. Run `conducks docs-lint` in CI to keep it that way.'));
     }
-    panel.appendChild(lintSection);
+    panel.appendChild(s);
   }
 
-  // 1b. 🛡️ GOVERNANCE PANEL
+  // 1b. 🛡️ GOVERNANCE PANEL — what the audit found, and what it advises.
   async function loadGovernance() {
     const panel = document.getElementById('governance-panel');
     if (!panel) return;
-    panel.innerHTML = '';
+    panel.replaceChildren();
 
-    let data;
-    try {
-      const resp = await fetch('/api/governance');
-      data = await resp.json();
-    } catch (err) {
-      const errMsg = document.createElement('p');
-      errMsg.textContent = 'Failed to load governance data.';
-      errMsg.style.color = '#e53e3e';
-      panel.appendChild(errMsg);
-      return;
-    }
+    const data = await load('/api/governance', panel, 'the audit');
+    if (!data) return;
 
-    // Violations
-    const violationsSection = document.createElement('section');
-    violationsSection.className = 'deck-section';
+    const severity = (v) => {
+      const s = String(v ?? 'info').toLowerCase();
+      if (s === 'error' || s === 'circular') return 'var(--state-blocked)';
+      if (s === 'warning' || s === 'refactor') return 'var(--state-doing)';
+      return 'var(--state-todo)';
+    };
 
-    const violHeader = document.createElement('div');
-    violHeader.className = 'section-header';
-    const violTitle = document.createElement('span');
-    violTitle.className = 'section-title';
-    violTitle.textContent = 'Violations';
-    const violBadge = document.createElement('div');
-    violBadge.className = 'section-badge';
-    violBadge.textContent = String(data.violations ? data.violations.length : 0);
-    violHeader.appendChild(violTitle);
-    violHeader.appendChild(violBadge);
-    violationsSection.appendChild(violHeader);
+    const finding = (tag, text, colour) => {
+      const item = el('div', 'record');
+      item.style.setProperty('--rec-color', colour);
+      const head = el('div', 'record-head');
+      head.appendChild(el('span', 'record-tag', String(tag)));
+      item.appendChild(head);
+      item.appendChild(el('div', 'record-note record-wrap', String(text)));
+      return item;
+    };
 
-    if (data.violations && data.violations.length > 0) {
-      data.violations.forEach(v => {
-        const item = document.createElement('div');
-        item.className = 'metric-pill';
-        item.style.marginBottom = '6px';
-        item.style.display = 'flex';
-        item.style.alignItems = 'flex-start';
-        item.style.gap = '8px';
-        item.style.padding = '10px 12px';
-
-        const badge = document.createElement('span');
-        const sev = v.severity ?? v.type ?? 'info';
-        badge.textContent = sev;
-        badge.style.background = sev === 'error' || sev === 'CIRCULAR' ? '#e53e3e' : sev === 'warning' || sev === 'REFACTOR' ? '#d69e2e' : '#4299e1';
-        badge.style.color = 'white';
-        badge.style.padding = '2px 6px';
-        badge.style.borderRadius = '4px';
-        badge.style.fontSize = '9px';
-        badge.style.fontWeight = '700';
-        badge.style.textTransform = 'uppercase';
-        badge.style.letterSpacing = '0.05em';
-        badge.style.flexShrink = '0';
-
-        const text = document.createElement('span');
-        text.textContent = v.message ?? v.id ?? JSON.stringify(v);
-        text.style.fontSize = '11px';
-        text.style.lineHeight = '1.4';
-        text.style.opacity = '0.8';
-        text.style.wordBreak = 'break-all';
-
-        item.appendChild(badge);
-        item.appendChild(text);
-        violationsSection.appendChild(item);
-      });
+    const violations = data.violations || [];
+    const vs = section('Violations', violations.length);
+    if (violations.length) {
+      violations.forEach(v => vs.appendChild(finding(
+        v.severity ?? v.type ?? 'info',
+        v.message ?? v.id ?? JSON.stringify(v),
+        severity(v.severity ?? v.type))));
     } else {
-      const ok = document.createElement('p');
-      ok.textContent = 'No violations detected.';
-      ok.style.fontSize = '11px';
-      ok.style.opacity = '0.5';
-      ok.style.marginTop = '8px';
-      violationsSection.appendChild(ok);
+      vs.appendChild(state('No violations.', 'The audit found no cycles, no layer breaches and no self-imports in this graph.'));
     }
-    panel.appendChild(violationsSection);
+    panel.appendChild(vs);
 
-    // Recommendations
-    const recsSection = document.createElement('section');
-    recsSection.className = 'deck-section';
-
-    const recsHeader = document.createElement('div');
-    recsHeader.className = 'section-header';
-    const recsTitle = document.createElement('span');
-    recsTitle.className = 'section-title';
-    recsTitle.textContent = 'Recommendations';
-    const recsBadge = document.createElement('div');
-    recsBadge.className = 'section-badge';
-    recsBadge.textContent = String(data.recommendations ? data.recommendations.length : 0);
-    recsHeader.appendChild(recsTitle);
-    recsHeader.appendChild(recsBadge);
-    recsSection.appendChild(recsHeader);
-
-    if (data.recommendations && data.recommendations.length > 0) {
-      data.recommendations.slice(0, 20).forEach(r => {
-        const item = document.createElement('div');
-        item.className = 'metric-pill';
-        item.style.marginBottom = '6px';
-        item.style.display = 'flex';
-        item.style.alignItems = 'flex-start';
-        item.style.gap = '8px';
-        item.style.padding = '10px 12px';
-
-        const badge = document.createElement('span');
-        badge.textContent = r.priority ?? r.severity ?? 'info';
-        badge.style.background = '#805ad5';
-        badge.style.color = 'white';
-        badge.style.padding = '2px 6px';
-        badge.style.borderRadius = '4px';
-        badge.style.fontSize = '9px';
-        badge.style.fontWeight = '700';
-        badge.style.textTransform = 'uppercase';
-        badge.style.letterSpacing = '0.05em';
-        badge.style.flexShrink = '0';
-
-        const text = document.createElement('span');
-        text.textContent = r.message ?? r.description ?? r.id ?? JSON.stringify(r);
-        text.style.fontSize = '11px';
-        text.style.lineHeight = '1.4';
-        text.style.opacity = '0.8';
-        text.style.wordBreak = 'break-all';
-
-        item.appendChild(badge);
-        item.appendChild(text);
-        recsSection.appendChild(item);
-      });
+    // Capped at 20: past that the panel stops being readable and the CLI is the right surface.
+    const recs = data.recommendations || [];
+    const rs = section('Recommendations', recs.length);
+    if (recs.length) {
+      recs.slice(0, 20).forEach(r => rs.appendChild(finding(
+        r.priority ?? r.severity ?? 'info',
+        r.message ?? r.description ?? r.id ?? JSON.stringify(r),
+        'var(--state-note)')));
+      if (recs.length > 20) {
+        rs.appendChild(el('div', 'record-meta',
+          'Showing 20 of ' + recs.length + '. Run `conducks advise` for the rest.'));
+      }
     } else {
-      const ok = document.createElement('p');
-      ok.textContent = 'No recommendations available.';
-      ok.style.fontSize = '11px';
-      ok.style.opacity = '0.5';
-      ok.style.marginTop = '8px';
-      recsSection.appendChild(ok);
+      rs.appendChild(state('Nothing to advise.', 'The audit produced no recommendations for this graph.'));
     }
-    panel.appendChild(recsSection);
+    panel.appendChild(rs);
 
-    // Stats footer
     if (data.stats) {
-      const statsSection = document.createElement('section');
-      statsSection.className = 'deck-section';
-
-      const statsTitle = document.createElement('p');
-      statsTitle.className = 'text-dim';
-      statsTitle.textContent = 'Audit Stats';
-      statsTitle.style.fontSize = '9px';
-      statsTitle.style.textTransform = 'uppercase';
-      statsTitle.style.letterSpacing = '0.2em';
-      statsTitle.style.fontWeight = '700';
-      statsTitle.style.marginBottom = '8px';
-      statsSection.appendChild(statsTitle);
-
-      const grid = document.createElement('div');
-      grid.className = 'grid grid-cols-2 gap-4';
-
+      const ss = section('Audit stats');
+      const grid = el('div', 'filter-grid');
       Object.entries(data.stats).forEach(([key, val]) => {
-        const pill = document.createElement('div');
-        pill.className = 'metric-pill';
-        const label = document.createElement('p');
-        label.className = 'metric-label';
-        label.textContent = key.replace(/_/g, ' ');
-        const value = document.createElement('span');
-        value.className = 'metric-value';
-        value.textContent = String(val);
-        pill.appendChild(label);
-        pill.appendChild(value);
+        const pill = el('div', 'metric-pill');
+        pill.appendChild(el('p', 'metric-label', key.replace(/_/g, ' ')));
+        pill.appendChild(el('span', 'metric-value', String(val)));
         grid.appendChild(pill);
       });
-
-      statsSection.appendChild(grid);
-      panel.appendChild(statsSection);
+      ss.appendChild(grid);
+      panel.appendChild(ss);
     }
   }
+
 
   // 2. 🧬 LAYER FILTERS & EVENT DELEGATION
   const layerCtn = document.getElementById('layer-filters');
@@ -524,34 +408,16 @@ function initUI() {
   }
 
   // 4. ⚙️ PHYSICS CONTROLS
-  const updatePhysics = (id, force, isGravity = false) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      document.getElementById(id.replace('ctrl-', 'label-')).innerText = val.toFixed(isGravity ? 2 : 0);
-      if (!isGravity) Graph.d3Force(force).strength(val);
-      else window.applyForces();
-      Graph.d3AlphaTarget(0.1).restart();
-    });
-  };
-
-  updatePhysics('ctrl-repulsion', 'charge');
-  updatePhysics('ctrl-gravity', null, true);
-  
-  document.getElementById('ctrl-spread')?.addEventListener('change', (e) => {
-    document.getElementById('label-spread').innerText = e.target.value;
-    window.refreshSynapse();
+  // Repulsion is applied to the running simulation; spread is a server parameter, so it re-fetches.
+  document.getElementById('ctrl-repulsion')?.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    document.getElementById('label-repulsion').innerText = val.toFixed(0);
+    Graph.d3Force('charge').strength(val);
+    Graph.d3AlphaTarget(0.1).restart();
   });
 
-  document.getElementById('btn-reset-physics')?.addEventListener('click', () => {
-    const repulsion = -2000;
-    const spread = 2000;
-    Graph.d3Force('charge').strength(repulsion);
-    document.getElementById('ctrl-repulsion').value = repulsion;
-    document.getElementById('label-repulsion').innerText = repulsion;
-    document.getElementById('ctrl-spread').value = spread;
-    document.getElementById('label-spread').innerText = spread;
+  document.getElementById('ctrl-spread')?.addEventListener('change', (e) => {
+    document.getElementById('label-spread').innerText = e.target.value;
     window.refreshSynapse();
   });
 
@@ -562,19 +428,21 @@ function initUI() {
       const preset = btn.dataset.preset;
       presetBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      if (preset === 'hubs') setPreset(-6000, 0.4, 2000);
-      else if (preset === 'depth') setPreset(-1500, 0.1, 1000);
-      else if (preset === 'atomic') setPreset(-400, 0.05, 600);
+      if (preset === 'hubs') setPreset(-6000, 2000, 0.40);
+      else if (preset === 'depth') setPreset(-1500, 1000, 0.10);
+      else if (preset === 'atomic') setPreset(-400, 600, 0.05);
     });
   });
 
-  const setPreset = (repulsion, gravity, spread) => {
+  const setPreset = (repulsion, spread, gravity) => {
+     window.MirrorState.gravity = gravity;
      const ctrlRep = document.getElementById('ctrl-repulsion');
      const ctrlSpr = document.getElementById('ctrl-spread');
      if (ctrlRep) ctrlRep.value = repulsion;
      if (ctrlSpr) ctrlSpr.value = spread;
      document.getElementById('label-repulsion').innerText = repulsion;
      document.getElementById('label-spread').innerText = spread;
+     window.applyForces();
      window.refreshSynapse();
   };
 
@@ -596,9 +464,18 @@ function updateClusterUI(wave) {
   if (!clusterCtn) return;
   clusterCtn.innerHTML = '';
 
-  if (countBadge) countBadge.innerText = wave.clusters.length;
-
   const sortedClusters = [...wave.clusters].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 50);
+
+  // Say what is LISTED, and say so when that is not all of them. The badge used to report the wave's
+  // full cluster count above a list capped at fifty, so the two disagreed on every large graph.
+  if (countBadge) {
+    countBadge.innerText = sortedClusters.length < wave.clusters.length
+      ? sortedClusters.length + '/' + wave.clusters.length
+      : String(wave.clusters.length);
+    countBadge.title = sortedClusters.length < wave.clusters.length
+      ? 'The 50 largest of ' + wave.clusters.length + ' clusters'
+      : '';
+  }
 
   sortedClusters.forEach(c => {
     const item = document.createElement('div');

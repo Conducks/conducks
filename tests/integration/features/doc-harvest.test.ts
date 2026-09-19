@@ -85,7 +85,7 @@ describe('doc harvest', () => {
 
   /**
    * An empty result has two causes — nothing matched, or nothing was ever harvested — and reporting
-   * them identically is the shape CONDUCKS-37 exists to prevent.
+   * them identically is the shape the confident-empty-result rule (docs/visuals/modules/domain/governance.md) exists to prevent.
    */
   it('tells "no match" from "nothing was harvested"', () => {
     const { combined } = runCli(['query', '--doc', 'zzznotathing'], { cwd: repo, allowFail: true });

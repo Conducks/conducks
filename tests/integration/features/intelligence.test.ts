@@ -62,7 +62,7 @@ export function applyDiscount(price: number): number {
 
   it('find_usages template finds the real caller of calculateDiscount', () => {
     // Resolve the real node id via the find_by_name template (returns raw `id`), rather than
-    // guessing the `<file>::symbol` shape by hand (CONDUCKS-28: use the producer's id, never a
+    // guessing the `<file>::symbol` shape by hand (see docs/visuals/modules/core/graph.md: use the producer's id, never a
     // hand-built one).
     const byName = JSON.parse(
       runCli(['query', 'calculateDiscount', '--mode', 'template', '--template', 'find_by_name', '--json'], { cwd: repo }).stdout

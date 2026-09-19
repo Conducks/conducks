@@ -907,31 +907,33 @@ min_members (the set the page was drawn from), and "shown" is how many came back
         // The same project-symbol count the CLI filters by (ADR 0148 — one rule, both surfaces).
         // Filtering on the raw list let a flow of built-ins satisfy `min_members`, which is the noise
         // the parameter exists to remove.
+        // KEYED BY THE ENTRY'S ID (ADR 0191), and the entry node is fetched BY THAT ID.
+        // `findNodesByName(name)[0]` took the first node sharing the flow's name, so on any of the
+        // hundreds of collisions the reported `file` belonged to a different symbol than the flow was
+        // built from — a wrong answer, not merely a missing one.
         const sizes = new Map<string, { project: string[]; external: string[] }>();
-        for (const [name, members] of Object.entries(processes)) {
-          sizes.set(name, splitProjectSymbols(members as string[]));
-        }
-        const projectSize = (name: string) => sizes.get(name)?.project.length ?? 0;
+        for (const p of processes) sizes.set(p.id, splitProjectSymbols(p.members));
+        const projectSize = (id: string) => sizes.get(id)?.project.length ?? 0;
 
-        const matched = Object.entries(processes)
-          .filter(([name]) => projectSize(name) >= minSize);
+        const matched = processes.filter(p => projectSize(p.id) >= minSize);
 
         const flows = matched
-          .sort((a, b) => projectSize(b[0]) - projectSize(a[0]))
+          .sort((a, b) => projectSize(b.id) - projectSize(a.id))
           .slice(0, cap)
-          .map(([name, members]) => {
-            const node = graph.findNodesByName(name)[0];
+          .map((p) => {
+            const node = graph.getNode(p.id);
             return {
-              name,
+              id: p.id,
+              name: p.name,
               file: node?.properties?.filePath ? realCasePath(String(node.properties.filePath)) : null,
-              member_count: projectSize(name),
-              external_member_count: sizes.get(name)?.external.length ?? 0,
-              top_members: (members as string[]).slice(0, 5)
+              member_count: projectSize(p.id),
+              external_member_count: sizes.get(p.id)?.external.length ?? 0,
+              top_members: p.members.slice(0, 5)
             };
           });
 
         return mcpOk(
-          { flows, total: Object.keys(processes).length, matching: matched.length, shown: flows.length },
+          { flows, total: processes.length, matching: matched.length, shown: flows.length },
           { nodeCount: flows.length, truncated: flows.length < matched.length }
         );
       } catch (err: any) {
@@ -1001,7 +1003,7 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
 
         const cap = limit ?? 50;
         // THE PATH MUST BE ONE THE READER CAN OPEN, on this surface too. Findings carry the stored
-        // path, which is lowercased (CONDUCKS-4) — repaired on the CLI side first, which left the two
+        // path, which is lowercased (see docs/visuals/modules/contracts.md) — repaired on the CLI side first, which left the two
         // surfaces disagreeing about the same finding: MEASURED against a live MCP server,
         // `conducks_prune` answered `renderer/src/components/sessionhistorypanel.tsx` where the CLI
         // answered `SessionHistoryPanel.tsx`. Same input, two answers (ADR 0148), and this is the one
@@ -1052,8 +1054,12 @@ what is blocked and by what. Finished work is omitted: this is the table, not th
 A SUMMARY AND LINKS, NOT A REPLACEMENT: every entry is an address (todo09#P2, a file path) or a
 state. Open the todo or the ADR before acting on it.
 
-layer="all" (default) also returns the constraints to load once per session — conventions (rules)
-and memory (gotchas), compacted to one line each. layer="board" omits them for repeat calls.
+layer="all" (default) also returns a compact summary of the module notes under docs/visuals/modules/
+— ADR 0193's replacement for the dissolved features.md/memory.md/conventions.md: counts from the two
+computed views (\`conducks glossary\`, \`conducks features\`), never their full text. A rule, gotcha
+or capability's purpose now lives in the owning feature's own note; open it, or run \`conducks
+glossary\` / \`conducks features\` for the full computed view. layer="board" omits the summary for
+repeat calls.
 
 MONOREPO: a repo that keeps a docs/ per deployable unit returns {trees:{"(root)":…, "app":…}} —
 one board per tree, kept SEPARATE because an address like todo01#P2 only resolves inside its own

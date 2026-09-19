@@ -1,5 +1,7 @@
 # domain/governance/sentinel — the rule engine
 
+**Layer:** domain (part of `domain/governance`).
+
 **Part of:** [domain/governance](../governance.md). `sentinel.ts` (the static policy evaluator),
 `sentinel-rules.ts` (graph rules + the layer contract), `guard.ts` (`RegressionGuard` — the drift
 threshold, a separate gate that shares the CI entry point), `config-detector.ts` (project anchors and
@@ -17,9 +19,35 @@ by `condition`) and static policy rules (`sentinel.ts`, JSON, keyed by `type` �
 
 **Deferred / not built:** no per-rule severity. Everything a rule reports is a violation, which is
 why a finding that cannot be trusted must be removed rather than downgraded — and why ADR 0017's
-"call cycle" finding has nowhere to live yet. Also no per-project layer config: `LAYER_FRAGMENTS` and
-`ALLOWED_DEPENDENCIES` are hardcoded because the minimal YAML parser has no nested maps, so the
-contract guards conducks itself and nobody else.
+"call cycle" finding has nowhere to live yet (it is now reported separately as ARCH-6, a DISCOVERY,
+not folded into this engine — see [governance](../governance.md)). Also no per-project layer config:
+`LAYER_FRAGMENTS` and `ALLOWED_DEPENDENCIES` are hardcoded because the minimal YAML parser has no
+nested maps, so the contract guards conducks itself and nobody else.
+
+**Uses:** [core/graph](../../core/graph.md) for every edge `layer_boundaries` and the other graph rules
+walk. Loaded by `conducks guard` (CI-facing) and `conducks audit`; the parent [governance](../governance.md)
+note carries the contract's prose, this note carries how it is evaluated and where it broke.
+
+## Features
+
+- **Layer contract** (`layer_boundaries` sentinel rule, `conducks guard`) — hard-blocks any upward
+  cross-layer edge, imports and calls alike, type-only included. See below for what is actually
+  encoded versus what ADR 0005's prose said.
+- **Graph rules** (`has_cycles`, `rank_violation`, `dead_code`, `high_churn`, `deep_nesting`) — the
+  other declarative conditions `conducks guard` evaluates alongside the layer rule.
+- **Static policy rules** (`sentinel.ts`, `config/sentinel.json`) — `require_heritage`,
+  `require_export`, `max_fans`, `require_file`, loaded by `AuditCommand` for `conducks audit`.
+- **Regression guard** (`guard.ts`) — the drift-threshold gate, a separate check sharing the same CI
+  entry point as the two rule engines above.
+
+## Glossary
+
+- **Sentinel rule** (`sentinel-rules.ts`) — a graph-wide structural condition, YAML-loadable, keyed by
+  `condition`. Unrelated to the next term despite the shared file-name root.
+- **Policy rule** (`sentinel.ts`) — a per-node JSON rule keyed by `type`, evaluated separately by
+  `conducks audit`.
+- **Layer fragment** — a path substring (`LAYER_FRAGMENTS`) used to classify a file into one of the
+  seven layers; order-sensitive, most specific first.
 
 ## The layer contract lives and is enforced here
 

@@ -820,7 +820,6 @@ export { Conducks } from "./conducks-core.js";
 // The surfaces the registry composes, each reached by a leaf import until now.
 export { MicroPulseService } from "./micro-pulse.js";
 export { ProjectMonitor } from "./project-monitor.js";
-export { GatewayService } from "./gateway-service.js";
 export { collectChanges, impactedSymbolIds } from "./change-set.js";
 export { buildFilterQuery } from "./filter-builder.js";
 export type { QueryFilter } from "./filter-builder.js";

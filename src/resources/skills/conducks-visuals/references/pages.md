@@ -72,8 +72,8 @@ share the one stylesheet, blocks link to fragments. Markdown does none of that.
 
 ## 3 · Authored as `.md`, in a narrow dialect
 
-The front page, problems and holding are **rendered from the `.md` beside them**. Never edit the
-HTML — it carries a DERIVED header and the next build discards the edit.
+The front page, problems and holding are **rendered from the `.md` beside them**. Edit the `.md`, not
+the rendered HTML — the HTML carries a DERIVED header and the next build discards any edit made there.
 
 The grammar is plain markdown plus a provenance line, an optional subtitle line after it, and four
 fenced blocks markdown has no shape for:
@@ -95,13 +95,18 @@ exists to prevent.
 | family | named after | authored |
 |---|---|---|
 | **feature pages** — `modules/<feature>.html` | the container id | generated from the graph data, or hand-written where the prose says more than the data can. **This is where a feature's internal architecture lives** — every block, the full flow, every branch. It is the only place it lives |
-| **module notes** — `modules/<source-path>.html` | the **source tree**, mirrored | from the authored `.md` beside it |
+| **module notes** — `modules/<feature-path>.html` | the **feature's** path, container segments elided — `src/lib/core/graph` is `modules/core/graph`, and `core` gets no note at all. NOT a mirror of the source tree | from the authored `.md` beside it |
 
-**A container id may never collide with a note path.** One container derived `cli.html`; the note for
-the CLI module rendered to the same name; the note won; the hand-written entry page was overwritten,
-and three blocks opened a page with none of their fragments in it. The build now refuses on any such
-collision, and separately checks that **every fragment the canvas links to exists in the page it
-opens.**
+**A module note is no longer prose beside a picture.** It now carries `**Layer:**`
+`**Responsibility:**` `**Boundaries:**` `**Uses:**`, `## Features`, `## Glossary` and optionally
+`## Traps` — the feature's authored source, not a caption. What each field holds is `conducks-docs`
+§6.3; this section owns only the two-family split and the namespace rule below.
+
+**Pick container ids that cannot collide with a note path** — one container once derived `cli.html`,
+matched the CLI module's note name exactly, and the note won: the hand-written entry page was
+overwritten, and three blocks opened a page with none of their fragments in it. The build now refuses
+on any such collision, and separately checks that **every fragment the canvas links to exists in the
+page it opens.**
 
 *Why nothing caught it:* the file still existed, so a file-level check saw nothing, and every anchor
 inside the surviving page was true. A link can resolve and still not land.
@@ -132,8 +137,9 @@ missing log because it would look like the rule was kept.
 **The derived log carries NO commit hash, deliberately.** It stamped one until the day someone
 noticed that made the page change whenever the REPOSITORY moved rather than whenever the DATA did —
 so the drift gate, whose whole job is "the data changed and the page did not", fired on every commit.
-A gate that fires for a reason unrelated to what it checks is one you learn to ignore. **Never bake
-mutable repository state into a byte-compared artifact.**
+A gate that fires for a reason unrelated to what it checks is one you learn to ignore. **Keep mutable
+repository state out of a byte-compared artifact** — baking one in is what made the page above change
+on every commit for a reason unrelated to what it checks.
 
 **If the tree is dirty, say so:** `79783ab + working tree (N files)` rather than the hash alone. A
 line number written against uncommitted work cannot be recovered from the hash.
@@ -155,7 +161,7 @@ than something two projects promise each other.
 |---|---|
 | 1 | **A task, not a feature.** "Tab strip" is not testable; "clicking a row switches to it" is. Expect three to seven tasks per feature |
 | 2 | **Three states.** `untested` · `tested and fine` · `tested and here is the problem`. A note box per feature collapses the first two, and **absence then reads as pass** |
-| 3 | **Every task carries a stable id**, printed beside it and carried into the report. Append tasks, never renumber — a tester's saved progress would move to a different question |
+| 3 | **Every task carries a stable id**, printed beside it and carried into the report. Append tasks and keep existing ids fixed — renumbering would move a tester's saved progress to a different question |
 | 4 | **The report OMITS what was not tested**, and prints a single count of the rest. A hundred `(NOT TESTED)` lines bury the four that matter |
 | 5 | **The page is data, rendered.** A page whose tasks live in hand-written markup stops being updated within two rounds |
 | 6 | **Progress survives the tab closing, and a rebuild MARKS it rather than killing it** |
@@ -166,10 +172,10 @@ were still testing. A rule that makes a multi-hour pass impossible stops the tes
 protect. So carry the tick, marked with the build it was made under. Touching it settles it on the
 current build. A note is what the tester WROTE and is never build-specific — carried whole, unmarked.
 
-**Do not make the ticks durable.** The instinct is a state file beside the page, committed. That file
-outlives the build it was ticked against, and it makes the testing page **accumulate** — the one
-thing it must never do. It is an instrument, not a record. The durable artifact is the report, copied
-out and turned into problem entries or todos.
+**Keep the ticks ephemeral, tied to a build, not saved as a durable file.** The instinct is a state
+file beside the page, committed. That file outlives the build it was ticked against, and it makes the
+testing page **accumulate** — the one property it exists to avoid. It is an instrument, not a record.
+The durable artifact is the report, copied out and turned into problem entries or todos.
 
 **Clipboard, not download.** A published page runs under a sandbox that makes page-initiated
 downloads inert, silently. A "save my progress" button that appears to work and does not is worse

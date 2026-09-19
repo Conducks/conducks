@@ -10,7 +10,15 @@ checked out, who touched a file and when, what a ref resolves to.
 
 **Boundaries:** it runs git and returns what git said. It does not decide what a file MEANS — a
 `.py` and a `.md` come back the same way — and it never writes to a repository it is reading, which
-is why `core.quotePath=false` is passed per-invocation rather than set in the repo's config.
+is why `core.quotePath=false` is passed per-invocation rather than set in the repo's config. Every
+subprocess is spawned with `execFileSync` and an argument array, never a shell string — a path or ref
+that reaches the shell as a concatenated string is a command-injection surface, and an argument array
+is not. Discovery goes git-direct through this interface rather than through any other
+file-enumeration path, because git already tracks what a plain directory walk cannot (deleted,
+renamed, submodule-nested files).
+
+**Uses:** imports [contracts](../contracts.md) and [core/utils](utils.md), nothing else — the leaf
+status stated above.
 
 ## Discovery asks EVERY repository under the anchor, not just the anchor's own
 
@@ -45,3 +53,36 @@ a guarantee the type cannot make.
 Anything needing a DIFFERENT root constructs its own `ChronicleInterface`. That is what let
 `project-monitor` stop re-implementing two git operations: the duplication existed because the door
 exported a singleton, not because the class could not answer per root.
+
+## Three call sites still inline `toRepoRelative`, and collapsing them changes behaviour
+
+`readSingleFile`, `getAuthorDistribution` and `getBlameData` each do by hand what
+`toRepoRelative` (<span class="anchor">src/lib/core/git/chronicle-interface.ts:532</span>) already
+does. The comment that once sat above it claimed the duplication had been removed; it had not, and a
+comment is held to the same bar as any other doc.
+
+It stays deferred on purpose rather than tidied: collapsing the three onto the helper changes
+behaviour on the case-insensitive path, and behaviour does not change during a clean — a fix is its
+own commit with its own measurement. Whoever takes it needs a case-collision fixture first.
+
+## Features
+- none — one interface, no user-facing sub-capability of its own
+
+## Glossary
+- **anchorChronicle(root)** — the named operation that points the shared chronicle instance at a
+  directory. Used at three sites, all at boot or a resolved CLI target — never a bare `setProjectDir`
+  reachable on every handed-out reference.
+- **ReadOnlyChronicle** — the type the door hands out: the chronicle class minus its one mutator.
+
+## Traps
+- **Reading a git ref is cheap; reading it per file is not.** `git archive <ref>` reads a whole
+  551-file, 4.4 MB repo in ~53 ms; `git show <ref>:<path>` per file measured at ~5,655 ms for the
+  same set — 107x slower, because each call is its own process spawn. Any design that reaches for
+  per-file `git show` in a loop is paying roughly 100x for nothing that a single whole-ref read would
+  answer.
+- **git QUOTES a path containing a non-ASCII byte, and the quoted string opens nothing.**
+  `core.quotePath` defaults to true, so `git ls-files` returns a non-ASCII filename as a literal
+  quoted, octal-escaped string. Taken as a path it opens nothing, so the file drops from the graph
+  with only "skipped 1 unreadable file" to show for it — correct on a repo naming files in ASCII,
+  silently wrong on one naming them in Turkish, French or Chinese. `-c core.quotePath=false` per
+  invocation is the fix; never write it into the analyzed repo's own config.

@@ -6,11 +6,12 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 /**
  * Conducks — Bootstrap Documentation Command
  *
- * Scaffolds the conducks-docs create-now set flat under docs/: features.md, architecture.md,
- * todos/todo01.md, plus handover.md at a root tree, and the empty decisions/ and todos/completed/
- * folders. `architecture.md` is a SKELETON a person fills — conducks writes no generated structure
- * (ADR 0011). `conventions.md`, `memory.md` and module notes (`visuals/modules/`, ADR 0140) are create-when-first-needed and are
- * deliberately not scaffolded. Every file written passes `conducks docs-lint` by construction.
+ * Scaffolds the conducks-docs create-now set flat under docs/: todos/todo01.md, plus handover.md at
+ * a root tree, and the empty decisions/ and todos/completed/ folders. `features.md` and
+ * `architecture.md` are DISSOLVED (ADR 0193) and no longer scaffolded — a capability's purpose and a
+ * module's shape now live in that feature's own note. Module notes (`visuals/modules/`, ADR 0140) are
+ * create-when-first-needed and are deliberately not scaffolded (conducks-docs §3.3). Every file
+ * written passes `conducks docs-lint` by construction.
  *
  * `--service` writes the service shape: no handover.md, since constraints are root-only.
  */

@@ -5,7 +5,10 @@
   /* Optic Glass Slabs */
   --glass-bg: rgba(13, 17, 23, 0.7); /* More translucent for better backdrop resonance */
   --glass-border: rgba(255, 255, 255, 0.08); /* 1px thin, light-catching */
-  --glass-blur: 40px; /* v3.0 Deep Optic Blur */
+  /* 18px, not 40px. The panels sit over a canvas that is animating every frame, so
+     the backdrop is re-blurred continuously; and at 40px small type over a moving
+     graph loses its edges, which is the type this UI is almost entirely made of. */
+  --glass-blur: 18px;
   
   /* Exclusive Brand Palette */
   --exclusive-blue: #2f81f7;
@@ -13,11 +16,45 @@
   --exclusive-text: #f0f6fc;
   --exclusive-text-muted: #8b949e;
   
+  /* THE LAYER SCALE.
+     Nine layers, and they are ORDINAL — an Ecosystem contains Repositories contains
+     Namespaces, down to Atoms and Data. They used to be nine unrelated hues (blue,
+     blue, indigo, cyan, amber, purple, green, orange, rose), so colour told a reader
+     nothing about depth: two adjacent rungs looked as different as the top and the
+     bottom. This is one continuous cold-to-hot ramp instead, monotonic in hue, so a
+     glance at the graph reads as altitude and the sidebar becomes a legend for a
+     scale rather than a row of switches. Blue-green-yellow-orange is also the ramp
+     that survives the common colour-vision deficiencies, which a rainbow does not. */
+  --layer-0: #3b5bdb;  /* Ecosystem   — the container */
+  --layer-1: #3b82d6;  /* Repositories */
+  --layer-2: #2fa8c9;  /* Namespaces */
+  --layer-3: #24c5ae;  /* Units, files */
+  --layer-4: #45d68b;  /* Infrastructure */
+  --layer-5: #86dc63;  /* Structures */
+  --layer-6: #c3dc4b;  /* Behaviors */
+  --layer-7: #eeb13e;  /* Atoms */
+  --layer-8: #f4713f;  /* Data        — the smallest thing there is */
+
+  /* Work state. These were hex literals inside ui.js, duplicated across the docs and governance
+     panels, so the two could disagree about what "blocked" looks like. One definition, both read it. */
+  --state-done:    #3fb950;
+  --state-doing:   #d29922;
+  --state-blocked: #f85149;
+  --state-todo:    #58a6ff;
+  --state-note:    #a371f7;
+
   --spacing-air: 24px; /* The 'Air' around floating slabs */
-  --radius-exclusive: 24px; /* Consistent rounded edges across the UI */
-  --radius-inner: 12px;
+  /* Radius carries nesting depth. It was 24px on the outer slab and 12px on
+     everything inside it, which is the card-kit look: a chip and a panel shaped the
+     same say they are the same kind of thing. Three steps now, and a reader can tell
+     what contains what without reading a border. */
+  --radius-exclusive: 14px;  /* a floating panel */
+  --radius-inner: 8px;       /* a control inside one */
+  --radius-chip: 4px;        /* a chip, a badge, a swatch */
   
-  --font: 'Outfit', sans-serif;
+  /* Outfit was loaded from Google Fonts, which made the dashboard need a network to look right.
+     Kept first so it is used where it is installed; the stack behind it is what actually renders. */
+  --font: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --transition-smooth: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -83,10 +120,6 @@ body {
   height: 1px;
   background: var(--glass-border);
   margin: 4px 0;
-}
-
-.rail-spacer {
-  flex: 1;
 }
 
 .dock-item {
@@ -155,10 +188,9 @@ body {
 }
 
 .slate-title {
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--exclusive-text);
   margin: 0;
 }
@@ -242,10 +274,9 @@ body {
 }
 
 .section-title {
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
   color: var(--exclusive-text-muted);
 }
 
@@ -274,7 +305,6 @@ body {
   color: var(--exclusive-text-muted);
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.1em;
   cursor: pointer;
   transition: all 0.3s;
@@ -296,15 +326,13 @@ body {
 }
 
 .control-label {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--exclusive-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
 }
 
 .control-value {
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   color: var(--exclusive-blue);
 }
@@ -367,7 +395,6 @@ body {
   color: #fff;
   font-size: 11px;
   font-weight: 800;
-  text-transform: uppercase;
   letter-spacing: 0.15em;
   cursor: pointer;
   box-shadow: 0 8px 32px rgba(47, 129, 247, 0.2);
@@ -437,7 +464,7 @@ body {
 .filter-shield-count {
   font-size: 9px;
   color: var(--exclusive-text-muted);
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   background: rgba(255, 255, 255, 0.05);
   padding: 1px 4px;
   border-radius: 3px;
@@ -491,20 +518,6 @@ input:checked + .slider:before {
 }
 
 /* 💎 GLASS SECTION (v3.0) */
-.glass-section {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-inner);
-  padding: 20px;
-  margin-bottom: 24px;
-  transition: var(--transition-smooth);
-}
-
-.glass-section:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
 /* 🧬 CUSTOM TOGGLE (Conducks Pill) */
 .switch {
   position: relative;
@@ -606,14 +619,14 @@ input:checked + .slider:before {
 }
 
 .metric-label {
-  font-size: 10px;
-  font-weight: 300; /* Exclusive light weight */
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
   color: var(--exclusive-text-muted);
 }
 
 .metric-value {
+  font-variant-numeric: tabular-nums;
   font-size: 22px;
   font-weight: 700; /* High contrast bold */
   color: var(--exclusive-text);
@@ -638,7 +651,6 @@ input:checked + .slider:before {
   border-radius: var(--radius-inner);
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.1em;
   cursor: pointer;
   transition: var(--transition-smooth);
@@ -723,4 +735,332 @@ input:checked + .slider:before {
   gap: 8px;
   z-index: 180;
   box-shadow: 0 0 20px rgba(47, 129, 247, 0.2);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PANEL CONTENT — the docs and governance boards.
+
+   Both panels used to build every row with `element.style.cssText = '...'`, 78 of
+   them across the file. Two costs: nothing could be restyled without editing
+   JavaScript, and the two panels drifted — they had separate copies of the same
+   severity colours and disagreed on padding. The rules below are what those
+   inline strings said, named once.
+
+   A record is a hierarchy, not a card. The state colour is carried on a left rule
+   rather than a pill, so the eye reads down a column of states instead of hunting
+   badges — and the same device works for a violation, which is the same shape.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.record {
+  border-left: 2px solid var(--rec-color, var(--glass-border));
+  padding: 8px 0 8px 12px;
+  margin-bottom: 10px;
+}
+
+.record-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.record-title {
+  flex: 1;
+  font-size: 12px;
+  color: var(--exclusive-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The count is the fact; it is set in the same weight as the title so a reader
+   comparing progress across records scans one column, not two type sizes. */
+.record-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--exclusive-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--rec-color, var(--exclusive-text-muted));
+  border: 1px solid currentColor;
+}
+
+.record-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.record-addr {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--rec-color, var(--exclusive-text-muted));
+}
+
+.record-note {
+  color: var(--exclusive-text-muted);
+}
+
+.record-meta {
+  font-size: 10px;
+  color: var(--exclusive-text-muted);
+  padding-top: 4px;
+}
+
+/* Wrapping matters here: a lint message or a violation is a sentence, and
+   truncating one costs the reader the whole point of showing it. */
+.record-wrap {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* ── States: empty, error, loading ───────────────────────────────────────────
+   These were a bare red <p> and the word "Loading...". A panel that fails should
+   say what failed and what to run; a panel with nothing in it should say what
+   that means, because "empty" and "broken" look identical otherwise. */
+
+.panel-state {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--exclusive-text-muted);
+  padding: 12px 0;
+}
+
+.panel-state strong {
+  display: block;
+  color: var(--exclusive-text);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.panel-state.is-error strong { color: var(--state-blocked); }
+
+.panel-state code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--exclusive-cyan);
+}
+
+.panel-stamp {
+  font-size: 10px;
+  color: var(--exclusive-text-muted);
+  opacity: 0.65;
+  margin-bottom: 10px;
+}
+
+/* ── Accessibility floor ─────────────────────────────────────────────────────
+   The stylesheet had exactly one `:focus` rule, so the whole command deck was
+   keyboard-navigable and invisibly so. */
+
+:where(button, input, select, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--exclusive-cyan);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* A preset button reported nothing when clicked: ui.js adds `.active` and no rule
+   had ever matched it, so all three read as unselected however many times you
+   pressed one. */
+.preset-btn.active {
+  background: rgba(47, 129, 247, 0.16);
+  border-color: var(--exclusive-blue);
+  color: var(--exclusive-text);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   THE MARKUP THAT WAS NEVER STYLED
+
+   `index.html` was written against Tailwind utility classes — `text-3xl`,
+   `tracking-tighter`, `grid grid-cols-2`, `text-dim` — and Tailwind was never
+   loaded. The page pulled d3, force-graph and a font, and nothing else. So 41
+   classes did nothing: the node inspector's whole type hierarchy, the status bar,
+   the focus badge, and the loading overlay, which had no rule of its own either
+   and was therefore a line of text at the top-left of the page rather than an
+   overlay.
+
+   Everything below replaces a class that was inert. Named for what it is, so the
+   next reader can tell a real rule from a hopeful one.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+#loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background: var(--bg);
+  transition: opacity 0.6s ease;
+}
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--glass-border);
+  border-top-color: var(--exclusive-cyan);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.overlay-caption {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--exclusive-text-muted);
+}
+
+/* ── Node inspector ──────────────────────────────────────────────────────────
+   One loud thing: the name of the symbol you clicked. Everything else is a
+   quiet supporting label, so the panel reads as an answer rather than a form. */
+
+.inspector-hero-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.inspector-ident { min-width: 0; }
+
+.inspector-name {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--exclusive-text);
+  overflow-wrap: anywhere;
+}
+
+.inspector-kind {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--exclusive-blue);
+}
+
+.content-container { display: block; }
+
+.inspector-field {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* The one label style the whole UI shares. It was five different Tailwind strings
+   before, which is why the same label read differently in four places. */
+.field-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--exclusive-text-muted);
+}
+
+.field-value {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--exclusive-blue);
+  overflow-wrap: anywhere;
+}
+
+.metric-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.inspector-deep {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--glass-border);
+  transition: opacity 0.4s ease;
+}
+
+.metric-list {
+  display: grid;
+  gap: 8px;
+}
+
+/* A metric read as a row rather than a tile: label left, number right, so three
+   of them stack into a column a reader can compare down. */
+.metric-pill.is-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.metric-pill.is-row .metric-label { margin: 0; }
+.metric-pill.is-row .metric-value {
+  font-variant-numeric: tabular-nums; font-size: 16px; }
+
+.skeleton-box.is-bar   { width: 100%; height: 40px; margin-bottom: 20px; }
+.skeleton-box.is-block { width: 100%; height: 76px; margin-bottom: 0; }
+
+/* ── Status bar and focus badge ──────────────────────────────────────────── */
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.status-version {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.focus-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* How much of the graph is drawn. Quiet when the answer is "all of it", marked
+   when it is not — a truncated picture that looks identical to a whole one is the
+   failure ADR 0054 added `truncated` to prevent, and the browser had been
+   discarding the field for a year. */
+.wave-scope {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--exclusive-text-muted);
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+
+.wave-scope.is-partial {
+  color: var(--state-doing);
+}
+
+.wave-scope.is-partial::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: currentColor;
 }

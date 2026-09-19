@@ -70,7 +70,7 @@ describe('extension ORDER decides which file wins', () => {
 
 describe('case', () => {
   it('matches a path whose case differs, because APFS treats them as one file', () => {
-    // CONDUCKS-4 at the resolver. On a case-insensitive filesystem `./Util` and `./util` open the
+    // Canonical lowercase ids (see docs/visuals/modules/contracts.md) at the resolver. On a case-insensitive filesystem `./Util` and `./util` open the
     // same file, and refusing the match splits one symbol across two nodes.
     expect(resolve('./Util.js', '/p/src/a.ts', ['/p/src/util.ts'])).toBe('/p/src/util.ts');
   });

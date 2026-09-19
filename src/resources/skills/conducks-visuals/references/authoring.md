@@ -91,13 +91,14 @@ outcomes of one question, it is a rectangle.
 |---|---|
 | default | ordinary. Nothing to flag |
 | **path** | the step to follow first, on a feature page. Meaningless on the canvas, which has no steps |
-| **ok** | a guarantee, or a thing done right — and it is load-bearing, so do not break it |
+| **ok** | a guarantee, or a thing done right — and it is load-bearing, so keep it working |
 | **warn** | surprising, or a hazard. A reader who assumed otherwise would be wrong |
 | **absent** | does not exist and should, or exists and is never called |
 | **detached** | happens off the main path — background, fire-and-forget, another process |
 
 **`absent` is the highest-value colour on the page.** It is the only thing a reader cannot derive by
-reading the code, because it is not in the code. Use it, and never soften it into `warn`.
+reading the code, because it is not in the code. Keep it as `absent` — softening it into `warn` throws
+away the one colour a reader could never have derived from the code themselves.
 
 ## 3 · Writing a block
 
@@ -184,5 +185,5 @@ page they used to live on. Both resolved. Neither landed anywhere useful.
 exist, and be the wrong page, and pass every file-level check. And watch relative depth — a page one
 folder deeper does not reach `../x` the way the canvas does.
 
-**A healthy block must not link to a defect.** Marking the block a problem was found *near* sends the
-reader to somebody else's problem, and reads as an accusation.
+**Link a healthy block only to its own page.** Marking it as the block a problem was found *near*
+sends the reader to somebody else's problem, and reads as an accusation.

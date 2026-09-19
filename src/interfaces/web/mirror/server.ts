@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GatewayService } from '@/lib/domain/analysis/index.js';
+import { GatewayService } from '@/lib/domain/mirror/index.js';
 
 import { Logger } from "@/lib/core/utils/index.js";
 import { registry } from '@/registry/index.js';
@@ -19,6 +19,8 @@ class MirrorServer {
   private app = express();
   private clients: http.ServerResponse[] = [];
   private server: http.Server | null = null;
+  /** Started by `initGlobalMirror`, so stopping the server has to stop it too — see `stop`. */
+  private docsWatcher: { stop(): Promise<void> } | null = null;
 
   constructor(private gateway: GatewayService) {
     this.setupRoutes();
@@ -41,7 +43,11 @@ class MirrorServer {
       credentials: false
     }));
 
-    const staticPath = path.resolve(__dirname, '../../resources/mirror');
+    // The page sits beside this file. It used to live in `src/resources/`, a folder filed by FILE
+    // TYPE rather than by feature — it held the agent skills and this web app, which have nothing to
+    // do with each other, and the mirror's four parts were spread across three trees. A reader
+    // looking for "the dashboard" now finds the server, the launcher's target and the page together.
+    const staticPath = path.resolve(__dirname, 'public');
     this.app.use(express.static(staticPath));
 
     this.app.get('/', (req, res) => {
@@ -50,18 +56,16 @@ class MirrorServer {
 
     // v2.0.0 Gateway: Unified Synapse Exploration
     this.app.get('/api/synapse', async (req, res) => {
-      const { layers, clusters, spread, compact, limit } = req.query;
+      const { layers, spread, limit } = req.query;
       const l = layers ? (layers as string).split(',').map(n => parseInt(n, 10)) : undefined;
-      const c = clusters ? (clusters as string).split(',') : undefined;
       const s = spread ? parseInt(spread as string, 10) : undefined;
-      const compactFlag = compact === '1' || compact === 'true' || compact === 'yes';
       // An override the caller has to mean: a non-numeric or non-positive `limit` is IGNORED rather
       // than silently becoming 0, which would serve an empty wave that reads as an empty graph.
       const parsedLimit = limit === undefined ? undefined : Number.parseInt(limit as string, 10);
       const waveLimit = Number.isFinite(parsedLimit) && (parsedLimit as number) > 0 ? parsedLimit : undefined;
 
       try {
-        const wave = await this.gateway.getWave(l, c, s, compactFlag, waveLimit);
+        const wave = await this.gateway.getWave(l, s, waveLimit);
         res.json(wave);
       } catch (err) {
         res.status(500).json({ error: 'Failed to build wave.' });
@@ -167,10 +171,22 @@ class MirrorServer {
     });
   }
 
-  public stop() {
+  /**
+   * Stop everything this server started.
+   *
+   * The docs watcher is included because it writes a readiness probe into the user's
+   * `docs/` and removes it in its own `stop()` — which nothing was calling. `conducks mirror`
+   * runs until it is killed and registered no signal handler, so every terminated session
+   * stranded a `.conducks-watch-probe` in a tracked directory. Measured on this repository.
+   */
+  public async stop(): Promise<void> {
     this.gateway.stop();
+    if (this.docsWatcher) { try { await this.docsWatcher.stop(); } catch { /* best effort on shutdown */ } }
     if (this.server) this.server.close();
   }
+
+  /** Hand the server the watcher it must also shut down. */
+  public ownDocsWatcher(w: { stop(): Promise<void> }) { this.docsWatcher = w; }
 }
 
 let globalMirror: MirrorServer | null = null;
@@ -187,6 +203,7 @@ export function initGlobalMirror(gateway: GatewayService) {
     const docsWatcher = registry.docs.watcher;
     docsWatcher.setPulseSubscriber((pulse) => globalMirror?.broadcastPulse(pulse));
     docsWatcher.start();
+    globalMirror.ownDocsWatcher(docsWatcher);
   } catch { /* no docs/ in this project — the panel still serves on demand */ }
   return globalMirror;
 }

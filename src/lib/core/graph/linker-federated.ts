@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ConducksAdjacencyList } from './adjacency-list.js';
+import { VAULT_DIR, VAULT_DB_FILENAME } from "@/contracts/index.js";
 
 /** Opens a neighbour's vault read-only. Injected, for the reason on the constructor. */
 export type OpenNeighbourVault = (path: string) => { load(graph: ConducksAdjacencyList): Promise<unknown> };
@@ -48,7 +49,7 @@ export class FederatedLinker {
     const absolutePath = path.resolve(projectPath);
     
     // Verify it's a valid Conducks project (DuckDB Sync)
-    const dbPath = path.join(absolutePath, '.conducks', 'conducks-synapse.db');
+    const dbPath = path.join(absolutePath, VAULT_DIR, VAULT_DB_FILENAME);
     try {
       await this.fsMock.access(dbPath);
     } catch {

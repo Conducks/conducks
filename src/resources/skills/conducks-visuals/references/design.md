@@ -45,9 +45,9 @@ whose only definition lives inside a media block has no value in the other theme
 hardcoded near-black ground. It was not a dark-mode design; it was a design with one mode, and the
 half of readers who print or read in daylight got the wrong one with no way to say so.
 
-**Do not borrow a product's palette.** That same sheet used `#58a6ff`, `#3fb950`, `#f85149` and
-`#d29922` — GitHub's own accent, success, danger and attention, exactly. A page wearing another
-product's colours reads as that product's page, and every project built to this standard then looks
+**Choose the project's own palette.** That same sheet used `#58a6ff`, `#3fb950`, `#f85149` and
+`#d29922` — GitHub's own accent, success, danger and attention, exactly — and a page wearing another
+product's colours reads as that product's page, so every project built to this standard then looked
 like a GitHub screenshot rather than like itself.
 
 ## 2 · Type — two faces, three roles, one scale

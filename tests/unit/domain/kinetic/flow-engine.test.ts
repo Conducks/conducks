@@ -18,9 +18,21 @@ const node = (id: string, label: string, name?: string) => ({
   properties: { name: name ?? id.split('::').pop(), filePath: id.split('::')[0], canonicalKind: label } as any,
 });
 
-const edge = (from: string, to: string, type = 'CALLS', confidence = 1) => ({
+/**
+ * A local call. `confidence` is NOT how a cross-service call is recognised — see `crossServiceEdge`.
+ * The real producer emits 0.85 for a resolved call and 0.40 for an unresolved one (ADR 0046) and
+ * never 1, so a fixture using 1 to mean "definitely local" describes an edge that does not exist.
+ */
+const edge = (from: string, to: string, type = 'CALLS', confidence = 0.85) => ({
   id: `${from}->${to}->${type}`, sourceId: from, targetId: to,
   type: type as any, confidence, properties: {} as any,
+});
+
+/** What `http-service-linker.ts` actually stamps on a call between two services. */
+const crossServiceEdge = (from: string, to: string) => ({
+  id: `${from}::http::${to}`, sourceId: from, targetId: to,
+  type: 'CALLS' as any, confidence: 0.8,
+  properties: { method: 'HTTP', hostname: 'svc', tier: 'service' } as any,
 });
 
 const build = (nodes: any[], edges: any[] = []) => {
@@ -110,36 +122,59 @@ describe('getProcesses() — what an ENTRY POINT is', () => {
 
     const p = k.getProcesses();
 
-    expect(Object.keys(p)).toEqual(['main']);
-    expect(p.main).toHaveLength(2);
+    expect(p.map(f => f.name)).toEqual(['main']);
+    expect(p[0].members).toHaveLength(2);
   });
 
   it('a symbol reached only by a CROSS-SERVICE call is still an entry', () => {
-    // An HTTP call between services carries confidence below 1. The handler on the far side is where
-    // execution begins for that service, even though an edge points at it — treating it as
-    // non-entry hides the entry point of every service but the caller's.
+    // The handler on the far side of an HTTP call is where execution begins for THAT service, even
+    // though an edge points at it — treating it as non-entry hides the entry point of every service
+    // but the caller's. Recognised by the `tier: 'service'` stamp the linker writes (ADR 0191).
     const k = build([
       node('/p/api.ts::handler', 'BEHAVIOR'),
       node('/p/client.ts::caller', 'BEHAVIOR'),
-    ], [edge('/p/client.ts::caller', '/p/api.ts::handler', 'CALLS', 0.5)]);
+    ], [crossServiceEdge('/p/client.ts::caller', '/p/api.ts::handler')]);
 
-    expect(Object.keys(k.getProcesses()).sort()).toEqual(['caller', 'handler']);
+    expect(k.getProcesses().map(f => f.name).sort()).toEqual(['caller', 'handler']);
   });
 
-  it('a symbol called with FULL confidence is not an entry', () => {
-    const k = build([
-      node('/p/a.ts::main', 'BEHAVIOR'),
-      node('/p/b.ts::helper', 'BEHAVIOR'),
-    ], [edge('/p/a.ts::main', '/p/b.ts::helper', 'CALLS', 1)]);
+  it('a symbol a LOCAL caller calls is not an entry, at any confidence the producer emits', () => {
+    // This asserted that a call at confidence 1 disqualifies. No CALLS edge is ever emitted at 1 —
+    // measured across all three benchmark subjects — so the test described an edge the producer does
+    // not make, and the rule it was pinning never ran in production. ADR 0028's trap, in a second
+    // place: a fixture built from the same misunderstanding as the code confirms it. Both real
+    // values are checked here instead.
+    for (const confidence of [0.85, 0.4]) {
+      const k = build([
+        node('/p/a.ts::main', 'BEHAVIOR'),
+        node('/p/b.ts::helper', 'BEHAVIOR'),
+      ], [edge('/p/a.ts::main', '/p/b.ts::helper', 'CALLS', confidence)]);
 
-    expect(Object.keys(k.getProcesses())).toEqual(['main']);
+      expect(k.getProcesses().map(f => f.name)).toEqual(['main']);
+    }
+  });
+
+  it('two entries sharing a NAME are two flows, not one', () => {
+    // Keyed by bare name, the second overwrote the first: 2,842 of scraper's entry points, 5,231 of
+    // sofie's and 2,854 of orchestrator's were discarded before any caller saw them, and which one
+    // survived depended on iteration order (ADR 0191).
+    const k = build([
+      node('/p/a.ts::run', 'BEHAVIOR'),
+      node('/p/b.ts::run', 'BEHAVIOR'),
+      node('/p/dep.ts::dep', 'BEHAVIOR'),
+    ], [edge('/p/a.ts::run', '/p/dep.ts::dep')]);
+
+    const p = k.getProcesses();
+    // `dep` is called by one of them, so it is correctly NOT an entry — only the two `run`s are.
+    expect(p.map(f => f.name).sort()).toEqual(['run', 'run']);
+    expect(new Set(p.map(f => f.id)).size).toBe(2);
   });
 
   it('skips file-level nodes, which are not where execution begins', () => {
     // A name ending in an extension is a file. Counting one as an entry point puts every module in
     // the process list and buries the real entries.
     const k = build([node('/p/a.ts::unit', 'STRUCTURE', 'a.ts')]);
-    expect(Object.keys(k.getProcesses())).toEqual([]);
+    expect(k.getProcesses()).toEqual([]);
   });
 
   it('skips a node with no file at all — a virtual or induced one', () => {
@@ -147,7 +182,7 @@ describe('getProcesses() — what an ENTRY POINT is', () => {
       id: 'external::pkg', label: 'STRUCTURE' as any,
       properties: { name: 'pkg', canonicalKind: 'STRUCTURE' } as any,
     }]);
-    expect(Object.keys(k.getProcesses())).toEqual([]);
+    expect(k.getProcesses()).toEqual([]);
   });
 
   it('terminates when the process contains a cycle', () => {
@@ -161,6 +196,6 @@ describe('getProcesses() — what an ENTRY POINT is', () => {
       edge('/p/c.ts::c', '/p/b.ts::b'),
     ]);
 
-    expect(k.getProcesses().a).toHaveLength(3);
+    expect(k.getProcesses().find(f => f.name === 'a')!.members).toHaveLength(3);
   });
 });

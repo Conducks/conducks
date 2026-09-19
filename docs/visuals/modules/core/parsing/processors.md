@@ -1,8 +1,10 @@
 # core/parsing/processors — capture → relationship
 
-**Part of:** [core/parsing](../parsing.md). Five small units: `parsing/processors/import.ts`,
-`parsing/processors/call.ts`, `parsing/processors/heritage.ts`, `parsing/processors/binding.ts`,
-`parsing/processors/flow.ts`.
+**Part of:** [core/parsing](../parsing.md). Five small units:
+`parsing/processors/import.ts`, `parsing/processors/call.ts`, `parsing/processors/heritage.ts`,
+`parsing/processors/binding.ts`, `parsing/processors/flow.ts`.
+
+**Layer:** core.
 
 **Responsibility:** turning a raw capture into a spectrum relationship, and resolving what can be
 resolved with only the current file in hand. `import` additionally owns module resolution — extension
@@ -11,6 +13,10 @@ inference, index files, external-package detection.
 **Boundaries:** file-local only. Anything needing the whole repo (binding a bare name to a symbol in
 another file) is the orchestrator's later pass; a processor emits an unresolved target and lets it
 dangle deliberately.
+
+**Uses:** takes a raw capture handed to it by [reflector](reflector.md)'s match loop and a provider's
+optional `resolveImport`/`isBoundaryModule` hooks from a [language](languages.md) provider; produces a
+spectrum relationship with `metadata.original` set to the pre-lowercase spelling.
 
 **Deferred / not built:** nothing outstanding here.
 
@@ -64,3 +70,37 @@ A bare identifier passed as an argument (`addEventListener('load', initUI)`) is 
 and the call processor only records the callee. Those candidates are collected during the match loop
 and emitted afterwards, gated on "imported here or defined in this file" — without the gate, every
 local variable would flood the graph with danglers.
+
+## Features
+- none — five processors, no user-facing capability of their own
+
+## Glossary
+- **processor** — the file-local unit that turns one raw capture into one spectrum relationship;
+  never resolves across files.
+- **metadata.original** — the pre-lowercase spelling every name-bearing relationship must carry,
+  because node IDs are lowercased downstream and a variable `nodeId` and a type `NodeId` would
+  otherwise collapse onto the same key.
+
+## Traps
+- **A workspace package looks like a dependency unless checked for a `package.json` inside the
+  analyzed tree.** A bare scoped specifier resolving to `packages/x` inside the repo was classified
+  as external, producing a synthetic node for every cross-package reference. Check the workspace map
+  BEFORE asking whether a specifier is external — a workspace package is also declared as a
+  dependency by its consumers, so both tests otherwise answer yes.
+- **An exact-match list of external prefixes cannot classify real module specifiers.** A
+  hand-maintained list like `['npm','pip','gem',…]` matched almost nothing against real specifiers
+  (`@jest/globals::jest.fn`, `node:fs::readdirsync` carry the package in the namespace, not a
+  prefix from the list). The property that actually separates a local id from an external one is
+  whether the namespace LOOKS LIKE A PATH — reach for that invariant, not an enumeration that goes
+  stale as soon as a new ecosystem shows up.
+- **A call processor capturing expression fragments as call targets feeds virtual induction its own
+  evidence.** `call.ts` records a call target text even for a chained expression or a regex literal —
+  `dumpdb().catch`, `path.join(x, y).toLowerCase`, `/\/architecture\//.test`
+  (<span class="anchor">src/lib/core/parsing/processors/call.ts:28</span>). Downstream,
+  `induceVirtualLibraries` mints a node for any edge target the graph does not contain, so it minted
+  one for every such fragment — and then most of those edges "resolved", each to the very node
+  induction had just created for that same fragment. A dangling-edge count could never have shown
+  this, because the junk resolved; the metric read healthy exactly where the system was manufacturing
+  its own evidence. When a downstream component's job is to create the thing that makes a check pass,
+  that check cannot also be the measure of success — count what a processor was actually given as a
+  call target, not the gaps a later stage closed for it.

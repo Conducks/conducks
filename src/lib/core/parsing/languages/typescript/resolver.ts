@@ -21,7 +21,7 @@ export class TypeScriptResolver {
    * A TypeScript specifier to a real file: tsconfig paths, then relative, then index resolution.
    *
    * Case-insensitively, deliberately — on APFS a path differing only by case is the SAME file, and
-   * treating it as another one splits a node in two (CONDUCKS-4).
+   * treating it as another one splits a node in two (see docs/visuals/modules/contracts.md).
    */
   public resolve(rawImportPath: string, currentFile: string, allFiles: string[]): string | undefined {
     // 0. Strip Quotes (Tree-sitter 'string' node includes them)

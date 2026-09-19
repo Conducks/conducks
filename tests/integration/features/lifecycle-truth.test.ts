@@ -41,7 +41,9 @@ describe('docs and lifecycle surfaces', () => {
 
   it('bootstrap-docs creates the create-now set, and docs-lint then passes for a real reason', () => {
     runCli(['bootstrap-docs', 'life'], { cwd: repo });
-    for (const f of ['docs/features.md', 'docs/architecture.md', 'docs/handover.md']) {
+    // features.md and architecture.md are dissolved (ADR 0193) — the create-now set at root is
+    // handover.md plus the first todo.
+    for (const f of ['docs/handover.md', path.join('docs', 'todos', 'todo01.md')]) {
       expect(existsSync(path.join(repo, f))).toBe(true);
     }
     const out = plain(runCli(['docs-lint'], { cwd: repo, allowFail: true }).combined);

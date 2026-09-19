@@ -1,24 +1,52 @@
-# Handover — 2026-08-29
+# Handover — 2026-09-19
 Status: current
 
 ## Where it stands
-Gates green: **2,469 tests / 319 suites**, build clean, `docs-lint` 234 docs, `visuals-lint` 235
-anchors across 82 pages, drift clean. `npm run gate` = build + suite + 3 benchmarks + 36 oracle runs
-over four subjects.
+Gates green: **2,521 tests / 326 suites**, build clean, `docs-lint` 239 docs, `visuals-lint` 296
+anchors across 81 pages, drift clean. `docs-lint` is the SINGLE docs gate — it runs the note grammar
+and invokes `visuals-lint` itself.
 
-todo77 (ADR 0160) has closed four phases. `prune`, `trace` and `context` are proved at L1/L2/L3 with a
-benchmark and an oracle each; `analyze` is scored on all five of its claims, including 0 misplaced of
-40,126 `CALLS` edges. Seven prune defects fixed (ADR 0161–0167). Full record: `list.md` at the repo
-parent, and `docs/todos/todo77.md`.
+**todo79 closed.** `architecture.md`, `features.md`, `conventions.md` and `memory.md` are deleted
+(ADR 0193, 0194, 0195) — 3,366 lines dissolved into the module notes, with a coverage audit proving
+every fact had a home before anything was removed. A module note is now grammar-linted, which turned
+1,864 lines of unchecked prose into ~300 anchored claims. The `CONDUCKS-N` ids are retired; ADR 0195
+carries the translation table and `tests/architecture/retired-convention-ids.test.ts` holds the line.
 
-Today also: the canvas gained **Band 5**, which draws the proving apparatus itself; four module-note
-sentences were false while every anchor in them resolved, and are corrected; and both skills were
-updated from this repo after an audit found they named 7 shared visuals files where 9 ship.
+**The skills were rewritten to their own §9.** `conducks-docs` split into a 167-line router plus six
+references (`grammar`, `notes`, `decisions`, `todos`, `trees`, `visuals-policy`) — writing a todo now
+loads ~431 lines instead of 1,172. Across all 19 skill files, ADR citations went 58 → 2 and no
+reader-facing prohibition remains: a rule states what to do and names its cost in the same sentence,
+because an internal record number is unopenable in the project a skill ships to.
+
+**`docs/` holds only what the standard defines** plus the soft folders and `legacy/`. `deep_clean.md`
+was a finished research log and is deleted; the two facts it still owned went to
+`core/parsing/reflector.md` and `core/git.md`. `AGENT_RULES.md` moved to `.claude/`, rewritten with
+its stale numbers re-measured.
+
+**ADR 0196** — `impact` and `trace` now share one `EDGE_DISTANCE` table. The visible symptom was a 5x
+magnitude gap; the actual defect was `ALIASES` missing from `trace`'s table, so a barrel re-export
+cost the same as a direct call.
 
 ## Next, in order
-1. **todo77 Phase 4 — `entry`, then `flows`.** Both at `base(2)`/`base(3)`: sampled, never scored.
-2. **Nine grammars have no subject.** Concrete since today: 9 of prune's 10 orphans here are every Rust
-   `#[test]` in `plugins/checklist/` (`problems.html` p4). Fix the capture only once Rust has a subject.
-3. **todo16 — npm publish.** Owner's to run: irreversible, spends the package name.
-4. The 42 wildcard re-export misses on the sofie exports oracle are declined — the fix was measured and
-   made it worse (ADR 0187). Do not re-open without new evidence.
+1. **`conducks features` reports 31/31 notes with no `## Features` body.** The section exists
+   everywhere and is almost always `none`. That count is honest and it is the largest remaining gap in
+   the corpus — the feature tree is not yet worth reading.
+2. **todo77 has four open decisions**, not work: whether the layer contract is per-project, whether
+   `doctor` exits non-zero on a failed check, reconciling `drift` STABLE against `diff`'s 13,103
+   changes, and what `doctor` and `list` each count as a vault.
+3. **`todo78` is `Status: done` with 0 open tasks but still sits in `todos/`.** Promote anything it
+   still owns, then move it to `completed/`. The board warns about it every run.
+4. **`brand/` is not named in the standard's soft list** (`product/ business/ design/`). One word, or
+   it keeps reading as an orphan at `docs/` root.
+5. **todo16 — npm publish.** Owner's to run: irreversible, spends the package name.
+
+## What the checks did NOT cover
+Three glossary collisions remain and are correct: `anchor`, `Pulse` and `Wave` are each two unrelated
+things sharing a word, qualified in place so a reader hitting either is warned. `conducks glossary`
+will report them forever, which is the honest state rather than an exemption.
+
+The completeness bar ADR 0193 states — from the notes alone a reader can describe the system without
+opening the code — is UNSCORED by decision. Nothing checks it; ADR 0194 says why.
+
+Nothing in this session is committed. The working tree also carries unrelated in-flight work (the
+mirror refactor, benchmark scripts) that predates it.

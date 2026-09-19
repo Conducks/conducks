@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { inferType, parseBody, shape, lint, readStatus, readRelations } from '@/lib/domain/docs/docs-grammar.js';
+import { inferType, parseBody, shape, lint, readStatus, readRelations, GOVERNED } from '@/lib/domain/docs/docs-grammar.js';
 import { crossCheckDecisions } from '@/lib/domain/docs/docs-board.js';
 
 // Gate 2 (conducks-docs): the parser must classify EVERY file/folder the standard defines —
@@ -37,10 +37,22 @@ describe('docs-grammar — full-format classification', () => {
   it('still classifies the governed types', () => {
     expect(inferType('docs/todos/todo01.md')).toBe('todo');
     expect(inferType('docs/decisions/0001-x.md')).toBe('decision');
-    expect(inferType('docs/features.md')).toBe('features');
-    expect(inferType('docs/memory.md')).toBe('memory');
-    expect(inferType('docs/conventions.md')).toBe('conventions');
     expect(inferType('docs/handover.md')).toBe('handover');
+    expect(inferType('docs/visuals/modules/core/graph.md')).toBe('note');
+  });
+
+  // ADR 0193 dissolves features.md, memory.md and conventions.md — a repo that still carries one
+  // now reads it as plain, ungoverned prose, never as a type of its own.
+  it('reads a dissolved file as prose, not as its old type', () => {
+    expect(inferType('docs/features.md')).toBe('prose');
+    expect(inferType('docs/memory.md')).toBe('prose');
+    expect(inferType('docs/conventions.md')).toBe('prose');
+  });
+
+  // ADR 0194: the linted set is four types, not six. A type re-added to GOVERNED without updating
+  // this test is still caught, because the list itself — not just an example path — is checked.
+  it('governs exactly todo, decision, handover and note', () => {
+    expect(GOVERNED.slice().sort()).toEqual(['decision', 'handover', 'note', 'todo']);
   });
 
   it('lints handover for a missing Status and shapes it when present', () => {
@@ -318,5 +330,57 @@ describe('module notes classify as architecture', () => {
 
   it('classifies the graph file itself', () => {
     expect(inferType('app/docs/architecture.md')).toBe('architecture');
+  });
+});
+
+// The module-note grammar (ADR 0194, conducks-docs §5.4.1): four bold fields, two sections that
+// must be present even if empty, and a `Status:` line legal only as a `deprecated` tombstone.
+describe('docs-grammar — module-note grammar (ADR 0194)', () => {
+  const NOTE = (body: string) =>
+    `# graph — parses source into nodes and edges\n${body}\n## Features\n- [linkers](./linkers.md) — one line\n\n## Glossary\n- Node — a parsed unit\n`;
+
+  const FIELDS =
+    '**Layer:** core\n**Responsibility:** parses files into the graph\n' +
+    '**Boundaries:** takes raw source, hands back typed nodes\n**Uses:** the parser registry below\n';
+
+  const lintNote = (src: string) => lint('note', parseBody(src), src);
+
+  it('passes a well-formed note', () => {
+    expect(lintNote(NOTE(FIELDS))).toEqual([]);
+  });
+
+  for (const field of ['Layer', 'Responsibility', 'Boundaries', 'Uses']) {
+    it(`fails when \`**${field}:**\` is dropped`, () => {
+      const withoutField = FIELDS.split('\n').filter(l => !l.startsWith(`**${field}:**`)).join('\n');
+      const errs = lintNote(NOTE(withoutField));
+      expect(errs.some(e => e.includes(`**${field}:**`))).toBe(true);
+    });
+  }
+
+  it('fails when `## Features` is missing', () => {
+    const src = `# graph — one line\n${FIELDS}\n## Glossary\n- Node — a parsed unit\n`;
+    expect(lintNote(src).some(e => e.includes('## Features'))).toBe(true);
+  });
+
+  it('fails when `## Glossary` is missing', () => {
+    const src = `# graph — one line\n${FIELDS}\n## Features\n- none\n`;
+    expect(lintNote(src).some(e => e.includes('## Glossary'))).toBe(true);
+  });
+
+  it('fails a misspelled field — `**Layers:**` does not satisfy `**Layer:**`', () => {
+    const misspelled = FIELDS.replace('**Layer:**', '**Layers:**');
+    const errs = lintNote(NOTE(misspelled));
+    expect(errs.some(e => e.includes('**Layer:**'))).toBe(true);
+  });
+
+  it('fails a `Status:` outside the `deprecated` vocabulary', () => {
+    const src = `# graph — one line\nStatus: retired\n\n${FIELDS}\n## Features\n- none\n\n## Glossary\n- none\n`;
+    const errs = lintNote(src);
+    expect(errs.some(e => /Status/.test(e))).toBe(true);
+  });
+
+  it('passes a correctly tombstoned note', () => {
+    const src = `# graph — one line\nStatus: deprecated\n\n${FIELDS}\n## Features\n- none\n\n## Glossary\n- none\n`;
+    expect(lintNote(src)).toEqual([]);
   });
 });

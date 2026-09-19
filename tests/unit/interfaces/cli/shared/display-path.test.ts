@@ -7,7 +7,7 @@ import { displayPath } from '@/interfaces/cli/shared/display-path.js';
 /**
  * A printed path has to be one the reader can open, and it was not.
  *
- * Node ids are lowercased on write (CONDUCKS-4, for APFS), and every command printing one printed
+ * Node ids are lowercased on write (see docs/visuals/modules/contracts.md, for APFS), and every command printing one printed
  * the lowercased spelling with it — `renderer/src/plugins/core/approval/approvalinfoview.tsx`, which
  * opens nothing and matches nothing in an editor. The ids are untouched; only the display is.
  *

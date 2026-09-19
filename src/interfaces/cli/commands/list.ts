@@ -2,6 +2,7 @@ import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs";
+import { VAULT_DIR, VAULT_DB_FILENAME } from "@/contracts/index.js";
 
 /**
  * Conducks — List Command
@@ -37,7 +38,7 @@ export class ListCommand implements ConducksCommand {
 
     /** A link is live when the target still holds an analyzed synapse — the same test `link` applies. */
     const check = (p: string) => {
-      const db = path.join(p, '.conducks', 'conducks-synapse.db');
+      const db = path.join(p, VAULT_DIR, VAULT_DB_FILENAME);
       if (!fs.existsSync(p)) return 'missing';
       return fs.existsSync(db) ? 'ok' : 'not-analyzed';
     };

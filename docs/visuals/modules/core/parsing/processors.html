@@ -8,8 +8,10 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>core/parsing/processors — capture → relationship</h1>
 <p><b>Part of:</b> <a href="../parsing.html">core/parsing</a>. Five small units: <code>parsing/processors/import.ts</code>, <code>parsing/processors/call.ts</code>, <code>parsing/processors/heritage.ts</code>, <code>parsing/processors/binding.ts</code>, <code>parsing/processors/flow.ts</code>.</p>
+<p><b>Layer:</b> core.</p>
 <p><b>Responsibility:</b> turning a raw capture into a spectrum relationship, and resolving what can be resolved with only the current file in hand. <code>import</code> additionally owns module resolution — extension inference, index files, external-package detection.</p>
 <p><b>Boundaries:</b> file-local only. Anything needing the whole repo (binding a bare name to a symbol in another file) is the orchestrator's later pass; a processor emits an unresolved target and lets it dangle deliberately.</p>
+<p><b>Uses:</b> takes a raw capture handed to it by <a href="reflector.html">reflector</a>'s match loop and a provider's optional <code>resolveImport</code>/<code>isBoundaryModule</code> hooks from a <a href="languages.html">language</a> provider; produces a spectrum relationship with <code>metadata.original</code> set to the pre-lowercase spelling.</p>
 <p><b>Deferred / not built:</b> nothing outstanding here.</p>
 <p><code>heritage</code> used to be described as "written and correct but never runs" — its patterns were standalone, so no node existed for the handler's gate and the graph carried zero EXTENDS/IMPLEMENTS edges. <b>That was fixed, and the sentence outlived it.</b> Every heritage pattern co-captures a definition node now, and <code>tools/benchmark/oracle-packs.mjs</code> fails the build if any of the ten packs claiming a heritage capture stops producing an edge for a two-line fixture — three packs (ruby, rust, php) were caught emitting none by exactly that check on 2026-08-17, with every other gate green.</p>
 <h2>Preserve the original spelling or you break type/value classification</h2>
@@ -30,5 +32,31 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>Same family is not enough on its own: the fallback also binds within a family, so a repo owning its own typing.py captured every <code>from typing import ...</code> in it (316 dangling edges, measured). A provider can now REFUSE a specifier outright — <code>isBoundaryModule</code> (ADR 0143), Python's standard library — and a refusal skips the fallback while still falling through to induction. Refusing by returning <code>undefined</code> from <code>resolveImport</code> does NOT work and is the bug that ADR names: it is the same token the processor reads as "I don't know".</p>
 <h2>Reference-as-value is deliberately narrow</h2>
 <p>A bare identifier passed as an argument (<code>addEventListener('load', initUI)</code>) is a *use*, not a call, and the call processor only records the callee. Those candidates are collected during the match loop and emitted afterwards, gated on "imported here or defined in this file" — without the gate, every local variable would flood the graph with danglers.</p>
+<h2>Features</h2>
+<ul>
+<li>none — five processors, no user-facing capability of their own</li>
+</ul>
+<h2>Glossary</h2>
+<ul>
+<li><b>processor</b> — the file-local unit that turns one raw capture into one spectrum relationship;</li>
+</ul>
+<p>  never resolves across files.</p>
+<ul>
+<li><b>metadata.original</b> — the pre-lowercase spelling every name-bearing relationship must carry,</li>
+</ul>
+<p>  because node IDs are lowercased downstream and a variable <code>nodeId</code> and a type <code>NodeId</code> would   otherwise collapse onto the same key.</p>
+<h2>Traps</h2>
+<ul>
+<li>**A workspace package looks like a dependency unless checked for a <code>package.json</code> inside the</li>
+</ul>
+<p>  analyzed tree.** A bare scoped specifier resolving to <code>packages/x</code> inside the repo was classified   as external, producing a synthetic node for every cross-package reference. Check the workspace map   BEFORE asking whether a specifier is external — a workspace package is also declared as a   dependency by its consumers, so both tests otherwise answer yes.</p>
+<ul>
+<li><b>An exact-match list of external prefixes cannot classify real module specifiers.</b> A</li>
+</ul>
+<p>  hand-maintained list like <code>['npm','pip','gem',…]</code> matched almost nothing against real specifiers   (<code>@jest/globals::jest.fn</code>, <code>node:fs::readdirsync</code> carry the package in the namespace, not a   prefix from the list). The property that actually separates a local id from an external one is   whether the namespace LOOKS LIKE A PATH — reach for that invariant, not an enumeration that goes   stale as soon as a new ecosystem shows up.</p>
+<ul>
+<li>**A call processor capturing expression fragments as call targets feeds virtual induction its own</li>
+</ul>
+<p>  evidence.** <code>call.ts</code> records a call target text even for a chained expression or a regex literal —   <code>dumpdb().catch</code>, <code>path.join(x, y).toLowerCase</code>, <code>/\/architecture\//.test</code>   (&lt;span class="anchor"&gt;src/lib/core/parsing/processors/call.ts:28&lt;/span&gt;). Downstream,   <code>induceVirtualLibraries</code> mints a node for any edge target the graph does not contain, so it minted   one for every such fragment — and then most of those edges "resolved", each to the very node   induction had just created for that same fragment. A dangling-edge count could never have shown   this, because the junk resolved; the metric read healthy exactly where the system was manufacturing   its own evidence. When a downstream component's job is to create the thing that makes a check pass,   that check cannot also be the measure of success — count what a processor was actually given as a   call target, not the gaps a later stage closed for it.</p>
 <footer>Source: <code>docs/visuals/modules/core/parsing/processors.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

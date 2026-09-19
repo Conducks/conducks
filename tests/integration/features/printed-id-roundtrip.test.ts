@@ -4,7 +4,7 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 /**
  * AN ID A COMMAND PRINTS MUST BE AN ID ITS SIBLINGS ACCEPT.
  *
- * `status` prints ids lowercased (they are lowercased on write, CONDUCKS-4) and prints member ids in
+ * `status` prints ids lowercased (they are lowercased on write, see docs/visuals/modules/contracts.md) and prints member ids in
  * dotted form. Both shapes were unresolvable:
  *
  *   - `src/core/service/hands.py::hands` — the class is `Hands`, and resolution fell through to a

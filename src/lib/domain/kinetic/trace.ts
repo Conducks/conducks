@@ -61,6 +61,34 @@ export class PriorityQueue<T extends { weight: number }> {
  * Provides shared traversal utilities for any component that needs to
  * query the Conducks knowledge graph.
  */
+/**
+ * How far apart two symbols are, per edge type — the distance every weighted traversal in this
+ * feature walks. LOWER means a TIGHTER relationship, so Dijkstra reaches tightly-coupled symbols
+ * first.
+ *
+ * One table, because `impact` and `trace` ask the same question of the graph and a second copy is a
+ * second answer that drifts. They used to hold separate tables: `trace.findPath` was missing
+ * `ALIASES` and `CONSTRUCTS` entirely, and `dijkstra` defaults an unlisted type to 1.0 — so a path
+ * through a barrel re-export cost exactly as much as a direct call, silently contradicting the rule
+ * below.
+ *
+ * A re-export is a pass-through, not a hop worth penalising: `export { x } from './y'` means every
+ * consumer of the barrel is a consumer of `y::x`. ALIASES is therefore weighted BELOW a call, so a
+ * caller reached through a barrel still ranks with the callers reached directly — without it the
+ * edge exists and the traversal ignores it, and "who uses this" answers with only the consumers who
+ * happened to import from the origin file (ADR 0109).
+ */
+export const EDGE_DISTANCE: Readonly<Record<string, number>> = {
+  EXTENDS: 0.5,      // critical — a subclass moves when its base does
+  ALIASES: 0.5,      // a re-export is a pass-through; see above
+  IMPLEMENTS: 0.7,   // high
+  CALLS: 1.0,        // the standard hop every other weight is read against
+  CONSTRUCTS: 1.2,   // instantiation
+  MEMBER_OF: 1.5,    // membership
+  IMPORTS: 2.0,      // low / indirect
+  DEPENDS_ON: 2.5,   // minimal
+};
+
 export abstract class BaseAnalyzer {
 
   /**
@@ -229,14 +257,7 @@ export class TraceAnalyzer extends BaseAnalyzer {
   public findPath(startId: NodeId, targetId: NodeId): NodeId[] {
     const g = this.graph || (null as any);
     if (!g) return [];
-    const weights: Record<string, number> = {
-      'EXTENDS': 0.1,      // Extremely strong coupling
-      'IMPLEMENTS': 0.2,   // Strong coupling
-      'CALLS': 1.0,        // Standard coupling
-      'MEMBER_OF': 1.2,
-      'IMPORTS': 1.5,      // Loose coupling
-      'DEPENDS_ON': 2.0    // Very loose coupling
-    };
+    const weights = EDGE_DISTANCE;
 
     const findings = this.dijkstra(g, startId, 'downstream', weights, 50);
     const target = targetId.toLowerCase();

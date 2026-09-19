@@ -3,7 +3,7 @@ import fs from "node:fs";
 /**
  * Conducks — the on-disk spelling of a stored path. ONE rule, both surfaces. 🏺
  *
- * Node ids and the `file` column are lowercased on write (CONDUCKS-4, for APFS), so every path this
+ * Node ids and the `file` column are lowercased on write (see docs/visuals/modules/contracts.md, for APFS), so every path this
  * tool reports is a correct KEY and a broken PATH: `renderer/src/lib/useworkgraph.ts` for a file
  * called `useWorkGraph.ts`. It opens on a case-insensitive filesystem by luck and on Linux CI not at
  * all.

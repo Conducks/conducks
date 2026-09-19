@@ -12,9 +12,57 @@ violations, no severity — [governance](governance.md) owns judgement. The spli
 the same cycle data serves an audit, an advisor and a guard with three different opinions applied on
 top.
 
+**Uses:** [core/parsing](../core/parsing.md)'s reflector for one file's spectrum, [core/graph](../core/graph.md)
+for the in-memory adjacency list the pulse builds into, and [core/persistence](../core/persistence.md)
+to write nodes, edges and kinetic columns atomically per pulse. Everything downstream —
+[governance](governance.md), [evolution](evolution.md), [coverage](coverage.md), [docs](docs.md) — reads
+the graph this module produces and never re-derives it.
+
 **Deferred / not built:** a query planner. `query-service` answers a fixed set of questions with
 hand-written SQL and graph walks; there is no general query language.
 Adequate while the question set is known.
+
+## Features
+
+- **Full structural pulse** (`conducks analyze`) — the orchestrator's multi-pass discovery, induction
+  and resolution wave, described in [orchestrator](analysis/orchestrator.md).
+- **Incremental re-analysis** — `project-monitor`, `change-set`, `module-hash` and `micro-pulse` decide
+  which files actually need re-parsing on a repeat run; see the orchestrator note for what this hides
+  when it goes wrong.
+- **Structural queries** (`conducks query`) — `query-service` answers a fixed set of questions
+  (symbol lookup, listing, entry-point detection) with hand-written SQL and graph walks, not a general
+  query language.
+- **Live watch feed** — `gateway-service` is the vault-watch stream behind the Mirror dashboard,
+  constructed by the `mirror` CLI command and consumed by the web server.
+
+A finding is scored by what was found WRONG, not by how many findings a pass produced — a headline
+count without that check rewards a louder tool over a more correct one. Applied concretely in
+[evolution](evolution.md)'s prune precision, which is audited both directions rather than by volume.
+
+## Glossary
+
+- **Pulse** — one full or incremental run of `analyze`: skeleton build, discovery, induction, link,
+  resolution, in one atomic transaction.
+- **Reflection** — turning one file's parse tree into a spectrum of unresolved nodes and edges (owned
+  by the reflector, not this module).
+- **Induction** — materialising a node for a reference that pointed outside the files seen so far.
+
+## Traps
+
+**`query`'s template library advertised entries it then refused, and a missing identifier answered
+zero rows instead of refusing.** `mode:"template"` with no name lists the Oracle library in full; it
+used to include `type_coupling` while a separately hand-typed allowlist beside it omitted that same
+entry, so calling it answered `UNKNOWN_TEMPLATE` with a suggestion to "list available templates" — the
+list that had just advertised it (todo53#P1). Fixed: the allowlist is now ASKED of the library
+(`listTemplates()`, `src/lib/domain/analysis/query-service.ts:559`) rather than retyped, so it cannot
+go stale in either direction. Separately, `execute()` used to resolve a missing template param to
+`PARAM_DEFAULTS[p] ?? ''`, so an identifier param like `symbolId` with no value ran `WHERE
+e.targetId = ''`, matched nothing, and reported `nodeCount: 0` — "nothing breaks" for a question that
+named no symbol (todo54#P1, ADR 0145). `REQUIRED_PARAMS` (`query-service.ts:47`) now lists every
+identifier param that has no meaningful empty value and refuses rather than silently answering zero
+rows; params whose SQL treats an empty string as "any" (`edgeType`, `canonicalKind`, `namespaceId`,
+`query` itself, for unscoped fuzzy search) are deliberately excluded — the distinction is read out of
+each template's SQL, never inferred from the defaults table.
 
 ## Parts
 

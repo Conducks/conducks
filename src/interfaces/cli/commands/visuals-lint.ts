@@ -111,6 +111,28 @@ export class VisualsLintCommand implements ConducksCommand {
     } else if (review.stamped > 0) {
       console.log(chalk.green(`  ✓ review stamps clean — ${review.stamped} reviewed claim(s) cite unchanged code.\n`));
     }
+
+    // The third number the standard asks for (conducks-visuals, anchoring §5). A stale flag needs a
+    // stamp to exist at all, so a page nobody ever stamped raises nothing and reads exactly like a
+    // page reviewed yesterday. Printing "N stale" without "M never checked" makes the first number
+    // a lie of omission.
+    if (review.unstamped.length > 0) {
+      console.log(chalk.yellow(`  ⚠ ${review.unstamped.length} page(s) have NEVER been stamped — nobody has checked them:`));
+      for (const p of review.unstamped) console.log(chalk.yellow(`      - ${p}`));
+      console.log(chalk.dim(`      Read each page against the code, then \`conducks visuals-lint --stamp <page>\`.`));
+      console.log(chalk.dim(`      A page that genuinely cannot be stamped: conducks.json → visuals.unstamped, with a reason.\n`));
+    }
+    // An exemption is a claim too, so it is checked like one. ERROR, not warn: a reasonless row
+    // silences a page permanently, which is the one way to turn this gate off from the outside.
+    if (review.exemptErrors.length > 0) {
+      console.log(chalk.red(`  ✗ ${review.exemptErrors.length} bad visuals.unstamped exemption(s) in conducks.json:`));
+      for (const e of review.exemptErrors) {
+        console.log(chalk.red(`      - ${e.page}`));
+        console.log(chalk.dim(`        ${e.reason}`));
+      }
+      console.log("");
+      process.exitCode = 1;
+    }
     // A stamp whose claim vanished from the page is SEEN vanishing (ADR 0142) — silence here would
     // make editing the note the way around the gate.
     if (review.orphans.length > 0) {

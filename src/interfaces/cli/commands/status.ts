@@ -204,7 +204,7 @@ export class StatusCommand implements ConducksCommand {
       // RELATIVE, like `impact` and `context` (ADR 0132): the absolute prefix was ~90 identical
       // characters on every row, which is the part a reader has to skip to reach the answer.
       const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
-      // The id is lowercased (CONDUCKS-4), so slicing the root off gives a path that opens nothing.
+      // The id is lowercased (see docs/visuals/modules/contracts.md), so slicing the root off gives a path that opens nothing.
       // `displayPath` recovers the on-disk spelling; the id itself is untouched.
       // Was a local reimplementation of `displayId` that repaired the PATH and left the SYMBOL
       // lowercased (`::registeripchandlers`). `displayId` now repairs both, given a way to read the

@@ -10,7 +10,8 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Layer:</b> core. Two files: <code>core/git/chronicle-interface.ts</code> and its door. Imports <code>contracts</code> and <code>core/utils</code>, nothing else — a true leaf, which is why it was the first feature cleaned.</p>
 <p><b>Read at <code>7c11bc4</code>.</b></p>
 <p><b>Responsibility:</b> every question that needs <code>git</code> to answer it. Which files exist, which branch is checked out, who touched a file and when, what a ref resolves to.</p>
-<p><b>Boundaries:</b> it runs git and returns what git said. It does not decide what a file MEANS — a <code>.py</code> and a <code>.md</code> come back the same way — and it never writes to a repository it is reading, which is why <code>core.quotePath=false</code> is passed per-invocation rather than set in the repo's config.</p>
+<p><b>Boundaries:</b> it runs git and returns what git said. It does not decide what a file MEANS — a <code>.py</code> and a <code>.md</code> come back the same way — and it never writes to a repository it is reading, which is why <code>core.quotePath=false</code> is passed per-invocation rather than set in the repo's config. Every subprocess is spawned with <code>execFileSync</code> and an argument array, never a shell string — a path or ref that reaches the shell as a concatenated string is a command-injection surface, and an argument array is not. Discovery goes git-direct through this interface rather than through any other file-enumeration path, because git already tracks what a plain directory walk cannot (deleted, renamed, submodule-nested files).</p>
+<p><b>Uses:</b> imports <a href="../contracts.html">contracts</a> and <a href="utils.html">core/utils</a>, nothing else — the leaf status stated above.</p>
 <h2>Discovery asks EVERY repository under the anchor, not just the anchor's own</h2>
 <p><code>ls-files</code> in the root of a repository does not descend into a nested checkout — it names the directory and stops. So a vendored dependency, a submodule or a test fixture with its own <code>.git</code> is invisible to it.</p>
 <p>Measured on this repository while cleaning the monitor: a private <code>ls-files</code> copy saw 575 source files and <code>discoverFiles</code> saw 578. The three were every file under a nested fixture checkout, and <code>status</code> had been reporting a smaller tree than <code>analyze</code> ingested with no test aware of it (ADR 0069).</p>
@@ -20,5 +21,29 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>The door hands it out as <code>ReadOnlyChronicle</code>, the class minus that one mutator. Moving the anchor is <code>anchorChronicle(root)</code>, used at three sites that all anchor at boot or at a resolved CLI target.</p>
 <p><b>What that does NOT claim:</b> the instance is still shared and the method still exists at runtime. A cast still reaches it. What is gone is the ACCIDENTAL case — a mutator reachable on every handed-out reference — which is the one that actually happened. The test says so out loud rather than implying a guarantee the type cannot make.</p>
 <p>Anything needing a DIFFERENT root constructs its own <code>ChronicleInterface</code>. That is what let <code>project-monitor</code> stop re-implementing two git operations: the duplication existed because the door exported a singleton, not because the class could not answer per root.</p>
+<h2>Three call sites still inline <code>toRepoRelative</code>, and collapsing them changes behaviour</h2>
+<p><code>readSingleFile</code>, <code>getAuthorDistribution</code> and <code>getBlameData</code> each do by hand what <code>toRepoRelative</code> (&lt;span class="anchor"&gt;src/lib/core/git/chronicle-interface.ts:532&lt;/span&gt;) already does. The comment that once sat above it claimed the duplication had been removed; it had not, and a comment is held to the same bar as any other doc.</p>
+<p>It stays deferred on purpose rather than tidied: collapsing the three onto the helper changes behaviour on the case-insensitive path, and behaviour does not change during a clean — a fix is its own commit with its own measurement. Whoever takes it needs a case-collision fixture first.</p>
+<h2>Features</h2>
+<ul>
+<li>none — one interface, no user-facing sub-capability of its own</li>
+</ul>
+<h2>Glossary</h2>
+<ul>
+<li><b>anchorChronicle(root)</b> — the named operation that points the shared chronicle instance at a</li>
+</ul>
+<p>  directory. Used at three sites, all at boot or a resolved CLI target — never a bare <code>setProjectDir</code>   reachable on every handed-out reference.</p>
+<ul>
+<li><b>ReadOnlyChronicle</b> — the type the door hands out: the chronicle class minus its one mutator.</li>
+</ul>
+<h2>Traps</h2>
+<ul>
+<li><b>Reading a git ref is cheap; reading it per file is not.</b> <code>git archive &lt;ref&gt;</code> reads a whole</li>
+</ul>
+<p>  551-file, 4.4 MB repo in ~53 ms; <code>git show &lt;ref&gt;:&lt;path&gt;</code> per file measured at ~5,655 ms for the   same set — 107x slower, because each call is its own process spawn. Any design that reaches for   per-file <code>git show</code> in a loop is paying roughly 100x for nothing that a single whole-ref read would   answer.</p>
+<ul>
+<li><b>git QUOTES a path containing a non-ASCII byte, and the quoted string opens nothing.</b></li>
+</ul>
+<p>  <code>core.quotePath</code> defaults to true, so <code>git ls-files</code> returns a non-ASCII filename as a literal   quoted, octal-escaped string. Taken as a path it opens nothing, so the file drops from the graph   with only "skipped 1 unreadable file" to show for it — correct on a repo naming files in ASCII,   silently wrong on one naming them in Turkish, French or Chinese. <code>-c core.quotePath=false</code> per   invocation is the fix; never write it into the analyzed repo's own config.</p>
 <footer>Source: <code>docs/visuals/modules/core/git.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

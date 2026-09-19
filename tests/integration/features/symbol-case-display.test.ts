@@ -4,7 +4,7 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 /**
- * Ids are lowercased on write (CONDUCKS-4, because APFS is case-insensitive), and the renderers
+ * Ids are lowercased on write (see docs/visuals/modules/contracts.md, because APFS is case-insensitive), and the renderers
  * printed the raw id — so every symbol a person read came out mangled: `::registeripchandlers`,
  * `::capabilityregistry`, `::domnode`. MEASURED on all three benchmark subjects, so it is not
  * language-specific.

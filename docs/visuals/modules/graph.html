@@ -12,6 +12,7 @@
 <a class="back" href="../architecture.html">&larr; back to the architecture</a>
 <h1>THE GRAPH</h1>
 <p class="sub">core/graph — nodes, edges, and binding names to them</p>
+<div class="det"><h3>Where this feature begins</h3><p class="where">src/lib/core/graph/index.ts — the graph feature's only door (ADR 0150): the adjacency store, the linkers, and ADR 0028's clustering rule</p></div>
 <div class="meta">
   <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
   so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
@@ -21,7 +22,7 @@
 <div class="det" id="add">
   <h3>Every id is lowercased</h3>
   <div class="where">src/lib/core/graph/adjacency-list.ts::addNode</div>
-  <p>treating them as two splits one symbol into two nodes, and every count then reports it twice (CONDUCKS-4)</p>
+  <p>treating them as two splits one symbol into two nodes, and every count then reports it twice (canonical lowercase node ids — see docs/visuals/modules/contracts.md)</p>
   <p class="file">on the canvas: APFS calls two spellings one file</p>
 </div>
 

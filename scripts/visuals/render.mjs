@@ -36,29 +36,123 @@ const CONTAINER = {
   'elk.spacing.nodeNode': '38',
 };
 
+/**
+ * The canvas draws every feature as ONE box and none of its steps (conducks-visuals SKILL.md §2).
+ *
+ * So a container enters ELK as a LEAF, not as a parent, and the blocks it holds never reach the
+ * layout at all — `detail.mjs` already draws them, on the feature's own page, which is the only
+ * place they now live. Nothing in the data file changed to make this true; the renderer simply
+ * stops descending.
+ *
+ * The rule this replaces was "draw each feature's spine, three to seven steps". It was specified
+ * for months and implemented in no project, because "is this step important enough" has no machine
+ * answer and so no gate could hold it. Zero is checkable, and §4's gate checks it.
+ */
+const FEATURE_H = 96;
+
+/** A contract is not a peer of the features and gets no box — it is the strip beneath them. */
+const isContract = c => c.kind === 'contract';
+
+/**
+ * Container-level edges, DERIVED from the block-level ones already in the data.
+ *
+ * Writing a second edge list by hand would be two things to keep in step, and they would not stay
+ * in step — the same argument that keeps positions out of the data file. So every edge the data
+ * declares is mapped to the containers holding its endpoints; an edge inside one container
+ * collapses to a self-pair and is dropped, which is exactly right, because that edge is a step of
+ * one feature and steps are not on this picture.
+ *
+ * An edge touching a contract is dropped too. A contract is read by nearly everything, so drawing
+ * those edges puts the densest region of the picture on its least interesting node.
+ */
+function containerEdges(bands) {
+  const owner = new Map();                     // block id -> container id
+  const kind = new Map();                      // container id -> kind
+  for (const b of bands) for (const c of b.containers) {
+    kind.set(c.id, c.kind ?? 'feature');
+    for (const n of c.nodes) owner.set(n.id, c.id);
+  }
+  const at = id => owner.get(id) ?? (kind.has(id) ? id : undefined);
+  const merged = new Map();
+  // An endpoint that names nothing is a TYPO, and the wrong answer is to drop the edge. Measured
+  // while mutation-testing this file: renaming one endpoint to `addd` removed a real edge from the
+  // picture and the build still printed `ELK OK`. Before this function existed the same typo
+  // crashed the engine — unreadable, but at least loud. Silence is the worse of the two.
+  const unknown = [];
+  const add = ([sBlk, tBlk, lbl, o]) => {
+    const s = at(sBlk), t = at(tBlk);
+    if (!s) unknown.push(sBlk);
+    if (!t) unknown.push(tBlk);
+    if (!s || !t || s === t) return;
+    if (kind.get(s) === 'contract' || kind.get(t) === 'contract') return;
+    const key = `${s}\u0000${t}`;
+    const prev = merged.get(key);
+    if (!prev) { merged.set(key, { s, t, lbls: lbl ? [lbl] : [], prio: o?.prio }); return; }
+    // Several block edges collapsing to one feature edge each said something; keep every distinct
+    // sentence rather than whichever happened to be declared first.
+    if (lbl && !prev.lbls.includes(lbl)) prev.lbls.push(lbl);
+    if (prev.prio === undefined && o?.prio !== undefined) prev.prio = o.prio;
+  };
+  for (const b of bands) {
+    for (const c of b.containers) for (const e of c.edges ?? []) add(e);
+    for (const e of b.crossEdges ?? []) add(e);
+  }
+  for (const e of BAND_LINKS) add(e);
+  if (unknown.length) {
+    console.error('LAYOUT REFUSED:');
+    for (const id of new Set(unknown))
+      console.error(`  - 10 · edge endpoint "${id}" is neither a block nor a container. A typo here would otherwise drop the edge in silence.`);
+    process.exit(1);
+  }
+  if (!merged.size) { console.error('LAYOUT REFUSED:\n  - 10 · the data yielded no edges between features at all'); process.exit(1); }
+  return [...merged.values()].map(e => ({ ...e, lbl: e.lbls.join(' · ') }));
+}
+
 function toElk(bands) {
-  // Each band is a top-level container so the three stack in order; ELK still routes the edges
-  // BETWEEN them, which is what makes this one drawing rather than three pictures in a column.
+  // Each band is a top-level container so they stack in order; ELK still routes the edges BETWEEN
+  // them, which is what makes this one drawing rather than N pictures in a column.
+  const derived = containerEdges(bands);
+  const bandOf = new Map();
+  for (const b of bands) for (const c of b.containers) bandOf.set(c.id, b.id);
+
   const children = bands.map(band => ({
     id: band.id,
     layoutOptions: { ...CONTAINER, 'elk.padding': '[top=86,left=30,bottom=30,right=30]' },
-    children: band.containers.map(c => ({
+    children: band.containers.filter(c => !isContract(c)).map(c => ({
       id: c.id,
-      layoutOptions: CONTAINER,
-      children: c.nodes.map(n => ({
-        id: n.id,
-        width: wide(n.t, (n.s || '').slice(0, 44)),
-        height: n.shape === 'dia' ? 74 : 68,
-      })),
-      // NO `labels` here on purpose. Handing ELK a label box makes it reserve space for one, and
-      // measured on this graph that cost 11% more ink, 38% more width and MORE THAN DOUBLE the
-      // direction reversals (20 vs 9) — the reserved boxes shove nodes apart and force detours.
-      // Labels are placed afterwards by the occlusion resolver, which is better at it anyway.
-      edges: c.edges.map(([s, t, l, o], i) => ({ id: `${c.id}_e${i}`, sources: [s], targets: [t], lbl: l, cls: o?.cls, ...(o?.prio!==undefined?{layoutOptions:{'elk.layered.priority.direction':String(o.prio)}}:{}) })),
+      isCont: true,                            // a leaf that still paints as a container
+      width: Math.max(wide(c.title, (c.sub || '').slice(0, 64)), 300),
+      height: FEATURE_H,
     })),
-    edges: band.crossEdges.map(([s, t, l, o], i) => ({ id: `${band.id}_x${i}`, sources: [s], targets: [t], lbl: l, cls: o?.cls, ...(o?.prio!==undefined?{layoutOptions:{'elk.layered.priority.direction':String(o.prio)}}:{}) })),
+    // NO `labels` here on purpose. Handing ELK a label box makes it reserve space for one, and
+    // measured on this graph that cost 11% more ink, 38% more width and MORE THAN DOUBLE the
+    // direction reversals (20 vs 9) — the reserved boxes shove nodes apart and force detours.
+    // Labels are placed afterwards by the occlusion resolver, which is better at it anyway.
+    edges: derived.filter(e => bandOf.get(e.s) === band.id && bandOf.get(e.t) === band.id)
+      .map((e, i) => ({ id: `${band.id}_x${i}`, sources: [e.s], targets: [e.t], lbl: e.lbl,
+        ...(e.prio !== undefined ? { layoutOptions: { 'elk.layered.priority.direction': String(e.prio) } } : {}) })),
   }));
-  const edges = BAND_LINKS.map(([s, t, l, o], i) => ({ id: `bl${i}`, sources: [s], targets: [t], lbl: l, cls: o?.cls, ...(o?.prio!==undefined?{layoutOptions:{'elk.layered.priority.direction':String(o.prio)}}:{}) }));
+  // 10 · Every edge must name a box that is actually drawn.
+  //
+  // This catches two things with one check. A contract is read by nearly everything, so an edge to
+  // one is a hairball rather than information — and it is filtered out of the boxes, so an edge
+  // reaching it names a node ELK has never heard of. Measured: ELK's answer to that is a 64 KB
+  // stack trace out of `elk-worker.min.js` naming a GWT internal, with nothing in it about the
+  // edge. The same check refuses a plain typo in a container id, which used to surface the same way.
+  const drawn = new Set(children.flatMap(b => b.children.map(c => c.id)));
+  const dangling = derived.filter(e => !drawn.has(e.s) || !drawn.has(e.t));
+  if (dangling.length) {
+    console.error('LAYOUT REFUSED:');
+    for (const e of dangling) {
+      const which = !drawn.has(e.s) ? e.s : e.t;
+      console.error(`  - 10 · edge ${e.s} → ${e.t} names ${which}, which is not a drawn box.`);
+      console.error('        A contract carries no edges (SKILL.md §2); anything else here is a typo.');
+    }
+    process.exit(1);
+  }
+  const edges = derived.filter(e => bandOf.get(e.s) !== bandOf.get(e.t))
+    .map((e, i) => ({ id: `bl${i}`, sources: [e.s], targets: [e.t], lbl: e.lbl,
+      ...(e.prio !== undefined ? { layoutOptions: { 'elk.layered.priority.direction': String(e.prio) } } : {}) }));
   return { id: 'root', layoutOptions: LAYOUT, children, edges };
 }
 
@@ -245,13 +339,13 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 const linkFor = (cid, id, prob) => prob ? `problems.html#p${prob}` : `modules/${PAGE[cid] ?? cid.replace(/^c_/, '')}.html#${id}`;
 
 function paint(bands, laid) {
-  const meta = new Map(), cmeta = new Map(), bmeta = new Map();
+  const meta = new Map(), bmeta = new Map();
   for (const b of bands) {
     bmeta.set(b.id, b);
-    for (const c of b.containers) {
-      cmeta.set(c.id, c);
-      for (const n of c.nodes) meta.set(n.id, { ...n, link: linkFor(c.id, n.id, n.prob) });
-    }
+    // §8 — a feature's link is DERIVED from its id, never typed. `href` in the data is an override,
+    // for the few whose page is not `pageFor(id)`. Without it a repo that wrote no hrefs got detail
+    // pages nothing on the canvas opened: generated, and linked from nowhere.
+    for (const c of b.containers) meta.set(c.id, { ...c, link: c.href ?? `modules/${pageFor(c.id)}` });
   }
   const flat = flatten(laid);
   const o = [];
@@ -259,7 +353,7 @@ function paint(bands, laid) {
   // Blocks are the content: they claim first and never move.
   for (const nd of flat.nodes) space.claim(nd.x, nd.y, nd.width, nd.height, `block ${nd.id}`);
   // A container's heading strip claims its own band so nothing lands on the title.
-  for (const c of flat.conts) space.claim(c.x, c.y, c.width, bmeta.get(c.id) ? 80 : 60, `head ${c.id}`);
+  for (const c of flat.conts) space.claim(c.x, c.y, c.width, 80, `head ${c.id}`);
 
   for (const c of flat.conts) {
     const b = bmeta.get(c.id);
@@ -278,17 +372,6 @@ function paint(bands, laid) {
       o.push(`<text class="band-s" x="${c.x + 74}" y="${c.y + 66}">${esc(b.sub)}</text>`);
       continue;
     }
-    const m = cmeta.get(c.id);
-    // §8 — a container's link is DERIVED from its id, not typed. `href` in the data is an override,
-    // for the few containers whose page is not `pageFor(id)`. Without this a repo that wrote no
-    // hrefs got detail pages that nothing on the canvas opened: generated, linked from nowhere.
-    const chref = m.href ?? `modules/${pageFor(c.id)}`;
-    o.push(`<g class="cont"><a href="${chref}">`);
-    o.push(`<rect class="sec cont-r" x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" rx="12"/>`);
-    o.push(`<text class="cont-t" x="${c.x + 20}" y="${c.y + 32}">${esc(m.title)}</text>`);
-    if (m.sub) o.push(`<text class="cont-s" x="${c.x + 20}" y="${c.y + 52}">${esc(m.sub)}</text>`);
-    o.push(`<text class="cont-go" x="${c.x + c.width - 20}" y="${c.y + 32}">open →</text></a>`);
-    o.push('</g>');
   }
 
   // Every edge is drawn in full. An earlier version replaced the long ones with lettered off-page
@@ -375,21 +458,58 @@ function paint(bands, laid) {
 
   for (const nd of flat.nodes) {
     const m = meta.get(nd.id); if (!m) continue;
-    const rx = m.shape === 'dia' ? 26 : 8;
-    o.push(`<g class="blk" id="blk-${nd.id}">${m.link ? `<a href="${m.link}">` : ''}`);
-    o.push(`<title>${esc(m.hov)}</title>`);
-    o.push(`<rect class="${m.cls || 'n-box'}" x="${nd.x}" y="${nd.y}" width="${nd.width}" height="${nd.height}" rx="${rx}"/>`);
-    o.push(`<text class="b-t" x="${nd.x + 15}" y="${nd.y + 27}">${esc(m.t)}</text>`);
-    if (m.s) o.push(`<text class="b-s" x="${nd.x + 15}" y="${nd.y + 46}">${esc(m.s.slice(0, 44))}</text>`);
-    o.push(`<circle class="hint" cx="${nd.x + nd.width - 15}" cy="${nd.y + 15}" r="6"/>`);
-    o.push(`<text class="hint-t" x="${nd.x + nd.width - 15}" y="${nd.y + 18.5}">i</text>`);
-    // The `i` is the OPEN affordance, and a 6px circle with a 9px glyph is not a click target — at
-    // 40% zoom it is under three real pixels. This transparent disc sits on top and catches the
-    // click for it. Emitted last so it wins the hit test against the rect underneath.
-    o.push(`<circle class="hint-h" cx="${nd.x + nd.width - 15}" cy="${nd.y + 15}" r="14"/>`);
-    o.push(`${m.link ? '</a>' : ''}</g>`);
+    // The drawn unit is the feature. It keeps the block vocabulary — the `blk` group, a `b-t`
+    // title, the `i` marker and its hit disc — because the GESTURES did not change when the
+    // altitude did: click selects and traces, the marker and a double click open. Renaming the
+    // classes would have meant editing `system.js`, which is shared byte-for-byte, to say the same
+    // thing in different words.
+    o.push(`<g class="blk cont" id="blk-${nd.id}"><a href="${m.link}">`);
+    // The main-feature anchor — where the feature BEGINS. A container without one is a boundary
+    // nobody can argue with, which was the state of every canvas built to these rules until now.
+    if (m.anchor) o.push(`<title>${esc(m.anchor)}</title>`);
+    o.push(`<rect class="cont-r" x="${nd.x}" y="${nd.y}" width="${nd.width}" height="${nd.height}" rx="12"/>`);
+    o.push(`<text class="cont-t b-t" x="${nd.x + 20}" y="${nd.y + 38}">${esc(m.title)}</text>`);
+    if (m.sub) o.push(`<text class="cont-s" x="${nd.x + 20}" y="${nd.y + 62}">${esc(m.sub)}</text>`);
+    o.push(`<circle class="hint" cx="${nd.x + nd.width - 17}" cy="${nd.y + 17}" r="6"/>`);
+    o.push(`<text class="hint-t" x="${nd.x + nd.width - 17}" y="${nd.y + 20.5}">i</text>`);
+    // A 6px circle with a 9px glyph is not a click target — at 40% zoom it is under three real
+    // pixels. This transparent disc sits on top and catches the click for it. Emitted last so it
+    // wins the hit test against the rect underneath.
+    o.push(`<circle class="hint-h" cx="${nd.x + nd.width - 17}" cy="${nd.y + 17}" r="16"/>`);
+    o.push(`</a></g>`);
   }
-  return { body: o.join('\n'), flat, space, dropped, rerouted, drawn };
+  // ── the substrate strip ───────────────────────────────────────────────────
+  //
+  // A contract is the shape every feature above is written against — the vault, the seam. Change
+  // one and every feature moves, which is exactly why it is NOT a peer of the boxes: drawn as one
+  // it earns an edge from nearly everything, and the densest region of the picture ends up on its
+  // least interesting node. The strip says the same fact and costs no ink (SKILL.md §2).
+  //
+  // It is laid out here rather than by ELK because it has no edges to route: a row of boxes under
+  // the drawing is arithmetic, and handing it to the engine would let it drift up into the bands.
+  const contracts = bands.flatMap(b => b.containers.filter(isContract));
+  let extraH = 0;
+  if (contracts.length) {
+    const bottom = Math.max(...flat.conts.map(c => c.y + c.height), 0);
+    const y = bottom + 54, W = 300, GAP = 22, H = 92;
+    const left = flat.conts.length ? Math.min(...flat.conts.map(c => c.x)) : 0;
+    o.push(`<text class="sec-t" x="${left}" y="${y - 16}">THE SUBSTRATE — EVERY FEATURE ABOVE IS WRITTEN AGAINST THESE</text>`);
+    contracts.forEach((c, i) => {
+      const x = left + i * (W + GAP);
+      o.push(`<g class="blk cont sub-c" id="blk-${c.id}"><a href="${c.href ?? `modules/${pageFor(c.id)}`}">`);
+      if (c.anchor) o.push(`<title>${esc(c.anchor)}</title>`);
+      o.push(`<rect class="cont-r sub-r" x="${x}" y="${y}" width="${W}" height="${H}" rx="12"/>`);
+      o.push(`<text class="cont-t b-t" x="${x + 20}" y="${y + 36}">${esc(c.title)}</text>`);
+      if (c.sub) o.push(`<text class="cont-s" x="${x + 20}" y="${y + 60}">${esc(c.sub.slice(0, 52))}</text>`);
+      o.push(`<circle class="hint" cx="${x + W - 17}" cy="${y + 17}" r="6"/>`);
+      o.push(`<text class="hint-t" x="${x + W - 17}" y="${y + 20.5}">i</text>`);
+      o.push(`<circle class="hint-h" cx="${x + W - 17}" cy="${y + 17}" r="16"/>`);
+      o.push(`</a></g>`);
+    });
+    extraH = (y + H + 30) - bottom;
+  }
+
+  return { body: o.join('\n'), flat, space, dropped, rerouted, drawn, extraH };
 }
 
 /** The gate survives the move: ELK is trusted to lay out, never trusted blindly. */
@@ -446,7 +566,7 @@ function verify(flat, meta) {
 }
 const graph = toElk(BANDS);
 const laid = await elk.layout(graph);
-const { body, flat, space, dropped, rerouted, drawn } = paint(BANDS, laid);
+const { body, flat, space, dropped, rerouted, drawn, extraH } = paint(BANDS, laid);
 const meta = new Map(); for (const b of BANDS) for (const c of b.containers) for (const n of c.nodes) meta.set(n.id, n);
 // ── THE RULES ────────────────────────────────────────────────────────────────
 // Six of them, checked on the finished drawing, not on intent. Anything that fails means something
@@ -472,6 +592,25 @@ for (const n of flat.nodes)
     bad.push(`5 · block ${n.id} escapes its container`);
 // 6 · nothing was given up on
 for (const d of dropped) bad.push(`6 · nowhere free to put ${d}`);
+// 9 · THE ALTITUDE. The canvas draws every feature as one box and none of its steps (SKILL.md §2).
+//
+// Checked by counting what was DRAWN against what the data says should be drawn, because that is
+// the only form of this check a machine can settle. The rule it replaced — "draw each feature's
+// spine, the three to seven steps that matter" — asks whether a step is important enough, which has
+// no machine answer, so it drifted for months while every other rule in this file held. A renderer
+// that started descending into containers again would put 74 boxes here instead of 13.
+const wantBoxes = BANDS.flatMap(b => b.containers).filter(c => c.kind !== 'contract').length;
+if (flat.nodes.length !== wantBoxes)
+  bad.push(`9 · the canvas drew ${flat.nodes.length} boxes for ${wantBoxes} features — a step of a feature has reached the canvas, and steps belong on the feature's own page`);
+// And refuse on an empty parse: a check whose subject came back empty reports a clean run over
+// nothing, which is the failure mode §4 of references/layout.md exists to name.
+if (!wantBoxes) bad.push('9 · no feature to draw — the data parsed to zero containers');
+// 11 · A feature without a main-feature anchor is a boundary nobody can argue with. Every claim on
+// the page was checkable except the claim about what the page is divided INTO — measured on one
+// canvas as thirty-nine containers, not one of them saying where its feature started.
+for (const c of BANDS.flatMap(b => b.containers))
+  if (!c.anchor) bad.push(`11 · container ${c.id} carries no main-feature anchor — nothing says where this feature begins`);
+
 if (bad.length) { console.error('LAYOUT REFUSED:'); for (const b of new Set(bad)) console.error('  -', b); process.exit(1); }
 // PUBLISH, rather than leaving the SVG in /tmp for a human to paste. The paste was the drift the
 // whole generator exists to stop: the run reported "ELK OK — 207 nodes" while the page on disk still
@@ -481,7 +620,7 @@ if (bad.length) { console.error('LAYOUT REFUSED:'); for (const b of new Set(bad)
 // transform onto it. Emitting the shapes bare into `<svg>` left `getElementById('viewport')` null,
 // so the first pan threw and the canvas was frozen: it rendered, and nothing moved. The gates all
 // passed, because a picture that is correct and unusable is still byte-identical to itself.
-const svg = `<svg id="canvas" viewBox="0 0 ${Math.ceil(laid.width)} ${Math.ceil(laid.height)}"`
+const svg = `<svg id="canvas" viewBox="0 0 ${Math.ceil(laid.width)} ${Math.ceil(laid.height + (extraH ?? 0))}"`
           + ` xmlns="http://www.w3.org/2000/svg">\n<g id="viewport">\n${body}\n</g>\n</svg>`;
 const PAGE_PATH = 'docs/visuals/architecture.html';
 const page = readFileSync(PAGE_PATH, 'utf8');

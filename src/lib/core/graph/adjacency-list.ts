@@ -103,7 +103,7 @@ export const NON_RUNTIME_EDGE_TYPES: EdgeType[] = atOrBelow('containment', 'eras
 export const IMPORT_CYCLE_IGNORED_EDGE_TYPES: EdgeType[] = atOrBelow('containment', 'erased', 'local');
 
 /**
- * One symbol in the graph. `id` is `canonicalize(file) + '::' + name`, lowercased (CONDUCKS-4), which
+ * One symbol in the graph. `id` is `canonicalize(file) + '::' + name`, lowercased (see docs/visuals/modules/contracts.md), which
  * is why two spellings of one path would split a symbol in two — see `contracts/path-utils`.
  *
  * `properties` is a fixed PERSISTED whitelist, not a free bag: a field added here reaches the vault
@@ -220,7 +220,7 @@ export class ConducksAdjacencyList {
    * go through it. `search`, `kinetic` and `governance` are handed `graph.getGraph()` at
    * CONSTRUCTION (`registry/index.ts:118,132,138`) and hold the object directly, so the getter never
    * runs for them — a deferred graph reads as an EMPTY one and every answer is a silent zero. That
-   * is CONDUCKS-13, and it is why `needsGraph` had to be opt-OUT rather than opt-in (todo21#P5).
+   * is the failure docs/visuals/modules/domain/governance.md warns against, and it is why `needsGraph` had to be opt-OUT rather than opt-in (todo21#P5).
    *
    * The guard therefore lives on the OBJECT rather than on the accessor. Every holder shares this
    * one instance, whenever they captured it, so one flag covers all of them and no constructor

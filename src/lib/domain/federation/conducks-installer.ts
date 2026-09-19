@@ -60,7 +60,8 @@ export interface SyncReport {
  *
  * The global scope is refreshed on every sync whether or not the caller asked. A stale copy that keeps
  * working is worse than no copy — it is guidance from an older version that reads as current
- * (CONDUCKS-15).
+ * (enforced by tests/unit/domain/federation/installer-scope.test.ts and
+ * tests/unit/interfaces/tools/skills-tool-surface.test.ts).
  */
 export class ConducksInstaller {
   private readonly dirs: Record<SkillScope, string>;
@@ -107,9 +108,23 @@ export class ConducksInstaller {
       if (existed) {
         try { same = this.fileSystem.readFileSync(file, "utf-8") === content; } catch { same = false; }
       }
-      if (same) { global.unchanged.push(name); continue; }
-      await this.fileSystem.ensureDir(path.dirname(file));
-      await this.fileSystem.writeFile(file, content, "utf-8");
+      let changed = !same;
+      if (!same) {
+        await this.fileSystem.ensureDir(path.dirname(file));
+        await this.fileSystem.writeFile(file, content, "utf-8");
+      }
+      // A skill may ship reference files beside its SKILL.md (resources/skills/<name>/**). Each is
+      // refreshed the same way: written only when it differs, so a no-op run stays a no-op.
+      for (const [rel, body] of Object.entries(this.getSkillReferences(name))) {
+        const target = path.join(this.dirs.global, name, rel);
+        let current: string | null = null;
+        try { current = this.fileSystem.readFileSync(target, "utf-8"); } catch { current = null; }
+        if (current === body) continue;
+        await this.fileSystem.ensureDir(path.dirname(target));
+        await this.fileSystem.writeFile(target, body, "utf-8");
+        changed = true;
+      }
+      if (!changed) { global.unchanged.push(name); continue; }
       (existed ? global.updated : global.created).push(name);
     }
 
@@ -188,5 +203,25 @@ export class ConducksInstaller {
     }
 
     return skills;
+  }
+
+  /**
+   * The reference files a skill ships beside its SKILL.md — every `.md` under
+   * resources/skills/<name>/, keyed by path relative to that folder. Empty for a single-file skill.
+   */
+  private getSkillReferences(name: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    const root = path.join(SKILLS_DIR, name);
+    const walk = (dir: string) => {
+      let entries: string[] = [];
+      try { entries = this.fileSystem.readdirSync(dir); } catch { return; }
+      for (const entry of entries) {
+        const full = path.join(dir, entry);
+        if (this.fileSystem.statSync(full).isDirectory()) walk(full);
+        else if (entry.endsWith('.md')) out[path.relative(root, full)] = this.fileSystem.readFileSync(full, 'utf-8');
+      }
+    };
+    walk(root);
+    return out;
   }
 }

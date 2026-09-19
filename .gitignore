@@ -64,3 +64,7 @@ scratch/
 # ForgeTerm's own .gitignore carries, since this repo is also a project a
 # ForgeTerm window can be pointed at.
 docs/checklist-run.json
+
+# The docs watcher writes this to prove itself live and removes it in stop(). A session killed
+# hard can still strand one, and it sits inside the tracked docs/ tree where `git add .` finds it.
+docs/.conducks-watch-probe

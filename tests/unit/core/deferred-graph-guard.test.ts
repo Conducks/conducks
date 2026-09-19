@@ -9,7 +9,7 @@ import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
  * runs for callers who go THROUGH it. `search`, `kinetic` and `governance` are handed
  * `graph.getGraph()` at construction (`registry/index.ts:118,132,138`) and hold the object directly,
  * so the getter never runs for them: a deferred graph reads as an EMPTY one, every answer is a
- * confident zero, and nothing errors. That is CONDUCKS-13, and it is why `needsGraph` had to be
+ * confident zero, and nothing errors, and it is why `needsGraph` had to be
  * opt-OUT rather than opt-in.
  *
  * So the guard moved onto the OBJECT. Every holder shares one instance, whenever they captured it.

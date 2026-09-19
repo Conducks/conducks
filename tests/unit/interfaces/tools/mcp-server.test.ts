@@ -44,7 +44,7 @@ describe('ConducksMCPServer Unit Tests 💎', () => {
   // Both cases here used to end in `expect(server).toBeDefined()` after `new ConducksMCPServer()`
   // had already assigned it — assertions that cannot fail once the constructor returns. The second
   // was named "should provide resource definitions" and checked nothing of the sort, which is worse
-  // than no test: it reads as coverage on the board and in review (todo25#P5, CONDUCKS-34).
+  // than no test: it reads as coverage on the board and in review (todo25#P5; the vacuous-test-reads-as-coverage rule, test-master skill, reference/advanced.md).
   it('registers the full tool surface on bootstrap', async () => {
     await server.bootstrap();
     const names = Object.keys(synapseTools).concat(Object.keys(kineticTools));

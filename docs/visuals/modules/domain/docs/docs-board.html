@@ -7,10 +7,40 @@
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>domain/docs/docs-board — the links between docs</h1>
+<p><b>Layer:</b> domain (part of <code>domain/docs</code>).</p>
 <p><b>Part of:</b> <a href="../docs.html">domain/docs</a>. Sits on top of <a href="docs-grammar.html">docs-grammar</a>; backs <code>conducks docs-status</code>, <code>conducks_docs</code> and the mirror's /api/docs. <code>docs/docs-board.ts</code> and <code>docs/docs-watcher.ts</code> are documented here together — the watcher is a thin trigger on this module, not a subsystem of its own.</p>
 <p><b>Responsibility:</b> the cross-file half of the docs standard. <code>docs-grammar</code> parses ONE file and has no idea the others exist; this walks the tree and resolves what only the set can answer — which decision a phase builds, which phase another waits on, what an accepted record left unbuilt, and whether a supersede dropped a remainder. It also owns the agent projection.</p>
 <p><b>Boundaries:</b> derivation and linkage only. It never parses markdown (that is <code>docs-grammar</code>) and never touches the code graph — no call, import or coverage fact enters this module. It reads the docs tree from disk and returns a plain object; nothing is written back, ever.</p>
 <p><b>Deferred / not built:</b> <code>- Builds:</code> / <code>- Depends:</code> are hand-written, so an unlinked ADR is reported rather than detected. Proving a decision is implemented from the code itself (walk <code>- Enforced by:</code> into the graph and check the symbol exists and its test passes) is the obvious next step and is deliberately not built — it needs the graph, which would put a code-layer dependency into a module that is currently docs-only.</p>
+<p><b>Uses:</b> <a href="docs-grammar.html">docs-grammar</a>'s per-file parse for every doc under <code>docs/</code>; nothing from the graph or the vault. Backs <code>conducks docs-status</code>, the MCP <code>conducks_docs</code> tool, and the mirror's <code>/api/docs</code>.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Docs board</b> (<code>conducks docs-status</code>, MCP <code>conducks_docs</code>) — the open threads in the authored docs:</li>
+</ul>
+<p>  which decision still owes work, the todo phases building it, the next task in each, and what is   blocked by what, without opening every file. Every line is an address (<code>todo09#P2</code>) or a state, never   a copy of the docs, so it cannot drift into a second version of them.</p>
+<ul>
+<li><b>Agent projection</b> (<code>agentView</code>) — a read-once/read-often split of the same board: conventions and</li>
+</ul>
+<p>  memory-equivalent context loaded once per session (<code>layer: "board"</code> drops them after), the open work   kept on every call. Cut the payload from 17.9k to 3.7k tokens at session start and 1.4k after, on   conducks' own docs.</p>
+<ul>
+<li><b>Module doc review</b> (<code>conducks monitor --dismiss</code>, surfaced by <code>docs-status</code>) — flags a module note</li>
+</ul>
+<p>  whose code changed since it was last reviewed, using the module-hash comparison below; a dismissal is   bound to the hash it was checked against, so it expires the next time the module changes.</p>
+<ul>
+<li><b>There is no progress file.</b> <code>docs/legacy/progress.md</code> was replaced by this board and is kept only</li>
+</ul>
+<p>  as an archived record, never read by any tool.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>Board</b> — the full projection: every open decision, todo phase and unlinked record.</li>
+<li><b>Agent projection</b> — the trimmed, read-once/read-often view of the same data (<code>agentView</code>).</li>
+<li><b>Unlinked</b> — a decision no <code>- Builds:</code> phase currently points at; a distinct state from <code>resolved</code></li>
+</ul>
+<p>  or <code>proven</code>, not a failure state by itself.</p>
+<ul>
+<li><b>Module hash</b> — the single comparison (<code>moduleHashOf</code>, <code>analysis/module-hash.ts</code>) a reviewed note</li>
+</ul>
+<p>  is checked against to detect drift; see the module-hash section below.</p>
 <h2>Why the projection exists, and why it is not just a smaller board</h2>
 <p><code>buildBoard</code> returns everything: 17.9k tokens on conducks itself. <code>agentView</code> returns 3.7k at session start and 1.4k after. The saving is not compression — it is a different question being answered. The board answers *how is the project doing* (percentages, counts, history); an agent needs *what may I do next, and what must I not break*. Percentages are unactionable; the next unchecked task and the rule you would violate are not.</p>
 <p>Two axes decide what is in the payload:</p>
@@ -24,7 +54,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>  shipping them on every call was 10.7k of the original 14.7k. <code>layer: "board"</code> drops them.</p>
 <p><code>features.md</code> is never in the payload at all. It is write-mostly: updated once an ADR and its todos are finished.</p>
 <h2>Everything here is derived, and that is the point</h2>
-<p>A phase's state is its checkboxes. Blocked is an unmet <code>- Depends:</code>. An ADR's build state is the phases that claim it. None of it is authored anywhere, so none of it can drift (ADR 0019, 0020, and CONDUCKS-19/20). The one authored claim that survives — a todo's <code>Status:</code> — is deliberately NOT trusted: <code>hygiene()</code> compares it against the checkboxes and reports the gap.</p>
+<p>A phase's state is its checkboxes. Blocked is an unmet <code>- Depends:</code>. An ADR's build state is the phases that claim it. None of it is authored anywhere, so none of it can drift (ADR 0019, 0020, and enforced by <code>tests/unit/domain/docs/docs-grammar.test.ts</code>). The one authored claim that survives — a todo's <code>Status:</code> — is deliberately NOT trusted: <code>hygiene()</code> compares it against the checkboxes and reports the gap.</p>
 <p><code>unlinked</code> is a distinct build state, and the distinction is load-bearing. An ADR that nobody linked has no evidence either way; collapsing it into a success state would make silence read as success, which is the failure the whole link graph exists to prevent. But a PHASE LINK is not the only evidence: <code>completed/</code> is never walked, so promoting a todo removes the phases that linked its ADRs — 141 of 142 fell to <code>unlinked</code> the day this repo's board was finally clean. So <code>proven</code> (a <code>- Enforced by:</code> test) and <code>resolved</code> (a <code>- Resolved by:</code> successor) hold whether or not a phase still links, and <code>board.unlinked</code> is DERIVED from the field rather than re-deciding the question — computed separately, the two drifted apart and disagreed about the same ADRs.</p>
 <h2>Two severities, because a gate that cries wolf gets turned off</h2>
 <p><code>lint</code> is broken grammar — a dangling <code>- Builds:</code>, a supersede that abandons unbuilt work, a duplicate phase number. It fails <code>docs-lint</code> and therefore CI. <code>warns</code> is hygiene — a <code>done</code> todo still sitting in <code>todos/</code>, a <code>Status:</code> the checkboxes contradict. Both are true findings; only the first means the board is reading a file wrong. Mixing them would have failed this repo's CI on five unpromoted todos, and the fix for that is a filing cabinet, not a build.</p>

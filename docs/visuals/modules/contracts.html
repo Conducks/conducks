@@ -11,6 +11,8 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Read at <code>7c11bc4</code>.</b></p>
 <p><b>Responsibility:</b> the words the layers share — the canonical kind ladder, what counts as a source extension, what counts as a test file, the prism types parsing produces and graph stores, and the verdict shape a command prints.</p>
 <p><b>Boundaries:</b> vocabulary, not logic. A predicate lives here when the QUESTION is shared, never because the implementation was convenient — <code>tryResolveSymbol</code> is here because the CLI and the MCP surface must resolve a symbol id the same way, not because it is a utility.</p>
+<p><b>Node ids are canonical, lowercase, absolute-normalized FQNs</b> (shape: "lowercased/absolute/path.ts::classname.method"), defined at &lt;span class="anchor"&gt;src/contracts/real-path.ts:6&lt;/span&gt; and &lt;span class="anchor"&gt;src/contracts/symbol-resolution.ts:67&lt;/span&gt;. macOS APFS is case-insensitive, so two spellings of one path — <code>/Users/Said/</code> and <code>/users/said/</code> — are the same file; without this rule they fragment into two nodes and every count that touches them reports twice. Every consumer citing this rule (<code>core/graph</code>, <code>core/utils/canonicalize</code>) should point here rather than restate it.</p>
+<p><b>Uses:</b> nothing — it is the bottom layer and imports nothing else in this codebase. Every layer above it, including <code>interfaces/cli</code>, imports it directly (ADR 0005 exempts this one downward edge from the layer contract because it is vocabulary, not logic).</p>
 <h2>It used to be two layers, and that was the defect</h2>
 <p><code>src/types/</code> and <code>src/contracts/</code> both existed, and thirteen language packs imported <code>types/language-plugin</code> — the single most-imported file in either folder. Two homes for one idea means every new type is a coin toss, and the answer drifts.</p>
 <p>They are one folder now. Two things went the OTHER way, into parsing, because only parsing used them: <code>language-plugin</code> and <code>capture-tags</code>. A shared layer holding something one feature uses is the same mistake pointing the other direction.</p>
@@ -21,6 +23,26 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <h2>The kind ladder is additive, and a declared rung needs a producer</h2>
 <p><code>mapToCanonical</code> turns a grammar's capture into a rung. A rung nothing emits is not a reservation — it is a row that makes the table wrong, and it hid a real defect: six different language constructs were all tagged <code>@isPackage</code>, so PACKAGE's only nodes on this repository were a C# and a PHP namespace while NAMESPACE — read by four consumers — had none at all (ADR 0100).</p>
 <p>Two capture tags have been removed for exactly this reason since. A tag with no producer is deleted, not carried.</p>
+<h2>Features</h2>
+<p>none — this is a vocabulary layer, not a set of capabilities. Its constituent files (<code>taxonomy.ts</code>, <code>test-path.ts</code>, <code>real-path.ts</code>, <code>symbol-resolution.ts</code>) are types and predicates shared across layers, not sub-features with their own intent.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>canonical kind</b> — the taxonomy rung (<code>CanonicalKind</code>) a grammar capture maps to via</li>
+</ul>
+<p>  <code>mapToCanonical</code>. Additive only; a rung with no producer is a defect, not a reservation.</p>
+<ul>
+<li><b>canonical node id</b> — the lowercase, absolute-normalized FQN every node and edge endpoint is</li>
+</ul>
+<p>  keyed by. See above.</p>
+<ul>
+<li><b>test path</b> — whether a file counts as a test, decided by <code>contracts/test-path.ts</code> from its</li>
+</ul>
+<p>  PATH (any <code>/tests/</code> segment, or a bare <code>test</code> filename prefix), never from a parsed flag — a   parsed <code>isTest</code> does not survive the vault.</p>
+<h2>Traps</h2>
+<ul>
+<li><b>A path suffix match has two possible longer sides.</b> Teaching <code>tryResolveSymbol</code> to honour a</li>
+</ul>
+<p>  qualifier of the shape <code>&lt;path&gt;::&lt;symbol&gt;</code> broke rename tests because macOS hands out   <code>/var/folders/...</code> while the resolved path the vault stores is <code>/private/var/folders/...</code> — an   ABSOLUTE id compared with its leading slash kept assumes the id is always the longer string, and it   is not always (&lt;span class="anchor"&gt;src/contracts/symbol-resolution.ts:120&lt;/span&gt;). Strip leading   slashes and test the suffix in BOTH directions — the caller may type the short path or paste the   resolved one, and either side can be the longer one. A qualifier that is not a path at all   (<code>MyClass::method</code>) must still fall back to the bare name; refusing on an incomplete match is a   behaviour change and is only safe once the match is genuinely complete.</p>
 <h2>On the canvas</h2>
 <p>cited by <a href="graph.html">THE GRAPH</a> — derived from the block anchors, not curated</p>
 <footer>Source: <code>docs/visuals/modules/contracts.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>

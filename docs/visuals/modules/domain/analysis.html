@@ -10,7 +10,40 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Layer:</b> domain. Imports core + contracts.</p>
 <p><b>Responsibility:</b> everything that turns source into knowledge (<code>domain/analysis/index.ts</code> is the facade) — reflecting files, sequencing a pulse, answering structural queries, and the feature-shaped analyses that sit on top (coverage, the docs grammar).</p>
 <p><b>Boundaries:</b> this module decides what is <b>true</b>, never what is <b>acceptable</b>. No thresholds, no violations, no severity — <a href="governance.html">governance</a> owns judgement. The split matters: the same cycle data serves an audit, an advisor and a guard with three different opinions applied on top.</p>
+<p><b>Uses:</b> <a href="../core/parsing.html">core/parsing</a>'s reflector for one file's spectrum, <a href="../core/graph.html">core/graph</a> for the in-memory adjacency list the pulse builds into, and <a href="../core/persistence.html">core/persistence</a> to write nodes, edges and kinetic columns atomically per pulse. Everything downstream — <a href="governance.html">governance</a>, <a href="evolution.html">evolution</a>, <a href="coverage.html">coverage</a>, <a href="docs.html">docs</a> — reads the graph this module produces and never re-derives it.</p>
 <p><b>Deferred / not built:</b> a query planner. <code>query-service</code> answers a fixed set of questions with hand-written SQL and graph walks; there is no general query language. Adequate while the question set is known.</p>
+<h2>Features</h2>
+<ul>
+<li><b>Full structural pulse</b> (<code>conducks analyze</code>) — the orchestrator's multi-pass discovery, induction</li>
+</ul>
+<p>  and resolution wave, described in <a href="analysis/orchestrator.html">orchestrator</a>.</p>
+<ul>
+<li><b>Incremental re-analysis</b> — <code>project-monitor</code>, <code>change-set</code>, <code>module-hash</code> and <code>micro-pulse</code> decide</li>
+</ul>
+<p>  which files actually need re-parsing on a repeat run; see the orchestrator note for what this hides   when it goes wrong.</p>
+<ul>
+<li><b>Structural queries</b> (<code>conducks query</code>) — <code>query-service</code> answers a fixed set of questions</li>
+</ul>
+<p>  (symbol lookup, listing, entry-point detection) with hand-written SQL and graph walks, not a general   query language.</p>
+<ul>
+<li><b>Live watch feed</b> — <code>gateway-service</code> is the vault-watch stream behind the Mirror dashboard,</li>
+</ul>
+<p>  constructed by the <code>mirror</code> CLI command and consumed by the web server.</p>
+<p>A finding is scored by what was found WRONG, not by how many findings a pass produced — a headline count without that check rewards a louder tool over a more correct one. Applied concretely in <a href="evolution.html">evolution</a>'s prune precision, which is audited both directions rather than by volume.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>Pulse</b> — one full or incremental run of <code>analyze</code>: skeleton build, discovery, induction, link,</li>
+</ul>
+<p>  resolution, in one atomic transaction.</p>
+<ul>
+<li><b>Reflection</b> — turning one file's parse tree into a spectrum of unresolved nodes and edges (owned</li>
+</ul>
+<p>  by the reflector, not this module).</p>
+<ul>
+<li><b>Induction</b> — materialising a node for a reference that pointed outside the files seen so far.</li>
+</ul>
+<h2>Traps</h2>
+<p><b><code>query</code>'s template library advertised entries it then refused, and a missing identifier answered zero rows instead of refusing.</b> <code>mode:"template"</code> with no name lists the Oracle library in full; it used to include <code>type_coupling</code> while a separately hand-typed allowlist beside it omitted that same entry, so calling it answered <code>UNKNOWN_TEMPLATE</code> with a suggestion to "list available templates" — the list that had just advertised it (todo53#P1). Fixed: the allowlist is now ASKED of the library (<code>listTemplates()</code>, <code>src/lib/domain/analysis/query-service.ts:559</code>) rather than retyped, so it cannot go stale in either direction. Separately, <code>execute()</code> used to resolve a missing template param to <code>PARAM_DEFAULTS[p] ?? ''</code>, so an identifier param like <code>symbolId</code> with no value ran <code>WHERE e.targetId = ''</code>, matched nothing, and reported <code>nodeCount: 0</code> — "nothing breaks" for a question that named no symbol (todo54#P1, ADR 0145). <code>REQUIRED_PARAMS</code> (<code>query-service.ts:47</code>) now lists every identifier param that has no meaningful empty value and refuses rather than silently answering zero rows; params whose SQL treats an empty string as "any" (<code>edgeType</code>, <code>canonicalKind</code>, <code>namespaceId</code>, <code>query</code> itself, for unscoped fuzzy search) are deliberately excluded — the distinction is read out of each template's SQL, never inferred from the defaults table.</p>
 <h2>Parts</h2>
 <ul>
 <li><b><a href="../core/parsing/reflector.html">reflector/</a></b> — file → spectrum. The single most load-bearing unit here.</li>

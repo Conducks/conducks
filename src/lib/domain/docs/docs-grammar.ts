@@ -14,10 +14,13 @@
 import path from "node:path";
 
 export type DocType =
-  | "todo" | "decision" | "features" | "memory" | "conventions"
+  | "todo" | "decision" | "note"
   | "handover" | "architecture" | "derived" | "prose";
 
-export const GOVERNED: DocType[] = ["todo", "decision", "features", "memory", "conventions", "handover"];
+// ADR 0193 dissolves features.md, memory.md and conventions.md; ADR 0194 replaces them in the
+// linted set with the module note, so GOVERNED falls from six types to four (todo, decision,
+// handover, note) rather than the three ADR 0193's own `## Consequences` mis-stated.
+export const GOVERNED: DocType[] = ["todo", "decision", "handover", "note"];
 
 export const RE = {
   title: /^#\s+(.+?)\s*$/,
@@ -52,6 +55,9 @@ const STATUS_VOCAB: Partial<Record<DocType, RegExp>> = {
   todo: /^(todo|doing|done|blocked)$/i,
   decision: /^(Accepted|Superseded\s+by\s+\d{4}(\s*,\s*\d{4})*)$/i,
   handover: /^(current|stale)$/i,
+  // A note carries no life-state Status at all UNLESS it is tombstoned (ADR 0193 §6.3, conducks-docs
+  // §5.4.1) — the one legal value is `deprecated`, never a second vocabulary a live note could use.
+  note: /^deprecated$/i,
 };
 
 /** Relation fields on an ADR, and the field that must answer back from the other end. */
@@ -71,15 +77,17 @@ export interface Body { title: string | null; status: string | null; fields: Rec
 export function inferType(fp: string): DocType {
   if (/\/todos?\//.test(fp) || /\/todo\d*\.md$/.test(fp)) return "todo";
   if (/\/decisions?\//.test(fp)) return "decision";
-  if (/features\.md$/.test(fp)) return "features";
-  if (/memory\.md$/.test(fp)) return "memory";
-  if (/conventions\.md$/.test(fp)) return "conventions";
   if (/handover\.md$/.test(fp)) return "handover";
+  // ADR 0194's fourth linted type: a feature's authored note under `visuals/modules/` (ADR 0140,
+  // ADR 0193 §6.3). Checked BEFORE the legacy `architecture` branch below, because that branch's own
+  // `/\/modules\//` regex would otherwise also match this path and read it as free-form prose.
+  if (/\/visuals\/modules\//.test(fp)) return "note";
   // Architecture is AUTHORED, not derived: a human explaining a module/subsystem's purpose, layer,
   // boundaries, and deferred design — the WHY the code can't tell you. It is free-form (no
-  // skeleton), never lint-flagged. Module notes live at `visuals/modules/<path>.md` (ADR 0140);
-  // `/\/modules\//` matches that path AND the legacy `docs/modules/` + `MODULE.md` layouts, so an
-  // unmigrated repo classifies identically. `architecture/` is the folder that predates the split.
+  // skeleton), never lint-flagged. `docs/modules/` + `MODULE.md` is the LEGACY pre-ADR-0140 layout —
+  // still classified here so an unmigrated repo keeps reading, but it is not the grammar-linted note
+  // above. `features.md`, `memory.md` and `conventions.md` are dissolved (ADR 0193): a repo that
+  // still carries one now reads it as plain, ungoverned prose rather than a type of its own.
   if (/architecture\.md$/.test(fp) || /\/architecture\//.test(fp) || /\/modules\//.test(fp) || /MODULE\.md$/.test(fp)) return "architecture";
   // `map.md` / `drift.md` are pure wiring — that IS derived structure; don't author it, query the
   // graph (audit / impact / trace / coverage) instead. `progress.md` joined them (ADR 0024): what
@@ -233,8 +241,6 @@ export function shape(type: DocType, body: Body, file: string): any {
       enforcedBy: body.fields["Enforced by"] || null, inherits: refsIn(body.fields.Inherits),
     };
   }
-  if (type === "features" || type === "memory" || type === "conventions")
-    return { ...base, entries: body.sections.map(s => ({ name: s.head, ...s.fields })) };
   if (type === "handover") return { ...base, ...readStatus(body.status), sections: body.sections.map(s => s.head) };
   return base;
 }
@@ -300,6 +306,31 @@ function hasReason(text: string): boolean {
   return i !== -1 && text.slice(i + 1).trim().length > 0;
 }
 
+/**
+ * The four bold module-note fields (conducks-docs §5.4.1, ADR 0194). NOT one of the five per-line
+ * primitives in §5 — `**Key:**` is a shape only a note uses, so it gets its own fence-aware scan
+ * rather than bending `RE.field` (which requires a leading `- `) to fit a second syntax.
+ */
+const NOTE_FIELD_RE: Record<string, RegExp> = {
+  Layer: /^\*\*Layer:\*\*/,
+  Responsibility: /^\*\*Responsibility:\*\*/,
+  Boundaries: /^\*\*Boundaries:\*\*/,
+  Uses: /^\*\*Uses:\*\*/,
+};
+
+/** Which of the four bold note fields appear as their own line, fenced blocks skipped. */
+function noteFieldsPresent(src: string): Set<string> {
+  const found = new Set<string>();
+  let fenced = false;
+  for (const line of src.split(/\r?\n/)) {
+    if (RE.fence.test(line)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+    const trimmed = line.trim();
+    for (const [name, re] of Object.entries(NOTE_FIELD_RE)) if (re.test(trimmed)) found.add(name);
+  }
+  return found;
+}
+
 export function lint(type: DocType, body: Body, src?: string): string[] {
   const errs: string[] = [];
   if (!body.title) errs.push("missing `# Title`");
@@ -349,6 +380,16 @@ export function lint(type: DocType, body: Body, src?: string): string[] {
       if (!body.sections.some(s => s.head === req)) errs.push(`missing ## ${req} section`);
   }
   if (type === "handover" && !body.status) errs.push("missing `Status:` (current | stale)");
+  if (type === "note") {
+    // Checks that the four fields and two sections were ANSWERED, never how well (conducks-docs
+    // §5.4.1) — a one-word `**Boundaries:** none` passes exactly like a paragraph.
+    const present = src ? noteFieldsPresent(src) : new Set<string>();
+    for (const f of Object.keys(NOTE_FIELD_RE))
+      if (!present.has(f)) errs.push(`missing \`**${f}:**\` — a module note requires all four fields (conducks-docs §5.4.1)`);
+    for (const heading of ["Features", "Glossary"])
+      if (!body.sections.some(s => s.head === heading))
+        errs.push(`missing \`## ${heading}\` section — must be present even when the body says \`none\` (ADR 0194)`);
+  }
   // The status VALUE, not just its presence: a typo'd state silently reads as active on the board.
   const vocab = STATUS_VOCAB[type];
   if (vocab && body.status && !vocab.test(body.status.trim()))
@@ -361,4 +402,5 @@ const VOCAB_HINT: Partial<Record<DocType, string>> = {
   todo: "todo | doing | done | blocked",
   decision: "Accepted | Superseded by NNNN — amendments are a `- Amended by:` field, not a status",
   handover: "current | stale",
+  note: "deprecated (tombstone only — a live note carries no `Status:` line at all)",
 };

@@ -12,7 +12,7 @@ import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
  * left them reported NOWHERE. They come back here under their own name, as a DISCOVERY — mutual
  * recursion is legal, so this must never fail an audit.
  *
- * Ids follow the producer's shape (CONDUCKS-28): `<file>::unit`, `<file>::<symbol>`.
+ * Ids follow the producer's shape (see docs/visuals/modules/core/graph.md): `<file>::unit`, `<file>::<symbol>`.
  */
 describe('ARCH-6 — mutual call tangles', () => {
   const build = () => {

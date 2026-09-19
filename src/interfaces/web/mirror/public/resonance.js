@@ -11,19 +11,30 @@ window.MirrorState = {
   activeWave: null,
   selectedLayers: [0, 1, 2, 3, 4, 5, 6, 7, 8],
   selectedClusters: [],
+  // Cluster gravity: how hard a node is pulled toward its cluster centre. It was read from a slider
+  // that was not in the markup, so it was pinned at the fallback and the three presets — which each
+  // named a different value — were indistinguishable on this axis. It lives here now, and the
+  // presets set it.
+  gravity: 0.15,
   focusNodes: new Set(),
   focusLinks: new Set(),
   lastSelectedNode: null,
+  // The nine layers are ORDINAL — an ecosystem contains repositories contains namespaces, down to
+  // the smallest thing there is. They used to carry nine unrelated hues, so two adjacent rungs
+  // looked as different as the top and the bottom and colour said nothing about depth. This is one
+  // cold-to-hot ramp, monotonic in hue, matching --layer-0..8 in styles.css: the graph reads as an
+  // altitude map, and the sidebar list becomes a legend for a scale. Blue-green-yellow-orange also
+  // survives the common colour-vision deficiencies, which a rainbow does not.
   layers: [
-    { id: 0, name: 'Ecosystem', color: '#60a5fa' },
-    { id: 1, name: 'Repositories', color: '#3b82f6' },
-    { id: 2, name: 'Namespaces', color: '#818cf8' },
-    { id: 3, name: 'Units (Files)', color: '#22d3ee' },
-    { id: 4, name: 'Infrastructure', color: '#fcd34d' },
-    { id: 5, name: 'Structures', color: '#c084fc' },
-    { id: 6, name: 'Behaviors', color: '#4ade80' },
-    { id: 7, name: 'Atoms', color: '#fb923c' },
-    { id: 8, name: 'Data', color: '#f43f5e' }
+    { id: 0, name: 'Ecosystem',      color: '#3b5bdb' },
+    { id: 1, name: 'Repositories',   color: '#3b82d6' },
+    { id: 2, name: 'Namespaces',     color: '#2fa8c9' },
+    { id: 3, name: 'Files',          color: '#24c5ae' },
+    { id: 4, name: 'Infrastructure', color: '#45d68b' },
+    { id: 5, name: 'Structures',     color: '#86dc63' },
+    { id: 6, name: 'Behaviors',      color: '#c3dc4b' },
+    { id: 7, name: 'Atoms',          color: '#eeb13e' },
+    { id: 8, name: 'Data',           color: '#f4713f' }
   ],
   edgeColors: {
     'MEMBER_OF': '#484f5866',
@@ -51,6 +62,7 @@ async function refreshSynapse() {
 
     const wave = await res.json();
     window.MirrorState.activeWave = wave;
+    reportWaveScope(wave);
 
     if (typeof updateClusterUI === 'function') {
       updateClusterUI(wave);
@@ -95,9 +107,40 @@ sse.onmessage = (event) => {
   }
 };
 
+/**
+ * Say how much of the graph is on screen.
+ *
+ * The wave has always carried `truncated` and `totalNodes` — ADR 0054 added them
+ * precisely so a capped picture could not pass for a whole one — and the browser
+ * threw both away. The only notice was a `logger.info` in the terminal, which is
+ * the one place the person looking at the dashboard is not looking. Measured on
+ * this repository: 1,500 drawn of 4,561 eligible, with nothing on screen saying so.
+ *
+ * It reports the honest count either way. A number that only appears when
+ * something is wrong leaves the reader unable to tell "complete" from "not
+ * instrumented".
+ */
+function reportWaveScope(wave) {
+  const box = document.getElementById('wave-scope');
+  if (!box) return;
+  const shown = (wave.nodes || []).length;
+  const total = wave.totalNodes || shown;
+  const n = x => x.toLocaleString();
+  if (wave.truncated && total > shown) {
+    box.textContent = n(shown) + ' of ' + n(total) + ' nodes';
+    box.title = 'The heaviest slice by gravity, not the whole graph. '
+      + 'Restart with `conducks mirror --wave-cap ' + total + '` to draw all of it.';
+    box.classList.add('is-partial');
+  } else {
+    box.textContent = n(shown) + ' nodes';
+    box.title = 'The whole eligible graph is drawn.';
+    box.classList.remove('is-partial');
+  }
+}
+
 function applyForces() {
   if (typeof d3 === 'undefined') return;
-  const gravity = parseFloat(document.getElementById('ctrl-gravity')?.value || '0.15');
+  const gravity = window.MirrorState.gravity;
 
   Graph.d3Force('x', d3.forceX(d => d.clusterX || 0).strength(gravity));
   Graph.d3Force('y', d3.forceY(d => d.clusterY || 0).strength(gravity));

@@ -34,7 +34,7 @@ and this benchmark is the regression test for it.
 
 T7's `impact classify` printed `0 Symbols affected` — CORRECT, nobody calls it. T3's
 `impact resolve_project_path` printed `0 Symbols affected` — WRONG, ten callers exist. The reader
-cannot tell these apart. This is CONDUCKS-37 (a green tick over an empty set) in its most expensive
+cannot tell these apart. This is the every-clean-states-what-it-examined rule (a green tick over an empty set) in its most expensive
 form: the honest answer and the resolution failure wear the same clothes. `impact` should state what
 it examined — "0 of 16,674 edges reach this symbol; 2,897 references in this graph are unresolved and
 one of them may be yours."

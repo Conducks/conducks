@@ -42,7 +42,7 @@ export class GraphTraversal {
     const fScore = new Map<NodeId, number>([[sId, 0]]);
 
     // The A* heuristic. Zero would make this Dijkstra; the estimate is what stops the search
-    // expanding the whole graph on a weighted traversal (CONDUCKS-6).
+    // expanding the whole graph on a weighted traversal.
     const h = (nodeId: NodeId) => {
       const node = graph.getNode(nodeId);
       if (!node) return 1000;

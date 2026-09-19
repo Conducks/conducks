@@ -1,6 +1,6 @@
 /**
  * F-08 — `tryResolveSymbol`'s multi-match WARN used to print `best.id` and the passed-over ids
- * RAW: an absolute, lowercased id (CONDUCKS-4) nobody can paste and whose case does not match the
+ * RAW: an absolute, lowercased id (canonical lowercase ids: docs/visuals/modules/contracts.md) nobody can paste and whose case does not match the
  * file on disk. `symbol-resolution.ts` sits in `contracts` and may not import the CLI's
  * `displayId` (ADR 0005), so the repair is threaded through as an optional `formatId` callback
  * instead, defaulting to identity so a caller that supplies none is byte-identical to before this

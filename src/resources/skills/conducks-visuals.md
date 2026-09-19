@@ -94,6 +94,27 @@ feature routinely spans several directories, and one file routinely serves sever
 `references/features.md` owns how you find the boundary, how the three piles are sorted, and how a
 multi-feature file is marked.
 
+**This section is the single owner of what a feature is.** `conducks-docs` §6.3 defers here for the
+definition, and a module note's path — the feature's path with container segments elided — follows
+directly from the classification made above: a `feature` row gets a note at its own path, a `util` or
+`contract` does not (`references/features.md` §1 decides which pile a candidate falls into).
+
+### A feature page and its module note are not the same thing
+
+`modules/<feature>.html` is generated — from the graph data, or hand-written where prose says more
+than data can (`references/pages.md` §4). The `.md` beside it is the feature's only **authored
+source** (`conducks-docs` §6.3): the `**Layer:**` `**Responsibility:**` `**Boundaries:**`
+`**Uses:**` fields, `## Features`, `## Traps` and `## Glossary` that state what the feature does, its
+seams, and what it uses. The page draws the internal steps; the note is where the binding claims
+live. Treat the note as source, not the page — §3's rule to regenerate rather than hand-edit applies
+to both halves of `modules/`.
+
+### A note may exist with no box on the canvas
+
+A util earns no box (above) but can still earn a note — `visuals/modules/core/utils.md` exists today
+with nothing on the canvas naming it. A note documents a container's or a util's boundaries even when
+nothing about it is drawn; absence from the canvas is not absence from the docs tree.
+
 ## 3 · The rules that bind, always
 
 These are kept by a person. The build cannot check most of them.
@@ -110,8 +131,9 @@ SVG and the same input always yields the same picture — which is what makes a 
 rather than a re-layout.
 
 **Every claim carries an anchor, and the anchor is not the claim.** The block says what a thing
-MEANS, in plain English. The hover carries the `file:line` and the constants. Never put a symbol name
-in a block title — `runOrchestratorTurn` tells a reader nothing unless they already know the code.
+MEANS, in plain English. The hover carries the `file:line` and the constants. Put the symbol name in
+the hover, not the block title — `runOrchestratorTurn` tells a reader nothing unless they already know
+the code.
 
 **An anchor resolving is not evidence the sentence is true.** This is the one hole no tool closes and
 the reason a re-anchor pass is periodic work rather than a one-off. `references/anchoring.md` owns it.
@@ -119,8 +141,8 @@ the reason a re-anchor pass is periodic work rather than a one-off. `references/
 **Links are derived, never written.** The page comes from the container, the fragment is the block id.
 Zero hardcoded links, so a block that moves container updates its own link.
 
-**The page is output. Never hand-edit it.** An edit survives exactly until the next render, and
-passes review in between.
+**The page is output — regenerate it rather than hand-editing it.** An edit survives exactly until the
+next render, and passes review in between.
 
 **Say what is NOT drawn.** A boundary is not completeness. Every page names its scope and what it
 leaves out, and a canvas that covers part of the system prints the fraction — a reader takes the edge
@@ -129,6 +151,12 @@ of the picture for the edge of the system otherwise.
 **Nine files are shared byte-for-byte across every project built to this standard; two are local.**
 Changing a shared file is allowed and changing it in one project only is not. `references/setup.md`
 holds the list and the propagation rule.
+
+**A visual's authored source belongs to the repository it describes, never to the repository holding
+the parser or renderer.** A renderer that ships everywhere and reads an optional source across a
+repository boundary must exit cleanly when that source is absent — every gate can pass while it
+silently draws an empty page, because the page still rendered, drift still passed, and both parsers
+still agreed with each other. Only running it against the real layout finds the gap.
 
 ## 4 · The build, and the two gates
 
@@ -147,7 +175,7 @@ Neither reads prose. A green gate is not a true page.
 
 | about to | read |
 |---|---|
-| stand up visuals in a project that has none · port the generator · check a shared file has not drifted | `references/setup.md` — **once per project, then never again.** If `docs/visuals/` already has a canvas, do not open this file |
+| stand up visuals in a project that has none · port the generator · check a shared file has not drifted | `references/setup.md` — **once per project, then never again.** If `docs/visuals/` already has a canvas, leave this file unopened — it only covers standing one up |
 | find what the features ARE · scope a feature · run a census · brief a subagent to walk code · record a code problem found while walking | `references/features.md` |
 | write an anchor · fix a stale one · run a re-anchor pass · stamp · read what `visuals-lint` is telling you | `references/anchoring.md` |
 | add or change a block, a container or a feature page · pick a shape · pick a colour · decide what goes on the canvas vs the page vs the hover | `references/authoring.md` |
@@ -156,6 +184,6 @@ Neither reads prose. A green gate is not a true page.
 | touch index / problems / holding / a module note / the testing page · write a read log · add a page on a new subject | `references/pages.md` |
 | draw or change a design mock of the product's own surface · move an editable canvas into the project · white on a board | `references/mock.md` |
 
-**Do not read a reference to "understand the system".** Sections 1–4 above are the understanding.
-The references are procedures, and loading one you are not about to execute is the token waste this
-split exists to remove.
+**Open a reference only when about to do the thing it covers** — sections 1–4 above are the
+understanding. The references are procedures, and loading one you are not about to execute is the
+token waste this split exists to remove.

@@ -27,7 +27,7 @@ describe('a hostile filename cannot execute commands', () => {
   let created = false;
   // The payload must contain NO slash, or it is not a legal filename and git never stores it. The
   // first version of this test used an absolute canary path, so the file was never created, the
-  // test self-skipped, and it passed while proving nothing — the exact failure CONDUCKS-34 warns
+  // test self-skipped, and it passed while proving nothing — the exact failure the vacuous-test rule (test-master skill, reference/advanced.md) warns
   // about. Verified against the old code path: `execSync` with this name DOES create the canary.
 
   beforeAll(() => {

@@ -8,10 +8,13 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>core/parsing/reflector — file → spectrum</h1>
 <p><b>Part of:</b> <a href="../parsing.html">core/parsing</a> — moved out of domain/analysis by ADR 0093. One file, <code>parsing/reflector.ts</code>, and the single most load-bearing unit in the codebase: every language, every file, every pulse goes through its match loop.</p>
+<p><b>Layer:</b> core.</p>
 <p><b>Responsibility:</b> walking a file's query matches and building its spectrum — nodes with canonical kinds and ranges, relationships, scope resolution, per-binding import records, and the type-only classification that decides whether an import survives compilation.</p>
 <p><b>Boundaries:</b> one file at a time. It never resolves cross-file references and never touches the graph or the vault. Anything needing repo-wide knowledge belongs to the <a href="../../domain/analysis/orchestrator.html">orchestrator</a>.</p>
+<p><b>Uses:</b> takes a compiled query from <a href="grammar-registry.html">grammar-registry</a>, dispatches each raw capture to a <a href="processors.html">processor</a>, and maps every node's grammar kind onto <a href="taxonomy.html">taxonomy</a>'s <code>canonicalKind</code>/<code>canonicalRank</code>. It also reads <a href="../../git.html">core/git</a>'s chronicle for a file's commit history and blame data, and feeds the resulting author distribution to <a href="../../algorithms.html">core/algorithms</a>' <code>calculateShannonEntropy</code>/<code>normalizeEntropyRisk</code> to score the file's ownership risk (&lt;span class="anchor"&gt;src/lib/core/parsing/reflector.ts:1582-1587&lt;/span&gt;).</p>
 <p><b>Deferred / not built:</b> the split. This should be a dispatcher over per-capture handlers (import, call, definition, reference-as-value) and is instead one giant <code>for (const capture of match.captures)</code> chain. It is wanted, not done, and it is the main reason edits here are risky.</p>
 <p>Two pieces HAVE come out, and neither is the dispatch: the pure functions moved to &lt;span class="anchor"&gt;src/lib/core/parsing/match-facts.ts&lt;/span&gt; (a node or a match in, a plain value out, nothing touching the spectrum), and the four capture pairs that each held their own <code>pending… = null</code> became one <code>PendingPair</code>. The chain itself stays, and the measurement that explains why is worth keeping: moving it needs <b>29 of <code>reflect()</code>'s locals</b> threaded out, 19 of them shared mutable state. That converts implicit coupling into an explicit bag rather than reducing it, in the file where a defect reaches all 42 commands.</p>
+<p><b>It is getting further away, not closer.</b> The deep-clean campaign recorded this file at 1,696 lines while closing every other core feature; it is 1,738 today. No todo carries the split — it is wanted, blocked on scope, and recorded here so the next person does not go looking for a plan that does not exist.</p>
 <h2>Treat every change as systemic</h2>
 <p>There is no seam isolating one language or one capture kind from another, and the file carries ~33 <code>as any</code>. A local-looking change can alter every language's output. Two habits:</p>
 <ul>
@@ -22,7 +25,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <li>Watch node counts. A silent drop means a query failed and that language went unread — since ADR 0089</li>
 </ul>
 <p>  there is no regex fallback, so what follows a broken query is a reported <code>ParseFailure</code> and a graph   missing every symbol in that language.</p>
-<p><b>A relationship's endpoint name must produce the id the node writer stores.</b> The two are decided in different places — <code>saveNodes</code> scopes a binding to its enclosing function (<code>&lt;file&gt;::main2.doit</code>) while a processor handed a bare name yields <code>&lt;file&gt;::doit</code> — and a mismatch does not error, does not read as a broken link, and DELETES the node: <code>pruneTaxonomy</code> counts a node referenced only when an edge's endpoint IS that node. <code>scopePrefix</code> in the definition branch is the shape to match (todo62, CONDUCKS-28).</p>
+<p><b>A relationship's endpoint name must produce the id the node writer stores.</b> The two are decided in different places — <code>saveNodes</code> scopes a binding to its enclosing function (<code>&lt;file&gt;::main2.doit</code>) while a processor handed a bare name yields <code>&lt;file&gt;::doit</code> — and a mismatch does not error, does not read as a broken link, and DELETES the node: <code>pruneTaxonomy</code> counts a node referenced only when an edge's endpoint IS that node. <code>scopePrefix</code> in the definition branch is the shape to match (todo62, the producer's id shape — see <a href="../../core/graph.html">core/graph</a>).</p>
 <h2>Type-only classification (ADR 0016)</h2>
 <p><code>markTypeOnlyImports</code> runs as a post-pass once the spectrum is complete, because usage evidence is only known after the whole file is walked. The rule is deliberately asymmetric:</p>
 <ul>
@@ -49,5 +52,59 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>This section used to describe a Gnosis regex extractor the reflector fell back to when a grammar was unavailable or a parse failed. <b>That has not been true since ADR 0089</b>, and the paragraph directly contradicted the one further up this same page, which already said so. Both were on the page at once for weeks; nothing reads prose, so nothing noticed.</p>
 <p>What actually happens: a missing parser, a grammar that cannot parse the file, or a query that compiles to nothing each <code>throw new ParseFailure</code> carrying file, language and reason (&lt;span class="anchor"&gt;src/lib/core/parsing/reflector.ts:194&lt;/span&gt;). The orchestrator reports those and says plainly that the symbols and edges are MISSING — the whole point of ADR 0089 being that a degraded answer is indistinguishable from a real one.</p>
 <p><code>Gnosis</code> survives as a name in &lt;span class="anchor"&gt;src/lib/core/parsing/grammar-registry.ts:51&lt;/span&gt; for the case where the NATIVE BINDING itself will not load, which is a different failure from a file that will not parse.</p>
+<h2>Features</h2>
+<ul>
+<li>none — the reflector is one file with one entry point, <code>reflect()</code></li>
+</ul>
+<h2>Glossary</h2>
+<ul>
+<li><b>match loop</b> — the single <code>for (const capture of match.captures)</code> chain that walks every query</li>
+</ul>
+<p>  match for a file and builds its spectrum. Not yet split into per-capture handlers (see Deferred).</p>
+<ul>
+<li><b>PendingPair</b> — the one shared shape now used by all four capture pairs that used to each hold</li>
+</ul>
+<p>  their own <code>pending… = null</code> local.</p>
+<h2>Traps</h2>
+<ul>
+<li>**A relationship's endpoint name must produce the id the node writer stores, or the node gets</li>
+</ul>
+<p>  silently deleted.** <code>saveNodes</code> scopes a binding to its enclosing function   (<code>&lt;file&gt;::main2.doit</code>); a processor handing back a bare name yields <code>&lt;file&gt;::doit</code>. The mismatch   does not error and does not read as a broken link — <code>pruneTaxonomy</code> counts a node referenced only   when an edge's endpoint IS that node, so the wrongly-scoped edge causes the real node to be dropped   as unreferenced. <code>scopePrefix</code> in the definition branch is the shape to match.</p>
+<ul>
+<li><b>A scope-resolution bug corrupts the node ID itself, not just a parent pointer.</b> <code>getScopeAt</code></li>
+</ul>
+<p>  used to resolve a declaration's scope from row ranges alone, excluding only the declaration's own   NAME. On <code>export class Widget { run(): void {} }</code>, the class and its one-line method share a start   and end row, so while resolving <code>Widget</code> its own method <code>run</code> passed the row test and became its   parent — id <code>::run.widget</code> instead of <code>::widget</code>. Multi-line code hid this completely. The scope map   now carries <code>startCol</code>/<code>endCol</code> and <code>getScopeAt</code> refuses any scope CONTAINED by the declaration's   own span; both the id and <code>parentId</code> needed the fix, not just <code>parentId</code>.</p>
+<ul>
+<li><b>STALE_IMPORT under-reports by design.</b> <code>findStaleImports</code> reports a binding only on affirmative</li>
+</ul>
+<p>  absence across every evidence class (calls, constructs, accesses, type references, extends/   implements, dependency links, identifier-in-arguments). Namespace, side-effect, default and   unresolved imports are structurally invisible to it — never "missed", because no per-binding edge   exists for them to check. Recall changes need re-running the tsc-subset validation, not just adding   another guard.</p>
+<ul>
+<li><b>Type-only classification only works for languages with a type-position capture.</b> <code>isTypeOnly</code></li>
+</ul>
+<p>  needs a <code>@pulse_type_target</code> capture; only TypeScript, TSX and Go emit one. Every other language is   type-blind, so a type-aware finding on those languages is not wrong, it is silent — it evaluates to   nothing rather than failing.</p>
+<ul>
+<li><b>A processor pushing straight onto <code>spectrum.nodes</code> used to lose the push.</b> The match loop ends</li>
+</ul>
+<p>  with <code>spectrum.nodes = Array.from(nodeCache.values())</code>   (&lt;span class="anchor"&gt;src/lib/core/parsing/reflector.ts:1491&lt;/span&gt;) — anything a processor had   pushed onto <code>spectrum.nodes</code> earlier in the walk, bypassing <code>nodeCache</code>, was discarded by that   assignment. Every route and request node <code>FlowProcessor</code> created was lost this way, in every   language, for as long as the code existed. The line now reads   <code>[...Array.from(nodeCache.values()), ...virtualNodes]</code>, merging in whatever <code>spectrum.nodes</code> holds   that <code>nodeCache</code> does not. A processor inventing a node (routes, requests, virtual libraries) must   still be verified to reach the VAULT, not just the spectrum — three of four historical cross-service   breaks were invisible at the spectrum level alone.</p>
+<ul>
+<li><b><code>resonate()</code>'s edges are not persisted for free.</b> <code>bindNeuralCircuits</code>, <code>bindRouteCircuits</code> and</li>
+</ul>
+<p>  <code>bindPulseCircuits</code> add edges to the in-memory graph inside <code>ConducksGraph.resonate()</code>   (&lt;span class="anchor"&gt;src/lib/core/graph/graph-engine.ts:139&lt;/span&gt;), which the pulse calls AFTER   the last wave flush. A pulse then ends with a metadata-only save, which writes no rows — any new   binder added to <code>resonate()</code> inherits this and needs its edges explicitly saved. Assert the edge is   in the vault after a pulse, not that the binder ran.</p>
+<ul>
+<li><b>Route detection is centralised in the reflector, not the grammar.</b> All ten grammars capture</li>
+</ul>
+<p>  <code>@kinesis_route_path</code>; the reflector triggers on that one capture and normalises the verb itself   (<code>GetMapping</code> → GET, <code>HandleFunc</code> → GET) rather than branching per language. Query SEMANTICS cannot   be shared (node types differ per grammar), but the meaning of a route is identical everywhere and   belongs in one place. Adding a language means adding a capture pattern, never a branch in the   reflector. The REQUEST half is still TypeScript-only (<code>@kinesis_request_url</code> exists nowhere else) —   routes working in a language does not mean cross-service binding works there.</p>
+<ul>
+<li><b><code>nodes.fingerprint</code> cannot answer "did this file change" — it is per SYMBOL.</b> <code>fingerprint</code> is a</li>
+</ul>
+<p>  SHA-256 of <code>path|name|dna</code> per symbol   (&lt;span class="anchor"&gt;src/lib/core/parsing/reflector.ts:610&lt;/span&gt;), written for the drift engine.   It looks like a file hash and is not one: a file with no symbols has none at all, and a   comment-only edit changes no fingerprint while still needing a re-parse to move every line number   below it. File-level freshness is a separate concern (a <code>file_hashes</code>-style table), never this   column.</p>
+<ul>
+<li><b>A local declaration can lose every reference to a built-in of the same name.</b> A reference is</li>
+</ul>
+<p>  routed to <code>GLOBAL::name</code> the moment the name is in the built-in list   (&lt;span class="anchor"&gt;src/lib/core/parsing/reflector.ts:1495&lt;/span&gt;), and that test can run before   anything asks whether the file declares the name itself — so <code>interface Location</code> in a project's own   code can be reported ORPHAN while being referenced twice in its own file, because both references   routed to the DOM's <code>Location</code> instead. <code>Request</code>, <code>Response</code>, <code>Document</code> and <code>Navigator</code> are on the   same built-in list, and a project declaring its own is ordinary. It is invisible by construction:   identical code differing only in the NAME gets opposite verdicts, so renaming the symbol to   reproduce it makes the bug disappear. Shadowing must be resolved AFTER the walk, from the set of   names the file itself declares — deciding during the walk depends on file layout (was the   declaration read before the use), not on the code.</p>
+<ul>
+<li><b>A case-collision count is not a damage count.</b> <code>class UserRepository</code> beside `const</li>
+</ul>
+<p>  userRepository` is an ordinary TypeScript idiom that collides on a lowercased node id — measured at   12 of 658 files on one subject, 32 of 513 on another. It is almost always harmless: the VALUE wins   the id (&lt;span class="anchor"&gt;src/lib/core/parsing/reflector.ts:554-556&lt;/span&gt;) — "edges target   values and a value has a body to point at" — so the surviving node carries the class's real span.   Re-casing the id itself was measured and rejected (todo32#P2): it changes ~38% of all ids, every   fingerprint, every baseline and every stored layer. Counting collisions does not test whether span   attribution is wrong; reading the surviving span back against source does. Do not re-open this on a   raw count.</p>
 <footer>Source: <code>docs/visuals/modules/core/parsing/reflector.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

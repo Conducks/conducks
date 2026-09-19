@@ -105,7 +105,8 @@ export class ImpactCommand implements ConducksCommand {
       // radius, and it was printed as a bare count — `createLogger` reads "409 Symbols affected"
       // where 71 of them are direct. A reader asking "who calls this" takes the headline as the
       // answer to that, and it is the answer to a different, larger question. The depth was already
-      // a flag; only the label was missing (todo44#P6 fixed the flag, CONDUCKS-37 the empty case).
+      // a flag; only the label was missing (todo44#P6 fixed the flag; the empty case is covered by
+      // docs/visuals/modules/domain/governance.md).
       // SPLIT THE HEADLINE: this codebase, and everything outside it.
       //
       // `affectedNodes` includes every unresolved and external target the walk reached —
@@ -129,7 +130,7 @@ export class ImpactCommand implements ConducksCommand {
         console.log(chalk.dim(`  + ${externalCount} external or unresolved reference(s) reached — built-ins, packages, and targets this analysis could not place.`));
       }
 
-      // A TRUE ZERO AND A BROKEN ZERO MUST NOT PRINT THE SAME OUTPUT (todo44#P6, CONDUCKS-37).
+      // A TRUE ZERO AND A BROKEN ZERO MUST NOT PRINT THE SAME OUTPUT (todo44#P6, see docs/visuals/modules/domain/governance.md).
       //
       // Measured on the frozen scraper subject: `impact classify` said 0 and was right — nobody
       // calls it. `impact resolve_project_path` said 0 and was wrong — ten callers existed, every
@@ -190,7 +191,7 @@ export class ImpactCommand implements ConducksCommand {
         const shown = impact.affectedNodes.slice(0, 10);
         const reader = registry.source.lineReader();
         const root = (registry as any).infrastructure?.chronicle?.getProjectDir?.() || process.cwd();
-        // `displayPath` rather than a slice: the id is lowercased (CONDUCKS-4), so slicing gives a
+        // `displayPath` rather than a slice: the id is lowercased (see docs/visuals/modules/contracts.md), so slicing gives a
         // path that matches no file in the reader's editor. Ids are untouched; only this line is.
         const rel = (p: string) => displayPath(p, root);
 
@@ -221,7 +222,7 @@ export class ImpactCommand implements ConducksCommand {
             for (const l of lines.slice(0, 3)) {
               const src = reader.read(file, l);
               // A line the working tree no longer holds says so rather than printing whatever now
-              // sits at that number — the vault can be older than the file (CONDUCKS-37).
+              // sits at that number — the vault can be older than the file (see docs/visuals/modules/domain/governance.md).
               const text = src.text === null
                 ? chalk.dim(src.reason === 'past-end' ? '(line no longer in this file — re-run analyze)' : '(file unreadable)')
                 : src.text;

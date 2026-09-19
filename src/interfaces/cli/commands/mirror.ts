@@ -1,6 +1,6 @@
 import { ConducksCommand } from "@/interfaces/cli/command.js";
 import type { Registry } from "@/registry/index.js";
-import { initGlobalMirror } from "@/interfaces/web/mirror-server.js";
+import { initGlobalMirror } from "@/interfaces/web/mirror/server.js";
 
 /**
  * Conducks — Mirror Command
@@ -48,6 +48,17 @@ export class MirrorCommand implements ConducksCommand {
       registry.evolution.watcher.start();
     }
     
+    // This command runs until it is killed, and until now it handled no signal — so `stop()`
+    // never ran, and the docs watcher's readiness probe was left behind in `docs/` every time.
+    // `once` so a second Ctrl-C during shutdown still kills the process rather than re-entering.
+    const shutdown = async () => {
+      console.log("\n\x1b[90m[Conducks] Stopping mirror…\x1b[0m");
+      try { await server.stop(); } catch { /* shutting down anyway */ }
+      process.exit(0);
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
+
     console.log("\n\x1b[32m✅ Conducks Mirror is LIVE.\x1b[0m");
     console.log(`\x1b[34m- Dashboard: http://localhost:${port}\x1b[0m`);
     console.log("\x1b[33m- Note: Keep this terminal open to maintain the live pulse.\x1b[0m");

@@ -46,18 +46,19 @@ export class FlowsCommand implements ConducksCommand {
     //
     // The full list is still carried and still shown; only the COUNT the caller filters and reads by
     // is now the project count, with the remainder stated rather than dropped.
+    // KEYED BY THE ENTRY'S ID (ADR 0191). Keyed by NAME, two entries called `run` in different files
+    // became one flow and the loser was never reported — 35% of scraper's entry points, 48% of
+    // sofie's, 44% of orchestrator's.
     const sizes = new Map<string, { project: string[]; external: string[] }>();
-    for (const [name, members] of Object.entries(processes)) {
-      sizes.set(name, splitProjectSymbols(members as string[]));
-    }
-    const projectSize = (name: string) => sizes.get(name)?.project.length ?? 0;
+    for (const p of processes) sizes.set(p.id, splitProjectSymbols(p.members));
+    const projectSize = (id: string) => sizes.get(id)?.project.length ?? 0;
 
-    const matching = Object.entries(processes).filter(([name]) => projectSize(name) >= minMembers);
+    const matching = processes.filter(p => projectSize(p.id) >= minMembers);
     const shown = limit === undefined ? matching : matching.slice(0, limit);
-    const hidden = Object.keys(processes).length - matching.length;
+    const hidden = processes.length - matching.length;
 
     if (useJson) {
-      // CARRY THE DENOMINATOR (ADR 0115/0145, CONDUCKS-37). This emitted a bare array, so `[]` meant
+      // CARRY THE DENOMINATOR (ADR 0115/0145, see docs/visuals/modules/domain/governance.md). This emitted a bare array, so `[]` meant
       // both "this project has no flows" and "it has 4 and none of them matched" — the rendered path
       // three lines below has always said which, and the MCP tool returns `{total, matching, shown}`.
       // `--json` is the CLI's machine surface and should carry the same data the tool does
@@ -67,13 +68,16 @@ export class FlowsCommand implements ConducksCommand {
       process.stdout.write(JSON.stringify({
         // `symbols` keeps every member, so nothing a consumer already reads disappears; the two
         // counts beside it say how many of those are this project's code.
-        flows: shown.map(([name, members]) => ({
-          name,
-          symbols: members as string[],
-          project_members: projectSize(name),
-          external_members: sizes.get(name)?.external.length ?? 0,
+        flows: shown.map(p => ({
+          // The entry's id, so a caller can address the flow it was actually given. Two flows may
+          // share a `name`; they never share an `id`.
+          id: p.id,
+          name: p.name,
+          symbols: p.members,
+          project_members: projectSize(p.id),
+          external_members: sizes.get(p.id)?.external.length ?? 0,
         })),
-        total: Object.keys(processes).length,
+        total: processes.length,
         matching: matching.length,
         shown: shown.length,
       }, null, 2) + '\n');
@@ -96,10 +100,10 @@ export class FlowsCommand implements ConducksCommand {
       return;
     }
 
-    for (const [name, members] of shown) {
-      const list = members as string[];
-      const ext = sizes.get(name)?.external.length ?? 0;
-      console.log(`\x1b[35m- ${name} Flow (${projectSize(name)} symbols${ext > 0 ? ` · ${ext} external` : ''})\x1b[0m`);
+    for (const p of shown) {
+      const list = p.members;
+      const ext = sizes.get(p.id)?.external.length ?? 0;
+      console.log(`\x1b[35m- ${p.name} Flow (${projectSize(p.id)} symbols${ext > 0 ? ` · ${ext} external` : ''})\x1b[0m`);
       list.slice(0, 5).forEach((m: string) => console.log(`  └─ ${displayId(m, projectRoot, nameLookupFrom(registry.query.graph.getGraph()))}`));
       if (list.length > 5) console.log(`  ... and ${list.length - 5} more`);
     }

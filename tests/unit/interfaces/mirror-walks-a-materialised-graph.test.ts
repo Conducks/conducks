@@ -19,7 +19,7 @@ import path from 'node:path';
  * inside jest would test the harness more than the rule. What matters is the rule itself: a handler
  * that reaches a graph-walking registry method must await the load in the same handler.
  */
-const SERVER = path.resolve('src/interfaces/web/mirror-server.ts');
+const SERVER = path.resolve('src/interfaces/web/mirror/server.ts');
 
 /** Each `app.get('<route>', …)` handler body, split at the next route registration. */
 const handlers = (): Array<{ route: string; body: string }> => {

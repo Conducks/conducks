@@ -15,6 +15,15 @@ code links them.
 repository of its own — `CoChangeEngine` takes an optional `historyExtractor`, and the analyze path
 hands it a connection rather than making one.
 
+**Uses:** `CoChangeEngine.discoverHiddenCoupling` takes a `ConducksAdjacencyList` from
+[core/graph](graph.md) (to ask `!hasEdge`) and a DuckDB handle from
+[core/persistence](persistence.md) (to run the vectorized commit-pair query), plus raw git log
+output — either injected via `historyExtractor` or read directly with `execSync('git log …')`
+(<span class="anchor">src/lib/core/algorithms/cochange-engine.ts:1-30</span>). `entropy.ts` takes a
+plain author-to-commit-count distribution built upstream — [core/parsing](../parsing.md)'s reflector
+assembles it from [core/git](git.md)'s chronicle (`getFileHistory`/`getBlameData`) and calls
+`calculateShannonEntropy`/`normalizeEntropyRisk` directly; this module never touches git itself.
+
 They share no code, and that is fine. A feature here is a BOUNDARY, not a cluster of similar
 functions.
 
@@ -39,3 +48,17 @@ two-person module permanently safe.
 
 A single author is 0 by an explicit guard, not by the arithmetic — `log2(1)` is zero and the division
 would be undefined.
+
+## Features
+- **hidden-coupling detection** — surfaced by `conducks advise`: files that keep changing together
+  in git history despite having no structural edge between them, so a reader sees coupling the code
+  graph is blind to.
+- **ownership-risk scoring** — the authorship-entropy signal folded into `conducks explain`'s
+  composite risk score, and compared against a historical baseline by `conducks guard` to catch
+  structural decay before it merges.
+
+## Glossary
+- **temporal coupling** — two files that change together across commits with no import, call or
+  other structural edge linking them; what `cochange-engine.ts` measures.
+- **ownership entropy** — the Shannon entropy of a unit's per-author commit distribution, normalised
+  against the author count so a large team is not permanently flagged risky.

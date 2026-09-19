@@ -7,7 +7,7 @@ import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
  * for reading a codebase top-down. It returned "No symbols found" on every project, because `*` was
  * scored as a literal token and no symbol is named `*`.
  *
- * Node ids are built the way the pulse builds them (CONDUCKS-28): a bare name as an id is the fixture
+ * Node ids are built the way the pulse builds them (see docs/visuals/modules/core/graph.md): a bare name as an id is the fixture
  * shape that makes a broken lookup look correct.
  */
 describe('search — the "*" inventory', () => {

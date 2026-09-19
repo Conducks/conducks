@@ -1,6 +1,7 @@
 import { registry } from "@/registry/index.js";
 import path from 'node:path';
 import fs from 'node:fs';
+import { VAULT_DIR, VAULT_DB_FILENAME } from "@/contracts/index.js";
 
 /**
  * S1: path guard — what a caller may anchor a tool to.
@@ -75,12 +76,12 @@ export async function ensureAnchor(
   //
   // Name the analyzed projects that ARE there. This is a diagnostic only — it fires when the
   // anchored root has no graph of its own, and never changes which root is used (ADR 0109).
-  if (!customPath && !fs.existsSync(path.join(root, '.conducks', 'conducks-synapse.db'))) {
+  if (!customPath && !fs.existsSync(path.join(root, VAULT_DIR, VAULT_DB_FILENAME))) {
     let siblings: string[] = [];
     try {
       siblings = fs.readdirSync(root, { withFileTypes: true })
         .filter(e => e.isDirectory())
-        .filter(e => fs.existsSync(path.join(root, e.name, '.conducks', 'conducks-synapse.db')))
+        .filter(e => fs.existsSync(path.join(root, e.name, VAULT_DIR, VAULT_DB_FILENAME)))
         .map(e => e.name);
     } catch { /* unreadable root: fall through to the normal failure */ }
     if (siblings.length > 0) {

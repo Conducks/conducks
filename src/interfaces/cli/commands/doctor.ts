@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { VAULT_DIR, VAULT_DB_FILENAME } from "@/contracts/index.js";
 
 /**
  * Conducks — Doctor Command
@@ -15,8 +16,16 @@ export class DoctorCommand implements ConducksCommand {
   public usage = "conducks doctor";
 
   public async execute(_args: string[], registry: Registry): Promise<void> {
+    // A `[✗]` now decides the exit code. `doctor` used to print every marker and exit 0 — measured
+    // with no vault at all, every check failing, still 0 — so it could not gate CI or a git hook and
+    // every failure marker was cosmetic. A command shaped like a health check that cannot fail is a
+    // check nobody can act on (todo77#P11).
+    //
+    // A warning does NOT fail: "an update is available" and "could not reach GitHub" are states of
+    // the world, not of this installation, and failing on them would make the gate unusable offline.
+    let failures = 0;
     const ok = (msg: string) => console.log(`[✓] ${msg}`);
-    const fail = (msg: string) => console.log(`[✗] ${msg}`);
+    const fail = (msg: string) => { failures++; console.log(`[✗] ${msg}`); };
     const warn = (msg: string) => console.log(`[!] ${msg}`);
 
     // 1. Node.js version
@@ -78,14 +87,15 @@ export class DoctorCommand implements ConducksCommand {
     const projectRoot = _args[0] ? path.resolve(_args[0]) : process.cwd();
     const vaultPath = path.resolve(projectRoot, '.conducks');
     if (fs.existsSync(vaultPath)) {
-      // 6. Last pulse timestamp
-      const dbCandidates = [
-        path.join(vaultPath, 'conducks-synapse.db'),
-        path.join(vaultPath, 'synapse.db'),
-        path.join(vaultPath, 'conducks.db'),
-      ];
-      const dbPath = dbCandidates.find(p => fs.existsSync(p));
-      if (dbPath) {
+      // 6. Last pulse timestamp.
+      //
+      // ONE filename, the one `persistence.ts` writes. This used to accept `synapse.db` and
+      // `conducks.db` as well — names nothing has ever written and nothing migrates, so `doctor`
+      // reported "Vault at .conducks/" for a file no version of conducks produces, while `list`
+      // (checking only the real name) called the same project `not-analyzed`. Two commands
+      // disagreeing about whether a project is analyzed is worse than either answer alone.
+      const dbPath = path.join(vaultPath, VAULT_DB_FILENAME);
+      if (fs.existsSync(dbPath)) {
         const stat = fs.statSync(dbPath);
         const ageMs = Date.now() - stat.mtimeMs;
         const ageHours = ageMs / (1000 * 60 * 60);
@@ -116,6 +126,11 @@ export class DoctorCommand implements ConducksCommand {
       warn(`  Upgrade with: ${update.upgradeCommand}`);
     } else {
       ok(`Version: ${update.installed} (latest)`);
+    }
+
+    if (failures > 0) {
+      console.log(`\n✗ ${failures} check(s) failed.`);
+      process.exitCode = 1;
     }
   }
 }

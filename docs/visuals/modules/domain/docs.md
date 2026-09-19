@@ -11,7 +11,35 @@ whether each file conforms to the conducks-docs grammar, whether every `file:lin
 still resolves, and whether a generated page still matches a fresh render.
 
 **Boundaries:** it reads the TREE, never the vault. A docs check that needed a graph would be a check
-you cannot run before analyzing, which is exactly when you most want it (ADR 0058).
+you cannot run before analyzing, which is exactly when you most want it (ADR 0058). A docs-layer tool
+never touches the graph — enforced by `tests/unit/interfaces/tools/docs-layer.test.ts`, which reads as
+a dependency boundary: the docs/code split (ADR 0023) means a docs tool must answer with no graph and
+no DuckDB open at all.
+
+**Uses:** nothing below it but the filesystem — this area is a leaf against the graph, which is what
+lets it run before `analyze` ever does. [docs-grammar](docs/docs-grammar.md) and
+[docs-board](docs/docs-board.md) are its two parts; see those notes for what each answers.
+
+## Features
+
+- **Docs grammar gate** (`conducks docs-lint`) — see [docs-grammar](docs/docs-grammar.md).
+- **Docs board** (`conducks docs-status`, MCP `conducks_docs`) — see [docs-board](docs/docs-board.md).
+- **Visual anchor gate** (`conducks visuals-lint`) — checks every anchor a diagram makes against the
+  working tree: the file resolves to exactly one place, the line exists, the symbol is still defined,
+  and a constant written in the page still matches the value the code assigns. An ambiguous
+  abbreviation fails rather than resolving to a guess. Runs against the filesystem, never the vault —
+  a graph keyed to the last pulse would let a lying page report clean (ADR 0138, ADR 0035).
+- **Drift check** (`visuals-drift.ts`) — flags a generated page that no longer matches a fresh render.
+  Anchors resolving and content being true are different claims; this is the second half `visuals-lint`
+  does not cover.
+
+## Glossary
+
+- **Anchor** — a `file:line` (or symbol) claim a visual page makes, checked to still resolve.
+  **Not the anchor [core/bootstrap](../core/bootstrap.md) means** — that one is the resolved project
+  root. Same word, unrelated things; `conducks glossary` reports the pair on purpose.
+- **Drift** (docs sense) — a generated page whose content no longer matches what a fresh render would
+  produce, distinct from an anchor that fails to resolve at all.
 
 ## Why it is a feature, and the measurement that decided it
 

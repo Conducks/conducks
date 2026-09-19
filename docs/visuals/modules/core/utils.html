@@ -11,9 +11,13 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Read at <code>7c11bc4</code>.</b></p>
 <p><b>Responsibility:</b> the shared decisions too small to be features and too load-bearing to be copied. <code>path-utils</code> decides what a node id looks like; <code>logger</code> decides where a diagnostic goes; <code>scope-guard</code> decides whether a directory is a sane thing to analyze at all.</p>
 <p><b>Boundaries:</b> no state that outlives a call, with ONE exception below, and no knowledge of the graph, the vault or a language.</p>
+<p><b>Uses:</b> takes a raw root path or CLI argument before anything else touches it and either validates it (<code>scope-guard</code>, below) or normalizes it (<code>path-utils</code>/<code>canonicalize</code>); every layer above reaches down into <code>logger</code> for output and <code>mem-trace</code> for diagnostics. Nothing here reads the graph, the vault, or a parsed language — the dependency only ever runs upward.</p>
 <h2><code>canonicalize</code> is where node identity is decided</h2>
-<p>Ids are lowercased on write (CONDUCKS-4) because APFS treats two spellings of a path as the same file, and treating them as two splits one symbol into two nodes — which every count then reports twice.</p>
+<p>Ids are lowercased on write, per the canonical-id rule defined in <a href="../contracts.html">contracts</a>, because APFS treats two spellings of a path as the same file, and treating them as two splits one symbol into two nodes — which every count then reports twice.</p>
 <p>The counter-rule matters as much: a DISPLAY path is never lowercased. A lowercased display path opens nothing on a case-sensitive filesystem, so the two must not be computed by one function.</p>
+<h2>A pulse target must look like a project</h2>
+<p><code>conducks analyze</code> grades its root before writing anything (<code>scope-guard.ts</code>), and nothing is outright forbidden — a hard block gets worked around. Three tiers: <b>ask-twice</b> (confirm, then type the folder name back) for OS trees, the home directory and anything directly under it, cloud-sync folders, dependency/build directories by name (<code>node_modules</code>, <code>vendor</code>, <code>dist</code>, <code>target</code>, <code>.venv</code>, …), and any folder whose subfolders are themselves projects; <b>ask</b> (one question) for no project marker or over 25,000 files; <b>ok</b> runs silently. With no TTY, anything above <code>ok</code> is a refusal — <code>--yes</code> is the only bypass. The assessment is pure and returns reasons, so CLI, MCP and tests share one rule.</p>
+<p>This exists because the command took any path at all: one typo (<code>conducks analyze ~/Documents</code>) started an hours-long pulse over every repo and photo library under it and wrote a <code>.conducks</code> vault into a folder that is not a project. Silence must not start an unbounded write — a question nobody can answer is a NO. The folder-of-projects tier exists because no hardcoded list can know where someone parks their repos; it caught <code>~/Documents/Gospel_Of_Technology</code> itself (ADR 0021).</p>
 <h2>Quiet belongs to the PROCESS, and that is why it is not a method</h2>
 <p><code>conducks status</code> printed five boot lines before its report, on every read-only command. None of it is the answer the caller asked for, and a tool that narrates its own startup is one an agent has to filter (ADR 0080).</p>
 <p>Making the flag per-instance was tried and MEASURED wrong: modules build their own loggers, so it silenced four of the five lines and left the fifth printing from a handle nobody held.</p>
@@ -22,5 +26,20 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <h2><code>traceMemory</code> is off unless asked for</h2>
 <p>It exists because five explanations of a 1 GB pulse peak were written down before anything was measured, and every one was wrong. What it prints is <code>rss - heapTotal - external</code> — the NATIVE footprint — because the same pulse survives <code>--max-old-space-size=400</code> and still exceeds a gigabyte, so the JavaScript heap is not the answer and <code>rss</code> alone is what misled five guesses.</p>
 <p>It deliberately does NOT ask DuckDB for its own accounting: querying <code>duckdb_memory()</code> on the pulse connection while the transaction is open kills the process.</p>
+<h2>Features</h2>
+<p>none — five independent leaves (<code>logger</code>, <code>path-utils</code>, <code>mem-trace</code>, <code>scope-guard</code>, <code>source-line</code>), each too small to be its own feature and none built on the others.</p>
+<h2>Glossary</h2>
+<ul>
+<li><b>canonicalize</b> — the function that lowercases a node id on write, keeping the pre-lowercase</li>
+</ul>
+<p>  spelling in <code>metadata.original</code> for consumers that need display case.</p>
+<ul>
+<li><b>quiet</b> — the process-wide flag suppressing INFO/DEBUG log lines, set once through</li>
+</ul>
+<p>  <code>setProcessQuiet</code>; WARN, ERROR and SUCCESS are never suppressed, and every suppressed line still   reaches <code>.conducks/mcp.log</code>.</p>
+<ul>
+<li><b>scope-guard</b> — the pre-flight check that grades a pulse target (<code>ok</code> / <code>ask</code> / <code>ask-twice</code>)</li>
+</ul>
+<p>  before <code>analyze</code> writes anything.</p>
 <footer>Source: <code>docs/visuals/modules/core/utils.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

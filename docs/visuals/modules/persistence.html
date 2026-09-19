@@ -12,6 +12,7 @@
 <a class="back" href="../architecture.html">&larr; back to the architecture</a>
 <h1>THE VAULT</h1>
 <p class="sub">core/persistence — DuckDB, and one writer</p>
+<div class="det"><h3>Where this feature begins</h3><p class="where">src/lib/core/persistence/index.ts — the persistence feature's only door (ADR 0150). Every other feature is written against the shape this file hands out, which is what makes it a contract rather than a peer</p></div>
 <div class="meta">
   <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
   so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next

@@ -59,6 +59,7 @@ ${why ? `  <p>${esc(why)}</p>\n` : ''}${n.s ? `  <p class="file">on the canvas: 
 ${NAV}<a class="back" href="../architecture.html">&larr; back to the architecture</a>
 <h1>${esc(c.title)}</h1>
 <p class="sub">${esc(c.sub || '')}</p>
+${c.anchor ? `<div class="det"><h3>Where this feature begins</h3><p class="where">${esc(c.anchor)}</p></div>` : ''}
 <div class="meta">
   <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
   so a block's hover and its entry here cannot disagree. An edit made here is discarded by the next
@@ -129,8 +130,10 @@ console.log(`generated ${made} detail pages covering ${blocks} blocks`);
 {
   const bad = [];
 
-  // 1 · a canvas page and a module note may never claim the same path
-  const derived = new Set(BANDS.flatMap(b => b.containers.map(c => pageFor(c.id))));
+  // 1 · a canvas page and a module note may never claim the same path — UNLESS the container is
+  // registered `HAND_WRITTEN` (visuals.config.mjs), in which case the collision is the point: the
+  // container's own generation is skipped above and the note supplies the page instead.
+  const derived = new Set(BANDS.flatMap(b => b.containers.filter(c => !HAND_WRITTEN.has(c.id)).map(c => pageFor(c.id))));
   for (const f of readdirSync('docs/visuals/modules'))
     if (f.endsWith('.md') && derived.has(f.replace(/\.md$/, '.html')))
       bad.push(`collision: modules/${f} and a canvas container both render to ${f.replace(/\.md$/, '.html')}`);

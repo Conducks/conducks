@@ -13,8 +13,9 @@ export const CaptureTags = {
   // A NAMESPACE is not a PACKAGE. C++ `namespace`, C# `namespace`, PHP `namespace` and Rust `mod`
   // are language scoping constructs; Go `package foo` and Java `package com.x` name a deployable
   // unit. All six were tagged `@isPackage`, which is why PACKAGE's only nodes on this repository
-  // were a C# and a PHP namespace, and why NAMESPACE — a rung four consumers already read
-  // (cluster-rule, http-service-linker, mirror.engine, dead-code) — had none at all (ADR 0100).
+  // were a C# and a PHP namespace, and why NAMESPACE — a rung several consumers already read, among
+  // them cluster-rule, http-service-linker and dead-code — had none at all (ADR 0100). The record
+  // named four; it is eight files today, and one of its four (mirror.engine) is gone (ADR 0190).
   IS_NAMESPACE: 'isNamespace',
   IS_MACRO:     'isMacro',
   IS_FIELD:     'isField',

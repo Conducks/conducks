@@ -11,18 +11,24 @@
  * zero coupling to the rest. A folder holding four unrelated subjects is not a feature; it is a
  * place things were put.
  *
- * `visuals-lint` and `visuals-drift` are here rather than in `domain/visual` because they lint the
- * docs/visuals PAGES — the standard's tooling. `domain/visual` is the graph's own visual wave, a
- * different subject that shares a word.
+ * `visuals-lint` and `visuals-drift` are here because they lint the docs/visuals PAGES — the
+ * standard's tooling, not the graph's own visual wave. That wave is `domain/analysis`'s
+ * `GatewayService`; the `domain/visual` folder this once contrasted itself with is gone (ADR 0190).
  *
  * `tests/architecture/feature-doors.test.ts` fails when anything outside reaches past this file.
  */
 export { buildBoard, agentView, governedCount, buildTrees, enforcedByPaths, crossTreeLint,
          treeShapeLint } from './docs-board.js';
 export { DocsWatcher } from './docs-watcher.js';
-export { lintVisuals, collectVisualPages, buildStamps, staleStamps } from './visuals-lint.js';
-export type { VisualsViolation, ReviewStamps } from './visuals-lint.js';
+export { lintVisuals, collectVisualPages, buildStamps, staleStamps, unstampedExemptionsOf, isDerivedPage } from './visuals-lint.js';
+export type { VisualsViolation, ReviewStamps, VisualsReport } from './visuals-lint.js';
 export { checkVisualsDrift, generatorCommandOf } from './visuals-drift.js';
 export { readTestingPage, renderTarget, FORGETERM_PLUGIN_CHORD } from './testing-page.js';
 export type { TestingPage, Target } from './testing-page.js';
 export type { DriftResult } from './visuals-drift.js';
+export { collectModuleNotes, sectionOf, isEmptyBody } from './module-notes.js';
+export type { ModuleNote } from './module-notes.js';
+export { buildGlossaryReport, normaliseTerm } from './glossary.js';
+export type { GlossaryReport, GlossaryEntry, GlossaryCollision } from './glossary.js';
+export { buildFeaturesReport } from './features.js';
+export type { FeaturesReport, FeatureNode, FeatureEntry } from './features.js';

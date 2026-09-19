@@ -14,6 +14,26 @@ const STANDARD = path.join(ROOT, 'src/resources/skills/conducks-docs.md');
 const SKIP_DIRS = new Set(['node_modules', 'build', 'coverage', '.git', 'completed', 'legacy', 'archive']);
 
 /**
+ * The standard is a SET of files: the router `conducks-docs.md` plus every reference beside it.
+ * A `§N` is defined wherever its heading lives; a citation `conducks-docs §6.3` resolves to the
+ * reference that carries §6.3. Reading only the router would report every section that moved
+ * into a reference as undefined, which is the split working, not a broken citation.
+ */
+function standardFiles(): string[] {
+  const refs = path.join(ROOT, 'src/resources/skills/conducks-docs/references');
+  const extra = statSync(refs, { throwIfNoEntry: false })?.isDirectory()
+    ? readdirSync(refs).filter(f => f.endsWith('.md')).sort().map(f => path.join(refs, f))
+    : [];
+  return [STANDARD, ...extra];
+}
+const STANDARD_SET = new Set(standardFiles());
+
+/** The whole standard's text, in file order. */
+function standardText(): string {
+  return standardFiles().map(f => readFileSync(f, 'utf8')).join('\n');
+}
+
+/**
  * The standard's real headings. Fenced blocks are skipped, because it is a document about markdown
  * and its examples are full of `## Phase 1` lines that are illustrations, not sections — the same
  * carve-out the parser itself makes (§5.1).
@@ -21,7 +41,7 @@ const SKIP_DIRS = new Set(['node_modules', 'build', 'coverage', '.git', 'complet
 function headings(): string[] {
   const out: string[] = [];
   let fence: string | null = null;
-  for (const line of readFileSync(STANDARD, 'utf8').split('\n')) {
+  for (const line of standardText().split('\n')) {
     const f = /^\s*(```+|~~~+)/.exec(line);
     if (f) {
       if (!fence) fence = f[1][0].repeat(3);
@@ -51,7 +71,7 @@ function citations(): Array<{ file: string; section: string }> {
       if (SKIP_DIRS.has(e)) continue;
       const fp = path.join(dir, e);
       if (statSync(fp).isDirectory()) { walk(fp); continue; }
-      if (!/\.(ts|tsx|js|md)$/.test(e) || fp === STANDARD) continue;
+      if (!/\.(ts|tsx|js|md)$/.test(e) || STANDARD_SET.has(fp)) continue;
       for (const m of readFileSync(fp, 'utf8').matchAll(/conducks-docs`?(?:\s+skill)?\s+§(\d+(?:\.\d+)?)/g))
         out.push({ file: path.relative(ROOT, fp), section: m[1] });
     }
@@ -110,7 +130,7 @@ describe('conducks-docs — the standard names what the code enforces', () => {
   function prose(): string {
     const out: string[] = [];
     let fence: string | null = null;
-    for (const line of readFileSync(STANDARD, 'utf8').split('\n')) {
+    for (const line of standardText().split('\n')) {
       const f = /^\s*(```+|~~~+)/.exec(line);
       if (f) {
         if (!fence) fence = f[1][0].repeat(3);

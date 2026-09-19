@@ -10,6 +10,33 @@ against a recorded baseline.
 
 **Boundaries:** it does not decide what is covered. It reads a report and binds it.
 
+**Uses:** [core/graph](../core/graph.md) for node spans to range-join the report onto, and
+[core/persistence](../core/persistence.md) to store and re-read the baseline it compares a run against.
+Consumed by `conducks coverage` / `conducks coverage-view`.
+
+## Features
+
+- **Coverage binding** (`conducks coverage <coverage-final.json>`) — range-joins an istanbul/c8 report
+  onto function spans, reporting coverage per function rather than per file.
+- **Baseline diff** (`conducks coverage-view`) — compares a run against a recorded baseline so a
+  coverage change reads as "which behaviour just lost its test", not just a percentage.
+
+## Glossary
+
+- **Bound** — a report line successfully range-joined onto a graph node's span.
+- **Considered** — the candidate set a join was checked against; published beside the bound count so a
+  zero result can be told apart from "nothing to find" (see Traps).
+
+## Traps
+
+A coverage report whose files match nothing in the graph used to return the same payload as a fully
+covered codebase — `{functions: [], summary: {total: 0, full: 0, dark: 0}}`, zero read as good news
+(todo53#P1). `bindCoverage` walks the graph's functions and marks each bound or not, so `results.length`
+is the candidate set and `bound.length` is the answer — only the second was published. Fixed by adding
+`Verdict` fields (`status`/`checked`/`why`) and `summary.considered` beside `summary.total`: when a tool
+joins two sets, publish both sizes, because the join's output alone cannot distinguish "they agreed on
+nothing" from "there was nothing to find".
+
 ## Reading a report rather than inferring coverage IS the feature
 
 There was another way of answering this, and it ran on every analyze for months. `TestAligner` walked

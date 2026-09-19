@@ -6,7 +6,7 @@
 
 export type ImportSemantics = 'named' | 'wildcard' | 'namespace';
 
-/** What every language pack must supply for the reflector to use it (CONDUCKS-2). */
+/** What every language pack must supply for the reflector to use it (see docs/visuals/modules/core/parsing.md). */
 export interface ConducksProvider {
   /** Unique ID (e.g. 'typescript-provider') */
   readonly id: string;

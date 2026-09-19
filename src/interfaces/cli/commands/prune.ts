@@ -58,7 +58,7 @@ export class PruneCommand implements ConducksCommand {
     // The verdict/question split (ADR 0104) travels as a FIELD rather than as two arrays: a caller
     // that ignores it gets every finding, which is the safe default, and one that reads it can tell
     // "this is unused" from "the graph cannot tell".
-    // The path a finding names must be one the reader can OPEN. Ids are lowercased (CONDUCKS-4) and
+    // The path a finding names must be one the reader can OPEN. Ids are lowercased (see docs/visuals/modules/contracts.md) and
     // `file` was printed straight from the id, so `renderer/src/lib/useWorkGraph.ts` was reported as
     // `useworkgraph.ts` — a path that resolves on APFS by luck and on Linux CI not at all, in the one
     // command whose output is a list of files to go and edit.

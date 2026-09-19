@@ -148,7 +148,7 @@ function conducksStaleImports() {
   const found = new Map();
   for (const f of JSON.parse(raw)) {
     if (f.type !== 'STALE_IMPORT') continue;
-    // Node ids are LOWERCASED on write (CONDUCKS-4), so `f.file` is an absolute path in a case the
+    // Node ids are LOWERCASED on write (see docs/visuals/modules/contracts.md), so `f.file` is an absolute path in a case the
     // filesystem may not use. Relativising it against the real-cased projectDir produces a path full
     // of `../` — which then matches nothing and reports every finding as an EXTRA. Compare lowercase
     // to lowercase, and only then relativise.

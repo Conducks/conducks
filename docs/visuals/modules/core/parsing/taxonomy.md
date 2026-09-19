@@ -1,8 +1,10 @@
 # core/parsing/taxonomy — the canonical kind vocabulary
 
-**Part of:** [core/parsing](../parsing.md). One file, `contracts/taxonomy.ts` — it moved to
-`contracts/` in todo72, because three features read the taxonomy and a type two features share does
-not travel through a door (ADR 0150 rule 5).
+**Part of:** [core/parsing](../parsing.md). One file, `contracts/taxonomy.ts` — it
+moved to `contracts/` in todo72, because three features read the taxonomy and a type two features
+share does not travel through a door (ADR 0150 rule 5).
+
+**Layer:** core.
 
 **Responsibility:** mapping each language's own node kinds onto one shared vocabulary, so that a
 Python class and a Go struct answer the same question. Every node carries a `canonicalKind` and a
@@ -18,6 +20,11 @@ indistinguishable from a true zero. Both an ADR count and a namespace check were
 in one session before the shape was noticed. Filter `canonicalKind` for taxonomy questions.
 
 **Boundaries:** naming only. It does not decide which nodes survive — see below.
+
+**Uses:** takes a raw node from every language's [queries](../parsing/languages.md) and maps its
+grammar-specific kind onto the shared `canonicalKind`/`canonicalRank` pair. Takes nothing from
+persistence or the graph; `pruneTaxonomy`, which reads this taxonomy to decide what survives, lives
+in [core/persistence](../persistence.md), not here.
 
 **Deferred / not built:** the second classification system. ADR 0012 describes two orthogonal systems
 — *what a symbol is* (this) and *where its boundary lies* (origin: internal / stdlib / dependency,
@@ -75,3 +82,40 @@ over `src/` in `tests/unit/core/taxonomy-rank-single-source.test.ts`. The taxono
 emits is derived from the enum for the same reason — it was a hand-written list, and it described a
 different taxonomy than the one in use. One exemption, commented at its site: the legend's anchor is
 `-1`, because a node describing the ladder cannot stand on a rung of it. ADR 0099.
+
+## Features
+- none — this is a naming vocabulary, not a set of sub-capabilities
+
+## Glossary
+- **canonicalKind** — the taxonomy kind (`NAMESPACE`, uppercase), the shared vocabulary a Python
+  class and a Go struct both answer to.
+- **semantic_kind** — the language's own RAW kind (`namespace`, lowercase), plus shapes the taxonomy
+  has no rung for (`library_symbol`, `binding`). Filtering this column for a taxonomy question reads
+  as clean and answers zero.
+- **canonicalRank** — the 0-9 rung a kind sits on (ecosystem, repository, package, namespace,
+  directory, unit, infra, structure, behavior, atom). Read from `CanonicalRank`; never written as a
+  literal by a producer.
+
+## Traps
+- **A parameter is recorded as `kind: 'variable'`, not `kind: 'parameter'`** — `kind` is the
+  grammar's own word for the node, not a stable classification. Anything joining or ranking on `kind`
+  instead of `canonicalKind` will misclassify parameters; this cost two thirds of a language's
+  docstrings before it was traced to the join key.
+- **A wrong kind can delete a symbol, not just mislabel it.** `pruneTaxonomy` drops an ATOM with no
+  non-structural edge. Every React component recorded as a plain variable and exported for another
+  file, with no reference inside its own file, was removed outright — only components something in
+  the SAME file also called survived. A kind that looks cosmetic can feed a step that deletes.
+- **The "Shadow Symbols" test diagnostic false-flags polymorphic methods.** The structural test warns
+  "Found N Shadow Symbols" for any STRUCTURE/BEHAVIOR name repeated more than 5 times
+  (<span class="anchor">tests/database/ts/structural.test.ts:153</span>, `console.warn` only, no
+  assertion). Hits are normally NOT binding failures — one implementation each across parallel
+  language plugins, correctly distinct by id. The heuristic groups by bare `name`, ignoring the
+  owning class or structure, so any polyglot analyzer with N plugins implementing the same interface
+  method trips it. Treat the warning as benign; a known-benign name is silenced via the `NOT IN (…)`
+  allowlist at line 160, but the real fix is grouping by (name, structureId/parent) instead.
+- **A kind can have a producer and still never appear as a parent.** Measured against this
+  repository's vault: no node of any language has a NAMESPACE parent, and PACKAGE/INFRA are the same
+  — every other kind is used as a parent by something, these three are not. `cluster-rule.ts` and
+  `dead-code.ts` both assume the containment exists and neither fails, because neither branch is ever
+  reached. ADR 0100 guarantees every declared kind has a producer; it does not guarantee the kind is
+  structurally load-bearing.

@@ -2,7 +2,7 @@
  * Conducks — the gate that makes forgetting `displayId`/`displayPath` impossible (F-08).
  *
  * Node ids and file paths are lowercased at store time in `reflector.ts` (~20 sites, deliberate —
- * CONDUCKS-4, APFS is case-insensitive). Real casing is recovered only at render, by an author
+ * see docs/visuals/modules/contracts.md, APFS is case-insensitive). Real casing is recovered only at render, by an author
  * remembering to route a printed id/path through `displayId`/`displayPath`
  * (`src/interfaces/cli/shared/display-path.ts`). A human census of "which command files still
  * print raw" has been done twice by hand and been wrong both times — a "9 sites" pass missed 5.

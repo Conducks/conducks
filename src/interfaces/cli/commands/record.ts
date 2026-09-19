@@ -11,7 +11,7 @@ import { closePersistence } from "@/interfaces/cli/shared/context.js";
 export class RecordCommand implements ConducksCommand {
   public id = "record";
   public description = "Record a learning, decision, or intent into the Manifest";
-  public usage = "conducks record --type [vision|architecture|implementation|handover|conventions|todo|memory] \"content\"";
+  public usage = "conducks record --type [vision|implementation|handover|todo] \"content\"";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     // `--type` is read WHEREVER it appears, in either form.
@@ -35,7 +35,7 @@ export class RecordCommand implements ConducksCommand {
     const content = args.find((a, i) => !a.startsWith('-') && i !== typeValueIdx);
 
     if (!content) {
-      console.error("Usage: conducks record --type [vision|architecture|implementation|handover|conventions|todo|memory] \"content\"");
+      console.error("Usage: conducks record --type [vision|implementation|handover|todo] \"content\"");
       process.exit(1);
     }
 
@@ -47,20 +47,37 @@ export class RecordCommand implements ConducksCommand {
 
     // Map common aliases
     const typeMap: Record<string, string> = {
-      'convention': 'conventions',
-      'rules': 'conventions',
-      'learning': 'memory',
       'intent': 'vision',
-      'arch': 'architecture',
       'impl': 'implementation'
     };
+
+    // `architecture`, `conventions` and `memory` are GONE, not renamed (ADR 0193). A rule now lives
+    // in a gate or a module note's `**Boundaries:**`, a trap in that note's `## Traps`, and the
+    // module graph in the canvas. There is no file for this command to append to, and silently
+    // routing the note somewhere else is what ADR 0122 refused. Say where it belongs instead.
+    const DISSOLVED: Record<string, string> = {
+      'architecture': 'the canvas at docs/visuals/architecture.html, and the layer contract in sentinel-rules.ts',
+      'conventions': "the gate that enforces the rule, or the owning module note's `**Boundaries:**`",
+      'memory': "the owning module note's `## Traps`",
+      'convention': "the gate that enforces the rule, or the owning module note's `**Boundaries:**`",
+      'rules': "the gate that enforces the rule, or the owning module note's `**Boundaries:**`",
+      'learning': "the owning module note's `## Traps`",
+      'arch': 'the canvas at docs/visuals/architecture.html, and the layer contract in sentinel-rules.ts',
+    };
+    const dissolved = DISSOLVED[type.toLowerCase()];
+    if (dissolved) {
+      console.error(`'${type}' no longer has a file — it dissolved into the module notes (ADR 0193).`);
+      console.error(`That belongs in ${dissolved}.`);
+      process.exitCode = 1;
+      return;
+    }
 
     const targetType = typeMap[type.toLowerCase()] || type.toLowerCase();
 
     // A TYPE THAT IS NOT ONE OF THE SEVEN IS REFUSED. `--type=nonsensetype` wrote
     // `docs/nonsensetype.md` — a file inside a governed tree that the standard does not define, that
     // `docs-lint` has no rules for, and that nobody looking for the note will ever open (ADR 0122).
-    const KNOWN = ['vision', 'architecture', 'implementation', 'handover', 'conventions', 'todo', 'memory'];
+    const KNOWN = ['vision', 'implementation', 'handover', 'todo'];
     if (!KNOWN.includes(targetType)) {
       console.error(`Unknown record type '${type}'. Expected one of: ${KNOWN.join(', ')}.`);
       console.error(`Aliases: ${Object.entries(typeMap).map(([k, v]) => `${k}→${v}`).join(', ')}`);

@@ -9,7 +9,8 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
  * noise. That number cost hours and cannot be re-run, so it decays into a claim about a build nobody
  * has any more. This is the same measurement against a project whose truth is DECLARED.
  *
- * Two things it must do that a "does prune flag X" test does not (CONDUCKS-40):
+ * Two things it must do that a "does prune flag X" test does not
+ * (see docs/visuals/modules/domain/analysis.md):
  *
  *   - score what was found WRONG, not only what was found. A finding list is scored on PRECISION
  *     (of what it flagged, how much is really dead) AND RECALL (of what is really dead, how much it

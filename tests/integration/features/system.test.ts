@@ -5,7 +5,7 @@ import os from 'node:os';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
 
 // System domain. STALE NAME: the todo names `conducks_system` — no MCP tool by that name exists
-// (grep confirms it), and MCP is read-only by design (CONDUCKS-8) so an installer could never be
+// (grep confirms it), and MCP is read-only by design (see docs/visuals/modules/interfaces/tools.md) so an installer could never be
 // an MCP tool anyway. The real capability the todo meant ("Installer + MCP") is `conducks setup`:
 // ConducksInstaller (skills sync) + ProjectRegistry (project registration) + MCPConfigurator
 // (Claude Desktop config registration). All three resolve their target paths through

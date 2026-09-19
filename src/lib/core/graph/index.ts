@@ -5,8 +5,8 @@
  * into it, four linkers that resolve a reference to a node, three algorithms over the result, and
  * the classifiers that decide what is external.
  *
- * IT USED TO IMPORT PARSING, AND PARSING IMPORTS IT. `CONDUCKS-1` passed anyway, because no single
- * FILE closed a loop — but the moment each feature has a door, two `index.ts` importing one another
+ * IT USED TO IMPORT PARSING, AND PARSING IMPORTS IT. `tests/architecture/feature-doors.test.ts` and
+ * `boundaries.test.ts` passed anyway, because no single FILE closed a loop — but the moment each feature has a door, two `index.ts` importing one another
  * is a real ESM cycle, and this repository has paid for that twice already (`registry` ↔ `watcher`,
  * fixed by injection; `chronicle` ↔ `typescript/resolver`, which is why `getDiscoverySurface` uses a
  * dynamic import). So the cycle was broken BEFORE this file existed: `taxonomy` and `built-ins` moved

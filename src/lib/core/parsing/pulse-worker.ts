@@ -69,7 +69,7 @@ function isCppHeader(filePath: string): boolean {
   }
 
   // Structural Mapping: File Extension -> Provider.
-  // DERIVED from each provider's own `extensions` array (CONDUCKS-2 guarantees the field) — the
+  // DERIVED from each provider's own `extensions` array (docs/visuals/modules/core/parsing.md guarantees the field) — the
   // hand-written map this replaces had to be kept in sync with the providers by hand and drifted
   // (CPPProvider declares .cxx/.hxx; neither was ever registered here or in src/registry, so those
   // files were found by discovery and then dispatched to nothing).

@@ -16,12 +16,66 @@ ever rebuilt — see todo48#P4 and ADR 0035.
 **Boundaries:** advisory only. Nothing here deletes anything, and nothing here should ever be wired
 to an automatic fix.
 
+**Uses:** [core/graph](../core/graph.md) for edges and usage evidence (`USAGE_EVIDENCE_EDGES`,
+`PRUNABLE_BINDING_KINDS`), and a stored baseline via [core/persistence](../core/persistence.md) for the
+drift comparison. Read by `conducks prune`, `conducks drift` and the watcher's incremental re-analysis
+trigger.
+
+## Features
+
+- **Dead code detection** (`conducks prune`) — flags exported symbols no proven edge reaches, as review
+  candidates, excluding entry points and test fixtures. Under-reports on purpose: a missed dead symbol
+  costs a review pass, a wrong one costs a user their build, and prune is scored on both directions at
+  once (`tests/integration/features/prune-precision.test.ts`) rather than on how much it finds — the
+  same principle [domain/analysis](../analysis.md) states generally (score what was found WRONG, not
+  what was found).
+- **Longitudinal drift** (`conducks drift`) — tracks structural velocity and decay across recorded
+  pulses; a single snapshot cannot show direction, only a comparison against a baseline can.
+- **Live watch** (`conducks watch`) — the watcher drives incremental re-analysis on file change.
+
+## Glossary
+
+- **Orphan** (this module's sense) — a node with no incoming edge. [governance](../governance.md) uses
+  the same word for a *dangling edge* (a target that was never induced) — never quote one count as the
+  other.
+- **Stale import** — an import statement whose binding has no evidence of use anywhere in its file.
+
+## Traps
+
+**`conducks rename` was removed and must not be re-added** (ADR 0156). `conducks rename`,
+`conducks_rename`, `GVREngine` and `RefactorResult` are gone; `tests/unit/adr-invariants.test.ts` fails
+the build if a `rename*.ts` or `gvr*.ts` module returns under `src/`, or if any MCP tool declares
+`destructiveHint: true`. It looked obviously buildable and was rebuilt in spirit twice; correct
+renaming needs TYPES — overloads, aliases, re-exports, structural typing, `this` binding — and conducks
+has a syntax graph, not a type checker. Each attempt printed success over a tree that no longer
+compiled.
+
+**"Rename" means two unrelated things.** `drift` reports `Renamed/Moved: N` — this is DETECTION, it
+observes that a symbol changed name between two pulses and writes nothing. It is alive and unaffected
+by the removal above. Do not delete drift's rename detection while cleaning up after the removed
+command; the drift tests now rename fixtures by hand (`renameByHand` in
+`tests/integration/features/helpers.ts`) rather than shelling out to the gone command.
+
 **Deferred / not built:** raising `STALE_IMPORT` recall past its deliberate floor. The finding fires
 since 2026-07-25 (`findStaleImports` — for a year it was gated on raw tree-sitter node types that
 labels never carry, then blocked on missing inheritance edges; todo11 closed both). It reports only
 on affirmative absence across every evidence class. The recall gap is a query-coverage problem, not
 detector logic, and un-excluding type targets before the type-position captures exist would re-create
 the measured 36-false-positive flood (todo14).
+
+**`watch` intermittently never saw a file created after it started, and the standing explanation for
+it was wrong.** A test note blamed CPU load and recommended moving the test to a serial jest project;
+run alone, in isolation, it still failed roughly 1 in 3 (todo55). The real cause: `start()` returned as
+soon as chokidar was constructed, before chokidar's `ready` event fired, so the command printed "Live
+Mirror Mode active" and ran its startup reconcile while chokidar was still indexing — a banner
+claiming a liveness the watcher did not have. Fixed by awaiting a `readyPromise` resolved from
+chokidar's own `ready` event (`src/lib/domain/evolution/watcher.ts:136`) before anything is
+considered live. Two lessons travel with the fix: an unverified flake explanation becomes folklore the
+next reader inherits as fact — run it alone in a loop before accepting "flaky under load" — and do not
+diagnose a spawned process by counting lines in jest's captured output, because a FAILING run waits out
+its timeout window and flushes far more output than a passing run that exits early, so line counts
+differ for reasons unrelated to the defect. Reproduce instead by driving the BUILT CLI from a shell
+with output redirected to a file and reading the whole log.
 
 **"Zero false positives" was the claim here and it was wrong** (todo63, 2026-08-11). It held on
 conducks itself — 1 finding — and was never checked against a subject with a different style. On
@@ -31,6 +85,32 @@ Cause: a bare value read produces no edge, so "no evidence of use" was read as e
 `variable` is now excluded from `PRUNABLE_BINDING_KINDS`, taking subject-c to 10. The floor is therefore
 LOWER than it was on purpose — a genuinely stale value import is no longer reported at all, which is
 this module's own rule applied honestly: a missed dead import is acceptable and a wrong one is not.
+
+**A suppression is invisible to a two-sided oracle.** `isEntryPoint` (`src/lib/domain/evolution/
+dead-code.ts:711`) tested its five entry-point convention names — main, index, app, handler, setup —
+with a SUBSTRING match, so "Approval" contains app, "Domain" contains main, "Wrapper" contains app,
+and "NameIndex" contains index; each one skipped both the ORPHAN and the UNUSED_EXPORT branch.
+Census of exported names caught: 53 of sofie's 887, 21 of orchestrator's 656, 5 of this repository's
+445. Tightening to equality turned 18 of them into findings the language service agrees with, EXTRA
+still 0 on all three. No oracle could have found it: EXTRA scores what the tool SAYS, and a
+suppression makes the tool SILENT, which contradicts nothing — it lands in MISSED, mixed in with
+every other cause, and MISSED only ratchets, it never fails a build. Read the SUPPRESSIONS when a
+recall number will not move — `tests/integration/features/prune-precision.test.ts`'s
+`deadApprovalGate` fixture now carries the substring-only failure mode as a named check.
+
+**"Keep it, it is a working capability" is a claim about VALUE, and value is measurable.** A Python
+method-resolution-order resolver was carried for weeks as not-dead-just-unwired, with a comment saying
+it was "written and never connected" and that wiring it "needs its own measurement" — the comment was
+right about the classification and never took the measurement, so the code sat as a standing orphan in
+every audit while reading as a decision already made. Measured before deciding, on the one Python
+subject available: 52 classes inherit from an in-project base and 112 inherited methods exist, but
+0 of 401 `self.method()` calls reach one, and only 5 of 1,721 dangling calls name a base-only method —
+an upper bound, since resolving also needs the receiver's class, which Python code rarely states. So
+the capability would fire on at most 0.3% of the dangling set, against the risk of a wrong edge.
+Removed 2026-08-17 with the measurement recorded here so nobody re-derives it — the code is gone and
+carries no anchor of its own. "Not dead, just unwired" is only half an answer; the other half is what
+wiring it would BUY, and that number has to come before the comment that defers the work, or the
+deferral becomes permanent and looks deliberate.
 
 ## Prune must under-report, and here is the proof
 

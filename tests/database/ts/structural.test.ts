@@ -16,7 +16,7 @@ import path from 'node:path';
 // before anyone has run `conducks analyze` once, MEASURED as
 // `IO Error: ... in read-only mode: database does not exist` out of DuckDB, thrown uncaught from
 // beforeAll. A "no vault yet" clone and a genuinely broken vault must not report the same way
-// (CONDUCKS-13 / ADR 0048's whole point) — so this checks for the file's ABSENCE only, before
+// (ADR 0048's whole point) — so this checks for the file's ABSENCE only, before
 // opening it. Absent -> skip with a stated reason (expected, first-run). Present but unopenable for
 // any other reason (locked, corrupt) -> beforeAll still throws, same as before this change.
 const vaultDbPath = path.resolve(process.cwd(), '.conducks', 'conducks-synapse.db');

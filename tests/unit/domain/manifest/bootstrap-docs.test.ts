@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ManifestService } from '@/lib/domain/manifest/index.js';
@@ -21,8 +21,10 @@ describe('bootstrap-docs', () => {
 
   it('writes the create-now set at a root tree', async () => {
     const created = await service.bootstrap(root, 'demo', 'root');
+    // architecture.md and features.md are dissolved (ADR 0193) — a capability's purpose and a
+    // module's shape now live in that feature's own note, never in a bootstrapped file.
     expect(created.sort()).toEqual([
-      'architecture.md', 'features.md', 'handover.md', path.join('todos', 'todo01.md'),
+      'handover.md', path.join('todos', 'todo01.md'),
     ]);
   });
 
@@ -60,13 +62,6 @@ describe('bootstrap-docs', () => {
     await service.bootstrap(root, 'demo', 'service');
     expect(buildBoard(root).lint).toEqual([]);
     expect(treeShapeLint(root, false).errs).toEqual([]);
-  });
-
-  it('leaves the mermaid graph fenced, so its arrows never parse as fields', async () => {
-    await service.bootstrap(root, 'demo', 'root');
-    const arch = readFileSync(docs('architecture.md'), 'utf8');
-    expect(arch).toMatch(/```mermaid/);
-    expect(arch).toMatch(/## Contract/);
   });
 
   it('writes nothing over a file already on disk', async () => {

@@ -1,8 +1,11 @@
 # 0054 — the mirror asks the vault instead of loading the graph
 Status: Accepted
-- Enforced by: tests/unit/domain/visual/wave-from-sql.test.ts (the wave is produced without a materialised graph, and reports truncation instead of silently capping)
+- Enforced by: tests/unit/domain/mirror/wave-from-sql.test.ts (the wave is produced without a materialised graph, and reports truncation instead of silently capping)
 - Builds: 0042
 - Date: 2026-07-31
+- Amended by: 0190
+
+0190 takes the option this record named and declined. "Not chosen: deleting `MirrorEngine`" below was correct when written — the invariant it names really did fail, and the engine still held the second copy of the clustering rule. ADR 0079 removed that copy, which retired the cost stated in `## Consequences`, and 0190 then deleted the engine and repointed 0028's invariant. Everything else here — the wave answered from SQL, truncation reported rather than silent — is unchanged and still binding. The `- Enforced by:` path above was also repointed: the same test moved from `tests/unit/domain/visual/` to `tests/unit/domain/mirror/` when 0190 gave the mirror a door and deleted the folder named after the removed engine. Same test, same claim, new address.
 
 ## Context
 

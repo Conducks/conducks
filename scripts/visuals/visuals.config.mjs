@@ -6,7 +6,10 @@
 // meant a shared file had to be edited on arrival — and a file edited on arrival is not shared.
 export const REPO = 'Conducks';
 
-// Containers already covered by a hand-written page. Empty: every detail page here is generated from
-// `graph.mjs`, and nothing yet says more than the data can. A container earns a place in this set
-// when its page needs prose the graph cannot carry, never to make a page look fuller.
-export const HAND_WRITTEN = new Set();
+// Containers already covered by a hand-written page. A container earns a place in this set when its
+// page needs prose the graph cannot carry, never to make a page look fuller.
+//
+// `c_bench` — `docs/visuals/modules/bench.md` is now the authored source for the benchmark feature
+// (ADR 0193); the container's own generated detail page collided with it byte-for-byte on
+// `bench.html`, and the note is the one meant to win.
+export const HAND_WRITTEN = new Set(['c_bench']);

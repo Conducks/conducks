@@ -1,4 +1,4 @@
-import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
+import { VAULT_DIR, VAULT_DB_FILENAME, SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import { readWatcherLiveness, type WatcherLiveness } from "@/lib/domain/evolution/index.js";
 import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import fs from "node:fs";
@@ -133,7 +133,7 @@ export class ProjectMonitor {
       };
     } catch { /* no docs/ is not a problem to report */ }
 
-    const vault = path.join(project.root, ".conducks", "conducks-synapse.db");
+    const vault = path.join(project.root, VAULT_DIR, VAULT_DB_FILENAME);
     if (!fs.existsSync(vault)) return base;                    // analyzed: false
 
     const persistence = new SynapsePersistence(project.root, true);   // READ_ONLY

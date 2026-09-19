@@ -5,8 +5,10 @@
  * the surface that had none: node/edge mutation, the VMC compression round-trip, rebinding,
  * per-file teardown, and the two lookup helpers (by-file neighbors, by-name search).
  *
- * Node ids follow the producer shape `<file>::<name>` (CONDUCKS-4/CONDUCKS-28) rather than an
- * id equal to filePath, so a bug that conflates "node id" with "file path" would be caught here.
+ * Node ids follow the producer shape `<file>::<name>` (canonical lowercase ids:
+ * docs/visuals/modules/contracts.md; producer id shape for fixtures: docs/visuals/modules/core/graph.md)
+ * rather than an id equal to filePath, so a bug that conflates "node id" with "file path" would be
+ * caught here.
  */
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { ConducksAdjacencyList, type ConducksEdge } from '@/lib/core/graph/adjacency-list.js';
