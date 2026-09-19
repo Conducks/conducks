@@ -60,7 +60,7 @@ Most responses carry `indexStaleness`. Stale means re-analyze before trusting th
 
 | tool | answers |
 |---|---|
-| `conducks_docs` | open threads, rooted at the decisions that own them: each ADR with unfinished work, the todo phases building it, the next task, what is blocked by what. Finished work omitted. `layer="all"` (default) adds conventions + memory — the constraints to load once per session; `layer="board"` omits them for repeat calls; `raw=true` returns the unprojected board |
+| `conducks_docs` | open threads, rooted at the decisions that own them: each ADR with unfinished work, the todo phases building it, the next task, what is blocked by what. Finished work omitted. `layer="all"` (default) adds a summary of the module notes — the constraints to load once per session; `layer="board"` omits them for repeat calls; `raw=true` returns the unprojected board |
 
 **Code layer — "where is it, what exists?"**
 
@@ -280,7 +280,25 @@ restores the single-tree run.
 - `audit [--history=<window>]` — cycles (ARCH-3), self-imports (ARCH-4), **mutual call
   tangles (ARCH-6)**, god objects, orphans. ARCH-6 is informational and never fails the audit:
   mutual recursion is legal, a knot with no entry order is not, and only a human tells them apart
-- `guard [--threshold=N] [--force]` — layer contract, cycles, rank rules; blocks violations
+- `guard [--threshold=N] [--force]` — layer contract, cycles, rank rules; blocks violations.
+  **Declare your layers or the contract checks nothing.** With no `layers:` block it matches
+  conducks' own directory names, finds nothing in your project, and prints `NOT CHECKED` rather
+  than a pass. Declare them in `.conducks/sentinel.yml`:
+
+  ```yaml
+  layers:
+    - name: contracts
+      path: /src/contracts
+    - name: domain
+      path: /src/domain
+      allow: core, contracts
+  ```
+
+  `allow` is comma-separated; a layer with no `allow` may depend on nothing outside itself;
+  same-layer edges are always legal; fragments match in file order, so put the more specific path
+  first. A duplicate name, a missing `path` or an `allow` naming a layer you never declared makes
+  the whole contract unusable — `guard` then reports the problem and checks nothing, because a
+  verdict computed from the wrong directory names costs more than no verdict
 - `advise` — structural advice
 - `drift [prevPulseId]` · `diff [--base <id>] [--head <id>]` — structural change between pulses
 - `supply-chain [--deps-only]` — the third-party surface, with each import's origin
