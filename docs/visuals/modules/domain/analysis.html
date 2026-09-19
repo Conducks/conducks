@@ -26,9 +26,9 @@ An edit made here is discarded by the next render; edit the .md.</div>
 </ul>
 <p>  (symbol lookup, listing, entry-point detection) with hand-written SQL and graph walks, not a general   query language.</p>
 <ul>
-<li><b>Live watch feed</b> — <code>gateway-service</code> is the vault-watch stream behind the Mirror dashboard,</li>
+<li><b>Live watch feed</b> — the vault-watch stream behind the Mirror dashboard. It is NOT in this module</li>
 </ul>
-<p>  constructed by the <code>mirror</code> CLI command and consumed by the web server.</p>
+<p>  any more: <code>gateway-service.ts</code> became <code>src/lib/domain/mirror/gateway.ts</code> behind its own door (ADR   0190). Listed here because this note claimed it for longer than it was true — see   <a href="../interfaces/web.html">interfaces/web</a>.</p>
 <p>A finding is scored by what was found WRONG, not by how many findings a pass produced — a headline count without that check rewards a louder tool over a more correct one. Applied concretely in <a href="evolution.html">evolution</a>'s prune precision, which is audited both directions rather than by volume.</p>
 <h2>Glossary</h2>
 <ul>
@@ -50,7 +50,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <li><b><a href="analysis/orchestrator.html">orchestrator/</a></b> — the multi-pass pulse, incremental analysis, workers.</li>
 </ul>
 <p><code>coverage</code> and <code>docs</code> are no longer parts of this module — they are their own areas, <a href="coverage.html">coverage</a> and <a href="docs.html">docs</a>, split out in the ADR 0150 campaign because each has its own door. The link here pointed at the old path under <code>analysis/</code> for some time after the move and resolved to nothing: <code>visuals-lint</code> checks that every code ANCHOR resolves and does not follow markdown links between notes, so a dead link between pages is invisible to it.</p>
-<p><code>conducks-core</code> is the façade the registry wires; <code>query-service</code> answers structural questions; <code>gateway-service</code> is the live vault-watch feed behind the Mirror dashboard, constructed by the <code>mirror</code> CLI command and consumed by the web server. <code>project-monitor</code>, <code>change-set</code>, <code>module-hash</code> and <code>micro-pulse</code> carry the incremental path; <code>graph-skeleton-builder</code> and <code>reflection-pipeline</code> the pulse itself.</p>
+<p><code>conducks-core</code> is the façade the registry wires; <code>query-service</code> answers structural questions. <code>project-monitor</code>, <code>change-set</code>, <code>module-hash</code> and <code>micro-pulse</code> carry the incremental path; <code>graph-skeleton-builder</code>, <code>reflection-pipeline</code> and <code>worker-pool</code> the pulse itself, with <code>filter-builder</code> shared by the query paths. Twelve files, and the gateway is no longer one of them.</p>
 <h2>The pulse links, inducts, then links AGAIN</h2>
 <p>The order inside <code>analyze</code> matters and is not obvious. <code>IntraLinker</code> runs once the whole graph is in memory, then virtual/external induction materialises nodes for references that pointed outside the project, then the linker runs a SECOND time against those new nodes.</p>
 <p>Without that second pass the first analyze on a fresh vault resolves fewer references than a rebuild of the same code — the induced nodes did not exist when linking happened, and on a warm vault they only appear to work because they survived from the previous pulse. Measured on subject-c: 7,531 resolutions cold against 7,994 warm, dangling 3,440 against 3,146 (todo59).</p>

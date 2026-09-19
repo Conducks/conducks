@@ -16,7 +16,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p>Two pieces HAVE come out, and neither is the dispatch: the pure functions moved to &lt;span class="anchor"&gt;src/lib/core/parsing/match-facts.ts&lt;/span&gt; (a node or a match in, a plain value out, nothing touching the spectrum), and the four capture pairs that each held their own <code>pending… = null</code> became one <code>PendingPair</code>. The chain itself stays, and the measurement that explains why is worth keeping: moving it needs <b>29 of <code>reflect()</code>'s locals</b> threaded out, 19 of them shared mutable state. That converts implicit coupling into an explicit bag rather than reducing it, in the file where a defect reaches all 42 commands.</p>
 <p><b>It is getting further away, not closer.</b> The deep-clean campaign recorded this file at 1,696 lines while closing every other core feature; it is 1,738 today. No todo carries the split — it is wanted, blocked on scope, and recorded here so the next person does not go looking for a plan that does not exist.</p>
 <h2>Treat every change as systemic</h2>
-<p>There is no seam isolating one language or one capture kind from another, and the file carries ~33 <code>as any</code>. A local-looking change can alter every language's output. Two habits:</p>
+<p>There is no seam isolating one language or one capture kind from another, and the file carries ~37 <code>as any</code>. A local-looking change can alter every language's output. Two habits:</p>
 <ul>
 <li>Verify with a <b>clean pulse</b>, not a unit test alone. <code>analyze</code> is incremental, so a re-run on an</li>
 </ul>

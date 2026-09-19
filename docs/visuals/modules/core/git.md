@@ -54,16 +54,17 @@ Anything needing a DIFFERENT root constructs its own `ChronicleInterface`. That 
 `project-monitor` stop re-implementing two git operations: the duplication existed because the door
 exported a singleton, not because the class could not answer per root.
 
-## Three call sites still inline `toRepoRelative`, and collapsing them changes behaviour
+## Path handling goes through one helper, and it is worth keeping that way
 
-`readSingleFile`, `getAuthorDistribution` and `getBlameData` each do by hand what
-`toRepoRelative` (<span class="anchor">src/lib/core/git/chronicle-interface.ts:532</span>) already
-does. The comment that once sat above it claimed the duplication had been removed; it had not, and a
-comment is held to the same bar as any other doc.
+`readSingleFile`, `getContent`, `getAuthorDistribution` and `getBlameData` each need the
+repo-relative path, and each calls `toRepoRelative`
+(<span class="anchor">src/lib/core/git/chronicle-interface.ts:532</span>). It is case-agnostic on
+purpose: on macOS and Windows a path can differ from its root only by case, and `path.relative`
+would answer with a `../..` chain.
 
-It stays deferred on purpose rather than tidied: collapsing the three onto the helper changes
-behaviour on the case-insensitive path, and behaviour does not change during a clean — a fix is its
-own commit with its own measurement. Whoever takes it needs a case-collision fixture first.
+This note and the helper's own comment both claimed until 2026-09-19 that three of those sites still
+inlined the logic by hand. They do not — checked call site by call site, every one routes through the
+helper. The claim outlived the fix, which is the failure mode a comment shares with any other doc.
 
 ## Features
 - none — one interface, no user-facing sub-capability of its own

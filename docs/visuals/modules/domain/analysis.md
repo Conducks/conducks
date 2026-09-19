@@ -32,8 +32,10 @@ Adequate while the question set is known.
 - **Structural queries** (`conducks query`) — `query-service` answers a fixed set of questions
   (symbol lookup, listing, entry-point detection) with hand-written SQL and graph walks, not a general
   query language.
-- **Live watch feed** — `gateway-service` is the vault-watch stream behind the Mirror dashboard,
-  constructed by the `mirror` CLI command and consumed by the web server.
+- **Live watch feed** — the vault-watch stream behind the Mirror dashboard. It is NOT in this module
+  any more: `gateway-service.ts` became `src/lib/domain/mirror/gateway.ts` behind its own door (ADR
+  0190). Listed here because this note claimed it for longer than it was true — see
+  [interfaces/web](../interfaces/web.md).
 
 A finding is scored by what was found WRONG, not by how many findings a pass produced — a headline
 count without that check rewards a louder tool over a more correct one. Applied concretely in
@@ -75,11 +77,10 @@ own door. The link here pointed at the old path under `analysis/` for some time 
 to nothing: `visuals-lint` checks that every code ANCHOR resolves and does not follow markdown links
 between notes, so a dead link between pages is invisible to it.
 
-`conducks-core` is the façade the registry wires; `query-service` answers structural questions;
-`gateway-service` is the live vault-watch feed behind the Mirror dashboard, constructed by the
-`mirror` CLI command and consumed by the web server. `project-monitor`, `change-set`, `module-hash`
-and `micro-pulse` carry the incremental path; `graph-skeleton-builder` and `reflection-pipeline` the
-pulse itself.
+`conducks-core` is the façade the registry wires; `query-service` answers structural questions.
+`project-monitor`, `change-set`, `module-hash` and `micro-pulse` carry the incremental path;
+`graph-skeleton-builder`, `reflection-pipeline` and `worker-pool` the pulse itself, with
+`filter-builder` shared by the query paths. Twelve files, and the gateway is no longer one of them.
 
 ## The pulse links, inducts, then links AGAIN
 

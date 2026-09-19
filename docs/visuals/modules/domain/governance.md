@@ -67,7 +67,9 @@ Enforcement is [sentinel](governance/sentinel.md)'s to detail — this note only
   declared rules and gives a yes/no answer.
 - **CI regression guard** (`conducks guard [--threshold=N]`) — compares structural entropy against a
   historical baseline and exits non-zero past a team-picked threshold.
-- **Layer contract enforcement** (`conducks guard`) — see above.
+- **Layer contract enforcement** (`conducks guard`) — see above. The contract is conducks' own by
+  default and this project's own when `.conducks/sentinel.yml` declares `layers:` (ADR 0197); when
+  no file maps to any layer the check reports NOT CHECKED rather than a pass.
 
 **A verdict is earned by a comparison that actually happened.** A CLI drift report (fed by
 `guard`/`advisor`'s comparison path) used to check `result.deltas.some(...)`, which is `false` on an
@@ -113,7 +115,24 @@ or DISCOVERY-1). In [evolution](evolution.md), an ORPHAN is a *node with no inco
 So `conducks audit` reporting zero orphans while `conducks prune` lists some (10, measured 2026-08-29) is not a contradiction and
 neither number is stale. Never quote one as the other.
 
-`conducks audit` on conducks reports zero findings, and that is validated rather than assumed: on
-compiled JS, conducks and `madge` both report zero cycles. `madge` on TS *source* still reports three
-— its type-erasure blind spot. Conducks being the more accurate of the two on the same repo is the
-claim this module exists to defend, so any change that loosens a filter needs the same cross-check.
+**`conducks audit` on conducks does NOT report zero findings, and this note claimed it did.**
+Measured 2026-09-19: 182 ARCH-3 clusters, plus one ARCH-1 hub overload
+(`src/registry/index.ts::registry`, 73 upstream against a limit of 50 — the count still excludes
+type-only and non-runtime edges, so 73 is an honest runtime number and the registry has simply
+grown). `conducks guard` prints the same 182 as `no_cycles`.
+
+Where they are matters more than the count. Grouped by path, 540 of the cycle members sit under
+`tests/fixtures/` — planted cycle repos that exist to be found, and the reason a raw total reads
+alarming. Eleven sit in `src/lib`, in two real clusters:
+
+- a 9-node cluster through `core/git/index.ts → chronicle-interface.ts`, joining the parsing
+  language packs to git via the two doors;
+- a 5-node cluster between `domain/analysis` and `domain/docs`, through both doors.
+
+Both are the door-to-door shape ADR 0150 rule 5b names: importing a door pulls in everything it
+re-exports. Neither is triaged here — this note records the measurement, and a fix is its own change
+with its own before/after.
+
+The earlier cross-check still stands on its own terms: on compiled JS, conducks and `madge` both
+report zero cycles for the SOURCE tree, while `madge` on TS source reports three it cannot erase.
+Any change that loosens a filter needs that cross-check re-run.

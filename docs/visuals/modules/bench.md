@@ -38,8 +38,8 @@ fly (`bench-*.mjs`) or against three frozen real subjects pinned by git SHA in
   question, per scenario. Every scenario states both halves: what the command MUST find (recall) and
   what it must NOT find (precision) — a neighbourhood returning everything passes every inclusion
   check and one returning nothing passes every exclusion check, so a scenario missing either half is
-  half a gate (`bench-context.mjs:31`). Counts measured directly: trace 10, context 10, prune 12,
-  drift 10, entry 10, doctor 12, list 10, diff 8, audit 8, flows 7, guard 7, advise 5.
+  half a gate (`bench-context.mjs:31`). Counts measured directly (2026-09-19): trace 10, context 10, prune 12,
+  drift 10, entry 12, doctor 12, list 10, diff 8, audit 8, flows 7, guard 11, advise 5.
 - **Oracles** (`tools/benchmark/oracle-*.mjs`) — score conducks against a SECOND, independently
   produced answer on the three frozen subjects, never against itself: `oracle-tsc.mjs` asks the real
   TypeScript compiler which imports are unused (`oracleUnusedImports`, `oracle-tsc.mjs:94`) and scores

@@ -11,7 +11,7 @@
 </nav>
 <a class="back" href="../architecture.html">&larr; back to the architecture</a>
 <h1>THE CLI</h1>
-<p class="sub">interfaces/cli — 42 commands behind one dispatcher</p>
+<p class="sub">interfaces/cli — 38 commands behind one dispatcher</p>
 <div class="det"><h3>Where this feature begins</h3><p class="where">src/interfaces/cli/index.ts:121::main — one dispatcher, and every command constructed in a single list so no command can reach another</p></div>
 <div class="meta">
   <b>DERIVED</b> — generated from the same data the canvas is drawn from (scripts/visuals/graph.mjs),
@@ -22,7 +22,7 @@
 <div class="det" id="argv">
   <h3>A command word</h3>
   <div class="where">src/interfaces/cli/index.ts::main</div>
-  <p>42 commands, each a ConducksCommand found by id</p>
+  <p>38 commands, each a ConducksCommand found by id</p>
   <p class="file">on the canvas: conducks &lt;id&gt; [args]</p>
 </div>
 
@@ -48,7 +48,7 @@
 </div>
 
 <div class="det" id="cli">
-  <h3>35 commands</h3>
+  <h3>38 commands</h3>
   <div class="where">src/interfaces/cli/index.ts:210</div>
   <p>every command is constructed in one `const commands: ConducksCommand[]` list. Verified 2026-08-23: no file in commands/ imports another command, constructs another command class, or shells out to the conducks binary</p>
   <p class="file">on the canvas: one file each, no command imports another</p>
@@ -67,8 +67,8 @@
     <tr><td>A command word</td><td>One contract per command</td><td>—</td></tr>
     <tr><td>A command word</td><td>--help is answered CENTRALLY</td><td>asked for usage</td></tr>
     <tr><td>A command word</td><td>A read command says nothing else</td><td>—</td></tr>
-    <tr><td>A command word</td><td>35 commands</td><td>—</td></tr>
-    <tr><td>35 commands</td><td>Both must answer the same</td><td>—</td></tr>
+    <tr><td>A command word</td><td>38 commands</td><td>—</td></tr>
+    <tr><td>38 commands</td><td>Both must answer the same</td><td>—</td></tr>
   </tbody>
 </table>
 <h2>Module notes</h2>

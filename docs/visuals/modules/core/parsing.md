@@ -6,7 +6,7 @@ the fix was not the dependency inversion that had been debated for weeks — the
 NOTHING from domain, so it was a core module filed in the wrong folder. It now lives here, and the
 layer gate grants zero exceptions.
 
-The largest module in the codebase (67 files), 50 of them per-language surface area.
+The largest module in the codebase (89 files), 67 of them per-language surface area — the next largest, `core/graph`, holds 14.
 
 **Responsibility:** turning source text into a language-agnostic *spectrum* — the intermediate form
 everything above consumes. Nothing upstream of this module knows what language a file was written in.
@@ -37,7 +37,7 @@ Breadth was chosen over uniform depth; see the per-part docs for what that costs
 - **[processors/](parsing/processors.md)** — capture → relationship. Import resolution, calls,
   heritage, bindings, flow.
 - **[grammar-registry/](parsing/grammar-registry.md)** — native grammar loading, parsers, ABI.
-- **[taxonomy/](parsing/taxonomy.md)** — the canonical 9 kinds and ranks.
+- **[taxonomy/](parsing/taxonomy.md)** — the canonical 10 kinds and their ranks, 0…9.
 
 Unlisted files are small and self-describing: `context` (per-pulse symbol registry and local
 bindings), `ignore-manager` (`.conducksignore`), `pipeline` and `pulse-worker` (batching and worker

@@ -17,13 +17,13 @@ There is a single [architecture](architecture.html) — one zoomable canvas, not
 The `analyze` pulse — the only path that writes. Git is asked which files exist, the reflector turns each into nodes and edges, the linkers bind bare names once every file is known, and the vault stores the result. Twenty-one blocks across four core features.
 
 #### [Band 2 · How a question is answered](architecture.html)
-Two surfaces — 35 CLI commands and the MCP server — over one composition root, and the choice that shapes everything: answer from SQL, or materialise a 165 MB graph. The registry turns forgetting that choice into a loud failure rather than an empty answer.
+Two surfaces — 38 CLI commands and the MCP server — over one composition root, and the choice that shapes everything: answer from SQL, or materialise a 165 MB graph. The registry turns forgetting that choice into a loud failure rather than an empty answer.
 
 #### [Band 3 · Keeping up, and crossing a repository](architecture.html)
 The watcher re-enters the write path mid-way instead of following it, which is why a re-pulse has to be handed the whole file list or every import dangles. Beside it, federation reads a neighbouring project's vault — through an opener that is injected and REFUSES rather than defaulting, after the third ESM cycle of the same shape.
 
 #### [Band 4 · The tool surface, and what is safe to delete](architecture.html)
-35 commands and 13 read-only tools over one registry, which is the whole reason deleting a command is safe: no command reaches another. Drawn because the rule had been stated and never checked, and four places turned out not to enforce it — including a mirror test that treats a missing file as nothing to check.
+38 commands and 13 read-only tools over one registry, which is the whole reason deleting a command is safe: no command reaches another. Drawn because the rule had been stated and never checked, and four places turned out not to enforce it — including a mirror test that treats a missing file as nothing to check.
 
 #### [Band 5 · How a tool is proved](architecture.html)
 The apparatus that makes the other four believable. An oracle asks a different tool the same question and compares; a benchmark plants the defect a real subject does not contain, and the counter-case it must not eat. Every scenario is proved by a mutation that makes it fail — and the fixture turned out to be wrong more often than the tool was.

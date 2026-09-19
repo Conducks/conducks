@@ -20,7 +20,7 @@ worse than a missing edge for exactly this reason (ADR 0046).
 `string`, so nothing stops a test — or a linker — from naming an endpoint with the wrong shape
 (a bare file path, or an id missing its enclosing scope). The mistake does not error: it returns an
 empty result at runtime, or worse, a confident edge whose node was deleted as unused by
-`pruneTaxonomy`'s reachability check. `getNeighborsByFilePath()` (`adjacency-list.ts:346`) is the
+`pruneTaxonomy`'s reachability check. `getNeighborsByFilePath()` (`adjacency-list.ts:760`) is the
 only sanctioned way a file path reaches a graph lookup; every id otherwise follows the shapes
 `repository::<name>`, `directory::<abs-path>`, `<file>::unit`, `<file>::<symbol>` (ADR 0028).
 

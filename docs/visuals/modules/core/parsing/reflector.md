@@ -41,7 +41,7 @@ exist.
 
 ## Treat every change as systemic
 
-There is no seam isolating one language or one capture kind from another, and the file carries ~33
+There is no seam isolating one language or one capture kind from another, and the file carries ~37
 `as any`. A local-looking change can alter every language's output. Two habits:
 
 - Verify with a **clean pulse**, not a unit test alone. `analyze` is incremental, so a re-run on an

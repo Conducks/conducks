@@ -5,9 +5,12 @@
 **Part of:** [domain/docs](../docs.md). Backs `conducks docs-lint`, `docs-status` and
 `bootstrap-docs`.
 
-**Responsibility:** classifying every file under `docs/` by type — todo, decision, features,
-conventions, memory, progress, handover, architecture — and checking that each conforms to the
-per-type skeleton. It is the mechanism that keeps the conducks-docs standard from being advice.
+**Responsibility:** classifying every file under `docs/` by type — `todo`, `decision`, `note`,
+`handover`, `architecture`, `derived`, `prose` — and checking that each conforms to the per-type
+skeleton. Four of those are GOVERNED and linted (todo, decision, handover, note); the rest are
+classified and left alone. It is the mechanism that keeps the conducks-docs standard from being
+advice. The `features`, `conventions` and `memory` types this note used to list are gone with the
+files themselves (ADR 0193, ADR 0194).
 
 **Boundaries:** structure only. It checks that an ADR has Context/Decision/Consequences and that a
 todo has `Status:` and `## Phase N —`; it has no opinion about whether the content is any good.
@@ -60,7 +63,11 @@ and passes untouched, while `map.md` / `drift.md` remain forbidden as derived ar
 
 ## Living vs record
 
-The classifier encodes the standard's core distinction: living files (features, conventions, memory,
-architecture) are overwritten in place; records (decisions, todos, progress, handover) are appended
-and never mutated. An accepted ADR is immutable — a later one amends or supersedes it, and the index
-carries the state.
+The classifier encodes the standard's core distinction: a LIVING file is overwritten in place — the
+module notes under `docs/visuals/modules/` and `handover.md` — while a RECORD is frozen: a decision
+or a todo keeps its reasoning as written and takes only a stamp. An accepted ADR is immutable, and a
+later one amends or supersedes it by stamping BOTH ends. There is no index carrying that state, by
+design: an index is a second copy to drift.
+
+The living half of this sentence used to name `features`, `conventions` and `memory`. Those files no
+longer exist (ADR 0193).

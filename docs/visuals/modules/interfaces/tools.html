@@ -47,11 +47,63 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <h2>Entry point caveat</h2>
 <p>Importing the server entry starts the process as a side effect, so tests must not import it directly — mock it or defer the import. This has bitten the suite before.</p>
 <p><b>Importing anything from <code>src/interfaces/tools/</b></code> boots the registry singletons** (grammar registry, persistence), which raced with the parsing suites and made <code>type-only-imports</code> fail intermittently with <code>isTypeOnly: undefined</code>. <code>tests/unit/interfaces/tools/ skills-tool-surface.test.ts</code> derives the MCP tool surface by reading <code>name:</code> fields as TEXT off the tool definition files instead of importing the tool modules, so the check touches no runtime state.</p>
-<p><b>The tree-sitter native addon serves ONE JS-wrapper per process.</b> The second test file to load a grammar in the same process gets a wrapper whose <code>tree.rootNode</code> is undefined and fails at random. <code>jest.config.js</code>'s <code>workerIdleMemoryLimit: '1KB'</code> (<code>jest.config.js:39</code>) recycles the worker after every test file for this reason, which is a narrower fix than the suite used to carry: <code>maxWorkers</code> runs at 2, not 1 — the suite went PARALLEL once <code>todo65</code> found the real cause of the failures years of comments blamed on "a shared DuckDB lock" was actually <code>conducks clean</code> matching processes by entry point and SIGTERM'ing every conducks process on the machine, including a sibling suite's. Do not cite a single-writer DB lock as the reason tests run serially — they no longer do, and the DB lock was never the reason.</p>
+<p><b>The tree-sitter native addon serves ONE JS-wrapper per process.</b> The second test file to load a grammar in the same process gets a wrapper whose <code>tree.rootNode</code> is undefined and fails at random. <code>jest.config.js</code>'s <code>workerIdleMemoryLimit: '1KB'</code> (<code>jest.config.js:44</code>) recycles the worker after every test file for this reason, which is a narrower fix than the suite used to carry: <code>maxWorkers</code> runs at 2, not 1 — the suite went PARALLEL once <code>todo65</code> found the real cause of the failures years of comments blamed on "a shared DuckDB lock" was actually <code>conducks clean</code> matching processes by entry point and SIGTERM'ing every conducks process on the machine, including a sibling suite's. Do not cite a single-writer DB lock as the reason tests run serially — they no longer do, and the DB lock was never the reason.</p>
 <p><b>A tool description is a CONTRACT with the agent, and nothing checked it against the registered surface until <code>tool-names-are-real.test.ts</code> existed.</b> <code>conducks_rename</code>'s description used to end "AFTER THIS: Run conducks_analyze to refresh the structural resonance graph" — there was never a <code>conducks_analyze</code> tool, so an agent that had just mutated source was sent to a call guaranteed to fail. (<code>rename</code> is gone entirely since ADR 0156 — see <a href="../domain/evolution.html">domain/evolution</a>'s Traps — so this specific instance no longer exists, but the class of defect does: "a documented feature nothing implements".) <code>tests/unit/interfaces/tools/tool-names-are-real.test.ts</code> now parses tool ids from the source that defines them and fails on any <code>conducks_*</code> named in a description or in <code>resources/tools/*.md</code> that is not registered, and asserts the parse found at least 10 tools so it cannot pass by scanning nothing.</p>
 <p><b>Uses:</b> takes an MCP JSON-RPC request, resolves any symbol id through the shared <code>resolveSymbolId</code> helper (<code>shared/resolve-symbol.ts</code>), asks the same wired registry the CLI uses for the domain service that answers it, and returns the result shaped as a tool response — read-only, mirroring the CLI's answer to the same question (see <code>interfaces/cli</code>'s "Every MCP tool is a CLI command" for the mirror rule itself).</p>
 <h2>Features</h2>
-<p>none — 13 tools grouping 35 CLI commands' capability, with no sub-notes of their own.</p>
+<p>No sub-notes — this module is one server. What it OFFERS is the thirteen tools, grouped by the question each answers; the CLI command beside each is the parity claim this module is held to.</p>
+<ul>
+<li><b><code>conducks_query</code></b> (<code>tools/synapse.ts:234</code>) — find a symbol by name or pattern; fuzzy search and</li>
+</ul>
+<p>  oracle templates. The discovery tool every other call starts from.</p>
+<ul>
+<li><b><code>conducks_status</code></b> (<code>tools/synapse.ts:405</code>) — structural health, hotspots and entry points, plus</li>
+</ul>
+<p>  the system manifest.</p>
+<ul>
+<li><b><code>conducks_audit</code></b> (<code>tools/synapse.ts:511</code>) — architectural integrity: cycles, god objects, rule</li>
+</ul>
+<p>  violations.</p>
+<ul>
+<li><b><code>conducks_explain</code></b> (<code>tools/synapse.ts:594</code>) — one symbol's risk: gravity, entropy, churn,</li>
+</ul>
+<p>  complexity.</p>
+<ul>
+<li><b><code>conducks_context</code></b> (<code>tools/synapse.ts:654</code>) — the neighbourhood around a symbol within a graph</li>
+</ul>
+<p>  radius, ranked, with an optional token budget.</p>
+<ul>
+<li><b><code>conducks_graph_query</code></b> (<code>tools/synapse.ts:804</code>) — a raw <code>SELECT</code> against the DuckDB store, for</li>
+</ul>
+<p>  a question no tool shapes. SELECT only.</p>
+<ul>
+<li><b><code>conducks_flows</code></b> (<code>tools/synapse.ts:860</code>) — the named execution flows: each entry point and the</li>
+</ul>
+<p>  symbols it reaches.</p>
+<ul>
+<li><b><code>conducks_prune</code></b> (<code>tools/synapse.ts:949</code>) — dead code: orphaned symbols, unused exports, stale</li>
+</ul>
+<p>  imports.</p>
+<ul>
+<li><b><code>conducks_docs</code></b> (<code>tools/synapse.ts:1046</code>) — the open threads in the authored docs, rooted at the</li>
+</ul>
+<p>  decisions that own them. The one tool on this surface whose subject is docs, not code.</p>
+<ul>
+<li><b><code>conducks_coverage</code></b> (<code>tools/synapse.ts:1188</code>) — an istanbul <code>coverage-final.json</code> laid over the</li>
+</ul>
+<p>  graph, so a dark function with no callers separates from a dark one with many.</p>
+<ul>
+<li><b><code>conducks_impact</code></b> (<code>tools/kinetic.ts:60</code>) — the blast radius of changing a symbol, upstream and</li>
+</ul>
+<p>  downstream.</p>
+<ul>
+<li><b><code>conducks_trace</code></b> (<code>tools/kinetic.ts:148</code>) — reachability from a symbol, or the shortest wiring</li>
+</ul>
+<p>  path between two, over the shared edge-distance table (ADR 0196).</p>
+<ul>
+<li><b><code>conducks_diff</code></b> (<code>tools/kinetic.ts:259</code>) — the structural difference between the current graph</li>
+</ul>
+<p>  and an earlier pulse.</p>
 <h2>Glossary</h2>
 <ul>
 <li><b>parity</b> — matching CLI *capability*, never matching defaults; a tool may default differently</li>

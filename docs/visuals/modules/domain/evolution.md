@@ -115,15 +115,25 @@ deferral becomes permanent and looks deliberate.
 ## Prune must under-report, and here is the proof
 
 An attempt to derive unused imports from per-file usage produced 232 findings against
-`tsc --noUnusedLocals`'s 96. The cause was not the import logic: the graph has **zero
-EXTENDS/IMPLEMENTS edges**, so `implements ConducksCommand` registers no usage and every CLI
-command's interface import looked unused. It was reverted rather than shipped.
+`tsc --noUnusedLocals`'s 96. The cause was not the import logic: the graph carried **zero
+EXTENDS/IMPLEMENTS edges** at the time, so `implements ConducksCommand` registered no usage and every
+CLI command's interface import looked unused. It was reverted rather than shipped.
+
+That input has since changed — the vault holds 27 `EXTENDS` and 57 `IMPLEMENTS` edges today
+(measured 2026-09-19), because every heritage pattern now co-captures a definition node
+([languages](../core/parsing/languages.md)). The rule below is what survives; the specific number
+that produced it does not.
 
 That is the standing rule. Dynamic dispatch, DI property chains and entry-wired symbols have no
 incoming edge, so they read as orphans while being perfectly alive. A finding that is wrong 40% of
 the time is worse than no finding, because it trains the reader to ignore the tool.
 
 ## Current precision, measured
+
+**Re-measured 2026-09-19: 8 ORPHAN + 55 UNUSED_EXPORT + 72 UNIMPORTED_MODULE on conducks**, and the
+eight orphans are all Rust test functions under `plugins/checklist/`. The audit below is the
+2026-08 measurement and its symbol-by-symbol reasoning is what makes it worth keeping — re-run
+`conducks prune` before quoting any of these counts.
 
 25 ORPHAN + 5 UNUSED_EXPORT on conducks, audited symbol by symbol: **20 of 25 orphans are genuinely
 unreferenced** (14 have zero textual occurrences anywhere; 6 more appear only in archived tests,

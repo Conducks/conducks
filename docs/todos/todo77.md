@@ -542,6 +542,7 @@ would only compare two policies.
 - [x] L3 — the counter-halves are in the same ten: a barrel, a test file nothing imports, a scratch script that is otherwise a perfect root module, a conventional filename inside a test tree, a module a real file imports, and a leaf that imports nothing
 - [x] the oracle scores a THIRD direction — both sides agree it is an entry and disagree WHY. ADR 0113 made `reason` a printed audited field, and the first mutation produced 10 rows a missed/extra-only oracle would have scored as agreement
 - [>] plant a framework ROUTE at L2 — deferred: routes need a framework the parser recognises, and a fixture small enough to run in the bench did not produce one. Route is scored at L1 only, where orchestrator carries 147 and deleting the rule shows all 147 as MISSED
+- [x] the ROUTE scenario is planted after all (2026-09-19): Next.js declares a route by FILE POSITION, so `app/api/hello/route.ts` exporting `GET` needs no framework detection and no fixture bigger than one file — scenarios 11 and 12 in `bench-entry.mjs`, with the route group and the lowercase-`get` counter-half. Proven by mutation: `looksRoute = false`, rebuilt and confirmed in the built output, fails 11 and leaves 12 green
 
 ### Every rule fires, and each mutation lands on its own scenario
 
@@ -648,6 +649,7 @@ entry sets already agreed and only the closures did not.
 - [x] state what is NOT scored, per rule rather than per command — three of the rules have no reachable instance and are pinned by outcome only
 - [x] give the spans-two-files filter a case that reaches it — two classes in ONE file extending each other. EXTENDS is module coupling, so a cluster genuinely forms and the filter is what rejects it; loosening the filter turns the scenario red
 - [>] give the two `length > 1` guards a case — deferred: `detectCycles` returns no cluster at all for a self-loop, so nothing can reach them from outside. Reaching them means changing the detector, which is a different job from scoring it
+- [x] the deferral premise was WRONG and the guards are gone instead (2026-09-19): `algorithms/cycle-detector.ts:89-96` DOES emit a one-node cluster when the node carries a self-edge, so the guards were reachable — and redundant, because a one-node cluster spans one file and the `files.size > 1` filter beside them already dropped it. Mutating `<= 1` to `< 1` changed no answer, which is what proved it. Both guards deleted, and `audit.test.ts` now pins the self-import outcome against the filter that does decide (mutating `files.size > 1` to `>= 1` fails three cases)
 
 ### Two rules are unexercised by every subject, and the bench cannot reach them either
 
@@ -715,6 +717,7 @@ change with its own measurement.
 - [x] L3 — the counter-halves are in the same seven: a legal downward edge, a same-layer edge, a test file exempt, a single pulse that says NOT ASSESSED and refuses the safe-limits line
 - [x] decide whether the layer contract should be per-project, or say in the output that it is not — DECIDED 2026-09-19: say it is not, and make the output say it. `LAYER_FRAGMENTS` matches this repository's own directory names (`/lib/core`, `/lib/domain`, `/contracts`) and `sentinel.yml` can express rules but not layers, so on any other project nothing maps, no edge is judged, and the check printed a clean pass — the "0 checked, exit 0" shape this repo already refuses elsewhere. `governance/index.ts` now counts how many endpoints mapped to a layer and, at zero, emits a `NOT CHECKED` warning naming the layers it looked for and why none matched
 - [x] Per-project layers were NOT built, and the reason is recorded rather than deferred silently: it is a real feature — a YAML schema for fragments and allowed edges, validation, and docs — and the minimal parser currently reads only `rules:`. The honest interim is a gate that refuses to claim a pass it did not earn
+- [x] per-project layers are now BUILT (ADR 0197, 2026-09-19): `.conducks/sentinel.yml` takes a `layers:` list of `name` / `path` / `allow`, read by `loadLayerContract`; an unusable declaration reports NOT CHECKED as an error instead of falling back to conducks' own fragments. The interim above stands as written — it is what shipped between the two dates
 
 ### `guard`'s hard gate is a no-op on any project that is not conducks
 

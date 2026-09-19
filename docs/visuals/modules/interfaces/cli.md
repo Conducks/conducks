@@ -4,13 +4,12 @@
 exactly once, legally: `mirror.ts:3` pulls `initGlobalMirror` from `interfaces/web` — a launcher edge,
 not logic coupling (ADR 0005, encoded as `cli → web`).
 
-**What it actually does, today:** 19 imports across 14 command files reach past the registry straight
-into `@/lib/domain/*` and `@/lib/core/*` (`chronicle-interface`, `persistence`, `docs-grammar`,
-`sentinel`, `gateway-service`, `linker-federated`, …). The encoded contract allows cli → composition,
-contracts and web only, so each of those is an illegal downward reach. They are not caught because the
-layer rule is not loaded ([sentinel](../domain/governance/sentinel.md)). Treat "imports
-composition only" as the target state; when you touch a command that does otherwise, route it through
-the registry instead of adding another one.
+**What it actually does, today:** it imports composition. Measured 2026-09-19, `src/interfaces/cli/`
+contains **zero** references to `@/lib/` — no reach past the registry into domain or core survives.
+This note recorded 19 such imports across 14 command files, and said they went uncaught "because the
+layer rule is not loaded"; the rule has been loaded by default since 2026-07-25 and `conducks guard`
+reports the contract clean on this repository. Both halves of that paragraph outlived their facts —
+keep the target state as the rule, and re-measure before repeating a number from it.
 
 **Responsibility:** argument parsing, output formatting, exit codes, and the one-line lifecycle of
 opening and closing the vault. 38 commands, one file each.
@@ -36,9 +35,8 @@ useful version is strictly the one people leave running (ADR 0031).
 
 **Uses:** takes argv from the shell and the wired registry from `composition`; each command asks the
 registry for the domain service or persistence handle it needs, formats the result, and sets an exit
-code. Nineteen imports across fourteen command files currently reach past the registry straight into
-domain/core — an illegal downward reach the layer contract does not yet catch here (see above) —
-route a touched command through the registry instead of adding another one.
+code. Nothing here imports domain or core directly (measured above), and the layer contract blocks a
+new one.
 
 ## Why every command imports the registry for typing only
 
@@ -132,5 +130,7 @@ they agree. Change the SOURCE, rebuild, and confirm the sync report says `N upda
 **Project paths are not discoverable from a fresh checkout.** The `conducks` bin (`package.json:18`)
 points at the BUILT CLI entry, compiled from `src/interfaces/cli/index.ts` — there is no `cli.ts` at
 the source tree's root, which the built path's flatter shape can suggest. The vault is a DuckDB file
-named `conducks-synapse.db` under a `.conducks/` directory at the project root, and grammars are the
-tree-sitter `.wasm` files under `src/resources/grammars/`.
+named `conducks-synapse.db` under a `.conducks/` directory at the project root. Grammars are NATIVE
+`optionalDependencies` packages, loaded through `core/parsing/grammar-registry.ts` — this note said
+they were `.wasm` files under `src/resources/grammars/`, a directory ADR 0027 deleted along with the
+WASM path itself.

@@ -47,8 +47,9 @@ An edit made here is discarded by the next render; edit the .md.</div>
 </ul>
 <p>  historical baseline and exits non-zero past a team-picked threshold.</p>
 <ul>
-<li><b>Layer contract enforcement</b> (<code>conducks guard</code>) — see above.</li>
+<li><b>Layer contract enforcement</b> (<code>conducks guard</code>) — see above. The contract is conducks' own by</li>
 </ul>
+<p>  default and this project's own when <code>.conducks/sentinel.yml</code> declares <code>layers:</code> (ADR 0197); when   no file maps to any layer the check reports NOT CHECKED rather than a pass.</p>
 <p><b>A verdict is earned by a comparison that actually happened.</b> A CLI drift report (fed by <code>guard</code>/<code>advisor</code>'s comparison path) used to check <code>result.deltas.some(...)</code>, which is <code>false</code> on an empty array — indistinguishable from "compared and found nothing decayed". It now checks <code>result.deltas &amp;&amp; result.deltas.length &gt; 0</code> explicitly, so "nothing to compare" and "compared, all clean" cannot collapse into the same silent pass (<code>src/interfaces/cli/commands/drift.ts:111</code>). Every finding in this module declares which edge types it traversed and whether each survives compilation — see "the one lesson" below — and every "clean" verdict states what it examined rather than staying silent about scope: an empty rule set (missing <code>config/sentinel.json</code>) now warns rather than passing quietly (see <a href="governance/sentinel.html">sentinel</a>).</p>
 <h2>Glossary</h2>
 <ul>
@@ -72,6 +73,16 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><b>Before adding a rule, write down which edge types it traverses and whether each survives compilation, in the ADR.</b> That single step would have prevented all three.</p>
 <h2>What a clean audit means</h2>
 <p><b>"Orphan" means two different things and they are both right.</b> Here, an orphan is a *dangling edge* — an edge whose target node was never induced (<code>governance/index.ts:141-212</code>, reported as ECOSYSTEM-1 or DISCOVERY-1). In <a href="evolution.html">evolution</a>, an ORPHAN is a *node with no incoming edge*. So <code>conducks audit</code> reporting zero orphans while <code>conducks prune</code> lists some (10, measured 2026-08-29) is not a contradiction and neither number is stale. Never quote one as the other.</p>
-<p><code>conducks audit</code> on conducks reports zero findings, and that is validated rather than assumed: on compiled JS, conducks and <code>madge</code> both report zero cycles. <code>madge</code> on TS *source* still reports three — its type-erasure blind spot. Conducks being the more accurate of the two on the same repo is the claim this module exists to defend, so any change that loosens a filter needs the same cross-check.</p>
+<p><b><code>conducks audit</code> on conducks does NOT report zero findings, and this note claimed it did.</b> Measured 2026-09-19: 182 ARCH-3 clusters, plus one ARCH-1 hub overload (<code>src/registry/index.ts::registry</code>, 73 upstream against a limit of 50 — the count still excludes type-only and non-runtime edges, so 73 is an honest runtime number and the registry has simply grown). <code>conducks guard</code> prints the same 182 as <code>no_cycles</code>.</p>
+<p>Where they are matters more than the count. Grouped by path, 540 of the cycle members sit under <code>tests/fixtures/</code> — planted cycle repos that exist to be found, and the reason a raw total reads alarming. Eleven sit in <code>src/lib</code>, in two real clusters:</p>
+<ul>
+<li>a 9-node cluster through <code>core/git/index.ts → chronicle-interface.ts</code>, joining the parsing</li>
+</ul>
+<p>  language packs to git via the two doors;</p>
+<ul>
+<li>a 5-node cluster between <code>domain/analysis</code> and <code>domain/docs</code>, through both doors.</li>
+</ul>
+<p>Both are the door-to-door shape ADR 0150 rule 5b names: importing a door pulls in everything it re-exports. Neither is triaged here — this note records the measurement, and a fix is its own change with its own before/after.</p>
+<p>The earlier cross-check still stands on its own terms: on compiled JS, conducks and <code>madge</code> both report zero cycles for the SOURCE tree, while <code>madge</code> on TS source reports three it cannot erase. Any change that loosens a filter needs that cross-check re-run.</p>
 <footer>Source: <code>docs/visuals/modules/domain/governance.md</code> — anchors checked by <code>conducks visuals-lint</code>.</footer>
 </div>

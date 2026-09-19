@@ -262,7 +262,9 @@ parameter is worse than no parameter: it sends the next reader to a fix that can
 call site reads as evidence that it can.
 
 ## Features
-none — one file, `persistence.ts`, with no sub-features of its own.
+none — four files (`persistence.ts`, `file-hash-gate.ts`, `freshness.ts`, the door), none of them a
+capability a caller asks for by name. `FileHashGate` and `freshness` are rules the vault applies on
+the way in and out, not questions anyone poses to this module.
 
 ## Glossary
 - **pruneTaxonomy** — the one place allowed to decide which nodes survive a pulse; see above.

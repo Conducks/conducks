@@ -95,7 +95,7 @@ tool definition files instead of importing the tool modules, so the check touche
 
 **The tree-sitter native addon serves ONE JS-wrapper per process.** The second test file to load a
 grammar in the same process gets a wrapper whose `tree.rootNode` is undefined and fails at random.
-`jest.config.js`'s `workerIdleMemoryLimit: '1KB'` (`jest.config.js:39`) recycles the worker after
+`jest.config.js`'s `workerIdleMemoryLimit: '1KB'` (`jest.config.js:44`) recycles the worker after
 every test file for this reason, which is a narrower fix than the suite used to carry: `maxWorkers`
 runs at 2, not 1 — the suite went PARALLEL once `todo65` found the real cause of the failures years of
 comments blamed on "a shared DuckDB lock" was actually `conducks clean` matching processes by entry
@@ -121,7 +121,36 @@ mirroring the CLI's answer to the same question (see `interfaces/cli`'s "Every M
 command" for the mirror rule itself).
 
 ## Features
-none — 13 tools grouping 35 CLI commands' capability, with no sub-notes of their own.
+
+No sub-notes — this module is one server. What it OFFERS is the thirteen tools, grouped by the
+question each answers; the CLI command beside each is the parity claim this module is held to.
+
+- **`conducks_query`** (`tools/synapse.ts:234`) — find a symbol by name or pattern; fuzzy search and
+  oracle templates. The discovery tool every other call starts from.
+- **`conducks_status`** (`tools/synapse.ts:405`) — structural health, hotspots and entry points, plus
+  the system manifest.
+- **`conducks_audit`** (`tools/synapse.ts:511`) — architectural integrity: cycles, god objects, rule
+  violations.
+- **`conducks_explain`** (`tools/synapse.ts:594`) — one symbol's risk: gravity, entropy, churn,
+  complexity.
+- **`conducks_context`** (`tools/synapse.ts:654`) — the neighbourhood around a symbol within a graph
+  radius, ranked, with an optional token budget.
+- **`conducks_graph_query`** (`tools/synapse.ts:804`) — a raw `SELECT` against the DuckDB store, for
+  a question no tool shapes. SELECT only.
+- **`conducks_flows`** (`tools/synapse.ts:860`) — the named execution flows: each entry point and the
+  symbols it reaches.
+- **`conducks_prune`** (`tools/synapse.ts:949`) — dead code: orphaned symbols, unused exports, stale
+  imports.
+- **`conducks_docs`** (`tools/synapse.ts:1046`) — the open threads in the authored docs, rooted at the
+  decisions that own them. The one tool on this surface whose subject is docs, not code.
+- **`conducks_coverage`** (`tools/synapse.ts:1188`) — an istanbul `coverage-final.json` laid over the
+  graph, so a dark function with no callers separates from a dark one with many.
+- **`conducks_impact`** (`tools/kinetic.ts:60`) — the blast radius of changing a symbol, upstream and
+  downstream.
+- **`conducks_trace`** (`tools/kinetic.ts:148`) — reachability from a symbol, or the shortest wiring
+  path between two, over the shared edge-distance table (ADR 0196).
+- **`conducks_diff`** (`tools/kinetic.ts:259`) — the structural difference between the current graph
+  and an earlier pulse.
 
 ## Glossary
 - **parity** — matching CLI *capability*, never matching defaults; a tool may default differently

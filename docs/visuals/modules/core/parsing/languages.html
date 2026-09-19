@@ -7,7 +7,7 @@
 An edit made here is discarded by the next render; edit the .md.</div>
 <a class="back" href="../../../architecture.html">&larr; back to the architecture</a>
 <h1>core/parsing/languages — one tree-sitter query per language</h1>
-<p><b>Part of:</b> <a href="../parsing.html">core/parsing</a>. 50 files across 13 language folders. Each folder owns a <code>queries.ts</code> (the tree-sitter query, an S-expression string — there are <b>no <code>.scm</code> files</b>; the query language is scm, the container is TypeScript), an <code>index.ts</code> provider, and usually a <code>resolver.ts</code> / <code>extractor.ts</code> / <code>bindings.ts</code>.</p>
+<p><b>Part of:</b> <a href="../parsing.html">core/parsing</a>. 61 files across 13 language folders, plus five shared ecmascript files beside them. Each folder owns a <code>queries.scm</code> (the tree-sitter query itself) and a <code>queries.ts</code> that is a one-line loader for it (<code>scm(import.meta.url, './queries.scm')</code>), an <code>index.ts</code> provider, and usually a <code>resolver.ts</code> / <code>extractor.ts</code> / <code>bindings.ts</code>. The query moved OUT of the TypeScript file in todo31 — this note said "there are no <code>.scm</code> files" for some time after that was no longer true, while its own anchors pointed into them.</p>
 <p><b>Layer:</b> core.</p>
 <p><b>Responsibility:</b> declaring what a language's syntax means in conducks' vocabulary — which node is a definition, a call, an import, a type position. This is where language support actually lives; the reflector is generic over it.</p>
 <p><b>Boundaries:</b> a query declares captures and nothing else. Any logic about what a capture *implies* belongs in <a href="processors.html">processors</a>.</p>
@@ -64,9 +64,9 @@ An edit made here is discarded by the next render; edit the .md.</div>
 </ul>
 <p>  <code>'/users'</code> captured the same way elsewhere unless both are stripped first.</p>
 <ul>
-<li><b>A backtick inside a query file's comment terminates the template literal.</b> <code>queries.ts</code> holds</li>
+<li><b>A backtick in a query comment used to break the build, and no longer can.</b> The patterns lived</li>
 </ul>
-<p>  the SCM query in a JS template literal; <code>tsc</code> then reports <code>';' expected</code> on the FOLLOWING line,   pointing at the pattern rather than the comment that broke it. Write those comments in words, never   with a code fragment in backticks.</p>
+<p>  in a JS template literal in <code>queries.ts</code>, where a backtick in a <code>;;</code> comment terminated the string   and <code>tsc</code> blamed the following line. They live in <code>queries.scm</code> now and <code>scm()</code> reads the file, so   a comment is ordinary text. The pre-build gate that made the old shape survivable is gone with it.</p>
 <ul>
 <li><b>Swift reuses one grammar field id for two different things.</b> <code>return_type</code> and the function's</li>
 </ul>

@@ -1,9 +1,11 @@
 # core/parsing/languages — one tree-sitter query per language
 
-**Part of:** [core/parsing](../parsing.md). 50 files across 13 language folders. Each
-folder owns a `queries.ts` (the tree-sitter query, an S-expression string — there are **no `.scm`
-files**; the query language is scm, the container is TypeScript), an `index.ts` provider, and usually
-a `resolver.ts` / `extractor.ts` / `bindings.ts`.
+**Part of:** [core/parsing](../parsing.md). 61 files across 13 language folders, plus five shared
+ecmascript files beside them. Each folder owns a `queries.scm` (the tree-sitter query itself) and a
+`queries.ts` that is a one-line loader for it (`scm(import.meta.url, './queries.scm')`), an
+`index.ts` provider, and usually a `resolver.ts` / `extractor.ts` / `bindings.ts`. The query moved
+OUT of the TypeScript file in todo31 — this note said "there are no `.scm` files" for some time
+after that was no longer true, while its own anchors pointed into them.
 
 **Layer:** core.
 
@@ -122,10 +124,10 @@ the grammar at all, in either JavaScript or TypeScript, so it cannot be captured
   query that matches nothing does not error — it silently yields zero forever.
 - **A `(string)` capture includes its quotes.** `'/users'` captured from a route path is not equal to
   `'/users'` captured the same way elsewhere unless both are stripped first.
-- **A backtick inside a query file's comment terminates the template literal.** `queries.ts` holds
-  the SCM query in a JS template literal; `tsc` then reports `';' expected` on the FOLLOWING line,
-  pointing at the pattern rather than the comment that broke it. Write those comments in words, never
-  with a code fragment in backticks.
+- **A backtick in a query comment used to break the build, and no longer can.** The patterns lived
+  in a JS template literal in `queries.ts`, where a backtick in a `;;` comment terminated the string
+  and `tsc` blamed the following line. They live in `queries.scm` now and `scm()` reads the file, so
+  a comment is ordinary text. The pre-build gate that made the old shape survivable is gone with it.
 - **Swift reuses one grammar field id for two different things.** `return_type` and the function's
   own `name` alias onto the same field id in tree-sitter-swift 0.7.1, so `return_type: (user_type)`
   compiles and matches nothing; the working form writes `name:` twice in one pattern, disambiguated by

@@ -24,7 +24,7 @@ export const BAND1 = {
   id:'band1', title:'HOW A CODEBASE BECOMES A GRAPH',
   sub:'the analyze pulse — the only path that writes',
   containers:[
-    { id:'c_parsing', anchor:"src/lib/core/parsing/index.ts — the parsing feature's only door (ADR 0150): 69 files, 8.8k lines, thirteen language packs and the reflector behind one export", title:'PARSING', sub:'core/parsing — 13 language packs and one reflector',
+    { id:'c_parsing', anchor:"src/lib/core/parsing/index.ts — the parsing feature's only door (ADR 0150): 89 files, 9.7k lines, thirteen language packs and the reflector behind one export", title:'PARSING', sub:'core/parsing — 13 language packs and one reflector',
       nodes:[
         n('anchor','Anchor on a root','one directory for the whole process',
           'src/lib/core/git/chronicle-interface.ts::anchorChronicle — the door hands out `chronicle` as ReadOnlyChronicle, the class minus its one mutator, so none of the two dozen files holding it can re-anchor mid-run',
@@ -43,7 +43,7 @@ export const BAND1 = {
         n('order','Order by dependency','so a definition is parsed before its user',
           'src/lib/core/parsing/pipeline.ts::topologicalSort — a cycle has no valid order, and the two wrong answers are to drop those files or loop forever. They are appended as a final tier instead'),
         n('refl','The reflector','tree-sitter match in, nodes and edges out',
-          'src/lib/core/parsing/reflector.ts::reflect — 1,696 lines, the single most consequential file here: a defect reaches all 35 commands',
+          'src/lib/core/parsing/reflector.ts::reflect — 1,738 lines, the single most consequential file here: a defect reaches all 38 commands',
           {cls:'n-hi'}),
         n('tags','A capture declares a kind','isFunction, isStruct, isBinding…',
           'src/lib/core/parsing/capture-tags.ts::DEFINITION_CAPTURES — one case per tag is pinned, in a language MEASURED to emit it. isClass is emitted by ONE of the thirteen grammars, so a TypeScript case would have tested isStruct and passed'),
@@ -117,10 +117,10 @@ export const BAND2 = {
   id:'band2', title:'HOW A QUESTION IS ANSWERED',
   sub:'two surfaces, one registry, and the choice between SQL and a 165 MB walk',
   containers:[
-    { id:'c_cli', anchor:'src/interfaces/cli/index.ts:121::main — one dispatcher, and every command constructed in a single list so no command can reach another', title:'THE CLI', sub:'interfaces/cli — 42 commands behind one dispatcher',
+    { id:'c_cli', anchor:'src/interfaces/cli/index.ts:121::main — one dispatcher, and every command constructed in a single list so no command can reach another', title:'THE CLI', sub:'interfaces/cli — 38 commands behind one dispatcher',
       nodes:[
         n('argv','A command word','conducks <id> [args]',
-          'src/interfaces/cli/index.ts::main — 42 commands, each a ConducksCommand found by id'),
+          'src/interfaces/cli/index.ts::main — 38 commands, each a ConducksCommand found by id'),
         n('iface','One contract per command','id, description, usage, execute',
           'src/interfaces/cli/command.ts::ConducksCommand — `link` was imported and never instantiated, so the command answered "Unknown command" while FederatedLinker underneath worked fine. The import satisfied the compiler and no test drove the surface',
           {cls:'n-warn'}),
@@ -129,7 +129,7 @@ export const BAND2 = {
           {cls:'n-ok'}),
         n('quiet','A read command says nothing else','narration is off unless asked',
           'src/lib/core/utils/logger.ts::setProcessQuiet — five boot lines used to precede every answer. Quiet is process-wide but the SETTER is not a method, so the reach is visible at the call site (ADR 0080)'),
-        n('cli','35 commands','one file each, no command imports another',
+        n('cli','38 commands','one file each, no command imports another',
           'src/interfaces/cli/index.ts:210 — every command is constructed in one `const commands: ConducksCommand[]` list. Verified 2026-08-23: no file in commands/ imports another command, constructs another command class, or shells out to the conducks binary',
           {cls:'n-ok'}),
         n('mirror','Both must answer the same','the CLI is where a person checks what the agent did',

@@ -15,7 +15,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <ul>
 <li><b>Plant benchmarks</b> (`tools/benchmark/bench-{prune,trace,context,drift,guard,advise,diff,doctor,</li>
 </ul>
-<p>  entry,flows,audit,list}.mjs<code>) — each builds small synthetic git repos and asks the built CLI a   question, per scenario. Every scenario states both halves: what the command MUST find (recall) and   what it must NOT find (precision) — a neighbourhood returning everything passes every inclusion   check and one returning nothing passes every exclusion check, so a scenario missing either half is   half a gate (</code>bench-context.mjs:31`). Counts measured directly: trace 10, context 10, prune 12,   drift 10, entry 10, doctor 12, list 10, diff 8, audit 8, flows 7, guard 7, advise 5.</p>
+<p>  entry,flows,audit,list}.mjs<code>) — each builds small synthetic git repos and asks the built CLI a   question, per scenario. Every scenario states both halves: what the command MUST find (recall) and   what it must NOT find (precision) — a neighbourhood returning everything passes every inclusion   check and one returning nothing passes every exclusion check, so a scenario missing either half is   half a gate (</code>bench-context.mjs:31`). Counts measured directly (2026-09-19): trace 10, context 10, prune 12,   drift 10, entry 12, doctor 12, list 10, diff 8, audit 8, flows 7, guard 11, advise 5.</p>
 <ul>
 <li><b>Oracles</b> (<code>tools/benchmark/oracle-*.mjs</code>) — score conducks against a SECOND, independently</li>
 </ul>

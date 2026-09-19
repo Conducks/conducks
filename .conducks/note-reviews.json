@@ -1,0 +1,308 @@
+{
+  "docs/visuals/modules/core/bootstrap.md": {
+    "src/lib/core/bootstrap/registry-bootstrapper.ts": "e40b0684a2efd826",
+    "src/registry/index.ts": "84994b984e90a487"
+  },
+  "docs/visuals/modules/core/registry.md": {
+    "src/lib/core/registry/synapse-registry.ts": "4fdb41ecb9ed0fda",
+    "src/registry/index.ts": "84994b984e90a487",
+    "src/lib/core/persistence/persistence.ts": "21f0b17ecdf21799"
+  },
+  "docs/visuals/modules/contracts.md": {
+    "src/contracts/test-path.ts": "ca46b868cf88d341"
+  },
+  "docs/visuals/modules/core/git.md": {
+    "src/lib/core/git/chronicle-interface.ts": "e412147696d8f336"
+  },
+  "docs/visuals/modules/core/persistence.md": {
+    "src/lib/core/persistence/persistence.ts": "21f0b17ecdf21799",
+    "tools/lib/vault.mjs": "711ad3642c40d324",
+    "src/interfaces/cli/commands/diff.ts": "90d7dae2f0ee3cce",
+    "src/lib/core/persistence/persistence.ts:1090": "143f3c9e000576da",
+    "src/lib/domain/analysis/index.ts:229": "1b1fbfda28e84fd6",
+    "src/lib/core/git/chronicle-interface.ts": "e412147696d8f336",
+    "src/lib/core/parsing/reflector.ts:610": "d1f19c06d05a7df4",
+    "src/lib/core/persistence/file-hash-gate.ts": "b6298828a271afe1",
+    "src/lib/core/persistence/persistence.ts:844": "81994b59a8345ead",
+    "src/lib/core/persistence/persistence.ts:1035": "e51316ede2e83469",
+    "src/lib/core/persistence/file-hash-gate.ts:39": "f80ecbeb33827e6d",
+    "src/lib/core/persistence/persistence.ts:1789": "480371ad5daa2b6d",
+    "src/lib/core/persistence/persistence.ts:1759": "eca2aedb0692feac",
+    "src/lib/core/persistence/persistence.ts:541": "3562e9b8b6b67a25",
+    "src/lib/core/persistence/persistence.ts:711": "6bd666fa50f3949e",
+    "src/lib/core/utils/mem-trace.ts": "d19ab164e7aab5e3",
+    "src/lib/domain/analysis/orchestrator.ts": "e6a82e7bdde7c404",
+    "src/lib/core/persistence/persistence.ts:1304": "bd7ba89c9c9e1867",
+    "src/lib/core/persistence/persistence.ts:1157": "2beb606d16fd6f9d",
+    "tests/integration/features/helpers.ts": "e976e4943959a8c9",
+    "src/lib/core/persistence/persistence.ts:885": "e18d2ac8f3f15765"
+  },
+  "docs/visuals/modules/core/utils.md": {
+    "src/lib/core/utils/logger.ts": "7ac78c3c6b1f0d74"
+  },
+  "docs/visuals/modules/core/graph/algorithms.md": {
+    "src/lib/core/graph/algorithms/cycle-detector.ts": "d9e159b4b81df29e",
+    "src/lib/core/graph/algorithms/ranker.ts": "ca50f4091c1b8e3b",
+    "src/lib/core/graph/algorithms/traversal.ts": "bde024f69d14a6a6"
+  },
+  "docs/visuals/modules/core/graph/linkers.md": {
+    "src/lib/core/graph/import-resolver.ts": "3a421fb782f43199",
+    "src/lib/core/graph/linker-intra.ts": "945862e1b6e055e6",
+    "src/lib/core/graph/linker-federated.ts": "2d85698f558d7db4",
+    "src/lib/core/graph/http-service-linker.ts": "db25b7b834f3af60",
+    "src/lib/core/parsing/languages/typescript/resolver.ts": "50424786d8687df2"
+  },
+  "docs/visuals/modules/core/algorithms.md": {
+    "src/lib/core/algorithms/entropy.ts": "bc9503ba048f5f67",
+    "src/lib/core/algorithms/cochange-engine.ts": "c7ec5881817578f7"
+  },
+  "docs/visuals/modules/core/graph.md": {
+    "src/lib/core/graph/adjacency-list.ts": "025836574952eaed",
+    "src/lib/core/graph/graph-engine.ts": "4c0c6337ff9c6d45",
+    "src/lib/core/graph/graph-engine.ts:273": "4770e8ef3c1c8f69",
+    "src/lib/core/graph/adjacency-list.ts:760": "f0bf6006cb6c8bab",
+    "src/lib/core/parsing/processors/call.ts": "047ca728bb8e4ab2",
+    "src/lib/core/persistence/persistence.ts:1175": "4d1c745dd3d30596",
+    "src/contracts/built-ins.ts:190": "ec170b94974a4dc6",
+    "src/lib/core/graph/graph-engine.ts:174-176": "0d5daad0da6ad342",
+    "src/lib/core/graph/graph-engine.ts:170": "4e3cf8c0c89bbefd",
+    "src/lib/core/persistence/persistence.ts:885": "e18d2ac8f3f15765",
+    "src/lib/core/graph/graph-engine.ts:157": "aa50c98eb252d397",
+    "src/lib/core/graph/graph-engine.ts:174": "0f52fe816c3bd395",
+    "src/lib/core/graph/adjacency-list.ts:560": "c86538d625762617",
+    "tests/unit/core/graph/neural-rebind-index.test.ts": "af96bb8c8f4b3e13"
+  },
+  "docs/visuals/modules/core/parsing/taxonomy.md": {
+    "src/contracts/taxonomy.ts": "fba5587d0929a9e2",
+    "tests/unit/core/taxonomy-rank-single-source.test.ts": "1557c904d28ecdf1"
+  },
+  "docs/visuals/modules/core/parsing/grammar-registry.md": {
+    "src/interfaces/cli/commands/doctor.ts:39-47": "7e27204c80c1163e",
+    "tests/unit/core/parsing/optional-native-binding.test.ts": "ba7f05e5a933f9f0"
+  },
+  "docs/visuals/modules/core/parsing/languages.md": {
+    "tools/benchmark/oracle-packs.mjs": "1cf0af6c5ad696f9"
+  },
+  "docs/visuals/modules/core/parsing/processors.md": {
+    "src/lib/core/parsing/processors/import.ts": "10b4c957a90fed6d",
+    "src/lib/core/parsing/processors/call.ts": "047ca728bb8e4ab2",
+    "src/lib/core/parsing/processors/heritage.ts": "fbb12cb8b6a03328",
+    "src/lib/core/parsing/processors/binding.ts": "ed25566d847b067d",
+    "src/lib/core/parsing/processors/flow.ts": "46ddd97746f19bf8",
+    "tools/benchmark/oracle-packs.mjs": "1cf0af6c5ad696f9"
+  },
+  "docs/visuals/modules/core/parsing.md": {
+    "src/lib/core/parsing/prism-core.ts": "644b993400150eae",
+    "src/contracts/prism-types.ts": "b47a3e9045ed4f9e",
+    "src/lib/core/parsing/reflector.ts:293": "2f4814a5b4317a76",
+    "src/contracts/test-path.ts:42": "5deec6e2290c694d",
+    "src/contracts/source-extensions.ts": "041ad2eb43d3ddc1"
+  },
+  "docs/visuals/modules/core/parsing/reflector.md": {
+    "src/lib/core/parsing/reflector.ts": "88c8a53ad1267130"
+  },
+  "docs/visuals/modules/domain/governance.md": {
+    "src/lib/domain/governance/sentinel-rules.ts": "f9d112498f6a5946",
+    "tests/architecture/boundaries.test.ts": "301074797299856e",
+    "src/lib/domain/governance/sentinel-rules.ts:70-76": "d379dbe3e25818c2",
+    "tests/unit/core/deferred-graph-guard.test.ts": "fd8211079ec36125",
+    "config/sentinel.json": "152f1597f569c396",
+    "src/lib/domain/governance/index.ts:98-121": "5042d00529c4925d",
+    "src/interfaces/cli/commands/drift.ts:111": "bae44558d8177570",
+    "src/lib/domain/governance/index.ts:141-212": "ae5cf610c4d51c65",
+    "src/registry/index.ts::registry": "6a13833ed420b793",
+    "src/lib/core/git/index.ts": "a2867ee6439cdf29",
+    "src/lib/core/git/chronicle-interface.ts": "e412147696d8f336"
+  },
+  "docs/visuals/modules/domain/governance/sentinel.md": {
+    "config/sentinel.json": "152f1597f569c396",
+    "src/lib/domain/governance/index.ts:349": "d10b36aa74a59bcf",
+    "src/lib/domain/governance/index.ts": "2209a79a2369a1ec",
+    "src/interfaces/cli/commands/audit.ts:82-88": "55a0dc932445fba6",
+    "src/registry/index.ts": "84994b984e90a487",
+    "src/lib/domain/governance/sentinel.ts:216": "2fe0f979f97407b7"
+  },
+  "docs/visuals/modules/interfaces/tools.md": {
+    "src/lib/core/utils/logger.ts": "7ac78c3c6b1f0d74",
+    "tests/unit/adr-invariants.test.ts": "dfca9b4f4d680ea4",
+    "tests/unit/domain/stale-import.test.ts": "16a694320f5285fe",
+    "src/interfaces/tools/shared/resolve-symbol.ts": "4e89c70fe0394cc4",
+    "src/interfaces/tools/shared/empty-vault.ts": "c061019a1deb7acb",
+    "src/interfaces/tools/tools/kinetic.ts:43": "37a9e28c044d06be",
+    "jest.config.js:44": "d8a02176c3335233",
+    "tests/unit/interfaces/tools/tool-names-are-real.test.ts": "2a68b784cded0e9e",
+    "src/interfaces/tools/tools/synapse.ts:234": "0bd33cc5ef4f6b58",
+    "src/interfaces/tools/tools/synapse.ts:405": "fbade3bd348797a7",
+    "src/interfaces/tools/tools/synapse.ts:511": "0518876ffb06b8bf",
+    "src/interfaces/tools/tools/synapse.ts:594": "05fe70c598a6ca58",
+    "src/interfaces/tools/tools/synapse.ts:654": "c46a58c02eed84e6",
+    "src/interfaces/tools/tools/synapse.ts:804": "4474c231ddf54630",
+    "src/interfaces/tools/tools/synapse.ts:860": "d5f9f82665f38075",
+    "src/interfaces/tools/tools/synapse.ts:949": "5c06df6c502fde76",
+    "src/interfaces/tools/tools/synapse.ts:1046": "220d32cb5c6fbf2f",
+    "src/interfaces/tools/tools/synapse.ts:1188": "d02377480dd2cb4e",
+    "src/interfaces/tools/tools/kinetic.ts:60": "50c5ab48e4267326",
+    "src/interfaces/tools/tools/kinetic.ts:148": "8f82c76e97c43e60",
+    "src/interfaces/tools/tools/kinetic.ts:259": "61fda46ff69085c0"
+  },
+  "docs/visuals/modules/registry.md": {
+    "src/lib/core/graph/index.ts:8-14": "61f97fb34bb20633",
+    "src/lib/domain/governance/advisor.ts": "80c609557d38ca0f",
+    "tests/architecture/feature-doors.test.ts": "10d09988a9b7780c",
+    "tests/architecture/boundaries.test.ts": "301074797299856e",
+    "src/registry/index.ts": "84994b984e90a487",
+    "src/lib/domain/governance/sentinel.ts:216": "2fe0f979f97407b7",
+    "src/interfaces/tools/shared/anchor.ts": "dc29166053fa44df",
+    "src/registry/index.ts::evolution": "e7f58fc002f64a49"
+  },
+  "docs/visuals/modules/interfaces/web.md": {
+    "src/lib/domain/governance/sentinel-rules.ts:70-72": "962ee6cd50693f07",
+    "src/interfaces/cli/commands/mirror.ts:3": "7cdf31f156ad4b24",
+    "src/lib/domain/governance/sentinel-rules.ts:66-72": "0c5d36c30319912d",
+    "src/interfaces/web/mirror/server.ts": "ab4d2a15531c4087",
+    "tests/architecture/feature-doors.test.ts:65": "a83d0983e0f8b938",
+    "src/lib/domain/mirror/index.ts": "3cb1f20826c1c095",
+    "src/lib/domain/mirror/gateway.ts": "ea4477072311944c",
+    "src/registry/index.ts:571-576": "175663510b9df4a7",
+    "src/interfaces/web/mirror/server.ts:193-209": "d37b9be5f9d4d00d",
+    "src/interfaces/web/mirror/public/vendor/force-graph.min.js": "1008539bb9e171a0",
+    "src/interfaces/web/mirror/public/vendor/d3-force.min.js": "1e07b47324132879",
+    "src/interfaces/web/mirror/public/ui.js:107": "301be8ebf8b89d53",
+    "tests/unit/interfaces/tools/docs-layer.test.ts": "05dc4354467b74af",
+    "tests/unit/interfaces/mirror-frontend-is-wired.test.ts": "30b8eea26287c29f",
+    "src/interfaces/web/mirror/public/ui.js:33": "e075e9ea1ee057c8",
+    "src/interfaces/web/mirror/public/ui.js:40-46": "68deaab915092d34",
+    "tests/unit/adr-invariants.test.ts": "dfca9b4f4d680ea4"
+  },
+  "docs/visuals/modules/interfaces/cli.md": {
+    "src/interfaces/cli/commands/mirror.ts:3": "7cdf31f156ad4b24",
+    "tests/architecture/paired-surfaces.test.ts": "c6a8bf288b0897c7",
+    "src/interfaces/cli/commands/diff.ts": "90d7dae2f0ee3cce",
+    "src/interfaces/cli/commands/supply-chain.ts": "e48ea7853789a128",
+    "src/interfaces/cli/commands/link.ts": "5b860d49b1964318",
+    "src/interfaces/cli/commands/record.ts": "038b0d1d70b86a56",
+    "src/interfaces/cli/commands/setup.ts": "e8c8c31fd05f02e1",
+    "scripts/sync-skills-postbuild.mjs": "6158c2bcd429613f",
+    "package.json:44": "e0923247caafe9bc",
+    "package.json:18": "57bf4ad2257fe254",
+    "src/interfaces/cli/index.ts": "d9fbae2ad344bab1",
+    "src/lib/core/parsing/grammar-registry.ts": "fd20e01f546c6a29"
+  },
+  "docs/visuals/modules/bench.md": {
+    "package.json:18": "57bf4ad2257fe254",
+    "docs/decisions/0175-a-benchmark-asks-for-the-shape-an-oracle-cannot.md": "9a7a302616d738b0",
+    "package.json:116": "8439b5980d56d62f",
+    "docs/decisions/0189-the-radius-is-the-claim.md": "7a4bcd80f056216b",
+    "tools/benchmark/projects.json": "2c0281c5fefa3fc2",
+    "tools/benchmark/bench-context.mjs:31": "dcd50e5d2bbd8391",
+    "tools/benchmark/oracle-tsc.mjs:94": "431fa680cc50144c",
+    "tools/benchmark/oracle-context.mjs:46": "c5e82c6e06eed7ad",
+    "tools/benchmark/oracle-tsc.mjs::probeDetectsPlantedImport": "ed660c40ccf38273",
+    "tools/benchmark/oracle-tsc.mjs:220": "98f48a7ca697f3c0",
+    "tools/benchmark/ts-program.mjs::buildProgram": "1dd8b72e97b547f7",
+    "tools/benchmark/ts-program.mjs:56": "d256899ddbf7eaee",
+    "tools/benchmark/reset-vault.mjs::resetVault": "1734004e6a8d37ce",
+    "tools/benchmark/reset-vault.mjs:51": "a740a71c83a74b3b",
+    "tools/benchmark/health.mjs": "374f52405ea70a05",
+    "tools/benchmark/doc-truth.mjs": "4e04a2bc51a14744",
+    "tools/benchmark/mutate-cli-smoke.mjs": "ce46ae5c245f771b",
+    "tools/benchmark/cli-smoke.mjs": "7e2a948efce0a147",
+    "package.json:43": "2cf822b932d4366a",
+    "tools/benchmark/oracle-tsc.mjs:41": "f61e801694976cd0"
+  },
+  "docs/visuals/modules/domain/coverage.md": {
+    "src/lib/domain/coverage/coverage-bind.ts": "33abc077a6621d61"
+  },
+  "docs/visuals/rules.md": {
+    "scripts/visuals/graph.mjs": "56119a0d17e0794e",
+    "scripts/visuals/visuals.config.mjs": "ca1e8842e9af29d6"
+  },
+  "docs/visuals/index.md": {
+    "scripts/visuals/graph.mjs": "56119a0d17e0794e"
+  },
+  "docs/visuals/modules/domain/kinetic.md": {
+    "src/lib/domain/kinetic/index.ts": "40325901d291a71c",
+    "tests/architecture/feature-doors.test.ts": "10d09988a9b7780c",
+    "src/interfaces/tools/tools/kinetic.ts": "f46995d633fca160",
+    "src/interfaces/tools/tools/synapse.ts": "8b33ad1fe245f0cf",
+    "src/lib/domain/kinetic/impact.ts:47": "8c4611bd857196ce",
+    "src/lib/domain/kinetic/impact.ts:58-63": "5f4bc365368ee820",
+    "src/interfaces/cli/commands/impact.ts": "8af3e4ca0496e4bd"
+  },
+  "docs/visuals/modules/domain/docs/docs-grammar.md": {
+    "tests/unit/domain/docs/docs-grammar.test.ts": "5553e3abf55ee008",
+    "src/resources/skills/conducks-docs.md": "462535b1d2c21d7e"
+  },
+  "docs/visuals/modules/domain/docs.md": {
+    "tests/unit/interfaces/tools/docs-layer.test.ts": "05dc4354467b74af"
+  },
+  "docs/visuals/modules/domain/analysis.md": {
+    "src/lib/domain/analysis/index.ts": "0bbf264021e16ac0",
+    "src/lib/domain/mirror/gateway.ts": "ea4477072311944c",
+    "src/lib/domain/analysis/query-service.ts:559": "67c8af7add853a33",
+    "src/lib/domain/analysis/query-service.ts:47": "e3939333dd84f74e"
+  },
+  "docs/visuals/modules/domain/analysis/orchestrator.md": {
+    "src/lib/domain/analysis/orchestrator.ts": "e6a82e7bdde7c404",
+    "src/lib/domain/analysis/micro-pulse.ts": "6ab922f93cb4bc15"
+  },
+  "docs/visuals/modules/domain/evolution.md": {
+    "src/lib/domain/evolution/dead-code.ts": "3f5a76664f43b02a",
+    "src/lib/domain/evolution/drift-engine.ts": "751cffef0689f5e9",
+    "src/lib/domain/evolution/watcher.ts": "73e05d8350da4435",
+    "tests/integration/features/prune-precision.test.ts": "f2d4b6d07a7e4392",
+    "tests/unit/adr-invariants.test.ts": "dfca9b4f4d680ea4",
+    "tests/integration/features/helpers.ts": "e976e4943959a8c9",
+    "src/lib/domain/evolution/watcher.ts:136": "2b35a9da254c64d7",
+    "src/contracts/dead-code-types.ts": "e4a771b4970307e4"
+  },
+  "docs/visuals/modules/domain/docs/docs-board.md": {
+    "src/lib/domain/docs/docs-board.ts": "9501e845d6875283",
+    "src/lib/domain/docs/docs-watcher.ts": "e9f918640551066a",
+    "docs/legacy/progress.md": "5cb1a3dafa997c11",
+    "src/lib/domain/analysis/module-hash.ts": "de4cb38ff431b656",
+    "tests/unit/domain/docs/docs-grammar.test.ts": "5553e3abf55ee008"
+  },
+  "docs/visuals/problems.md": {
+    "tests/architecture/paired-surfaces.test.ts": "c6a8bf288b0897c7",
+    "tests/architecture/paired-surfaces.test.ts:71": "7e7d7569f691ec83",
+    "src/interfaces/tools/tools/synapse.ts:796": "e3b0c44298fc1c14",
+    "tests/unit/adr-invariants.test.ts": "dfca9b4f4d680ea4",
+    "src/lib/core/graph/cluster-rule.ts": "99690c5f2d3d22c3",
+    "tests/integration/features/kinetic.test.ts:26": "e3b0c44298fc1c14",
+    "tests/integration/features/helpers.ts:74": "ce58a7607e96e9e9",
+    "tests/integration/features/record-command.test.ts:59": "67d02f805131ffe6",
+    "plugins/checklist/src/parser.rs": "2f1b36d80a5a78ff",
+    "src/lib/domain/analysis/filter-builder.ts": "b6fe1f49c1022425",
+    "plugins/checklist/src/lib.rs": "073d3f223990998d",
+    "plugins/checklist/src/parser.rs:177": "e3b0c44298fc1c14",
+    "src/lib/core/graph/cluster-rule.ts:28": "2d6dc39c526f98a3",
+    "src/lib/domain/evolution/dead-code.ts:623": "cfc6b5c20b3da938",
+    "src/contracts/test-path.ts": "ca46b868cf88d341",
+    "tests/architecture/paired-surfaces.test.ts:94": "088585acbfe0bfaa",
+    "tests/architecture/paired-surfaces.test.ts:115": "5152f1ec6357d9a7",
+    "tests/integration/features/kinetic.test.ts": "67c7cec9746b421b",
+    "tests/integration/features/kinetic.test.ts:40": "e7a539e03e1090ff"
+  },
+  "docs/visuals/system-trace.html": {
+    "src/lib/domain/analysis/conducks-core.ts:58": "1107036d824bbf62",
+    "src/lib/core/parsing/processors/call.ts:58": "79e002234df4685b",
+    "src/lib/core/parsing/processors/heritage.ts:38": "7062d6d773232245",
+    "src/interfaces/cli/index.ts:203-204": "5baf4b5acd90915f",
+    "src/lib/domain/analysis/micro-pulse.ts:68": "a2c2339691fc48fb",
+    "src/lib/core/graph/adjacency-list.ts:318": "e3b0c44298fc1c14",
+    "src/lib/core/graph/graph-engine.ts:590": "8cd4e4b7e6b0ebde"
+  },
+  "docs/visuals/architecture.html": {
+    "src/lib/core/parsing/index.ts": "4a315adf1eff89fd",
+    "src/lib/core/graph/index.ts": "0497f7f3f46e5774",
+    "src/interfaces/cli/index.ts:121": "a19db96831b1084a",
+    "src/interfaces/tools/index.ts::main": "cffd5f4e7b6ef49f",
+    "src/lib/domain/analysis/index.ts": "0bbf264021e16ac0",
+    "src/lib/domain/evolution/index.ts": "1b3991e8d17cc820",
+    "src/lib/domain/federation/index.ts": "c1da81878daf6d99",
+    "package.json:116": "8439b5980d56d62f",
+    "src/lib/core/persistence/index.ts": "35fa5c8ed3b2bfdb",
+    "src/registry/index.ts:205": "ed9623369ff082ab"
+  }
+}

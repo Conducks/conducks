@@ -1,7 +1,9 @@
 # domain/docs — the tooling for the two standards
 
-**Layer:** domain. `domain/docs/docs-board.ts`, `docs-grammar.ts`, `docs-watcher.ts`,
-`service-docs.ts`, `visuals-lint.ts`, `visuals-drift.ts`.
+**Layer:** domain. Eleven files: `docs-board.ts`, `docs-grammar.ts`, `docs-watcher.ts`,
+`service-docs.ts`, `visuals-lint.ts`, `visuals-drift.ts`, and the five that arrived with ADR 0193's
+computed views and the visuals build — `features.ts`, `glossary.ts`, `module-notes.ts`,
+`testing-page.ts` and the door. The six named first are the originals this note was written for.
 
 **Read at `8d4e7ff`.** This area did not exist until 2026-08-17. All six files lived under
 `domain/analysis`, which held twenty-three files and four unrelated subjects.

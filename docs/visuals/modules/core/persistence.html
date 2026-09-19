@@ -64,7 +64,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <p><code>save()</code> (<code>src/lib/core/persistence/persistence.ts:885</code>) once accepted a <code>metadataOnly</code> flag its body never read. Two call-site comments described it as the switch that suppressed row writes, so the obvious fix for a binder whose output had vanished was to flip it — which would have changed nothing. <code>save()</code> writes metadata and the pulse row and has never written node or edge rows in any mode. The parameter is gone; the comment at that line records why.</p>
 <p><b>When a comment explains WHY an option is set, check the callee actually reads it.</b> A dead parameter is worse than no parameter: it sends the next reader to a fix that cannot work, and the call site reads as evidence that it can.</p>
 <h2>Features</h2>
-<p>none — one file, <code>persistence.ts</code>, with no sub-features of its own.</p>
+<p>none — four files (<code>persistence.ts</code>, <code>file-hash-gate.ts</code>, <code>freshness.ts</code>, the door), none of them a capability a caller asks for by name. <code>FileHashGate</code> and <code>freshness</code> are rules the vault applies on the way in and out, not questions anyone poses to this module.</p>
 <h2>Glossary</h2>
 <ul>
 <li><b>pruneTaxonomy</b> — the one place allowed to decide which nodes survive a pulse; see above.</li>

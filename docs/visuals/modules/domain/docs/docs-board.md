@@ -32,10 +32,11 @@ graph or the vault. Backs `conducks docs-status`, the MCP `conducks_docs` tool, 
   which decision still owes work, the todo phases building it, the next task in each, and what is
   blocked by what, without opening every file. Every line is an address (`todo09#P2`) or a state, never
   a copy of the docs, so it cannot drift into a second version of them.
-- **Agent projection** (`agentView`) — a read-once/read-often split of the same board: conventions and
-  memory-equivalent context loaded once per session (`layer: "board"` drops them after), the open work
-  kept on every call. Cut the payload from 17.9k to 3.7k tokens at session start and 1.4k after, on
-  conducks' own docs.
+- **Agent projection** (`agentView`) — a read-once/read-often split of the same board: the context an
+  agent loads once per session (`layer: "board"` drops it after), and the open work kept on every
+  call. Measured 2026-08 on conducks' own docs: 17.9k → 3.7k tokens at session start, 1.4k after.
+  What sits in the read-once half changed with ADR 0193 — it was `conventions.md` and `memory.md`,
+  and it is now the module-note summary.
 - **Module doc review** (`conducks monitor --dismiss`, surfaced by `docs-status`) — flags a module note
   whose code changed since it was last reviewed, using the module-hash comparison below; a dismissal is
   bound to the hash it was checked against, so it expires the next time the module changes.
@@ -63,11 +64,13 @@ Two axes decide what is in the payload:
 
 - **Open vs closed.** Finished phases and done todos are absent. An agent needs the table, not the
   history — and history is what `--all` and `--raw` are for.
-- **Read-once vs read-often.** Conventions and memory are loaded at session start and kept, so
-  shipping them on every call was 10.7k of the original 14.7k. `layer: "board"` drops them.
+- **Read-once vs read-often.** The session-start context is loaded once and kept, so shipping it on
+  every call was 10.7k of the original 14.7k. `layer: "board"` drops it. That context was
+  `conventions.md` plus `memory.md` when this was measured; both files are gone (ADR 0193) and the
+  module-note summary took their place in the same slot.
 
-`features.md` is never in the payload at all. It is write-mostly: updated once an ADR and its todos
-are finished.
+There is no `features.md` in the payload, and now no `features.md` at all — `conducks features`
+computes the tree from every note's `## Features` instead.
 
 ## Everything here is derived, and that is the point
 

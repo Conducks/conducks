@@ -19,9 +19,9 @@ An edit made here is discarded by the next render; edit the .md.</div>
 </ul>
 <p>  which decision still owes work, the todo phases building it, the next task in each, and what is   blocked by what, without opening every file. Every line is an address (<code>todo09#P2</code>) or a state, never   a copy of the docs, so it cannot drift into a second version of them.</p>
 <ul>
-<li><b>Agent projection</b> (<code>agentView</code>) — a read-once/read-often split of the same board: conventions and</li>
+<li><b>Agent projection</b> (<code>agentView</code>) — a read-once/read-often split of the same board: the context an</li>
 </ul>
-<p>  memory-equivalent context loaded once per session (<code>layer: "board"</code> drops them after), the open work   kept on every call. Cut the payload from 17.9k to 3.7k tokens at session start and 1.4k after, on   conducks' own docs.</p>
+<p>  agent loads once per session (<code>layer: "board"</code> drops it after), and the open work kept on every   call. Measured 2026-08 on conducks' own docs: 17.9k → 3.7k tokens at session start, 1.4k after.   What sits in the read-once half changed with ADR 0193 — it was <code>conventions.md</code> and <code>memory.md</code>,   and it is now the module-note summary.</p>
 <ul>
 <li><b>Module doc review</b> (<code>conducks monitor --dismiss</code>, surfaced by <code>docs-status</code>) — flags a module note</li>
 </ul>
@@ -49,10 +49,10 @@ An edit made here is discarded by the next render; edit the .md.</div>
 </ul>
 <p>  history — and history is what <code>--all</code> and <code>--raw</code> are for.</p>
 <ul>
-<li><b>Read-once vs read-often.</b> Conventions and memory are loaded at session start and kept, so</li>
+<li><b>Read-once vs read-often.</b> The session-start context is loaded once and kept, so shipping it on</li>
 </ul>
-<p>  shipping them on every call was 10.7k of the original 14.7k. <code>layer: "board"</code> drops them.</p>
-<p><code>features.md</code> is never in the payload at all. It is write-mostly: updated once an ADR and its todos are finished.</p>
+<p>  every call was 10.7k of the original 14.7k. <code>layer: "board"</code> drops it. That context was   <code>conventions.md</code> plus <code>memory.md</code> when this was measured; both files are gone (ADR 0193) and the   module-note summary took their place in the same slot.</p>
+<p>There is no <code>features.md</code> in the payload, and now no <code>features.md</code> at all — <code>conducks features</code> computes the tree from every note's <code>## Features</code> instead.</p>
 <h2>Everything here is derived, and that is the point</h2>
 <p>A phase's state is its checkboxes. Blocked is an unmet <code>- Depends:</code>. An ADR's build state is the phases that claim it. None of it is authored anywhere, so none of it can drift (ADR 0019, 0020, and enforced by <code>tests/unit/domain/docs/docs-grammar.test.ts</code>). The one authored claim that survives — a todo's <code>Status:</code> — is deliberately NOT trusted: <code>hygiene()</code> compares it against the checkboxes and reports the gap.</p>
 <p><code>unlinked</code> is a distinct build state, and the distinction is load-bearing. An ADR that nobody linked has no evidence either way; collapsing it into a success state would make silence read as success, which is the failure the whole link graph exists to prevent. But a PHASE LINK is not the only evidence: <code>completed/</code> is never walked, so promoting a todo removes the phases that linked its ADRs — 141 of 142 fell to <code>unlinked</code> the day this repo's board was finally clean. So <code>proven</code> (a <code>- Enforced by:</code> test) and <code>resolved</code> (a <code>- Resolved by:</code> successor) hold whether or not a phase still links, and <code>board.unlinked</code> is DERIVED from the field rather than re-deciding the question — computed separately, the two drifted apart and disagreed about the same ADRs.</p>

@@ -96,10 +96,10 @@ granted it. `conducks_graph_query` is one of those entries rather than a silent 
 
 **Background.** These were read off the code during the 2026-08-23 census and drawn on the canvas under a container called WHAT NOTHING ENFORCES. That container was not a feature — it was a findings list wearing a feature's shape — so it left the canvas on 2026-09-07 and the findings landed here, which is where `references/features.md` §4 says they always belonged.
 
-**Tests borrow one tool to set up another.** `tests/integration/features/kinetic.test.ts:26` runs `query` inside `resolveId()` purely to obtain an id that could have been written as `path::name`. The borrow is invisible until someone deletes the borrowed tool — the same shape as the rename/drift coupling fixed on 2026-08-23.
+**Tests borrow one tool to set up another — fixed, and listed here as the shape to watch for.** `tests/integration/features/kinetic.test.ts` ran `query` inside `resolveId()` purely to obtain an id that could have been written as `path::name`. It is `idOf(file, name)` today (`kinetic.test.ts:40`), the same fix p3 records. The borrow is invisible until someone deletes the borrowed tool — the same shape as the rename/drift coupling fixed on 2026-08-23. This entry claimed it was still live after p3 already recorded the fix.
 
 **Not every borrow is coupling, and the difference matters.** `tests/integration/features/record-command.test.ts:59` runs `docs-lint` as the ASSERTION, not as setup: "writes a file that passes docs-lint" has no other way to be stated. `analyze` appears in 118 fixtures for the same reason — nothing else writes the vault. A rule that forbade all borrowing would delete these too.
 
 **A guard outlived the file it named.** `src/lib/core/graph/cluster-rule.ts` holds the rule ADR 0028 cares about, moved there by ADR 0079 — which left `MirrorEngine` an empty delegation of 232 lines that `prune` could not flag, because its own barrel re-export counts as an incoming edge. ADR 0190 deleted it on 2026-09-05 and repointed 0028. **Fixed**, and kept here because the mechanism is not: a barrel re-export still hides a dead symbol from `prune`, and nothing measures how many others it hides.
 
-**Owner.** Unassigned. The first is a cleanliness issue, the third names a live blind spot in `prune` that no one has sized.
+**Owner.** Unassigned — for the third only. The first is fixed (above) and the second was never a defect; the third names a live blind spot in `prune` that no one has sized.

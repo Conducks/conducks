@@ -199,7 +199,7 @@
   <div class="rowlab">entry points</div>
   <div class="row">
     <div class="nb">conducks CLI<small>38 commands</small></div>
-    <div class="nb">MCP server<small>14 tools</small></div>
+    <div class="nb">MCP server<small>13 tools</small></div>
     <div class="nb">watch<small>micro-pulse per save</small></div>
     <div class="nb">mirror server<small>port 3333</small></div>
   </div>
@@ -318,7 +318,8 @@
 </div>
   </div>
   <div class="callout">
-    <strong>Half the edges end at <code>DANG</code>.</strong> 6,808 of 13,418 edges in this repo's
+    <strong>Half the edges end at <code>DANG</code>.</strong> Measured when this page was written:
+    6,808 of 13,418 edges in this repo's
     vault point at a target with no node — 5,559 <code>CALLS</code>, 650
     <code>TYPE_REFERENCE</code>, 458 <code>CONSTRUCTS</code>. The targets are
     <code>global::process</code>, <code>path.resolve</code>, <code>db.all</code>: external symbols
@@ -385,7 +386,7 @@
         <tr><td>capitalised bare name</td><td>calls it a constructor</td><td><span class="st g">guesses</span></td><td><strong>measured at 11%</strong>: of 602 CONSTRUCTS, 144 resolve — 128 to a struct (right) and 16 to a variable or property (wrong). Deferred, not ignored: the CALLS/CONSTRUCTS choice is made before the processor sees it, so ADR 0046's confidence channel cannot carry it</td><td class="src">todo24#P2</td></tr>
         <tr><td>heritage clause untyped</td><td>guesses from the name at <strong>0.6</strong></td><td><span class="st fx">fixed</span></td><td><code>I</code>-prefix ⇒ IMPLEMENTS, else EXTENDS — unchanged, but a guessed relation is no longer stored at 1.0 alongside one the query captured</td><td class="src">ADR 0046</td></tr>
         <tr><td><code>.h</code> file</td><td>sniffs 2 KB for C++ tokens</td><td><span class="st">measured</span></td><td>run over the labelled corpus in <code>polyglot-test-lab</code> — 3 known-C++ and 6 known-C headers, <strong>9 of 9 correct</strong>. Small sample, and silent on templates-only headers, but a heuristic with 0% measured error should not be swapped for another guess</td><td class="src">todo24#P2</td></tr>
-        <tr><td>ambiguous symbol</td><td>picks highest gravity</td><td><span class="st g">guesses</span></td><td>no ambiguity signalled; gravity has 102 distinct values across 2,465 nodes, so ties are common and <code>reduce</code> silently keeps the first</td><td class="src">synapse.ts:39</td></tr>
+        <tr><td>ambiguous symbol</td><td>picks highest gravity</td><td><span class="st g">guesses</span></td><td>no ambiguity signalled; gravity had 102 distinct values across the 2,465 nodes measured then (the vault holds 10,333 nodes / 36,654 edges today, fixtures included), so ties are common and <code>reduce</code> silently keeps the first</td><td class="src">synapse.ts:39</td></tr>
         <tr><td>coverage has no entry</td><td><code>pct: 0</code> but <code>bound: false</code></td><td><span class="st r">refuses</span></td><td><strong>re-checked and cleared.</strong> The raw record reads 0%, but the flag rides with it and all three consumers filter on <code>r.bound</code> before reporting, so an unmeasured function is never counted as covered-zero</td><td class="src">coverage-bind:83 · coverage.ts:49 · coverage-view.ts:89 · synapse.ts:891</td></tr>
         <tr><td>drift SQL throws</td><td>reports <code>UNAVAILABLE</code></td><td><span class="st fx">fixed</span></td><td>was <code>STABLE</code> — a failed query and genuine stability gave the same verdict. Now three distinct states, and STABLE requires symbols actually compared</td><td class="src">ADR 0044</td></tr>
         <tr><td>no baseline pulse</td><td><code>guard</code> says NOT ASSESSED</td><td><span class="st fx">fixed</span></td><td>was "✅ risk 0.000 within limits" from a gate that never ran. Still exits zero — a first pulse has no baseline and blocking it would be worse — but no longer claims a pass</td><td class="src">ADR 0044</td></tr>
