@@ -199,7 +199,7 @@ export class ConducksInstaller {
       const descMatch = raw.match(/<!--\s*description:\s*(.+?)\s*-->/);
       const description = descMatch ? descMatch[1] : `Conducks skill: ${name}`;
       const body = raw.replace(/<!--\s*description:[\s\S]*?-->\s*/, '').trimStart();
-      skills[name] = `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`;
+      skills[name] = `---\nname: ${name}\ndescription: ${JSON.stringify(description)}\n---\n\n${body}\n`;
     }
 
     return skills;
