@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file. The format 
 ## [Unreleased]
 
 ### Fixed
+- The MCP handshake and `conducks_status` reported version 2.0.0 for every release; both now read `package.json`. The release check compares the MCP handshake too.
 - README matches 0.8.0: the new Mirror, compact MCP answers, `--version`, `monitor`; removed `rename`, `fallback` and `audit --fallback`, which do not exist. The release check now also compares the README footer.
 
 ## [0.8.0] — 2026-11-11

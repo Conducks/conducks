@@ -20,6 +20,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "url";
 import { RISK_WEIGHTS } from "@/contracts/index.js";
+import { conducksVersion } from "@/contracts/version.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -255,7 +256,7 @@ export class Conducks {
 
     return {
       status: "ready",
-      version: "2.0.0",
+      version: conducksVersion(),
       framework: graph.getMetadata('framework') || "generic",
       staleness: {
         stale: isStale,

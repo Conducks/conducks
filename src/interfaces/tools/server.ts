@@ -10,6 +10,7 @@ import { ConducksRegistry } from "./hypertoon.js";
 import { synapseTools } from "./tools/synapse.js";
 import { kineticTools } from "./tools/kinetic.js";
 import { registry } from "@/registry/index.js";
+import { conducksVersion } from "@/contracts/version.js";
 import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
@@ -32,7 +33,7 @@ export class ConducksMCPServer {
     this.server = new Server(
       {
         name: "conducks",
-        version: "2.0.0",
+        version: conducksVersion(),
         title: "CONDUCKS: Tool Registry Engine",
       },
       {
