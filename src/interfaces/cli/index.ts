@@ -2,7 +2,7 @@
 import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs";
-import { conducksVersion } from "@/contracts/version.js";
+import { conducksVersion } from "@/contracts/index.js";
 import { AnalyzeCommand } from "./commands/analyze.js";
 import { StatusCommand } from "./commands/status.js";
 import { GraphCommand } from "./commands/graph.js";

@@ -1,4 +1,4 @@
-import { realCasePath } from "@/contracts/index.js";
+import { realCasePath, conducksVersion } from "@/contracts/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -10,7 +10,6 @@ import { ConducksRegistry } from "./hypertoon.js";
 import { synapseTools } from "./tools/synapse.js";
 import { kineticTools } from "./tools/kinetic.js";
 import { registry } from "@/registry/index.js";
-import { conducksVersion } from "@/contracts/version.js";
 import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
+import { untable } from '../../helpers/untable.js';
 
 /**
  * ADR 0103 — `conducks_context` measured through the real MCP transport.
@@ -30,7 +31,7 @@ describe('conducks_context — the agent-facing surface', () => {
       encoding: 'utf-8',
       timeout: 120000,
     });
-    return JSON.parse(out);
+    return untable(JSON.parse(out));
   };
 
   beforeAll(() => {
@@ -77,9 +78,14 @@ describe('conducks_context — the agent-facing surface', () => {
   }, 120000);
 
   /** `short_id` is for display; `id` is what callers feed back in. They must not be the same string. */
-  it('short_id is genuinely shorter than id', () => {
+  /**
+   * `short_id` once came back identical to `id` (ADR 0103). Since todo82 the answer carries the path
+   * once: `id` is relative to `meta.root`, and `short_id` is dropped when it would repeat it.
+   */
+  it('carries each path once: a relative id, and no short_id that repeats it', () => {
     for (const n of context({ symbol: 'logAudit' }).data.nodes) {
-      expect(n.short_id.length).toBeLessThan(n.id.length);
+      expect(n.id.startsWith('/')).toBe(false);
+      if (n.short_id !== undefined) expect(n.short_id.length).toBeLessThan(n.id.length);
     }
   }, 120000);
 

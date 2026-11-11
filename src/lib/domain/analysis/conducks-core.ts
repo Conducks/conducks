@@ -19,8 +19,7 @@ import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "url";
-import { RISK_WEIGHTS } from "@/contracts/index.js";
-import { conducksVersion } from "@/contracts/version.js";
+import { RISK_WEIGHTS, conducksVersion } from "@/contracts/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

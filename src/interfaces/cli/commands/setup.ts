@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "fs-extra";
 import { spawnSync } from "node:child_process";
+import { VAULT_DIR, VAULT_DB_FILENAME } from "@/contracts/index.js";
 
 /**
  * Conducks — Setup Command
@@ -110,7 +111,7 @@ export class SetupCommand implements ConducksCommand {
 
     // 4. Build the first graph, so setup is the last step before asking questions (todo82#P8).
     // Only when there is none: a second setup must stay quick and never re-index by surprise.
-    const vault = path.join(process.cwd(), ".conducks", "conducks-synapse.db");
+    const vault = path.join(process.cwd(), VAULT_DIR, VAULT_DB_FILENAME);
     if (!fs.existsSync(vault) && !args.includes("--no-analyze")) {
       console.log("\x1b[35m[Conducks Setup] Building the first graph (conducks analyze)...\x1b[0m");
       const run = spawnSync(process.execPath, [cliEntry, "analyze", "--yes"], { cwd: process.cwd(), stdio: "inherit" });

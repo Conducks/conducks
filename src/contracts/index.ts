@@ -17,6 +17,8 @@
  * copies of the same rule. That is what a contract is for — one answer, not a convenient home.
  */
 export { VAULT_DIR, VAULT_DB_FILENAME } from './vault.js';
+// The one installed version, read from package.json: the CLI, the MCP handshake and status all print it.
+export { conducksVersion } from './version.js';
 export { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from './dead-code-types.js';
 export type { DeadCodeType } from './dead-code-types.js';
 

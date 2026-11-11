@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Fixed
 - The MCP handshake and `conducks_status` reported version 2.0.0 for every release; both now read `package.json`. The release check compares the MCP handshake too.
+- The full suite is green again. Three integration tests still read the pre-0.8.0 answer shape (absolute ids, arrays instead of `{cols, rows}`) and failed on the published 0.8.0; they now decode the compact answer. `conducks setup` reads the vault filename from its contract instead of a copy.
 - README matches 0.8.0: the new Mirror, compact MCP answers, `--version`, `monitor`; removed `rename`, `fallback` and `audit --fallback`, which do not exist. The release check now also compares the README footer.
 
 ## [0.8.0] — 2026-11-11
