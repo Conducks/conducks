@@ -252,14 +252,14 @@ Every language below is parsed with a native Tree-sitter grammar and a per-langu
 | TypeScript / TSX        | Full          | symbols, imports + per-binding imports, calls, type-usage edges, React hook nodes   |
 | JavaScript / JSX        | Full          | symbols, ES + CommonJS `require` imports, calls                                     |
 | Python                  | Full          | symbols, imports + named bindings, calls                                            |
-| Go                      | Full          | functions, structs, interfaces, methods, generics, type-usage edges                 |
+| Go                      | Full          | functions, structs, interfaces, methods, generics, type-usage edges; module-path imports from go.mod, a package is its directory, functions used as values, `init`, methods reached through interfaces (staticcheck U1000's rule) |
 | Rust                    | Partial       | functions, structs, traits, enums, impl methods, type-usage edges, calls and imports across a Cargo workspace (crate names, `crate::`/`self::`/`super::`), method calls, struct literals, enum paths and functions passed as values; `#[test]`, `tests.rs` and `*_tests.rs` are tests; trait-impl methods are never dead — no per-binding imports; a method on a local value or a chain binds by name, not by type, so some live methods are still reported dead |
 | C / C++                 | Partial       | structs/classes, functions, methods — no per-binding imports, no type-usage edges   |
 | C#                      | Partial       | namespaces, classes, methods — properties are not extracted                         |
 | Ruby                    | Partial       | classes and methods                                                                 |
 | Java                    | Partial       | classes, records, interfaces, enums, methods, fields, imports, **EXTENDS/IMPLEMENTS heritage**; no constructors (name-collision with the class), no annotations, no type-usage edges |
 | PHP                     | Partial       | namespaces, classes, traits, interfaces, enums, methods, functions, typed properties, use-imports incl. aliases; no heritage edges, no constants or enum cases |
-| Swift                   | Partial       | classes, actors, structs, enums, extensions, protocols, funcs/init/deinit, properties, enum cases, typealiases, **conformance + superclass heritage**; no subscripts, no property wrappers, no async/visibility DNA |
+| Swift                   | Partial       | classes, actors, structs, enums, extensions, protocols, funcs/init/deinit, properties, enum cases, typealiases, **conformance + superclass heritage**; a module is its SPM target, functions used as values, members reached through a protocol; no subscripts, no property wrappers, no async/visibility DNA |
 
 Two limits apply to every language:
 

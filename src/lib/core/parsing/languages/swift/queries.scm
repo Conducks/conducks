@@ -84,6 +84,16 @@
   (call_expression (navigation_expression) @kinesis_target)
   (call_expression (simple_identifier) @kinesis_target)
 
+  ;; A FUNCTION USED AS A VALUE is a use with no call: `xs.map(double)`, `["one": one]`,
+  ;; `let f = twice`, `handler = next`, `return next`. MEASURED on a two-file Swift module: `double`,
+  ;; `one` and `twice` were reported dead. The reflector keeps only names this file defines or binds,
+  ;; so a local passed along adds nothing.
+  (value_argument value: (simple_identifier) @ref_value)
+  (dictionary_literal value: (simple_identifier) @ref_value)
+  (property_declaration value: (simple_identifier) @ref_value)
+  (assignment result: (simple_identifier) @ref_value)
+  (control_transfer_statement result: (simple_identifier) @ref_value)
+
   ;; --- Debt Markers ---
   (comment) @comment
   (multiline_comment) @comment

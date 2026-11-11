@@ -1,4 +1,4 @@
-import { isBuiltIn, getGlobalId } from "@/contracts/index.js";
+import { isBuiltIn, getGlobalId, moduleKeyOf } from "@/contracts/index.js";
 import { ConducksAdjacencyList, type ConducksEdge, type EdgeType } from './adjacency-list.js';
 import { logger } from "@/lib/core/utils/index.js";
 
@@ -203,6 +203,9 @@ export class IntraLinker {
     for (const node of graph.getAllNodes()) {
       const kind = String((node as any).properties?.canonicalKind ?? '');
       if (kind !== 'PACKAGE' && kind !== 'NAMESPACE') continue;
+      // Go is grouped by DIRECTORY below: its declared package name is not unique (every command
+      // is `package main`), so keying on it made unrelated programs see each other.
+      if (String((node as any).properties?.filePath ?? '').toLowerCase().endsWith('.go')) continue;
       const declared = String((node as any).properties?.name ?? '').toLowerCase();
       const file = String((node as any).properties?.filePath ?? '').toLowerCase();
       // The taxonomy legend carries PACKAGE/NAMESPACE rows with no file — they name the RUNG, not a
@@ -221,6 +224,73 @@ export class IntraLinker {
         if (list) { for (const s of siblings) if (!list.includes(s)) list.push(s); }
         else unitImports.set(unitId, [...siblings]);
       }
+    }
+
+    // ── 2a-ter. A MODULE BY LOCATION: Go packages and Swift targets ─────────
+    //
+    // Go: a package IS a directory — every .go file in it sees the others with no import, and
+    // `import "example.com/m/internal/store"` names all of them, not the one file the resolver
+    // answers with. Swift: a module is an SPM target, every .swift file under `Sources/<Target>/`,
+    // subfolders included. MEASURED on two fixtures: a package's second file read as unimported, and
+    // its functions as questions or dead verdicts while they were called.
+    //
+    // Same expression as 2a-bis — visibility as imports — so 3a–3e need no change: members see one
+    // another, and an import of ANY member reaches every member.
+    const moduleOfUnit = (unitId: string): string | null => moduleKeyOf(unitId.slice(0, unitId.lastIndexOf('::')));
+    const moduleMembers = new Map<string, string[]>();
+    for (const unitId of unitSymbols.keys()) {
+      if (!unitId.endsWith('::unit')) continue;
+      const key = moduleOfUnit(unitId);
+      if (!key) continue;
+      const list = moduleMembers.get(key);
+      if (list) list.push(unitId); else moduleMembers.set(key, [unitId]);
+    }
+    for (const [unitId, imports] of [...unitImports.entries()]) {
+      for (const target of [...imports]) {
+        const key = moduleOfUnit(target);
+        for (const member of key ? moduleMembers.get(key) ?? [] : []) {
+          if (member !== unitId && !imports.includes(member)) imports.push(member);
+        }
+      }
+    }
+    for (const members of moduleMembers.values()) {
+      if (members.length < 2) continue;
+      for (const unitId of members) {
+        const list = unitImports.get(unitId) ?? [];
+        for (const m of members) if (m !== unitId && !list.includes(m)) list.push(m);
+        unitImports.set(unitId, list);
+      }
+    }
+
+    // ── 2a-quater. Go: which package each import NAME refers to, per file ───
+    //
+    // `tui.TtyIn()` names the package-level `TtyIn` of the package imported as `tui` — nothing else.
+    // Go is case-sensitive; this linker matches names in lower case, so the generic lookup bound the
+    // call to `LightRenderer.ttyin` (a field) and `t.ttyin` to a sibling's `var ttyin`. MEASURED on
+    // fzf v0.56.3 against go/types: `TtyIn` and `TtyOut` reported dead.
+    const goPackageByImportName = new Map<string, Map<string, string>>();
+    for (const edge of graph.getAllEdges()) {
+      if (edge.type !== 'IMPORTS') continue;
+      const source = edge.sourceId.toLowerCase();
+      if (!source.endsWith('.go::unit')) continue;
+      const spec = String((edge as any).properties?.specifier ?? '').replace(/['"]/g, '');
+      const key = moduleKeyOf(edge.targetId.slice(0, edge.targetId.lastIndexOf('::')));
+      if (!spec || !key) continue;
+      const segs = spec.split('/').filter(Boolean);
+      const last = segs.length > 1 && /^v\d+$/.test(segs[segs.length - 1]) ? segs[segs.length - 2] : segs[segs.length - 1];
+      if (!last) continue;
+      const map = goPackageByImportName.get(source) ?? new Map<string, string>();
+      map.set(last.toLowerCase(), key);
+      goPackageByImportName.set(source, map);
+    }
+    // Package-level Go declarations by package and EXACT name.
+    const goPackageLevel = new Map<string, string>();
+    for (const node of graph.getAllNodes()) {
+      const props = node.properties as any;
+      const unit = String(props?.unitId ?? '').toLowerCase();
+      if (!unit.endsWith('.go::unit') || String(props?.parentId ?? '').toLowerCase() !== unit || !props?.name) continue;
+      const key = `${moduleKeyOf(unit.slice(0, unit.lastIndexOf('::')))}|${props.name}`;
+      if (!goPackageLevel.has(key)) goPackageLevel.set(key, node.id);
     }
 
     // ── 2b. One hop further, through barrels ────────────────────────────────
@@ -815,6 +885,11 @@ export class IntraLinker {
         // 134 ORPHAN verdicts were `new`s, each one shadowed by another type's `new`. When the type
         // resolves and its file has no such item (an impl written elsewhere), nothing is bound: a
         // dangling edge spares the name, a wrong one condemns the right symbol.
+        // Go `pkg.Name`: the receiver is an imported PACKAGE, so the answer is that package's
+        // package-level `Name`, exact case, or nothing (see 2a-quater).
+        const goPackage = !pathSeparated && segments.length === 1
+          ? goPackageByImportName.get(sourceUnitId)?.get(segments[0]) : undefined;
+        const goMember = String((edge.properties as Record<string, unknown> | undefined)?.original ?? '').split('.').pop() ?? '';
         const originalHead = String((edge.properties as Record<string, unknown> | undefined)?.original ?? '').split('::');
         // Rust only: PHP's `User::find()` and C++'s `Foo::bar()` share the shape but were not measured.
         const typeHead = pathSeparated && sourceUnitId.endsWith('.rs::unit') && segments.length === 1 && originalHead.length === 2
@@ -827,7 +902,9 @@ export class IntraLinker {
         // A head that names no type here (`Box::new`, `Vec::with_capacity`, `Arc::clone`) is a foreign
         // receiver: binding its item to a project symbol of the same name is the guess
         // `receiverIsForeign` exists to refuse. It used to land `Box::new` on a local type's `new`.
-        if (typeHead) {
+        if (goPackage) {
+          resolvedId = goPackageLevel.get(`${goPackage}|${goMember}`) ?? null;
+        } else if (typeHead) {
           const typeUnit = typeId ? `${typeId.slice(0, typeId.lastIndexOf('::'))}::unit` : null;
           resolvedId = typeUnit ? unitSymbols.get(typeUnit)?.get(method) ?? null : null;
         } else if (method && method !== bareName && !receiverIsForeign) {

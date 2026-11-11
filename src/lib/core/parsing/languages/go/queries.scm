@@ -159,6 +159,28 @@
   (defer_statement (call_expression function: [(identifier) (selector_expression)] @kinesis_target)) @isDeferred
   (call_expression function: [(identifier) (selector_expression)] @kinesis_target)
 
+  ;; A FUNCTION USED AS A VALUE is a use with no call: `Map(xs, double)`, `map[string]func(){"one": one}`,
+  ;; `registry["two"] = two`, `h := handler`, `return next`. Go passes functions around constantly
+  ;; (callbacks, handler tables, option funcs), and none of these left an edge. MEASURED on a
+  ;; two-package fixture checked with `go vet`/`go test`: `double`, `one` and `two` were all
+  ;; reported dead. The reflector keeps only names this file defines or binds, so a local variable
+  ;; passed along adds nothing.
+  (call_expression arguments: (argument_list (identifier) @ref_value))
+  (literal_element (identifier) @ref_value)
+  (assignment_statement right: (expression_list (identifier) @ref_value))
+  (short_var_declaration right: (expression_list (identifier) @ref_value))
+  (return_statement (expression_list (identifier) @ref_value))
+
+  ;; ...and the QUALIFIED form: a package function or a method value, `algo.PrefixMatch` stored in a
+  ;; table, `t.dumpStatus` passed on. Emitted as a reference whose target the linker resolves the way
+  ;; it resolves `pkg.Fn()` / `t.m()`. MEASURED on fzf v0.56.3 against go/types: `FuzzyMatchV2`,
+  ;; `PrefixMatch`, `SuffixMatch`, `ExactMatchBoundary` and `dumpStatus` were reported dead.
+  (argument_list (selector_expression) @pulse_type_target)
+  (literal_element (selector_expression) @pulse_type_target)
+  (assignment_statement right: (expression_list (selector_expression) @pulse_type_target))
+  (short_var_declaration right: (expression_list (selector_expression) @pulse_type_target))
+  (return_statement (expression_list (selector_expression) @pulse_type_target))
+
   ;; Variadic DNA
   (variadic_parameter_declaration) @isVariadic
 

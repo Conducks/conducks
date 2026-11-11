@@ -180,5 +180,23 @@
     "outside": 0,
     "missed": 0,
     "excluded": 0
+  },
+  "scraper::js-dead": {
+    "decls": 84,
+    "oracle": 18,
+    "missed": 11,
+    "agreed": 5
+  },
+  "orchestrator::js-dead": {
+    "decls": 217,
+    "oracle": 5,
+    "missed": 2,
+    "agreed": 3
+  },
+  "fzf::go-dead": {
+    "defs": 1106,
+    "dead": 1,
+    "missed": 0,
+    "extra": 0
   }
 }
