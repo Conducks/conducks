@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [0.8.1] — 2026-11-11
 
+### Changed
+- A tool call that leaves a required parameter out is refused with `MISSING_PARAMETER` and the required names, beside `UNKNOWN_PARAMETER`. `conducks_coverage {}` used to answer with a raw Node error.
+
 ### Fixed
 - The MCP handshake and `conducks_status` reported version 2.0.0 for every release; both now read `package.json`. The release check compares the MCP handshake too.
 - The full suite is green again. Three integration tests still read the pre-0.8.0 answer shape (absolute ids, arrays instead of `{cols, rows}`) and failed on the published 0.8.0; they now decode the compact answer. `conducks setup` reads the vault filename from its contract instead of a copy.

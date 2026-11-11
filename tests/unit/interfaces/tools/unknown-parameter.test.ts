@@ -11,7 +11,7 @@ describe('unknown tool parameters (todo82)', () => {
   let called = false;
   registry.register({
     type: 'tool', name: 'probe', description: 'd',
-    inputSchema: { type: 'object', properties: { q: { type: 'string' }, limit: { type: 'number' } } },
+    inputSchema: { type: 'object', properties: { q: { type: 'string' }, limit: { type: 'number' } }, required: ['q'] },
     handler: async () => { called = true; return {}; },
     formatter: (r: unknown) => JSON.stringify(r),
   } as never);
@@ -24,5 +24,21 @@ describe('unknown tool parameters (todo82)', () => {
     expect(body.error.message).toContain('"query"');
     expect(body.error.suggestion).toBe('Accepted: q, limit');
     expect(called).toBe(false);
+  });
+
+  it('refuses a call that leaves a required key out, naming it', async () => {
+    const res = await registry.handleRequest('probe', { limit: 1 });
+    expect(res.isError).toBe(true);
+    const body = JSON.parse(res.content[0].text);
+    expect(body.error.code).toBe('MISSING_PARAMETER');
+    expect(body.error.message).toContain('"q"');
+    expect(body.error.suggestion).toBe('Required: q');
+    expect(called).toBe(false);
+  });
+
+  it('lets a complete call through', async () => {
+    const res = await registry.handleRequest('probe', { q: 'x' });
+    expect(res.isError).not.toBe(true);
+    expect(called).toBe(true);
   });
 });
