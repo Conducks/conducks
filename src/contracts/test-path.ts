@@ -25,7 +25,11 @@
  * (`test_hands.py`), never a directory segment like `testing/` that often holds real source.
  */
 
-const TEST_FILENAME = /^(test_|test\.)|(_test|_spec|\.test|\.spec|tests)\.[cm]?[jt]sx?$|_test\.(go|rs|py)$|_spec\.rb$|tests?\.swift$/;
+// `tests.rs` is where `#[cfg(test)] mod tests;` puts a Rust module's tests (measured: 2,252 of 3,070
+// prune findings on a 27-crate workspace were functions in such files), and `<module>_tests.rs` is
+// where `#[cfg(test)] #[path = "<module>_tests.rs"] mod tests;` puts them (20 files on the same
+// workspace, still 28 findings after `tests.rs` was known).
+const TEST_FILENAME = /^(test_|test\.)|(_test|_spec|\.test|\.spec|tests)\.[cm]?[jt]sx?$|_test\.(go|rs|py)$|_tests\.rs$|_spec\.rb$|tests?\.swift$|^tests?\.rs$/;
 const TEST_DIR = /(^|\/)(tests?|__tests__|spec|specs)\//;
 
 /** True when this path belongs to a test tree or is itself a test file. */

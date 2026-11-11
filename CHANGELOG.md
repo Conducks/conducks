@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Fixed
+- Rust across a Cargo workspace. A crate name (`use core_lib::helper`, `cli::run_offline(...)`) resolves to that crate, read from each crate's `Cargo.toml` (`core-lib` is used as `core_lib`), and so do `crate::`, `self::` and `super::`. When the tree holds the same crate name more than once (a gate's test fixtures are whole workspaces), the name means the crate in the importer's own workspace. A call through a module path (`core_lib::util::third()`) reaches the function in the file that path names. Measured on a 27-crate workspace (945 files): `impact run_offline` found 0 callers, and now finds the real one.
+- Rust method calls (`self.step()`, `e.run()`, `self.store.get(...)`) were not captured at all, so 157 of 685 dead-function verdicts on that workspace were methods called through `self.`. They are now call edges. A method on a local value binds by name in the caller's scope, as in Python and TypeScript, so a call like `out.push(x)` on a `Vec` can land on a project function named `push`.
+- Rust tests are tests: `tests.rs`, `test.rs` and `<module>_tests.rs` are test files, and `#[test]` (or `#[tokio::test]`) on a function marks it as called by the test harness. `#[inline]`, `#[must_use]`, `#[allow(...)]`, `#[cfg(...)]`, `#[derive]` and the other built-in attributes still leave a function judgeable, because rustc still reports it as unused. `prune` on that workspace went from 3,070 findings, 2,252 of them test functions, to 144.
+- Rust names used without a call count as used: a struct literal (`BlobsImpl { .. }`), an enum path (`Kind::A`), a unit struct handed on (`Arc::new(HeaderJudge)`), and a function passed as a value (`.map_err(views_err)`). `Beta::new()` reaches `Beta`'s `new` instead of the first `new` in scope, and `Box::new` no longer binds to a project `new`. A method inside `impl Trait for X` is never reported dead, because the trait calls it. A binary in `src/bin/` is parsed; the default ignore list had skipped every `bin/` folder.
+- An inline `mod tests { ... }` was read as a module file declaration, and the fallback bound it to an unrelated `tests.rs` elsewhere in the crate.
+- On Linux (a case-sensitive filesystem), commands printed paths in lower case (`src/useworkgraph.ts` for `src/useWorkGraph.ts`) and `impact` showed "(file unreadable)" instead of each call-site line. The real spelling is now recovered on any filesystem; macOS was never affected.
+- `prune` used its own copy of the test-file rule and missed every test file the shared rule knows (Rust's `tests.rs` among them). It now uses the shared rule, plus its own mocks, fixtures and verifier folders.
+
 ## [0.8.1] — 2026-11-11
 
 ### Changed

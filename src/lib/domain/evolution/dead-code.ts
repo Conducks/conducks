@@ -2,7 +2,7 @@ import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from "@/lib
 // The union used to be spelled out here AND retyped in `conducks_prune`'s summary and enum, which is
 // how two of the five went missing from both (todo53). One list, in contracts.
 import type { DeadCodeType } from "@/contracts/index.js";
-import { hasRegisteringDecorator } from "@/contracts/index.js";
+import { hasRegisteringDecorator, isTestPath } from "@/contracts/index.js";
 
 export interface Finding {
   /**
@@ -286,7 +286,10 @@ export class DeadCodeAnalyzer {
       // one no list can enumerate.
       const decorators = ((node.properties as any)?.dna?.decorators ?? []) as string[];
       const isRegistered = hasRegisteringDecorator(decorators);
-      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && this.isModuleScoped(node, graph, isNested) && liveRefs.length === 0 && !this.isEntryPoint(node)) {
+      // A Rust TRAIT-IMPL method is reached through the trait (`x.to_string()` → `Display::fmt`), which
+      // no edge names; rustc never reports one as unused. Same standing as a registered symbol.
+      const isTraitImpl = (node.properties as any)?.dna?.inTraitImpl === true;
+      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && this.isModuleScoped(node, graph, isNested) && liveRefs.length === 0 && !this.isEntryPoint(node)) {
         // NOTHING IMPORTS THE FILE — so the graph cannot say whether this symbol is dead. Report the
         // question instead of a verdict (oracle T28, ADR 0104). `orphan-module.ts` in the fixture is
         // exactly this: two functions in a file no one imports, previously reported as a confident
@@ -314,7 +317,7 @@ export class DeadCodeAnalyzer {
       // directories, namespaces all carry isExport but are not "exports").
       // Untrackable type declarations are skipped for the same reason as above.
       const isSymbol = ['STRUCTURE', 'BEHAVIOR', 'ATOM', 'INFRA'].includes(node.label);
-      if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && node.properties.isExport) {
+      if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && node.properties.isExport) {
         // Find if any incoming edges are 'IMPORTS' from OTHER files or 'CALLS' from other files
         // liveRefs, not incomingRefs — an unused import from another file would otherwise read as
         // external consumption and launder the export exactly as it laundered the orphan above.
@@ -703,9 +706,11 @@ export class DeadCodeAnalyzer {
   }
 
   private static isTestPath(filePath: string): boolean {
-    const fp = filePath.toLowerCase();
-    return /(^|\/)(tests?|__tests__|__mocks__|spec|fixtures?|polyglot-verify)(\/|$)/.test(fp)
-      || /\.(test|spec)\.[cm]?[jt]sx?$/.test(fp);
+    // The contract answers "is this a test file" for every language (incl. Rust `tests.rs`); the
+    // extra directories are this analyzer's own: mocks, fixtures and the polyglot verifier are not
+    // production code either.
+    return isTestPath(filePath)
+      || /(^|\/)(__mocks__|fixtures?|polyglot-verify)(\/|$)/.test(filePath.toLowerCase());
   }
 
   private isEntryPoint(node: any): boolean {

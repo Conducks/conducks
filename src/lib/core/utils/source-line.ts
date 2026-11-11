@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { realCasePath } from '@/contracts/index.js';
 
 /**
  * Conducks — turning a stored `(file, line)` back into the line of code (ADR 0132).
@@ -63,12 +64,12 @@ export class SourceLineReader {
 
     let lines: string[] | null = null;
     try {
-      // Node ids and the `file` column are LOWERCASED on write (see docs/visuals/modules/contracts.md, for APFS), so on a
-      // case-insensitive filesystem this path opens the real file. On a case-sensitive one it will
-      // not, and the honest answer is `unreadable` rather than a guess at the original casing —
-      // recovering it belongs to todo32, which owns the id-casing question.
+      // Node ids and the `file` column are LOWERCASED on write, so on a case-sensitive filesystem
+      // the stored path opens nothing. `realCasePath` recovers the real spelling segment by segment,
+      // and only where it is unambiguous; an unrecoverable path still reads as `unreadable` rather
+      // than as a guess. MEASURED: every call-site line read "(file unreadable)" on Linux.
       this.fileReads++;
-      lines = fs.readFileSync(file, 'utf8').split('\n');
+      lines = fs.readFileSync(realCasePath(file), 'utf8').split('\n');
     } catch {
       lines = null;
     }

@@ -71,7 +71,13 @@ export class IgnoreManager {
     // Conducks: Strict Normalization for matches
     const normalized = relativePath.replace(/\\/g, "/");
 
+    // `bin/` is build OUTPUT for .NET, and SOURCE for Cargo: `src/bin/<name>.rs` is a binary target,
+    // and skipping it hid every call a binary makes into its library. Only that one default gives
+    // way; every other rule (`target/`, a user's `.conducksignore`) still applies to the file.
+    const cargoBinary = /(^|\/)src\/bin\/.+\.rs$/.test(normalized);
+
     return this.patterns.some(pattern => {
+      if (cargoBinary && pattern === "**/bin/**") return false;
       return minimatch(normalized, pattern, { dot: true, matchBase: true });
     });
   }

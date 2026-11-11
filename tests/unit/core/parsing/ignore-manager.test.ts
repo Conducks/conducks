@@ -29,6 +29,15 @@ describe('Exclude structural noise (IgnoreManager) 🛡️', () => {
         expect(mgr.isIgnored(path.join(root, 'lib/core/graph.ts'))).toBe(false);
     });
 
+    it('keeps a Cargo binary target (src/bin/*.rs) while bin/ stays build output elsewhere', () => {
+        expect(mgr.isIgnored(path.join(root, 'crates/gates/src/bin/rules-report.rs'))).toBe(false);
+        expect(mgr.isIgnored(path.join(root, 'src/bin/app.rs'))).toBe(false);
+        expect(mgr.isIgnored(path.join(root, 'MyApp/bin/Debug/app.dll'))).toBe(true);
+        expect(mgr.isIgnored(path.join(root, 'bin/tool.js'))).toBe(true);
+        // Every OTHER rule still applies: a copy under target/ is build output.
+        expect(mgr.isIgnored(path.join(root, 'target/package/x/src/bin/app.rs'))).toBe(true);
+    });
+
     it('Should exclude SQLite and log files', () => {
         expect(mgr.isIgnored(path.join(root, 'data/cache.sqlite'))).toBe(true);
         expect(mgr.isIgnored(path.join(root, 'logs/error.log'))).toBe(true);

@@ -89,6 +89,49 @@ function isNestedInExpression(declNode: any): boolean {
   return false;
 }
 
+/**
+ * The file a Rust QUALIFIED CALL names through its module path: `core_lib::util::third()` → util.rs.
+ *
+ * The linker resolves a `a::b::f` call by looking `f` up in the units the caller IMPORTS, which is
+ * right for `helper::alpha()` after `mod helper;` and wrong one module deeper: main.rs imports
+ * core_lib's lib.rs, `third` lives in util.rs, and the call stayed a phantom while rustc linked it.
+ * The module path is written in the call itself, and the language's own resolver can read it, so it
+ * is read here, where the file list is at hand, and handed to the linker as a fact.
+ *
+ * Only when every prefix segment is lower case: Rust modules are snake_case and types are not, and
+ * `Vec::new` / `Self::new` / `Shape::area` name a type's item. The resolver matches files
+ * case-insensitively (vault ids are lower-cased), so without this `Vec::new` would name a child
+ * `vec.rs`. A prefix naming this same file (`inline_mod::f`) carries nothing.
+ */
+function rustCallQualifier(
+  target: string, filePath: string, provider: any, allPaths: string[] | undefined,
+): { qualifierFile: string } | undefined {
+  if (provider?.langId !== 'rust' || !allPaths?.length || typeof provider.resolveImport !== 'function') return undefined;
+  const sep = target.lastIndexOf('::');
+  if (sep <= 0 || target.includes('.')) return undefined;
+  const prefix = target.slice(0, sep);
+  if (!prefix.split('::').every(seg => /^[a-z_][a-z0-9_]*$/.test(seg))) return undefined;
+  const file = provider.resolveImport(prefix, filePath, allPaths);
+  if (typeof file !== 'string' || file.toLowerCase() === filePath.toLowerCase()) return undefined;
+  return { qualifierFile: file.toLowerCase() };
+}
+
+/**
+ * True for a declaration written inside a Rust `impl Trait for X { ... }` block.
+ *
+ * Such a method is called through the TRAIT — `x.to_string()` reaches `Display::fmt`, a `dyn Check`
+ * reaches `check` — so no edge in the graph ever names it, and rustc never reports one as unused.
+ * An INHERENT `impl X { ... }` method is different: rustc does warn on it, so it stays judgeable.
+ * MEASURED on the 27-crate workspace: `fmt` of `Display` impls among the ORPHAN verdicts.
+ */
+function isInTraitImpl(declNode: any): boolean {
+  for (let n = declNode?.parent; n; n = n.parent) {
+    if (n.type === 'impl_item') return !!n.childForFieldName?.('trait');
+    if (n.type === 'function_item' || n.type === 'source_file') return false;
+  }
+  return false;
+}
+
 function decoratorsOf(declNode: any): string[] {
   if (!declNode) return [];
   const found: string[] = [];
@@ -116,6 +159,19 @@ function decoratorsOf(declNode: any): string[] {
 
   // Decorators written as leading children of the declaration (TypeScript, C#, Java via `modifiers`).
   collect(declNode);
+
+  // Rust writes its attributes as PRECEDING SIBLINGS: `#[test]` is an `attribute_item` beside the
+  // `function_item`, not inside it, so neither scan above sees it. Walk back over the contiguous run
+  // (comments may sit between) and keep source order. Without this, `#[cfg(test)] mod tests {
+  // #[test] fn t() {} }` reported every inline test as dead — rustc's test harness calls them.
+  const leading: string[] = [];
+  for (let prev = declNode.previousSibling; prev; prev = prev.previousSibling) {
+    if (prev.type === 'attribute_item') {
+      const text = String(prev.text ?? '').trim();
+      if (text) leading.unshift(text);
+    } else if (!/comment/.test(String(prev.type))) break;
+  }
+  found.unshift(...leading);
 
   return found;
 }
@@ -598,6 +654,8 @@ export class ConducksReflector {
               decorators: decoratorsOf(rangeNode),
               // Written inside an object literal / call argument — a member, not a module symbol.
               nestedInExpression: isNestedInExpression(rangeNode),
+              // Inside `impl Trait for X` (Rust): reached through the trait, never judged on its own.
+              inTraitImpl: isInTraitImpl(rangeNode),
               // The DECLARED return type, or null when the source does not state one.
               //
               // This was the literal `'void'` for every function in every language — 4,267 nodes on
@@ -1036,7 +1094,8 @@ export class ConducksReflector {
 
           const type = this.calls.isConstructor(finalTarget, provider) ? 'CONSTRUCTS' : 'CALLS';
           // `currentMatchRow` is 0-based (tree-sitter); every line the vault stores is 1-based.
-          this.calls.process(finalTarget, scope, type, spectrum, args, context, currentMatchRow + 1);
+          this.calls.process(finalTarget, scope, type, spectrum, args, context, currentMatchRow + 1,
+            rustCallQualifier(finalTarget, file.path, provider, allPaths));
 
           // Reference-as-value: a bare identifier passed as a call ARGUMENT (a callback like
           // `addEventListener('load', initUI)`, or a function handed to a DI/command table) is a
