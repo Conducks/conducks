@@ -37,7 +37,41 @@ export function realCasePath(storedPath: string): string {
   if (hit !== undefined) return hit;
 
   let real = storedPath;
-  try { real = fs.realpathSync.native(storedPath); } catch { /* gone, or a case-sensitive filesystem */ }
+  try { real = fs.realpathSync.native(storedPath); }
+  catch { real = walkCaseInsensitive(storedPath) ?? storedPath; /* gone, or a case-sensitive filesystem */ }
   cache.set(storedPath, real);
   return real;
+}
+
+/** Directory listings, read once per process: one `prune` asks about the same folders thousands of times. */
+const listings = new Map<string, string[] | null>();
+
+/**
+ * The CASE-SENSITIVE half, which the native call cannot do: there the lower-cased path names nothing,
+ * so each segment is matched against its directory's entries instead. An exact match is kept; a
+ * lower-cased segment takes the ONE entry equal to it ignoring case. Two entries differing only in
+ * case, or none, mean the path cannot be recovered, and the caller keeps the stored spelling.
+ * MEASURED: on Linux, `prune` printed `src/useworkgraph.ts` for `src/useWorkGraph.ts`, and `impact`
+ * printed "file unreadable" in place of every call-site line — three suites red that macOS passes.
+ */
+function walkCaseInsensitive(storedPath: string): string | null {
+  if (!storedPath.startsWith('/')) return null;
+  let current = '/';
+  for (const segment of storedPath.split('/').filter(Boolean)) {
+    let entries = listings.get(current);
+    if (entries === undefined) {
+      try { entries = fs.readdirSync(current); } catch { entries = null; }
+      listings.set(current, entries);
+    }
+    if (!entries) return null;
+    let next = entries.includes(segment) ? segment : null;
+    if (!next) {
+      const lower = segment.toLowerCase();
+      const matches = entries.filter(e => e.toLowerCase() === lower);
+      if (matches.length !== 1) return null;
+      next = matches[0];
+    }
+    current = current === '/' ? `/${next}` : `${current}/${next}`;
+  }
+  return current;
 }

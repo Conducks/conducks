@@ -50,11 +50,35 @@ const PURE_MODIFIER_DECORATORS: ReadonlySet<string> = new Set([
   'nullable',
 ]);
 
-/** The decorator's callee name: `@app.route("/x")` → `app.route`, `@wraps(fn)` → `wraps`. */
+/**
+ * Rust's built-in attributes that change codegen, lints or docs and hand the item to nobody. rustc
+ * still reports a function carrying only these as never used, so they must not excuse it. `cfg` is
+ * here because a `#[cfg(test)] fn` is compiled out of the build rustc judges, not registered.
+ *
+ * Kept apart from the list above and matched on the WHOLE path: a Rust attribute is a path into a
+ * crate (`tokio::test`), and its last segment means nothing on its own (`rustfmt::skip` is a
+ * formatter hint, while Python's `@unittest.skip` is a test-runner registration). Tool attributes
+ * (`rustfmt::`, `clippy::`) are lint and format hints by definition.
+ */
+const RUST_PURE_ATTRIBUTES: ReadonlySet<string> = new Set([
+  'inline', 'cold', 'must_use', 'track_caller', 'allow', 'warn', 'deny', 'forbid', 'expect',
+  'doc', 'cfg', 'cfg_attr', 'derive', 'repr', 'non_exhaustive', 'deprecated', 'automatically_derived',
+]);
+const RUST_TOOL_ATTRIBUTE = /^(rustfmt|clippy)\./;
+
+const RUST_ATTRIBUTE = /^#!?\[([\s\S]*)\]$/;
+
+/**
+ * The decorator's callee name: `@app.route("/x")` → `app.route`, `@wraps(fn)` → `wraps`, and a Rust
+ * attribute `#[tokio::test]` → `tokio.test`, `#[doc = "x"]` → `doc` (the `::` path is spelled with
+ * the same dot separator as every other language's callee).
+ */
 export function decoratorCallee(raw: string): string {
-  const text = String(raw).trim().replace(/^@/, '');
-  const paren = text.indexOf('(');
-  const callee = (paren > -1 ? text.slice(0, paren) : text).trim();
+  let text = String(raw).trim().replace(/^@/, '');
+  const rust = RUST_ATTRIBUTE.exec(text);
+  if (rust) text = rust[1].trim().replace(/::/g, '.');
+  const cut = text.search(rust ? /[(=]/ : /\(/);
+  const callee = (cut > -1 ? text.slice(0, cut) : text).trim();
   return callee.split(/\s/)[0] ?? '';
 }
 
@@ -69,6 +93,10 @@ export function decoratorCallee(raw: string): string {
 export function isRegisteringDecorator(raw: string): boolean {
   const callee = decoratorCallee(raw);
   if (!callee) return false;
+  if (RUST_ATTRIBUTE.test(String(raw).trim())) {
+    const p = callee.toLowerCase();
+    return !(RUST_PURE_ATTRIBUTES.has(p) || RUST_TOOL_ATTRIBUTE.test(p));
+  }
   const last = callee.split('.').pop()!.toLowerCase();
   return !PURE_MODIFIER_DECORATORS.has(last);
 }

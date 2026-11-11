@@ -20,7 +20,12 @@
   ;; MEASURED on a rustc-verified two-file crate where rustc reports only beta as never used:
   ;; conducks reported BOTH alpha and beta as ORPHAN, and impact alpha upstream found 0 callers.
   ;; This is a fact the source states, not an inference — mod helper; IS the declaration.
-  (mod_item name: (identifier) @source) @isImport
+  ;;
+  ;; Only the BODILESS form. `mod tests { ... }` declares its module inline and names no file; captured
+  ;; as an import, the resolver rightly found nothing (lib.rs's child `tests` would be src/tests.rs)
+  ;; and the generic fuzzy fallback then bound it by basename to util/tests.rs, an edge lib.rs never
+  ;; states. Measured on the two-crate workspace fixture.
+  (mod_item name: (identifier) @source !body) @isImport
 
   ;; --- Atoms (L6: Persistence & State) ---
   (let_declaration pattern: (identifier) @name) @isVariable
@@ -97,6 +102,22 @@
   (let_declaration type: (type_identifier) @pulse_type_target)
   (let_declaration type: (reference_type type: (type_identifier) @pulse_type_target))
   (function_item return_type: (type_identifier) @pulse_type_target)
+  ;; A TYPE NAME USED AS A VALUE is a use of the type, and none of these left an edge: a struct literal
+  ;; `BlobsImpl { .. }`, an enum path `ConflictKind::Referenced`, a unit struct handed on
+  ;; (`Arc::new(HeaderJudge)`, `&StdHost`, `let h = StdHost;`, `Shown.to_string()`), and a path into
+  ;; another module (`&cli::StdHost`). MEASURED on a 27-crate workspace: 76 of 262 ORPHAN verdicts were
+  ;; struct/enum names, the four above all live. Upper case only — Rust's own convention for types,
+  ;; variants, unit structs and consts — so a local `x` is never read as one. The whole-path form needs
+  ;; a lower-case module prefix: `Kind::A` would otherwise leave a dangling `a`, and a dangling NAME
+  ;; spares every symbol of that name.
+  (struct_expression name: [(type_identifier) (scoped_type_identifier)] @pulse_type_target)
+  (scoped_identifier path: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
+  ((scoped_identifier path: (_) @_rust_mod name: (identifier) @_rust_item) @pulse_type_target
+    (#match? @_rust_mod "^[a-z_][a-z0-9_:]*$") (#match? @_rust_item "^[A-Z]"))
+  (arguments (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
+  (reference_expression value: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
+  (let_declaration value: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
+  (field_expression value: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
   (const_item type: (type_identifier) @pulse_type_target)
   (static_item type: (type_identifier) @pulse_type_target)
   (pointer_type type: (type_identifier) @pulse_type_target)
@@ -122,6 +143,23 @@
   
   ;; --- Kinesis (Execution Flow) ---
   (call_expression function: [(identifier) (field_identifier) (scoped_identifier)] @kinesis_target)
+
+  ;; A FUNCTION HANDED ON AS A VALUE — `.map_err(views_err)`, `.and_then(epoch_ms)` — is a use with no
+  ;; call. Any call's identifier argument is a reference-as-value candidate, whatever the callee or its
+  ;; receiver looks like (`"1".parse::<i32>().map_err(to_err)` has a call as receiver). The reflector
+  ;; keeps only names this file defines or binds, so a local variable passed along adds nothing.
+  ;; MEASURED on a 27-crate workspace: 45 of 134 ORPHAN verdicts were functions used this way.
+  (call_expression arguments: (arguments (identifier) @ref_value))
+
+  ;; A METHOD CALL is a call_expression whose function is a field_expression, and nothing captured
+  ;; it: `self.step()`, `e.run()` and `self.store.is_derived(h)` produced no edge at all. The receiver
+  ;; goes in @kinesis_object so the call processor builds `receiver.method` exactly as for the other
+  ;; languages, and the linker's receiver rules resolve it (`self.step` finds the same-file `step`
+  ;; first, as `this.x` does). MEASURED on a 27-crate workspace: 157 of 685 ORPHAN
+  ;; verdicts were methods called as `self.<name>(...)` in their own file.
+  (call_expression function: (field_expression
+    value: [(self) (identifier) (field_expression)] @kinesis_object
+    field: (field_identifier) @kinesis_target))
   
   ;; --- Debt Markers ---
   [(line_comment) (block_comment)] @comment

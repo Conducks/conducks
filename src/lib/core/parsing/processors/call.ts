@@ -21,7 +21,7 @@ export class CallProcessor {
    * take this graph from ~5k nodes to ~32k for a question nobody asks (ADR 0099). 0 means the
    * caller had no position to give.
    */
-  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: AnalyzeContext, line: number = 0): void {
+  public process(target: string, source: string, type: 'CALLS' | 'CONSTRUCTS' | 'TYPE_REFERENCE', spectrum: PrismSpectrum, args: string[] = [], context?: AnalyzeContext, line: number = 0, extra?: Record<string, unknown>): void {
     if (!target) return;
     // A call whose RECEIVER is a literal or an expression is not a reference to any symbol, and the
     // edge it produced could never resolve. Two shapes accounted for 169 dangling edges here:
@@ -128,7 +128,7 @@ export class CallProcessor {
       // UNRESOLVED_CONFIDENCE after linking for any edge that still dangles (ADR 0104).
       confidence: resolved ? 0.85 : UNRESOLVED_CONFIDENCE,
       // `line` is the key persistence reads for the `lineNumber` column (persistence.ts, saveEdges).
-      metadata: { arguments: args, original: target, resolved, line }
+      metadata: { arguments: args, original: target, resolved, line, ...(extra ?? {}) }
     });
   }
 

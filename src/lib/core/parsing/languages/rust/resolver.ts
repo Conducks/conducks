@@ -18,16 +18,18 @@ import path from "node:path";
  * understood, so every crate name became a phantom `external://` node.
  */
 export class RustResolver {
-  /** `<crate src dir>` by crate name as written in code, per file list. */
-  private cratesFor: { key: string; byName: Map<string, string> } | null = null;
+  /** Every `<crate src dir>` declaring each crate name as written in code, per file list. */
+  private cratesFor: { key: string; byName: Map<string, string[]> } | null = null;
   /** Cargo.toml package name per crate dir; null when there is no manifest or no name. */
   private manifestName = new Map<string, string | null>();
+  /** The nearest enclosing `[workspace]` root per directory; null when there is none. */
+  private workspaceRoot = new Map<string, string | null>();
 
   public resolve(rawPath: string, currentFile: string, allFiles: string[]): string | undefined {
     const segs = rawPath.replace(/^::/, '').split('::').filter(Boolean);
     if (segs.length === 0) return undefined;
     const files = RustResolver.index(allFiles);
-    const srcRoot = RustResolver.srcRootOf(currentFile, files);
+    const srcRoot = RustResolver.srcRootOf(currentFile, RustResolver.index([...allFiles, currentFile]));
     let base: string | undefined;   // the module DIRECTORY the tail is relative to
     let i = 0;
     if (segs[0] === 'crate') { base = srcRoot; i = 1; }
@@ -36,7 +38,7 @@ export class RustResolver {
       base = RustResolver.moduleDirOf(currentFile);
       while (segs[i] === 'super') { base = path.dirname(base); i++; }
     } else {
-      const crateSrc = this.crateSrcByName(segs[0], allFiles, files);
+      const crateSrc = this.crateSrcByName(segs[0], currentFile, allFiles, files);
       if (crateSrc) { base = crateSrc; i = 1; }
       else base = RustResolver.moduleDirOf(currentFile);   // `mod helper;`, `helper::alpha()`
     }
@@ -74,20 +76,51 @@ export class RustResolver {
       ?? files.lookup(`${dir}.rs`) ?? files.lookup(path.join(dir, 'mod.rs'));
   }
 
-  /** The `src/` of the workspace crate used as `name` in code, from each crate's Cargo.toml. */
-  private crateSrcByName(name: string, allFiles: string[], files: FileIndex): string | undefined {
+  /**
+   * The `src/` of the crate used as `name` in code, from each crate's Cargo.toml.
+   *
+   * A name means the crate of that name IN THE IMPORTER'S WORKSPACE, which is how Cargo resolves it.
+   * A tree can hold the same name many times over: a gate's test fixtures are whole workspaces of
+   * their own, and on the 27-crate workspace `cli` is declared 8 times and `docs` about 60. Keyed by
+   * name alone, the last one indexed won, and `cli::run_offline` from the real `cli` crate resolved
+   * into a fixture. A name declared once is taken as is (a path dependency outside any workspace);
+   * a name the workspace still cannot tell apart is refused rather than guessed.
+   */
+  private crateSrcByName(name: string, currentFile: string, allFiles: string[], files: FileIndex): string | undefined {
     const key = `${allFiles.length}:${allFiles[0]}:${allFiles[allFiles.length - 1]}`;
     if (!this.cratesFor || this.cratesFor.key !== key) {
-      const byName = new Map<string, string>();
+      const byName = new Map<string, string[]>();
       for (const f of files.all) {
         if (!/\/src\/(lib|main)\.rs$/i.test(f)) continue;
         const src = path.dirname(f);
         const manifest = this.packageName(path.dirname(src));
-        if (manifest) byName.set(manifest.replace(/-/g, '_').toLowerCase(), src);
+        if (!manifest) continue;
+        const crate = manifest.replace(/-/g, '_').toLowerCase();
+        const list = byName.get(crate) ?? [];
+        if (!list.includes(src)) list.push(src);   // lib.rs and main.rs share one src/
+        byName.set(crate, list);
       }
       this.cratesFor = { key, byName };
     }
-    return this.cratesFor.byName.get(name.toLowerCase());
+    const candidates = this.cratesFor.byName.get(name.toLowerCase());
+    if (!candidates?.length) return undefined;
+    if (candidates.length === 1) return candidates[0];
+    const home = this.workspaceOf(path.dirname(currentFile));
+    const same = candidates.filter(src => this.workspaceOf(path.dirname(src)) === home);
+    return same.length === 1 ? same[0] : undefined;
+  }
+
+  /** The nearest directory at or above `dir` whose Cargo.toml declares `[workspace]`. */
+  private workspaceOf(dir: string): string | null {
+    const cached = this.workspaceRoot.get(dir);
+    if (cached !== undefined) return cached;
+    let root: string | null = null;
+    try {
+      if (/^\s*\[workspace\]/m.test(fs.readFileSync(path.join(dir, 'Cargo.toml'), 'utf-8'))) root = dir;
+    } catch { /* no manifest here */ }
+    if (root === null && path.dirname(dir) !== dir) root = this.workspaceOf(path.dirname(dir));
+    this.workspaceRoot.set(dir, root);
+    return root;
   }
 
   private packageName(crateDir: string): string | null {

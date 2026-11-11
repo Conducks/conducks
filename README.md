@@ -253,7 +253,7 @@ Every language below is parsed with a native Tree-sitter grammar and a per-langu
 | JavaScript / JSX        | Full          | symbols, ES + CommonJS `require` imports, calls                                     |
 | Python                  | Full          | symbols, imports + named bindings, calls                                            |
 | Go                      | Full          | functions, structs, interfaces, methods, generics, type-usage edges                 |
-| Rust                    | Partial       | functions, structs, traits, enums, impl methods — no per-binding imports, no type-usage edges |
+| Rust                    | Partial       | functions, structs, traits, enums, impl methods, type-usage edges, calls and imports across a Cargo workspace (crate names, `crate::`/`self::`/`super::`), method calls, struct literals, enum paths and functions passed as values; `#[test]`, `tests.rs` and `*_tests.rs` are tests; trait-impl methods are never dead — no per-binding imports; a method on a local value or a chain binds by name, not by type, so some live methods are still reported dead |
 | C / C++                 | Partial       | structs/classes, functions, methods — no per-binding imports, no type-usage edges   |
 | C#                      | Partial       | namespaces, classes, methods — properties are not extracted                         |
 | Ruby                    | Partial       | classes and methods                                                                 |

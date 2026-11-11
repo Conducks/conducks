@@ -620,8 +620,26 @@ export class IntraLinker {
       const bareName = edge.targetId.toLowerCase();
       let resolvedId: string | null = null;
 
+      // 3-pre. A QUALIFIED CALL whose module path the language's own resolver already read at parse
+      // time: `core_lib::util::third()` arrives with `qualifierFile` = util.rs (see
+      // `rustCallQualifier` in the reflector). The item is looked up IN THAT FILE, then through its
+      // own imports for a re-export (`pub use util::helper` in lib.rs). Ahead of every name-based
+      // step below, because the source stated which module it meant and those steps only guess it:
+      // 3c matches the last segment across whatever the CALLER imports, which for a path two
+      // modules deep is the wrong scope, and 3d asks for the whole path, which no unit defines.
+      // MEASURED on the two-crate workspace fixture: `third` reported dead and `impact third` empty
+      // while rustc links the call.
+      const qualifierFile = (edge.properties as Record<string, unknown> | undefined)?.qualifierFile;
+      if (typeof qualifierFile === 'string' && bareName.includes('::')) {
+        const qualifierUnit = `${qualifierFile}::unit`;
+        const item = bareName.slice(bareName.lastIndexOf('::') + 2);
+        resolvedId =
+          unitSymbols.get(qualifierUnit)?.get(item) ??
+          this.resolveSymbol(item, qualifierUnit, unitImports, unitSymbols);
+      }
+
       // 3a. Same file first (catches batch-ordering misses within the same file).
-      resolvedId = unitSymbols.get(sourceUnitId)?.get(bareName) ?? null;
+      if (!resolvedId) resolvedId = unitSymbols.get(sourceUnitId)?.get(bareName) ?? null;
 
       // 3b. Check each file the source imports.
       if (!resolvedId) {
@@ -790,7 +808,29 @@ export class IntraLinker {
         // typed resolution at 3b′ and are left alone rather than swept in on the same reasoning.
         const receiverIsForeign = !pathSeparated && segments.length === 1
           && this.receiverIsExternalModule(segments[0], sourceUnitId, unitExternalModules);
-        if (method && method !== bareName && !receiverIsForeign) {
+        // A TYPE-QUALIFIED PATH: `Beta::new()`. The head names a TYPE (Rust spells types in upper
+        // case; the original text keeps the case this id lost), and the item belongs to that type —
+        // so it is looked up in the file that defines the type, not as a bare `new` across the
+        // caller's scope, where the first `new` found wins. MEASURED on a 27-crate workspace: 18 of
+        // 134 ORPHAN verdicts were `new`s, each one shadowed by another type's `new`. When the type
+        // resolves and its file has no such item (an impl written elsewhere), nothing is bound: a
+        // dangling edge spares the name, a wrong one condemns the right symbol.
+        const originalHead = String((edge.properties as Record<string, unknown> | undefined)?.original ?? '').split('::');
+        // Rust only: PHP's `User::find()` and C++'s `Foo::bar()` share the shape but were not measured.
+        const typeHead = pathSeparated && sourceUnitId.endsWith('.rs::unit') && segments.length === 1 && originalHead.length === 2
+          && /^[A-Z]/.test(originalHead[0]) && originalHead[0] !== 'Self' ? segments[0] : null;
+        const typeId = typeHead
+          ? unitSymbols.get(sourceUnitId)?.get(typeHead) ??
+            this.resolveSymbol(typeHead, sourceUnitId, unitImports, unitSymbols) ??
+            this.resolveSymbolUnique(typeHead, sourceUnitId, unitImportsDepth2, unitSymbols)
+          : null;
+        // A head that names no type here (`Box::new`, `Vec::with_capacity`, `Arc::clone`) is a foreign
+        // receiver: binding its item to a project symbol of the same name is the guess
+        // `receiverIsForeign` exists to refuse. It used to land `Box::new` on a local type's `new`.
+        if (typeHead) {
+          const typeUnit = typeId ? `${typeId.slice(0, typeId.lastIndexOf('::'))}::unit` : null;
+          resolvedId = typeUnit ? unitSymbols.get(typeUnit)?.get(method) ?? null : null;
+        } else if (method && method !== bareName && !receiverIsForeign) {
           resolvedId =
             unitSymbols.get(sourceUnitId)?.get(method) ??
             this.resolveSymbol(method, sourceUnitId, unitImports, unitSymbols);
