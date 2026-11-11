@@ -45,3 +45,67 @@ export function mcpOk<T>(data: T, meta?: Partial<McpMeta>): McpResponse<T> {
 export function mcpErr(code: string, message: string, suggestion?: string, retryable = false): McpResponse<never> {
   return { error: { code, message, retryable, suggestion } };
 }
+
+/**
+ * Every tool's answer as an agent reads it: compact JSON, paths relative to the project root.
+ *
+ * Each node used to carry its path three times (absolute `id`, `short_id`, absolute `file`) in
+ * indented JSON; `context` on one class came to about 7,500 tokens (todo82). The root is cut from
+ * every string and stated once as `meta.root`, so nothing is lost: every tool accepts a relative id
+ * (`tryResolveSymbol` matches it as a path suffix). `short_id` is dropped when it equals the
+ * shortened `id`. A path outside the root stays absolute.
+ */
+export function formatAnswer(res: unknown, root: string | null | undefined): string {
+  const base = (root ?? '').replace(/[\\/]+$/, '');
+  if (!base) return JSON.stringify(res);
+  const prefix = new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/', 'gi');
+  let cut = false;
+  const json = JSON.stringify(res, function (key, value) {
+    if (typeof value === 'string') {
+      const short = value.replace(prefix, '');
+      if (short !== value) cut = true;
+      return short;
+    }
+    if (value && typeof value === 'object' && !Array.isArray(value)
+        && typeof value.id === 'string' && typeof value.short_id === 'string'
+        && value.id.replace(prefix, '') === value.short_id) {
+      const { short_id: _drop, ...rest } = value;
+      return rest;
+    }
+    return value;
+  });
+  const out = tabulate(JSON.parse(json)) as any;
+  if (!cut) return JSON.stringify(out);
+  if (out && typeof out === 'object' && out.meta && typeof out.meta === 'object') out.meta.root = base;
+  else if (out && typeof out === 'object' && !Array.isArray(out)) out.root = base;
+  else return JSON.stringify({ root: base, answer: out });
+  return JSON.stringify(out);
+}
+
+/**
+ * A list of 3+ objects that share one key set, holding only primitives or arrays of them, becomes
+ * `{ cols, rows }`: the keys once, then one array per item in column order. Node lists repeat about
+ * nine keys per item; written once they cost about a third less (todo82; the TOON format makes the
+ * same trade). A value of `undefined` cannot occur here, because the input came out of JSON.parse.
+ */
+function tabulate(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    const items = value.map(tabulate);
+    if (items.length >= 3 && items.every(isFlatRecord)) {
+      const cols = Object.keys(items[0] as object);
+      const same = items.every(o => { const k = Object.keys(o as object); return k.length === cols.length && k.every((x, i) => x === cols[i]); });
+      if (same) return { cols, rows: items.map(o => cols.map(c => (o as Record<string, unknown>)[c])) };
+    }
+    return items;
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, tabulate(v)]));
+  }
+  return value;
+}
+
+function isFlatRecord(v: unknown): boolean {
+  return !!v && typeof v === 'object' && !Array.isArray(v)
+    && Object.values(v as object).every(x => x === null || typeof x !== 'object'
+      || (Array.isArray(x) && x.every(y => y === null || typeof y !== 'object')));
+}

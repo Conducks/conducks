@@ -54,13 +54,11 @@ const DOORS = [
   //   last          analysis -> six of the others
   'lib/domain/analysis',
   'lib/domain/coverage',
-  'lib/domain/docs',
   'lib/domain/evolution',
   'lib/domain/federation',
   'lib/domain/governance',
   'lib/domain/intelligence',
   'lib/domain/kinetic',
-  'lib/domain/manifest',
   'lib/domain/metrics',
   'lib/domain/mirror',
 ];

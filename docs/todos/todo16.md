@@ -1,7 +1,7 @@
 # todo16 — make conducks installable: one command, no build chain
 
 Status: blocked
-- Blocked by: the only work left is the publish itself, which is Said's to run and not an agent's — decided 2026-07-26; everything gating it is green
+- Blocked by: npm is not logged in on the Mac. The owner said to publish on 2026-11-11; 0.8.0 is packed and install-tested from `release-0.8.0` (see `docs/handover.md`), and waits for `npm login`
 - Acceptance: `npm i -g conducks` succeeds on a clean machine with no compiler flags and no build tools, and `conducks analyze .` works immediately afterwards
 
 Conducks is meant to be a platform every project uses, but installing it meant cloning the repo and

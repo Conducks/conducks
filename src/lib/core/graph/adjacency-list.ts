@@ -262,6 +262,29 @@ export class ConducksAdjacencyList {
   private nameIndex: Map<string, Set<NodeId>> = new Map();        // Fast search index (Set for O(1) dedup)
   private metadata: Map<string, string> = new Map();             // Global project metadata (Phase 5.3)
   private compressedMeat: Map<NodeId, Buffer> = new Map();       // VMC: Memory Zip for non-skeleton properties
+  /**
+   * Meat not yet compressed, as the same JSON snapshot the deflate would have taken (todo82).
+   * Deflating every node on ingest was ~160 ms of a ~1 s CLI query that exits long before memory
+   * matters; a long-lived process (MCP, watch) compresses these in batches once ingest goes quiet.
+   */
+  private pendingMeat: Map<NodeId, string> = new Map();
+  private compactTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private scheduleCompaction(): void {
+    if (this.compactTimer) clearTimeout(this.compactTimer);
+    this.compactTimer = setTimeout(() => this.compactSome(), 2000);
+    this.compactTimer.unref?.();
+  }
+
+  private compactSome(): void {
+    this.compactTimer = null;
+    let n = 0;
+    for (const [id, json] of this.pendingMeat) {
+      this.compressedMeat.set(id, zlib.deflateSync(json));
+      this.pendingMeat.delete(id);
+      if (++n === 500) { this.compactTimer = setTimeout(() => this.compactSome(), 0); this.compactTimer.unref?.(); return; }
+    }
+  }
 
   /**
    * `getNode` decompresses and re-`JSON.parse`s the same buffer on every call — MEASURED
@@ -313,6 +336,7 @@ export class ConducksAdjacencyList {
     this.filePathIndex.clear();
     this.metadata.clear();
     this.compressedMeat.clear();
+    this.pendingMeat.clear();
     this.meatCache.clear();
   }
 
@@ -461,8 +485,9 @@ export class ConducksAdjacencyList {
         const meat = { ...node.properties } as Record<string, unknown>;
         for (const key of Object.keys(skeletonNode.properties)) delete meat[key];
         
-        const compressed = zlib.deflateSync(JSON.stringify(meat));
-        this.compressedMeat.set(id, compressed);
+        this.compressedMeat.delete(id);
+        this.pendingMeat.set(id, JSON.stringify(meat));
+        this.scheduleCompaction();
       } catch (err) {
         console.error(`[Conducks VMC] Compression failed for node ${id}:`, err);
       }
@@ -471,6 +496,7 @@ export class ConducksAdjacencyList {
       // compressed buffer in place — nothing here ever cleared it — so `getNode` kept handing back
       // meat from before this node went shallow. A shallow node has no meat by definition.
       this.compressedMeat.delete(id);
+      this.pendingMeat.delete(id);
     }
 
     // An id can be re-added with a DIFFERENT name or file — a symbol renamed, or a file moved. The
@@ -727,18 +753,26 @@ export class ConducksAdjacencyList {
    * sixth duplicate of a predicate this codebase has been consolidating all week — caught because a
    * module note still cited the original.
    *
-   * Returns false when no edge carries that id, so a caller cannot read "not found" as "retargeted".
+   * Returns how many rebinds found their edge, so a caller cannot read "not found" as "retargeted".
+   *
+   * BATCHED: one pass over the edges for the whole list. It took one id at a time and scanned every
+   * edge per id; 5,535 rebinds on this repo cost 3 s of a 15 s analyze (todo82), and the watcher
+   * paid the same scan per resolution on every save.
    */
-  public retargetEdge(edgeId: string, newTargetId: NodeId): boolean {
-    const id = edgeId.toLowerCase();
+  public retargetEdges(rebinds: Array<{ id: string; newTargetId: NodeId }>): number {
+    const ids = new Set(rebinds.map(r => r.id.toLowerCase()));
+    const byId = new Map<string, ConducksEdge>();
     for (const [, outSet] of this.outEdges) {
-      for (const edge of outSet) {
-        if (edge.id !== id) continue;
-        this.rebindEdgeTarget(edge, newTargetId.toLowerCase());
-        return true;
-      }
+      for (const edge of outSet) if (ids.has(edge.id) && !byId.has(edge.id)) byId.set(edge.id, edge);
     }
-    return false;
+    let applied = 0;
+    for (const r of rebinds) {
+      const edge = byId.get(r.id.toLowerCase());
+      if (!edge) continue;
+      this.rebindEdgeTarget(edge, r.newTargetId.toLowerCase());
+      applied++;
+    }
+    return applied;
   }
 
   /** Edges touching a node, in one direction. `upstream` = who points AT it; `downstream` = what it points at. */
@@ -806,7 +840,8 @@ export class ConducksAdjacencyList {
     if (!skeleton) return undefined;
 
     const compressed = this.compressedMeat.get(id);
-    if (compressed) {
+    const pending = compressed ? undefined : this.pendingMeat.get(id);
+    if (compressed || pending !== undefined) {
       // Decompress once per id and reuse from the LRU on repeat reads — MEASURED (todo22#P12) at a
       // 5.45x re-decode rate for the same ids on `prune` (21501 calls landing on 3945 distinct
       // nodes). `analyze --force` never reaches this branch at all (0 of 7306 `getNode` calls hit
@@ -816,7 +851,7 @@ export class ConducksAdjacencyList {
       if (!meat) {
         let decoded: Record<string, unknown>;
         try {
-          decoded = JSON.parse(zlib.inflateSync(compressed).toString());
+          decoded = JSON.parse(compressed ? zlib.inflateSync(compressed).toString() : pending!);
         } catch (err) {
           throw new Error(`Decompression failed for node ${id}: ${err}`);
         }

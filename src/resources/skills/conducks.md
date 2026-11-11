@@ -1,44 +1,27 @@
-<!-- description: Using conducks — what it is, the 13 MCP tools and the CLI, and the probe sequence for each question (explore, debug, impact, refactor, audit). Use when running conducks from the terminal or an MCP client, picking a tool, orienting in an unfamiliar codebase, or checking whether a change was safe. Reach for it whenever the question is structural and the answer must be TRUE rather than plausible — even when the user never says "conducks": "what breaks if I change this", "what calls this", "is anything using it", "how does X actually work", "is there a cycle". Those are graph questions, and grep answers them by coincidence. -->
+<!-- description: Using conducks — what it is, the 12 MCP tools and the CLI, and the probe sequence for each question (explore, debug, impact, refactor, audit). Use when running conducks from the terminal or an MCP client, picking a tool, orienting in an unfamiliar codebase, or checking whether a change was safe. Reach for it whenever the question is structural and the answer must be TRUE rather than plausible — even when the user never says "conducks": "what breaks if I change this", "what calls this", "is anything using it", "how does X actually work", "is there a cycle". Those are graph questions, and grep answers them by coincidence. -->
 
 # conducks
 
 A structural intelligence engine. It parses a codebase into a queryable graph — symbols as nodes,
 calls and imports as edges, stored in DuckDB — and answers structural questions live from that graph
-instead of from prose in a doc.
+instead of from prose.
 
 **Ask the graph, then read the code.** The graph knows the shape; grep knows only the text.
 
-Two surfaces over one graph: **13 MCP tools** and **the CLI**. Same answers, different clients.
+Two surfaces over one graph: **12 MCP tools** and **the CLI**. Same answers, different clients.
 
 ---
 
 **Owns:** which tool answers which structural question · the probe sequence per question · the CLI.
-**Does not own:** where a fact goes and the doc grammar → `conducks-docs` · how a visual is built,
-anchored and gated → `conducks-visuals` · doors, dead code and tests that bite →
-`conducks-feature-clean` · running several agents at once → `multi-agent-protocol`.
-
-**One owner per fact, across all four skills.** Everywhere else is a pointer. A rule repeated on
-purpose — because it must bind when the owning skill is NOT loaded — is a **restatement**: one or two
-lines, ending in `→ owner`, never a second copy of the mechanics. The test is whether you can name
-the one file to edit when the rule changes. If you cannot, it is a duplicate, and it gets fixed at
-the owner rather than reconciled in both.
+**Does not own:** doors, dead code and tests that bite → `conducks-feature-clean` · running several
+agents at once → `multi-agent-protocol`.
 
 ---
 
-## §1 Two layers, and why it decides what works right now
+## §1 What needs `conducks analyze` first
 
-| layer | reads | needs `conducks analyze` first? |
-|---|---|---|
-| **docs** | authored markdown under `docs/` | **no** — any folder, no database, no lock |
-| **code** | the structural graph in `.conducks/` | **yes** — an unanalyzed project has nothing to answer from |
-
-Docs layer: `conducks_docs` · `docs-status` · `docs-lint` · `glossary` · `features` · `monitor` ·
-`bootstrap-docs` · `help`.
-Everything else is the code layer. Each MCP tool's description is prefixed `[docs layer]` or
-`[code layer]`, so the split survives into any client.
-
-Start a session on the docs layer — it says what is on the table and what the binding decisions are,
-instantly, before any pulse has run. Reach for the code layer when you need wiring.
+Every tool reads the structural graph in `.conducks/`, so an unanalyzed project has nothing to
+answer from: run `conducks analyze` first.
 
 **A running `analyze` locks the vault.** Every code-layer call FAILS — it does not queue:
 
@@ -47,22 +30,15 @@ instantly, before any pulse has run. Reach for the code layer when you need wiri
 ```
 
 Many readers at once is fine; a writer excludes everyone. On a large repo that is minutes. Read the
-error and wait rather than concluding conducks is broken. The docs layer holds no connection and
-keeps working throughout.
+error and wait rather than concluding conducks is broken.
 
 Most responses carry `indexStaleness`. Stale means re-analyze before trusting the answer.
 
 ---
 
-## §2 The 13 tools, by the question they answer
+## §2 The 12 tools, by the question they answer
 
-**Docs layer**
-
-| tool | answers |
-|---|---|
-| `conducks_docs` | open threads, rooted at the decisions that own them: each ADR with unfinished work, the todo phases building it, the next task, what is blocked by what. Finished work omitted. `layer="all"` (default) adds a summary of the module notes — the constraints to load once per session; `layer="board"` omits them for repeat calls; `raw=true` returns the unprojected board |
-
-**Code layer — "where is it, what exists?"**
+**"Where is it, what exists?"**
 
 | tool | answers |
 |---|---|
@@ -172,9 +148,6 @@ writer.
 Place extracted code by layer, not by convenience: shared primitives go down toward the base of the
 dependency stack, specific logic goes up toward the entry points. Dependencies point one way.
 
-When a module outgrows one file, split it into parts and give each part its own architecture note
-(`conducks-docs`).
-
 ### Audit — "is it healthy, what is dead?"
 
 ```
@@ -193,9 +166,8 @@ an orphan. Verify by SYMBOL, never by import path: `grep -rn "\bSymbolName\b" <s
 excluding the defining file; zero hits means genuinely unused. `UNUSED_EXPORT` usually means drop the
 `export` keyword and keep the symbol.
 
-**Structure is queried, not written.** Asked to update an architecture document, query the graph and
-let a human author the prose. What conducks writes to disk is its own vault (`.conducks/`), nothing
-else.
+**Structure is queried, not written.** What conducks writes to disk is its own vault
+(`.conducks/`), nothing else.
 
 ---
 
@@ -227,49 +199,12 @@ Every command takes an optional trailing `[path]`, defaulting to the current dir
 - `doctor` — Node, DuckDB, **which parse path is live** (native vs Gnosis fallback), vault age, and
   whether a newer release exists
 
-**Docs** (the `conducks-docs` grammar)
-- `docs-status [--json] [--all] [--root-only]` — open work: each ADR with unfinished phases, the next
-  task, what is blocked
-- `docs-lint [--root-only]` — validate against the grammar AND run `visuals-lint`; **exits 1** on
-  violation. This is the whole docs gate in one command — the grammar half and the
-  visuals half report separately, so a reader can tell which failed. Module notes are the fourth
-  linted type: four `**...:**` fields, `## Features` and `## Glossary` present even when empty
-- `glossary [path]` — walks every module note's `## Glossary` and reports any term two or more
-  features define. The collision is DERIVED, so it cannot go stale
-- `features [path]` — the same walk over `## Features`, printed as a tree. **Both print how many
-  notes carry no such section**, because "0 collisions" over a corpus nobody has filled in reads
-  exactly like "0 collisions" over a complete one
-- `bootstrap-docs [name] [--service]` — scaffold the file set into `docs/`; `--service` omits the
-  root-only files
-- `monitor [--json] [--stale]` — every registered project: graph freshness, docs violations,
-  architecture notes describing changed code. `--dismiss <module>` = "checked, still accurate";
-  add `--intent <adr|todo|path>` when an enhancement landed, and the address must exist
-
-Both docs commands are **RECURSIVE**: a monorepo keeps a `docs/` per service, so they read the root
-tree AND every service tree. Declare services in `conducks.json` (`{"services": ["app", …]}`);
-without it they are guessed from which folders hold a `docs/`.
-
-```
-✓ (root)            43 governed docs conform to the grammar.
-✓ admin             3 governed docs conform to the grammar.
-✖ app               1 file(s) violate the grammar:
-✓ packages/core     3 governed docs conform to the grammar.
-```
-
-`docs-lint` fails if ANY tree fails — that is what makes it a real gate. The old root-only behaviour
-reported 43 docs clean and exited 0 while a broken phase sat unread in `app/docs/`. `--root-only`
-restores the single-tree run.
-
-**Visuals** (the `conducks-visuals` standard)
-- `visuals-lint [path]` — every `file:line` resolves to exactly one tracked file, every `::symbol` is
-  defined, every `NAME=value` still matches the code. Where a generator is declared it also
-  re-renders and fails on any byte of drift. **Exits 1** on violation. `docs-lint` now runs this
-  itself, so CI needs the one command; this stays callable alone for `--stamp`, which is per-page
-  and not a gate. It reads the working tree, never the vault
-- `visuals-lint --stamp <page>` — record that a human re-read that page's claims against the code.
-  Bare `--stamp` asserts you re-read EVERY page. A run prints three separate numbers — anchors
-  resolving, anchors flagged stale, pages NEVER stamped — and collapsing them is how a rotten page
-  reads as clean
+**Monitor and graph export**
+- `monitor [--json] [--stale]` — every registered project: graph freshness, branch mismatch, watcher
+  state
+- `graph --at <ref> --json [--ranges <file>]` — the code graph at a commit as one JSON object: files,
+  symbols (`name`, `file`, `line`), edges, harvested code comments, and the hash of each line range
+  listed in the `--ranges` file (a JSON array of `{path, start, end}`). An unknown ref exits non-zero
 
 **Coverage and drift**
 - `coverage <coverage-final.json> [--all] [--json]` — per-function fill % and branch coverage
@@ -314,62 +249,29 @@ restores the single-tree run.
 - `prune` — dead code; advisory, under-reports. Verify by SYMBOL, never by import path
 
 **Lifecycle**
-- `setup` — install skills into `~/.claude/skills`, register the project, configure MCP, write
-  `.conducksignore`, install the pre-commit gates. Skills are GLOBAL only; a repo-local copy loads
+- `setup` — install skills into `~/.claude/skills` (and `~/.agents/skills` for Codex and Gemini CLI,
+  `~/.gemini/config/skills` for Antigravity, when installed), register the project, configure MCP for every agent found, write
+  `.conducksignore`, build the first graph when there is none. Skills are GLOBAL only; a repo-local copy loads
   twice and setup prunes it. They also re-sync on every `npm run build` of conducks itself, so the
   installed copy never lags the source
-- `install-hooks [path] [--force]` — write the docs-lint/visuals-lint gates into
-  `.git/hooks/pre-commit` behind managed markers. Idempotent; a foreign hook is appended to with its
-  own lines untouched and the gates placed before a trailing `exit 0`; a symlinked hook is left alone
-  with an instruction; no `.git` exits quietly; `--force` rewrites wholesale
 - `uninstall` — remove the skills conducks installed
 - `mcp [--sse] [--root <path>]` — run the MCP server (stdio by default)
 - `watch` — live re-analysis on save · `mirror` — web dashboard on port 3333
-- `link <path>` — link a neighbouring repo · `record --type <t> "content"`
+- `link <path>` — link a neighbouring repo
 
-### §5.1 Every gate, and which of them actually blocks a commit
+### §5.1 Gates
 
-Six checklists live across these skills and nothing said which ones run by themselves. One does,
-and it carries the other inside it.
-
-| gate | runs | refuses | owner |
-|---|---|---|---|
-| `docs-lint` | pre-commit, CI | the doc line grammar for all four linted types — every tree, fails if ANY tree fails — AND everything in the row below, which it runs itself | `conducks-docs` §5.4 |
-| `visuals-lint` | inside `docs-lint`; alone only for `--stamp` | a broken anchor · a stale `NAME=value` · a byte of render drift | `conducks-visuals` §4 |
-| the build's own gates | `npm run visuals` | overlap, an escaped block, a diagonal segment, a block drawn on the canvas, a dead selector, chrome drift, a missing read log | `conducks-visuals/references/layout.md` §4 |
-| `guard` / `audit` | on demand | cycles, layer violations, god objects | `conducks` §3 |
-| the band checklist | **a person** | 13 checks, before calling a band done | `conducks-visuals/references/setup.md` §8 |
-| the stylesheet checklist | **a person** | 9 things, before a shared-file change ships everywhere | `conducks-visuals/references/design.md` §6 |
-| the clean rule table | **a person** | every rule stated PASS, n/a or OPEN with a reason | `conducks-feature-clean` |
-
-**The bottom three are kept by a person and nothing catches them being skipped.** Say which checks
-were scripted and which were run by hand — a list where one of four is automated is useful to write
-down; presenting all four as "checked" is not.
-
-**Every gate must refuse on an empty parse.** A selector matching nothing reports zero problems over
-a page that failed to render. Two real instances are recorded in `references/layout.md` §4.
+`guard` and `audit` run on demand (cycles, layer violations, god objects). Neither runs by itself:
+wire them into your CI or hook if you want them to block.
 
 ---
 
-## §6 A monorepo returns one board per tree
-
-`conducks_docs` and both docs commands read the root tree and each unit's, and hand them back
-SEPARATELY as `{monorepo: true, trees: {"(root)": …, "app": …}}`. A single repo returns the board
-unwrapped, so the common shape never changes. `scope="root"` or `scope="app"` reads one tree.
-
-They are not merged on purpose: `todo01#P2` is an address inside its own tree, and two units may each
-hold a `todo01`. Read the tree that owns the work. Decisions, todos and the handover live at the
-repository root; what a unit DOES lives in the module notes under its own `visuals/modules/`, one
-per feature (the four per-tree living files were dissolved into them).
-
----
-
-## §7 Two things that surprise people
+## §6 Two things that surprise people
 
 - **A running `analyze` locks the vault** (§1). Graph-reading commands fail rather than queue.
 - **Native parsing is optional to INSTALL, required to ANALYZE.** The `tree-sitter` binding compiles
-  from source, so it is absent wherever there is no C++ toolchain. The CLI still installs and its
-  docs commands still work, but `analyze` refuses — there is no second parse path, and writing an
+  from source, so it is absent wherever there is no C++ toolchain. The CLI still installs,
+  but `analyze` refuses — there is no second parse path, and writing an
   empty graph that looks real is worse. `doctor` says which state you are in.
 
 ---
@@ -378,6 +280,4 @@ per feature (the four per-tree living files were dissolved into them).
 
 | skill | use it for |
 |---|---|
-| `conducks-docs` | the documentation standard — what goes where, the line grammar, code comments |
-| `conducks-visuals` | building and maintaining the rendered architecture pages |
 | `conducks-feature-clean` | putting a feature behind one door and cleaning behind it |

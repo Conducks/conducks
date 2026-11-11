@@ -105,10 +105,18 @@ this note; they are listed here rather than left undocumented:
 - **`conducks setup`** (`src/interfaces/cli/commands/setup.ts`) — `conducks setup [--dry-run]` writes
   OUTSIDE the project: it syncs conducks' skills from `src/resources/skills/` into the single global
   `~/.claude/skills` (ADR 0029 — one copy serves every project; a repo-local copy would load twice),
+  plus `~/.agents/skills` (Codex, Gemini CLI) and `~/.gemini/config/skills` (Antigravity) when those
+  agents are installed (ADR 0198),
   registers the project root in a global project registry under the user's home directory, edits the
   Claude Desktop MCP config, and
   installs the docs-lint/visuals-lint pre-commit gates behind managed markers. `--dry-run` prints what
   it would touch without touching it (ADR 0126).
+
+- **`conducks graph --at <ref> --json`** (`src/interfaces/cli/commands/graph.ts`) — the canvas contract, one JSON
+  object: `commit`, `files`, `ranges` (`{path,start,end,hash}`), `symbols` (`path::name`) with `symbols_at: "head"`,
+  `features` (`{path,title,file}`, the module notes' feature tree), `edges` (`{from,to,kind}` between symbols,
+  `edges_at: "head"`, external targets dropped) and `comments` (`{symbol,text}`, the harvested doc comments).
+  An unknown ref exits 1.
 
 ## Glossary
 - **mirror** (ADR 0148) — every MCP tool has a matching CLI command; both must answer identically

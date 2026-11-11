@@ -6,9 +6,8 @@
 
 **Owns:** the door and the gate that holds it · the boundary rules · dead code judged by reading ·
 tests that bite under mutation · the order a clean runs in.
-**Does not own:** where the result gets written down — the ADR, the todo, the module note →
-`conducks-docs` · drawing what you found → `conducks-visuals` · measuring the blast radius before you
-touch it → `conducks`. Rules restated from those skills are marked; the mechanics live there.
+**Does not own:** measuring the blast radius before you touch it → `conducks`. Rules restated from
+that skill are marked; the mechanics live there.
 
 Needs no conducks — 14 of these 16 rules are about module boundaries and testing discipline, and
 apply to any language. The two that name conducks say so.
@@ -22,10 +21,9 @@ not in this file.
 
 Everything else is situational. These are not.
 
-**Numbers are ADR 0150's and never change.** Fourteen citations across the todos and the clean log
-address these rules by number, so the tiering here regroups them and renumbers nothing — a citation
-that silently points at the wrong rule is worse than no citation. (The deleted conventions file cited
-them too; these numbers are unaffected.)
+**The numbers never change.** Citations address these rules by number, so the tiering here
+regroups them and renumbers nothing — a citation that silently points at the wrong rule is worse
+than no citation.
 
 ### Rule 1 · One door
 
@@ -179,7 +177,7 @@ lint. All green, or the unit is not done.
    Measure which public symbols have no caller — and for each, say whether it is dead,
    superseded, or a capability nothing consumes. They have different answers
 1  THE DOOR, and the gate that holds it
-2  CLEAN behind it — docs, dead code, contradicting comments
+2  CLEAN behind it — dead code, contradicting comments
 3  MAKE IT BREAK — adversarial cases, each mutation-tested
 4  CLOSE — gates, log, and the rule table stated per rule
 ```

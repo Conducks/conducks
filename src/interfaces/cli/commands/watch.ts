@@ -108,16 +108,10 @@ export class WatchCommand implements ConducksCommand {
       console.log(`[Watch] Caught up on ${caught.changed} changed and ${caught.added} new file(s) from while the watcher was off.`);
     }
 
-    // The docs half of the same heartbeat: a governed doc changing re-lints the tree. Reports only —
-    // the exit-code surface stays on `conducks docs-lint` for CI (ADR 0020, todo15).
-    const docsWatcher = registry.docs.watcher;
-    docsWatcher.start();
-
     // The banner names the mode, because they differ in the only way a reader cares about: whether
     // anything outside this process will see the update.
     console.log(`\n\x1b[32m🔭 Conducks Watcher — ${isPulse ? 'Auto-Pulse Mode (persists each change)' : 'Live Mirror Mode (Read-Only)'} active.\x1b[0m`);
     console.log("\x1b[34m- Changes update the in-memory Visual Mirror instantly.\x1b[0m");
-    console.log("\x1b[34m- docs/ is watched too: grammar + link violations report on write.\x1b[0m");
     // MEASURED, and the first wording of this line was wrong. While THIS process holds the vault
     // writable, every other command is served from the previous pulse's SNAPSHOT (ADR 0040) — for
     // the whole session, not merely while a write is in flight: on a 400-file project the change was
@@ -156,7 +150,6 @@ export class WatchCommand implements ConducksCommand {
         console.log(`\n\x1b[33m[Conducks Watch] Received ${signal}. Shutting down watcher...\x1b[0m`);
         try {
           stopBranchWatch();
-          await docsWatcher.stop();
           await watcher.stop();
         } catch (err: any) {
           console.error(`[Conducks Watch] Error during watcher shutdown: ${err?.message || err}`);

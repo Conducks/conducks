@@ -44,7 +44,7 @@ An edit made here is discarded by the next render; edit the .md.</div>
 <ul>
 <li><b><code>conducks setup</code></b> (<code>src/interfaces/cli/commands/setup.ts</code>) — <code>conducks setup [--dry-run]</code> writes</li>
 </ul>
-<p>  OUTSIDE the project: it syncs conducks' skills from <code>src/resources/skills/</code> into the single global   <code>~/.claude/skills</code> (ADR 0029 — one copy serves every project; a repo-local copy would load twice),   registers the project root in a global project registry under the user's home directory, edits the   Claude Desktop MCP config, and   installs the docs-lint/visuals-lint pre-commit gates behind managed markers. <code>--dry-run</code> prints what   it would touch without touching it (ADR 0126).</p>
+<p>  OUTSIDE the project: it syncs conducks' skills from <code>src/resources/skills/</code> into the single global   <code>~/.claude/skills</code> (ADR 0029 — one copy serves every project; a repo-local copy would load twice),   plus <code>~/.agents/skills</code> (Codex, Gemini CLI) and <code>~/.gemini/config/skills</code> (Antigravity) when those   agents are installed (ADR 0198),   registers the project root in a global project registry under the user's home directory, edits the   Claude Desktop MCP config, and   installs the docs-lint/visuals-lint pre-commit gates behind managed markers. <code>--dry-run</code> prints what   it would touch without touching it (ADR 0126).</p>
 <h2>Glossary</h2>
 <ul>
 <li><b>mirror</b> (ADR 0148) — every MCP tool has a matching CLI command; both must answer identically</li>

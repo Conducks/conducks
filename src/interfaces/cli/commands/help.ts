@@ -68,7 +68,7 @@ export class HelpCommand implements ConducksCommand {
         ],
       },
       "SYSTEM (Meta)": {
-        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "monitor", "bootstrap-docs", "docs-lint", "docs-status", "testing", "help"],
+        ids: ["mcp", "setup", "uninstall", "doctor", "watch", "monitor", "help"],
         examples: [
           "conducks setup",
           "conducks uninstall",
@@ -101,8 +101,7 @@ export class HelpCommand implements ConducksCommand {
     // ANYTHING THE MAP FORGOT STILL PRINTS.
     //
     // The groups above are a hardcoded list of ids, and a command absent from it was invisible: 32
-    // of 39 were listed, and the seven missing included `docs-lint` — the documented CI gate — and
-    // `coverage`, which four ADRs of this sweep were spent fixing. Every one of them worked; none
+    // of 39 were listed, and the seven missing included `coverage`, which four ADRs of this sweep were spent fixing. Every one of them worked; none
     // could be found from the tool itself (ADR 0125).
     //
     // Assigning those seven to groups fixes today. This fixes tomorrow: the next command added to

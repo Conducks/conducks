@@ -105,3 +105,78 @@ describe('registering conducks in Claude Desktop', () => {
     expect(res.message).toContain('disk on fire');
   }, 30000);
 });
+
+/**
+ * todo82#P8 — `setup` registers conducks in every other MCP client that is installed, so no config
+ * is edited by hand. The two failures that matter: writing into a client that is not installed
+ * (a stray config directory in the user's home), and running a real client CLI from a test.
+ */
+describe('registering conducks in the other detected clients', () => {
+  const calls: string[][] = [];
+  const makeWith = (home: string, exec: (cmd: string, args: string[]) => string) =>
+    new MCPConfigurator(fsExtra, { homedir: () => home }, (cmd, args) => { calls.push([cmd, ...args]); return exec(cmd, args); });
+  afterEach(() => { calls.length = 0; });
+
+  it('writes nothing and runs nothing when no client is installed', async () => {
+    const home = mkHome();
+    const res = await makeWith(home, () => '').registerDetected('/opt/conducks/cli.js');
+    expect(res).toEqual([]);
+    expect(fs.readdirSync(home)).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('adds conducks to an installed Cursor and keeps its other servers', async () => {
+    const home = mkHome();
+    fs.mkdirSync(path.join(home, '.cursor'));
+    fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { other: { command: 'x' } } }));
+
+    const res = await makeWith(home, () => '').registerDetected('/opt/conducks/cli.js');
+
+    const after = JSON.parse(fs.readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8'));
+    expect(res.map(r => [r.client, r.success])).toEqual([['Cursor', true]]);
+    expect(after.mcpServers.other).toEqual({ command: 'x' });
+    expect(after.mcpServers.conducks).toEqual({ command: 'node', args: ['/opt/conducks/cli.js', 'mcp'] });
+  });
+
+  it('registers Claude Code through its own CLI, and only when it is not registered yet', async () => {
+    const home = mkHome();
+    fs.writeFileSync(path.join(home, '.claude.json'), '{}');
+    const before = fs.readFileSync(path.join(home, '.claude.json'), 'utf8');
+
+    await makeWith(home, (_c, args) => { if (args[1] === 'get') throw new Error('not found'); return ''; }).registerDetected('/opt/conducks/cli.js');
+    expect(calls[1]).toEqual(['claude', 'mcp', 'add', '--scope', 'user', 'conducks', '--', 'node', '/opt/conducks/cli.js', 'mcp']);
+    expect(fs.readFileSync(path.join(home, '.claude.json'), 'utf8')).toBe(before); // never edited directly
+
+    calls.length = 0;
+    const again = await makeWith(home, () => 'conducks: ...').registerDetected('/opt/conducks/cli.js');
+    expect(calls).toEqual([['claude', 'mcp', 'get', 'conducks']]);
+    expect(again[0].message).toContain('already registered');
+  });
+
+  it('appends one Codex block, keeps the rest of the TOML, and does not append twice', async () => {
+    const home = mkHome();
+    fs.mkdirSync(path.join(home, '.codex'));
+    const toml = path.join(home, '.codex', 'config.toml');
+    fs.writeFileSync(toml, 'model = "x"');
+
+    await makeWith(home, () => '').registerDetected('/opt/conducks/cli.js');
+    await makeWith(home, () => '').registerDetected('/opt/conducks/cli.js');
+
+    const text = fs.readFileSync(toml, 'utf8');
+    expect(text.startsWith('model = "x"\n')).toBe(true);
+    expect(text.match(/\[mcp_servers\.conducks\]/g)).toHaveLength(1);
+    expect(text).toContain('args = ["/opt/conducks/cli.js", "mcp"]');
+  });
+
+  it('reports a client that fails and still handles the others', async () => {
+    const home = mkHome();
+    fs.mkdirSync(path.join(home, '.cursor'));
+    fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), '{ not json');
+    fs.mkdirSync(path.join(home, '.codex'));
+
+    const res = await makeWith(home, () => '').registerDetected('/opt/conducks/cli.js');
+
+    expect(res.map(r => [r.client, r.success])).toEqual([['Cursor', false], ['Codex', true]]);
+    expect(fs.readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8')).toBe('{ not json'); // left as it was
+  });
+});

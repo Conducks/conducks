@@ -1,9 +1,9 @@
 import { Tool, FilterValidationError, FILTER_DEFAULT_LIMIT, FILTER_MAX_LIMIT, realCasePath, splitProjectSymbols } from "@/contracts/index.js";
 import { registry } from "@/registry/index.js";
-import { ensureAnchor, releaseAnchor, resolveDocsRoot } from "../shared/anchor.js";
+import { ensureAnchor, releaseAnchor } from "../shared/anchor.js";
 import { resolveSymbolId } from "../shared/resolve-symbol.js";
 import { emptyVaultAnswer } from "../shared/empty-vault.js";
-import { mcpOk, mcpErr } from "@/interfaces/tools/shared/mcp-response.js";
+import { mcpOk, mcpErr, formatAnswer } from "@/interfaces/tools/shared/mcp-response.js";
 import { verdict, verdictToJson } from "@/contracts/index.js";
 import { DEAD_CODE_TYPES, DEAD_CODE_QUESTION_TYPES } from "@/contracts/index.js";
 import { graphHealth } from "@/contracts/index.js";
@@ -47,23 +47,6 @@ const PRUNE_LIMIT_BOUNDS = { min: 1, max: 200 };
 
 // `conducks_query`, as published in its inputSchema.
 const QUERY_LIMIT_BOUNDS = { min: 1, max: 500 };
-
-// `conducks_docs raw:true`. The unbounded raw board measured 279,483 bytes on this repo — roughly 11x
-// what an MCP response carries — with `truncated: false` and no cap of any kind (todo54#P2). 50 entries
-// per list is the default; the ceiling is generous because `raw` exists for callers who want the lot.
-const DOCS_RAW_LIMIT_BOUNDS = { min: 1, max: 500 };
-const DOCS_RAW_DEFAULT_LIMIT = 50;
-// An ENTRY COUNT is a poor proxy for response size here, and the measurement says so: on this repo
-// `limit: 3` is 9,770 bytes and `limit: 5` is 47,608 — a docs entry is not a fixed-size row the way a
-// coverage row is. So the real bound is bytes, the same technique `conducks_context` uses for its
-// token budget.
-//
-// The budget counts COMPACT entry JSON while the response is pretty-printed, so the rendered payload
-// runs about 1.5x the budget. Calibrated against the real thing rather than assumed — measured on this
-// repo: budget 10,000 -> 15,135 bytes rendered, 15,000 -> 22,693, 20,000 -> 30,264. 15,000 is the
-// largest that stays under the ~25 KB an MCP response carries.
-const DOCS_RAW_BYTE_BOUNDS = { min: 1000, max: 200000 };
-const DOCS_RAW_DEFAULT_BYTES = 15000;
 
 /**
  * The templates the Oracle library actually holds — ASKED, never retyped.
@@ -127,8 +110,6 @@ const STATUS_MODES = ['health', 'map', 'manifest', 'pulse'] as const;
 export const AUDIT_MODES = ['scan', 'advice', 'guard', 'archeology'] as const;
 /** The modes `conducks_query` implements. */
 const QUERY_MODES = ['fuzzy', 'template', 'filter'] as const;
-/** The layers `conducks_docs` publishes: threads + constraints, or threads alone. */
-const DOCS_LAYERS = ['all', 'board'] as const;
 /**
  * The finding types `conducks_prune` can filter to, plus the unfiltered `all`.
  *
@@ -290,7 +271,7 @@ Returns:
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ q, mode, template, params, filter, limit, path: customPath }: any) => {
       // `mode:"banana"` used to fall through to fuzzy, and `limit:"x"` reached DuckDB and came back
       // as `Conversion Error: Could not convert string 'x' to INT64` under a QUERY_FAILED code
@@ -430,7 +411,7 @@ Modes:
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ mode, file, path: customPath }: any) => {
       // The last unguarded enum on the surface (todo53#P2): `mode:"JUNK"` returned health's payload
       // byte for byte, so a mistyped `manifest` silently became a different analysis.
@@ -539,7 +520,7 @@ Modes:
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ mode, threshold, window, path: customPath }: any) => {
       // An unknown mode fell through every branch below and ran `scan`, returning a full, plausible
       // payload for a request that was never honoured — the caller asked for one analysis and
@@ -614,7 +595,7 @@ AFTER THIS: Use conducks_trace to see how data flows through this symbol.`,
       },
       required: ["symbol"]
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ symbol, path: customPath }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
@@ -666,8 +647,8 @@ depth (STRUCTURE 7, BEHAVIOR 8, ATOM 9), so a local variable is worth less than 
 that holds it at the same graph depth and confidence.
 Budget: nodes are scored and added highest-first until budget is exhausted or diminishing returns threshold hit.
 ATOMs (local variables, fields) are excluded by default — pass include_atoms:true to get them back.
-Each item carries "line" (jump target, when the node has one) and "short_id" (repo-relative, alongside
-the full "id" — always feed "id" back into trace/impact/explain/context, short_id is display-only).`,
+Each item carries "line" (jump target, when the node has one) and "id", relative to meta.root; feed "id"
+back into trace/impact/explain/context as it is.`,
     // MCP2: tool annotations
     annotations: {
       readOnlyHint: true,
@@ -686,7 +667,7 @@ the full "id" — always feed "id" back into trace/impact/explain/context, short
       },
       required: ["symbol"]
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ symbol, radius, max_tokens, path: customPath, include_atoms }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
@@ -824,7 +805,7 @@ AFTER THIS: Use conducks_explain for deeper analysis of returned symbols.`,
       },
       required: ["sql"]
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ sql, path: customPath }: any) => {
       // MCP4 + ADR 0047. The prefix check below is NECESSARY and was never SUFFICIENT: DuckDB's core
       // table functions read files and make network requests from inside a perfectly ordinary
@@ -882,7 +863,7 @@ min_members (the set the page was drawn from), and "shown" is how many came back
         path: { type: "string", description: "Optional: absolute project root path." }
       }
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ min_members, limit, path: customPath }: any) => {
       // Both bounds are published in the inputSchema above and neither was checked, so
       // `min_members: "two"` reported `shown: 0, truncated: false` against 2,878 flows (todo53#P1).
@@ -979,7 +960,7 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
         path: { type: "string", description: "Optional: absolute project root path." }
       }
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ type: filterType, limit, path: customPath }: any) => {
       // An unknown `type` used to reach the filter below and match nothing, so the answer was
       // `findings: []` with `summary: {ORPHAN: 0, UNUSED_EXPORT: 0, STALE_IMPORT: 0}, total: 0` — a
@@ -1040,148 +1021,6 @@ Returns: list of findings with type, symbol name, file path, and reason.`,
     }
   },
 
-  // Parity: docs progress board (todo %, ADR states) parsed from the authored markdown grammar.
-  conducks_docs: {
-    id: "conducks-docs",
-    name: "conducks_docs",
-    layer: "docs",
-    type: "tool",
-    version: "1.0.0",
-    description: `The open threads in the project's authored docs, rooted at the decisions that own
-them: each ADR with unfinished work, the todo phases building it, and the next task in each — plus
-what is blocked and by what. Finished work is omitted: this is the table, not the history.
-
-A SUMMARY AND LINKS, NOT A REPLACEMENT: every entry is an address (todo09#P2, a file path) or a
-state. Open the todo or the ADR before acting on it.
-
-layer="all" (default) also returns a compact summary of the module notes under docs/visuals/modules/
-— ADR 0193's replacement for the dissolved features.md/memory.md/conventions.md: counts from the two
-computed views (\`conducks glossary\`, \`conducks features\`), never their full text. A rule, gotcha
-or capability's purpose now lives in the owning feature's own note; open it, or run \`conducks
-glossary\` / \`conducks features\` for the full computed view. layer="board" omits the summary for
-repeat calls.
-
-MONOREPO: a repo that keeps a docs/ per deployable unit returns {trees:{"(root)":…, "app":…}} —
-one board per tree, kept SEPARATE because an address like todo01#P2 only resolves inside its own
-tree and merging them would lose which unit each belongs to. A single-repo project returns the board
-directly, unwrapped. scope="root" forces the single-tree shape and, like docs-lint --root-only, skips
-cross-tree address checks since no other tree is loaded to check against. scope="<unit path>" reads
-one unit but every tree is still built and cross-checked first, so a cross-tree address inside that
-unit is still resolved correctly.
-
-WHEN TO USE: at session start, and whenever you pick up work — "what is on the table, what is
-waiting, which decisions still have unbuilt parts" without opening every doc.`,
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Optional: the project root." },
-        layer: { type: "string", enum: [...DOCS_LAYERS], description: "all = threads + constraints (session start). board = open threads only." },
-        recent: { type: "number", description: "How many recent decisions to list (default 4, 0 for none). Derived from ADR dates — there is no progress file." },
-        raw: { type: "boolean", description: "Return the full unprojected board (every doc, every entry). Large." },
-        max_bytes: { type: "number", default: DOCS_RAW_DEFAULT_BYTES, minimum: DOCS_RAW_BYTE_BOUNDS.min, maximum: DOCS_RAW_BYTE_BOUNDS.max, description: "raw mode only: response byte budget. Entry counts are a poor proxy for size here — a docs entry is not a fixed-size row." },
-        limit: { type: "number", default: DOCS_RAW_DEFAULT_LIMIT, minimum: DOCS_RAW_LIMIT_BOUNDS.min, maximum: DOCS_RAW_LIMIT_BOUNDS.max, description: "raw mode only: max entries per list. The raw board is otherwise unbounded and overruns the response budget." },
-        scope: { type: "string", description: "Monorepo only. Omit for every tree (root + each unit). 'root' = the root tree alone. A unit path ('app', 'packages/core') = that unit alone." }
-      }
-    },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
-    handler: async ({ path: customPath, layer, recent, raw, scope, limit, max_bytes }: any) => {
-      // Every one of these was read with a silent fallback: `layer: "banana"` returned "all" because
-      // the branch was `layer === "board" ? … : "all"`, `raw: "yes"` switched the FULL board on
-      // because a non-empty string is truthy, and `recent: "four"` fell back to 4 via a `typeof`
-      // check. Confirmed by diffing whole payloads, not by reading the code (todo53#P1).
-      const badParam =
-        enumErr(layer, DOCS_LAYERS, 'layer') ??
-        boolErr(raw, 'raw') ??
-        numErr(recent, { min: 0 }, 'recent') ??
-        numErr(limit, { min: DOCS_RAW_LIMIT_BOUNDS.min, max: DOCS_RAW_LIMIT_BOUNDS.max }, 'limit') ??
-        numErr(max_bytes, { min: DOCS_RAW_BYTE_BOUNDS.min, max: DOCS_RAW_BYTE_BOUNDS.max }, 'max_bytes');
-      if (badParam) return badParam;
-
-      try {
-        // DOCS LAYER: markdown only. No anchor, no graph, no DuckDB — this answers on a folder that
-        // was never analyzed, and takes no connection for another agent to queue behind.
-        const root = resolveDocsRoot(customPath);
-        const depth = typeof recent === "number" ? recent : 4;
-        // `raw` returns every entry of every doc and was UNBOUNDED — 279,483 bytes on this repo, with
-        // `truncated: false` (todo54#P2). Capped per list, and `rawTruncated` records whether anything
-        // was held back so `meta.truncated` is measured rather than asserted. The projected board is
-        // left alone: it is already compact by construction.
-        const rawCap = limit ?? DOCS_RAW_DEFAULT_LIMIT;
-        let byteBudget = max_bytes ?? DOCS_RAW_DEFAULT_BYTES;
-        let rawTruncated = false;
-        const capRaw = (board: any) => {
-          const capped: any = { ...board };
-          for (const key of ['todos', 'decisions', 'other', 'lint', 'warns', 'unlinked', 'crossRefs']) {
-            const list = board[key];
-            if (!Array.isArray(list)) continue;
-            const kept: unknown[] = [];
-            for (const entry of list.slice(0, rawCap)) {
-              const size = JSON.stringify(entry)?.length ?? 0;
-              // Never cut mid-entry: an entry either fits whole or is held back and reported.
-              if (kept.length > 0 && size > byteBudget) { rawTruncated = true; break; }
-              kept.push(entry);
-              byteBudget -= size;
-            }
-            if (kept.length < list.length) rawTruncated = true;
-            capped[key] = kept;
-          }
-          return capped;
-        };
-
-        const project = (board: ReturnType<typeof registry.docs.trees>[number]["board"]) => raw
-          ? capRaw(board)
-          : registry.docs.viewOf(board, layer === "board" ? "board" : "all", depth);
-
-        // Every docs tree, ALWAYS, WITH both docs checks already applied (the merged lint is what
-        // makes `board.lint.length` — `agentView`'s `health.grammarViolations` — correct here too). A
-        // monorepo hides most of its authored intent in unit folders, and a tool that silently reads
-        // only the root reports a fraction of the open work as if it were all of it — the same failure
-        // the CLI had.
-        let trees = registry.docs.trees(root);
-
-        // `scope` narrows only what is RETURNED, never what is built — and `"root"` is not special,
-        // it is just one more tree label. Every tree is built and cross-checked first, so an address
-        // that names another tree is still resolved against the full set. Building the scoped tree
-        // alone would make a broken `admin:todo99` read as clean purely because `admin` was never
-        // loaded — the "silently reports clean" failure this whole layer exists to avoid. That costs
-        // one pass over the other trees; reporting a dangling address as fine costs more.
-        if (typeof scope === "string" && scope.length > 0) {
-          const label = scope === "root" ? "(root)" : scope;
-          const hit = trees.find(t => t.label === label);
-          if (!hit) {
-            return mcpErr('UNKNOWN_SCOPE', `No docs tree "${scope}".`,
-              `Available: ${trees.map(t => t.label).join(", ")}.`, false);
-          }
-          trees = [hit];
-        }
-
-        // Single tree — including every non-monorepo project — returns the board directly, so the
-        // common shape never changes and no caller has to unwrap a one-entry map.
-        if (trees.length === 1) {
-          const one = project(trees[0].board);
-          const count = raw
-            ? (one as any).todos.length + (one as any).decisions.length
-            : ((one as any).open as unknown[]).length + ((one as any).unlinkedWork as unknown[]).length;
-          return mcpOk(one, { nodeCount: count, truncated: rawTruncated });
-        }
-
-        const byTree: Record<string, unknown> = {};
-        let nodeCount = 0;
-        for (const { label, board } of trees) {
-          const view = project(board);
-          byTree[label] = view;
-          nodeCount += raw
-            ? (view as any).todos.length + (view as any).decisions.length
-            : ((view as any).open as unknown[]).length + ((view as any).unlinkedWork as unknown[]).length;
-        }
-        return mcpOk({ monorepo: true, trees: byTree }, { nodeCount, truncated: rawTruncated });
-      } catch (err: any) {
-        return mcpErr('DOCS_FAILED', err.message, 'Check the docs/ folder follows the conducks-docs grammar.', true);
-      }
-    }
-  },
-
   // Parity: coverage overlay — range-join a coverage report onto function spans (drift detection).
   conducks_coverage: {
     id: "conducks-coverage",
@@ -1209,7 +1048,7 @@ computed over the FULL bound set, only the \`functions\` list is capped. Raise \
       },
       required: ["coverage"]
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ coverage, limit, path: customPath }: any) => {
       // Declared 1..500 and never enforced: `limit: "x"` made `Math.max(1, "x")` NaN, and
       // `slice(0, NaN)` is empty — an empty page against 752 bound functions (todo53#P1).

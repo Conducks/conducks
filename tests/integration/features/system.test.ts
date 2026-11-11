@@ -37,6 +37,8 @@ describe('System domain integration (conducks setup)', () => {
     const { combined, status } = runCli(['setup'], { cwd: repo, env: { HOME: fakeHome } });
     expect(status).toBe(0);
     expect(combined).toContain('Setup complete');
+    // todo82#P8: setup builds the first graph, so it is the last step before asking questions.
+    expect(fs.existsSync(path.join(repo, '.conducks', 'conducks-synapse.db'))).toBe(true);
 
     const fakeSkillsDir = path.join(fakeHome, '.claude', 'skills');
     expect(fs.existsSync(fakeSkillsDir)).toBe(true);

@@ -56,7 +56,6 @@ jest.unstable_mockModule('@/registry/index.js', () => ({
 
 jest.unstable_mockModule('@/interfaces/tools/shared/anchor.js', () => ({
   ensureAnchor: jest.fn(async () => {}),
-  resolveDocsRoot: jest.fn((p?: string) => p ?? '/fake/root'),
   releaseAnchor: jest.fn(async () => {}),
   acquireAnchor: jest.fn(() => {}),
 }));

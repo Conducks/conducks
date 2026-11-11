@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.8.0] — 2026-11-11
+
+First release on npm: `npm i -g conducks`, then `conducks setup` in a project.
+
+### Changed
+- A full analyze is about 3× faster on a repeat run (43 s → 13 s on conducks itself; 598,000 lines in about 22 s): file history comes from one `git log` per repo instead of one per file, blame is cached per file version under `.conducks/blame-cache/`, and linker results are applied in one pass.
+- MCP answers are compact: paths are relative to `meta.root`, and a list of same-shaped items comes as `{cols, rows}`. The same 12 sample calls cost 58% fewer tokens with identical content. A client that parsed the old shape must read `cols`/`rows`.
+- A tool call with a parameter the tool does not have is refused with `UNKNOWN_PARAMETER` and the accepted names. It used to be ignored, so `conducks_query {"query": …}` answered with unrelated symbols.
+- `conducks setup` is the only project step: it registers the MCP server in Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity, Gemini CLI and Codex when they are installed, and builds the first graph (`--no-analyze` skips it).
+- `conducks mirror` is one picture instead of a force graph: the modules in layers with their links, a strip of seven readings (a score and six checks) that light up where each problem lives, and one card for detail. Click a module to see what a change to it can reach. No library is loaded; the force graph and its vendored d3 files are removed.
+- The installer no longer deletes `conducks-docs` or `conducks-visuals` from a skills folder. They stopped shipping, and an installed copy is left alone.
+
+### Fixed
+- The Mirror graph never drew in the previous build (`t.quadtree is not a function`).
+- The TypeScript recall oracle counted calls inside vendored, minified files that analyze ignores.
+
+### Added
+- `conducks --version` and `npm run release:check` (lockfile, changelog, build, website and tag must agree before a publish).
+- `conducks graph --at <ref> --json [--ranges <file>]`: the code graph at a named commit as one JSON object: files, symbols (`{name,file,line}`), edges (`{from,to,kind}`), harvested code comments, and the hash of each line range listed in the `--ranges` file. Symbols and edges come from the current graph (`symbols_at`/`edges_at: "head"`); an unknown ref exits 1.
+
+### Removed
+- conducks is now code analysis only. The documentation tooling is gone: the `docs-lint`, `docs-status`, `bootstrap-docs`, `glossary`, `features`, `testing`, `visuals-lint`, `record` and `install-hooks` commands, the `conducks_docs` MCP tool, the docs panel and `/api/docs` route of the mirror, the visuals generator scripts, the pre-commit gates written by `setup`, the document-to-code `GOVERNS` edges, and the per-module doc-review part of `monitor`. The documentation and visuals skills are no longer shipped and are removed from existing installs by `setup`. Code comments are still harvested into the graph.
+
 ## [1.1.0-Mirror-HD] — 2026-04-06 🏺 💎
 
 ### Added 🛰️

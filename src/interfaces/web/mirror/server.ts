@@ -6,6 +6,7 @@ import { GatewayService } from '@/lib/domain/mirror/index.js';
 
 import { Logger } from "@/lib/core/utils/index.js";
 import { registry } from '@/registry/index.js';
+import { DEAD_CODE_QUESTION_TYPES } from '@/contracts/index.js';
 import http from 'node:http';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,8 +20,6 @@ class MirrorServer {
   private app = express();
   private clients: http.ServerResponse[] = [];
   private server: http.Server | null = null;
-  /** Started by `initGlobalMirror`, so stopping the server has to stop it too — see `stop`. */
-  private docsWatcher: { stop(): Promise<void> } | null = null;
 
   constructor(private gateway: GatewayService) {
     this.setupRoutes();
@@ -49,6 +48,18 @@ class MirrorServer {
     // looking for "the dashboard" now finds the server, the launcher's target and the page together.
     const staticPath = path.resolve(__dirname, 'public');
     this.app.use(express.static(staticPath));
+
+    // ONE API REQUEST AT A TIME. Each route opens the vault and closes it when done, so the lock is
+    // free for `analyze`; two overlapping requests therefore closed it under each other and the
+    // second answered HTTP 500. Found when the page asked for six files at once. The SSE channel is
+    // exempt: it never touches the vault and never ends.
+    let last: Promise<void> = Promise.resolve();
+    this.app.use('/api', (req, res, next) => {
+      if (req.path === '/pulse') return next();
+      const turn = last;
+      last = new Promise<void>(release => { res.on('close', () => release()); });
+      void turn.then(() => next());
+    });
 
     this.app.get('/', (req, res) => {
       res.sendFile(path.join(staticPath, 'index.html'));
@@ -85,6 +96,42 @@ class MirrorServer {
     });
 
     // Governance dashboard data
+    // The structured map (todo82#P10). Each answers 404 for an unknown path or id rather than
+    // an empty object, so the page can say "not in the graph" instead of drawing nothing.
+    const answer = (fn: (req: express.Request) => Promise<unknown>) => async (req: express.Request, res: express.Response) => {
+      try {
+        const out = await fn(req);
+        if (out === null) res.status(404).json({ error: 'Not in the graph.' });
+        else res.json(out);
+      } catch (err) {
+        res.status(500).json({ error: String(err) });
+      }
+    };
+    this.app.get('/api/overview', answer(() => this.gateway.overview()));
+    this.app.get('/api/file', answer(req => this.gateway.fileDetail(String(req.query.path ?? ''))));
+    this.app.get('/api/symbol', answer(req => this.gateway.symbolDetail(String(req.query.id ?? ''))));
+    this.app.get('/api/search', answer(req => this.gateway.search(String(req.query.q ?? ''))));
+
+    // Dead code and flows come from the same services the CLI uses (`prune`, `flows`); both walk the
+    // graph, so the deferred load is materialised first. Paths leave relative to the project root.
+    const relative = (v: string) => {
+      const root = String((registry.infrastructure as any).chronicle.getProjectDir() ?? '').replace(/\/+$/, '') + '/';
+      return v.toLowerCase().startsWith(root.toLowerCase()) ? v.slice(root.length) : v;
+    };
+    this.app.get('/api/dead', answer(async () => {
+      await registry.infrastructure.ensureGraphLoaded();
+      return registry.explain.prune().map((f: any) => ({ type: f.type, symbol: f.symbol, file: relative(String(f.file ?? '')), sure: !DEAD_CODE_QUESTION_TYPES.includes(f.type) }));
+    }));
+    this.app.get('/api/flows', answer(async () => {
+      await registry.infrastructure.ensureGraphLoaded();
+      const own = (id: string) => /^([a-z]:)?[\\/]/i.test(id);
+      return registry.kinetic.getProcesses()
+        .map((p: any) => ({ name: p.name, entry: relative(String(p.id)), steps: (p.members as string[]).filter(own).map(relative) }))
+        .filter((f: any) => f.steps.length >= 3)
+        .sort((x: any, y: any) => y.steps.length - x.steps.length).slice(0, 30)
+        .map((f: any) => ({ ...f, total: f.steps.length, steps: f.steps.slice(0, 80) }));
+    }));
+
     this.app.get('/api/governance', async (req, res) => {
       try {
         // This path WALKS the graph, so the deferred load (ADR 0038) has to be materialised first.
@@ -102,16 +149,6 @@ class MirrorServer {
           stats: auditResult.stats,
           timestamp: Date.now()
         });
-      } catch (err) {
-        res.status(500).json({ error: String(err) });
-      }
-    });
-
-    // Docs board — todo progress and ADR states, parsed from the authored markdown grammar.
-    // Same source as `conducks docs-status`; the graph is not touched.
-    this.app.get('/api/docs', (req, res) => {
-      try {
-        res.json(registry.docs.board());
       } catch (err) {
         res.status(500).json({ error: String(err) });
       }
@@ -144,7 +181,7 @@ class MirrorServer {
    * `host` defaults to loopback (ADR 0047).
    *
    * `app.listen(port)` with no host binds EVERY interface, and these routes — /api/synapse,
-   * /api/node/:id, /api/governance, /api/docs — are unauthenticated. The CORS allowlist restricts
+   * /api/node/:id, /api/governance — are unauthenticated. The CORS allowlist restricts
    * browser JavaScript and does nothing to `curl`, so on a shared network or a cloud dev box any
    * other host could read the full structural and governance dataset of the analysed codebase.
    * Exposing it is now a deliberate act rather than the default nobody chose.
@@ -181,12 +218,8 @@ class MirrorServer {
    */
   public async stop(): Promise<void> {
     this.gateway.stop();
-    if (this.docsWatcher) { try { await this.docsWatcher.stop(); } catch { /* best effort on shutdown */ } }
     if (this.server) this.server.close();
   }
-
-  /** Hand the server the watcher it must also shut down. */
-  public ownDocsWatcher(w: { stop(): Promise<void> }) { this.docsWatcher = w; }
 }
 
 let globalMirror: MirrorServer | null = null;
@@ -198,12 +231,5 @@ export function initGlobalMirror(gateway: GatewayService) {
   try {
     registry.evolution.watcher?.setPulseSubscriber((pulse) => globalMirror?.broadcastPulse(pulse));
   } catch { /* watcher not active in this context — mirror still serves static/gateway data */ }
-  // Same inversion for the docs watcher: editing a doc refreshes the Docs panel without a click.
-  try {
-    const docsWatcher = registry.docs.watcher;
-    docsWatcher.setPulseSubscriber((pulse) => globalMirror?.broadcastPulse(pulse));
-    docsWatcher.start();
-    globalMirror.ownDocsWatcher(docsWatcher);
-  } catch { /* no docs/ in this project — the panel still serves on demand */ }
   return globalMirror;
 }

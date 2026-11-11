@@ -21,6 +21,7 @@
  */
 export { Logger, logger, setProcessQuiet } from './logger.js';
 export { canonicalize, getProjectRelativePath } from './path-utils.js';
+export { spanHashOf } from './span-hash.js';
 export { traceMemory } from './mem-trace.js';
 export { assessRoot, explainScope, isNeverAProjectRoot } from './scope-guard.js';
 export { SourceLineReader } from './source-line.js';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { mcpOk, mcpErr } from '@/interfaces/tools/shared/mcp-response.js';
+import { mcpOk, mcpErr, formatAnswer } from '@/interfaces/tools/shared/mcp-response.js';
 
 /**
  * The envelope every MCP tool answers in, and it had no test (todo72#P4).
@@ -69,5 +69,52 @@ describe('mcpErr', () => {
 
   it('carries no data key, so a failed call cannot read as an empty result', () => {
     expect('data' in mcpErr('X', 'y')).toBe(false);
+  });
+});
+
+/**
+ * todo82 — the agent-facing text. Paths lose the project root, which is stated once, so the answer
+ * shrinks without losing anything: the cut root comes back as `meta.root`, a relative id is an
+ * accepted input, and a path outside the root is left alone.
+ */
+describe('formatAnswer', () => {
+  const root = '/Users/Me/Repo';
+  const answer = mcpOk({
+    nodes: [{ id: '/users/me/repo/src/a.ts::f', short_id: 'src/a.ts::f', file: '/Users/Me/Repo/src/a.ts' }],
+    edge: 'semantic::/users/me/repo/src/a.ts::f->/users/me/repo/src/b.ts::g',
+    outside: '/Users/Me/Other/x.ts',
+  });
+
+  it('cuts the root from every string, case-insensitively, and states it once', () => {
+    const out = JSON.parse(formatAnswer(answer, root + '/'));
+    expect(out.data.nodes[0]).toEqual({ id: 'src/a.ts::f', file: 'src/a.ts' });
+    expect(out.data.edge).toBe('semantic::src/a.ts::f->src/b.ts::g');
+    expect(out.data.outside).toBe('/Users/Me/Other/x.ts');
+    expect(out.meta.root).toBe(root);
+  });
+
+  it('keeps short_id when it is not the shortened id', () => {
+    const out = JSON.parse(formatAnswer(mcpOk({ id: '/users/me/repo/a.ts::f', short_id: 'other' }), root));
+    expect(out.data.short_id).toBe('other');
+  });
+
+  it('writes a list of 3+ same-shaped flat items as cols and rows, and leaves other lists alone', () => {
+    const out = JSON.parse(formatAnswer(mcpOk({
+      same: [{ id: 'a', line: 1 }, { id: 'b', line: 2 }, { id: 'c', line: null }],
+      two: [{ id: 'a' }, { id: 'b' }],
+      mixed: [{ id: 'a' }, { id: 'b' }, { name: 'c' }],
+      nested: [{ id: 'a', x: [1] }, { id: 'b', x: [2] }, { id: 'c', x: [3] }],
+      deep: [{ id: 'a', x: { y: 1 } }, { id: 'b', x: { y: 2 } }, { id: 'c', x: { y: 3 } }],
+    }), root));
+    expect(out.data.same).toEqual({ cols: ['id', 'line'], rows: [['a', 1], ['b', 2], ['c', null]] });
+    expect(out.data.two).toEqual([{ id: 'a' }, { id: 'b' }]);
+    expect(out.data.mixed).toEqual([{ id: 'a' }, { id: 'b' }, { name: 'c' }]);
+    expect(out.data.deep).toHaveLength(3);
+    expect(out.data.nested).toEqual({ cols: ['id', 'x'], rows: [['a', [1]], ['b', [2]], ['c', [3]]] });
+  });
+
+  it('adds no root when nothing was cut, and writes compact JSON', () => {
+    const text = formatAnswer(mcpOk({ name: 'x' }), root);
+    expect(text).toBe('{"data":{"name":"x"},"meta":{"truncated":false}}');
   });
 });

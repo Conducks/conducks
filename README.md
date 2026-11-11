@@ -48,46 +48,39 @@ npm i -g conducks
 
 That is the whole install. The native `tree-sitter` bindings are **optional dependencies**: npm
 builds them if your machine has a C/C++ toolchain and skips them if it does not, so the install never
-fails on a missing compiler. Check which parse path you got:
-
-```bash
-conducks doctor
-```
-
-`[✓] Parse path: native tree-sitter, all 13 grammars induced` is full fidelity.
-`[!] Parse path: Gnosis regex fallback` means the bindings did not build — Conducks works, but see
-[parsing fidelity](#parsing-fidelity-native-vs-fallback) for what you lose and how to fix it.
+fails on a missing compiler. `conducks doctor` shows which parse path you got: `[✓] Parse path: native
+tree-sitter, all 13 grammars induced` is full fidelity; `[!] Parse path: Gnosis regex fallback` still
+works, at lower fidelity (see [parsing fidelity](#parsing-fidelity-native-vs-fallback)).
 
 <details>
 <summary>From source instead (contributors)</summary>
 
 ```bash
-git clone https://github.com/conducks/conducks
-cd conducks
-npm run bootstrap && npm run build
-npm link
+git clone https://github.com/conducks/conducks && cd conducks
+npm run install:global    # installs dependencies, builds, and puts `conducks` on your PATH
 ```
-
-`npm run bootstrap` installs dependencies and, on Node 23+, sets the C++20 flag the native build
-needs (see [parsing fidelity](#parsing-fidelity-native-vs-fallback)). On Node LTS 20/22, plain
-`npm install --legacy-peer-deps` works too.
 
 </details>
 
-### 2. Index your project
+### 2. Set up your project
 
 Go into the project you want to analyze and run:
 
 ```bash
-conducks setup      # installs the conducks skills into .claude/skills/ and writes .conducksignore
-conducks analyze    # parses the codebase and builds the graph in .conducks/
+conducks setup
 ```
 
-`analyze` is what creates the structural vault (`.conducks/conducks-synapse.db`). From here you can
-use the CLI directly or connect it to an AI agent via MCP.
+That is the whole setup. It:
 
-`conducks setup` also auto-registers Conducks in Claude Desktop, resolving the CLI entry point from
-its own install location. If your agent is not Claude Desktop, configure it by hand as shown below.
+- registers the Conducks MCP server in every agent it finds on your machine: Claude Desktop, Claude
+  Code, Cursor, Windsurf, Antigravity, Gemini CLI and Codex. A client that is not installed is left
+  alone, and every other server in your configs is kept;
+- installs the conducks skills and writes `.conducksignore`;
+- builds the first graph in `.conducks/` (`conducks analyze`), unless one exists. Pass `--no-analyze`
+  to skip, or `--dry-run` to see what it would write.
+
+Restart your agent and it can use the conducks tools. After code changes, `conducks analyze` updates
+the graph (only changed files are re-read).
 
 ### 3a. Use the CLI
 
@@ -105,9 +98,8 @@ conducks mirror           # Open the visual graph dashboard on port 3333
 
 ### 3b. Use it with an AI agent (MCP)
 
-A global install puts `conducks` on your `PATH`, so the config needs no paths — the same block works
-for **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`),
-**Antigravity** (`~/.gemini/antigravity/mcp_config.json`), and any other stdio MCP client:
+`conducks setup` already did this for the agents listed in step 2. For any other stdio MCP client,
+add this block to its config by hand (`conducks` is on your `PATH` after the install):
 
 ```json
 {
@@ -146,7 +138,7 @@ The server reads the workspace root from `--root <path>`, else from the `CONDUCK
 environment variable, else from the current working directory. The default transport is stdio; pass
 `mcp --sse` if your client needs an SSE transport instead (served on port 3001).
 
-The agent will then have access to these 13 tools, every one of them read-only:
+The agent will then have access to these 12 tools, every one of them read-only:
 
 | Tool                   | What it does                                                                                 |
 | ---------------------- | -------------------------------------------------------------------------------------------- |
@@ -160,14 +152,11 @@ The agent will then have access to these 13 tools, every one of them read-only:
 | `conducks_flows`       | List execution flows — each a named entry point and the symbols it calls                      |
 | `conducks_prune`       | Find dead code: orphaned symbols, unused exports, stale imports                                |
 | `conducks_coverage`    | Overlay an istanbul/c8 `coverage-final.json` onto the graph — per-function fill %              |
-| `conducks_docs`        | Progress board parsed from the authored docs: todo %, ADR states, grammar violations           |
 | `conducks_diff`        | Structural diff of uncommitted changes                                                         |
 | `conducks_graph_query` | Run a raw SELECT against the DuckDB graph store                                                |
 
-Usage guidance for agents does **not** ship as an MCP tool. It ships as eight skills that
-`conducks setup` copies into `.claude/skills/` — `conducks-guide`, `conducks-cli`,
-`conducks-exploring`, `conducks-impact-analysis`, `conducks-refactoring`, `conducks-debugging`,
-`conducks-governance`, `conducks-docs`.
+Usage guidance for agents does **not** ship as an MCP tool. It ships as a skill that
+`conducks setup` copies into `.claude/skills/` — `conducks`.
 
 ---
 
@@ -225,20 +214,15 @@ conducks rename <symbolId> <newName> [--confirm]
                                   # Safe rename — dry-run unless --confirm
 ```
 
-**Coverage and docs**
+**Coverage and graph export**
 
 ```bash
 conducks coverage <coverage-final.json> [--json] [--all] [--save-baseline] [--vs-baseline] [path]
                                   # Overlay istanbul/c8 coverage onto the graph
 conducks coverage-view <coverage-final.json> [--out coverage.html] [--watch] [path]
                                   # Render the overlay as a static HTML file
-conducks bootstrap-docs [project_name]
-                                  # Scaffold the conducks-docs file set into docs/
-conducks docs-lint [path]         # Validate authored docs against the grammar (CI gate)
-conducks docs-status [--json] [path]
-                                  # Progress board parsed from the docs
-conducks record --type [vision|architecture|implementation|handover|conventions|todo|memory] "content"
-                                  # Record a learning, decision, or intent
+conducks graph --at <ref> --json [--ranges <file>]
+                                  # The code graph at a commit as one JSON object
 ```
 
 **Federation**
