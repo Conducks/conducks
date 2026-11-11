@@ -91,10 +91,20 @@ conducks impact <id>      # What breaks if I change this?
 conducks trace <id>       # Trace structural dependencies from a symbol
 conducks audit            # Detect circular deps, god objects, orphans
 conducks status           # Project health summary
-conducks mirror           # Open the visual graph dashboard on port 3333
+conducks mirror           # Open the Mirror at http://127.0.0.1:3333
 ```
 
-![Conducks Mirror dashboard](assets/arch.png)
+### The Mirror
+
+`conducks mirror` opens a map of your project in the browser. It answers, at a glance:
+
+- **Is the code clean?** Six checks across the top: two-way links, import loops, overloaded files, unused code, untested risky code, oversized files. Click the score to see each one.
+- **Is it modular?** Folders are boxes in layers; every arrow is a real import. A link that goes both ways shows in red.
+- **Where does it start?** The entry folder is marked `START`; the most-used one `MOST USED`.
+- **What does a change reach?** Hover or click a box: everything it can affect lights up, and one line at the bottom says how far it reaches.
+- **What is inside?** Click a box to go inside it, down to single files; the side card lists who uses it and the files others lean on most.
+
+![Conducks Mirror](assets/mirror.png)
 
 ### 3b. Use it with an AI agent (MCP)
 
@@ -138,7 +148,7 @@ The server reads the workspace root from `--root <path>`, else from the `CONDUCK
 environment variable, else from the current working directory. The default transport is stdio; pass
 `mcp --sse` if your client needs an SSE transport instead (served on port 3001).
 
-The agent will then have access to these 12 tools, every one of them read-only:
+The agent will then have access to these 12 tools, every one of them read-only. Answers are compact: paths are relative to `meta.root`, and a list of same-shaped items comes as `{cols, rows}`. A parameter the tool does not have is refused with `UNKNOWN_PARAMETER` and the names it accepts.
 
 | Tool                   | What it does                                                                                 |
 | ---------------------- | -------------------------------------------------------------------------------------------- |
@@ -147,7 +157,7 @@ The agent will then have access to these 12 tools, every one of them read-only:
 | `conducks_explain`     | 6-signal risk breakdown for a symbol (gravity, complexity, entropy, churn, fan-out, fallback)  |
 | `conducks_impact`      | See what breaks if you change a symbol (blast radius)                                          |
 | `conducks_trace`       | Trace execution or data flow between symbols                                                   |
-| `conducks_audit`       | Detect circular deps, god objects, violations (modes: scan, advice, guard, archeology, fallback) |
+| `conducks_audit`       | Detect circular deps, god objects, violations (modes: scan, advice, guard, archeology) |
 | `conducks_context`     | Collect structural context around a symbol within a graph radius                              |
 | `conducks_flows`       | List execution flows — each a named entry point and the symbols it calls                      |
 | `conducks_prune`       | Find dead code: orphaned symbols, unused exports, stale imports                                |
@@ -174,8 +184,10 @@ conducks clean                    # Nuclear purge: evict blocked handles and pur
 conducks uninstall                # Remove the MCP config + skills that setup installed
 conducks mcp [--sse] [--root <path>]
                                   # Launch the MCP server
-conducks mirror                   # Start the visual explorer (port 3333; --live to auto-refresh)
-conducks help                     # Show the built-in help (note: `conducks --help` is not recognized)
+conducks mirror                   # Start the visual explorer (http://127.0.0.1:3333; --live to auto-refresh)
+conducks monitor                  # Graph freshness across every registered project
+conducks --version                # Print the installed version
+conducks help                     # Show the built-in help (also --help, -h)
 ```
 
 **Explore**
@@ -197,7 +209,7 @@ conducks entry [path]             # List detected entry points (API, CLI, Main)
 **Govern**
 
 ```bash
-conducks audit [--fallback] [--history=<window>]
+conducks audit [--history=<window>] [--json]
                                   # Structural integrity and governance audit
 conducks guard [--threshold=N] [--force]
                                   # Enforce stability thresholds (note: --threshold=N, not --threshold N)
@@ -206,12 +218,8 @@ conducks diff [--base <id>] [--head <id>]
                                   # Structural risk of the current changes
 conducks drift [prevPulseId]      # Architectural drift between two pulses
 conducks prune                    # Unused exports and dead code
-conducks fallback [--min-confidence 0.7] [--min-tenure 365] [--limit 20]
-                                  # Legacy fallback-pattern analysis
 conducks supply-chain [--deps-only]
                                   # Dependency / boundary surface (stdlib vs versioned deps)
-conducks rename <symbolId> <newName> [--confirm]
-                                  # Safe rename — dry-run unless --confirm
 ```
 
 **Coverage and graph export**
@@ -335,14 +343,15 @@ attributes on their parent, not as graph nodes.
 
 All analysis runs locally. No data leaves your machine.
 
+**Speed.** A repeat analyze of conducks itself (about 84,000 lines) takes about 13 s; 598,000 lines take about 22 s. History comes from one `git log` per repo, and blame is cached per file version under `.conducks/blame-cache/`. Only changed files are re-read.
+
 ---
 
 ## Docs
 
-- [docs/README.md](./docs/README.md) - Map of the project documentation (state, read order, what each doc holds)
 - [CHANGELOG.md](./CHANGELOG.md) - Release history
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - How to contribute
 
 ---
 
-_v0.7.7 | Apache 2.0 |_
+_v0.8.0 | Apache 2.0_

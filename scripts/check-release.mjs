@@ -19,6 +19,7 @@ for (const [name, target] of Object.entries(pkg.bin ?? {})) {
   if (target.startsWith('./')) problems.push(`bin "${name}" is "${target}"; write it without the leading ./`);
   if (!fs.existsSync(path.join(root, target))) problems.push(`bin "${name}" points at ${target}, which is not built`);
 }
+expect('README footer', read('README.md').match(/^_v(\d+\.\d+\.\d+) \|/m)?.[1]);
 const lock = JSON.parse(read('package-lock.json'));
 expect('package-lock.json version', lock.version);
 expect('package-lock.json packages[""] version', lock.packages?.['']?.version);
