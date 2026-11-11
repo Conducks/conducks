@@ -28,6 +28,7 @@ export { tryResolveSymbol } from './symbol-resolution.js';
 export type { NameIndex } from './symbol-resolution.js';
 
 export { isTestNode, isTestPath } from './test-path.js';
+export { moduleKeyOf } from './source-module.js';
 
 export { FilterValidationError, FILTER_MAX_LIMIT, FILTER_DEFAULT_LIMIT } from './types.js';
 export type { ConducksComponent, RegistryEntry, RegistryConfig, Tool } from './types.js';

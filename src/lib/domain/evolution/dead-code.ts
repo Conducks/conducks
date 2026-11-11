@@ -2,7 +2,7 @@ import { ConducksAdjacencyList, NodeId, ConducksNode, ConducksEdge } from "@/lib
 // The union used to be spelled out here AND retyped in `conducks_prune`'s summary and enum, which is
 // how two of the five went missing from both (todo53). One list, in contracts.
 import type { DeadCodeType } from "@/contracts/index.js";
-import { hasRegisteringDecorator, isTestPath } from "@/contracts/index.js";
+import { hasRegisteringDecorator, isTestPath, moduleKeyOf } from "@/contracts/index.js";
 
 export interface Finding {
   /**
@@ -76,6 +76,39 @@ export class DeadCodeAnalyzer {
 
     // See `isModuleScoped`: a declaration written inside an expression is that expression's business.
     const isNested = (n: any): boolean => (n?.properties as any)?.dna?.nestedInExpression === true;
+
+    // Member names declared by Go INTERFACES and Swift PROTOCOLS, per language — see
+    // `isImplicitConformance` below.
+    const requirementNames = { go: new Set<string>(), swift: new Set<string>() };
+    for (const n of nodes as ConducksNode[]) {
+      const props = n.properties as any;
+      const f = String(props?.filePath || '').toLowerCase();
+      const lang = f.endsWith('.go') ? 'go' : f.endsWith('.swift') ? 'swift' : null;
+      if (!lang || !props?.parentId) continue;
+      const parent = graph.getNode(props.parentId) as any;
+      if (String(parent?.properties?.kind || '').toLowerCase() === 'interface') requirementNames[lang].add(String(props.name));
+    }
+
+    // GO BUILD-CONSTRAINED TWINS. A package can declare one name in several files only when build
+    // constraints keep them apart (`result_x86.go` / `result_others.go`, `ttyname_unix.go` /
+    // `ttyname_windows.go`); a call binds to one, and the other is exactly as live on its platform.
+    // MEASURED on fzf v0.56.3 against go/types: `compareRanks`, `TtyIn`, `TtyOut` reported dead, and
+    // most of 26 verdicts on Windows/OpenBSD-only files. Keyed by package (directory) and name.
+    const goNodesByKey = new Map<string, string[]>();
+    for (const n of nodes as ConducksNode[]) {
+      const f = String((n.properties as any)?.filePath || '').toLowerCase();
+      if (!f.endsWith('.go') || !(n.properties as any)?.name) continue;
+      const key = `${moduleKeyOf(f)}|${(n.properties as any).name}`;
+      const list = goNodesByKey.get(key);
+      if (list) list.push(n.id); else goNodesByKey.set(key, [n.id]);
+    }
+    const liveGoTwinKeys = new Set<string>();
+    for (const [key, ids] of goNodesByKey) {
+      if (ids.length < 2) continue;
+      const referenced = ids.some(id => graph.getNeighbors(id, 'upstream')
+        .some((e: any) => DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type) && e.type !== 'IMPORTS' && !ids.includes(e.sourceId)));
+      if (referenced) liveGoTwinKeys.add(key);
+    }
 
     // Cross-file usage is often recorded as a DANGLING reference edge whose
     // target is the bare symbol name (e.g. `ensureCollection`) or a wrong
@@ -153,6 +186,20 @@ export class DeadCodeAnalyzer {
         return !!source && String(source.properties.filePath || '').toLowerCase() !== self;
       });
       if (imported) importedFiles.add(self);
+    }
+    // A Go package or Swift target is reached as a WHOLE: the import names the module, and the
+    // resolver answers with one of its files. Every other file of an imported module is imported too.
+    const filesByModule = new Map<string, string[]>();
+    for (const n of nodes as ConducksNode[]) {
+      if (String(n.properties.canonicalKind ?? '') !== 'UNIT') continue;
+      const f = String(n.properties.filePath || '').toLowerCase();
+      const key = moduleKeyOf(f);
+      if (!key) continue;
+      const list = filesByModule.get(key);
+      if (list) list.push(f); else filesByModule.set(key, [f]);
+    }
+    for (const files of filesByModule.values()) {
+      if (files.some(f => importedFiles.has(f))) for (const f of files) importedFiles.add(f);
     }
 
     /**
@@ -289,7 +336,25 @@ export class DeadCodeAnalyzer {
       // A Rust TRAIT-IMPL method is reached through the trait (`x.to_string()` → `Display::fmt`), which
       // no edge names; rustc never reports one as unused. Same standing as a registered symbol.
       const isTraitImpl = (node.properties as any)?.dna?.inTraitImpl === true;
-      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && this.isModuleScoped(node, graph, isNested) && liveRefs.length === 0 && !this.isEntryPoint(node)) {
+      // A METHOD REACHED THROUGH AN INTERFACE OR PROTOCOL. `s.Save()` / `s.save()` lands on the
+      // interface's requirement and never on the implementation, because nothing in the graph links
+      // the two without types. Go conforms implicitly; Swift declares it, but the call still names
+      // the protocol.
+      //   - Go, staticcheck's rule (U1000): an EXPORTED method may satisfy an interface anywhere,
+      //     the standard library's included (`MarshalJSON`, `ServeHTTP`), so it is never judged; an
+      //     unexported one is spared when an interface in the project declares its name.
+      //   - Swift: a member is spared when a protocol in the project declares its name.
+      // Both can only under-report. MEASURED on a Go and a Swift fixture: `Save`, `close`,
+      // `MarshalJSON` and `save` were each reported dead while called through the interface.
+      const memberFile = String(node.properties.filePath || '').toLowerCase();
+      const memberName = String(node.properties.name);
+      const isLiveGoTwin = memberFile.endsWith('.go') && liveGoTwinKeys.has(`${moduleKeyOf(memberFile)}|${memberName}`);
+      const isImplicitConformance =
+        (memberFile.endsWith('.go') && String(node.properties.kind || '').toLowerCase() === 'method'
+          && (/^[A-Z]/.test(memberName) || requirementNames.go.has(memberName)))
+        || (memberFile.endsWith('.swift') && requirementNames.swift.has(memberName)
+          && String((graph.getNode(String(node.properties.parentId ?? '')) as any)?.properties?.kind ?? '').toLowerCase() !== 'interface');
+      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && !isImplicitConformance && !isLiveGoTwin && this.isModuleScoped(node, graph, isNested) && liveRefs.length === 0 && !this.isEntryPoint(node)) {
         // NOTHING IMPORTS THE FILE — so the graph cannot say whether this symbol is dead. Report the
         // question instead of a verdict (oracle T28, ADR 0104). `orphan-module.ts` in the fixture is
         // exactly this: two functions in a file no one imports, previously reported as a confident
@@ -317,7 +382,7 @@ export class DeadCodeAnalyzer {
       // directories, namespaces all carry isExport but are not "exports").
       // Untrackable type declarations are skipped for the same reason as above.
       const isSymbol = ['STRUCTURE', 'BEHAVIOR', 'ATOM', 'INFRA'].includes(node.label);
-      if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && node.properties.isExport) {
+      if (isSymbol && !isSynthetic && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && !isImplicitConformance && !isLiveGoTwin && node.properties.isExport) {
         // Find if any incoming edges are 'IMPORTS' from OTHER files or 'CALLS' from other files
         // liveRefs, not incomingRefs — an unused import from another file would otherwise read as
         // external consumption and launder the export exactly as it laundered the orphan above.
@@ -726,6 +791,9 @@ export class DeadCodeAnalyzer {
     const entryNames = ['main', 'index', 'app', 'handler', 'setup'];
     const name = node.properties.name.toLowerCase();
     if (entryNames.includes(name)) return true;
+    // Go runs every `init` before `main`, and nothing ever names it. Go only: a TypeScript `init`
+    // is an ordinary function.
+    if (name === 'init' && String(node.properties.filePath || '').toLowerCase().endsWith('.go')) return true;
 
     // Framework convention (Next.js / app-router, etc.): symbols in these
     // special files are invoked by the framework via file-based routing, not
