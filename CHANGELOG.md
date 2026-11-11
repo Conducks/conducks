@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file. The format 
 ## [0.8.1] — 2026-11-11
 
 ### Changed
+- `docs/` left the repository. conducks ships code only; the project notes live in the owner's private, unversioned folder. The one test that read an ADR from `docs/` now checks the code alone.
 - A tool call that leaves a required parameter out is refused with `MISSING_PARAMETER` and the required names, beside `UNKNOWN_PARAMETER`. `conducks_coverage {}` used to answer with a raw Node error.
 
 ### Fixed

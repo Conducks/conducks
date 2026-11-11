@@ -26,17 +26,9 @@ const ROOT = path.resolve(HERE, '../..');
 
 /** Files that legitimately still carry an id, and why each one does. */
 const ALLOWED = [
-  // Frozen records. ADR 0195 decided NOT to stamp all 43 of them: a record says what was true when
-  // it was written, and rewriting its prose changes that. A reader resolves the id through 0195.
-  'docs/decisions/',
-  'docs/todos/',
-  // Last stop; nothing live links into it (`conducks-docs` §8).
-  'docs/legacy/',
-  'docs/archive/',
   // This gate itself. It has to name the pattern it forbids, and its own prose cites the range the
-  // scheme covered. Excluding it is the one exemption that cannot be avoided — and it is the reason
-  // the second case below exists: if this file could silently stop scanning, nothing would notice,
-  // so the translation table is checked independently.
+  // scheme covered. The translation table (ADR 0195) left the repo with docs/ on 2026-11-11 and
+  // lives in the owner's private notes, so it is no longer checked here.
   'tests/architecture/retired-convention-ids.test.ts',
 ];
 
@@ -69,16 +61,5 @@ describe('the retired convention ids stay retired (ADR 0194, ADR 0195)', () => {
       offenders.push(`${rel}:${line}  cites a retired id — see docs/decisions/0195-the-convention-ids-retire-into-one-map.md`);
     }
     expect(offenders).toEqual([]);
-  });
-
-  it('the translation table still resolves every id that ever existed', () => {
-    const adr = fs.readFileSync(
-      path.join(ROOT, 'docs/decisions/0195-the-convention-ids-retire-into-one-map.md'), 'utf8');
-    // One row per rule, `| <n> | … | … |`. All 49, no gaps — the set is closed, so a missing row is
-    // an id nobody can resolve any more.
-    const ids = new Set(
-      [...adr.matchAll(/^\|\s*(\d{1,2})\s*\|/gm)].map(m => Number(m[1])));
-    const missing = Array.from({ length: 49 }, (_, i) => i + 1).filter(n => !ids.has(n));
-    expect(missing).toEqual([]);
   });
 });
