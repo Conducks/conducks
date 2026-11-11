@@ -143,6 +143,22 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
       };
     }
 
+    // A required argument that is absent is refused the same way. A client that validates the schema
+    // never sends such a call; one that does not got a raw Node error ("path" must be a string).
+    const required: string[] = tool.inputSchema?.required ?? [];
+    const missing = required.filter(k => (args as Record<string, unknown> | undefined)?.[k] === undefined);
+    if (missing.length) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ error: {
+          code: 'MISSING_PARAMETER',
+          message: `${name} requires ${missing.map(k => `"${k}"`).join(', ')}`,
+          retryable: false,
+          suggestion: `Required: ${required.join(', ')}`,
+        } }) }],
+        isError: true,
+      };
+    }
+
     const cacheKey = `${name}:${JSON.stringify(args ?? {})}`;
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {

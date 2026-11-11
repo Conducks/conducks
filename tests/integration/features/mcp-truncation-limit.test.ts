@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
+import { untable } from '../../helpers/untable.js';
 
 /**
  * `conducks_impact` and `conducks_trace` hard-capped their MCP-side result at 10 with NO `limit`
@@ -27,17 +28,6 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../build/src/interfaces/cli/index.js');
 
-/** A same-shaped list arrives as `{cols, rows}` (todo82); a client turns it back into objects. */
-function untable(v: any): any {
-  if (Array.isArray(v)) return v.map(untable);
-  if (v && typeof v === 'object') {
-    if (Array.isArray(v.cols) && Array.isArray(v.rows) && Object.keys(v).length === 2) {
-      return v.rows.map((r: unknown[]) => Object.fromEntries(v.cols.map((c: string, i: number) => [c, r[i]])));
-    }
-    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, untable(x)]));
-  }
-  return v;
-}
 
 async function callTool(cwd: string, name: string, args: unknown): Promise<any> {
   const proc = spawn('node', [CLI, 'mcp'], { cwd, stdio: ['pipe', 'pipe', 'pipe'] });

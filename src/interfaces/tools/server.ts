@@ -1,4 +1,4 @@
-import { realCasePath } from "@/contracts/index.js";
+import { realCasePath, conducksVersion } from "@/contracts/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -32,7 +32,7 @@ export class ConducksMCPServer {
     this.server = new Server(
       {
         name: "conducks",
-        version: "2.0.0",
+        version: conducksVersion(),
         title: "CONDUCKS: Tool Registry Engine",
       },
       {

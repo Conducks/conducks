@@ -4,7 +4,7 @@
 // Usage: node scripts/check-release.mjs [--website <path-to-website-repo>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf-8');
@@ -36,6 +36,11 @@ try {
   expect('build/package.json (rebuild with npm run build)', built);
   const cli = execFileSync('node', [path.join(root, 'build/src/interfaces/cli/index.js'), '--version'], { encoding: 'utf-8' }).trim();
   expect('`conducks --version`', cli);
+  // The MCP handshake carries its own version, which once said 2.0.0 for every release.
+  const init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"release-check","version":"1"}}}\n';
+  const hs = spawnSync('node', [path.join(root, 'build/src/interfaces/cli/index.js'), 'mcp'], { input: init, encoding: 'utf-8', timeout: 20000 });
+  const line = (hs.stdout || '').split('\n').find(l => l.includes('"serverInfo"'));
+  expect('MCP serverInfo.version', line ? JSON.parse(line).result.serverInfo.version : undefined);
 } catch (e) { problems.push(`build is missing or has no --version: ${String(e.message).split('\n')[0]}`); }
 
 const w = process.argv.indexOf('--website');

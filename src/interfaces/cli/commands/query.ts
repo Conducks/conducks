@@ -237,7 +237,7 @@ export class QueryCommand implements ConducksCommand {
         // RELATIVE, REAL-CASE paths and the DECLARATION LINE (ADR 0132, todo39#P3).
         //
         // The absolute path is ~90 characters here and was truncated to 46, so the column showed
-        // `/users/saidmustafasaid/documents/gospel_of_tec` — the same prefix on every row, and the
+        // `/users/you/projects/` — the same prefix on every row, and the
         // part that identifies the file cut off. Relative to the project root it fits, and the
         // source line under each hit is what makes "where is X" end in one answer rather than in an
         // editor.

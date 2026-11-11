@@ -354,4 +354,4 @@ All analysis runs locally. No data leaves your machine.
 
 ---
 
-_v0.8.0 | Apache 2.0_
+_v0.8.1 | Apache 2.0_

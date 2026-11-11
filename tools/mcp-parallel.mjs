@@ -12,7 +12,7 @@
  * Usage: node tools/mcp-parallel.mjs
  */
 import { spawn } from 'node:child_process';
-const root = '/Users/saidmustafasaid/Documents/Gospel_Of_Technology/CONDUCKS/conducks';
+const root = process.argv[2] ?? process.cwd();
 const srv = spawn('node', [`${root}/build/src/interfaces/cli/index.js`, 'mcp'],
   { cwd: root, env: { ...process.env, CONDUCKS_WORKSPACE_ROOT: root }, stdio: ['pipe','pipe','pipe'] });
 
@@ -83,3 +83,6 @@ console.log(`  baseline: 274 ms concurrent (ADR 0128) / 2,135 ms serialised (ADR
 if (err > 0) process.exitCode = 1;
 srv.kill();
 process.exit(0);
+
+
+

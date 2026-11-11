@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './helpers.js';
+import { untable } from '../../helpers/untable.js';
 
 /**
  * todo61#P2 — the pairs gate checks STRUCTURE; this checks the ANSWER.
@@ -36,7 +38,17 @@ function mcp(repo: string, tool: string, args: Record<string, unknown> = {}): an
     encoding: 'utf-8',
     timeout: 120000,
   });
-  return JSON.parse(out);
+  return untable(JSON.parse(out));
+}
+
+/**
+ * The tool answers with paths relative to `meta.root` (todo82); the CLI keeps them absolute. Same
+ * fact, two spellings, so the CLI side is brought to the tool's before ids are compared.
+ */
+function relativeTo(root: string, id: string): string {
+  // case-insensitive, as the tool strips it: the CLI folds ids to lower case on a case-insensitive disk
+  const base = root.replace(/\/$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return id.replace(new RegExp(base + '/', 'gi'), '');
 }
 
 describe('the two surfaces answer the same question (todo61#P2)', () => {
@@ -101,7 +113,8 @@ export function addedLater(): number { return 4; }
 
     expect(cli.status).toBe(tool.status);
     expect(cli.summary).toEqual(tool.summary);
-    expect(cli.deltas.map((d: any) => d.id).sort()).toEqual(tool.deltas.map((d: any) => d.id).sort());
+    const root = envelope.meta?.root ?? fs.realpathSync(repo);
+    expect(cli.deltas.map((d: any) => relativeTo(root, d.id)).sort()).toEqual(tool.deltas.map((d: any) => d.id).sort());
     // Truncation is part of the ANSWER — a bounded answer must say it is bounded (ADR 0091) — but the
     // two carry it in different envelopes: the tool in `meta`, the CLI in its payload. Same fact,
     // different rendering, so it is compared across the envelopes rather than field-for-field.
@@ -165,19 +178,21 @@ export function addedLater(): number { return 4; }
     // line count. So the shared answer is the SCORED SET and its denominator, and the tool's list must
     // be a prefix of the CLI's — same order, same scores, cut at a different place.
     const cli = JSON.parse(runCli(['context', 'usedFn', '--json', '--limit', '200'], { cwd: repo }).stdout);
-    const tool = mcp(repo, 'conducks_context', { symbol: 'usedFn' }).data;
+    const envelope = mcp(repo, 'conducks_context', { symbol: 'usedFn' });
+    const tool = envelope.data;
+    const root = envelope.meta?.root ?? fs.realpathSync(repo);
 
     expect(cli.total_in_radius).toBe(tool.total_in_radius);
     expect(cli.total_in_radius).toBeGreaterThan(0);
 
-    const cliIds = cli.nodes.map((n: any) => n.id);
+    const cliIds = cli.nodes.map((n: any) => relativeTo(root, n.id));
     const toolIds = tool.nodes.map((n: any) => n.id);
     expect(toolIds.length).toBeGreaterThan(0);
     expect(toolIds.every((id: string, i: number) => cliIds[i] === id)).toBe(true);
 
     // Scores are the ANSWER, not rendering: a surface that re-ranked would order a reader's attention
     // differently while reporting the same set.
-    const byId = new Map(cli.nodes.map((n: any) => [n.id, n.relevance_score]));
+    const byId = new Map(cli.nodes.map((n: any) => [relativeTo(root, n.id), n.relevance_score]));
     for (const n of tool.nodes) expect(byId.get(n.id)).toBe(n.relevance_score);
   }, 180000);
 

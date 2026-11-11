@@ -29,11 +29,11 @@ crate-type = ["cdylib"]
 # after ForgeTerm ADR 0058 gave every plugin colour roles: the copy had `num` and
 # `int` and never grew `str`, so there was nothing here to call. Depending on the
 # real crate is what makes that drift impossible rather than merely noticed.
-forgeterm-plugin-api = { path = "/Users/saidmustafasaid/Documents/Gospel_Of_Technology/forgeterm/plugins/plugin-api" }
+forgeterm-plugin-api = { path = "../../../forgeterm/plugins/plugin-api" }
 # The one text engine, shared with the host and every other plugin (ADR 0065).
 # Absolute for the same reason the line above is: this plugin lives in another
 # repository, so a relative path would encode one machine's layout.
-forgeterm-text = { path = "/Users/saidmustafasaid/Documents/Gospel_Of_Technology/forgeterm/crates/text" }
+forgeterm-text = { path = "../../../forgeterm/crates/text" }
 # `wit-bindgen` was a DIRECT dependency only because `src/bindings.rs` called
 # `wit_bindgen::generate!` itself. `forgeterm-plugin-api` calls it now, exactly
 # once, so this crate no longer names it.

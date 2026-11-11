@@ -2,6 +2,7 @@
 import { registry } from "@/registry/index.js";
 import path from "node:path";
 import fs from "node:fs";
+import { conducksVersion } from "@/contracts/index.js";
 import { AnalyzeCommand } from "./commands/analyze.js";
 import { StatusCommand } from "./commands/status.js";
 import { GraphCommand } from "./commands/graph.js";
@@ -106,7 +107,7 @@ export async function branchGuard(
 }
 
 /**
- * Conducks — Modular Conducks CLI v2.0.0
+ * Conducks — the CLI entry point
  */
 export async function main() {
   const args = process.argv.slice(2);
@@ -117,17 +118,8 @@ export async function main() {
   // would otherwise consume the same flag and answer about `help` itself.
   const helpFlagIsTheCommand = !!args[0] && HELP_FLAGS.has(args[0]);
   if (args[0] === '--version' || args[0] === '-v') {
-    // Walk up to the package.json named conducks: build/ carries a copy, src/ runs from the repo root.
-    let dir = path.dirname(new URL(import.meta.url).pathname);
-    for (; dir !== path.dirname(dir); dir = path.dirname(dir)) {
-      const pj = path.join(dir, 'package.json');
-      if (fs.existsSync(pj) && JSON.parse(fs.readFileSync(pj, 'utf-8')).name === 'conducks') {
-        console.log(JSON.parse(fs.readFileSync(pj, 'utf-8')).version);
-        return;
-      }
-    }
-    console.error('version unknown');
-    process.exit(1);
+    console.log(conducksVersion());
+    return;
   }
   const commandId = args[0] ? (helpFlagIsTheCommand ? 'help' : args[0]) : 'help';
   const cmdArgs = args.slice(1);
