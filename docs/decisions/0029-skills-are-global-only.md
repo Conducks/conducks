@@ -1,6 +1,7 @@
 # 0029 — Skills live only in ~/.claude/skills; a repo-local copy is a duplicate, not a pin
 
 Status: Accepted
+- Amended by: 0198
 - Enforced by: `tests/unit/domain/federation/installer-scope.test.ts`
 - Amends: 0025
 - Date: 2026-07-26

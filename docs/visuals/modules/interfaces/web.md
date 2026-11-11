@@ -9,9 +9,9 @@ in [interfaces/cli](cli.md)).
 
 **Responsibility:** the mirror — a live visual dashboard over the analysed codebase. This note
 covers both halves: `src/interfaces/web/mirror/server.ts` (an express server, `MirrorServer`) and,
-beside it, `src/interfaces/web/mirror/public/` (the page itself: `index.html`, `ui.js`,
-`resonance.js`, `styles.css`, a `vendor/` folder for `d3-force` and `force-graph`). The DATA half —
-answering the visual wave and hydrating a node — is `GatewayService`, `src/lib/domain/mirror/`, a
+beside it, `src/interfaces/web/mirror/public/` (the page itself: `index.html`, `app.js` and
+`styles.css`, with no library and no build step). The DATA half —
+answering the project map, one file, one symbol and a name search — is `GatewayService`, `src/lib/domain/mirror/`, a
 domain door the web server holds by composition, not by inheritance.
 
 **Boundaries:** the domain door may not hold an interface asset, so the mirror genuinely spans two
@@ -20,19 +20,19 @@ layers — the express server and static page live in `interfaces/web`, the data
 outside `src/lib/domain/mirror/` reaches past its door
 (`src/lib/domain/mirror/index.ts`, which re-exports `GatewayService` from `src/lib/domain/mirror/gateway.ts`).
 The API routes
-(`/api/synapse`, `/api/node/:id`, `/api/governance`, `/api/docs`, `/api/pulse`) are unauthenticated;
+(`/api/overview`, `/api/file`, `/api/symbol`, `/api/search`, `/api/governance`, `/api/pulse`, plus
+`/api/synapse` and `/api/node/:id`, which the page no longer calls) are unauthenticated;
 `MirrorServer.start` defaults to binding loopback only and warns loudly if a caller opts into a
 wider host (`src/interfaces/web/mirror/server.ts`, `start()`).
 
-**Uses:** `registry.mirror.createGateway(projectRoot)` (`src/registry/index.ts:571-576`) wires
+**Uses:** `registry.mirror.createGateway(projectRoot)` (`src/registry/index.ts:397-400`) wires
 `GatewayService` against the composition-owned graph and persistence singletons; the gateway itself
-reads `core/graph` and `core/persistence` (`getVisualWave`, `fetchNodeDeep`) and answers the wave
-from SQL, never by walking the in-memory graph (ADR 0054). The Docs panel reads
-`registry.docs.board()` through `/api/docs`, the same source `conducks docs-status` uses — the
-graph is not touched for that route. The Governance panel calls `registry.audit.audit()` /
+reads `core/persistence` and answers the map from SQL (`GatewayService.overview`, `fileDetail`,
+`symbolDetail`, `search`), never by walking the in-memory graph (ADR 0054). The Health
+section of the page calls `registry.audit.audit()` /
 `registry.audit.advise()` through `/api/governance`. Live updates ride one SSE channel
 (`/api/pulse`): the evolution watcher and the docs watcher both subscribe their pulses to
-`MirrorServer.broadcastPulse` (`initGlobalMirror`, `src/interfaces/web/mirror/server.ts:193-209`) —
+`MirrorServer.broadcastPulse` (`initGlobalMirror`, `src/interfaces/web/mirror/server.ts:226-235`) —
 dependency inversion so `domain/evolution` and `domain/docs` do not import web themselves.
 
 **Deferred / not built:** the data half is mid-refactor as of 2026-09-18. `src/lib/domain/visual/`
@@ -45,28 +45,34 @@ written.
 
 ## Features
 
-- **Live force-graph dashboard** (`conducks mirror`) — `MirrorServer` serves the static page from
-  `src/interfaces/web/mirror/public/` and the `/api/synapse` wave; the page renders it with
-  `vendor/force-graph.min.js` / `vendor/d3-force.min.js`.
-- **Node hydration on demand** — `/api/node/:id` calls `GatewayService.hydrateNode`, which merges
-  in-memory node properties with a deeper DuckDB read (complexity, entropy, resonance) rather than
-  shipping the full deep payload for every node in the wave.
-- **Governance panel** — `/api/governance` surfaces `registry.audit.audit()` and
-  `registry.audit.advise()` in the browser; the same audit the CLI runs.
-- **Docs panel** — `/api/docs` surfaces `registry.docs.board()` (todo progress, ADR states) parsed
-  from the authored markdown grammar; see Traps for its coverage gap.
+- **One stage** (`conducks mirror`) — the module diagram fills the screen: modules in layers, links
+  as lines with pulses running from the module that uses to the one that is used. A module is a top
+  folder of the source, split further while one folder holds most of the code.
+- **Every level is a small codebase** — clicking a module goes inside it: its sub-folders and files
+  become the diagram, the outside modules that use it sit along the top and the ones it uses along
+  the bottom, and a trail leads back. It repeats down to a single file, which shows the files that
+  use it above and the files it uses below. A START label marks where the program begins, at every
+  depth. Hovering a box previews what a change to it can reach.
+- **Readings** — a strip above the stage: a score ring and six checks (two-way links, import loops,
+  overloaded files, unused code, risky untested files, oversized files), plus two guides (where to
+  start, how it runs). Choosing one lights up the same diagram where that problem lives.
+- **Card** — one card, on request, six rows at most: a reading's worst files, a module's reach and
+  the files the outside uses, a file, or a function.
+- **Search** — `/api/search` finds functions and types by part of their name.
+- **Health** — `/api/governance` surfaces `registry.audit.audit()` in the page: cycles, hubs,
+  orphans; the same audit the CLI runs.
 - **Live pulse (SSE)** — `/api/pulse` pushes a reload signal to every connected browser tab when the
   vault changes (`GatewayService.watchSynapse`, a `fs.watch` on the DuckDB file with a 1250ms debounce
   for in-flight multi-stage writes) or when a doc is saved (the docs watcher).
 
 ## Glossary
 
-- **wave** — the shallow `{nodes, links, clusters, truncated, totalNodes}` payload `getVisualWave`
-  answers for the dashboard; capped by default (`--wave-cap`, `mirror.ts`) because an unreadable
-  ten-thousand-node graph is not useful, not because the rest is uninteresting. **The page SAYS when
-  it is capped** — the status bar reads "N of M nodes" whenever the wave truncates, so a partial
-  picture cannot be mistaken for the whole graph (ADR 0054). That is why `truncated` and `totalNodes`
-  are in the payload at all: a cap nobody is told about is a wrong answer delivered confidently.
+- **overview** — the `{root, files, deps, hotspots, entries}` payload the page draws from. `deps`
+  holds `[from, to, count]` as indexes into `files`, so a path is sent once. The whole page with
+  this data was 185 kB for conducks itself (1,184 files).
+- **wave** — the older `{nodes, links, clusters, truncated, totalNodes}` payload behind
+  `/api/synapse`. The force graph that drew it was removed (it showed every symbol as a dot, with
+  no structure a reader could use); the route stays until its last caller is confirmed gone.
 - **pulse** — a `{type: 'PULSE', timestamp}` (or docs-watcher) event broadcast over `/api/pulse`
   telling every open mirror tab to re-fetch, never carrying the changed data itself. **Not the pulse
   [domain/analysis](../domain/analysis.md) means** — that one is an analyze run. This is only the
@@ -74,18 +80,24 @@ written.
 
 ## Traps
 
-- **The Docs panel has no automated coverage of what it renders, deliberately.** `loadDocs()`
-  (`src/interfaces/web/mirror/public/ui.js:107`) builds the panel's DOM from the `/api/docs`
-  payload, and nothing in the suite exercises what it *builds*:
-  `tests/unit/interfaces/tools/docs-layer.test.ts` covers only the `/api/docs` payload itself, and
-  `tests/unit/interfaces/mirror-frontend-is-wired.test.ts` checks the page STRUCTURALLY — every id
-  the scripts reach exists, every class they set is defined, no external resource, every cross-file
-  call resolves — but asserts nothing about what `loadDocs`, `loadGovernance` or
-  `window.onDocsPulse` (`ui.js:33`, `ui.js:40-46`) actually render. A prior hand-written DOM shim
-  used to check the rendered output and was deliberately not kept: it would pass because its author
-  read the renderer, and keep passing after a change that breaks a real browser. Verify any change
-  to `loadDocs` / `loadGovernance` / `window.onDocsPulse` by running `conducks mirror` and looking
-  at a real browser — do not simulate one.
+- **The page is checked structurally, not by rendering.**
+  `tests/unit/interfaces/mirror-frontend-is-wired.test.ts` checks that every id `app.js` reaches
+  exists, every class it sets is defined, the page loads only its own two files, and every endpoint
+  it calls is a route. `tests/unit/domain/mirror/overview.test.ts` checks the data. Nothing asserts
+  what a browser draws: a hand-written DOM shim would pass because its author read the renderer.
+  Verify a change to `app.js` by running `conducks mirror` and looking at a real browser.
+- **API requests are served one at a time.** Every route opens the vault and closes it when done,
+  so the lock is free for `analyze`. Two overlapping requests closed it under each other and the
+  second answered HTTP 500, which is how the page's six parallel file requests failed
+  (`src/interfaces/web/mirror/server.ts`, the `/api` middleware).
+- **Two designs were tried and removed before this one.** Boxes sized by lines showed structure and
+  answered nothing. A menu of questions with tables answered them, but was wordy and looked dated.
+  Keep the rules the third design follows: the picture is the page, colour only for problems, one
+  card at a time.
+- **The force graph never drew in the shipped build.** Its vendored `d3-force` UMD file needed
+  `d3-quadtree`, `d3-dispatch` and `d3-timer` on the global `d3` and none was vendored, so the page
+  threw `t.quadtree is not a function` (found 2026-11-11). A static page with vendored libraries has
+  no build to catch a missing one; the current page uses no library at all.
 - **`MirrorEngine` and `src/lib/domain/visual/` are deleted — do not re-add them.** ADR 0190 removed
   both; the visual wave has been answered from SQL since ADR 0054
   (`GatewayService.getWave`, `src/lib/domain/mirror/gateway.ts`), and nothing on any live path calls

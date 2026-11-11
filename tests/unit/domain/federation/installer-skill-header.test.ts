@@ -18,7 +18,7 @@ describe('conducks-installer — skill header is valid YAML', () => {
   const skillsSrc = path.resolve(process.cwd(), 'src/resources/skills');
 
   const installerFor = (fs: typeof fsExtra) => {
-    const inst = new ConducksInstaller(home, fs);
+    const inst = new ConducksInstaller(home, fs, home);
     (inst as unknown as { dirs: Record<string, string> }).dirs = {
       global: path.join(home, '.claude', 'skills'),
       local: path.join(home, 'local'),

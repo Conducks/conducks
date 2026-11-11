@@ -10,12 +10,7 @@ import { GovernanceService, ConducksAdvisor, ConducksSentinel } from "@/lib/doma
 import { IntelligenceService, ConducksSearch } from "@/lib/domain/intelligence/index.js";
 import { FederatedLinker } from "@/lib/core/graph/index.js";
 import { EvolutionService, DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
-import { buildBoard, agentView, governedCount, buildTrees } from "@/lib/domain/docs/index.js";
-import { collectModuleNotes, buildGlossaryReport, buildFeaturesReport } from "@/lib/domain/docs/index.js";
 import { collectChanges, impactedSymbolIds } from "@/lib/domain/analysis/index.js";
-import { lintVisuals, collectVisualPages, buildStamps, staleStamps, unstampedExemptionsOf, isDerivedPage, type VisualsViolation, type ReviewStamps } from "@/lib/domain/docs/index.js";
-import { checkVisualsDrift, generatorCommandOf, type DriftResult } from "@/lib/domain/docs/index.js";
-import { readTestingPage, renderTarget, FORGETERM_PLUGIN_CHORD } from "@/lib/domain/docs/index.js";
 // Composition owns the domain/core surface the interfaces need (ADR 0005). Every import below
 // exists because a CLI command or an MCP tool used to reach past this layer for it.
 import { assessRoot, explainScope } from "@/lib/core/utils/index.js";
@@ -24,13 +19,11 @@ import { UpdateCheck } from "@/lib/domain/federation/index.js";
 import { ProjectRegistry } from "@/lib/domain/federation/index.js";
 import { ProjectMonitor } from "@/lib/domain/analysis/index.js";
 import { buildFilterQuery, type QueryFilter } from "@/lib/domain/analysis/index.js";
-import { DocsWatcher } from "@/lib/domain/docs/index.js";
 import { parseIstanbul, bindCoverage, weightedPct, type CovNode } from "@/lib/domain/coverage/index.js";
 import { SourceLineReader } from "@/lib/core/utils/index.js";
 import { firstLineOf } from "@/lib/core/parsing/index.js";
 import { GatewayService } from "@/lib/domain/mirror/index.js";
 import { ConducksInstaller } from "@/lib/domain/federation/index.js";
-import { installHook, type HookInstallResult } from "@/lib/domain/federation/index.js";
 import { MCPConfigurator } from "@/lib/domain/federation/index.js";
 import {
   defaultBaselinePath,
@@ -40,7 +33,6 @@ import {
   type CoverageResult,
   type CoverageSnapshot,
 } from "@/lib/domain/coverage/index.js";
-import { ManifestService, ManifestEngine, type TreeKind } from "@/lib/domain/manifest/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { ConducksDiffEngine } from "@/lib/core/graph/index.js";
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
@@ -63,7 +55,6 @@ import { RegistryBootstrapper } from "@/lib/core/bootstrap/index.js";
 import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import fs from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -134,7 +125,6 @@ const advisor = new ConducksAdvisor();
 const sentinel = new ConducksSentinel();
 const deadCode = new DeadCodeAnalyzer();
 const diffEngine = new ConducksDiffEngine();
-const manifestEngine = new ManifestEngine();
 
 // 4. Domain Facade Consolidation (Service Layer)
 let orchestrator = new AnalyzeOrchestrator(synapseRegistry, graph, persistence, undefined, ignoreManager);
@@ -149,7 +139,6 @@ let conducksCore = new Conducks();
 let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, persistence);
 let intelligence = new IntelligenceService(search, federation);
 let evolution = new EvolutionService(graph, persistence);
-const manifest = new ManifestService(manifestEngine);
 
 /**
  * The one definition of the coverage overlay's node set: every BEHAVIOR node carrying a real line
@@ -161,7 +150,6 @@ const coverageNodes = () => persistence.query<CovNode>(
   `SELECT name, file, lineStart, lineEnd FROM nodes
    WHERE canonicalKind = 'BEHAVIOR' AND lineEnd > lineStart ORDER BY file, lineStart`
 );
-let docsWatcher: DocsWatcher | null = null;
 
 // 5. Lifecycle Management
 export async function initializeRegistry(readOnly: boolean = true, root?: string, lazy: boolean = readOnly) {
@@ -206,8 +194,6 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
 export const registry = {
   events: events,
   status: {
-    bootstrap: (root: string, name: string, kind?: TreeKind) => manifest.bootstrap(root, name, kind),
-    record: (root: string, name: string, type: string, content: string) => manifest.record(root, name, type, content),
     health: () => governance.status()
   },
   analyze: {
@@ -274,43 +260,6 @@ export const registry = {
     // Composition-owned factories (ADR 0005): interfaces must not import domain directly.
     createSentinel: () => new ConducksSentinel(),
   },
-  docs: {
-    board: (root?: string) => buildBoard(root || chronicle.getProjectDir() || process.cwd()),
-    // Every tree — root plus each service (§7). `docs-lint`, `docs-status` and the MCP docs tool
-    // all read the monorepo through this one call.
-    trees: (root?: string, options?: { rootOnly?: boolean; only?: string }) =>
-      buildTrees(root || chronicle.getProjectDir() || process.cwd(), options),
-    // The agent projection: open threads + (optionally) the read-once constraint set.
-    view: (root?: string, layer: "all" | "board" = "all", recent = 4) =>
-      agentView(buildBoard(root || chronicle.getProjectDir() || process.cwd()), layer, recent),
-    // Same projection over a board the caller already built — `trees()` returns one board per
-    // tree, and re-deriving each from disk would parse the whole monorepo a second time.
-    viewOf: (board: Parameters<typeof agentView>[0], layer: "all" | "board" = "all", recent = 4) =>
-      agentView(board, layer, recent),
-    // The denominator behind every claim a board makes. Exposed here rather than imported by the CLI
-    // directly, because `cli -> domain` is a forbidden static edge and the boundary test enforces it.
-    governedCount: (board: Parameters<typeof governedCount>[0]) => governedCount(board),
-    // The two COMPUTED cross-module views (ADR 0193): a term defined in two features is a
-    // collision, and the feature tree is walked rather than written down. Both carry their own
-    // honesty count — how many notes hold no such section — because a clean run over a corpus
-    // nobody has filled in reads exactly like a clean run over one that is complete (ADR 0124).
-    // Through composition for the same reason `governedCount` is: `cli -> domain` is forbidden.
-    glossary: (root?: string) =>
-      buildGlossaryReport(collectModuleNotes(root || chronicle.getProjectDir() || process.cwd())),
-    features: (root?: string) =>
-      buildFeaturesReport(collectModuleNotes(root || chronicle.getProjectDir() || process.cwd())),
-    // The manual testing checklist: where it is, how far through it anyone is, and which surface
-    // this shell should be told to read it on. Through composition for the same reason
-    // `governedCount` is — `cli -> domain` is a forbidden static edge.
-    testingPage: (root?: string) => readTestingPage(root || chronicle.getProjectDir() || process.cwd()),
-    renderTarget: (env: NodeJS.ProcessEnv = process.env) => renderTarget(env),
-    forgetermChord: () => FORGETERM_PLUGIN_CHORD,
-    // One watcher per process: `mirror` and `watch` both ask for it, neither owns it.
-    get watcher() {
-      docsWatcher ??= new DocsWatcher(chronicle.getProjectDir() || process.cwd());
-      return docsWatcher;
-    }
-  },
   // Reading a stored `(file, line)` back into the LINE OF CODE, at answer time (ADR 0132). A fresh
   // reader per call so its cache — and its read count — is scoped to one answer rather than living
   // for the process; the whole point of the cache is "one read per file IN THIS ANSWER".
@@ -320,137 +269,6 @@ export const registry = {
     // may name no core module (ADR 0005), and because a vault-loaded node carries `doc` but not
     // the derived first line — that is computed, not stored.
     firstLineOf: (doc: string) => firstLineOf(doc),
-  },
-  /**
-   * The visuals gate (ADR 0138). Separate from `docs` because it answers a different question with a
-   * different source of truth: `docs` parses AUTHORED grammar, this checks DERIVED anchors against
-   * the working tree. Discovery lives here — the lint itself takes its file list as an argument so it
-   * stays pure, and so it can never be pointed at a stale graph by accident.
-   */
-  visuals: {
-    lint: async (root?: string) => {
-      const dir = root || chronicle.getProjectDir() || process.cwd();
-      const pages = collectVisualPages(dir);
-      if (pages.length === 0) return { violations: [] as VisualsViolation[], checked: 0, pagesWithAnchors: 0, pages: 0 };
-      // The FILESYSTEM is ground truth, never the vault — a graph keyed to the last pulse describes a
-      // tree that may no longer exist (ADR 0035), and a stale input makes this gate a false green.
-      const abs = await chronicle.discoverFiles();
-      const rel = abs
-        .map(f => path.relative(dir, f))
-        .filter(f => f.length > 0 && !f.startsWith('..'));
-      const read = (p: string): string | null => {
-        try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
-      };
-      return { ...lintVisuals(pages, rel, read), pages: pages.length };
-    },
-    /**
-     * Review stamps (ADR 0141): stale = the cited span changed since the recorded stamp; stamp =
-     * record every resolving anchor's span hash as reviewed-now. The store is `.conducks/
-     * note-reviews.json` — beside `doc-reviews.json`, its module-level ancestor.
-     */
-    review: async (root?: string): Promise<{
-      flags: VisualsViolation[];
-      orphans: Array<{ page: string; key: string }>;
-      unstamped: string[];
-      exemptErrors: VisualsViolation[];
-      stamped: number;
-    }> => {
-      const dir = root || chronicle.getProjectDir() || process.cwd();
-      const pages = collectVisualPages(dir);
-      let stamps: ReviewStamps = {};
-      try { stamps = JSON.parse(fs.readFileSync(path.join(dir, ".conducks", "note-reviews.json"), "utf8")); } catch { /* never stamped */ }
-      const stamped = Object.values(stamps).reduce((n, a) => n + Object.keys(a).length, 0);
-      // NO early return on `stamped === 0`. A repo that has never stamped anything is the one this
-      // check exists for: it has no flags, so silence here reported it as clean.
-      if (pages.length === 0) return { flags: [], orphans: [], unstamped: [], exemptErrors: [], stamped };
-      let confText: string | null = null;
-      try { confText = fs.readFileSync(path.join(dir, "conducks.json"), "utf8"); } catch { /* no declaration */ }
-      const abs = await chronicle.discoverFiles();
-      const rel = abs.map(f => path.relative(dir, f)).filter(f => f.length > 0 && !f.startsWith('..'));
-      const read = (p: string): string | null => {
-        try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
-      };
-      return { ...staleStamps(pages, rel, read, stamps, unstampedExemptionsOf(confText)), stamped };
-    },
-    /**
-     * `only` (a page path) stamps ONE page's anchors, merged over the store — reviewing one note
-     * must not assert a review of every other (ADR 0142). No `only` re-stamps everything, which is
-     * an assertion the caller has to mean.
-     */
-    stamp: async (root?: string, only?: string): Promise<number> => {
-      const dir = root || chronicle.getProjectDir() || process.cwd();
-      const pages = collectVisualPages(dir);
-      const abs = await chronicle.discoverFiles();
-      const rel = abs.map(f => path.relative(dir, f)).filter(f => f.length > 0 && !f.startsWith('..'));
-      const read = (p: string): string | null => {
-        try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return null; }
-      };
-      const fresh = buildStamps(pages, rel, read, only);
-      let stamps: ReviewStamps = fresh;
-      if (only !== undefined) {
-        try { stamps = JSON.parse(fs.readFileSync(path.join(dir, ".conducks", "note-reviews.json"), "utf8")); } catch { stamps = {}; }
-        if (fresh[only]) stamps[only] = fresh[only]; else delete stamps[only];
-      }
-      fs.mkdirSync(path.join(dir, ".conducks"), { recursive: true });
-      fs.writeFileSync(path.join(dir, ".conducks", "note-reviews.json"), JSON.stringify(stamps, null, 2) + "\n");
-      return Object.values(fresh).reduce((n, a) => n + Object.keys(a).length, 0);
-    },
-    /**
-     * The generator-drift half of the gate (ADR 0139): re-run the repo's DECLARED generator and diff
-     * `docs/visuals/` byte-for-byte. `skipped` when the repo declares none — most repos never will,
-     * and the CLI says so rather than passing silently.
-     */
-    drift: async (root?: string): Promise<DriftResult & { command: string | null; derivedHeaderMissing?: string[] }> => {
-      const dir = root || chronicle.getProjectDir() || process.cwd();
-      let confText: string | null = null;
-      try { confText = fs.readFileSync(path.join(dir, "conducks.json"), "utf8"); } catch { /* no declaration */ }
-      const command = generatorCommandOf(confText);
-      if (!command) return { status: "skipped", reason: "no visuals.generate declared in conducks.json", command: null };
-
-      const { execSync } = await import("node:child_process");
-      const io = {
-        listFiles: (base: string): string[] => {
-          const out: string[] = [];
-          const walk = (d: string, rel: string): void => {
-            let entries: string[] = [];
-            try { entries = fs.readdirSync(d); } catch { return; }
-            for (const name of entries.sort()) {
-              const abs = path.join(d, name);
-              let isDir = false;
-              try { isDir = fs.statSync(abs).isDirectory(); } catch { continue; }
-              if (isDir) walk(abs, path.join(rel, name));
-              else out.push(path.join(rel, name));
-            }
-          };
-          walk(base, "");
-          return out;
-        },
-        read: (abs: string): Buffer | null => { try { return fs.readFileSync(abs); } catch { return null; } },
-        write: (abs: string, data: Buffer): void => { fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, data); },
-        remove: (abs: string): void => { try { fs.rmSync(abs); } catch { /* already gone */ } },
-        run: (cmd: string, cwd: string): { ok: true } | { ok: false; output: string } => {
-          try { execSync(cmd, { cwd, stdio: "pipe" }); return { ok: true }; }
-          catch (e: any) {
-            const output = [e?.stdout?.toString(), e?.stderr?.toString()].filter(Boolean).join("") || String(e?.message ?? e);
-            return { ok: false, output };
-          }
-        },
-      };
-      const result = { ...checkVisualsDrift(dir, command, io), command };
-      // A repo that declares a generator has DERIVED pages, and every one must say so in its own
-      // text — ADR 0011's failure mode (edit the render, the next render discards the edit) returns
-      // the moment renders exist. Warn-only until the reference project's templates carry the
-      // header (todo47); the drift check itself already guards the content.
-      // A page may instead declare itself hand-written (`Provenance: hand-written` / `authored`) —
-      // not everything in a generated tree is generated, and warning the five hand-maintained pages
-      // teaches everyone to ignore the warning.
-      const derivedHeaderMissing = collectVisualPages(dir)
-        .filter(p => !/\.md$/i.test(p.path)
-          && !isDerivedPage(p.text)
-          && !/provenance\b\W{0,4}(?:<\/?\w+>)?\W{0,4}(?:authored|hand-written)\b/i.test(p.text))
-        .map(p => p.path);
-      return { ...result, derivedHeaderMissing };
-    },
   },
   coverage: {
     nodes: coverageNodes,
@@ -470,10 +288,6 @@ export const registry = {
   },
   federation: {
     createInstaller: (root: string) => new ConducksInstaller(root),
-    // The pre-commit gates, installed by the tool that owns them (todo46). `cliPath` is this very
-    // process's entry script, so the hook always points at the build that installed it.
-    installHook: (root: string, force = false): HookInstallResult =>
-      installHook(root, process.argv[1], force),
     createMCPConfigurator: () => new MCPConfigurator(),
     createLinker: (root: string) => new FederatedLinker(root, undefined, (path: string) => new SynapsePersistence(path, true)),
     createProjectRegistry: () => new ProjectRegistry(),
@@ -594,3 +408,6 @@ export const registry = {
 };
 
 export type Registry = typeof registry;
+
+/** The span hash of a line range, for the graph command (the CLI reaches core only through the registry). */
+export { spanHashOf } from "@/lib/core/utils/index.js";

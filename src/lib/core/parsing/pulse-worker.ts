@@ -24,7 +24,7 @@ import fs from 'node:fs';
  */
 
 async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = false) {
-  const { units, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages } = data;
+  const { units, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages, gitHistory } = data;
 
   // The reflector lives in the DOMAIN layer; this worker is in CORE. A static import would be a
   // core → domain edge (ADR 0005). This file is a process entry point, not a core primitive — it is
@@ -35,6 +35,9 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
   const { ConducksReflector } = await import("@/lib/core/parsing/reflector.js");
   const reflector = new ConducksReflector();
   const context = new AnalyzeContext();
+  // The parent ran one repo-wide `git log` and sent this chunk's share (todo82#P1). Lazy for the
+  // same reason as the reflector above: it keeps this entry point free of a static import.
+  if (gitHistory) (await import("@/lib/core/git/index.js")).chronicle.primeHistory(gitHistory);
   
   // Conducks: Sync discovery mode and global symbols from parent
   if (discoveryMode) context.setDiscoveryMode(true);

@@ -1,6 +1,6 @@
 {
   "name": "conducks",
-  "version": "0.7.7",
+  "version": "0.8.0",
   "description": "High-fidelity structural intelligence and automated governance for AI agents. Transform your code into a living Synapse Graph.",
   "keywords": [
     "mcp",
@@ -15,7 +15,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "conducks": "./build/src/interfaces/cli/index.js"
+    "conducks": "build/src/interfaces/cli/index.js"
   },
   "files": [
     "build",
@@ -26,6 +26,8 @@
   ],
   "scripts": {
     "build": "rm -rf build && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && chmod +x build/src/interfaces/cli/index.js && cp package.json config/sentinel.json build/ && rm -rf build/src/resources && mkdir -p build/src/resources && cp -r src/resources/* build/src/resources/ && mkdir -p build/src/interfaces/web/mirror && cp -r src/interfaces/web/mirror/public build/src/interfaces/web/mirror/ && node scripts/copy-scm.mjs && node scripts/check-build-aliases.mjs && node scripts/check-declared-deps.mjs",
+    "release:check": "node scripts/check-release.mjs",
+    "prepublishOnly": "npm run build && node scripts/check-release.mjs",
     "postinstall": "node scripts/check-native-parser.mjs",
     "start": "node ./build/src/interfaces/cli/index.js mirror",
     "demo": "npm run build && npm run start",
@@ -40,7 +42,7 @@
     "benchmark": "node tools/measure-pulse.mjs",
     "test:persistence": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects persistence",
     "bootstrap": "node scripts/bootstrap.mjs",
-    "hooks": "git config core.hooksPath scripts/hooks && echo \"hooks installed: pre-commit runs conducks docs-lint\"",
+    "install:global": "node scripts/bootstrap.mjs && npm run build && npm link",
     "postbuild": "node scripts/sync-skills-postbuild.mjs",
     "cli:smoke": "node tools/benchmark/cli-smoke.mjs",
     "oracle": "node tools/benchmark/oracle-tsc.mjs && node tools/benchmark/oracle-exports.mjs && node tools/benchmark/oracle-packs.mjs",
@@ -116,7 +118,6 @@
     "gate": "npm run build && npm test && npm run bench:prune && npm run bench:trace && npm run bench:context && npm run oracle && npm run oracle:imports:sofie && npm run oracle:imports:admin && npm run oracle:imports:app && npm run oracle:python && npm run oracle:python-dead && npm run oracle:python-dead:sofie && npm run oracle:nodes && npm run oracle:nodes:sofie && npm run oracle:nodes:ts && npm run oracle:nodes:ts:sofie && npm run oracle:nodes:ts:orch && npm run oracle:edges && npm run oracle:edges:sofie && npm run oracle:edges:orch && npm run oracle:edges:self && npm run oracle:incremental && npm run oracle:recall && npm run oracle:recall:sofie && npm run oracle:lines && npm run oracle:lines:sofie && npm run oracle:lines:ts:sofie && npm run oracle:lines:ts:orch && npm run oracle:lines:ts:self && npm run oracle:recall:ts:sofie && npm run oracle:recall:ts:orch && npm run oracle:recall:ts:self && npm run oracle:trace && npm run oracle:trace:sofie && npm run oracle:trace:orch && npm run oracle:context && npm run oracle:context:sofie && npm run oracle:context:orch && npm run oracle:nodes:ts:scraper && npm run oracle:lines:ts:scraper && npm run oracle:recall:ts:scraper",
     "cli:mutate": "node tools/benchmark/mutate-cli-smoke.mjs",
     "test:fast": "cross-env NODE_OPTIONS=--experimental-vm-modules jest -c jest.fast.config.js",
-    "visuals": "node scripts/visuals/render.mjs && node scripts/visuals/detail.mjs && node scripts/visuals/notes.mjs && node scripts/visuals/testing.mjs && node scripts/visuals/pages.mjs",
     "oracle:packs": "node tools/benchmark/oracle-packs.mjs"
   },
   "dependencies": {

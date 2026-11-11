@@ -3,6 +3,7 @@ import { AnalyzeContext } from "@/lib/core/parsing/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
+import { chronicle } from "@/lib/core/git/index.js";
 
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -65,6 +66,9 @@ export class WorkerPool {
       }
     }
 
+    // One repo-wide `git log` for the whole run, instead of one per file (todo82#P1).
+    const history = discoveryMode ? {} : chronicle.buildHistoryIndex();
+
     const workerCount = parseInt(process.env.CONDUCKS_WORKERS ?? String(Math.max(1, os.cpus().length - 1)), 10);
     // Only CONDUCKS_WORKERS<=0 opts out. The compiled binary used to be excluded here too
     // (`!isTs && tsxLoader === null`), which meant every shipped install parsed single-threaded —
@@ -96,7 +100,9 @@ export class WorkerPool {
           const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
           const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
 
-          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages, isFork: true, tempOutputFile: tempOutput }));
+          const gitHistory: typeof history = {};
+          for (const u of chunk) { const h = history[path.resolve(u.path)]; if (h) gitHistory[path.resolve(u.path)] = h; }
+          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages, gitHistory, isFork: true, tempOutputFile: tempOutput }));
 
           const nodeArgs = isTs
             ? ['--no-warnings', '--import', tsxLoader!, workerScript, tempInput]
@@ -177,6 +183,8 @@ export class WorkerPool {
     const providerMap = new Map<string, any>();
     const loadedGrammars = new Set<string>();
 
+    chronicle.primeHistory(history);
+    try {
     for (const file of files) {
       try {
         const ext = path.extname(file.path);
@@ -213,6 +221,10 @@ export class WorkerPool {
       } catch (err) {
         results.push({ success: false, path: file.path, error: (err as Error)?.message ?? String(err) });
       }
+    }
+    } finally {
+      // A long-lived process (MCP, watch) must not answer later saves from this run's snapshot.
+      chronicle.primeHistory({});
     }
     return results;
   }

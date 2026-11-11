@@ -67,9 +67,7 @@ const mcpTools = (): Map<string, string> => {
  * A tool whose CLI command is spelled differently. A name difference is not a missing surface, and
  * treating it as one would make the existence check below unusable within a week.
  */
-const CLI_NAME: Readonly<Record<string, string>> = {
-  docs: 'docs-status',
-};
+const CLI_NAME: Readonly<Record<string, string>> = {};
 
 /**
  * Tools that deliberately have NO CLI command. Every entry names the record that granted it, because

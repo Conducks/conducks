@@ -3,6 +3,7 @@ import type { Registry } from "@/registry/index.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "fs-extra";
+import { spawnSync } from "node:child_process";
 
 /**
  * Conducks — Setup Command
@@ -10,7 +11,7 @@ import fs from "fs-extra";
 export class SetupCommand implements ConducksCommand {
   public id = "setup";
   public description = "Configure MCP and install skills";
-  public usage = "conducks setup [--dry-run]";
+  public usage = "conducks setup [--dry-run] [--no-analyze]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {
     // `--dry-run`, because this command WRITES OUTSIDE THE PROJECT: it edits the user's Claude
@@ -25,11 +26,11 @@ export class SetupCommand implements ConducksCommand {
       const cliEntry = fileURLToPath(new URL("../index.js", import.meta.url));
       const ignorePath = path.join(process.cwd(), ".conducksignore");
       console.log("\x1b[35m[Conducks Setup] --dry-run — nothing will be written.\x1b[0m\n");
-      console.log(`  skills          → ~/.claude/skills (global only, ADR 0029)`);
+      console.log(`  skills          → ~/.claude/skills, plus ~/.agents/skills (Codex, Gemini CLI) and ~/.gemini/config/skills (Antigravity) when installed`);
       console.log(`  project registry→ ${projects.path}  ${already ? "(already registered)" : "(would add this root)"}`);
-      console.log(`  MCP entry       → the Claude Desktop config, pointing at ${cliEntry}`);
+      console.log(`  MCP entry       → Claude Desktop, plus Claude Code, Cursor, Windsurf, Antigravity, Gemini CLI and Codex when installed, pointing at ${cliEntry}`);
+      console.log(`  first graph     → conducks analyze, when .conducks/ has no vault yet (skip with --no-analyze)`);
       console.log(`  ignore file     → ${ignorePath} ${fs.existsSync(ignorePath) ? "(exists — would be left alone)" : "(would be created)"}`);
-      console.log(`  pre-commit gates→ .git/hooks/pre-commit (docs-lint / visuals-lint, behind managed markers; a symlinked hook is left alone)`);
       console.log("\n\x1b[2m  Re-run without --dry-run to apply.\x1b[0m\n");
       return;
     }
@@ -53,7 +54,7 @@ export class SetupCommand implements ConducksCommand {
         console.log(`🧹 Skills (local) → ${report.dir}: ${bits}` +
           `  \x1b[90m(duplicate of the global copy — it would load twice)\x1b[0m`);
       } else {
-        console.log(`✅ Skills (global) → ${report.dir}: ${bits}`);
+        console.log(`✅ Skills (${report.scope}) → ${report.dir}: ${bits}`);
       }
     }
 
@@ -75,6 +76,8 @@ export class SetupCommand implements ConducksCommand {
     const cliEntry = fileURLToPath(new URL("../index.js", import.meta.url));
     const mcpResult = await configurator.registerClaude(cliEntry);
     console.log(mcpResult.message);
+    // Every other MCP client that is installed here, so no config is edited by hand (todo82#P8).
+    for (const r of await configurator.registerDetected(cliEntry)) console.log(r.message);
 
     // 3. Harden Environment (.conducksignore)
     console.log("\x1b[35m[Conducks Setup] Hardening Environment...\x1b[0m");
@@ -105,12 +108,16 @@ export class SetupCommand implements ConducksCommand {
       console.log("ℹ️  .conducksignore already exists. Skipping generation.");
     }
 
-    // 4. The pre-commit gates (todo46): setup is the one command every project runs first, so
-    // adoption is one command instead of a hand-written hook per repo. A check nobody runs is advice.
-    const hook = registry.federation.installHook(process.cwd());
-    if (hook.status === "skipped") console.log(`ℹ️  Hooks: ${hook.reason}`);
-    else console.log(`✅ Pre-commit gates (docs-lint / visuals-lint) → .git/hooks/pre-commit (${hook.status})`);
+    // 4. Build the first graph, so setup is the last step before asking questions (todo82#P8).
+    // Only when there is none: a second setup must stay quick and never re-index by surprise.
+    const vault = path.join(process.cwd(), ".conducks", "conducks-synapse.db");
+    if (!fs.existsSync(vault) && !args.includes("--no-analyze")) {
+      console.log("\x1b[35m[Conducks Setup] Building the first graph (conducks analyze)...\x1b[0m");
+      const run = spawnSync(process.execPath, [cliEntry, "analyze", "--yes"], { cwd: process.cwd(), stdio: "inherit" });
+      if (run.status !== 0) console.log("❌ analyze failed — run `conducks analyze` to see why. Setup itself is complete.");
+    }
 
     console.log("\n\x1b[32m[Conducks] Setup complete.\x1b[0m");
+    console.log("  Restart your agent so it loads the conducks MCP server, or try: conducks status");
   }
 }

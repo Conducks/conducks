@@ -92,7 +92,7 @@ const SMOKE = [
  * failure would report every honest codebase as breaking conducks — and it did, on two of the three
  * subjects, until this list existed. A gate may exit 0 or 1; anything above 1 is still a crash.
  */
-const GATES = new Set(['audit', 'guard', 'docs-lint', 'prune']);
+const GATES = new Set(['audit', 'guard', 'prune']);
 const crashed = (cmd, code) => (GATES.has(cmd) ? code > 1 : code !== 0);
 
 const sh = (cmd, args, cwd) => {

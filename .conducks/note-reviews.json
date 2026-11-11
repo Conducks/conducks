@@ -181,7 +181,7 @@
     "src/interfaces/cli/commands/supply-chain.ts": "e48ea7853789a128",
     "src/interfaces/cli/commands/link.ts": "5b860d49b1964318",
     "src/interfaces/cli/commands/record.ts": "038b0d1d70b86a56",
-    "src/interfaces/cli/commands/setup.ts": "e8c8c31fd05f02e1",
+    "src/interfaces/cli/commands/setup.ts": "f2f5a71bdf5316d0",
     "scripts/sync-skills-postbuild.mjs": "6158c2bcd429613f",
     "package.json:44": "e0923247caafe9bc",
     "package.json:18": "57bf4ad2257fe254",
@@ -257,7 +257,7 @@
     "src/contracts/dead-code-types.ts": "e4a771b4970307e4"
   },
   "docs/visuals/modules/domain/docs/docs-board.md": {
-    "src/lib/domain/docs/docs-board.ts": "9501e845d6875283",
+    "src/lib/domain/docs/docs-board.ts": "95b9c08952f10cc8",
     "src/lib/domain/docs/docs-watcher.ts": "e9f918640551066a",
     "docs/legacy/progress.md": "5cb1a3dafa997c11",
     "src/lib/domain/analysis/module-hash.ts": "de4cb38ff431b656",

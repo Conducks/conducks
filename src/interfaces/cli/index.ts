@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { AnalyzeCommand } from "./commands/analyze.js";
 import { StatusCommand } from "./commands/status.js";
+import { GraphCommand } from "./commands/graph.js";
 import { QueryCommand } from "./commands/query.js";
 import { ContextCommand } from "./commands/context.js";
 import { AuditCommand } from "./commands/audit.js";
@@ -25,20 +26,11 @@ import { EntryCommand } from "./commands/entry.js";
 import { McpCommand } from "./commands/mcp.js";
 import { DriftCommand } from "./commands/drift.js";
 import { GuardCommand } from "./commands/guard.js";
-import { RecordCommand } from "./commands/record.js";
-import { BootstrapDocsCommand } from "./commands/bootstrap-docs.js";
 import { UninstallCommand } from "./commands/uninstall.js";
 import { DoctorCommand } from "./commands/doctor.js";
 import { CoverageCommand } from "./commands/coverage.js";
 import { CoverageViewCommand } from "./commands/coverage-view.js";
-import { DocsStatusCommand } from "./commands/docs-status.js";
 import { MonitorCommand } from "./commands/monitor.js";
-import { DocsLintCommand } from "./commands/docs-lint.js";
-import { VisualsLintCommand } from "./commands/visuals-lint.js";
-import { GlossaryCommand } from "./commands/glossary.js";
-import { FeaturesCommand } from "./commands/features.js";
-import { TestingCommand } from "./commands/testing.js";
-import { InstallHooksCommand } from "./commands/install-hooks.js";
 import { SupplyChainCommand } from "./commands/supply-chain.js";
 import { ConducksCommand } from "./command.js";
 
@@ -55,17 +47,14 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
  */
 export const STALENESS_BYPASS = new Set([
   'analyze', 'help', 'setup', 'uninstall', 'doctor', 'clean', 'mirror',
-  'watch', 'record', 'mcp', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor',
-  'visuals-lint', 'install-hooks', 'testing', 'glossary', 'features',
+  'watch', 'mcp', 'monitor',
 ]);
 
 /**
  * Commands that need no structural engine AT ALL — no grammars, no vault, no graph (ADR 0033).
  *
- * This is the CLI's half of the docs/code split ADR 0023 made on the MCP surface. These answer from
- * authored markdown and the filesystem: `docs-status` and `docs-lint` call `buildBoard`, which walks
- * `docs/`; `bootstrap-docs` writes template files; `monitor` opens each REGISTERED project's vault
- * read-only itself and never touches the current one; `help` prints a list it was handed.
+ * `monitor` opens each REGISTERED project's vault read-only itself and never touches the current
+ * one; `help` prints a list it was handed.
  *
  * Skipping `registry.initialize()` skips loading 12 tree-sitter grammars and reading the whole graph
  * out of DuckDB — work these commands then never use. `STALENESS_BYPASS` alone was not enough: it
@@ -75,8 +64,7 @@ export const STALENESS_BYPASS = new Set([
  * asked for a graph nobody loaded — asserted by `tests/unit/interfaces/cli/no-registry-commands.test.ts`.
  */
 export const NEEDS_NO_REGISTRY = new Set([
-  'help', 'docs-status', 'docs-lint', 'bootstrap-docs', 'monitor', 'visuals-lint',
-  'install-hooks', 'testing', 'glossary', 'features',
+  'help', 'monitor',
 ]);
 
 /**
@@ -128,6 +116,19 @@ export async function main() {
   // `conducks --help` means the LIST, not "usage of the help command" — the per-command block below
   // would otherwise consume the same flag and answer about `help` itself.
   const helpFlagIsTheCommand = !!args[0] && HELP_FLAGS.has(args[0]);
+  if (args[0] === '--version' || args[0] === '-v') {
+    // Walk up to the package.json named conducks: build/ carries a copy, src/ runs from the repo root.
+    let dir = path.dirname(new URL(import.meta.url).pathname);
+    for (; dir !== path.dirname(dir); dir = path.dirname(dir)) {
+      const pj = path.join(dir, 'package.json');
+      if (fs.existsSync(pj) && JSON.parse(fs.readFileSync(pj, 'utf-8')).name === 'conducks') {
+        console.log(JSON.parse(fs.readFileSync(pj, 'utf-8')).version);
+        return;
+      }
+    }
+    console.error('version unknown');
+    process.exit(1);
+  }
   const commandId = args[0] ? (helpFlagIsTheCommand ? 'help' : args[0]) : 'help';
   const cmdArgs = args.slice(1);
 
@@ -149,7 +150,7 @@ export async function main() {
   // Scoped to READ commands. `analyze`, `watch` and `clean` are long-running and their progress IS
   // the output — silencing those would replace noise with a command that looks hung. And quiet never
   // suppresses WARN/ERROR/SUCCESS at any level, so a failure is still reported.
-  const NARRATES = new Set(['analyze', 'watch', 'clean', 'record', 'mcp', 'setup', 'doctor', 'uninstall']);
+  const NARRATES = new Set(['analyze', 'watch', 'clean', 'mcp', 'setup', 'doctor', 'uninstall']);
   const verbose = args.includes('--verbose') || process.env.CONDUCKS_VERBOSE === '1';
   registry.infrastructure.setQuiet(!verbose && !NARRATES.has(commandId));
 
@@ -212,20 +213,18 @@ export async function main() {
   // Registry of modular commands
   const commands: ConducksCommand[] = [
     new AnalyzeCommand(), new QueryCommand(), new ContextCommand(), new AuditCommand(),
-    new ImpactCommand(), new StatusCommand(), new CleanCommand(), new SetupCommand(),
+    new ImpactCommand(), new StatusCommand(), new GraphCommand(), new CleanCommand(), new SetupCommand(),
     new WatchCommand(), new DiffCommand(),
     new AdviseCommand(), new PruneCommand(),
     new ListCommand(), new FlowsCommand(),
     new TraceCommand(), new ExplainCommand(), new EntryCommand(), new McpCommand(),
-    new DriftCommand(), new GuardCommand(), new RecordCommand(), new MirrorCommand(),
-    new BootstrapDocsCommand(), new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
-    new CoverageViewCommand(), new DocsStatusCommand(), new DocsLintCommand(), new VisualsLintCommand(),
-    new GlossaryCommand(), new FeaturesCommand(),
-    new TestingCommand(),
+    new DriftCommand(), new GuardCommand(), new MirrorCommand(),
+    new UninstallCommand(), new DoctorCommand(), new CoverageCommand(),
+    new CoverageViewCommand(),
     // `link` was imported and never instantiated, so `conducks link <path>` answered
     // `Unknown command "link"` while FederatedLinker underneath worked fine. Nothing caught it:
     // the import satisfied the compiler and no test drove the command surface.
-    new SupplyChainCommand(), new MonitorCommand(), new LinkCommand(), new InstallHooksCommand()
+    new SupplyChainCommand(), new MonitorCommand(), new LinkCommand()
   ];
 
   commands.push(new HelpCommand(commands));

@@ -6,7 +6,12 @@ import { fileURLToPath } from "node:url";
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../resources/skills");
 
-export type SkillScope = "global" | "local";
+/**
+ * `global` is Claude Code. `agents` is the shared user folder Codex and Gemini CLI both read;
+ * `antigravity` is the one folder every Antigravity variant reads. Each is written only when that
+ * agent is on the machine (ADR 0198).
+ */
+export type SkillScope = "global" | "local" | "agents" | "antigravity";
 
 /**
  * Skills conducks used to ship and no longer does. Sync deletes these wherever it finds them.
@@ -23,6 +28,9 @@ const RETIRED_SKILLS = [
   // merged into `conducks` (2026-08-16) — all three answered one question, "how do I use conducks",
   // and split it across three loads: what it is, which command, which probe sequence.
   "conducks-cli", "conducks-guide", "conducks-workflows",
+  // NOT here, on purpose: `conducks-docs` and `conducks-visuals`. They stopped shipping when conducks
+  // became code analysis only, but they are the owner's documentation standard and now live outside
+  // this project. Sync and uninstall leave an installed copy alone (owner, 2026-11-11).
 ];
 
 export interface SyncReport {
@@ -68,15 +76,27 @@ export class ConducksInstaller {
 
   constructor(
     workspaceRoot: string,
-    private readonly fileSystem: any = fs
+    private readonly fileSystem: any = fs,
+    private readonly home: string = os.homedir(),
   ) {
     // ONE source (resources/skills/), flat targets: <root>/.claude/skills/<name>/SKILL.md.
     // Flat because Claude Code discovers only direct children of skills/; the old extra conducks/
-    // nesting broke discovery. Claude-only by decision (ADR 0006).
+    // nesting broke discovery. Every agent reads the same SKILL.md format, so one source serves all.
     this.dirs = {
-      global: path.join(os.homedir(), ".claude", "skills"),
+      global: path.join(home, ".claude", "skills"),
       local: path.join(workspaceRoot, ".claude", "skills"),
+      agents: path.join(home, ".agents", "skills"),
+      antigravity: path.join(home, ".gemini", "config", "skills"),
     };
+  }
+
+  /** The other agents installed on this machine, detected by the home folder each one creates. */
+  private otherAgents(): SkillScope[] {
+    const has = (...p: string[]) => this.fileSystem.existsSync(path.join(this.home, ...p));
+    const out: SkillScope[] = [];
+    if (has(".codex") || has(".gemini", "settings.json")) out.push("agents");
+    if (has(".gemini", "antigravity")) out.push("antigravity");
+    return out;
   }
 
   public dirFor(scope: SkillScope): string { return this.dirs[scope]; }
@@ -96,36 +116,12 @@ export class ConducksInstaller {
    */
   public async sync(): Promise<SyncReport[]> {
     const skills = this.getDynamicSkillTemplates();
-    const reports: SyncReport[] = [this.emptyReport("global")];
-    const global = reports[0];
-
-    await this.pruneRetired("global", global);
-
-    for (const [name, content] of Object.entries(skills)) {
-      const file = path.join(this.dirs.global, name, "SKILL.md");
-      const existed = this.fileSystem.existsSync(file);
-      let same = false;
-      if (existed) {
-        try { same = this.fileSystem.readFileSync(file, "utf-8") === content; } catch { same = false; }
-      }
-      let changed = !same;
-      if (!same) {
-        await this.fileSystem.ensureDir(path.dirname(file));
-        await this.fileSystem.writeFile(file, content, "utf-8");
-      }
-      // A skill may ship reference files beside its SKILL.md (resources/skills/<name>/**). Each is
-      // refreshed the same way: written only when it differs, so a no-op run stays a no-op.
-      for (const [rel, body] of Object.entries(this.getSkillReferences(name))) {
-        const target = path.join(this.dirs.global, name, rel);
-        let current: string | null = null;
-        try { current = this.fileSystem.readFileSync(target, "utf-8"); } catch { current = null; }
-        if (current === body) continue;
-        await this.fileSystem.ensureDir(path.dirname(target));
-        await this.fileSystem.writeFile(target, body, "utf-8");
-        changed = true;
-      }
-      if (!changed) { global.unchanged.push(name); continue; }
-      (existed ? global.updated : global.created).push(name);
+    const reports: SyncReport[] = [];
+    for (const scope of ["global", ...this.otherAgents()] as SkillScope[]) {
+      const report = this.emptyReport(scope);
+      await this.pruneRetired(scope, report);
+      await this.writeSkills(scope, skills, report);
+      reports.push(report);
     }
 
     // A local copy is a duplicate, not a pin: it double-loads against the global one. Remove the
@@ -142,6 +138,36 @@ export class ConducksInstaller {
     if (local.superseded.length || local.retired.length) reports.push(local);
 
     return reports;
+  }
+
+  /** Writes every skill into one scope, refreshing in place and reporting what actually changed. */
+  private async writeSkills(scope: SkillScope, skills: Record<string, string>, report: SyncReport): Promise<void> {
+    for (const [name, content] of Object.entries(skills)) {
+      const file = path.join(this.dirs[scope], name, "SKILL.md");
+      const existed = this.fileSystem.existsSync(file);
+      let same = false;
+      if (existed) {
+        try { same = this.fileSystem.readFileSync(file, "utf-8") === content; } catch { same = false; }
+      }
+      let changed = !same;
+      if (!same) {
+        await this.fileSystem.ensureDir(path.dirname(file));
+        await this.fileSystem.writeFile(file, content, "utf-8");
+      }
+      // A skill may ship reference files beside its SKILL.md (resources/skills/<name>/**). Each is
+      // refreshed the same way: written only when it differs, so a no-op run stays a no-op.
+      for (const [rel, body] of Object.entries(this.getSkillReferences(name))) {
+        const target = path.join(this.dirs[scope], name, rel);
+        let current: string | null = null;
+        try { current = this.fileSystem.readFileSync(target, "utf-8"); } catch { current = null; }
+        if (current === body) continue;
+        await this.fileSystem.ensureDir(path.dirname(target));
+        await this.fileSystem.writeFile(target, body, "utf-8");
+        changed = true;
+      }
+      if (!changed) { report.unchanged.push(name); continue; }
+      (existed ? report.updated : report.created).push(name);
+    }
   }
 
   private emptyReport(scope: SkillScope): SyncReport {
@@ -165,7 +191,7 @@ export class ConducksInstaller {
    * a partial uninstall leaves exactly the stale copy the sync rule exists to prevent.
    */
   public async remove(scopes?: SkillScope[]): Promise<Array<{ scope: SkillScope; dir: string; removed: string[] }>> {
-    const targets = scopes ?? (["global", "local"] as SkillScope[]).filter(s => this.isInstalled(s));
+    const targets = scopes ?? (["global", "local", "agents", "antigravity"] as SkillScope[]).filter(s => this.isInstalled(s));
     const owned = [...Object.keys(this.getDynamicSkillTemplates()), ...RETIRED_SKILLS];
     const out: Array<{ scope: SkillScope; dir: string; removed: string[] }> = [];
 

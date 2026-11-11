@@ -3,243 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mirror — Exclusive v3.0</title>
-  
-  <!-- Core engines, vendored — see vendor/README.md. Local because the dashboard rendered
-       nothing without a network, and force-graph was loaded with no version pin at all. -->
-  <script src="vendor/d3-force.min.js"></script>
-  <script src="vendor/force-graph.min.js"></script>
-
+  <title>Conducks Mirror</title>
+  <!-- No library and no network: three static files, drawn with plain DOM and SVG (ADR 0027). -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- 🛰️ LOADING -->
-  <div id="loading-overlay">
-    <div class="spinner"></div>
-    <div class="overlay-caption">Reading the vault</div>
+  <div id="stage" class="stage"></div>
+  <header class="hud">
+    <div class="ident">
+      <img class="ident-logo" src="logo.png" alt="Conducks">
+      <span id="project-name" class="ident-name">mirror</span>
+    </div>
+    <div id="strip" class="strip"></div>
+    <div class="search">
+      <input id="search" class="search-input" type="search" placeholder="search" autocomplete="off" spellcheck="false">
+      <ul id="search-results" class="search-results" hidden></ul>
+    </div>
+    <span id="live" class="live"></span>
+  </header>
+  <div class="trail">
+    <nav id="crumbs" class="crumbs"></nav>
+    <span id="project-summary" class="trail-sum">reading the graph</span>
   </div>
-
-  <!-- 🎮 UNIFIED COMMAND DECK (Conducks v0.8.0) -->
-  <aside id="command-deck" class="command-deck">
-    <nav class="deck-rail">
-      <button class="dock-item" id="btn-collapse" title="Toggle Sidebar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-      </button>
-      <div class="rail-divider"></div>
-      <button class="dock-item active" id="dock-discovery" title="Find">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-      </button>
-      <button class="dock-item" id="dock-physics" title="Forces">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-      </button>
-      <button class="dock-item" id="dock-trace" title="Trace">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-      </button>
-      <button class="dock-item" id="dock-docs" title="Docs — todos & decisions">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-      </button>
-      <button class="dock-item" id="dock-governance" title="Governance">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-      </button>
-    </nav>
-
-    <div class="deck-content custom-scrollbar">
-      <!-- DISCOVERY -->
-      <div id="slate-discovery">
-        <header class="slate-header">
-          <div class="search-shield">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="origin-search" placeholder="Search symbols" autocomplete="off">
-            <button id="btn-clear-search" class="search-clear-btn" style="display: none;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-            <kbd class="search-kbd">/</kbd>
-          </div>
-        </header>
-
-        <div class="slate-body">
-          <section class="deck-section">
-            <div class="section-header">
-              <span class="section-title">Layers</span>
-              <div class="section-badge" id="layer-count">7</div>
-            </div>
-            <div id="layer-filters" class="filter-grid"></div>
-          </section>
-
-          <section class="deck-section">
-            <div class="section-header">
-              <span class="section-title">Clusters</span>
-              <div class="section-badge" id="cluster-count">...</div>
-            </div>
-            <div id="cluster-filters" class="cluster-stack"></div>
-          </section>
-        </div>
-      </div>
-
-      <!-- FORCES -->
-      <div id="slate-physics" style="display: none;">
-        <header class="slate-header">
-          <h2 class="slate-title">Forces</h2>
-        </header>
-        <div class="slate-body">
-           <section class="deck-section">
-              <p class="field-label">Presets</p>
-              <div class="preset-grid">
-                <button class="preset-btn" data-preset="hubs">Hubs</button>
-                <button class="preset-btn" data-preset="depth">Depth</button>
-                <button class="preset-btn" data-preset="atomic">Atomic</button>
-              </div>
-           </section>
-
-           <section class="deck-section">
-             <div class="control-row">
-               <div class="control-meta">
-                 <span class="control-label">Repulsion</span>
-                 <span id="label-repulsion" class="control-value">-2000</span>
-               </div>
-               <input type="range" id="ctrl-repulsion" class="deck-slider" min="-8000" max="-200" value="-2000">
-             </div>
-             
-             <div class="control-row">
-              <div class="control-meta">
-                <span class="control-label">Spread</span>
-                <span id="label-spread" class="control-value">2000</span>
-              </div>
-              <input type="range" id="ctrl-spread" class="deck-slider" min="500" max="10000" step="100" value="2000">
-            </div>
-           </section>
-        </div>
-      </div>
-
-      <!-- DOCS -->
-      <div id="slate-docs" style="display: none;">
-        <header class="slate-header">
-          <h2 class="slate-title">Docs</h2>
-        </header>
-        <div class="slate-body" id="docs-panel">
-          <p class="panel-state">Opens when you select this panel.</p>
-        </div>
-      </div>
-
-      <!-- GOVERNANCE -->
-      <div id="slate-governance" style="display: none;">
-        <header class="slate-header">
-          <h2 class="slate-title">Governance</h2>
-        </header>
-        <div class="slate-body" id="governance-panel">
-          <p class="panel-state">Opens when you select this panel.</p>
-        </div>
-      </div>
-
-      <!-- TRACE -->
-      <div id="slate-trace" style="display: none;">
-        <header class="slate-header">
-          <h2 class="slate-title">Trace</h2>
-        </header>
-        <div class="slate-body">
-          <section class="deck-section">
-            <p class="field-label">Direction</p>
-            <div class="shield-select">
-              <select id="trace-direction">
-                <option value="downstream">Downstream — what this reaches</option>
-                <option value="upstream">Upstream — what reaches this</option>
-                <option value="bidirectional">Both directions</option>
-              </select>
-              <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </div>
-            <button id="btn-clear-isolation" class="action-btn-primary">Clear focus</button>
-          </section>
-        </div>
-      </div>
-    </div>
-  </aside>
-
-  <div class="fixed-bottom-status">
-    <div class="status-row">
-       <div class="status-pill">
-         <div class="pulse-dot"></div>
-         <span id="sync-status">Synced</span>
-       </div>
-       <span id="wave-scope" class="wave-scope"></span>
-       <span class="status-version">Conducks v0.8.0</span>
-    </div>
-  </div>
-
-  <div id="focus-indicator" class="focus-indicator" style="display: none;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-    <span class="focus-label">Focused</span>
-  </div>
-
-  <!-- 🧊 MAIN GRAPH -->
-  <div id="graph-container"></div>
-  
-  <!-- 🔪 DETAIL PANEL (v3.0.0 Exclusive Glass) -->
-  <section id="node-inspector">
-    <div class="inspector-hero">
-      <div class="inspector-hero-row">
-        <div class="inspector-ident">
-          <h3 id="ins-name" class="inspector-name">Symbol</h3>
-          <p id="ins-type" class="inspector-kind">Kind</p>
-        </div>
-        <div id="ins-level" class="badge">Layer</div>
-      </div>
-    </div>
-    
-    <div class="inspector-body custom-scrollbar">
-      <!-- SKELETON -->
-      <div class="skeleton-container">
-        <div class="skeleton-box is-bar"></div>
-        <div class="metric-pair">
-          <div class="skeleton-box is-block"></div>
-          <div class="skeleton-box is-block"></div>
-        </div>
-      </div>
-
-      <!-- CONTENT -->
-      <div class="content-container">
-        <div class="inspector-field">
-          <p class="field-label">Lives in</p>
-          <span id="ins-cluster" class="field-value">-</span>
-        </div>
-
-        <div class="metric-pair">
-          <div class="metric-pill">
-            <p class="metric-label">Degree</p>
-            <span id="ins-degree" class="metric-value">0</span>
-          </div>
-          <div class="metric-pill">
-            <p class="metric-label">Mass</p>
-            <span id="ins-mass" class="metric-value">1.00</span>
-          </div>
-        </div>
-
-        <div id="ins-meat" class="inspector-deep opacity-0">
-          <p class="field-label">Measured on the node</p>
-          <div class="metric-list">
-            <div class="metric-pill is-row">
-              <p class="metric-label">Entropy</p>
-              <span id="ins-entropy" class="metric-value">-</span>
-            </div>
-            <div class="metric-pill is-row">
-              <p class="metric-label">Complexity</p>
-              <span id="ins-complexity" class="metric-value">-</span>
-            </div>
-            <div class="metric-pill is-row">
-              <p class="metric-label">Resonance</p>
-              <span id="ins-resonance" class="metric-value">-</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="inspector-footer">
-       <button id="btn-reset-view-panel" class="action-btn-hd" style="background: rgba(255,255,255,0.05); color: var(--exclusive-text-muted); border: 1px solid var(--glass-border);">Clear focus</button>
-    </div>
-  </section>
-
-  <!-- Execution Logic -->
-  <script src="resonance.js"></script>
-  <script src="ui.js"></script>
+  <p id="verdict" class="verdict"></p>
+  <aside id="card" class="card" hidden></aside>
+  <script src="app.js"></script>
 </body>
 </html>

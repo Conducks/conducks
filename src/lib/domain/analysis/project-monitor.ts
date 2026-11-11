@@ -1,21 +1,18 @@
 import { VAULT_DIR, VAULT_DB_FILENAME, SOURCE_EXTENSIONS } from "@/contracts/index.js";
 import { readWatcherLiveness, type WatcherLiveness } from "@/lib/domain/evolution/index.js";
-import { moduleHashOf } from "@/lib/domain/analysis/module-hash.js";
 import fs from "node:fs";
 import path from "node:path";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
-import { buildBoard } from "@/lib/domain/docs/index.js";
 import { ProjectRegistry, type RegisteredProject } from "@/lib/domain/federation/index.js";
 import { branchMismatch, ChronicleInterface } from "@/lib/core/git/index.js";
 
 /**
  * Conducks — Cross-Project Monitor
  *
- * One report covering every registered project: has the graph fallen behind the code, do the docs
- * violate the grammar, and which modules changed under an architecture note that still describes the
- * old shape (todo17 Phases 2 and 3).
+ * One report covering every registered project: has the graph fallen behind the code, and is anything
+ * keeping it fresh.
  *
  * REPORT ONLY. It never analyzes, never writes to a vault, never edits a doc and never fails a build —
  * an always-on process that does any of those gets turned off, and then it reports nothing at all. Every
@@ -27,16 +24,6 @@ import { branchMismatch, ChronicleInterface } from "@/lib/core/git/index.js";
  * or formatter run; comparing content hashes says WHICH files actually differ, and that is what makes
  * the per-module answer possible at all.
  */
-
-export interface ModuleDrift {
-  /** Module path relative to the project root, e.g. `src/lib/core/parsing`. */
-  module: string;
-  changedFiles: number;
-  /** The authored note describing this module, if one exists. */
-  moduleDoc?: string;
-  /** True when the note exists and has not been reviewed against this exact code. */
-  needsDocReview: boolean;
-}
 
 export interface ProjectReport {
   name: string;
@@ -58,11 +45,6 @@ export interface ProjectReport {
     /** The graph holds something WRONG: changed or removed. Never set by `added` alone. */
     stale: boolean;
   };
-  docs: {
-    violations: number;
-    warnings: number;
-    unlinkedDecisions: number;
-  };
   /**
    * Branch identity — a freshness dimension the hashes cannot express (ADR 0035, todo20#P1).
    *
@@ -79,7 +61,6 @@ export interface ProjectReport {
     /** Both sides are a real branch name and they differ. Null on either side is NOT a mismatch. */
     mismatch: boolean;
   };
-  drift: ModuleDrift[];
   /**
    * Whether anything is keeping this project's graph fresh.
    *
@@ -109,11 +90,9 @@ export class ProjectMonitor {
       name: project.name,
       root: project.root,
       graph: { analyzed: false, changed: 0, added: 0, removed: 0, tracked: 0, stale: false },
-      docs: { violations: 0, warnings: 0, unlinkedDecisions: 0 },
       // Read here for the same reason as `watcher`: it survives every early return, and a project
       // with no repository legitimately answers null on both sides.
       branch: { vault: null, checkout: this.checkoutBranch(project.root), mismatch: false },
-      drift: [],
       // Read here, in `base`, so it survives every early return below: a project whose vault is
       // unreadable is exactly one where "is anything watching it?" is worth knowing.
       watcher: readWatcherLiveness(project.root),
@@ -122,16 +101,6 @@ export class ProjectMonitor {
     if (!fs.existsSync(project.root)) {
       return { ...base, unavailable: "root does not exist on disk" };
     }
-
-    // Docs first: it needs no vault, so a project that has never been analyzed still gets a docs answer.
-    try {
-      const board = buildBoard(project.root);
-      base.docs = {
-        violations: board.lint.reduce((n, l) => n + l.errs.length, 0),
-        warnings: board.warns.reduce((n, w) => n + w.errs.length, 0),
-        unlinkedDecisions: board.unlinked.length,
-      };
-    } catch { /* no docs/ is not a problem to report */ }
 
     const vault = path.join(project.root, VAULT_DIR, VAULT_DB_FILENAME);
     if (!fs.existsSync(vault)) return base;                    // analyzed: false
@@ -166,7 +135,6 @@ export class ProjectMonitor {
       base.graph.added = fresh.added.length;
       base.graph.removed = fresh.removed.length;
       base.graph.stale = isStale(fresh);
-      base.drift = this.moduleDrift(project.root, [...fresh.added, ...fresh.changed]);
     } catch (err: any) {
       return { ...base, unavailable: `vault unreadable: ${err?.message ?? err}` };
     } finally {
@@ -174,125 +142,6 @@ export class ProjectMonitor {
     }
 
     return base;
-  }
-
-  /**
-   * Groups changed files by the deepest module that has an authored note, so the report says
-   * "core/parsing changed" rather than listing forty files.
-   *
-   * The note path mirrors the source path — `src/lib/core/parsing` →
-   * `docs/modules/core/parsing/MODULE.md` — so the mapping is a path translation, with the
-   * `src/lib/` prefix dropped because the notes are organised by layer, not by source root.
-   */
-  private moduleDrift(root: string, changedPaths: string[]): ModuleDrift[] {
-    const byModule = new Map<string, number>();
-
-    for (const abs of changedPaths) {
-      const rel = path.relative(root, abs);
-      const dir = path.dirname(rel);
-      byModule.set(dir, (byModule.get(dir) ?? 0) + 1);
-    }
-
-    const reviews = this.readReviews(root);
-    const out: ModuleDrift[] = [];
-
-    for (const [module, changedFiles] of [...byModule.entries()].sort((a, b) => b[1] - a[1])) {
-      const doc = this.findModuleDoc(root, module);
-      let needsDocReview = false;
-      if (doc) {
-        // A dismissal is bound to the code it was checked against: the combined hash of the module's
-        // files at the time. Change the module again and the hash moves, so the flag comes back —
-        // "checked, still accurate" cannot silence a note forever (todo17 Phase 3).
-        const record = reviews[module] ?? "";
-        needsDocReview = record.split("|")[0] !== this.moduleHash(root, module);
-      }
-      out.push({ module, changedFiles, moduleDoc: doc, needsDocReview });
-    }
-    return out;
-  }
-
-  /** Walks up from the changed directory to the nearest MODULE.md, so a leaf file still finds its note. */
-  private findModuleDoc(root: string, moduleDir: string): string | undefined {
-    // src/lib/core/parsing -> core/parsing ; src/interfaces/cli -> interfaces/cli
-    let rel = moduleDir.replace(/^src\/(lib\/)?/, "");
-    while (rel && rel !== "." && rel !== "/") {
-      const candidate = path.join("docs", "modules", rel, "MODULE.md");
-      if (fs.existsSync(path.join(root, candidate))) return candidate;
-      const parent = path.dirname(rel);
-      if (parent === rel) break;
-      rel = parent;
-    }
-    return undefined;
-  }
-
-  /** Combined hash of every source file directly in a module directory. */
-  public moduleHash(root: string, moduleDir: string): string {
-    // ONE implementation with docs-board's drift check (todo21's acceptance): both used to carry a
-    // copy coupled by a "must match" comment — the shared function is what makes matching a fact.
-    return moduleHashOf(path.join(root, moduleDir));
-  }
-
-  /** Dismissals live in the PROJECT, beside its vault — they are a fact about this code, not this machine. */
-  private reviewsPath(root: string): string {
-    return path.join(root, ".conducks", "doc-reviews.json");
-  }
-
-  private readReviews(root: string): Record<string, string> {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this.reviewsPath(root), "utf8"));
-      return typeof parsed === "object" && parsed !== null ? parsed : {};
-    } catch {
-      return {};
-    }
-  }
-
-  /**
-   * Marks a module's note as checked against its current code.
-   *
-   * Two shapes, because the two cases are not the same claim:
-   *
-   *  - no `intent` — "checked, still accurate". The escape hatch that stops a bug fix from demanding a
-   *    doc edit. Most changes are this.
-   *  - with `intent` — an ENHANCEMENT, whose intent has to land somewhere a reader will find it: an
-   *    architecture note, a decision record or a todo. The address is verified to exist, so the record
-   *    cannot point at a doc nobody wrote. A change that adds a capability and says only "still
-   *    accurate" has lost the reason it was made, and no later reader can recover it.
-   */
-  public dismissReview(root: string, moduleDir: string, intent?: string): { hash: string; intent?: string } {
-    const reviews = this.readReviews(root);
-    const hash = this.moduleHash(root, moduleDir);
-    reviews[moduleDir] = intent ? `${hash}|${intent}` : hash;
-    try {
-      fs.mkdirSync(path.dirname(this.reviewsPath(root)), { recursive: true });
-      fs.writeFileSync(this.reviewsPath(root), JSON.stringify(reviews, null, 2) + "\n");
-    } catch { /* a dismissal that cannot be stored simply re-appears */ }
-    return { hash, intent };
-  }
-
-  /**
-   * Whether an intent address names a doc that actually exists — `0027`, `todo17`, `todo17#P3`, or a
-   * path to an architecture note. An address pointing at nothing is refused rather than stored, because
-   * the whole point of requiring one is that a reader can follow it.
-   */
-  public resolveIntent(root: string, intent: string): string | undefined {
-    const bare = intent.split("#")[0];
-
-    if (/^\d{4}$/.test(bare)) {
-      const dir = path.join(root, "docs", "decisions");
-      try {
-        const hit = fs.readdirSync(dir).find(f => f.startsWith(`${bare}-`) && f.endsWith(".md"));
-        if (hit) return path.join("docs", "decisions", hit);
-      } catch { /* no decisions dir */ }
-      return undefined;
-    }
-
-    if (/^todo\d+$/.test(bare)) {
-      const rel = path.join("docs", "todos", `${bare}.md`);
-      return fs.existsSync(path.join(root, rel)) ? rel : undefined;
-    }
-
-    // Anything else is treated as a path, so an architecture note can be named directly.
-    return fs.existsSync(path.join(root, intent)) ? intent : undefined;
   }
 
   /**

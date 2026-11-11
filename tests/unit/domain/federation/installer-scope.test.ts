@@ -22,16 +22,9 @@ describe('conducks-installer — global is the only scope', () => {
   let home = '';
   let fs: typeof fsExtra;
 
-  // The real homedir() is not writable in a test, so the global scope is redirected onto a temp dir
-  // through the injected filesystem — path shape stays identical, nothing touches the real ~.
-  const installerFor = (proj: string) => {
-    const inst = new ConducksInstaller(proj, fs);
-    (inst as unknown as { dirs: Record<string, string> }).dirs = {
-      global: path.join(home, '.claude', 'skills'),
-      local: path.join(proj, '.claude', 'skills'),
-    };
-    return inst;
-  };
+  // The real homedir() is not writable in a test, so home is a temp dir — path shape stays
+  // identical, nothing touches the real ~.
+  const installerFor = (proj: string) => new ConducksInstaller(proj, fs, home);
 
   const globalSkill = (name: string) => path.join(home, '.claude', 'skills', name, 'SKILL.md');
   const localSkill = (name: string) => path.join(project, '.claude', 'skills', name, 'SKILL.md');
@@ -53,101 +46,91 @@ describe('conducks-installer — global is the only scope', () => {
     expect(reports[0].scope).toBe('global');
     expect(reports[0].created.length).toBeGreaterThan(0);
     expect(reports[0].updated).toEqual([]);
-    expect(existsSync(globalSkill('conducks-docs'))).toBe(true);
+    expect(existsSync(globalSkill('conducks'))).toBe(true);
     expect(existsSync(path.join(project, '.claude', 'skills'))).toBe(false);
   });
 
-  it('ships a skill\'s reference files beside its SKILL.md, and refreshes them in place', async () => {
+  it('leaves the documentation and visuals skills alone: they no longer ship, and are not conducks\'s to delete', async () => {
+    for (const old of ['conducks-docs', 'conducks-visuals']) {
+      mkdirSync(path.dirname(globalSkill(old)), { recursive: true });
+      writeFileSync(globalSkill(old), 'the owner\'s documentation standard');
+    }
     const inst = installerFor(project);
-    await inst.sync();
-    const ref = path.join(home, '.claude', 'skills', 'conducks-visuals', 'references', 'pages.md');
-    expect(existsSync(ref)).toBe(true);
-
-    writeFileSync(ref, 'stale');
     const [report] = await inst.sync();
-    expect(report.updated).toContain('conducks-visuals');
-    expect(readFileSync(ref, 'utf-8')).not.toBe('stale');
-    expect((await inst.sync())[0].unchanged).toContain('conducks-visuals');
+    expect(report.retired).toEqual([]);
+    await inst.remove();
+    for (const old of ['conducks-docs', 'conducks-visuals']) {
+      expect(readFileSync(globalSkill(old), 'utf-8')).toBe('the owner\'s documentation standard');
+    }
+    expect(existsSync(globalSkill('conducks'))).toBe(false); // uninstall still removes what conducks ships
   });
 
-  it('claims no work it did not do on a second run', async () => {
-    const inst = installerFor(project);
-    await inst.sync();
-    const second = await inst.sync();
-
-    expect(second[0].created).toEqual([]);
-    expect(second[0].updated).toEqual([]);
-    expect(second[0].unchanged.length).toBeGreaterThan(0);
-  });
-
-  it('prunes a repo-local copy, because it would load twice against the global one', async () => {
-    const stale = localSkill('conducks-docs');
-    mkdirSync(path.dirname(stale), { recursive: true });
-    writeFileSync(stale, 'an old version from a previous conducks release');
-
-    const reports = await installerFor(project).sync();
-    const local = reports.find(r => r.scope === 'local');
-
-    expect(local).toBeDefined();
-    expect(local!.superseded).toContain('conducks-docs');
-    expect(existsSync(stale)).toBe(false);
-    // The global copy is the one that survives, and it is current.
-    expect(readFileSync(globalSkill('conducks-docs'), 'utf-8')).toContain('name: conducks-docs');
-  });
-
-  it('leaves a skill conducks does not own alone in the local directory it prunes', async () => {
-    const mine = localSkill('my-own-skill');
-    mkdirSync(path.dirname(mine), { recursive: true });
-    writeFileSync(mine, 'mine');
-    const stale = localSkill('conducks-docs');
-    mkdirSync(path.dirname(stale), { recursive: true });
-    writeFileSync(stale, 'old');
-
-    await installerFor(project).sync();
-
-    expect(existsSync(stale)).toBe(false);
-    expect(readFileSync(mine, 'utf-8')).toBe('mine');
-    // Pruning is per-skill, so the shared directory itself must survive.
-    expect(existsSync(path.join(project, '.claude', 'skills'))).toBe(true);
-  });
-
-  it('reports no local scope at all when there is nothing to prune', async () => {
-    const reports = await installerFor(project).sync();
-    expect(reports.map(r => r.scope)).toEqual(['global']);
-  });
-
-  it('refreshes the global copy in place rather than deleting it', async () => {
-    const inst = installerFor(project);
-    await inst.sync();
-    writeFileSync(globalSkill('conducks-docs'), 'hand-edited, and out of date');
-
-    const reports = await inst.sync();
-
-    expect(reports[0].updated).toContain('conducks-docs');
-    expect(reports[0].created).not.toContain('conducks-docs');
-    expect(readFileSync(globalSkill('conducks-docs'), 'utf-8')).toContain('name: conducks-docs');
-  });
-
-  it('uninstall clears every scope that has them and leaves foreign skills alone', async () => {
-    const inst = installerFor(project);
-    await inst.sync();
-    // A local copy predating the global-only rule is exactly what uninstall must still reach.
-    mkdirSync(path.dirname(localSkill('conducks-docs')), { recursive: true });
-    writeFileSync(localSkill('conducks-docs'), 'old local copy');
-    const foreign = localSkill('my-own-skill');
-    mkdirSync(path.dirname(foreign), { recursive: true });
-    writeFileSync(foreign, 'mine');
-
-    const reports = await inst.remove();
-
-    expect(reports.map(r => r.scope).sort()).toEqual(['global', 'local']);
-    expect(existsSync(path.join(home, '.claude', 'skills', 'conducks-docs'))).toBe(false);
-    expect(existsSync(path.join(project, '.claude', 'skills', 'conducks-docs'))).toBe(false);
-    expect(existsSync(foreign)).toBe(true);
+  it('still retires a skill that was merged into another', async () => {
+    mkdirSync(path.dirname(globalSkill('conducks-guide')), { recursive: true });
+    writeFileSync(globalSkill('conducks-guide'), 'from an earlier release');
+    const [report] = await installerFor(project).sync();
+    expect(report.retired).toEqual(['conducks-guide']);
+    expect(existsSync(globalSkill('conducks-guide'))).toBe(false);
   });
 
   it('points global at the real ~/.claude/skills by default', () => {
     expect(new ConducksInstaller(project, fs).dirFor('global'))
       .toBe(path.join(homedir(), '.claude', 'skills'));
+  });
+
+  /**
+   * Codex, Gemini CLI and Antigravity read the same SKILL.md format from their own folders
+   * (ADR 0198). Each is written only when that agent is on the machine.
+   */
+  describe('other agents', () => {
+    const agents = (name: string) => path.join(home, '.agents', 'skills', name, 'SKILL.md');
+    const antigravity = (name: string) => path.join(home, '.gemini', 'config', 'skills', name, 'SKILL.md');
+
+    it('writes nowhere else when no other agent is installed', async () => {
+      await installerFor(project).sync();
+      expect(existsSync(path.join(home, '.agents'))).toBe(false);
+      expect(existsSync(path.join(home, '.gemini'))).toBe(false);
+    });
+
+    it('installs into ~/.agents/skills when Codex is present', async () => {
+      mkdirSync(path.join(home, '.codex'));
+      const reports = await installerFor(project).sync();
+      expect(reports.map(r => r.scope)).toEqual(['global', 'agents']);
+      expect(readFileSync(agents('conducks'), 'utf-8')).toBe(readFileSync(globalSkill('conducks'), 'utf-8'));
+      expect(existsSync(antigravity('conducks'))).toBe(false);
+    });
+
+    it('installs into ~/.agents/skills when Gemini CLI is present', async () => {
+      mkdirSync(path.join(home, '.gemini'));
+      writeFileSync(path.join(home, '.gemini', 'settings.json'), '{}');
+      await installerFor(project).sync();
+      expect(existsSync(agents('conducks'))).toBe(true);
+    });
+
+    it('installs into ~/.gemini/config/skills when Antigravity is present', async () => {
+      mkdirSync(path.join(home, '.gemini', 'antigravity'), { recursive: true });
+      await installerFor(project).sync();
+      expect(existsSync(antigravity('conducks'))).toBe(true);
+    });
+
+    it('prunes retired skills there, and leaves the user\'s own skills alone', async () => {
+      mkdirSync(path.join(home, '.codex'));
+      const retired = agents('conducks-guide');
+      const mine = agents('pentest-master');
+      for (const f of [retired, mine]) { mkdirSync(path.dirname(f), { recursive: true }); writeFileSync(f, 'x'); }
+      await installerFor(project).sync();
+      expect(existsSync(retired)).toBe(false);
+      expect(readFileSync(mine, 'utf-8')).toBe('x');
+    });
+
+    it('uninstall clears them too', async () => {
+      mkdirSync(path.join(home, '.codex'));
+      mkdirSync(path.join(home, '.gemini', 'antigravity'), { recursive: true });
+      const inst = installerFor(project);
+      await inst.sync();
+      await inst.remove();
+      expect(existsSync(agents('conducks'))).toBe(false);
+      expect(existsSync(antigravity('conducks'))).toBe(false);
+    });
   });
 });

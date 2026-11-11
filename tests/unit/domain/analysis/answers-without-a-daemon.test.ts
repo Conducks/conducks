@@ -13,7 +13,7 @@ import { writeWatcherMarker, clearWatcherMarker } from '@/lib/domain/evolution/w
  * pull request, so every command must answer correctly with nothing running at all.
  *
  * The sharp version of that rule, and what these tests pin: watcher liveness is purely DIAGNOSTIC.
- * The substantive answer — graph freshness, docs violations, drifted notes — must be byte-identical
+ * The substantive answer — graph freshness — must be byte-identical
  * whether a watcher is live, dead, or was never started. If liveness ever leaks into the answer, the
  * report becomes a function of what happens to be running on the machine reading it, and two people
  * asking the same question about the same commit get different results.
@@ -23,9 +23,7 @@ const mkProject = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-cold-'));
   tmp.push(root);
   fs.mkdirSync(path.join(root, 'src', 'lib', 'foo'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'docs', 'modules', 'foo'), { recursive: true });
   fs.writeFileSync(path.join(root, 'src', 'lib', 'foo', 'a.ts'), 'export const a = 1;\n');
-  fs.writeFileSync(path.join(root, 'docs', 'modules', 'foo', 'MODULE.md'), '# foo\n');
   return root;
 };
 afterEach(() => { while (tmp.length) fs.rmSync(tmp.pop()!, { recursive: true, force: true }); });
@@ -102,7 +100,7 @@ describe('watcher liveness never changes the answer', () => {
     // one agent added a field to `ProjectReport` while another was asserting its exact shape — and a
     // `toContain` here would have let the next such change through silently, which is the whole
     // thing it exists to prevent.
-    expect(Object.keys(substance(cold)).sort()).toEqual(['branch', 'docs', 'drift', 'graph', 'name', 'root']);
+    expect(Object.keys(substance(cold)).sort()).toEqual(['branch', 'graph', 'name', 'root']);
     expect(substance(live)).toEqual(substance(cold));
     expect(substance(dead)).toEqual(substance(cold));
   });

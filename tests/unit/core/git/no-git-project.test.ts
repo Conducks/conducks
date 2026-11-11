@@ -7,7 +7,6 @@ import { branchGuard } from '@/interfaces/cli/index.js';
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ProjectMonitor } from '@/lib/domain/analysis/index.js';
 import { ProjectRegistry } from '@/lib/domain/federation/index.js';
-import { buildBoard } from '@/lib/domain/docs/index.js';
 
 /**
  * A project with NO git keeps answering everything it answers today (ADR 0035).
@@ -84,18 +83,6 @@ describe('a directory with no .git', () => {
       expect(rows.map(r => r.name)).toEqual(['alpha', 'beta']);
     } finally { await p.close(); }
   }, 60000);
-
-  it('LINTS: docs are read and graded with no repository present', () => {
-    const root = mkPlainDir();
-    fs.mkdirSync(path.join(root, 'docs', 'todos'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'docs', 'todos', 'todo01.md'), '# todo01 — a thing\n\nStatus: nonsense\n');
-
-    const board = buildBoard(root);
-
-    // The grammar reads authored markdown and the filesystem; git is not in that path and must not
-    // become a precondition for it.
-    expect(board.lint.reduce((n, l) => n + l.errs.length, 0)).toBeGreaterThan(0);
-  }, 30000);
 
   it('MONITORS: freshness is answered by hashing, with no branch line to report', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-home-'));

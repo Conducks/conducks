@@ -27,6 +27,18 @@ import { ensureBuild, mkGitRepo, writeFile, commit, runCli, rmRepo } from './hel
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../build/src/interfaces/cli/index.js');
 
+/** A same-shaped list arrives as `{cols, rows}` (todo82); a client turns it back into objects. */
+function untable(v: any): any {
+  if (Array.isArray(v)) return v.map(untable);
+  if (v && typeof v === 'object') {
+    if (Array.isArray(v.cols) && Array.isArray(v.rows) && Object.keys(v).length === 2) {
+      return v.rows.map((r: unknown[]) => Object.fromEntries(v.cols.map((c: string, i: number) => [c, r[i]])));
+    }
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, untable(x)]));
+  }
+  return v;
+}
+
 async function callTool(cwd: string, name: string, args: unknown): Promise<any> {
   const proc = spawn('node', [CLI, 'mcp'], { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
   let buf = '';
@@ -55,7 +67,7 @@ async function callTool(cwd: string, name: string, args: unknown): Promise<any> 
       let msg: any; try { msg = JSON.parse(line); } catch { continue; }
       if (msg.id !== 2) continue;
       const text = msg.result?.content?.[0]?.text ?? JSON.stringify(msg.error ?? msg.result);
-      return JSON.parse(text);
+      return untable(JSON.parse(text));
     }
     throw new Error(`no response for id 2 within deadline; buffer tail: ${buf.slice(-500)}`);
   } finally {

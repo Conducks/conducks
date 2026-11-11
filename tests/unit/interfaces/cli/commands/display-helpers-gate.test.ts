@@ -46,8 +46,6 @@ const KNOWN_DEBT: Record<string, string> = {
   // passing; a future pass should sweep these the same way this one swept its own four files.
   'context.ts': 'Not W1-owned this phase; L87 prints a raw ${resolvedId} in its "not found" message.',
   'coverage.ts': 'Not W1-owned this phase; L111 prints a raw ${d.file} in its report.',
-  'docs-lint.ts': 'Not W1-owned this phase; L65/L81 print a raw ${l.file} lint-finding path.',
-  'docs-status.ts': 'Not W1-owned this phase; L160 prints a raw ${w.file} warning path (its L126 ${d.id} is a docs-board entry id, not a graph node id — see SCANNER_EXEMPTIONS).',
   'explain.ts': 'Not W1-owned this phase; L57/L65 print a raw ${symbolId} in error messages.',
   'guard.ts': 'Not W1-owned this phase; L67 prints a raw ${h.file} rejected-hotspot path.',
   'impact.ts': 'Not W1-owned this phase; L71 prints raw ${resolvedId}/${symbolId}, L257 a raw ${rootId}.',
@@ -59,8 +57,6 @@ const KNOWN_DEBT: Record<string, string> = {
   // dropped because this scanner cannot prove that without deeper analysis of `projectRoot`'s
   // origin in each file, and asserting it confidently is exactly the kind of hand-judgment this
   // gate exists to not rely on.
-  'bootstrap-docs.ts': 'Not W1-owned this phase; L25 path.basename(projectRoot) — likely a false positive (project label, not a stored path), unconfirmed.',
-  'record.ts': 'Not W1-owned this phase; L46 path.basename(projectRoot) — likely a false positive (project label, not a stored path), unconfirmed.',
 
   // help.ts's `${cmd.id}` is a CLI COMMAND id (`"query"`, `"rename"`, ...) — a fixed, always-
   // lowercase vocabulary this tool defines itself, never a file-path-derived, case-losing node id.

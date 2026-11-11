@@ -334,7 +334,7 @@ export class ConducksWatcher {
       // edit to the calling file, because the fresh CALLS edge never bound to anything.
       const resolvedEdges = this.intraLinker.resolve(this.graph.getGraph());
       const g0 = this.graph.getGraph();
-      for (const r of resolvedEdges) g0.retargetEdge(r.id, r.newTargetId);
+      g0.retargetEdges(resolvedEdges);
 
       // 4. Kinetic Resonance Mapping
       if (changedLines.length > 0) {

@@ -329,8 +329,7 @@ export class SynapsePersistence {
       return [
         `🛡️ [Vault Locked] Another process is WRITING this vault${pid ? ` (PID ${pid})` : ""}, so it cannot be read right now.`,
         `  That is almost always a running 'conducks analyze' — one writer at a time, by design.`,
-        `  Wait for it to finish and retry. Docs-layer tools (docs-status, docs-lint, conducks_docs)`,
-        `  take no connection and keep working throughout.`,
+        `  Wait for it to finish and retry.`,
         `  Vault: ${dbPath}`,
       ].join("\n");
     }
@@ -1104,27 +1103,28 @@ export class SynapsePersistence {
       const exec = async (sql: string) => { await db.run(sql); };
       const owned = !this.inPulse;
       if (owned) await exec("BEGIN TRANSACTION");
-      // PER-ROW ON PURPOSE, and the only survivor of the todo22#P8 sweep. Batching this into
-      // `updateFromValues` — the same helper `updateRanks` above uses safely on `nodes` — fails the
-      // pulse with `PRIMARY KEY or UNIQUE constraint violation: duplicate key "semantic::...
-      // ::type_reference"` on an edge id the statement never writes. Reproducible; reverting this
-      // one call and leaving the other two batched runs clean. Almost certainly the same DuckDB
-      // index bug ADR 0041 documents (duckdb/duckdb#2241, #16520, #16604) reached from a third
-      // direction, since `edges` has just taken a large insert in this transaction — but the
-      // mechanism is NOT established, and 1,566 statements at 364 ms is not worth guessing at.
-      // Capture the statement log and shrink it before trying again: todo22#P8.
+      // BATCHED again (todo82), after being per-row since 2026-07-30 (todo22#P8). The per-row form
+      // dodged a `PRIMARY KEY or UNIQUE constraint violation: duplicate key "semantic::...
+      // ::type_reference"` that a batched `updateFromValues` hit on an edge id it never wrote, most
+      // likely the DuckDB index bug ADR 0041 documents. Re-tested 2026-11-11 on @duckdb/node-api
+      // 1.5.5-r.3: three forced and one incremental analyze of conducks, a forced analyze of
+      // scraper, sofie and orchestrator, and `oracle:incremental`, with no failure and identical
+      // graphs. Per row cost 1.9 s for 5,565 rebinds. If the duplicate-key error comes back,
+      // revert to one prepared UPDATE per row and capture the statement log (`CONDUCKS_SQL_LOG`).
       // Confidence is raised with the target, for the reason in `rebindEdgeTarget`: a resolved
       // edge is no longer a guess. Without this, ADR 0046's 0.4 stuck to edges the linker had
       // since resolved, so the column understated them — a new inaccuracy introduced by the fix
       // for the old one.
-      const stmt = await db.prepare(`UPDATE edges SET targetId = ?, confidence = CASE WHEN confidence < 0.6 THEN 0.85 ELSE confidence END WHERE id = ?`);
-      try {
-        for (const entry of rebinds) {
-          stmt.bind([entry.newTargetId.toLowerCase(), entry.id]);
-          await stmt.run();
-        }
-      } finally {
-        stmt.destroySync();
+      const last = new Map<string, string>();
+      for (const entry of rebinds) last.set(entry.id, entry.newTargetId.toLowerCase());
+      const all = [...last];
+      const perBatch = SynapsePersistence.batchSizeFor(2);
+      for (let off = 0; off < all.length; off += perBatch) {
+        const slice = all.slice(off, off + perBatch);
+        const stmt = await db.prepare(
+          `UPDATE edges SET targetId = v.t, confidence = CASE WHEN edges.confidence < 0.6 THEN 0.85 ELSE edges.confidence END ` +
+          `FROM (VALUES ${slice.map(() => '(?, ?)').join(',')}) AS v(id, t) WHERE edges.id = v.id`);
+        try { stmt.bind(slice.flatMap(([id, t]) => [id, t])); await stmt.run(); } finally { stmt.destroySync(); }
       }
       if (owned) await exec("COMMIT");
     } catch (fail) {

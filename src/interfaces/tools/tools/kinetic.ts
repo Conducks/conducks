@@ -3,7 +3,7 @@ import { registry } from "@/registry/index.js";
 import { ensureAnchor, releaseAnchor } from "../shared/anchor.js";
 import { resolveSymbolId } from "../shared/resolve-symbol.js";
 import { enumErr, numErr } from "./synapse.js";
-import { mcpOk, mcpErr } from "@/interfaces/tools/shared/mcp-response.js";
+import { mcpOk, mcpErr, formatAnswer } from "@/interfaces/tools/shared/mcp-response.js";
 
 /**
  * Conducks — Behavioral Intelligence Tools (Standardized Taxonomy)
@@ -90,7 +90,7 @@ symbol means "what breaks if I change it" unless you say otherwise.`,
       },
       required: ["symbol"]
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ symbol, direction = "upstream", depth, limit, path: customPath }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
@@ -178,7 +178,7 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
       },
       required: ["symbol"]
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ symbol, target, mode, limit, path: customPath }: any) => {
       // MCP6: symbol validation
       const symbolErr = validateSymbol(symbol);
@@ -278,7 +278,7 @@ AFTER THIS: Use conducks_audit to verify no new circularities were introduced.`,
         path: { type: "string", description: "Optional: The absolute project root." }
       }
     },
-    formatter: (res: unknown) => JSON.stringify(res, null, 2),
+    formatter: (res: unknown) => formatAnswer(res, (registry.infrastructure as any).chronicle.getProjectDir()),
     handler: async ({ mode, path: customPath }: any) => {
       const badMode = enumErr(mode, DIFF_MODES, 'mode');
       if (badMode) return badMode;

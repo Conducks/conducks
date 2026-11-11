@@ -18,6 +18,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fsSync from "node:fs";
 import path from 'node:path';
 import { logger } from "@/lib/core/utils/index.js";
@@ -464,6 +465,14 @@ export class ChronicleInterface {
   public async getFileHistory(filePath: string): Promise<{ count: number, authors: number, distribution: Record<string, number> } | null> {
     if (!this.isInsideProject(filePath)) return null;
 
+    const indexed = this.historyIndex.get(path.resolve(filePath));
+    if (indexed) {
+      const distribution: Record<string, number> = {};
+      let count = 0;
+      for (const [, author] of indexed) if (author) { distribution[author] = (distribution[author] || 0) + 1; count++; }
+      return { count, authors: Object.keys(distribution).length, distribution };
+    }
+
     try {
       // The repository that OWNS this file, not the workspace anchor (ADR 0069).
       const repo = this.gitRootFor(filePath);
@@ -478,6 +487,53 @@ export class ChronicleInterface {
     } catch {
       return null;
     }
+  }
+
+  /** Absolute path -> its commits, newest first, as [hash, author email]. Filled by `primeHistory`. */
+  private historyIndex = new Map<string, Array<[string, string]>>();
+  private builtIndex: { head: string; entries: Record<string, Array<[string, string]>> } | null = null;
+
+  /**
+   * Every file's history from ONE repo-wide `git log`, instead of one `git log` per file
+   * (todo82#P1: the per-file spawns were 30 s of a 73 s single-thread analyze).
+   *
+   * Matches `git log --format=%ae -- <file>` on 2,092 of 2,093 files measured across two repos.
+   * `--diff-merges=combined` keeps merges that changed the file, `--no-renames` keeps the commit
+   * that renamed it away. The one difference is a side-branch commit that the per-file walk's
+   * history simplification hides and this counts. Memoised per HEAD, so a long-lived process
+   * rebuilds after a commit. Covers the project's own repo; a file in a nested repo has no entry
+   * and its caller falls back to the per-file log. Empty when git cannot be read.
+   */
+  public buildHistoryIndex(): Record<string, Array<[string, string]>> {
+    try {
+      // A child path, because gitRootFor starts at the dirname; the project dir itself would skip its own .git.
+      const repo = this.gitRootFor(path.join(this.projectDir, '_'));
+      const head = this.git(['rev-parse', 'HEAD'], { quiet: true, cwd: repo }).trim();
+      if (this.builtIndex?.head === head) return this.builtIndex.entries;
+      // shortcut: one buffered call under git()'s 30 s timeout and 64 MB cap; a repo past either gets
+      // an empty index and the per-file fallback. Stream it if a real repo hits that.
+      const log = this.git(['log', '--format=%x1e%H%x1f%ae', '--name-only', '-z', '--diff-merges=combined', '--no-renames'], { quiet: true, cwd: repo });
+      const entries: Record<string, Array<[string, string]>> = {};
+      for (const rec of log.split('\x1e')) {
+        const z = rec.indexOf('\0');
+        if (z < 0) continue;
+        const [hash, author = ''] = rec.slice(0, z).split('\x1f');
+        for (const f of rec.slice(z + 1).split('\0')) {
+          const rel = f.replace(/^\n/, '');
+          if (rel) (entries[path.join(repo, rel)] ??= []).push([hash, author.trim()]);
+        }
+      }
+      this.builtIndex = { head, entries };
+      return entries;
+    } catch {
+      return {};
+    }
+  }
+
+  /** Makes `getFileHistory` answer from these entries (absolute path -> commits) without spawning git. Replaces any earlier set; `{}` clears it. */
+  public primeHistory(entries: Record<string, Array<[string, string]>>): void {
+    this.historyIndex.clear();
+    for (const [file, commits] of Object.entries(entries)) this.historyIndex.set(path.resolve(file), commits);
   }
 
   /** Cache: absolute directory -> the repository root that owns it, or null. */
@@ -578,6 +634,19 @@ export class ChronicleInterface {
     try {
       const repo = this.gitRootFor(filePath);
       const relativePath = this.toRepoRelative(filePath, repo);
+
+      // todo82#P2: blame depends only on the file's commits and its working content, so a result
+      // keyed by both is reused until either changes. Needs the history index (no index, no cache).
+      const commits = this.historyIndex.get(path.resolve(filePath));
+      let cacheFile: string | null = null;
+      if (commits) {
+        const key = createHash('sha1').update(relativePath).update('\0')
+          .update(commits.map(c => c[0]).join(',')).update('\0')
+          .update(fsSync.readFileSync(filePath)).digest('hex');
+        cacheFile = path.join(this.projectDir, '.conducks', 'blame-cache', `${key}.json`);
+        try { return JSON.parse(fsSync.readFileSync(cacheFile, 'utf-8')); } catch { /* miss */ }
+      }
+
       const output = this.git(['blame', '--porcelain', '--', relativePath], { quiet: true, cwd: repo });
       const lines = output.split('\n');
 
@@ -607,6 +676,18 @@ export class ChronicleInterface {
 
           blameMap[finalLine] = hashCommitMeta[hash];
         }
+      }
+
+      // An uncommitted line carries the zero hash and a "now" timestamp; caching it would freeze
+      // that time, so a dirty file is blamed fresh every run, exactly as before.
+      // shortcut: entries are never pruned; one small file per file version. Prune if the folder grows.
+      if (cacheFile && !/^0{40} /m.test(output)) {
+        try {
+          fsSync.mkdirSync(path.dirname(cacheFile), { recursive: true });
+          const tmp = `${cacheFile}.${process.pid}.tmp`;
+          fsSync.writeFileSync(tmp, JSON.stringify(blameMap));
+          fsSync.renameSync(tmp, cacheFile);
+        } catch { /* a cache that cannot be written costs a blame next run, nothing else */ }
       }
 
       return blameMap;

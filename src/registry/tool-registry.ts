@@ -107,8 +107,8 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
     return this.getAll().map((tool) => {
       const layer = (tool as { layer?: string }).layer ?? 'code';
       const tag = layer === 'docs'
-        ? '[docs layer — authored markdown; works with no analysis, opens no database, safe for any number of concurrent agents]'
-        : '[code layer — the structural graph; run `conducks analyze` first. Concurrent reads by many agents are safe, but while a pulse is WRITING the vault every read FAILS rather than queues — retry once it finishes, or use conducks_docs meanwhile]';
+        ? '[docs layer — markdown only, opens no database, safe for concurrent agents]'
+        : '[code layer — needs `conducks analyze`. Reads are concurrent-safe, but during a pulse write they FAIL rather than queue: retry after. Answers are compact JSON: paths relative to meta.root, and a list of same-shaped items comes as {cols, rows}]';
       return {
         name: tool.name,
         description: `${tag}\n${tool.description || ''}`,
@@ -123,6 +123,24 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
     const tool = this.getAll().find(t => t.name === name);
     if (!tool) {
       return errorResponse(`Unknown tool: "${name}".`);
+    }
+
+    // An argument the schema does not name is refused, not ignored (todo82). Ignored, it produced
+    // answers that looked right: `conducks_query {"query": ...}` (the name is `q`) returned the
+    // highest-ranked symbols as if they matched, and the symbol tools said "symbol must not be
+    // empty" without naming the key that was wrong.
+    const accepted = Object.keys(tool.inputSchema?.properties ?? {});
+    const unknown = args && typeof args === 'object' ? Object.keys(args).filter(k => !accepted.includes(k)) : [];
+    if (unknown.length) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ error: {
+          code: 'UNKNOWN_PARAMETER',
+          message: `${name} has no parameter ${unknown.map(k => `"${k}"`).join(', ')}`,
+          retryable: false,
+          suggestion: `Accepted: ${accepted.join(', ')}`,
+        } }) }],
+        isError: true,
+      };
     }
 
     const cacheKey = `${name}:${JSON.stringify(args ?? {})}`;

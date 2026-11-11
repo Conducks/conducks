@@ -19,7 +19,9 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.conducks', '.next', 'venv', '.venv', '__pycache__']);
+// 'vendor' matches analyze's default ignore (`**/vendor/**`): counting calls in files the graph never reads scored two
+// minified vendored libraries as 2,592 missed calls (todo82).
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.conducks', '.next', 'venv', '.venv', '__pycache__', 'vendor']);
 const JS_EXT = /\.(js|jsx|mjs|cjs)$/;
 
 /** Every tsconfig at the root or one level down — the shape a monorepo has. */
