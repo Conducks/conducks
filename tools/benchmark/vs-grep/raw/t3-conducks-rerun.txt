@@ -1,9 +1,9 @@
 
 Structural Diagnostic Summary:
-Node ID: /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/paths.py::resolve_project_path
+Node ID: <home>/projects/conducks/test-projects/scraper/src/foundation/paths.py::resolve_project_path
 Composite Risk Score: 1.7 / 10.0
 
-[1m--- Conducks UPSTREAM Impact Report: /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/foundation/paths.py::resolve_project_path ---[0m
+[1m--- Conducks UPSTREAM Impact Report: <home>/projects/conducks/test-projects/scraper/src/foundation/paths.py::resolve_project_path ---[0m
 [35mWeighted Impact Coverage:[0m 11 Symbols affected
 [35mShortest Weighted Path:[0m 1.00
 [35mImpact Score:[0m 9.08

@@ -1,7 +1,7 @@
 
 [1m--- 🛡️ Conducks Structural Explanation ---[0m
 Symbol: [35msetup_logging[0m (BEHAVIOR)
-Path:   /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/logging_setup.py
+Path:   <home>/projects/conducks/test-projects/scraper/src/core/logging_setup.py
 
   Sets up a centralized logger that outputs to both console and a per-run file.
       Returns the path to the created log file.

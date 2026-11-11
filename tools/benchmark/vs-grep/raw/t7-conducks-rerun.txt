@@ -1,9 +1,9 @@
 
 Structural Diagnostic Summary:
-Node ID: /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/errors/classifier.py::classify
+Node ID: <home>/projects/conducks/test-projects/scraper/src/core/errors/classifier.py::classify
 Composite Risk Score: 4.3 / 10.0
 
-[1m--- Conducks UPSTREAM Impact Report: /users/saidmustafasaid/documents/gospel_of_technology/conducks/test-projects/scraper/src/core/errors/classifier.py::classify ---[0m
+[1m--- Conducks UPSTREAM Impact Report: <home>/projects/conducks/test-projects/scraper/src/core/errors/classifier.py::classify ---[0m
 [35mWeighted Impact Coverage:[0m 0 Symbols affected
   (examined 16,746 edges; 2,106 unresolved reference(s) in this graph, none of them share this name — no caller exists in what was analyzed)
 [35mShortest Weighted Path:[0m 0

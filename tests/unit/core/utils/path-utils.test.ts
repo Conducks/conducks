@@ -16,7 +16,7 @@ import { canonicalize, getProjectRelativePath } from '@/lib/core/utils/index.js'
  */
 describe('canonicalize — one path, one id', () => {
   it('lowercases, because APFS is case-insensitive and would otherwise split a node in two', () => {
-    expect(canonicalize('/Users/Said/Src/File.ts')).toBe('/users/said/src/file.ts');
+    expect(canonicalize('/Users/Dev/Src/File.ts')).toBe('/users/dev/src/file.ts');
   });
 
   it('collapses a Windows separator onto the one the ids use', () => {

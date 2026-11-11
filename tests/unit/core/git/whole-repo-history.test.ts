@@ -12,7 +12,7 @@
  *
  * Proof, not assertion: 514 currently-tracked files in this repository (conducks) agreed between
  * the two methods, 0 disagreements. The SAME comparison against subject-b
- * (/Users/saidmustafasaid/Documents/Gospel_Of_Technology/subject-b, read-only, not analyzed)
+ * (~/projects/subject-b, read-only, not analyzed)
  * found 2 disagreements out of 1034 tracked files: `.gitignore` and `admin/docs/architecture.md`.
  *
  * The `.gitignore` case, reproduced below with the real commit hashes: commits `71eff3806` and
@@ -91,10 +91,10 @@ describe('repo-wide history vs per-file `git log -- <path>` — subject-b .gitig
   // parent `ca940e934...`, identical diff to .gitignore. Only the fixture-relevant slice of the
   // repo-wide pass is reproduced; the rest of the fixture is irrelevant to this file.
   const repoWideSlice = [
-    '\x002e1a7bf67f494d66b80a3440f8e0810991156c66\x00saidmustafa2812@gmail.com',
+    '\x002e1a7bf67f494d66b80a3440f8e0810991156c66\x00dev@example.com',
     '',
     '.gitignore',
-    '\x0071eff3806d7c645728ccc3cec26d4c53a4e7b3ab\x00saidmustafa2812@gmail.com',
+    '\x0071eff3806d7c645728ccc3cec26d4c53a4e7b3ab\x00dev@example.com',
     '',
     '.gitignore',
   ].join('\n');

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file. The format 
 ## [0.8.1] — 2026-11-11
 
 ### Changed
+- A leak scan (gitleaks over the full public history, the tree and the npm tarball) found no secret. It did find the owner's home directory in captured tool output, a diagnostics log, a repro dump, two hard-coded paths and a few comments and fixtures; all are scrubbed, and a new gate (`tests/architecture/no-home-paths.test.ts`) refuses any tracked text file that names a real home directory.
 - `docs/` left the repository. conducks ships code only; the project notes live in the owner's private, unversioned folder. The one test that read an ADR from `docs/` now checks the code alone.
 - A tool call that leaves a required parameter out is refused with `MISSING_PARAMETER` and the required names, beside `UNKNOWN_PARAMETER`. `conducks_coverage {}` used to answer with a raw Node error.
 
