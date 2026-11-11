@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Fixed
+- README matches 0.8.0: the new Mirror, compact MCP answers, `--version`, `monitor`; removed `rename`, `fallback` and `audit --fallback`, which do not exist. The release check now also compares the README footer.
+
 ## [0.8.0] — 2026-11-11
 
 First release on npm: `npm i -g conducks`, then `conducks setup` in a project.
