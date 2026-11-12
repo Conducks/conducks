@@ -44,7 +44,18 @@ export class FederatedLinker {
   /**
    * Registers a new neighboring project.
    */
-  public async link(projectPath: string): Promise<void> {
+  public link(projectPath: string): Promise<void> {
+    // One read-modify-write at a time. Two links registered together each read the same list and
+    // the second write dropped the first link (state-machine audit P-02-11). Serialised within the
+    // process; a second PROCESS can still race, which is accepted for a command a person runs by hand.
+    const run = this.linkQueue.then(() => this.linkOne(projectPath));
+    this.linkQueue = run.catch(() => {});
+    return run;
+  }
+
+  private linkQueue: Promise<void> = Promise.resolve();
+
+  private async linkOne(projectPath: string): Promise<void> {
     const links = await this.getLinks();
     const absolutePath = path.resolve(projectPath);
     
@@ -73,16 +84,20 @@ export class FederatedLinker {
       // an exclusive lock on a database this process does not own and blocking that project's own
       // readers. Since ADR 0040's reader snapshot, it would also have paid a full vault copy per
       // neighbour on every federated load.
-      const p = this.openVault(linkPath);
+      //
+      // One neighbour that fails is reported and SKIPPED: a throw here used to end the loop, so
+      // every neighbour after it went unloaded behind one generic error (P-02-12). And success is
+      // `load` returning, not the node count growing — a neighbour whose nodes were all already
+      // present was reported "Hydration failed" (P-02-13).
       const before = mainGraph.stats.nodeCount;
-      await p.load(mainGraph);
-      const success = mainGraph.stats.nodeCount > before;
-      if (success) {
-        const added = mainGraph.stats.nodeCount - before;
-        console.error(`[Federated Linker] Resonated with ${linkPath} (+${added} nodes).`);
-      } else {
-        console.warn(`[Federated Linker] ⚠️  Hydration failed for: ${linkPath}`);
+      try {
+        await this.openVault(linkPath).load(mainGraph);
+      } catch (err: any) {
+        console.warn(`[Federated Linker] ⚠️  Hydration failed for ${linkPath}: ${err?.message ?? err}`);
+        continue;
       }
+      const added = mainGraph.stats.nodeCount - before;
+      console.error(`[Federated Linker] Resonated with ${linkPath} (+${added} new nodes).`);
     }
   }
 
