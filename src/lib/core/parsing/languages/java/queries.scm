@@ -54,6 +54,32 @@
     name: (identifier) @name
     interfaces: (super_interfaces
       (type_list (type_identifier) @heritage_implements))) @isEnum
+  ;; A GENERIC supertype — `extends TypeAdapter<T>`, `implements Codec<String>` — wraps the name in a
+  ;; generic_type, and a record's interfaces were not read at all. MEASURED (Java oracle on gson,
+  ;; 2026-11-12): SerializationDelegatingTypeAdapter, extended only as `…<T>`, was called ORPHAN.
+  (class_declaration
+    name: (identifier) @name
+    superclass: (superclass (generic_type (type_identifier) @heritage_extends))) @isStruct
+  (class_declaration
+    name: (identifier) @name
+    interfaces: (super_interfaces
+      (type_list (generic_type (type_identifier) @heritage_implements)))) @isStruct
+  (interface_declaration
+    name: (identifier) @name
+    (extends_interfaces
+      (type_list (generic_type (type_identifier) @heritage_extends)))) @isInterface
+  (enum_declaration
+    name: (identifier) @name
+    interfaces: (super_interfaces
+      (type_list (generic_type (type_identifier) @heritage_implements)))) @isEnum
+  (record_declaration
+    name: (identifier) @name
+    interfaces: (super_interfaces
+      (type_list (type_identifier) @heritage_implements))) @isStruct
+  (record_declaration
+    name: (identifier) @name
+    interfaces: (super_interfaces
+      (type_list (generic_type (type_identifier) @heritage_implements)))) @isStruct
   
   ;; --- Type positions (todo10 Phase 4) ---
   ;; Probed against tree-sitter-java 0.23.5 (node-types.json + a live parse, see docs/memory.md).
@@ -93,6 +119,17 @@
   (field_access object: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
   (method_reference . (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
   (method_reference . (type_identifier) @pulse_type_target)
+  ;; Types the compiler requires in an expression or a clause, measured missing on the oracle
+  ;; fixture (each one alone left its class ORPHAN): `x instanceof Marker`, `(Tagged) x`,
+  ;; `catch (Boom e)`, `new Cell[2]`, and an array type `Cell[]` in any declaration.
+  (instanceof_expression right: (type_identifier) @pulse_type_target)
+  (instanceof_expression right: (generic_type (type_identifier) @pulse_type_target))
+  (cast_expression type: (type_identifier) @pulse_type_target)
+  (cast_expression type: (generic_type (type_identifier) @pulse_type_target))
+  (catch_type (type_identifier) @pulse_type_target)
+  (array_creation_expression type: (type_identifier) @pulse_type_target)
+  (array_type element: (type_identifier) @pulse_type_target)
+  (array_type element: (generic_type (type_identifier) @pulse_type_target))
 
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Spring Boot / JAX-RS Route Annotations: @GetMapping("/")
@@ -110,6 +147,9 @@
   ;; --- Kinesis (Execution Flow) ---
   (method_invocation name: (identifier) @kinesis_target)
   (object_creation_expression type: (type_identifier) @kinesis_target)
+  ;; `new Box<>(…)` / `new Box<String>()`: the type is wrapped in a generic_type. MEASURED (gson):
+  ;; TypeAdapterRuntimeTypeWrapper, built only by diamond in five files, was called ORPHAN.
+  (object_creation_expression type: (generic_type (type_identifier) @kinesis_target))
   
   ;; --- Debt Markers ---
   [(line_comment) (block_comment)] @comment

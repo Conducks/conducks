@@ -37,8 +37,17 @@ class Uses {
         Object c = Color.RED;                     // static field qualifier
         Runnable r = Helper::run;                 // method reference qualifier
         repo.find("a", null);                     // a VARIABLE receiver — not a type
+        boolean m = repo instanceof Marker;       // instanceof
+        Object g = (Tagged) repo;                 // cast
+        Object[] cells = new Cell[2];             // array creation
+        Slot[] slots = null;                      // array type
+        try { } catch (Boom | Bang e) { }         // catch (multi)
+        Object p = new Pair<>(1, 2);              // diamond
     }
 }
+
+class StringAdapter extends Adapter<String> implements Codec<String> { }
+record Point(int x) implements Shaped<Point> { }
 `;
 
   const CHILD = `
@@ -63,11 +72,12 @@ class Uses {
     grammarLoaded: !!lang,
     compileError,
     typeRefs: s.relationships.filter((r) => r.type === 'TYPE_REFERENCE').map((r) => r.metadata && r.metadata.original),
+    other: s.relationships.filter((r) => r.type !== 'TYPE_REFERENCE').map((r) => r.type + ' ' + ((r.metadata && r.metadata.original) || r.targetName || r.targetId)),
   }));
 })();
 `;
 
-  let result: { grammarLoaded: boolean; compileError: string | null; typeRefs: string[] };
+  let result: { grammarLoaded: boolean; compileError: string | null; typeRefs: string[]; other: string[] };
 
   beforeAll(() => {
     const tsx = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
@@ -110,6 +120,21 @@ class Uses {
 
   it('does not take a lower-case variable receiver for a type', () => {
     expect(result.typeRefs).not.toContain('repo');
+  });
+
+  // Java oracle on gson + fixture, 2026-11-12: each of these alone left its class ORPHAN.
+  it.each(['Marker', 'Tagged', 'Cell', 'Slot', 'Boom', 'Bang'])(
+    'captures %s named by instanceof, a cast, a catch clause or an array type', (name) => {
+      expect(result.typeRefs).toContain(name);
+    });
+
+  it('a generic supertype is heritage: extends Adapter<String>, implements Codec<String>, a record\'s interfaces', () => {
+    const heritage = result.other.filter(r => /^(EXTENDS|IMPLEMENTS) /.test(r)).join(' | ');
+    for (const name of ['Adapter', 'Codec', 'Shaped']) expect(heritage).toContain(name);
+  });
+
+  it('a diamond `new Pair<>(…)` constructs Pair', () => {
+    expect(result.other.join(' | ')).toMatch(/(CONSTRUCTS|CALLS) [^|]*Pair/i);
   });
 
   it('captures a checked exception type from a throws clause', () => {

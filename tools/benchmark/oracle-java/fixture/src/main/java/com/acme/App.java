@@ -1,5 +1,6 @@
 package com.acme;
 
+import com.acme.generic.*;
 import com.acme.model.*;
 import com.acme.shapes.Circle;
 import com.acme.shapes.Shape;
@@ -25,6 +26,14 @@ public class App {
         Runnable r = () -> service.run();
         r.run();
         Base b = new Derived();
+        String read = new StringAdapter().read();
+        Object box = new Box<>(1).get();          // diamond
+        boolean marked = box instanceof Marker;   // instanceof only
+        Object tag = box instanceof Object o ? ((Tagged) o) : null;   // cast only
+        Object pair = new Pair<>(1, "b");          // diamond only
+        Object[] cells = new Cell[2];             // array creation only
+        try { s.area(); } catch (Boom e) { }      // catch only
+        System.out.println(read + pair + marked + tag + cells.length);
         System.out.println(owner.getName() + p.x() + c + a + sq + up + t + b.template());
     }
 }

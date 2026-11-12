@@ -200,7 +200,7 @@
     "extra": 0
   },
   "fixture::java-dead": {
-    "defs": 51,
+    "defs": 65,
     "dead": 2,
     "missed": 0,
     "extra": 0
@@ -209,6 +209,12 @@
     "defs": 137,
     "dead": 0,
     "missed": 0,
+    "extra": 0
+  },
+  "gson::java-dead": {
+    "defs": 1815,
+    "dead": 1,
+    "missed": 1,
     "extra": 0
   }
 }
