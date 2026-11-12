@@ -53,10 +53,13 @@ export class TypeScriptResolver {
             cfg = JSON.parse(raw) || {};
           } catch {
             const cleanJson = raw.replace(/\/\/[^\n]*/g, '').replace(/,(\s*[}\]])/g, '$1');
-            cfg = JSON.parse(cleanJson) || {};
+            // A file that does not parse is cached as NULL, on the same mtime + size: it was read and
+            // parsed again on every import, because only a success was ever cached (round 2, Q-04-3).
+            try { cfg = JSON.parse(cleanJson) || {}; } catch { cfg = null; }
           }
           TypeScriptResolver.tsconfigCache[tsconfigPath] = { mtime: stat.mtimeMs, size: stat.size, config: cfg };
         }
+        if (cfg === null) throw new Error(`unparseable ${tsconfigPath}`);   // basic resolution below
 
         const compilerOptions = cfg.compilerOptions || {};
         const baseUrl = compilerOptions.baseUrl ? path.resolve(projectRoot, compilerOptions.baseUrl) : projectRoot;
