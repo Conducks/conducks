@@ -55,6 +55,8 @@
     "oracle:python-dead": "node tools/benchmark/oracle-python-dead.mjs ../test-projects/scraper",
     "oracle:python-dead:sofie": "node tools/benchmark/oracle-python-dead.mjs ../test-projects/sofie",
     "oracle:go-dead": "node tools/benchmark/oracle-go-dead.mjs ../test-projects/fzf",
+    "oracle:java-dead": "node tools/benchmark/oracle-java-dead.mjs ../test-projects/spring-petclinic",
+    "oracle:java-dead:fixture": "node tools/benchmark/oracle-java-dead.mjs tools/benchmark/oracle-java/fixture",
     "oracle:js-dead": "node tools/benchmark/oracle-js-dead.mjs ../test-projects/scraper",
     "oracle:js-dead:orch": "node tools/benchmark/oracle-js-dead.mjs ../test-projects/orchestrator",
     "oracle:nodes": "node tools/benchmark/oracle-nodes-python.mjs ../test-projects/scraper",
