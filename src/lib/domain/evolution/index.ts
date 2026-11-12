@@ -43,7 +43,7 @@ export class EvolutionService {
     (this.drift as any).persistence = persistence;
     (this.auditService as any).persistence = persistence;
     for (const watcher of this._watchers.values()) {
-      (watcher as any).options.persistence = persistence;
+      watcher.setPersistence(persistence);
     }
   }
 
