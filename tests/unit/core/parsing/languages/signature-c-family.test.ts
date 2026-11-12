@@ -163,6 +163,19 @@ describe('c, cpp, csharp, java record the signatures they declare', () => {
   describe('java', () => {
     const provider = new JavaProvider();
 
+    // MEASURED on spring-petclinic: `@Valid Owner owner` was recorded as a parameter NAMED `@Valid`, so
+    // `owner` had no type and every `owner.getId()` in the controllers went unbound.
+    it('reads past annotations and modifiers to the parameter name', async () => {
+      const src = 'class Foo {\n  public void add(@Valid Owner owner, final String s, @PathVariable("id") int id) {}\n}\n';
+      const dna = await dnaOf(provider, 'java', '/repo/a.java', src, 'add');
+      expect(dna.params).toEqual([
+        { name: 'owner', type: 'Owner', optional: false },
+        { name: 's', type: 'String', optional: false },
+        { name: 'id', type: 'int', optional: false },
+      ]);
+    });
+
+
     /** Java `formal_parameter` exposes a `name` field directly, so this fits the fallback chain cleanly. */
     it('records name and declared type for typed parameters', async () => {
       const src = 'class Foo {\n  public int add(int a, String b) { return a; }\n}\n';

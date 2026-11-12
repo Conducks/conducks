@@ -149,7 +149,22 @@
   (assignment_expression left: (identifier) @pulse_assignment_name right: (_) @pulse_assignment_value)
   
   ;; --- Kinesis (Execution Flow) ---
-  (method_invocation name: (identifier) @kinesis_target)
+  ;; A call on a NAMED receiver keeps the receiver — `owner.getName`, `this.owners.findAll` → `owners.findAll`
+  ;; — so the linker can bind it through the receiver's declared type instead of by method name alone.
+  ;; MEASURED (Java call oracle, gson): 1,061 calls bound to the wrong same-named method, e.g.
+  ;; `adapter.fromJson(…)` to Gson.fromJson while `adapter` is declared a TypeAdapter.
+  ;; Every other receiver (a chain, `new X()`, `super`, a literal) and an unqualified call keep the bare name.
+  (method_invocation object: (identifier) @kinesis_object name: (identifier) @kinesis_target)
+  (method_invocation object: (field_access object: (this) field: (identifier) @kinesis_object) name: (identifier) @kinesis_target)
+  (method_invocation !object name: (identifier) @kinesis_target)
+  (method_invocation object: [(method_invocation) (object_creation_expression) (field_access object: [(identifier) (field_access) (method_invocation) (super)]) (super) (this) (parenthesized_expression) (array_access) (string_literal) (cast_expression) (class_literal) (scoped_identifier)] name: (identifier) @kinesis_target)
+
+  ;; A declared variable's TYPE — local or field — read the way `const x = new Y()` is in TypeScript:
+  ;; the type is written on the declaration. `var` states nothing and is skipped.
+  (local_variable_declaration type: (type_identifier) @instance_type (#not-eq? @instance_type "var") declarator: (variable_declarator name: (identifier) @instance_name)) @isInstanceOf
+  (local_variable_declaration type: (generic_type (type_identifier) @instance_type) declarator: (variable_declarator name: (identifier) @instance_name)) @isInstanceOf
+  (field_declaration type: (type_identifier) @instance_type declarator: (variable_declarator name: (identifier) @instance_name)) @isInstanceOf
+  (field_declaration type: (generic_type (type_identifier) @instance_type) declarator: (variable_declarator name: (identifier) @instance_name)) @isInstanceOf
   (object_creation_expression type: (type_identifier) @kinesis_target)
   ;; `new Box<>(…)` / `new Box<String>()`: the type is wrapped in a generic_type. MEASURED (gson):
   ;; TypeAdapterRuntimeTypeWrapper, built only by diamond in five files, was called ORPHAN.

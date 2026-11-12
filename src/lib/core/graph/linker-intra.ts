@@ -27,6 +27,17 @@ import { logger } from "@/lib/core/utils/index.js";
  */
 export type ResolveSpecifier = (specifier: string, fromFile: string, allFiles: string[]) => string | undefined;
 
+/**
+ * A parameter's declared type — from the map's OWN keys only. `paramTypes` is a plain object, so a
+ * receiver named `constructor`, `toString` or `valueOf` read Object's built-ins: MEASURED on gson
+ * (`constructor.construct()`), `analyze` died with "declared?.replace is not a function".
+ */
+function ownParamType(paramTypes: unknown, name: string): string | undefined {
+  if (!paramTypes || typeof paramTypes !== 'object' || !Object.prototype.hasOwnProperty.call(paramTypes, name)) return undefined;
+  const t = (paramTypes as Record<string, unknown>)[name];
+  return typeof t === 'string' ? t : undefined;
+}
+
 export class IntraLinker {
 
   /**
@@ -484,7 +495,7 @@ export class IntraLinker {
           // object paths. Every step reads something the source states.
           if (!paths) {
             const enclosing = graph.getNode(edge.sourceId)?.properties as any;
-            const declaredType = (enclosing?.paramTypes as Record<string, string> | undefined)?.[rootName];
+            const declaredType = ownParamType(enclosing?.paramTypes, rootName);
             if (declaredType) {
               // Strip array/generic decoration; a decorated type states a shape, not a single value.
               const bare = declaredType.replace(/\[\]$/, '');
@@ -721,7 +732,13 @@ export class IntraLinker {
 
       // 3a. Same file first (catches batch-ordering misses within the same file).
       const namesAType = edge.type === 'CONSTRUCTS' || edge.type === 'TYPE_REFERENCE';
-      const symbolsFor = namesAType ? unitTypeSymbols : unitSymbols;
+      // A JAVA VARIABLE IS NEVER CALLED — a lambda in a variable is invoked through its interface
+      // method (`f.apply(x)`), not as `f(x)`. MEASURED (Java call oracle, 2026-11-12): `new
+      // StringAdapter().read()` bound to the local `read` beside it, and `out.value(…)` in gson to a
+      // local `value` — the same-file index finds the variable first. (JavaScript is not so: a
+      // variable holding a function IS called, so this is Java's rule, not every language's.)
+      const javaCall = edge.type === 'CALLS' && sourceUnitId.toLowerCase().includes('.java::');
+      const symbolsFor = namesAType || javaCall ? unitTypeSymbols : unitSymbols;
       if (!resolvedId) resolvedId = symbolsFor.get(sourceUnitId)?.get(bareName) ?? null;
 
       // 3b. Check each file the source imports.
@@ -745,10 +762,17 @@ export class IntraLinker {
         const file = sourceUnitId.slice(0, sourceUnitId.lastIndexOf('::'));
         const callerScope = edge.sourceId.slice(edge.sourceId.lastIndexOf('::') + 2);
 
-        const scoped = `${file}::${callerScope}.${receiver}`;
-        const receiverId = graph.hasNode(scoped) ? scoped
-          : graph.hasNode(`${file}::${receiver}`) ? `${file}::${receiver}`
-          : null;
+        // Innermost scope outward: the caller's own locals, then each enclosing scope — a Java FIELD
+        // lives under its class (`ownercontroller.owners`) while the call sits in a method
+        // (`ownercontroller.processfindform`), so caller-or-file missed every field receiver.
+        let receiverId: string | null = null;
+        for (let scope = callerScope; !receiverId; ) {
+          const candidate = scope ? `${file}::${scope}.${receiver}` : `${file}::${receiver}`;
+          if (graph.hasNode(candidate)) receiverId = candidate;
+          if (!scope) break;
+          const cut = scope.lastIndexOf('.');
+          scope = cut < 0 ? '' : scope.slice(0, cut);
+        }
 
         if (receiverId) {
           const declId = this.declarationOf(graph, receiverId, unitImports, unitSymbols);
@@ -764,10 +788,13 @@ export class IntraLinker {
             if (isBuiltIn(typeName, 'typescript') && graph.hasNode(getGlobalId(typeName))) {
               resolvedId = getGlobalId(typeName);
             } else {
+              // A recorded type names a TYPE: looked up without variables, or a sibling's local `vet`
+              // makes `Vet` ambiguous and the receiver resolves to nothing (Java call oracle, petclinic:
+              // `Vet james = new Vet(); james.setFirstName(…)` left unbound).
               const typeId =
-                unitSymbols.get(`${declFile}::unit`)?.get(typeName) ??
-                this.resolveSymbolUnique(typeName, `${declFile}::unit`, unitImports, unitSymbols);
-              if (typeId) resolvedId = this.memberOfType(graph, typeId, typeName, member, unitImports, unitSymbols);
+                unitTypeSymbols.get(`${declFile}::unit`)?.get(typeName) ??
+                this.resolveSymbolUnique(typeName, `${declFile}::unit`, unitImports, unitTypeSymbols);
+              if (typeId) resolvedId = this.memberOfType(graph, typeId, typeName, member, unitImports, unitTypeSymbols);
             }
           }
         }
@@ -784,18 +811,19 @@ export class IntraLinker {
         // and guessing from the name is how the vault filled with `results.foreach`.
         if (!resolvedId) {
           const enclosing = graph.getNode(edge.sourceId)?.properties as any;
-          const declared = (enclosing?.paramTypes as Record<string, string> | undefined)?.[receiver];
+          const declared = ownParamType(enclosing?.paramTypes, receiver);
           const bare = declared?.replace(/\[\]$/, '');
           if (bare && /^[a-z_$][\w$]*$/i.test(bare)) {
             if (isBuiltIn(bare, 'typescript') && graph.hasNode(getGlobalId(bare))) {
               resolvedId = getGlobalId(bare);
             } else {
+              // A declared parameter type names a TYPE — looked up without variables (see 3b-bis).
               const typeId =
-                unitSymbols.get(sourceUnitId)?.get(bare) ??
-                unitSymbols.get(sourceUnitId)?.get(bare.toLowerCase()) ??
-                this.resolveSymbolUnique(bare, sourceUnitId, unitImports, unitSymbols) ??
-                this.resolveSymbolUnique(bare.toLowerCase(), sourceUnitId, unitImports, unitSymbols);
-              if (typeId) resolvedId = this.memberOfType(graph, typeId, bare, member, unitImports, unitSymbols);
+                unitTypeSymbols.get(sourceUnitId)?.get(bare) ??
+                unitTypeSymbols.get(sourceUnitId)?.get(bare.toLowerCase()) ??
+                this.resolveSymbolUnique(bare, sourceUnitId, unitImports, unitTypeSymbols) ??
+                this.resolveSymbolUnique(bare.toLowerCase(), sourceUnitId, unitImports, unitTypeSymbols);
+              if (typeId) resolvedId = this.memberOfType(graph, typeId, bare, member, unitImports, unitTypeSymbols);
             }
           }
         }
@@ -816,7 +844,7 @@ export class IntraLinker {
         const file = sourceUnitId.slice(0, sourceUnitId.lastIndexOf('::'));
         const callerScope = edge.sourceId.slice(edge.sourceId.lastIndexOf('::') + 2);
         const enclosing = graph.getNode(edge.sourceId)?.properties as any;
-        const recvType = (enclosing?.paramTypes as Record<string, string> | undefined)?.[recv]
+        const recvType = ownParamType(enclosing?.paramTypes, recv)
           ?? ((graph.getNode(`${file}::${callerScope}.${recv}`) ?? graph.getNode(`${file}::${recv}`))?.properties as any)?.instanceOf;
 
         if (recvType && /^[a-z_$][\w$]*$/i.test(recvType)) {
@@ -1073,6 +1101,11 @@ export class IntraLinker {
       if (localId === String(edge.targetId).toLowerCase()) continue;
       const local = graph.getNode(localId);
       if (!local) continue;                                  // nothing declares it here — the import stands
+      // JAVA KEEPS METHODS AND VARIABLES IN SEPARATE NAMESPACES: a local `read` cannot shadow the
+      // method `read()`, because a Java variable is never called. MEASURED (Java call oracle): `new
+      // StringAdapter().read()` beside `String read = …` was rebound HERE onto the local, after 3b had
+      // bound it right.
+      if (edge.type === 'CALLS' && String(local.properties?.canonicalKind) === 'ATOM' && localId.includes('.java::')) continue;
 
       // CASE-SENSITIVE, and this is not fussiness. Ids are lowercased for APFS (see docs/visuals/modules/contracts.md), so
       // `Path` imported from pathlib and a local variable `path` share one id shape. The first cut of

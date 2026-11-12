@@ -219,5 +219,23 @@
     "missed": 1,
     "missedMethods": 0,
     "extra": 0
+  },
+  "fixture::java-calls": {
+    "pairs": 36,
+    "exact": 33,
+    "recallWrong": 2,
+    "precisionWrong": 1
+  },
+  "spring-petclinic::java-calls": {
+    "pairs": 297,
+    "exact": 292,
+    "recallWrong": 1,
+    "precisionWrong": 1
+  },
+  "gson::java-calls": {
+    "pairs": 8443,
+    "exact": 7634,
+    "recallWrong": 212,
+    "precisionWrong": 217
   }
 }

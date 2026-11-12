@@ -142,6 +142,16 @@ enum Mode {
     expect(same.find((n) => n.kind === 'function')!.parent).toBe('/repo/helloservice.java::helloservice');
   });
 
+  // Java states a variable's type BEFORE its name (`List<String> parts`), and the name/type pair fired on
+  // nothing — so no Java variable ever had a type, and `parts.get(0)` could only be bound by name
+  // (Java call oracle: 1,061 wrong targets on gson). Locals and fields both.
+  it('records a declared type for a local and for a field', () => {
+    // Source names are scoped: `helloservice.greet.parts`, `helloservice.prefix`.
+    const typed = result.rels.filter((r) => r.type === 'CONSTRUCTS').map((r) => `${r.source}:${String(r.target).toLowerCase()}`);
+    expect(typed.some((t) => t.startsWith('helloservice.greet.parts:') && t.includes('list'))).toBe(true);
+    expect(typed.some((t) => t.startsWith('helloservice.prefix:') && t.includes('string'))).toBe(true);
+  });
+
   it('records the import specifiers', () => {
     const imports = result.rels.filter((r) => r.type === 'IMPORTS').map((r) => r.specifier);
     expect(imports).toContain('java.util.List');
@@ -160,6 +170,9 @@ enum Mode {
 
   it('records a method call made inside a method body', () => {
     const calls = result.rels.filter((r) => r.type === 'CALLS').map((r) => r.target);
-    expect(calls).toContain('split');
+    // Recorded WITH its receiver since 2026-11-12, so the linker binds it through the type
+    // (`Helper.split` is the class's qualified member key) instead of guessing among every `split`.
+    expect(calls).toContain('helper.split');
+    expect(calls).toContain('parts.get');
   });
 });

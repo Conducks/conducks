@@ -313,6 +313,17 @@ export function paramsOf(match: any): Array<{ name: string; type: string | null;
       ?? child.childForFieldName('right');
     let from = child.startIndex;
     let to = child.endIndex;
+    // LEADING MODIFIERS — Java's `@Valid Owner owner`, `final String s`. They sit before the type, so
+    // the type no longer starts the parameter and the cut below took it for a TRAILING annotation:
+    // the name came out as `@Valid` (measured on spring-petclinic — every annotated controller
+    // parameter lost its type, and every call on it went unbound). Skip them like a prefix type.
+    for (let k = 0; k < child.namedChildCount; k++) {
+      const m = child.namedChild(k);
+      if (m?.type === 'modifiers' && m.startIndex === from) {
+        from = m.endIndex;
+        while (from < to && /\s/.test(child.text[from - child.startIndex])) from++;
+      }
+    }
     for (const cut of [typeNode, valueNode]) {
       if (!cut) continue;
       // A PREFIX annotation (C `int a`, Go `a string` is a suffix, Java `String a` a prefix) starts

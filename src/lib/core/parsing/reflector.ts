@@ -1222,6 +1222,16 @@ export class ConducksReflector {
           // to the WRONG class — a confidently wrong edge, which is worse than the dangling one it
           // replaced. Found by testing shadowing rather than by a failure.
           pendingInstance.arm(scopedVarKey(getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol), cText));
+          // A TYPE-FIRST grammar (Java, C#: `Owner owner = …`) delivers the type BEFORE the name, so
+          // the pair would fire on nothing. The whole match is in `captureMap` already: fire it here.
+          const typeCap = match.captures.findIndex((c: any) => c.name === 'instance_type');
+          if (typeCap >= 0 && typeCap < match.captures.indexOf(capture)) {
+            const typeText = captureMap['instance_type'];
+            pendingInstance.fire(key => {
+              instanceTypes.set(key, typeText.trim().split('.').pop()!.toLowerCase());
+              instanceTypeLines.set(key, currentMatchRow + 1);
+            });
+          }
         }
         else if (cName === 'instance_type') {
           pendingInstance.fire(key => {
