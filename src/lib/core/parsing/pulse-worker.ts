@@ -23,7 +23,7 @@ import fs from 'node:fs';
  * High-performance structural induction worker thread.
  */
 
-async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = false) {
+async function runWorker(data: any, isSpawn: boolean = false) {
   const { units, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages, gitHistory } = data;
 
   // The reflector lives in the DOMAIN layer; this worker is in CORE. A static import would be a
@@ -163,23 +163,20 @@ function isCppHeader(filePath: string): boolean {
     }
   }
 
-  if (isSpawn) {
-    return results;
-  } else if (isFork) {
-    process.send?.({ type: 'SUCCESS', results });
-    process.exit(0);
-  } else {
-    parentPort?.postMessage(results);
-  }
+  if (!isSpawn) parentPort?.postMessage(results);
   return results;
 }
 
-// Bootstrap Protocol: Worker vs Spawn vs Fork Detection 🏺
+// Bootstrap Protocol: Worker vs Spawn Detection 🏺
+//
+// There was a third, FORK mode (`CONDUCKS_FORK_MODE=1`, results over IPC). Nothing set that variable,
+// so it was unreachable — and it exited straight after `process.send`, which can drop a large result
+// before the IPC pipe drains (state-machine audit round 2, Q-03-6). Removed rather than repaired.
 if (process.env.CONDUCKS_WORKER_MODE === 'spawn') {
   try {
     const inputPath = process.argv[2];
     const data = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
-    const results = await runWorker(data, false, true);
+    const results = await runWorker(data, true);
     if (data.tempOutputFile) {
       const payload = results && Array.isArray(results) ? results : [];
       fs.writeFileSync(data.tempOutputFile, JSON.stringify(payload));
@@ -192,17 +189,6 @@ if (process.env.CONDUCKS_WORKER_MODE === 'spawn') {
     // an empty result: a crash and a chunk with no symbols were indistinguishable.
     process.exit(1);
   }
-} else if (process.env.CONDUCKS_FORK_MODE === '1') {
-  process.on('message', async (msg: any) => {
-    if (msg.type === 'START') {
-      try {
-        await runWorker(msg.data, true);
-      } catch (err) {
-        process.send?.({ type: 'ERROR', error: (err as Error).message });
-        process.exit(1);
-      }
-    }
-  });
 } else {
   runWorker(workerData).catch(err => {
     console.error(`[Conducks Pulse Worker] Fatal Error:`, err);

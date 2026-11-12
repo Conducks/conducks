@@ -78,10 +78,25 @@ export class GrammarRegistry {
     this.log('[Conducks Parser] Native Engine initialized.');
   }
 
+  /** Loads in flight, by language, so concurrent callers share ONE induction. */
+  private loading = new Map<string, Promise<void>>();
+
   /**
    * Loads a language grammar using native module induction.
+   *
+   * Single-flight. The "already loaded" check below is followed by an `await import(...)` before
+   * "loaded" is set, so two callers asking at once both passed it and both induced the grammar,
+   * attaching its node-type info twice (state-machine audit round 2, Q-03-4).
    */
-  public async loadLanguage(langId: string): Promise<void> {
+  public loadLanguage(langId: string): Promise<void> {
+    const running = this.loading.get(langId);
+    if (running) return running;
+    const load = this.induce(langId).finally(() => this.loading.delete(langId));
+    this.loading.set(langId, load);
+    return load;
+  }
+
+  private async induce(langId: string): Promise<void> {
     await this.init();
     
     if (this.languages.has(langId) || this.unavailableLanguages.has(langId)) return;

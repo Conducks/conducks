@@ -645,6 +645,10 @@ export class ConducksAdjacencyList {
         for (const edge of outgoing) {
           const inSet = this.inEdges.get(edge.targetId);
           if (inSet) for (const e of [...inSet]) if (e.id === edge.id) inSet.delete(e);
+          // An entry that indexes nothing goes, as in `rebindEdgeTarget`. A removed symbol's index is
+          // kept while callers still point at it (step 3 below) and used to stay as an empty set
+          // after the last of them, one per removed id for the session (round 2, Q-02-4).
+          if (inSet && inSet.size === 0) this.inEdges.delete(edge.targetId);
         }
         this.outEdges.delete(id);
       }
