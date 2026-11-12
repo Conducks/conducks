@@ -76,6 +76,17 @@ describe('diff --base compares against what the vault actually retains', () => {
   }, 120000);
 
   /**
+   * State-machine audit P-09-9: a trailing `--head` with no value became `undefined`, which the
+   * chronoscopic path reads as "the latest pulse" — the flag read as obeyed and compared against
+   * something the user never named.
+   */
+  it('refuses --head given with no pulse id', () => {
+    const { status, combined } = runCli(['diff', '--base', firstPulse, '--head'], { cwd: repo, allowFail: true });
+    expect(status).not.toBe(0);
+    expect(combined).toMatch(/--head needs a pulse id/);
+  }, 120000);
+
+  /**
    * The git path claims "staged/unstaged" in its own description and ran `git diff -U0`, which
    * shows unstaged changes ONLY — so a fully staged change set reported "No structural changes".
    */

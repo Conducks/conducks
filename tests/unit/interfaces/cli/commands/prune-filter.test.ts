@@ -83,6 +83,11 @@ describe('conducks prune mirrors the tool: --type and --limit — todo61', () =>
     expect(JSON.parse(out)).toHaveLength(2);
   });
 
+  it('refuses --type given with no value, instead of printing every finding (state-machine audit P-09-9)', async () => {
+    await run(['--json', '--type']);
+    expect(exit).toHaveBeenCalled();
+  });
+
   it('refuses a limit that is not a positive integer, rather than defaulting', async () => {
     await run(['--limit', 'lots', '--json']);
     expect(exit).toHaveBeenCalled();

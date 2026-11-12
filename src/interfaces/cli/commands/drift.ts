@@ -149,7 +149,9 @@ export class DriftCommand implements ConducksCommand {
 
     } catch (err: any) {
       console.error(`\x1b[31mError during drift analysis: ${err.message}\x1b[0m`);
-      process.exit(1);
+      // exitCode, not exit(): `process.exit` ended the process before the `finally` below, so the one
+      // path most likely to leave the vault open never closed it (state-machine audit P-09-7).
+      process.exitCode = 1;
     } finally {
       await closePersistence(registry);
     }

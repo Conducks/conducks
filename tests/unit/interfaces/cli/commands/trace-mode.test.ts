@@ -94,6 +94,22 @@ describe('conducks trace mirrors the tool: --mode and --target — todo61', () =
     expect(trace).toHaveBeenCalled();
   });
 
+  // State-machine audit P-09-9 / P-09-10: a flag with no value, or a bound that does not parse, read as
+  // obeyed — the walk ran in the default mode, at the default depth and step cap, with no notice.
+  it('refuses --mode given with no value, instead of tracing reachability', async () => {
+    await run(['alpha', '--json', '--mode']);
+    expect(exit).toHaveBeenCalled();
+    expect(trace).not.toHaveBeenCalled();
+  });
+
+  it('refuses a --depth or --limit that is not a positive integer, instead of the default', async () => {
+    for (const bad of [['--depth', 'abc'], ['--depth', '0'], ['--limit', 'lots'], ['--depth']]) {
+      jest.clearAllMocks();
+      await run(['alpha', '--json', ...bad]);
+      expect([bad, exit.mock.calls.length > 0, trace.mock.calls.length]).toEqual([bad, true, 0]);
+    }
+  });
+
   it('still traces reachability with no mode at all', async () => {
     await run(['alpha', '--json']);
     expect(exit).not.toHaveBeenCalled();
