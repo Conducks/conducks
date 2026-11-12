@@ -205,8 +205,11 @@ export class AnalysisService {
     }
 
     if (options.force) {
-      logger.info(`🛡️ [Force Resonance] Forcing re-induction of all ${filteredFiles.length} units.`);
-      dirtyFiles = filteredFiles;
+      // Every unit IN SCOPE. This took every discovered file, so a scoped `--force` re-parsed and
+      // rewrote the whole project while saving the pulse as scoped (state-machine audit P-06-9).
+      const inScope = filteredFiles.filter(f => f.startsWith(targetRoot));
+      logger.info(`🛡️ [Force Resonance] Forcing re-induction of all ${inScope.length} units.`);
+      dirtyFiles = inScope;
     }
 
     // Did this pulse re-stamp EVERY discoverable unit in scope, or only the changed ones?
