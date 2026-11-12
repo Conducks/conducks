@@ -232,7 +232,11 @@ export class ConducksWatcher {
   /**
    * Stops the Monitor.
    */
+  /** How many times `stop()` has been called — a running catch-up compares it to know it must end. */
+  private stops = 0;
+
   public async stop(): Promise<void> {
+    this.stops++;
     if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = null; }
     // The state is released BEFORE the close is awaited, and a close that throws is reported, not
     // propagated. Nulling `this.watcher` after `await close()` meant a throwing close left it set with
@@ -313,7 +317,13 @@ export class ConducksWatcher {
         p => path.extname(p),
       );
       const toPulse = [...fresh.added, ...fresh.changed].filter(f => !this.ignoreManager.isIgnored(f));
-      for (const filePath of toPulse) await this.handlePulseEvent('change', filePath);
+      // A stop() ends the catch-up. The loop used to queue every remaining file after a Ctrl-C — each a
+      // worker thread, written after stop() had reclaimed and closed the vault (round 2, Q-08-4 follow-up).
+      const generation = this.stops;
+      for (const filePath of toPulse) {
+        if (this.stops !== generation) break;
+        await this.handlePulseEvent('change', filePath);
+      }
       return { changed: fresh.changed.length, added: fresh.added.length };
     } catch {
       return { changed: 0, added: 0 };

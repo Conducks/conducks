@@ -123,4 +123,41 @@ describe('watcher reconcileOnStart', () => {
     await save;
     expect(caught.added).toBe(1);
   });
+
+  it('a stop() during the catch-up ends it: no file is pulsed after the stop', async () => {
+    // A Ctrl-C during the start-up catch-up stopped the watcher, and the catch-up loop then queued
+    // every remaining file anyway — 40 pulses, each a worker thread, written AFTER stop() had already
+    // reclaimed and closed the vault. Measured as an intermittent leftover reader snapshot in
+    // `cli-lifecycle-round2.test.ts` whenever the machine was busy enough for that to outlast the
+    // test's patience (round 2, follow-up to Q-08-4).
+    const dir = mkDir();
+    const files: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      const f = path.join(dir, `f${i}.ts`);
+      fs.writeFileSync(f, `export const v${i} = ${i};\n`);
+      files.push(f);
+    }
+    const persistence: any = {
+      readOnly: true,
+      getAllFileHashes: async () => new Map(),
+      getFileHash: async () => undefined,
+      close: async () => {},
+    };
+    const pulsed: string[] = [];
+    let stopAt: number | null = null;
+    const slowGraph = {
+      pulseStructuralStream: async (u: any[]) => { pulsed.push(u[0].path); await sleep(20); },
+      getGraph: () => new ConducksAdjacencyList(),
+    } as any;
+    const w = new ConducksWatcher(dir, slowGraph, { persistence, watcher: chokidar(async () => {}) });
+    w.start();
+    const reconcile = w.reconcileOnStart(files);
+    while (pulsed.length === 0) await sleep(2);
+    const stopping = w.stop().then(() => { stopAt = pulsed.length; });
+    await reconcile;
+    await stopping;
+    expect(stopAt).not.toBeNull();
+    expect(pulsed.length).toBe(stopAt);
+    expect(pulsed.length).toBeLessThan(files.length);
+  });
 });
