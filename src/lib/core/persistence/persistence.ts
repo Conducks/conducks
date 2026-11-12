@@ -885,7 +885,13 @@ export class SynapsePersistence {
   // comments described it as the switch that suppressed row writes, so the obvious fix for a
   // binder whose output vanished was to flip it — which would have changed nothing. save() writes
   // metadata and the pulse row and commits; it has never written node or edge rows in any mode.
-  public async save(graph: any, options: { nodeCount?: number, edgeCount?: number, scoped?: boolean } = {}): Promise<void> {
+  /**
+   * `timestamp` is when the pulse STARTED reading. It is the clock the incremental gate compares
+   * mtimes with, so it must not be later than any read: a file saved after it was read but before
+   * the pulse ended was otherwise clean forever (state-machine audit P-06-2). Defaults to now for
+   * callers that read nothing (the watcher writes one already-read file).
+   */
+  public async save(graph: any, options: { nodeCount?: number, edgeCount?: number, scoped?: boolean, timestamp?: number } = {}): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     const pulseId = graph.getMetadata('targetPulseId') || `pulse_${Date.now()}`;
@@ -912,7 +918,7 @@ export class SynapsePersistence {
         // died with "graph.nodeCount is not a function", got logged by the watcher's catch, and the
         // delta was never written to the vault. The two callers that pass counts explicitly never hit
         // this line, which is why it survived.
-        pulseId, Date.now(), headHash, branch, options.nodeCount ?? graph.stats?.nodeCount ?? 0, options.edgeCount ?? graph.stats?.edgeCount ?? 0, JSON.stringify(Object.fromEntries(metadata)), options.scoped === true
+        pulseId, options.timestamp ?? Date.now(), headHash, branch, options.nodeCount ?? graph.stats?.nodeCount ?? 0, options.edgeCount ?? graph.stats?.edgeCount ?? 0, JSON.stringify(Object.fromEntries(metadata)), options.scoped === true
       ]);
       await this.run(`COMMIT`);   // publishes the pulse (owned tx, or the big inPulse tx)
       this.inPulse = false;

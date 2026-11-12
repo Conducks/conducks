@@ -50,6 +50,10 @@ export class AnalysisService {
    * Consolidates discovery, batch reflection, gravity resonance, and persistence.
    */
   public async analyze(options: { root?: string, staged?: boolean, verbose?: boolean, force?: boolean } = {}): Promise<{ success: boolean, files: number }> {
+    // Taken BEFORE discovery and before any file is stat'ed or read, and recorded as the pulse's time:
+    // a file saved after this point is newer than the pulse and so dirty next time, even if this run
+    // already read it. The end-of-pulse clock made a save that landed mid-pulse look clean (P-06-2).
+    const startedAt = Date.now();
     const projectRoot = chronicle.getProjectDir();
     const targetRoot = options.root ? path.resolve(options.root) : projectRoot;
 
@@ -513,7 +517,7 @@ export class AnalysisService {
     logger.info(`🛡️ [Conducks] Synapse Reflection: ${held.nodes} Nodes, ${held.edges} Edges in the vault.`);
 
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
-    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges, scoped: targetRoot !== projectRoot });
+    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges, scoped: targetRoot !== projectRoot, timestamp: startedAt });
 
     } catch (pulseErr) {
       // Any failure before the commit rolls the entire pulse back — no partial graph is left behind.
