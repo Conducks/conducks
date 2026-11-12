@@ -162,6 +162,39 @@ describe('the mirror page state', () => {
     expect(box.hidden).toBe(true);
   });
 
+  // Round 2 (state-machine re-audit, 2026-11-12).
+  it('a failed search says it failed, not that nothing matches (Q-10-5)', async () => {
+    const page = boot(url => url.startsWith('/api/search') ? { status: 500, body: { error: 'vault busy' } } : healthy(url));
+    await settle();
+    page.el('search').dispatch('input', { target: { value: 'foo' } });
+    await settle(400);
+    const box = page.el('search-results');
+    expect(box.hidden).toBe(false);
+    expect(box.textContent).not.toMatch(/Nothing has that/);
+    expect(box.textContent).toMatch(/could not search/i);
+  });
+
+  it('an empty overview over a picture still drawn says the picture is the last one (Q-10-6)', async () => {
+    const page = boot((url, n) => url.startsWith('/api/overview') && n > 1 ? ok({ ...OVERVIEW, files: [], deps: [] }) : healthy(url));
+    await settle();
+    page.source().onmessage();
+    await settle();
+    expect(page.run('D === null')).toBe(false);                     // the old picture is still up…
+    expect(page.el('project-summary').textContent).toMatch(/last/);  // …and the summary says so
+  });
+
+  it('pulses arriving during a load are ONE more load, and a superseded load stops fetching (Q-10-7)', async () => {
+    const page = boot(url => url.startsWith('/api/governance') ? ok({ violations: [], recommendations: [], stats: {} }, 150) : healthy(url));
+    await settle(20);                       // first load is waiting on governance
+    page.source().onmessage();
+    page.source().onmessage();
+    page.source().onmessage();
+    await settle(1500);
+    const count = (p: string) => page.calls.filter(u => u.startsWith(p)).length;
+    expect(count('/api/overview')).toBe(2);   // the first load, plus one for the three pulses
+    expect(count('/api/dead')).toBeLessThanOrEqual(2);
+  });
+
   it('reconnecting the live channel reloads the page (P-10-20)', async () => {
     const page = boot(healthy);
     await settle();

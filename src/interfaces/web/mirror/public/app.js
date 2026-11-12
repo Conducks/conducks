@@ -793,10 +793,13 @@ $('search').addEventListener('input', (e) => {
   searchWanted = text;
   if (text.length < 2) { box.hidden = true; return; }
   searchTimer = setTimeout(async () => {
-    const hits = (await getJson('/api/search?q=' + encodeURIComponent(text))) || [];
+    const hits = await getJson('/api/search?q=' + encodeURIComponent(text));
     if (searchWanted !== text) return;
     box.replaceChildren();
-    if (hits.length) rowsOf(box, '', hits.slice(0, 8).map(h => ({ name: h.name, sub: `${h.file}:${h.line}`, tag: h.kind, open: () => { box.hidden = true; openSymbol(h.id); } })), '');
+    // A FAILED search is not an empty one: `|| []` turned a 500 into "Nothing has that in its name"
+    // (round 2, Q-10-5).
+    if (hits === null) box.append(el('li', 'empty', 'Could not search · is the vault busy?'));
+    else if (hits.length) rowsOf(box, '', hits.slice(0, 8).map(h => ({ name: h.name, sub: `${h.file}:${h.line}`, tag: h.kind, open: () => { box.hidden = true; openSymbol(h.id); } })), '');
     else box.append(el('li', 'empty', 'Nothing has that in its name.'));
     box.hidden = false;
   }, 160);
@@ -815,13 +818,31 @@ document.addEventListener('keydown', (e) => {
 });
 window.addEventListener('resize', () => { if (D) drawStage(); });
 
+// ONE load at a time. Each pulse started another, and every one of them still fetched governance,
+// dead code and flows — each a full graph walk queued behind the server's one vault turn — even after
+// a newer load had replaced its model (round 2, Q-10-7). Pulses that arrive during a load now ask for
+// ONE more, run when it ends, and a superseded load stops fetching.
+let loading = false;
+let loadAgain = false;
 async function load() {
+  if (loading) { loadAgain = true; return; }
+  loading = true;
+  try {
+    do { loadAgain = false; await loadOnce(); } while (loadAgain);
+  } finally {
+    loading = false;
+  }
+}
+
+async function loadOnce() {
   const fresh = await getJson('/api/overview');
   // A FAILED read is not an empty vault. It printed "empty · run conducks analyze" over a picture
   // still on screen (P-10-17); now an empty answer says empty, a failed one says the update failed
   // and leaves the last picture standing.
   if (!fresh) { if (D) $('project-summary').textContent += ' · update failed, showing the last one'; else $('project-summary').textContent = 'could not read the graph · is the vault busy?'; return; }
-  if (!fresh.files.length) { $('project-summary').textContent = 'empty · run conducks analyze'; return; }
+  // Empty NOW, over a picture still drawn — the vault being rebuilt by an `analyze`, typically. Saying
+  // only "empty" under a graph that stays up and clickable contradicted itself (round 2, Q-10-6).
+  if (!fresh.files.length) { $('project-summary').textContent = D ? 'the vault reads empty right now · showing the last picture' : 'empty · run conducks analyze'; return; }
   const first = D === null;
   D = derive(fresh);
   // Every live pulse used to reset the trail to the top, so the reader lost their place on each
@@ -834,9 +855,11 @@ async function load() {
   render();
   // One at a time: all three walk the graph. Each fills in the readings that wait for it.
   const model = D;
-  model.gov = await getJson('/api/governance'); if (D === model) render();
-  model.dead = await getJson('/api/dead'); if (D === model) render();
-  model.flows = await getJson('/api/flows'); if (D === model) render();
+  for (const [key, url] of [['gov', '/api/governance'], ['dead', '/api/dead'], ['flows', '/api/flows']]) {
+    if (D !== model || loadAgain) return;   // superseded: a newer load will fetch these
+    model[key] = await getJson(url);
+    if (D === model) render();
+  }
 }
 
 /** The trail rebuilt against the current files: each step keeps its prefix, the trail stops at the first that is gone. */

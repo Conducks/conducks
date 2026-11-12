@@ -14,10 +14,16 @@ const logger = new Logger("GatewayService");
  */
 export class GatewayService {
 
+  /**
+   * `rearm` drops the in-memory graph and re-arms the registry's deferred load (the bootstrapper's
+   * `reloadGraph`), so the next route that walks the graph loads it through `ensureGraphLoaded`,
+   * which retries after a failure. Used when a live reload fails (round 2, Q-10-1).
+   */
   constructor(
     private graph: ConducksGraph,
     private persistence: SynapsePersistence,
-    private projectRoot: string
+    private projectRoot: string,
+    private rearm?: () => void,
   ) {
   }
 
@@ -71,7 +77,20 @@ export class GatewayService {
           // A deferred graph is left deferred: its first reader loads the new pulse anyway. A loaded
           // one is REPLACED, not loaded on top — on top kept every symbol the new pulse deleted.
           const g = this.graph.getGraph();
-          if (!g.isDeferred) { g.clear(); await this.persistence.load(g); }
+          if (g.isDeferred) return;
+          g.clear();
+          try {
+            await this.persistence.load(g);
+            g.markMaterialised();
+          } catch (err) {
+            // The graph is cleared, and the load failed — typically the vault is still locked by the
+            // `analyze` whose writes fired this reload. Left like that it was EMPTY and NOT deferred,
+            // and the routes that walk it answered "no dead code, no flows" with HTTP 200
+            // (state-machine audit round 2, Q-10-1). Deferred again instead: the next walk loads it,
+            // or fails loudly, and the PULSE below makes the page ask.
+            if (this.rearm) this.rearm(); else g.markDeferred();
+            logger.error("Failed to reload graph on vault pulse — deferred, the next request loads it", err);
+          }
         }).then(
           () => callback({ type: 'PULSE', timestamp: Date.now() }),
           err => logger.error("Failed to reload graph on vault pulse", err),

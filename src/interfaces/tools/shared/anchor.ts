@@ -154,15 +154,11 @@ export async function ensureAnchor(
     }
   }
 
-  const currentAnchor = (registry.infrastructure as any).chronicle?.getProjectDir();
-  const currentPersistence = (registry.infrastructure as any).persistence;
-
-  const rootChanged = root && root !== currentAnchor && root !== '/';
-  const modeChanged = currentPersistence && currentPersistence.readOnly !== readOnly;
-  // Disconnection is NOT a re-init trigger — the lazy connection reopens on next query.
-  // Re-initializing the registry just because the connection was closed between tool calls
-  // is expensive and unnecessary; the existing persistence object handles reconnection.
-  if (rootChanged || modeChanged) {
+  // The SAME question the gate asks (`wouldReanchor`, on the discovered root). This compared the raw
+  // path to the chronicle, which is never equal for a subdirectory of the anchored project, so every
+  // such call re-initialized on its own, beside the calls the gate had let in (state-machine audit
+  // round 2, Q-10-3). Disconnection is NOT a re-init trigger — the lazy connection reopens on next query.
+  if (root && root !== '/' && registry.infrastructure.wouldReanchor(readOnly, root)) {
     await registry.initialize(readOnly, root);
   }
 

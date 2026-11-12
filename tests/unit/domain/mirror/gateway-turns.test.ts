@@ -85,3 +85,46 @@ describe('the mirror vault turn', () => {
     expect(stats.closesDuringOp).toBe(0);
   }, 30000);
 });
+
+/**
+ * Round 2, Q-10-1: the live reload CLEARED the graph and then loaded it. When the load threw — the
+ * vault still locked by the `analyze` whose writes triggered the reload — the graph stayed empty and
+ * NOT deferred, so `/api/dead`, `/api/flows` and `/api/governance` answered "nothing" with HTTP 200.
+ * A failed reload must leave the graph deferred and the load re-armed, never empty-and-trusted.
+ */
+describe('a failed live reload', () => {
+  async function failOnce(rearm?: (graph: ConducksGraph) => void) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-mirror-reload-fail-'));
+    cleanups.push(() => fs.rmSync(root, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(root, '.conducks'));
+    const db = path.join(root, '.conducks', 'conducks-synapse.db');
+    fs.writeFileSync(db, 'v0');
+    const graph = new ConducksGraph();
+    graph.getGraph().addNode({ id: 'a.ts::foo', label: 'FUNCTION', properties: { name: 'foo', filePath: 'a.ts' } } as any);
+    const persistence = {
+      load: async () => { throw new Error('Could not set lock on file: Conflicting lock is held'); },
+      close: async () => { /* closed */ },
+    };
+    const gateway = new GatewayService(graph, persistence as any, root, rearm && (() => rearm(graph)));
+    let pulses = 0;
+    gateway.watchSynapse(() => { pulses++; });
+    cleanups.push(() => gateway.stop());
+    await new Promise(r => setTimeout(r, 700));
+    fs.writeFileSync(db, 'v1-changed');
+    await new Promise(r => setTimeout(r, 3000));
+    return { graph, pulses };
+  }
+
+  it('re-arms the deferred load through the registry hook', async () => {
+    let rearmed = 0;
+    const { graph, pulses } = await failOnce(g => { rearmed++; g.getGraph().clear(); g.getGraph().markDeferred(); });
+    expect(rearmed).toBe(1);
+    expect(graph.getGraph().isDeferred).toBe(true);
+    expect(pulses).toBe(1);   // the page is told to re-fetch: its next request loads the graph
+  }, 30000);
+
+  it('without a hook, still leaves the graph deferred rather than empty and trusted', async () => {
+    const { graph } = await failOnce();
+    expect(graph.getGraph().isDeferred).toBe(true);
+  }, 30000);
+});
