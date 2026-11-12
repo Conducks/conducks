@@ -118,9 +118,9 @@ function checks() {
   const huge = codeFiles.filter(i => D.files[i].lines > 1000);
   return [
     { id: 'tangles', value: D.tangles.length, status: grade(D.tangles.length, 2), name: 'Two-way module links', what: 'pairs of modules that depend on each other', view: 'structure' },
-    { id: 'cycles', value: cycles, status: grade(cycles, 0), name: 'Import loops', what: 'groups of files that import each other in a circle', view: 'health' },
+    { id: 'cycles', value: cycles, status: grade(cycles, 0), failed: D.gov === null, name: 'Import loops', what: 'groups of files that import each other in a circle', view: 'health' },
     { id: 'hubs', value: hubs.length, status: grade(hubs.length, 2), name: 'Overloaded files', what: 'files that more than 50 other files depend on', view: 'health' },
-    { id: 'dead', value: dead, status: grade(dead, 25), name: 'Unused code', what: 'functions and types nothing uses', view: 'dead' },
+    { id: 'dead', value: dead, status: grade(dead, 25), failed: D.dead === null, name: 'Unused code', what: 'functions and types nothing uses', view: 'dead' },
     { id: 'untested', value: untested.length, status: grade(untested.length, 10), name: 'Risky and untested', what: 'high-risk files no test touches', view: 'risk' },
     { id: 'huge', value: huge.length, status: grade(huge.length, 3), name: 'Oversized files', what: 'files longer than 1,000 lines', view: 'risk' },
   ];
@@ -177,7 +177,10 @@ function lensData(id) {
       paths.forEach(t => bump(D.byPath.get(t)));
       return { name: `${plural(paths.length, 'file', 'files')} in one loop`, sub: paths.slice(0, 4).map(baseName).join(' → '), value: 1, max: 1, kind: 'bad', open: () => paths[0] && openFile(paths[0]) };
     });
-    return { title: 'import loops', big: D.gov === undefined ? null : loops.length, note: 'Files that import each other in a circle.', none: 'No file imports itself in a circle.', files, rows };
+    // `D.gov` is undefined while loading and NULL when the fetch failed. A failed read used to fall
+    // through to `loops = []` and print "None." — a check that never ran shown as a clean pass, the
+    // ADR 0124 mistake (state-machine audit P-10-15). Both are unknown; `failed` says which.
+    return { title: 'import loops', big: D.gov == null ? null : loops.length, failed: D.gov === null, note: 'Files that import each other in a circle.', none: 'No file imports itself in a circle.', files, rows };
   }
   if (id === 'hubs') {
     const top = codeFiles().sort((a, b) => D.users[b].size - D.users[a].size).slice(0, 6);
@@ -192,7 +195,7 @@ function lensData(id) {
     for (const d of sure) (byFile.get(d.file) || byFile.set(d.file, []).get(d.file)).push(d.symbol);
     const list = [...byFile].sort((a, b) => b[1].length - a[1].length);
     for (const [file, names] of list) { const i = D.byPath.get(file.toLowerCase()); if (i !== undefined) bump(i, names.length); }
-    return { title: 'unused code', big: D.dead === undefined ? null : sure.length, note: 'Functions and types that nothing uses.', none: 'Nothing is provably unused.', files,
+    return { title: 'unused code', big: D.dead == null ? null : sure.length, failed: D.dead === null, note: 'Functions and types that nothing uses.', none: 'Nothing is provably unused.', files,
       rows: list.slice(0, 6).map(([file, names]) => ({ name: baseName(file), sub: names.slice(0, 3).join(' · '), tag: String(names.length), value: names.length, max: list[0][1].length, kind: 'bad', open: () => openFile(file.toLowerCase()) })) };
   }
   if (id === 'untested') {
@@ -216,7 +219,7 @@ function lensData(id) {
       rows: path.map((i, k) => ({ name: `${k + 1}   ${baseName(D.files[i].path)}`, sub: D.files[i].path, tag: `${num(D.files[i].lines)} lines`, value: 0, max: 1, open: () => openFile(D.files[i].path) })) };
   }
   const flows = D.flows || [];
-  return { title: 'paths it runs', big: D.flows === undefined ? null : flows.length, note: 'Where it starts, then the modules it passes through. Hover a row.', none: 'No entry point calling three or more functions was found.', files, step: true,
+  return { title: 'paths it runs', big: D.flows == null ? null : flows.length, failed: D.flows === null, note: 'Where it starts, then the modules it passes through. Hover a row.', none: 'No entry point calling three or more functions was found.', files, step: true,
     rows: flows.slice(0, 6).map(f => {
       const chain = [];
       for (const sid of f.steps) { const i = D.byPath.get(sid.split('::')[0]); const m = i === undefined ? -1 : D.modOf[i]; if (m >= 0 && !chain.includes(m)) chain.push(m); }
@@ -544,7 +547,10 @@ function drawStrip() {
   ring.append(svg('circle', { cx: 19, cy: 19, r: 15, fill: 'none', 'stroke-width': 3, 'stroke-linecap': 'round', transform: 'rotate(-90 19 19)',
     stroke: overall === 'ok' ? '#4ade9a' : overall === 'warn' ? '#ff8a3d' : '#ff5d6c', 'stroke-dasharray': `${(C * passed) / (known.length || 1)} ${C}` }));
   const text = el('span', 'score-text');
-  text.append(el('span', 'chip-label', overall === 'ok' ? 'clean' : overall === 'warn' ? 'nearly clean' : 'needs work'), el('span', 'chip-num', `${passed}/${known.length}`));
+  // Counted over ALL six. It counted only the checks that answered, so two failed reads still showed
+  // "clean 4/4" (P-10-15).
+  const unknown = list.some(c => c.failed) ? 'incomplete' : list.some(c => c.status === null) ? 'checking' : null;
+  text.append(el('span', 'chip-label', overall !== 'ok' ? (overall === 'warn' ? 'nearly clean' : 'needs work') : unknown ?? 'clean'), el('span', 'chip-num', `${passed}/${list.length}`));
   score.append(ring, text);
   score.onclick = () => setLens('score');
   strip.append(score);
@@ -553,7 +559,7 @@ function drawStrip() {
     if (c.status) b.classList.add(c.status);
     if (lens === c.id) b.classList.add('on');
     b.title = c.what;
-    b.append(el('span', 'chip-label', LABEL[c.id]), el('span', 'chip-num', c.value === null ? '·' : num(c.value)));
+    b.append(el('span', 'chip-label', LABEL[c.id]), el('span', 'chip-num', c.failed ? '?' : c.value === null ? '·' : num(c.value)));
     b.onclick = () => setLens(c.id);
     strip.append(b);
   }
@@ -592,7 +598,11 @@ function drawVerdict() {
   if (lens) {
     const d = lensData(lens);
     const status = statusOf(lens);
-    if (d.big === null) { say('', 'Checking…', ''); return; }
+    if (d.big === null) {
+      if (d.failed) say('warn-text', 'Unknown.', ' This reading could not be fetched, so nothing is claimed. It is asked again on the next update.');
+      else say('', 'Checking…', '');
+      return;
+    }
     const zero = d.big === 0 && lens !== 'read' && lens !== 'run';
     say(zero ? 'ok-text' : status === 'warn' ? 'warn-text' : status === 'bad' ? 'bad-text' : '', zero ? 'None.' : `${num(d.big)}`, zero ? ` ${d.none}` : ` ${d.title}.`);
     return;
@@ -613,7 +623,9 @@ function drawSummary() {
 
 // ── The card: one thing at a time, six rows at most ────────────────────────────────────────────
 
+let cardEpoch = 0;   // bumped by every card render; a fill that resolves after a newer render stops
 function cardShell(kicker, onClose) {
+  cardEpoch++;
   const c = $('card');
   c.hidden = false;
   c.replaceChildren();
@@ -697,8 +709,11 @@ function openSymbol(id) { detail = { kind: 'symbol', key: id }; hover = null; re
 async function fileCard(path) {
   const c = cardShell('file', () => { detail = null; render(); });
   c.append(el('h2', 'card-title', baseName(path)), el('p', 'card-path', path));
+  const epoch = cardEpoch;
   const f = await getJson('/api/file?path=' + encodeURIComponent(path));
-  if (!detail || detail.key !== path) return;
+  // The key check alone let a fill from an EARLIER render of the same file append into the card a
+  // later render had already rebuilt, so every row showed twice (P-10-18).
+  if (!detail || detail.key !== path || epoch !== cardEpoch) return;
   if (!f) { c.append(el('p', 'card-note', 'Not in the graph. Run conducks analyze.')); return; }
   if (f.doc) c.append(el('p', 'card-doc', f.doc));
   const i = D.byPath.get(path);
@@ -713,8 +728,9 @@ async function fileCard(path) {
 
 async function symbolCard(id) {
   const c = cardShell('function', () => { detail = null; render(); });
+  const epoch = cardEpoch;
   const s = await getJson('/api/symbol?id=' + encodeURIComponent(id));
-  if (!detail || detail.key !== id) return;
+  if (!detail || detail.key !== id || epoch !== cardEpoch) return;
   if (!s) { c.append(el('p', 'card-note', 'Not in the graph. Run conducks analyze.')); return; }
   c.querySelector('.card-kicker').textContent = s.kind;
   c.append(el('h2', 'card-title', s.name), el('p', 'card-path', `${s.file}:${s.line}`));
@@ -766,13 +782,19 @@ function goTo(label) {
 }
 
 let searchTimer = 0;
+// The text whose answer may still be shown. A slow answer to "ab" arriving after the fast one to "abc"
+// overwrote it, and an answer arriving after Escape reopened the box (P-10-19). Escape and every new
+// keystroke move this, so only the answer to the current, undismissed text is drawn.
+let searchWanted = null;
 $('search').addEventListener('input', (e) => {
   clearTimeout(searchTimer);
   const text = e.target.value.trim();
   const box = $('search-results');
+  searchWanted = text;
   if (text.length < 2) { box.hidden = true; return; }
   searchTimer = setTimeout(async () => {
     const hits = (await getJson('/api/search?q=' + encodeURIComponent(text))) || [];
+    if (searchWanted !== text) return;
     box.replaceChildren();
     if (hits.length) rowsOf(box, '', hits.slice(0, 8).map(h => ({ name: h.name, sub: `${h.file}:${h.line}`, tag: h.kind, open: () => { box.hidden = true; openSymbol(h.id); } })), '');
     else box.append(el('li', 'empty', 'Nothing has that in its name.'));
@@ -782,6 +804,8 @@ $('search').addEventListener('input', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === '/' && document.activeElement !== $('search')) { e.preventDefault(); $('search').focus(); }
   if (e.key === 'Escape' && D) {
+    searchWanted = null;
+    clearTimeout(searchTimer);
     $('search-results').hidden = true;
     $('search').blur();
     if (detail) detail = null; else if (lens) lens = null; else scopes.pop();
@@ -793,9 +817,18 @@ window.addEventListener('resize', () => { if (D) drawStage(); });
 
 async function load() {
   const fresh = await getJson('/api/overview');
-  if (!fresh || !fresh.files.length) { $('project-summary').textContent = 'empty · run conducks analyze'; return; }
+  // A FAILED read is not an empty vault. It printed "empty · run conducks analyze" over a picture
+  // still on screen (P-10-17); now an empty answer says empty, a failed one says the update failed
+  // and leaves the last picture standing.
+  if (!fresh) { if (D) $('project-summary').textContent += ' · update failed, showing the last one'; else $('project-summary').textContent = 'could not read the graph · is the vault busy?'; return; }
+  if (!fresh.files.length) { $('project-summary').textContent = 'empty · run conducks analyze'; return; }
+  const first = D === null;
   D = derive(fresh);
-  scopes = [];
+  // Every live pulse used to reset the trail to the top, so the reader lost their place on each
+  // save (P-10-16). Only the FIRST load starts at the top; a reload keeps the trail as far as it still
+  // exists — each step re-derived from the new files, and cut where a module is gone.
+  if (first) scopes = [];
+  else scopes = rescope(scopes);
   hover = null;
   $('project-name').textContent = baseName(fresh.root.replace(/\/+$/, '')) || 'project';
   render();
@@ -806,8 +839,24 @@ async function load() {
   model.flows = await getJson('/api/flows'); if (D === model) render();
 }
 
+/** The trail rebuilt against the current files: each step keeps its prefix, the trail stops at the first that is gone. */
+function rescope(trail) {
+  const out = [];
+  for (const sc of trail) {
+    // An empty prefix is the "(root files)" module: the files with no folder of their own.
+    const inScope = sc.prefix ? (p) => p === sc.prefix || p.startsWith(sc.prefix + '/') : (p) => !p.includes('/');
+    const files = D.files.map((f, i) => i).filter(i => inScope(D.files[i].path));
+    if (!files.length) break;
+    out.push({ ...sc, files });
+  }
+  return out;
+}
+
 const pulse = new EventSource('/api/pulse');
-pulse.onopen = () => $('live').classList.add('on');
-pulse.onerror = () => $('live').classList.remove('on');
+// A reconnect means pulses may have been missed while the channel was down, so it reloads. It only
+// lit the dot, and the page showed a stale picture that looked live (P-10-20).
+let pulseDropped = false;
+pulse.onopen = () => { $('live').classList.add('on'); if (pulseDropped) { pulseDropped = false; load(); } };
+pulse.onerror = () => { $('live').classList.remove('on'); pulseDropped = true; };
 pulse.onmessage = () => load();
 load();
