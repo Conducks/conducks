@@ -83,6 +83,16 @@
   ;; checked exceptions: throws java.io.IOException
   (throws (type_identifier) @pulse_type_target)
   (throws (scoped_type_identifier) @pulse_type_target)
+  ;; A type NAMED in an expression, not a declaration (Java oracle, 2026-11-12). Each one is a use the
+  ;; compiler requires: `Plugin.class`, the qualifier of a static call or field (`Strings.trimAll(…)`,
+  ;; `Color.RED`) and of a method reference (`Strings::upper`). Without them a class reached only this
+  ;; way was ORPHAN. A qualifier is only taken for a type when it is spelled like one (upper-case
+  ;; first letter, Java's convention) — `repo.find()` names a variable, and a variable is not a type.
+  (class_literal (type_identifier) @pulse_type_target)
+  (method_invocation object: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
+  (field_access object: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
+  (method_reference . (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
+  (method_reference . (type_identifier) @pulse_type_target)
 
   ;; --- Infrastructure (L3: Entry Points) ---
   ;; Spring Boot / JAX-RS Route Annotations: @GetMapping("/")

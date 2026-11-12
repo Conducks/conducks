@@ -29,6 +29,16 @@ class Repo<T extends Comparable<T>> {
 interface Shape {
     double area();
 }
+
+class Uses {
+    void go(Repo repo) {
+        Registry.register(Plugin.class);          // class literal
+        String t = Strings.trimAll(" x ");        // static call qualifier
+        Object c = Color.RED;                     // static field qualifier
+        Runnable r = Helper::run;                 // method reference qualifier
+        repo.find("a", null);                     // a VARIABLE receiver — not a type
+    }
+}
 `;
 
   const CHILD = `
@@ -89,6 +99,17 @@ interface Shape {
   it('captures a dotted field type (java.util.Optional) without double-counting the prefix', () => {
     expect(result.typeRefs).toContain('java.util.Optional');
     expect(result.typeRefs).not.toContain('java.util');
+  });
+
+  // Java oracle, 2026-11-12: `Plugin` was ORPHAN while `Registry.register(Plugin.class)` used it, and a
+  // class reached only as `Strings.trimAll(...)`, `Color.RED` or `Strings::upper` had no edge to it.
+  it.each(['Plugin', 'Registry', 'Strings', 'Color', 'Helper'])(
+    'captures %s named as a class literal, a static qualifier or a method reference', (name) => {
+      expect(result.typeRefs).toContain(name);
+    });
+
+  it('does not take a lower-case variable receiver for a type', () => {
+    expect(result.typeRefs).not.toContain('repo');
   });
 
   it('captures a checked exception type from a throws clause', () => {
