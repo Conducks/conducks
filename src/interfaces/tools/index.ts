@@ -35,7 +35,9 @@ export async function main() {
   await server.bootstrap();
 
   if (process.argv.includes("--sse")) {
-    await server.startSSE();
+    // `CONDUCKS_SSE_PORT` picks the port (default 3001), so a second server or a test need not collide.
+    const port = Number.parseInt(process.env.CONDUCKS_SSE_PORT ?? '', 10);
+    await server.startSSE(Number.isFinite(port) && port > 0 ? port : undefined);
   } else {
     // Default: Stdio Transport
     await server.startStdio();
