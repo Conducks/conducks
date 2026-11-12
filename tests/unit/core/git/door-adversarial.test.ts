@@ -123,6 +123,8 @@ describe('the git door on hostile or unusual answers', () => {
 describe('the git door on discovery edges', () => {
   it('drops a binary file rather than reading it as text', async () => {
     const dir = mkDir();
+    // Real files: discovery keeps only what exists on disk (a deleted, unstaged file is gone).
+    for (const f of ['logo.png', 'main.ts']) fs.writeFileSync(path.join(dir, f), '');
     const git = new ChronicleInterface(dir, gitSaying((args) =>
       args.includes('ls-files') ? 'logo.png\nmain.ts\n' : ''));
 
@@ -134,6 +136,7 @@ describe('the git door on discovery edges', () => {
   it('keeps an unknown extension, because the list is a denylist', async () => {
     // A language added later must not be silently skipped — the failure direction is deliberate.
     const dir = mkDir();
+    fs.writeFileSync(path.join(dir, 'thing.zig'), '');
     const git = new ChronicleInterface(dir, gitSaying((args) =>
       args.includes('ls-files') ? 'thing.zig\n' : ''));
 
