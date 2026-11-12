@@ -72,4 +72,23 @@ describe('System domain integration (conducks setup)', () => {
     const count = registry.projects.filter((p: any) => p.root === fs.realpathSync(repo)).length;
     expect(count).toBe(1);
   });
+
+  /**
+   * State-machine audit P-08-7: the MCP registration catches its own error and returns
+   * `success: false`, and setup printed the ❌ line, then "Setup complete." and exited 0 — a script or
+   * an agent read a half-configured machine as a configured one.
+   */
+  it('a failed MCP registration fails setup, naming the step', () => {
+    const brokenHome = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-broken-'));
+    try {
+      // `Library` is a FILE, so the Claude Desktop config directory cannot be created under it.
+      fs.writeFileSync(path.join(brokenHome, 'Library'), 'not a directory');
+      const { combined, status } = runCli(['setup', '--no-analyze'], { cwd: repo, env: { HOME: brokenHome }, allowFail: true });
+      expect(status).not.toBe(0);
+      expect(combined).not.toContain('Setup complete.');
+      expect(combined).toMatch(/Setup incomplete.*Claude Desktop/s);
+    } finally {
+      fs.rmSync(brokenHome, { recursive: true, force: true });
+    }
+  });
 });
