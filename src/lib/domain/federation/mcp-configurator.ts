@@ -69,8 +69,13 @@ export class MCPConfigurator {
   /** Adds or replaces `mcpServers.conducks` in one JSON config, keeping everything else; backs the old file up. */
   private async mergeJson(file: string, serverPath: string, extra: Record<string, unknown> = {}): Promise<void> {
     const config = (await this.fsMock.pathExists(file)) ? await this.fsMock.readJson(file) : {};
-    // Captured BEFORE the edit: a config that already holds a conducks entry is one this tool wrote.
-    const alreadyOurs = !!config?.mcpServers?.["conducks"];
+    // Captured BEFORE the edit: a config whose conducks entry has the shape this tool writes is one
+    // this tool already edited, and its `.bak` holds the user's original (P-08-12). An entry merely
+    // NAMED conducks is not proof of that — a user's own server of that name was overwritten with no
+    // backup (state-machine audit round 2, Q-05-9).
+    const entry = config?.mcpServers?.["conducks"];
+    const alreadyOurs = !!entry && entry.command === "node" && Array.isArray(entry.args)
+      && entry.args.length === 2 && entry.args[1] === "mcp";
     config.mcpServers = config.mcpServers || {};
     config.mcpServers["conducks"] = {
       command: "node",
@@ -115,12 +120,30 @@ export class MCPConfigurator {
       // the old, removed path (state-machine audit P-05-5). The entry is kept only when it names this
       // install; otherwise it is replaced.
       await attempt('Claude Code', async () => {
+        const addArgs = ['mcp', 'add', '--scope', 'user', 'conducks', '--', 'node', serverPath, 'mcp'];
         let existing: string | null = null;
         try { existing = String(this.exec('claude', ['mcp', 'get', 'conducks']) ?? ''); } catch { /* not registered yet */ }
-        if (existing !== null && existing.includes(serverPath)) return 'already registered';
-        if (existing !== null) this.exec('claude', ['mcp', 'remove', '--scope', 'user', 'conducks']);
-        this.exec('claude', ['mcp', 'add', '--scope', 'user', 'conducks', '--', 'node', serverPath, 'mcp']);
-        return existing !== null ? 'updated to this install (user scope)' : 'registered for every project (user scope)';
+        if (existing === null) {
+          this.exec('claude', addArgs);
+          return 'registered for every project (user scope)';
+        }
+        // This install is named as a whole argument, not as a substring: `/a/cli.js` is not
+        // `/a/cli.js.old` (state-machine audit round 2, Q-05-7).
+        const argsLine = existing.split('\n').find(l => /^\s*Args:/i.test(l)) ?? '';
+        if (argsLine.replace(/^\s*Args:/i, '').trim().split(/\s+/).includes(serverPath)) return 'already registered';
+        // Only a USER-scope entry is replaced. `remove --scope user` fails for a local or project entry,
+        // and that entry is the user's to change, not ours.
+        const scope = existing.split('\n').find(l => /^\s*Scope:/i.test(l))?.replace(/^\s*Scope:/i, '').trim();
+        if (scope && !/^user/i.test(scope)) {
+          throw new Error(`a conducks entry in ${scope} points at another install; not changed. Run: claude ${addArgs.join(' ')} after removing it`);
+        }
+        this.exec('claude', ['mcp', 'remove', '--scope', 'user', 'conducks']);
+        try { this.exec('claude', addArgs); }
+        catch (err) {
+          // The old entry is already gone: say so, and how to finish, rather than only the add's error.
+          throw new Error(`removed the entry for another install, then adding this one failed (${(err as Error).message}). Claude Code has NO conducks entry now. Run: claude ${addArgs.join(' ')}`);
+        }
+        return 'updated to this install (user scope)';
       });
     }
 
@@ -129,13 +152,23 @@ export class MCPConfigurator {
       await attempt('Codex', async () => {
         const current = existsSync(codex) ? await this.fsMock.readFile(codex, 'utf8') : '';
         const argsLine = `args = [${JSON.stringify(serverPath)}, "mcp"]`;
-        // The block runs from its header to the next table header (or the end of the file).
-        const existing = current.match(/(^|\n)\[mcp_servers\.conducks\]\n[\s\S]*?(?=\n\[|$)/);
+        // The block runs from its header to the next table header (or the end of the file). `\r?` so
+        // a CRLF file is found too: it was not, and a second `[mcp_servers.conducks]` table was
+        // appended — invalid TOML (state-machine audit round 2, Q-05-8).
+        const existing = current.match(/(^|\r?\n)\[mcp_servers\.conducks\]\r?\n[\s\S]*?(?=\r?\n\[|$)/);
         if (existing) {
           if (existing[0].includes(argsLine)) return 'already registered';
           // Same P-05-5 fault as Claude Code: rewrite the block's args to this install, touch nothing else.
-          const updated = existing[0].replace(/^args = .*$/m, argsLine);
-          writeFileSync(codex, current.replace(existing[0], updated), 'utf8');
+          // Replacements are FUNCTIONS: a string replacement expands `$&` and `$'` inside the path.
+          // Only a COMPLETE one-line array: the first line of a multi-line one is `args = [`, and
+          // replacing it alone would leave the rest of the array behind as broken TOML.
+          const updated = existing[0].replace(/^args\s*=\s*\[.*\]([ \t]*\r?)$/m, (_m: string, eol: string) => argsLine + eol);
+          if (!updated.includes(argsLine)) {
+            // No single-line `args =` to rewrite (a multi-line array): the file is left as it was, and
+            // that is said — it used to report "updated" over an unchanged file.
+            throw new Error(`the conducks block in ${codex} has no single-line \`args = [...]\`; not changed. Set it to: ${argsLine}`);
+          }
+          writeFileSync(codex, current.replace(existing[0], () => updated), 'utf8');
           return `updated to this install in ${codex}`;
         }
         const block = `\n[mcp_servers.conducks]\ncommand = "node"\n${argsLine}\n`;
