@@ -49,17 +49,10 @@ class MirrorServer {
     const staticPath = path.resolve(__dirname, 'public');
     this.app.use(express.static(staticPath));
 
-    // ONE API REQUEST AT A TIME. Each route opens the vault and closes it when done, so the lock is
-    // free for `analyze`; two overlapping requests therefore closed it under each other and the
-    // second answered HTTP 500. Found when the page asked for six files at once. The SSE channel is
-    // exempt: it never touches the vault and never ends.
-    let last: Promise<void> = Promise.resolve();
-    this.app.use('/api', (req, res, next) => {
-      if (req.path === '/pulse') return next();
-      const turn = last;
-      last = new Promise<void>(release => { res.on('close', () => release()); });
-      void turn.then(() => next());
-    });
+    // ONE VAULT TURN AT A TIME is the gateway's job now (`GatewayService.exclusive`), keyed on the
+    // TASK finishing, not on the response closing. The middleware that lived here released the turn on
+    // the response's `close` — which fires when the browser aborts a fetch — so the next request ran
+    // beside a handler still using the shared handle (state-machine audit P-10-11).
 
     this.app.get('/', (req, res) => {
       res.sendFile(path.join(staticPath, 'index.html'));
@@ -118,11 +111,13 @@ class MirrorServer {
       const root = String((registry.infrastructure as any).chronicle.getProjectDir() ?? '').replace(/\/+$/, '') + '/';
       return v.toLowerCase().startsWith(root.toLowerCase()) ? v.slice(root.length) : v;
     };
-    this.app.get('/api/dead', answer(async () => {
+    // Through the gateway's turn, which closes the handle afterwards: these three load the graph and
+    // left the vault open, so a `conducks analyze` in a terminal met a locked vault (P-10-14).
+    this.app.get('/api/dead', answer(() => this.gateway.exclusive(async () => {
       await registry.infrastructure.ensureGraphLoaded();
       return registry.explain.prune().map((f: any) => ({ type: f.type, symbol: f.symbol, file: relative(String(f.file ?? '')), sure: !DEAD_CODE_QUESTION_TYPES.includes(f.type) }));
-    }));
-    this.app.get('/api/flows', answer(async () => {
+    })));
+    this.app.get('/api/flows', answer(() => this.gateway.exclusive(async () => {
       await registry.infrastructure.ensureGraphLoaded();
       const own = (id: string) => /^([a-z]:)?[\\/]/i.test(id);
       return registry.kinetic.getProcesses()
@@ -130,7 +125,7 @@ class MirrorServer {
         .filter((f: any) => f.steps.length >= 3)
         .sort((x: any, y: any) => y.steps.length - x.steps.length).slice(0, 30)
         .map((f: any) => ({ ...f, total: f.steps.length, steps: f.steps.slice(0, 80) }));
-    }));
+    })));
 
     this.app.get('/api/governance', async (req, res) => {
       try {
@@ -140,15 +135,13 @@ class MirrorServer {
         // its job on a panel that therefore never rendered. Same defect as `audit --fallback` in ADR
         // 0123, in a second surface: the CLI audit path was fixed and the web one was not, because
         // nothing drives this endpoint. Found by starting the mirror and asking it for the page.
-        await registry.infrastructure.ensureGraphLoaded();
-        const auditResult = registry.audit.audit();
-        const recommendations = await registry.audit.advise();
-        res.json({
-          violations: auditResult.violations,
-          recommendations,
-          stats: auditResult.stats,
-          timestamp: Date.now()
+        const body = await this.gateway.exclusive(async () => {
+          await registry.infrastructure.ensureGraphLoaded();
+          const auditResult = registry.audit.audit();
+          const recommendations = await registry.audit.advise();
+          return { violations: auditResult.violations, recommendations, stats: auditResult.stats, timestamp: Date.now() };
         });
+        res.json(body);
       } catch (err) {
         res.status(500).json({ error: String(err) });
       }
