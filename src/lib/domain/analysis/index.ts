@@ -267,9 +267,19 @@ export class AnalysisService {
 
     // 2.2 Conducks Purge: Remove old structural DNA for these units — and the vanished ones the
     // reconcile above found, in this same transaction.
-    logger.info(`🛡️ [Persistence] Purging structural DNA for ${dirtyFiles.length} units...`);
-    const unitIds = dirtyFiles.map(f => `${f.toLowerCase()}::unit`);
+    //
+    // Only the files that were READ. The reader drops a file it cannot read (permissions, a race with
+    // a delete), and purging every dirty file wiped that one's rows with nothing to write them back —
+    // and since its hash stayed recorded and its mtime is older than this pulse, no later run would
+    // ever look at it again. An unread file keeps its rows and loses its hash, so the never-seen rule
+    // re-reads it on the next run (state-machine audit round 2; measured with `chmod 000`).
+    const read = new Set(allUnits.map(u => u.path));
+    const readDirty = dirtyFiles.filter(f => read.has(f));
+    const unreadDirty = dirtyFiles.filter(f => !read.has(f));
+    logger.info(`🛡️ [Persistence] Purging structural DNA for ${readDirty.length} units...`);
+    const unitIds = readDirty.map(f => `${f.toLowerCase()}::unit`);
     await this.persistence.purgeUnits([...vanishedUnits, ...unitIds]);
+    for (const f of unreadDirty) await this.persistence.forgetFileHash(f.toLowerCase());
 
 
     // 2.5 One project root. This read `registry.bootstrapper` off this service and off the
@@ -507,8 +517,9 @@ export class AnalysisService {
 
     // A scoped run sweeps only its own subtree — otherwise it deletes every other service in the
     // workspace (ADR 0069). An INCREMENTAL run does not sweep at all: it re-stamped only the dirty
-    // units, so every untouched row would be "not in this pulse" and deleted (ADR 0101).
-    if (isFullPass) {
+    // units, so every untouched row would be "not in this pulse" and deleted (ADR 0101). Nor does a
+    // pass that could not read every file: the unread one keeps its rows from an earlier pulse.
+    if (isFullPass && unreadDirty.length === 0) {
       const swept = await this.persistence.sweepRowsNotInPulse(pulseId, targetRoot !== projectRoot ? targetRoot : undefined);
       if (swept.nodes > 0 || swept.edges > 0) {
         logger.info(`🛡️ [Conducks] Swept ${swept.nodes} node(s) and ${swept.edges} edge(s) left by earlier pulses.`);
