@@ -50,10 +50,18 @@ describe('mirror --live', () => {
     const exited = new Promise<number | null>(r => proc.on('exit', code => r(code)));
     try {
       expect(await until(() => buffer, s => /Mirror is LIVE/.test(s))).toBe(true);
+      // The graph load at startup must not keep the vault either, before any save happens.
+      expect(runCli(['analyze', '--yes'], { cwd: repo, allowFail: true }).status).toBe(0);
       writeFile(repo, 'src/a.ts', 'export function foo() { return 2; }\nexport function bar() { return 3; }\n');
       expect(await until(() => buffer, s => /Change detected:.*a\.ts/.test(s) || /Pulse error/.test(s))).toBe(true);
       expect(clean(buffer)).not.toMatch(/Pulse error/);
       expect(fs.existsSync(path.join(repo, '.conducks', 'watcher.json'))).toBe(true);
+      // The live mirror must not sit on the vault between turns: an open handle in this process
+      // refuses a writer in another, so `analyze` in a second terminal failed as LOCKED for the
+      // whole session (the graph load and the watcher's per-save query never closed it).
+      const other = runCli(['analyze', '--yes'], { cwd: repo, allowFail: true });
+      expect(other.combined).not.toMatch(/LOCKED/);
+      expect(other.status).toBe(0);
     } finally {
       proc.kill('SIGINT');
       await Promise.race([exited, new Promise(r => setTimeout(r, 15000))]);

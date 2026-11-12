@@ -51,7 +51,11 @@ export class MirrorCommand implements ConducksCommand {
     const watcher = registry.evolution.watcher;
     const live = !!watcher && (args.includes('--live') || args.includes('--watch'));
     if (live) {
-      await registry.infrastructure.ensureGraphLoaded();
+      // Loaded INSIDE the gateway's turn, which closes the handle when it ends, and the watcher's own
+      // reads borrow the same turn: a handle held between turns locks the vault against `analyze` in
+      // another terminal for the whole session.
+      await gateway.exclusive(() => registry.infrastructure.ensureGraphLoaded());
+      watcher.setVaultTurn(task => gateway.exclusive(task));
       watcher.start();
       await watcher.whenReady();
     }

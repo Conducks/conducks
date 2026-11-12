@@ -32,8 +32,8 @@ async function until(out: () => string, test: (s: string) => boolean, ms = 30000
 }
 
 /** Run `watch --pulse`, hand it to `probe`, then stop it CLEANLY so its writes are on disk. */
-async function withWatcher(cwd: string, probe: (out: () => string) => Promise<void>): Promise<string> {
-  const proc = spawn('node', [CLI, 'watch', '--pulse'], {
+async function withWatcher(cwd: string, probe: (out: () => string) => Promise<void>, args: string[] = ['--pulse']): Promise<string> {
+  const proc = spawn('node', [CLI, 'watch', ...args], {
     cwd, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, CHOKIDAR_USEPOLLING: '1', CHOKIDAR_INTERVAL: '250' },
   });
@@ -42,7 +42,7 @@ async function withWatcher(cwd: string, probe: (out: () => string) => Promise<vo
   proc.stderr.on('data', d => { buffer += String(d); });
   const exited = new Promise<void>(r => proc.on('exit', () => r()));
   try {
-    if (!(await until(() => buffer, s => /Auto-Pulse Mode/.test(s), 40000))) throw new Error(`watcher never ready:\n${buffer.slice(-600)}`);
+    if (!(await until(() => buffer, s => /Watcher — .* active/.test(s), 40000))) throw new Error(`watcher never ready:\n${buffer.slice(-600)}`);
     await probe(() => buffer);
   } finally {
     proc.kill('SIGINT');
@@ -104,5 +104,23 @@ describe('watch --pulse writes the vault the way analyze does', () => {
     });
     expect(log).not.toMatch(/Persisting structural delta/);
     expect(await rows(repo, "SELECT name FROM nodes WHERE file LIKE '%/src/a.ts' ORDER BY name")).toEqual(before);
+  }, 180000);
+
+  it('a read-only watch does not hold the vault: analyze runs beside it', async () => {
+    // An open DuckDB handle in one process refuses a writer in another. Plain `watch` loaded the graph
+    // and kept the handle open, and queried it again on every save, so `analyze` in a second terminal
+    // failed as LOCKED for the whole session.
+    let other: { status: number; combined: string } | null = null;
+    let before: { status: number; combined: string } | null = null;
+    await withWatcher(repo, async out => {
+      // Before any save, too: the initial graph load is a read that must not keep the handle.
+      before = runCli(['analyze', '--yes'], { cwd: repo, allowFail: true });
+      writeFile(repo, 'src/a.ts', 'export function foo() { return bar() + 5; }\nfunction bar() { return 1; }\n');
+      expect(await until(out, s => /Change detected:.*a\.ts/.test(s))).toBe(true);
+      other = runCli(['analyze', '--yes'], { cwd: repo, allowFail: true });
+    }, []);
+    expect(before!.status).toBe(0);
+    expect(other!.combined).not.toMatch(/LOCKED/);
+    expect(other!.status).toBe(0);
   }, 180000);
 });

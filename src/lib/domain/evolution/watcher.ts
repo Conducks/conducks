@@ -101,6 +101,22 @@ export class ConducksWatcher {
   public get unchangedSkips(): number { return this.skippedUnchanged; }
 
   /**
+   * How a READ-ONLY watcher borrows the vault. An open DuckDB handle in this process refuses a writer
+   * in any other, so a read handle left open between saves made `analyze` in a second terminal fail
+   * as LOCKED for the whole session. A host that already serialises the handle (the mirror gateway)
+   * hands in its turn, which closes at the end; without one, the read closes the handle itself.
+   * A `--pulse` session holds the vault for write anyway and keeps it.
+   */
+  private vaultTurn?: <T>(task: () => Promise<T>) => Promise<T>;
+  public setVaultTurn(turn: <T>(task: () => Promise<T>) => Promise<T>): void { this.vaultTurn = turn; }
+  private async readVault<T>(task: () => Promise<T>): Promise<T> {
+    const persistence: any = this.options.persistence;
+    if (!persistence?.readOnly) return task();
+    if (this.vaultTurn) return this.vaultTurn(task);
+    try { return await task(); } finally { await persistence.close(); }
+  }
+
+  /**
    * Enables or disables automatic structural pulsing to the database.
    */
   public enableAutoPulse(enabled: boolean): void {
@@ -279,7 +295,7 @@ export class ConducksWatcher {
     const persistence = this.options.persistence;
     if (!persistence) return { changed: 0, added: 0 };
     try {
-      const stored = await persistence.getAllFileHashes();
+      const stored = await this.readVault(() => persistence.getAllFileHashes());
       const fresh = classifyFreshness(
         stored, onDisk, WATCHED_EXTENSIONS,
         abs => { try { return fs.readFileSync(abs, 'utf8'); } catch { return null; } },
@@ -316,7 +332,7 @@ export class ConducksWatcher {
       try {
         this.graph.getGraph().replaceFile(normalizedPath.toLowerCase(), new Set());
         await this.writeUnit(normalizedPath, []);
-        await this.hashGate?.forget(normalizedPath);
+        await this.readVault(async () => this.hashGate?.forget(normalizedPath));
         console.error(`[Watcher] Removed: ${path.relative(this.rootDir, filePath)}`);
         this.options.onPulse?.({ event, filePath });
       } catch (err: any) {
@@ -333,7 +349,7 @@ export class ConducksWatcher {
       // a git subprocess, a grammar load, a parse, a global re-link — costs the same for those as for
       // a real edit. One string comparison in front of it dismisses them. A miss falls through to the
       // work, so this can only cost time, never correctness.
-      if (this.hashGate && !(await this.hashGate.hasChanged(path.resolve(filePath), source))) {
+      if (this.hashGate && !(await this.readVault(() => this.hashGate!.hasChanged(path.resolve(filePath), source)))) {
         this.skippedUnchanged++;
         console.error(`[Watcher] unchanged, skipped: ${path.basename(filePath)}`);
         return;
@@ -425,10 +441,10 @@ export class ConducksWatcher {
             try {
               const persistence: any = this.options.persistence;
               if (persistence?.query) {
-                const rows: any[] = await persistence.query(
+                const rows: any[] = await this.readVault(() => persistence.query(
                   "SELECT risk, complexity FROM nodes WHERE id = ? ORDER BY pulseId DESC LIMIT 1 OFFSET 1",
                   [symbolId]
-                );
+                ));
                 if (rows[0]) riskDelta = (node.properties.risk || 0) - rows[0].risk;
               }
             } catch { /* baseline risk is supplementary — non-fatal */ }
@@ -462,7 +478,7 @@ export class ConducksWatcher {
 
       // 6. Record the hash — AFTER the pulse and the save, never before. Recording first would make a
       // parse that threw look complete, and those nodes would stay missing until the file changed again.
-      await this.hashGate?.record(path.resolve(filePath), source);
+      await this.readVault(async () => this.hashGate?.record(path.resolve(filePath), source));
 
       // 7. Notify pulse subscriber (web mirror wires this in — dependency inversion, no domain→web import)
       this.options.onPulse?.({ event, filePath });
@@ -470,7 +486,7 @@ export class ConducksWatcher {
       // The in-memory graph may already hold the new content while the vault or the hash gate does
       // not. Forget the hash so the NEXT event for this file — including a revert to the old content —
       // is pulsed instead of dismissed as unchanged (state-machine audit P-07-4).
-      try { await this.hashGate?.forget(path.resolve(filePath)); } catch { /* best effort */ }
+      try { await this.readVault(async () => this.hashGate?.forget(path.resolve(filePath))); } catch { /* best effort */ }
       console.error(`[Watcher] Pulse error for ${path.basename(filePath)}: ${err?.message || err}`);
     }
   }
