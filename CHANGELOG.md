@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-13
+
 ### Added — Java
 - `prune` reports unused class members with a new finding type, `UNUSED_MEMBER`: a method of a class in use that nothing calls, and a private field nothing reads or writes. A public method of a public class is treated as API and never reported, nor is anything a framework reaches: annotated members, fields of annotated classes (JPA, Lombok), serialization hooks, bean accessors, overrides and constructors.
 - Calls are bound through the receiver's declared type: a local, a field, a parameter or an inherited method (`adapter.fromJson()` reaches `TypeAdapter.fromJson`, not whichever `fromJson` was found first). Measured against javac: spring-petclinic 93.3% → 98.3% of calls bound to the exact method, google/gson 78.9% → 90.4%; wrong targets 12 → 1 and 1,061 → 212.
