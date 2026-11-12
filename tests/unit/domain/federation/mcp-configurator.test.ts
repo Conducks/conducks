@@ -163,9 +163,43 @@ describe('registering conducks in the other detected clients', () => {
     expect(fs.readFileSync(path.join(home, '.claude.json'), 'utf8')).toBe(before); // never edited directly
 
     calls.length = 0;
-    const again = await makeWith(home, () => 'conducks: ...').registerDetected('/opt/conducks/cli.js');
+    const again = await makeWith(home, () => 'conducks:\n  Command: node\n  Args: /opt/conducks/cli.js mcp\n').registerDetected('/opt/conducks/cli.js');
     expect(calls).toEqual([['claude', 'mcp', 'get', 'conducks']]);
     expect(again[0].message).toContain('already registered');
+  });
+
+  /**
+   * State-machine audit P-05-5: an entry that EXISTS was taken as current. After a reinstall moved the
+   * CLI (another node version, another global prefix), `setup` said "already registered" and Claude
+   * Code and Codex kept starting conducks from the old, removed path.
+   */
+  it('re-registers Claude Code when its entry points at another install', async () => {
+    const home = mkHome();
+    fs.writeFileSync(path.join(home, '.claude.json'), '{}');
+    const res = await makeWith(home, (_c, args) => args[1] === 'get' ? 'conducks:\n  Args: /old/node20/conducks/cli.js mcp\n' : '')
+      .registerDetected('/opt/conducks/cli.js');
+    expect(calls).toEqual([
+      ['claude', 'mcp', 'get', 'conducks'],
+      ['claude', 'mcp', 'remove', '--scope', 'user', 'conducks'],
+      ['claude', 'mcp', 'add', '--scope', 'user', 'conducks', '--', 'node', '/opt/conducks/cli.js', 'mcp'],
+    ]);
+    expect(res[0].message).toContain('updated');
+  });
+
+  it('rewrites a Codex block that points at another install, keeping the rest of the TOML', async () => {
+    const home = mkHome();
+    fs.mkdirSync(path.join(home, '.codex'));
+    const toml = path.join(home, '.codex', 'config.toml');
+    fs.writeFileSync(toml, 'model = "x"\n\n[mcp_servers.conducks]\ncommand = "node"\nargs = ["/old/cli.js", "mcp"]\n\n[other]\nk = 1\n');
+
+    await makeWith(home, () => '').registerDetected('/opt/conducks/cli.js');
+
+    const text = fs.readFileSync(toml, 'utf8');
+    expect(text).toContain('args = ["/opt/conducks/cli.js", "mcp"]');
+    expect(text).not.toContain('/old/cli.js');
+    expect(text.match(/\[mcp_servers\.conducks\]/g)).toHaveLength(1);
+    expect(text).toContain('[other]\nk = 1');
+    expect(text.startsWith('model = "x"')).toBe(true);
   });
 
   it('appends one Codex block, keeps the rest of the TOML, and does not append twice', async () => {

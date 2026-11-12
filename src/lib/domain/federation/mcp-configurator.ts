@@ -110,10 +110,17 @@ export class MCPConfigurator {
     }
 
     if (existsSync(path.join(home, '.claude.json'))) {
+      // An entry that EXISTS is not necessarily CURRENT: a reinstall under another node version or
+      // global prefix moves the CLI, and "already registered" left Claude Code starting conducks from
+      // the old, removed path (state-machine audit P-05-5). The entry is kept only when it names this
+      // install; otherwise it is replaced.
       await attempt('Claude Code', async () => {
-        try { this.exec('claude', ['mcp', 'get', 'conducks']); return 'already registered'; } catch { /* not registered yet */ }
+        let existing: string | null = null;
+        try { existing = String(this.exec('claude', ['mcp', 'get', 'conducks']) ?? ''); } catch { /* not registered yet */ }
+        if (existing !== null && existing.includes(serverPath)) return 'already registered';
+        if (existing !== null) this.exec('claude', ['mcp', 'remove', '--scope', 'user', 'conducks']);
         this.exec('claude', ['mcp', 'add', '--scope', 'user', 'conducks', '--', 'node', serverPath, 'mcp']);
-        return 'registered for every project (user scope)';
+        return existing !== null ? 'updated to this install (user scope)' : 'registered for every project (user scope)';
       });
     }
 
@@ -121,8 +128,17 @@ export class MCPConfigurator {
     if (existsSync(path.dirname(codex))) {
       await attempt('Codex', async () => {
         const current = existsSync(codex) ? await this.fsMock.readFile(codex, 'utf8') : '';
-        if (current.includes('[mcp_servers.conducks]')) return 'already registered';
-        const block = `\n[mcp_servers.conducks]\ncommand = "node"\nargs = [${JSON.stringify(serverPath)}, "mcp"]\n`;
+        const argsLine = `args = [${JSON.stringify(serverPath)}, "mcp"]`;
+        // The block runs from its header to the next table header (or the end of the file).
+        const existing = current.match(/(^|\n)\[mcp_servers\.conducks\]\n[\s\S]*?(?=\n\[|$)/);
+        if (existing) {
+          if (existing[0].includes(argsLine)) return 'already registered';
+          // Same P-05-5 fault as Claude Code: rewrite the block's args to this install, touch nothing else.
+          const updated = existing[0].replace(/^args = .*$/m, argsLine);
+          writeFileSync(codex, current.replace(existing[0], updated), 'utf8');
+          return `updated to this install in ${codex}`;
+        }
+        const block = `\n[mcp_servers.conducks]\ncommand = "node"\n${argsLine}\n`;
         writeFileSync(codex, current + (current && !current.endsWith('\n') ? '\n' : '') + block, 'utf8');
         return `registered in ${codex}`;
       });
