@@ -198,5 +198,17 @@
     "dead": 1,
     "missed": 0,
     "extra": 0
+  },
+  "fixture::java-dead": {
+    "defs": 51,
+    "dead": 2,
+    "missed": 0,
+    "extra": 0
+  },
+  "spring-petclinic::java-dead": {
+    "defs": 137,
+    "dead": 0,
+    "missed": 0,
+    "extra": 0
   }
 }
