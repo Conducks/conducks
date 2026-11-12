@@ -136,3 +136,100 @@ describe('the bootstrapper anchor state', () => {
     expect(graph.getGraph().getNode('/old/root.ts::stale')).toBeUndefined();
   }, 60000);
 });
+
+/**
+ * Round 2 (state-machine re-audit, 2026-11-12), the load state as the round-1 fixes left it:
+ *
+ *   Q-01-2  `loadedPulse === null` meant both "nothing loaded" and "loaded from a vault with no pulse",
+ *           so an MCP server started before the first `analyze` never noticed that analyze.
+ *   Q-01-1  a load for the OLD root that failed during a re-anchor restored its own closure into
+ *           `pendingLoad` after the re-anchor had cleared it; the eager path never re-armed, so the
+ *           new root read as deferred forever and its next load ran the old root's closure.
+ *   Q-01-4  a load that failed after filling the graph (federation hydrate) left it marked
+ *           materialised while the bootstrapper called it deferred, and the retry loaded on top.
+ *   Q-01-3  the pulse id was read AFTER the load, so a pulse committed in between was recorded as
+ *           loaded and the stale graph was never noticed.
+ */
+describe('the bootstrapper load state, round 2', () => {
+  it('a graph loaded from a vault with no pulse notices the first one (Q-01-2)', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-anchor-nopulse-'));
+    roots.push(root);
+    const seed = new SynapsePersistence(root, false);
+    await seed.saveNodes([node('/p/a.ts::before')], 'pulse_0');
+    await seed.close();
+
+    const b = new RegistryBootstrapper();
+    const graph = new ConducksGraph();
+    let current = new SynapsePersistence(':memory:', true);
+    await b.initialize({ readOnly: true, root, lazy: true }, ctx(graph, current, { updatePersistence: (p: SynapsePersistence) => { current = p; } }));
+    await b.ensureGraphLoaded(current);
+    expect(await b.graphIsStale(current)).toBe(false);
+    await current.close();
+
+    const w = new SynapsePersistence(root, false);
+    await w.saveNodes([node('/p/a.ts::analyzed')], 'pulse_1');
+    await w.run(`INSERT INTO pulses (id, timestamp, nodeCount, edgeCount) VALUES (?, ?, ?, ?)`, ['pulse_1', Date.now(), 2, 0]);
+    await w.close();
+
+    expect(await b.graphIsStale(current)).toBe(true);
+    await current.close();
+  }, 60000);
+
+  it('a failed old-root load does not survive an eager re-anchor (Q-01-1)', async () => {
+    const root = await vaultWith(['/p/new.ts::fresh']);
+    const first = await vaultWith(['/old/root.ts::first']);
+    const b = new RegistryBootstrapper();
+    const graph = new ConducksGraph();
+    await b.initialize({ readOnly: true, root: first, lazy: true }, ctx(graph, new SynapsePersistence(':memory:', true)));
+    let fail!: () => void;
+    const gate = new Promise<void>((_, reject) => { fail = () => reject(new Error('Conflicting lock is held')); });
+    (b as unknown as { pendingLoad: unknown }).pendingLoad = async () => { await gate; };
+
+    const oldLoad = b.ensureGraphLoaded(new SynapsePersistence(':memory:', true)).catch(() => 'failed');
+    const reanchor = b.initialize({ readOnly: true, root, lazy: false }, ctx(graph, new SynapsePersistence(':memory:', true)));
+    fail();
+    expect(await oldLoad).toBe('failed');
+    await reanchor;
+
+    expect(b.graphIsDeferred).toBe(false);
+    expect(graph.getGraph().getNode('/p/new.ts::fresh')).toBeDefined();
+  }, 60000);
+
+  it('a load that fails after filling the graph leaves it deferred, and the retry starts clean (Q-01-4)', async () => {
+    const root = await vaultWith(['/p/a.ts::one', '/p/a.ts::two']);
+    const b = new RegistryBootstrapper();
+    const graph = new ConducksGraph();
+    let hydrations = 0;
+    const federationFor = () => ({ hydrate: async (g: any) => {
+      hydrations++;
+      if (hydrations === 1) throw new Error('neighbour vault locked');
+      g.addNode({ id: '/n/x.ts::neighbour', label: 'BEHAVIOR', properties: { name: 'neighbour', filePath: '/n/x.ts' } });
+    } }) as never;
+    let current = new SynapsePersistence(':memory:', true);
+    await b.initialize({ readOnly: true, root, lazy: true }, ctx(graph, current, { federationFor, updatePersistence: (p: SynapsePersistence) => { current = p; } }));
+
+    await expect(b.ensureGraphLoaded(current)).rejects.toThrow('neighbour vault locked');
+    expect(b.graphIsDeferred).toBe(true);
+    expect(graph.getGraph().isDeferred).toBe(true);   // the guard and the bootstrapper agree
+
+    await b.ensureGraphLoaded(current);
+    expect(graph.getGraph().isDeferred).toBe(false);
+    expect(graph.getGraph().getNode('/p/a.ts::one')).toBeDefined();
+    expect(graph.getGraph().getNode('/n/x.ts::neighbour')).toBeDefined();
+    await current.close();
+  }, 60000);
+
+  it('records the pulse the load STARTED from, so a pulse landing mid-load reads as stale (Q-01-3)', async () => {
+    const root = await vaultWith(['/p/a.ts::one']);
+    const b = new RegistryBootstrapper();
+    const graph = new ConducksGraph();
+    await b.initialize({ readOnly: true, root, lazy: true }, ctx(graph, new SynapsePersistence(':memory:', true)));
+    let loaded = false;
+    const racing = {
+      load: async () => { loaded = true; },   // an outside analyze commits pulse_2 while this runs
+      currentPulse: async () => ({ id: loaded ? 'pulse_2' : 'pulse_1', timestamp: 0, commitHash: null, branch: null }),
+    } as unknown as SynapsePersistence;
+    await b.ensureGraphLoaded(racing);
+    expect(await b.graphIsStale(racing)).toBe(true);
+  }, 60000);
+});

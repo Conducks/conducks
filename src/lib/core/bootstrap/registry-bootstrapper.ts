@@ -43,8 +43,14 @@ export class RegistryBootstrapper {
    */
   public get graphIsDeferred(): boolean { return this.pendingLoad !== null || this.loadInFlight !== null; }
 
-  /** The pulse the in-memory graph was loaded from; null when nothing has been loaded yet. */
+  /**
+   * The pulse the in-memory graph was loaded from — null when the vault had none — and whether a load
+   * has happened at all. One nullable used to say both, so a graph loaded from a vault with no pulse
+   * read as "nothing loaded", and the first `analyze` after an MCP server started was never noticed
+   * (state-machine audit round 2, Q-01-2).
+   */
   private loadedPulse: string | null = null;
+  private graphLoaded = false;
 
   /** Re-arms the deferred load for the current root. Set by `initialize`, used by `reloadGraph`. */
   private armLoad: (() => void) | null = null;
@@ -57,10 +63,10 @@ export class RegistryBootstrapper {
    * (state-machine audit P-10-3). False while nothing is loaded — there is nothing to be stale.
    */
   public async graphIsStale(persistence: SynapsePersistence): Promise<boolean> {
-    if (this.loadedPulse === null || this.pendingLoad || this.loadInFlight) return false;
+    if (!this.graphLoaded || this.pendingLoad || this.loadInFlight) return false;
     try {
       const current = await persistence.currentPulse();
-      return !!current && current.id !== this.loadedPulse;
+      return (current?.id ?? null) !== this.loadedPulse;
     } catch { return false; }
   }
 
@@ -69,6 +75,7 @@ export class RegistryBootstrapper {
     if (!this.armLoad) return;
     graph.getGraph().clear();
     this.loadedPulse = null;
+    this.graphLoaded = false;
     this.armLoad();
   }
 
@@ -410,11 +417,15 @@ export class RegistryBootstrapper {
     // running for an unchanged anchor, that re-arm is gone — so clearing it unconditionally would
     // leave the graph deferred forever and every tool would answer SYMBOL_NOT_FOUND against an
     // empty graph. Measured exactly that way while removing the queue (todo52).
-    this.pendingLoad = null;
     // A load ALREADY RUNNING for the old root is waited out, not raced: it holds the old handle and
     // would otherwise keep adding the old root's nodes to the graph cleared below for the new one
     // (state-machine audit P-01-10).
     if (this.loadInFlight) await this.loadInFlight.catch(() => { /* its caller reports it */ });
+    // Nulled AFTER that wait, not before it: a load that FAILS restores its own closure into
+    // `pendingLoad` on the way out, and that is the OLD root's load. Nulled first, it came back, and
+    // the eager path below never re-arms — so the new root read as deferred for good and its next load
+    // ran the old root's closure (state-machine audit round 2, Q-01-1).
+    this.pendingLoad = null;
     if (isCurrentlyConnected) await persistence.close();
 
     // Cleared on a MODE change too. Only a root change cleared it, and the load below adds the
@@ -422,6 +433,7 @@ export class RegistryBootstrapper {
     // same process survived a read-only → write switch as a ghost (state-machine audit P-01-14).
     graph.getGraph().clear();
     this.loadedPulse = null;
+    this.graphLoaded = false;
 
     const newPersistence = new SynapsePersistence(effectiveRoot, readOnly);
     updatePersistence(newPersistence);
@@ -431,11 +443,27 @@ export class RegistryBootstrapper {
     const newIgnoreManager = new IgnoreManager(effectiveRoot);
     updateIgnoreManager(newIgnoreManager);
 
+    // Round 2 (state-machine re-audit): the pulse is read BEFORE the rows, so a pulse an outside
+    // `analyze` commits mid-load is newer than the one recorded and reads as stale; read after, it was
+    // recorded as loaded while the graph held the older rows (Q-01-3). Every load starts from an empty
+    // graph, and one that fails part-way leaves it EMPTY and DEFERRED: it used to stay half-filled and
+    // marked materialised while the bootstrapper called it deferred, and the retry loaded on top (Q-01-4).
     const load = async (current: SynapsePersistence) => {
-      await current.load(graph.getGraph());
-      graph.getGraph().markMaterialised();
-      try { this.loadedPulse = (await current.currentPulse())?.id ?? null; } catch { this.loadedPulse = null; }
-      await federation.hydrate(graph.getGraph());
+      let pulse: string | null = null;
+      try { pulse = (await current.currentPulse())?.id ?? null; } catch { pulse = null; }
+      const g = graph.getGraph();
+      g.clear();
+      try {
+        await current.load(g);
+        g.markMaterialised();
+        await federation.hydrate(g);
+      } catch (err) {
+        g.clear();
+        g.markDeferred();
+        throw err;
+      }
+      this.loadedPulse = pulse;
+      this.graphLoaded = true;
     };
     this.armLoad = () => {
       graph.getGraph().markDeferred();
@@ -459,6 +487,8 @@ export class RegistryBootstrapper {
       logger.boot(`🛡️ [Conducks Bootstrapper] Structural graph loaded (${graph.getGraph().stats.nodeCount} nodes).`);
     } catch (err: any) {
       console.error(`🛡️ [Conducks Bootstrapper] Structural load failed: ${err.message}`);
+      // Deferred and re-armed, so the next walk retries the load instead of reading an empty graph.
+      this.armLoad();
     } finally {
       if (readOnly) await newPersistence.close();
     }
