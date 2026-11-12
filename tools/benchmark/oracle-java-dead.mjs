@@ -156,7 +156,7 @@ for (const f of findings) {
 // language (DeadCodeAnalyzer.isModuleScoped). The Python and JS oracles score the same scope
 // (module-level / top-level). In Java that is the top-level TYPE: methods, fields and nested types
 // are reported on their own line and never charged as MISSED.
-const topLevel = (d) => d.kind === 'class' && !d.owner;
+const topLevel = (d) => d.kind === 'class' && d.topLevel;
 const unreferencedMembers = scored.filter(d => !topLevel(d) && d.refs === 0 && !compileRequired(d) && !d.main && !d.annotated && !d.accessor && !d.enumConstant && !dispatchOnly(d));
 const unreferenced = scored.filter(d => topLevel(d) && d.refs === 0 && d.memberRefs === 0 && !compileRequired(d));
 const framework = unreferenced.filter(d => d.annotated);

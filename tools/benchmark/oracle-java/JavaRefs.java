@@ -30,7 +30,7 @@ public class JavaRefs {
       "java.lang.Deprecated", "java.lang.FunctionalInterface", "java.lang.SafeVarargs");
   static final class Def {
     String file, name, kind, owner; int line; long start, end;
-    boolean test, annotated, main, accessor, isPublic, enumConstant;
+    boolean test, annotated, main, accessor, isPublic, enumConstant, topLevel;
     String override;      // "abstract:<owner>.<name>" (compile-required) | "concrete:<…>" | "unresolved"
     int refs, refsOtherFile, refsNonTest, importRefs, memberRefs; String firstMemberRef; String firstRef;
   }
@@ -40,6 +40,9 @@ public class JavaRefs {
     List<File> files;
     try (Stream<Path> s = Files.walk(root)) {
       files = s.filter(p -> p.toString().endsWith(".java"))
+               // module-info.java: a multi-module tree has several, and javac compiles ONE module per run
+               // — measured on gson: "too many module declarations found", the first of 100 errors.
+               .filter(p -> !p.getFileName().toString().equals("module-info.java"))
                .filter(p -> { String r = root.relativize(p).toString().replace('\\', '/');
                               return !r.startsWith("target/") && !r.startsWith("build/") && !r.contains("/.") && !r.startsWith("."); })
                .map(Path::toFile).collect(Collectors.toList());
@@ -49,7 +52,7 @@ public class JavaRefs {
     StandardJavaFileManager fm = jc.getStandardFileManager(diags, null, StandardCharsets.UTF_8);
     Path out = Files.createTempDirectory("conducks-javarefs");
     JavacTask task = (JavacTask) jc.getTask(null, fm, diags,
-        List.of("-proc:none", "-Xlint:none", "-implicit:none", "-d", out.toString()), null, fm.getJavaFileObjectsFromFiles(files));
+        List.of("-proc:none", "-Xlint:none", "-Xmaxerrs", "1000000", "-implicit:none", "-d", out.toString()), null, fm.getJavaFileObjectsFromFiles(files));
     List<CompilationUnitTree> units = new ArrayList<>();
     task.parse().forEach(units::add);
     task.analyze();
@@ -76,12 +79,15 @@ public class JavaRefs {
               .anyMatch(n -> !COMPILER_ANNOTATIONS.contains(n));
           d.enumConstant = e.getKind() == ElementKind.ENUM_CONSTANT;
           d.isPublic = e.getModifiers().contains(Modifier.PUBLIC);
+          d.topLevel = e.getEnclosingElement() != null && e.getEnclosingElement().getKind() == ElementKind.PACKAGE;
           defs.put(e, d);
         }
         @Override public Void visitClass(ClassTree t, Void v) {
           Element e = trees.getElement(getCurrentPath());
           String owner = e != null && e.getEnclosingElement() instanceof TypeElement te ? te.getSimpleName().toString() : "";
-          add(t, "class", t.getSimpleName().toString(), owner);
+          // An anonymous class — `new X() {…}`, an enum constant's body — declares nothing anyone can
+          // name or reference. Measured on gson: scored as 20 unreferenced TOP-LEVEL types (owner "").
+          if (!t.getSimpleName().toString().isEmpty()) add(t, "class", t.getSimpleName().toString(), owner);
           return super.visitClass(t, v);
         }
         @Override public Void visitMethod(MethodTree t, Void v) {
@@ -130,6 +136,18 @@ public class JavaRefs {
           if (!d.file.equals(rel)) d.refsOtherFile++;
           if (!fromTest) d.refsNonTest++;
           if (d.firstRef == null) d.firstRef = rel + ":" + lm.getLineNumber(at);
+          // A type whose MEMBERS are referenced from OUTSIDE it is in use: `square(3)` resolves to
+          // Maths.square, and deleting Maths breaks the build all the same. Propagated to every
+          // enclosing type, but only for a reference outside THAT type — a class using its own nested
+          // classes is not used (measured on gson: NoSerializedNameMain read as live through itself).
+          if (inImport) return;
+          for (Element up = e.getEnclosingElement(); up != null; up = up.getEnclosingElement()) {
+            Def holder = defs.get(up);
+            if (holder == null) continue;
+            if (holder.file.equals(rel) && at >= holder.start && at < holder.end) break;
+            holder.memberRefs++;
+            if (holder.firstMemberRef == null) holder.firstMemberRef = d.owner + "." + d.name + " at " + rel + ":" + lm.getLineNumber(at);
+          }
         }
         boolean inImport = false;
         @Override public Void visitImport(ImportTree t, Void v) { inImport = true; try { return super.visitImport(t, v); } finally { inImport = false; } }
@@ -140,19 +158,6 @@ public class JavaRefs {
       }.scan(cu, null);
     }
 
-    // A type whose MEMBERS are referenced is in use: `square(3)` resolves to Maths.square, and deleting
-    // Maths breaks the build all the same. Propagated to every enclosing type.
-    for (Map.Entry<Element, Def> en : defs.entrySet()) {
-      Def d = en.getValue();
-      int outside = d.refs - d.importRefs;
-      if (outside <= 0) continue;
-      for (Element up = en.getKey().getEnclosingElement(); up != null; up = up.getEnclosingElement()) {
-        Def holder = defs.get(up);
-        if (holder == null) continue;
-        holder.memberRefs += outside;
-        if (holder.firstMemberRef == null) holder.firstMemberRef = d.owner + "." + d.name + " at " + d.firstRef;
-      }
-    }
     // A class that holds `main` is an entry point as much as `main` is.
     for (Map.Entry<Element, Def> en : defs.entrySet()) {
       if (en.getValue().main) { Def holder = defs.get(en.getKey().getEnclosingElement()); if (holder != null) holder.main = true; }
@@ -169,7 +174,7 @@ public class JavaRefs {
       sb.append('{').append("\"file\":").append(q(d.file)).append(",\"line\":").append(d.line)
         .append(",\"name\":").append(q(d.name)).append(",\"kind\":").append(q(d.kind)).append(",\"owner\":").append(q(d.owner))
         .append(",\"test\":").append(d.test).append(",\"annotated\":").append(d.annotated).append(",\"main\":").append(d.main)
-        .append(",\"accessor\":").append(d.accessor).append(",\"enumConstant\":").append(d.enumConstant).append(",\"isPublic\":").append(d.isPublic)
+        .append(",\"accessor\":").append(d.accessor).append(",\"enumConstant\":").append(d.enumConstant).append(",\"isPublic\":").append(d.isPublic).append(",\"topLevel\":").append(d.topLevel)
         .append(",\"override\":").append(q(d.override)).append(",\"refs\":").append(d.refs)
         .append(",\"importRefs\":").append(d.importRefs).append(",\"memberRefs\":").append(d.memberRefs).append(",\"firstMemberRef\":").append(q(d.firstMemberRef)).append(",\"refsOtherFile\":").append(d.refsOtherFile).append(",\"refsNonTest\":").append(d.refsNonTest)
         .append(",\"firstRef\":").append(q(d.firstRef)).append('}');
