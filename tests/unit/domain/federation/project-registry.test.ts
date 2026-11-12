@@ -79,9 +79,9 @@ describe('ProjectRegistry', () => {
   it('forgets a root, and reports when there was nothing to forget', () => {
     registry.register('/repo/a');
 
-    expect(registry.forget('/repo/a')).toBe(true);
+    expect(registry.forget('/repo/a')).toEqual({ removed: true, written: true });
     expect(registry.list()).toEqual([]);
-    expect(registry.forget('/repo/a')).toBe(false);
+    expect(registry.forget('/repo/a')).toEqual({ removed: false, written: false });
   });
 
   it('reports roots that no longer exist on disk without removing them', () => {

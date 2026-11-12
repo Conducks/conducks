@@ -179,6 +179,12 @@ export class AnalysisService {
     //
     // Skipped for `--staged`, where discovery returns ONLY the staged files: reconciling against that
     // subset would purge the entire rest of the project.
+    //
+    // DECIDED here, PURGED later: inside the pulse transaction when a pulse follows, so a pulse that
+    // fails rolls the purge back with everything else. It committed on its own before `beginPulse`, and
+    // a failed pulse left the vault neither the old graph nor the new one (round 2, Q-06-7). With
+    // nothing else to do — no dirty file — it is the whole run and commits alone, as before.
+    let vanishedUnits: string[] = [];
     if (!options.staged) {
       const discovered = new Set(filteredFiles.map(f => f.toLowerCase()));
       const known = await this.persistence.query<{ file: string }>(
@@ -192,7 +198,7 @@ export class AnalysisService {
 
       if (vanished.length > 0) {
         logger.info(`🛡️ [Persistence] Reconciling: purging ${vanished.length} unit(s) no longer discoverable.`);
-        await this.persistence.purgeUnits(vanished.map(f => `${f}::unit`));
+        vanishedUnits = vanished.map(f => `${f}::unit`);
       }
     }
 
@@ -205,6 +211,8 @@ export class AnalysisService {
     // (The empty-discovery gate moved above the reconcile — see "NOTHING FOUND" there.)
 
     if (dirtyFiles.length === 0 && !options.force) {
+      // No pulse follows: the reconcile is the whole run, so it commits on its own.
+      if (vanishedUnits.length > 0) await this.persistence.purgeUnits(vanishedUnits);
       logger.warn("No changes detected. Structural Synapse is already at 100% resonance.");
       return { success: true, files: 0 };
     }
@@ -257,15 +265,19 @@ export class AnalysisService {
     await this.persistence.beginPulse();
     try {
 
-    // 2.2 Conducks Purge: Remove old structural DNA for these units
+    // 2.2 Conducks Purge: Remove old structural DNA for these units — and the vanished ones the
+    // reconcile above found, in this same transaction.
     logger.info(`🛡️ [Persistence] Purging structural DNA for ${dirtyFiles.length} units...`);
     const unitIds = dirtyFiles.map(f => `${f.toLowerCase()}::unit`);
-    await this.persistence.purgeUnits(unitIds);
+    await this.persistence.purgeUnits([...vanishedUnits, ...unitIds]);
 
 
-    // 2.5 Discover Sub-Repositories for Multi-Project Resonance
-    const bootstrapper = (this as any).registry?.bootstrapper || (this.orchestrator as any).registry?.bootstrapper;
-    const projectRoots = bootstrapper ? bootstrapper.discoverProjects(projectRoot) : [projectRoot];
+    // 2.5 One project root. This read `registry.bootstrapper` off this service and off the
+    // orchestrator to discover sub-repositories — neither has one (the orchestrator's `registry` is
+    // the provider registry), so the lookup was always undefined and the roots always this one. The
+    // dead branch is gone and the behaviour it never had is not switched on here: sub-repository
+    // roots would change the graph's shape, which is a feature, not a state fix (round 2, Q-06-6).
+    const projectRoots = [projectRoot];
 
     // Execute the core analysis wave with project context
     // `filteredFiles` — every discoverable file — not `dirtyFiles`. Import resolution searches this
