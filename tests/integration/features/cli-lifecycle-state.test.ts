@@ -83,6 +83,19 @@ describe('CLI lifecycle state', () => {
    * `close()`. `clean` never closed its write handle, so a full copy of the PRE-clean graph stayed on
    * disk — and the lock fallback serves that copy to readers.
    */
+  /**
+   * P-09-8: with no third-party dependency `supply-chain --json` said `advisories.available: false`,
+   * which everywhere else in that payload means "vulnerability status UNKNOWN" — for a project with
+   * nothing to audit. `needed: false` tells the two apart.
+   */
+  it('supply-chain --json on a project with no dependencies says no audit was needed', () => {
+    const repo = analyzed('supply-none');
+    const { stdout } = runCli(['supply-chain', '--json'], { cwd: repo });
+    const got = JSON.parse(stdout);
+    expect(got.analysed).toBe(true);
+    expect(got.advisories).toEqual({ available: false, needed: false });
+  }, 240000);
+
   it('clean leaves no reader snapshot behind', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
