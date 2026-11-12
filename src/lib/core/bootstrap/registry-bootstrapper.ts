@@ -366,6 +366,10 @@ export class RegistryBootstrapper {
       const vaultDir = path.join(effectiveRoot, '.conducks');
       if (!readOnly || fsSync.existsSync(vaultDir)) {
         logger.setLogFile(path.join(vaultDir, 'mcp.log'));
+      } else {
+        // Not this root's sink — and not the PREVIOUS root's either, which is where a re-anchored
+        // MCP server kept writing (state-machine audit round 2, Q-03-7).
+        logger.clearLogFile();
       }
     }
 
