@@ -50,6 +50,7 @@ export class UninstallCommand implements ConducksCommand {
     }
 
     let removed = 0;
+    let configFailed = false;
 
     if (await fs.pathExists(claudeConfigPath)) {
       try {
@@ -76,7 +77,12 @@ export class UninstallCommand implements ConducksCommand {
           console.log(`No conducks entry found in: ${claudeConfigPath}`);
         }
       } catch (err) {
+        // A config that could not be rewritten still holds the entry: the command FAILED. It was logged
+        // and ignored — exit 0, closing on "Nothing to uninstall — conducks was not registered"
+        // (state-machine audit round 2, Q-08-6).
         console.error(`Failed to update ${claudeConfigPath}: ${(err as Error).message}`);
+        configFailed = true;
+        process.exitCode = 1;
       }
     } else {
       console.log(`Config not found: ${claudeConfigPath}`);
@@ -114,7 +120,9 @@ export class UninstallCommand implements ConducksCommand {
       process.exitCode = 1;
     }
 
-    if (removed > 0 || skillResult.removed.length > 0 || forgotten.written) {
+    if (configFailed) {
+      console.log(`\nUninstall incomplete — ${claudeConfigPath} still registers conducks. ${removed} config(s) updated, ${skillResult.removed.length} skill(s) removed.`);
+    } else if (removed > 0 || skillResult.removed.length > 0 || forgotten.written) {
       console.log(`\nUninstall complete. ${removed} config(s) updated, ${skillResult.removed.length} skill(s) removed.`);
     } else {
       console.log(`\nNothing to uninstall — conducks was not registered.`);

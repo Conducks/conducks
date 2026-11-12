@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 
 /**
  * Conducks — the on-disk spelling of a stored path. ONE rule, both surfaces. 🏺
@@ -33,18 +34,38 @@ export function realCasePath(storedPath: string): string {
   // paste, from the helper whose purpose is pasteable ids.
   if (storedPath.includes('://')) return storedPath;
 
+  // A cached spelling is re-checked before it is trusted: one syscall, against the walk it saves. The
+  // file can be renamed to another case after the first lookup, and the long-running MCP server then
+  // answered the old, unopenable spelling until restart (state-machine audit round 2, Q-09-3).
   const hit = cache.get(storedPath);
-  if (hit !== undefined) return hit;
+  if (hit !== undefined) {
+    if (spelledOnDisk(hit)) return hit;
+    cache.delete(storedPath);
+  }
 
   let real: string | null = null;
   try { real = fs.realpathSync.native(storedPath); }
-  catch { real = walkCaseInsensitive(storedPath); /* gone, or a case-sensitive filesystem */ }
+  catch {
+    // gone, or a case-sensitive filesystem. The directory listings are cached too, so a walk over a
+    // stale one can land on the old spelling — checked, and walked again over fresh listings.
+    real = walkCaseInsensitive(storedPath, false);
+    if (real !== null && !spelledOnDisk(real)) real = walkCaseInsensitive(storedPath, true);
+  }
   // Only a RECOVERED spelling is cached. Caching the unrepaired fallback kept a path that did not
   // exist yet unopenable for the life of the process — the MCP server's whole session
   // (state-machine audit P-09-11). A miss costs one more walk next time; a stale answer cost a restart.
   if (real === null) return storedPath;
   cache.set(storedPath, real);
   return real;
+}
+
+/**
+ * True when `p` names an existing file whose own name the OS spells exactly so. The NAME, not the
+ * whole path: a root reached through a symlink (`/var` → `/private/var` on macOS) resolves to another
+ * string, and comparing whole paths would fail every cached hit there and re-walk on every call.
+ */
+function spelledOnDisk(p: string): boolean {
+  try { return path.basename(fs.realpathSync.native(p)) === path.basename(p); } catch { return false; }
 }
 
 /** Directory listings, read once per process: one `prune` asks about the same folders thousands of times. */
@@ -67,7 +88,7 @@ function listing(dir: string, fresh: boolean): string[] | null {
   return entries;
 }
 
-function walkCaseInsensitive(storedPath: string): string | null {
+function walkCaseInsensitive(storedPath: string, fresh: boolean): string | null {
   if (!storedPath.startsWith('/')) return null;
   let current = '/';
   for (const segment of storedPath.split('/').filter(Boolean)) {
@@ -78,7 +99,7 @@ function walkCaseInsensitive(storedPath: string): string | null {
       const matches = entries.filter(e => e.toLowerCase() === lower);
       return matches.length === 1 ? matches[0] : null;
     };
-    let next = pick(listing(current, false));
+    let next = pick(listing(current, fresh));
     // A cached listing that does not hold the segment may simply predate it: a file created after its
     // folder was first read stayed unfindable for the process's life (P-09-11). Re-read once.
     if (!next) next = pick(listing(current, true));

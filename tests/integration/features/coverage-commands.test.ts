@@ -202,6 +202,48 @@ describe('coverage commands refuse a file that is not a coverage report', () => 
   }, 120000);
 
   /**
+   * State-machine audit round 2, Q-09-2. The debounced re-render ran in a bare timer, so a write
+   * that failed (the output path became unwritable) threw an uncaught exception: the watch session
+   * died with a stack trace instead of saying what failed and watching on.
+   */
+  it('coverage-view --watch survives a re-render that cannot write, and renders again once it can', async () => {
+    const { spawn } = await import('node:child_process');
+    const cli = path.resolve('build/src/interfaces/cli/index.js');
+    const live = path.join(repo, 'live2-coverage.json');
+    const out2 = path.join(repo, 'live2.html');
+    fs.copyFileSync(covPath, live);
+    const proc = spawn('node', [cli, 'coverage-view', live, '--watch', '--out', out2], { cwd: repo });
+    let out = '';
+    let exited = false;
+    proc.stdout.on('data', d => { out += String(d); });
+    proc.stderr.on('data', d => { out += String(d); });
+    const done = new Promise<void>(r => proc.on('exit', () => { exited = true; r(); }));
+    const until = async (test: () => boolean, ms = 30000) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) { if (test()) return true; await new Promise(r => setTimeout(r, 100)); }
+      return false;
+    };
+    const renders = () => (out.match(/re-rendered/g) ?? []).length;
+    const touch = () => fs.writeFileSync(live, fs.readFileSync(covPath));
+    try {
+      expect(await until(() => /Watching/.test(out))).toBe(true);
+      fs.rmSync(out2, { force: true });
+      fs.mkdirSync(out2);                       // the output path is now a directory: the write fails
+      touch();
+      expect(await until(() => /EISDIR|could not|failed/i.test(out) || exited, 10000)).toBe(true);
+      await new Promise(r => setTimeout(r, 500));
+      expect(exited).toBe(false);
+      fs.rmdirSync(out2);
+      touch();
+      expect(await until(() => renders() >= 1)).toBe(true);
+    } finally {
+      proc.kill('SIGINT');
+      await Promise.race([done, new Promise(r => setTimeout(r, 8000))]);
+      proc.kill('SIGKILL');
+    }
+  }, 120000);
+
+  /**
    * The `not.toMatch(/Missing coverage file/)` is the point, and it was missing the first time.
    * This asserted only a non-zero exit — which it got, from the WRONG message: the `--out` skip
    * index was `outIdx + 1` with no guard for `indexOf` returning -1, so with no `--out` present the

@@ -50,22 +50,20 @@ export class MirrorCommand implements ConducksCommand {
     // announced only once it is really watching, as `watch` does (P-08-10, todo55).
     const watcher = registry.evolution.watcher;
     const live = !!watcher && (args.includes('--live') || args.includes('--watch'));
-    if (live) {
-      // Loaded INSIDE the gateway's turn, which closes the handle when it ends, and the watcher's own
-      // reads borrow the same turn: a handle held between turns locks the vault against `analyze` in
-      // another terminal for the whole session.
-      await gateway.exclusive(() => registry.infrastructure.ensureGraphLoaded());
-      watcher.setVaultTurn(task => gateway.exclusive(task));
-      watcher.start();
-      await watcher.whenReady();
-    }
-
     // This command runs until it is killed, and until now it handled no signal — so `stop()`
     // never ran, and the docs watcher's readiness probe was left behind in `docs/` every time.
-    // `once` so a second Ctrl-C during shutdown still kills the process rather than re-entering.
     // The file watcher is stopped too: exiting without `stop()` left its liveness marker behind, and
     // `monitor` then read a deliberate Ctrl-C as a DEAD watcher (P-07-2).
+    //
+    // Armed BEFORE the watcher starts, not after it is ready: `start()` writes the marker, and a
+    // Ctrl-C in between took the default action and left it (round 2, Q-08-4). And ONE shutdown:
+    // there is one `once` listener per signal, so a SIGTERM arriving during a SIGINT shutdown ran it
+    // again and exited while the first was still stopping the watcher — the fault P-08-9 fixed for
+    // `watch` (round 2, Q-08-7). A second signal of the SAME kind still kills the process.
+    let stopping = false;
     const shutdown = async () => {
+      if (stopping) return;
+      stopping = true;
       console.log("\n\x1b[90m[Conducks] Stopping mirror…\x1b[0m");
       try { await server.stop(); } catch { /* shutting down anyway */ }
       if (live) { try { await registry.evolution.stopWatchers(); } catch { /* shutting down anyway */ } }
@@ -73,6 +71,17 @@ export class MirrorCommand implements ConducksCommand {
     };
     process.once('SIGINT', shutdown);
     process.once('SIGTERM', shutdown);
+
+    if (live) {
+      // Loaded INSIDE the gateway's turn, which closes the handle when it ends, and the watcher's own
+      // reads borrow the same turn: a handle held between turns locks the vault against `analyze` in
+      // another terminal for the whole session.
+      await gateway.exclusive(() => registry.infrastructure.ensureGraphLoaded());
+      if (stopping) return;   // stopped while loading: starting now would write a marker nothing removes
+      watcher.setVaultTurn(task => gateway.exclusive(task));
+      watcher.start();
+      await watcher.whenReady();
+    }
 
     console.log("\n\x1b[32m✅ Conducks Mirror is LIVE.\x1b[0m");
     console.log(`\x1b[34m- Dashboard: http://localhost:${port}\x1b[0m`);

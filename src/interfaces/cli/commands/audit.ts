@@ -15,7 +15,11 @@ export class AuditCommand implements ConducksCommand {
   public async execute(args: string[], registry: Registry): Promise<void> {
     const historyArg = args.find(a => a.startsWith("--history"));
     if (historyArg) {
-      const windowStr = historyArg.includes("=") ? historyArg.split("=")[1] : "5";
+      // `--history 10` is the same request as `--history=10`. Only the `=` form was read, so the
+      // space form silently audited 5 pulses (state-machine audit round 2, Q-09-4).
+      const next = args[args.indexOf(historyArg) + 1];
+      const windowStr = historyArg.includes("=") ? historyArg.split("=")[1]
+        : (next !== undefined && !next.startsWith("--") ? next : "5");
       // A window that does not parse is REFUSED, not turned into 5 — the rule `trace --depth`,
       // `impact` and `flows` follow (state-machine audit P-09-10).
       const window = Number(windowStr);
