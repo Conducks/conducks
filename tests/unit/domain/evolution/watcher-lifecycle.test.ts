@@ -105,6 +105,8 @@ describe('watcher event ordering and lifecycle', () => {
     const p1 = fakePersistence('p1');
     const evolution = new EvolutionService(graph, p1);
     const w = evolution.getWatcher(dir)!;
+    // A `--pulse` session: only then does a hash reach the vault at all (round 2, Q-07-1).
+    w.enableAutoPulse(true);
     await (w as any).handlePulseEvent('change', file);
     expect(log).toContain('p1:record');
 

@@ -336,6 +336,10 @@ export class ConducksWatcher {
         console.error(`[Watcher] Removed: ${path.relative(this.rootDir, filePath)}`);
         this.options.onPulse?.({ event, filePath });
       } catch (err: any) {
+        // The graph has already dropped the file. A hash left behind made restoring it byte-identical
+        // (a checkout of the file, an undo) read as "unchanged", so it stayed missing until its content
+        // changed — the change path below forgets on failure for the same reason (round 2, Q-07-2).
+        try { await this.readVault(async () => this.hashGate?.forget(normalizedPath)); } catch { /* best effort */ }
         console.error(`[Watcher] Removal error for ${path.basename(filePath)}: ${err?.message || err}`);
       }
       return;
@@ -478,7 +482,7 @@ export class ConducksWatcher {
 
       // 6. Record the hash — AFTER the pulse and the save, never before. Recording first would make a
       // parse that threw look complete, and those nodes would stay missing until the file changed again.
-      await this.readVault(async () => this.hashGate?.record(path.resolve(filePath), source));
+      await this.recordHash(path.resolve(filePath), source);
 
       // 7. Notify pulse subscriber (web mirror wires this in — dependency inversion, no domain→web import)
       this.options.onPulse?.({ event, filePath });
@@ -489,6 +493,22 @@ export class ConducksWatcher {
       try { await this.readVault(async () => this.hashGate?.forget(path.resolve(filePath))); } catch { /* best effort */ }
       console.error(`[Watcher] Pulse error for ${path.basename(filePath)}: ${err?.message || err}`);
     }
+  }
+
+  /**
+   * Records that `source` is what the graph now holds for this file — in the VAULT only when the vault
+   * received it too. With auto-pulse off on a writable handle (`watch --pulse` after a branch switch)
+   * `writeUnit` writes nothing, and storing the hash anyway claimed content the vault never got: the
+   * freshness check, the monitor and the next session's reconcile then called the file current
+   * (state-machine audit round 2, Q-07-1). The in-memory gate still learns it, because this process's
+   * graph does hold it. A read-only handle stores nothing either way.
+   */
+  private async recordHash(absPath: string, source: string): Promise<void> {
+    const gate = this.hashGate;
+    if (!gate) return;
+    const persistence: any = this.options.persistence;
+    if (this.autoPulse && !persistence?.readOnly) await this.readVault(() => gate.record(absPath, source));
+    else gate.remember(absPath, source);
   }
 
   /**
