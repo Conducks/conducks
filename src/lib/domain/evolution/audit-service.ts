@@ -20,8 +20,11 @@ export class AuditService {
     // 1. Unified Windowed Structural Trend Query
     const archeologicalQuery = `
       WITH pulse_history AS (
+        -- Pulses that carry history only: a watcher save writes a pulses row and no node_history,
+        -- and a window of those compared nothing (state-machine audit round 2, Q-07-3).
         SELECT id, timestamp
         FROM pulses
+        WHERE id IN (SELECT DISTINCT pulseId FROM node_history)
         ORDER BY timestamp DESC
         LIMIT ?
       ),

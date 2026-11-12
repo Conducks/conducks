@@ -1751,9 +1751,14 @@ export class SynapsePersistence {
        SELECT ?, id, gravity, complexity, fingerprint, shape_fingerprint FROM nodes`, [pulseId]);
     // Drop snapshots older than the retention window. Done here rather than as a chore because a
     // maintenance command nobody runs is a table nobody prunes (the reasoning of ADR 0037).
+    //
+    // The window counts pulses that HAVE history. It counted every pulses row, and `watch --pulse`
+    // writes one per save with no history — so twenty watched saves made the next analyze delete
+    // the history of every real pulse (state-machine audit round 2, Q-07-3).
     await this.run(
       `DELETE FROM node_history WHERE pulseId NOT IN (
-         SELECT id FROM pulses ORDER BY timestamp DESC LIMIT ${SynapsePersistence.KEEP_PULSES})`);
+         SELECT id FROM pulses WHERE id IN (SELECT DISTINCT pulseId FROM node_history)
+         ORDER BY timestamp DESC LIMIT ${SynapsePersistence.KEEP_PULSES})`);
   }
 
   /**
