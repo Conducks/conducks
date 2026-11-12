@@ -241,7 +241,9 @@ export class DriftEngine {
 export interface DriftResult {
   // INSUFFICIENT_DATA = the comparison ran and had nothing to compare.
   // UNAVAILABLE       = the comparison could not run at all. Neither is a pass.
-  status: 'STABLE' | 'DECAYING' | 'IMPROVING' | 'INSUFFICIENT_DATA' | 'UNAVAILABLE';
+  // No IMPROVING: nothing ever assigned it, so a branch on it was dead code that type-checked.
+  // Improvement is counted in `summary.improvement_count` (state-machine audit round 2, Q-07-9).
+  status: 'STABLE' | 'DECAYING' | 'INSUFFICIENT_DATA' | 'UNAVAILABLE';
   message: string;
   deltas: Array<{
     id: string;
