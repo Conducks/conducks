@@ -103,10 +103,18 @@ export class UninstallCommand implements ConducksCommand {
     // `setup` registers this project in ~/.conducks/projects.json; uninstall takes it back out.
     // Nothing used to, so an uninstalled project stayed listed and `monitor` reported it forever
     // (state-machine audit P-05-6).
-    const forgotten = registry.federation.createProjectRegistry().forget(process.cwd());
-    if (forgotten) console.log(`Removed ${process.cwd()} from the project registry.`);
+    const projects = registry.federation.createProjectRegistry();
+    const forgotten = projects.forget(process.cwd());
+    if (forgotten.removed && forgotten.written) {
+      console.log(`Removed ${process.cwd()} from the project registry.`);
+    } else if (forgotten.removed) {
+      // Found and NOT removed: the write failed, or another process held the registry. This printed
+      // "Removed" either way (state-machine audit round 2, Q-08-5).
+      console.error(`Could not remove ${process.cwd()} from the project registry (${projects.path}) — it is still listed.`);
+      process.exitCode = 1;
+    }
 
-    if (removed > 0 || skillResult.removed.length > 0 || forgotten) {
+    if (removed > 0 || skillResult.removed.length > 0 || forgotten.written) {
       console.log(`\nUninstall complete. ${removed} config(s) updated, ${skillResult.removed.length} skill(s) removed.`);
     } else {
       console.log(`\nNothing to uninstall — conducks was not registered.`);
