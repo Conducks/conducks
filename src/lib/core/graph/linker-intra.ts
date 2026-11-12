@@ -107,6 +107,11 @@ export class IntraLinker {
     // Nodes that are the unit themselves (fileX::unit) are skipped since they can't
     // be a call target by bare name.
     const unitSymbols = new Map<string, Map<string, string>>();
+    // A constructor call and a type reference name a TYPE. Ids are lower-cased, so in
+    // `Owner owner = new Owner()` the local variable and the class share a name, and the file index
+    // found the variable first: `impact Owner` answered 0 callers (Java oracle, 2026-11-12). Those two
+    // edge kinds resolve against this index, which holds no value (ATOM) nodes.
+    const unitTypeSymbols = new Map<string, Map<string, string>>();
 
     for (const node of graph.getAllNodes()) {
       const unitId = (node.properties.unitId as string | undefined)?.toLowerCase();
@@ -119,6 +124,12 @@ export class IntraLinker {
       // First-encountered (highest gravity after resonate) wins for ambiguous names.
       const fileMap = unitSymbols.get(unitId)!;
       if (!fileMap.has(name)) fileMap.set(name, node.id);
+      // The same index without VALUE nodes, for edges that can only name a type.
+      if (node.properties.canonicalKind !== 'ATOM') {
+        if (!unitTypeSymbols.has(unitId)) unitTypeSymbols.set(unitId, new Map());
+        const typeMap = unitTypeSymbols.get(unitId)!;
+        if (!typeMap.has(name)) typeMap.set(name, node.id);
+      }
 
       // The QUALIFIED member path, keyed alongside the bare name.
       //
@@ -709,11 +720,13 @@ export class IntraLinker {
       }
 
       // 3a. Same file first (catches batch-ordering misses within the same file).
-      if (!resolvedId) resolvedId = unitSymbols.get(sourceUnitId)?.get(bareName) ?? null;
+      const namesAType = edge.type === 'CONSTRUCTS' || edge.type === 'TYPE_REFERENCE';
+      const symbolsFor = namesAType ? unitTypeSymbols : unitSymbols;
+      if (!resolvedId) resolvedId = symbolsFor.get(sourceUnitId)?.get(bareName) ?? null;
 
       // 3b. Check each file the source imports.
       if (!resolvedId) {
-        resolvedId = this.resolveSymbol(bareName, sourceUnitId, unitImports, unitSymbols);
+        resolvedId = this.resolveSymbol(bareName, sourceUnitId, unitImports, symbolsFor);
       }
 
       // 3b-bis. A BARE `receiver.method` whose receiver is a variable with a recorded type.
@@ -917,7 +930,7 @@ export class IntraLinker {
       // 3d. One import hop further, through a barrel that re-exports the definition rather than
       // owning it. Uniqueness-gated — see `unitImportsDepth2`.
       if (!resolvedId) {
-        resolvedId = this.resolveSymbolUnique(bareName, sourceUnitId, unitImportsDepth2, unitSymbols);
+        resolvedId = this.resolveSymbolUnique(bareName, sourceUnitId, unitImportsDepth2, symbolsFor);
       }
 
       // 3e. A named import of an EXTERNAL symbol. Bound only when this unit already references the
