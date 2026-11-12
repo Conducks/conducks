@@ -408,7 +408,7 @@ export const registry = {
     // The wave is answered from SQL now (ADR 0054) and nothing called this facade member, so it is
     // gone with the engine rather than left as a second way to ask the same question.
     // Gateway is wired against the composition-owned graph + persistence singletons.
-    createGateway: (projectRoot: string) => new GatewayService(graph, persistence, projectRoot)
+    createGateway: (projectRoot: string) => new GatewayService(graph, persistence, projectRoot, () => bootstrapper.reloadGraph(graph))
   },
   evolution: {
     compare: (prevPulseId?: string) => evolution.compare(prevPulseId),
