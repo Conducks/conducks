@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, jest } from '@jest/globals';
 import { RegistryBootstrapper } from "@/lib/core/bootstrap/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
-import { logger } from "@/lib/core/utils/logger.js";
+import { logger } from "@/lib/core/utils/index.js";
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
