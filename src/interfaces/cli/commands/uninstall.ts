@@ -85,7 +85,13 @@ export class UninstallCommand implements ConducksCommand {
     // Remove the conducks-usage skills setup installed into this workspace (scoped to what
     // conducks owns — never touches other skills). Symmetric with `setup`.
     // Every scope that has them: a partial uninstall leaves exactly the stale copy sync exists to prevent.
-    const skillReports = await registry.federation.createInstaller(process.cwd()).remove();
+    let skillReports: Awaited<ReturnType<ReturnType<typeof registry.federation.createInstaller>['remove']>> = [];
+    try {
+      skillReports = await registry.federation.createInstaller(process.cwd()).remove();
+    } catch (err) {
+      console.log(`❌ Skills not removed: ${(err as Error).message}`);
+      process.exitCode = 1;
+    }
     const skillResult = { removed: skillReports.flatMap(r => r.removed) };
     for (const r of skillReports.filter(r => r.removed.length)) {
       console.log(`Removed ${r.removed.length} conducks skill(s) from ${r.dir} (${r.scope}).`);
