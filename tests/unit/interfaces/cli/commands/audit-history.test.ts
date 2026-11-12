@@ -42,6 +42,20 @@ describe('audit --history', () => {
     }
   });
 
+  it('takes a space-separated window (`--history 10`), not 5 (round 2, Q-09-4)', async () => {
+    quiet();
+    const { reg, calls } = registry('STABLE');
+    await new AuditCommand().execute(['--history', '10'], reg);
+    expect(calls).toEqual([10]);
+  });
+
+  it('refuses a space-separated window that does not parse', async () => {
+    quiet();
+    const { reg, calls } = registry('STABLE');
+    await new AuditCommand().execute(['--history', 'abc'], reg);
+    expect([calls, process.exitCode]).toEqual([[], 1]);
+  });
+
   it('still defaults a bare --history to 5', async () => {
     quiet();
     const { reg, calls } = registry('STABLE');
