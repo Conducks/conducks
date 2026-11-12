@@ -156,7 +156,10 @@ export class ConducksGraph {
       workerPromises.push(p);
     }
 
-    await Promise.all(workerPromises);
+    // EVERY worker is waited for, not the first to fail. `Promise.all` rejected on the first failure,
+    // while the other workers kept re-stating their files after it — and the relink and binders below
+    // never ran for those files, so their cross-service CALLS edges stayed lost (round 2, Q-02-2).
+    const settled = await Promise.allSettled(workerPromises);
 
     // `replaceFile` above dropped each file's outgoing edges, its cross-service HTTP CALLS included,
     // and only `analyze` ever created those. Re-link the files this pulse re-stated, or the first
@@ -166,6 +169,10 @@ export class ConducksGraph {
 
     // Phase 2: Neural Binding (Universal Workspace Resolution)
     this.resonate();
+
+    // The pulse still FAILS when a worker did: the caller must not record those files as done.
+    const failed = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected');
+    if (failed) throw failed.reason;
     this.logger.info(`[Conducks Synapse] Pulse complete: ${this.graph.stats.nodeCount} Neurons active.`);
   }
 
