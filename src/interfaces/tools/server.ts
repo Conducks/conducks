@@ -7,6 +7,7 @@ import cors from "cors";
 import path from "node:path";
 import { ToolRegistry, Tool } from "@/registry/tool-registry.js";
 import { ConducksRegistry } from "./hypertoon.js";
+import { enterToolCall, leaveToolCall, ensureAnchor, releaseAnchor } from "./shared/anchor.js";
 import { synapseTools } from "./tools/synapse.js";
 import { kineticTools } from "./tools/kinetic.js";
 import { registry } from "@/registry/index.js";
@@ -127,7 +128,15 @@ export class ConducksMCPServer {
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
       
+      // Through the same gate and anchor as a tool call. This relied on "CLI-level initialization",
+      // which an MCP server never has: on a fresh server the graph is deferred, and every resource —
+      // even ones that need no graph — failed with "read a graph that is not materialised"
+      // (state-machine audit P-10-4).
+      let entered = false;
       try {
+        await enterToolCall();
+        entered = true;
+        await ensureAnchor();
         // Conducks Lazy Resonance: Relies on CLI-level initialization for the session
         const status = registry.audit.status();
         const nodes = Array.from(registry.query.graph.getGraph().getAllNodes());
@@ -232,6 +241,8 @@ export class ConducksMCPServer {
         throw new Error(`Resource not found: ${uri}`);
       } catch (err: any) {
         throw new Error(`Failed to read resource ${uri}: ${err.message}`);
+      } finally {
+        if (entered) { leaveToolCall(); await releaseAnchor(); }
       }
     });
   }
@@ -252,17 +263,37 @@ export class ConducksMCPServer {
     const app = express();
     app.use(cors());
 
-    let transport: SSEServerTransport | null = null;
+    // ONE client at a time, tracked by its session, and forgotten when it disconnects.
+    //
+    // An MCP `Server` speaks over ONE transport, and this kept it in a single slot that every
+    // GET /sse overwrote and nothing cleared (state-machine audit P-10-6): a second client took over
+    // the first one's replies, a POST before any GET was never answered at all, and a closed client
+    // left POSTs going to a dead stream. Now a second client is refused while one is connected, a
+    // POST must name the live session, and every refusal is an answer rather than a hang.
+    let live: SSEServerTransport | null = null;
 
     app.get("/sse", async (req, res) => {
-      transport = new SSEServerTransport("/messages", res);
+      if (live) {
+        res.status(409).json({ error: 'Another MCP client is connected to this server. Disconnect it first, or start another server.' });
+        return;
+      }
+      const transport = new SSEServerTransport("/messages", res);
+      live = transport;
+      res.on('close', () => {
+        if (live !== transport) return;
+        live = null;
+        void this.server.close().catch(() => { /* the stream is already gone */ });
+      });
       await this.server.connect(transport);
     });
 
     app.post("/messages", async (req, res) => {
-      if (transport) {
-        await (transport as SSEServerTransport).handlePostMessage(req, res);
+      const session = String(req.query.sessionId ?? '');
+      if (!live || live.sessionId !== session) {
+        res.status(404).json({ error: live ? `No session ${session || '(none given)'}.` : 'No MCP client is connected. Open GET /sse first.' });
+        return;
       }
+      await live.handlePostMessage(req, res);
     });
 
     app.listen(port, () => {

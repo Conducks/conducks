@@ -25,14 +25,11 @@ export interface ConducksComponent {
 }
 
 /**
- * Metadata for a registry entry, tracked for auditing and status.
+ * Metadata for a registry entry, tracked for auditing.
  */
 export interface RegistryEntry<T extends ConducksComponent> {
   component: T;
   registeredAt: Date;
-  // No `'error'`: nothing ever set it, so a branch on it would test a state that cannot occur
-  // (state-machine audit P-09-12). `'deprecated'` is set by `deprecate()` and read by nothing yet.
-  status: 'active' | 'deprecated';
 }
 
 /**

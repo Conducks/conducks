@@ -1,4 +1,5 @@
 import { FileHashGate } from "@/lib/core/persistence/file-hash-gate.js";
+import { realCasePath } from "@/contracts/index.js";
 
 /**
  * Conducks — what a vault knows against what is on disk (ADR 0036, todo21#P3).
@@ -71,7 +72,10 @@ export function classifyFreshness(
   for (const key of storedHashes.keys()) {
     if (seen.has(key)) continue;
     if (!sourceExtensions.has(extensionOf(key))) continue;   // see the note above
-    if (!stillExists(key)) removed.push(key);
+    // The key is LOWER-CASED; on a case-sensitive filesystem `src/util.ts` does not exist when the
+    // file is `src/Util.ts`, which reported a file on disk as deleted (state-machine audit P-01-13).
+    // Ask under its real spelling too before calling it gone.
+    if (!stillExists(key) && !stillExists(realCasePath(key))) removed.push(key);
   }
 
   return { changed, added, removed, tracked: storedHashes.size };

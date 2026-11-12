@@ -58,6 +58,7 @@ export class SynapsePersistence {
 
   /** Open an atomic analyze pulse: every write until save()/abortPulse() is one transaction. */
   public async beginPulse(): Promise<void> {
+    this.pulseInterrupted = false;
     if (this.readOnly || this.inPulse) return;
     await this.ensureVaultOpen();
     await this.run("BEGIN TRANSACTION");
@@ -66,6 +67,7 @@ export class SynapsePersistence {
 
   /** Roll the pulse back (on error). A process kill mid-pulse auto-rolls-back on the next open. */
   public async abortPulse(): Promise<void> {
+    this.pulseInterrupted = false;
     if (!this.inPulse) return;
     this.inPulse = false;
     try { await this.run("ROLLBACK"); } catch { /* connection may already be gone */ }
@@ -167,6 +169,20 @@ export class SynapsePersistence {
    */
   private async ensureVaultOpen(): Promise<DuckDBConnection> {
     if (this.db) return this.db;
+    // SINGLE-FLIGHT. Callers that reach a closed handle together share one open. This was
+    // check-then-act: each saw `db === null` and created its own DuckDB instance, and every assignment
+    // after the first orphaned the one before — measured, three pipelined queries made three
+    // instances, two of them unreachable by `close()` (state-machine audit P-01-1). The MCP server
+    // closes the vault after every call, so pipelined calls reopen it exactly this way.
+    if (this.opening) return this.opening;
+    this.opening = this.openVault().finally(() => { this.opening = null; });
+    return this.opening;
+  }
+
+  /** The open in flight, joined by every caller that arrives while it runs. */
+  private opening: Promise<DuckDBConnection> | null = null;
+
+  private async openVault(): Promise<DuckDBConnection> {
 
     const vaultDir = path.resolve(this.vaultPath, '.conducks');
     // A READ never creates. It used to mkdir unconditionally, so running any read command outside a
@@ -933,6 +949,9 @@ export class SynapsePersistence {
   public async run(sql: string, params: unknown[] = []): Promise<void> {
     if (this.readOnly) {
       throw new Error(`🛡️ [Persistence] WRITE BLOCKED: Attempted to execute mutational SQL on a Read-Only vault connection.`);
+    }
+    if (this.pulseInterrupted) {
+      throw new Error(`🛡️ [Persistence] WRITE BLOCKED: the vault was closed in the middle of a pulse, so its transaction is gone. Abort the pulse and start again.`);
     }
     // `CONDUCKS_SQL_LOG=<file>` appends every write statement as one JSONL row, so a failing pulse
     // can be REPLAYED verbatim instead of reconstructed from a description of it. Exists because
@@ -1886,6 +1905,13 @@ export class SynapsePersistence {
     // the timer guarding it kept the event loop alive for the full 5s on every command that opened a
     // vault (`conducks query` answered at 451ms and exited at 5.5s). `closeSync` cannot hang, so both
     // the race and the bug it introduced are gone.
+    // A close inside a pulse discards its transaction. Left as it was, `inPulse` told every later
+    // write it was already inside one, so each AUTOCOMMITTED — rows of a half-finished pulse with no
+    // `pulses` row (state-machine audit P-01-7). Writes are refused until the pulse is aborted.
+    if (this.inPulse) {
+      this.inPulse = false;
+      this.pulseInterrupted = true;
+    }
     if (this.db) {
       this.db.closeSync();
       this.db = null;
@@ -1895,4 +1921,7 @@ export class SynapsePersistence {
       this.instance = null;
     }
   }
+
+  /** Set when the vault was closed inside a pulse; cleared by `abortPulse` or the next `beginPulse`. */
+  private pulseInterrupted = false;
 }

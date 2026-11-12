@@ -94,7 +94,7 @@ describe('RegistryBootstrapper — the deferred graph load', () => {
       {
         graph, persistence,
         ignoreManager: { } as never,
-        federation: { hydrate: async () => {} } as never,
+        federationFor: () => ({ hydrate: async () => {} }) as never,
         updatePersistence: () => {},
         updateIgnoreManager: () => {},
       },
