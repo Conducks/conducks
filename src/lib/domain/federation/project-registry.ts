@@ -171,9 +171,8 @@ export class ProjectRegistry {
   }
 
   /**
-   * Drops a root. Nothing calls it yet: `uninstall` removes the global install, not a project, and the
-   * monitor deliberately REPORTS a missing root rather than forgetting it (see `missingRoots`). The
-   * comment here used to claim both did (state-machine audit P-05-6).
+   * Drops a root. `uninstall` calls it for the project it runs in (state-machine audit P-05-6); the
+   * monitor deliberately REPORTS a missing root rather than forgetting it (see `missingRoots`).
    */
   public forget(root: string): boolean {
     const absolute = path.resolve(root);

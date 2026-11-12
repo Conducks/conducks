@@ -100,6 +100,25 @@ describe('System domain integration (conducks setup)', () => {
     }
   });
 
+  /**
+   * State-machine audit P-05-6: `setup` registers the project and nothing ever removed it — `forget`
+   * had no caller — so an uninstalled project stayed in `~/.conducks/projects.json` and `monitor`
+   * listed it forever.
+   */
+  it('uninstall removes the project setup registered', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-forget-'));
+    try {
+      runCli(['setup', '--no-analyze'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      const file = path.join(home, '.conducks', 'projects.json');
+      const roots = () => (JSON.parse(fs.readFileSync(file, 'utf8')).projects as Array<{ root: string }>).map(p => fs.realpathSync(p.root));
+      expect(roots()).toContain(fs.realpathSync(repo));
+      runCli(['uninstall'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      expect(roots()).not.toContain(fs.realpathSync(repo));
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('a failed MCP registration fails setup, naming the step', () => {
     const brokenHome = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-broken-'));
     try {

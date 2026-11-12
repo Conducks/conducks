@@ -94,7 +94,13 @@ export class UninstallCommand implements ConducksCommand {
       console.log(`No conducks skills found in ~/.claude/skills or ./.claude/skills.`);
     }
 
-    if (removed > 0 || skillResult.removed.length > 0) {
+    // `setup` registers this project in ~/.conducks/projects.json; uninstall takes it back out.
+    // Nothing used to, so an uninstalled project stayed listed and `monitor` reported it forever
+    // (state-machine audit P-05-6).
+    const forgotten = registry.federation.createProjectRegistry().forget(process.cwd());
+    if (forgotten) console.log(`Removed ${process.cwd()} from the project registry.`);
+
+    if (removed > 0 || skillResult.removed.length > 0 || forgotten) {
       console.log(`\nUninstall complete. ${removed} config(s) updated, ${skillResult.removed.length} skill(s) removed.`);
     } else {
       console.log(`\nNothing to uninstall — conducks was not registered.`);
