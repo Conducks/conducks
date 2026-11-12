@@ -46,7 +46,7 @@ export class HelpCommand implements ConducksCommand {
         ids: ["audit", "advise", "context", "guard", "drift", "supply-chain"],
         examples: [
           "conducks audit",
-          "conducks context UserService --max-tokens 4000",
+          "conducks context UserService --radius 2",
         ],
       },
       "HISTORICAL (Diff)": {
@@ -122,7 +122,7 @@ export class HelpCommand implements ConducksCommand {
     console.log(`   \x1b[2mconducks analyze ./my-project\x1b[0m`);
     console.log(`   \x1b[2mconducks query "UserService" --limit 10\x1b[0m`);
     console.log(`   \x1b[2mconducks impact UserService --depth 3 --tree\x1b[0m`);
-    console.log(`   \x1b[2mconducks context UserService --max-tokens 4000\x1b[0m`);
+    console.log(`   \x1b[2mconducks context UserService --radius 2\x1b[0m`);
     console.log(`   \x1b[2mconducks status --json\x1b[0m`);
     console.log(`   \x1b[2mconducks doctor\x1b[0m`);
     console.log(`   \x1b[2mconducks uninstall\x1b[0m`);
