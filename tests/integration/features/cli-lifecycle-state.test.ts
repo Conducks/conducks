@@ -77,6 +77,50 @@ describe('CLI lifecycle state', () => {
     expect(fs.existsSync(path.join(host, 'src', '.conducks'))).toBe(false);
     expect(fs.readFileSync(path.join(host, '.conducks', 'links.json'), 'utf8')).toContain(path.basename(other));
   }, 300000);
+
+  /**
+   * P-08-8: a write session publishes a reader SNAPSHOT of the vault (`<db>.reader`) and removes it in
+   * `close()`. `clean` never closed its write handle, so a full copy of the PRE-clean graph stayed on
+   * disk — and the lock fallback serves that copy to readers.
+   */
+  it('clean leaves no reader snapshot behind', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const repo = analyzed('clean-snapshot');
+    runCli(['clean'], { cwd: repo, allowFail: true });
+    const left = fs.readdirSync(path.join(repo, '.conducks')).filter(f => f.includes('.reader'));
+    expect(left).toEqual([]);
+  }, 240000);
+
+  /**
+   * P-08-8 / P-08-9 for `watch --pulse`: its write handle was never closed, so the reader snapshot
+   * outlived the session; and a SIGTERM during a SIGINT shutdown ran the whole shutdown a second time.
+   */
+  it('watch --pulse shuts down once, on two signals, and leaves no reader snapshot', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { spawn } = await import('node:child_process');
+    const repo = analyzed('watch-shutdown');
+    const proc = spawn('node', [path.resolve('build/src/interfaces/cli/index.js'), 'watch', '--pulse'], {
+      cwd: repo, env: { ...process.env, CHOKIDAR_USEPOLLING: '1', CHOKIDAR_INTERVAL: '250' },
+    });
+    let out = '';
+    proc.stdout.on('data', d => { out += String(d); });
+    proc.stderr.on('data', d => { out += String(d); });
+    const exited = new Promise<void>(r => proc.on('exit', () => r()));
+    try {
+      const end = Date.now() + 40000;
+      while (!/Auto-Pulse Mode/.test(out) && Date.now() < end) await new Promise(r => setTimeout(r, 200));
+      expect(out).toMatch(/Auto-Pulse Mode/);
+      proc.kill('SIGINT');
+      proc.kill('SIGTERM');
+      await Promise.race([exited, new Promise(r => setTimeout(r, 15000))]);
+    } finally {
+      proc.kill('SIGKILL');
+    }
+    expect((out.match(/Shutting down watcher/g) ?? []).length).toBe(1);
+    expect(fs.readdirSync(path.join(repo, '.conducks')).filter(f => f.includes('.reader'))).toEqual([]);
+  }, 240000);
 });
 
 function analyzedWith(prefix: string, files: Record<string, string>): string {

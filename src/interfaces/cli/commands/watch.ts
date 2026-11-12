@@ -29,10 +29,14 @@ export function watchBranchSwitch(
   let current = readBranch();
   const timer = setInterval(() => {
     const next = readBranch();
-    // Both sides must be a real branch name. A momentary null is a detached HEAD mid-rebase or a
-    // git call that failed, and treating that as a switch would invalidate the graph twice for one
-    // checkout — once into the null and once back out of it.
-    if (next === current || next === null || current === null) { current = next ?? current; return; }
+    // A momentary null is a detached HEAD mid-rebase or a git call that failed, and treating that as a
+    // switch would invalidate the graph twice for one checkout — once into the null and once back out
+    // of it. So a null READING is ignored and never overwrites `current`.
+    //
+    // `current` itself is null only when the watcher STARTED detached, and then the first real branch
+    // IS a switch: the old guard also skipped `current === null`, so the one checkout the watcher exists
+    // to catch passed silently and auto-pulse kept writing (state-machine audit P-08-11).
+    if (next === null || next === current) return;
     const from = current;
     current = next;
     onSwitch(from, next);
@@ -129,7 +133,8 @@ export class WatchCommand implements ConducksCommand {
     const chronicle = registry.infrastructure.chronicle;
     const stopBranchWatch = watchBranchSwitch(
       () => chronicle.getCurrentBranch(),
-      (from, to) => {
+      (fromBranch, to) => {
+        const from = fromBranch ?? 'a detached HEAD';
         console.log(`\n\x1b[31m[Conducks Watch] Branch switched: '${from}' → '${to}'.\x1b[0m`);
         console.log(`\x1b[31m  The live graph describes '${from}' and is now invalid.\x1b[0m`);
         if (isPulse) {
@@ -146,7 +151,13 @@ export class WatchCommand implements ConducksCommand {
     // Use process.once() so each handler fires exactly once and is then
     // removed — prevents listener accumulation across multiple invocations.
     await new Promise<void>((resolve) => {
+      // ONE shutdown. `once` removes only the listener that fired, so a SIGTERM arriving during a
+      // SIGINT shutdown ran it again — two `stop()`s, and two vault compactions sharing one temp file
+      // (state-machine audit P-08-9).
+      let stopping = false;
       const shutdown = async (signal: string) => {
+        if (stopping) return;
+        stopping = true;
         console.log(`\n\x1b[33m[Conducks Watch] Received ${signal}. Shutting down watcher...\x1b[0m`);
         try {
           stopBranchWatch();
@@ -154,6 +165,10 @@ export class WatchCommand implements ConducksCommand {
         } catch (err: any) {
           console.error(`[Conducks Watch] Error during watcher shutdown: ${err?.message || err}`);
         }
+        // Close the vault too. A `--pulse` session holds it for WRITE, which publishes a reader
+        // snapshot that only `close()` removes — a full copy of the vault outlived every session
+        // (P-08-8). After `stop()`, which still uses the handle to reclaim churn.
+        try { await registry.infrastructure.persistence.close(); } catch { /* shutting down anyway */ }
         resolve();
       };
 

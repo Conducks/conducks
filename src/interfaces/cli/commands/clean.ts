@@ -102,8 +102,15 @@ export class CleanCommand implements ConducksCommand {
 
 
     // 2. Structural Cache Purge
-    await registry.infrastructure.persistence.clear();
-    
+    // Closed in a `finally`: opening for write publishes a reader snapshot of the vault, and only
+    // `close()` removes it. Without this a full copy of the PRE-clean graph stayed on disk, and the lock
+    // fallback serves that copy to readers (state-machine audit P-08-8).
+    try {
+      await registry.infrastructure.persistence.clear();
+    } finally {
+      await registry.infrastructure.persistence.close();
+    }
+
     console.log("✅ Structural handles evicted and memory cache purged.");
   }
 }
