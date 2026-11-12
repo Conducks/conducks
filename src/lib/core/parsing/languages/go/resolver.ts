@@ -107,19 +107,12 @@ export class GoResolver {
    * Go doesn't have __init__.py, but usually the package name is the directory.
    */
   private tryExtensions(target: string, allFiles: string[]): string | undefined {
-    // Usually any .go file in the directory belongs to the package.
-    // We return the directory path itself if files exist, or a sample .go file.
-    const goFiles = allFiles.filter(f => {
-      if (!f.startsWith(target.toLowerCase())) return false;
-      if (!f.endsWith('.go')) return false;
-      if (f.endsWith('_test.go')) return false;
-      if (f.includes('/vendor/') || f.includes('\\vendor\\')) return false;
-      return true;
-    });
-    if (goFiles.length > 0) {
-      // Return the most generic file or the dir if possible.
-      return goFiles[0];
-    }
-    return undefined;
+    // The package is the files DIRECTLY in `target` — the same rule the go.mod path uses. This was a
+    // path-PREFIX match with only one side lower-cased and an unsorted first hit: `internal/store`
+    // answered with `internal/storefront/x.go`, the winner depended on list order, and on a path with
+    // an upper-case letter nothing matched (state-machine audit P-04-6).
+    // `vendor/` stays out, as before: a Go build never resolves into it by proximity.
+    if (/[\\/]vendor([\\/]|$)/i.test(target)) return undefined;
+    return this.packageFile(target, allFiles);
   }
 }

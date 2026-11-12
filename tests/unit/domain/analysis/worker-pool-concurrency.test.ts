@@ -114,4 +114,70 @@ describe('WorkerPool dispatches chunks concurrently', () => {
     const killedCount = mockState.liveProcs.filter(p => p.kill.mock.calls.length > 0).length;
     expect(killedCount).toBeGreaterThan(0);
   });
+
+  it('a worker that cannot START rejects instead of hanging (no exit event ever comes)', async () => {
+    // State-machine audit P-06-5. A spawn that fails — `node` not on PATH — emits `error` and then
+    // `close`, and NEVER `exit` (checked against real Node: `spawn('definitely-not-a-binary')`). The
+    // pool listened to `exit` only, so `analyze` waited forever with no message.
+    mockState.handler = (proc) => {
+      setTimeout(() => {
+        const err = Object.assign(new Error('spawn node ENOENT'), { code: 'ENOENT' });
+        proc.emit('error', err);
+        proc.emit('close', -2, null);
+      }, 5);
+    };
+
+    const files = makeFiles(2);
+    const pool = new WorkerPool({} as any);
+    const outcome = await Promise.race([
+      pool.run(files, false, files.map(f => f.path)).then(() => 'resolved', (e: Error) => e.message),
+      new Promise<string>(r => setTimeout(() => r('HUNG'), 2000)),
+    ]);
+    expect(outcome).toMatch(/failed to start: spawn node ENOENT/);
+  });
+
+  it('a CONDUCKS_WORKERS that is not a number still sends every file to a worker (round 2, Q-06-4)', async () => {
+    // `parseInt('abc')` is NaN: `NaN <= 0` is false, the chunk size was NaN, and ONE worker was spawned
+    // on an empty slice — the pulse then died on "sent N units and received 0".
+    process.env.CONDUCKS_WORKERS = 'abc';
+    const seen: number[] = [];
+    mockState.handler = (proc, tempInput, tempOutputFile) => {
+      seen.push(JSON.parse(fs.readFileSync(tempInput, 'utf8')).units.length);
+      setTimeout(() => { fs.writeFileSync(tempOutputFile, JSON.stringify([])); proc.emit('exit', 0, null); }, 5);
+    };
+
+    const files = makeFiles(4);
+    await new WorkerPool({} as any).run(files, false, files.map(f => f.path));
+
+    expect(seen.reduce((a, b) => a + b, 0)).toBe(4);
+  });
+
+  it('a later chunk that cannot be prepared kills the chunks already running (round 2, Q-06-5)', async () => {
+    // The temp-input write ran inside the Promise executor before the process was tracked; its throw
+    // rejected `Promise.all`, and nothing killed the workers already started.
+    mockState.handler = () => { /* runs until killed */ };
+    const realWrite = fs.writeFileSync;
+    let inputs = 0;
+    const spy = jest.spyOn(fs, 'writeFileSync').mockImplementation(((p: any, d: any, o?: any) => {
+      if (/conducks_in_/.test(String(p)) && ++inputs === 2) throw Object.assign(new Error('ENOSPC: no space left'), { code: 'ENOSPC' });
+      return realWrite(p, d, o);
+    }) as any);
+
+    const files = makeFiles(4);
+    try {
+      await expect(new WorkerPool({} as any).run(files, false, files.map(f => f.path))).rejects.toThrow(/ENOSPC/);
+    } finally { spy.mockRestore(); }
+
+    expect(mockState.liveProcs.length).toBeGreaterThan(0);
+    expect(mockState.liveProcs.every(p => p.kill.mock.calls.length > 0)).toBe(true);
+  });
+
+  it('the main-thread fallback reports a file no provider reads as SKIPPED, not unread (round 2, Q-06-3)', async () => {
+    // The worker marks it `skipped: true`; the fallback did not, so with CONDUCKS_WORKERS=0 every
+    // README and manifest counted as a parse failure and was never hashed.
+    process.env.CONDUCKS_WORKERS = '0';
+    const pool = new WorkerPool({ getProvider: () => undefined } as any);
+    const results = await pool.run([{ path: '/p/README.md', source: '# x' }], false, ['/p/README.md']);
+    expect(results).toEqual([expect.objectContaining({ path: '/p/README.md', success: false, skipped: true })]);
+  });
 });

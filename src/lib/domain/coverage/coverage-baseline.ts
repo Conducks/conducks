@@ -35,6 +35,22 @@ function snapshotKey(file: string, name: string): string {
   return `${file}::${name}`;
 }
 
+/**
+ * One key per result. A file can hold two functions of one name (two classes each with `get`), and
+ * `file::name` alone collapsed them: the snapshot kept the last, and both were then compared with it
+ * (state-machine audit P-07-12). The second and later repeats get `#2`, `#3`… in result order; the
+ * first keeps the plain key, so a baseline saved before this still matches every unique name.
+ */
+function snapshotKeys(results: CoverageResult[]): string[] {
+  const seen = new Map<string, number>();
+  return results.map(r => {
+    const base = snapshotKey(r.file, r.name);
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? base : `${base}#${n}`;
+  });
+}
+
 export function defaultBaselinePath(projectRoot: string = process.cwd()): string {
   return path.join(projectRoot, ".conducks", "coverage-baseline.json");
 }
@@ -42,9 +58,8 @@ export function defaultBaselinePath(projectRoot: string = process.cwd()): string
 /** Builds a snapshot object ("file::name" -> pct) from a set of coverage results. */
 function buildSnapshot(results: CoverageResult[]): CoverageSnapshot {
   const snapshot: CoverageSnapshot = {};
-  for (const r of results) {
-    snapshot[snapshotKey(r.file, r.name)] = r.pct;
-  }
+  const keys = snapshotKeys(results);
+  results.forEach((r, i) => { snapshot[keys[i]] = r.pct; });
   return snapshot;
 }
 
@@ -55,10 +70,26 @@ export function saveBaseline(results: CoverageResult[], baselinePath: string = d
   writeFileSync(baselinePath, JSON.stringify(snapshot, null, 2), "utf8");
 }
 
-/** Loads a previously saved snapshot. Returns null if none exists yet. */
+/**
+ * Loads a previously saved snapshot. Returns null if none exists yet.
+ *
+ * A file that exists but is not a snapshot — cut short, hand-edited — is refused BY NAME. It went
+ * straight to `JSON.parse`, so `--vs-baseline` died on "Unexpected end of JSON input" naming neither
+ * the file nor the repair, and a parsed non-object was compared as if every function were NEW
+ * (state-machine audit round 2, Q-07-8).
+ */
 export function loadBaseline(baselinePath: string = defaultBaselinePath()): CoverageSnapshot | null {
   if (!existsSync(baselinePath)) return null;
-  return JSON.parse(readFileSync(baselinePath, "utf8"));
+  const refuse = (why: string) =>
+    new Error(`${baselinePath} is not a coverage baseline (${why}). Re-save it with \`coverage --save-baseline\`.`);
+  let parsed: unknown;
+  try { parsed = JSON.parse(readFileSync(baselinePath, "utf8")); }
+  catch (err: any) { throw refuse(err?.message ?? String(err)); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw refuse("not an object of file::name → percent");
+  for (const [key, pct] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof pct !== "number") throw refuse(`"${key}" holds ${JSON.stringify(pct)}, not a percent`);
+  }
+  return parsed as CoverageSnapshot;
 }
 
 /**
@@ -69,8 +100,9 @@ export function loadBaseline(baselinePath: string = defaultBaselinePath()): Cove
  *  - SAME: pct unchanged.
  */
 export function diffAgainstBaseline(results: CoverageResult[], baseline: CoverageSnapshot): DriftEntry[] {
-  return results.map(r => {
-    const key = snapshotKey(r.file, r.name);
+  const keys = snapshotKeys(results);
+  return results.map((r, i) => {
+    const key = keys[i];
     const baselinePct = baseline[key];
 
     if (baselinePct === undefined) {

@@ -72,4 +72,86 @@ describe('System domain integration (conducks setup)', () => {
     const count = registry.projects.filter((p: any) => p.root === fs.realpathSync(repo)).length;
     expect(count).toBe(1);
   });
+
+  /**
+   * State-machine audit P-08-7: the MCP registration catches its own error and returns
+   * `success: false`, and setup printed the ❌ line, then "Setup complete." and exited 0 — a script or
+   * an agent read a half-configured machine as a configured one.
+   */
+  /**
+   * State-machine audit P-08-12: setup backed up C0 (the user's config) and wrote C1; uninstall then
+   * copied C1 over the backup — so after a round trip the only `.bak` held the conducks entry and the
+   * user's original config was gone.
+   */
+  it('setup then uninstall leaves the user original as the backup', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-bak-'));
+    try {
+      const cfg = path.join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+      fs.mkdirSync(path.dirname(cfg), { recursive: true });
+      fs.writeFileSync(cfg, JSON.stringify({ mcpServers: { mine: { command: 'x' } }, marker: 'original' }));
+      runCli(['setup', '--no-analyze'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      runCli(['uninstall'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      const bak = JSON.parse(fs.readFileSync(cfg + '.bak', 'utf8'));
+      expect(bak.mcpServers.conducks).toBeUndefined();
+      expect(bak.marker).toBe('original');
+      expect(fs.existsSync(cfg + '.tmp')).toBe(false);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * State-machine audit P-05-6: `setup` registers the project and nothing ever removed it — `forget`
+   * had no caller — so an uninstalled project stayed in `~/.conducks/projects.json` and `monitor`
+   * listed it forever.
+   */
+  it('uninstall removes the project setup registered', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-forget-'));
+    try {
+      runCli(['setup', '--no-analyze'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      const file = path.join(home, '.conducks', 'projects.json');
+      const roots = () => (JSON.parse(fs.readFileSync(file, 'utf8')).projects as Array<{ root: string }>).map(p => fs.realpathSync(p.root));
+      expect(roots()).toContain(fs.realpathSync(repo));
+      runCli(['uninstall'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      expect(roots()).not.toContain(fs.realpathSync(repo));
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * State-machine audit round 2, Q-08-6: a Claude config that could not be rewritten was logged as
+   * "Failed to update" and then ignored — exit 0, and the closing line said "Nothing to uninstall —
+   * conducks was not registered" about a config that still held the conducks entry.
+   */
+  it('a Claude config uninstall cannot rewrite fails the command, and is not called unregistered', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-ro-'));
+    const dir = path.join(home, 'Library', 'Application Support', 'Claude');
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'claude_desktop_config.json'), JSON.stringify({ mcpServers: { conducks: { command: 'node' } } }));
+      fs.chmodSync(dir, 0o555);   // the rewrite's temp file cannot be created
+      const { combined, status } = runCli(['uninstall'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      expect(combined).toMatch(/Failed to update/);
+      expect(combined).not.toMatch(/Nothing to uninstall/);
+      expect(status).not.toBe(0);
+    } finally {
+      fs.chmodSync(dir, 0o755);
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('a failed MCP registration fails setup, naming the step', () => {
+    const brokenHome = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-broken-'));
+    try {
+      // `Library` is a FILE, so the Claude Desktop config directory cannot be created under it.
+      fs.writeFileSync(path.join(brokenHome, 'Library'), 'not a directory');
+      const { combined, status } = runCli(['setup', '--no-analyze'], { cwd: repo, env: { HOME: brokenHome }, allowFail: true });
+      expect(status).not.toBe(0);
+      expect(combined).not.toContain('Setup complete.');
+      expect(combined).toMatch(/Setup incomplete.*Claude Desktop/s);
+    } finally {
+      fs.rmSync(brokenHome, { recursive: true, force: true });
+    }
+  });
 });

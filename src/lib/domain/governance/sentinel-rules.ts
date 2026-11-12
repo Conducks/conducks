@@ -154,17 +154,29 @@ function coerce(value: string): any {
 // Rule loader
 // ---------------------------------------------------------------------------
 
-export function loadSentinelRules(projectRoot: string): SentinelRule[] {
+/**
+ * The rules, and what was wrong with the file if anything was.
+ *
+ * No file, or a file with no `rules:` key (one that declares only `layers:`), means the defaults.
+ * A file that cannot be read, or whose `rules:` is present but not a list, ALSO runs the defaults —
+ * and says so in `errors`. It used to fall back silently, so the user's own rules were dropped and
+ * `guard` reported a normal verdict over the three builtins (state-machine audit P-07-11), unlike
+ * `loadLayerContract` below, which reports the same mistake as a failed check.
+ */
+export function loadSentinelRuleFile(projectRoot: string): { rules: SentinelRule[]; errors: string[] } {
   const rulesPath = path.join(projectRoot, '.conducks', 'sentinel.yml');
-  if (!existsSync(rulesPath)) return getDefaultRules();
+  if (!existsSync(rulesPath)) return { rules: getDefaultRules(), errors: [] };
+  let parsed: SentinelRuleFile;
   try {
-    const raw = readFileSync(rulesPath, 'utf8');
-    const parsed = parseMinimalYaml(raw) as SentinelRuleFile;
-    if (!Array.isArray(parsed.rules)) return getDefaultRules();
-    return (parsed.rules as SentinelRule[]).filter(r => r.enabled !== false);
-  } catch {
-    return getDefaultRules();
+    parsed = parseMinimalYaml(readFileSync(rulesPath, 'utf8')) as SentinelRuleFile;
+  } catch (err) {
+    return { rules: getDefaultRules(), errors: [`.conducks/sentinel.yml is unreadable: ${String(err)}`] };
   }
+  if (parsed?.rules === undefined) return { rules: getDefaultRules(), errors: [] };
+  if (!Array.isArray(parsed.rules)) {
+    return { rules: getDefaultRules(), errors: ['.conducks/sentinel.yml: `rules:` is not a list, so the default rules ran instead of yours.'] };
+  }
+  return { rules: (parsed.rules as SentinelRule[]).filter(r => r.enabled !== false), errors: [] };
 }
 
 // ---------------------------------------------------------------------------

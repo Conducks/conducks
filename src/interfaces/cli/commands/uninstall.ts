@@ -50,6 +50,7 @@ export class UninstallCommand implements ConducksCommand {
     }
 
     let removed = 0;
+    let configFailed = false;
 
     if (await fs.pathExists(claudeConfigPath)) {
       try {
@@ -58,18 +59,30 @@ export class UninstallCommand implements ConducksCommand {
           delete config.mcpServers["conducks"];
           const tmpPath = claudeConfigPath + '.tmp';
           const bakPath = claudeConfigPath + '.bak';
-          fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8');
-          if (fs.existsSync(claudeConfigPath)) {
-            fs.copyFileSync(claudeConfigPath, bakPath);
+          // The `.bak` `setup` wrote is the user's config from BEFORE conducks. Copying the current
+          // file over it replaced that original with a config that still held the conducks entry, so
+          // after a setup/uninstall round trip the original was gone (state-machine audit P-08-12).
+          // A backup is written only when none exists; a failed write removes its `.tmp`.
+          try {
+            fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8');
+            if (!fs.existsSync(bakPath)) fs.copyFileSync(claudeConfigPath, bakPath);
+            fs.renameSync(tmpPath, claudeConfigPath);
+          } catch (err) {
+            try { fs.rmSync(tmpPath, { force: true }); } catch { /* best effort */ }
+            throw err;
           }
-          fs.renameSync(tmpPath, claudeConfigPath);
           console.log(`Removed conducks from: ${claudeConfigPath}`);
           removed++;
         } else {
           console.log(`No conducks entry found in: ${claudeConfigPath}`);
         }
       } catch (err) {
+        // A config that could not be rewritten still holds the entry: the command FAILED. It was logged
+        // and ignored — exit 0, closing on "Nothing to uninstall — conducks was not registered"
+        // (state-machine audit round 2, Q-08-6).
         console.error(`Failed to update ${claudeConfigPath}: ${(err as Error).message}`);
+        configFailed = true;
+        process.exitCode = 1;
       }
     } else {
       console.log(`Config not found: ${claudeConfigPath}`);
@@ -78,7 +91,13 @@ export class UninstallCommand implements ConducksCommand {
     // Remove the conducks-usage skills setup installed into this workspace (scoped to what
     // conducks owns — never touches other skills). Symmetric with `setup`.
     // Every scope that has them: a partial uninstall leaves exactly the stale copy sync exists to prevent.
-    const skillReports = await registry.federation.createInstaller(process.cwd()).remove();
+    let skillReports: Awaited<ReturnType<ReturnType<typeof registry.federation.createInstaller>['remove']>> = [];
+    try {
+      skillReports = await registry.federation.createInstaller(process.cwd()).remove();
+    } catch (err) {
+      console.log(`❌ Skills not removed: ${(err as Error).message}`);
+      process.exitCode = 1;
+    }
     const skillResult = { removed: skillReports.flatMap(r => r.removed) };
     for (const r of skillReports.filter(r => r.removed.length)) {
       console.log(`Removed ${r.removed.length} conducks skill(s) from ${r.dir} (${r.scope}).`);
@@ -87,7 +106,23 @@ export class UninstallCommand implements ConducksCommand {
       console.log(`No conducks skills found in ~/.claude/skills or ./.claude/skills.`);
     }
 
-    if (removed > 0 || skillResult.removed.length > 0) {
+    // `setup` registers this project in ~/.conducks/projects.json; uninstall takes it back out.
+    // Nothing used to, so an uninstalled project stayed listed and `monitor` reported it forever
+    // (state-machine audit P-05-6).
+    const projects = registry.federation.createProjectRegistry();
+    const forgotten = projects.forget(process.cwd());
+    if (forgotten.removed && forgotten.written) {
+      console.log(`Removed ${process.cwd()} from the project registry.`);
+    } else if (forgotten.removed) {
+      // Found and NOT removed: the write failed, or another process held the registry. This printed
+      // "Removed" either way (state-machine audit round 2, Q-08-5).
+      console.error(`Could not remove ${process.cwd()} from the project registry (${projects.path}) — it is still listed.`);
+      process.exitCode = 1;
+    }
+
+    if (configFailed) {
+      console.log(`\nUninstall incomplete — ${claudeConfigPath} still registers conducks. ${removed} config(s) updated, ${skillResult.removed.length} skill(s) removed.`);
+    } else if (removed > 0 || skillResult.removed.length > 0 || forgotten.written) {
       console.log(`\nUninstall complete. ${removed} config(s) updated, ${skillResult.removed.length} skill(s) removed.`);
     } else {
       console.log(`\nNothing to uninstall — conducks was not registered.`);

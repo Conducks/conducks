@@ -53,18 +53,18 @@ export class PythonResolver {
     // 0. The standard library is a boundary, never an in-repo file — see PYTHON_STDLIB.
     if (this.isStdlib(rawImportPath)) return undefined;
 
-    // 1. Absolute Resolution (Bare Imports)
-    // import x.y -> x/y.py or x/y/__init__.py
-    const absolutePath = this.resolveAbsolute(rawImportPath, currentFile, allFiles);
-    if (absolutePath) return absolutePath;
-
-    // 2. PEP 328 Relative Resolution (Dots)
-    // from .module import X or from ..package import Y
+    // 1. PEP 328 Relative Resolution (Dots) — ONLY relative, and decided first.
+    // A leading dot is never an absolute import. It used to be offered to the absolute walk first,
+    // which turned `..x` into `//x` — and `path.join(dir, '//x')` is `dir/x`, the importer's own
+    // folder — so `from ..x import y` bound to a same-named sibling, and a missing relative target
+    // fell back to any `x.py` up the tree (state-machine audit P-04-4).
     if (rawImportPath.startsWith('.')) {
       return this.resolveRelative(rawImportPath, currentFile, allFiles);
     }
 
-    return undefined;
+    // 2. Absolute Resolution (Bare Imports)
+    // import x.y -> x/y.py or x/y/__init__.py
+    return this.resolveAbsolute(rawImportPath, currentFile, allFiles);
   }
 
   /**

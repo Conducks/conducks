@@ -124,13 +124,34 @@ export class CoverageViewCommand implements ConducksCommand {
       // running app instrumented), but the same feedback loop for a test-driven session.
       console.log(chalk.cyan(`\n  👁  Watching ${covPath} — re-renders on change. Ctrl-C to stop.`));
       let timer: NodeJS.Timeout | null = null;
-      watch(covPath, () => {
+      // A re-render runs in a bare timer, where a throw is an uncaught exception: a write that failed
+      // killed the whole session with a stack trace. It is reported and the watch goes on, so the
+      // next change renders once the cause is gone (state-machine audit round 2, Q-09-2).
+      const rerender = () => {
+        try { regenerate(); }
+        catch (e) { console.error(chalk.red(`  Re-render failed: ${(e as Error).message} — still watching.`)); }
+      };
+      const watcher = watch(covPath, () => {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(() => { regenerate(); }, 150); // debounce mid-write bursts
+        timer = setTimeout(rerender, 150); // debounce mid-write bursts
       });
-      // Keep the process alive until interrupted.
+      // Keep the process alive until interrupted — and then let it END. The watcher and the pending
+      // timer are what hold the event loop open, and neither was released: Ctrl-C printed "Stopped
+      // watching." and the process stayed alive (state-machine audit P-09-4). An `error` from the
+      // watcher had no listener, which is also an uncaught exception, and SIGTERM was not handled.
       await new Promise<void>((resolve) => {
-        process.on("SIGINT", () => { console.log(chalk.dim("\n  Stopped watching.")); resolve(); });
+        let stopped = false;
+        const stop = (why: string) => {
+          if (stopped) return;
+          stopped = true;
+          watcher.close();
+          if (timer) clearTimeout(timer);
+          console.log(chalk.dim(`\n  ${why}`));
+          resolve();
+        };
+        watcher.on("error", (e) => stop(`Stopped watching: ${(e as Error).message}`));
+        process.once("SIGINT", () => stop("Stopped watching."));
+        process.once("SIGTERM", () => stop("Stopped watching."));
       });
     } finally {
       await closePersistence(registry);

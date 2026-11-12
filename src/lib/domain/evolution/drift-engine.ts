@@ -31,12 +31,27 @@ export class DriftEngine {
     // 1. Resolve Pulses
     let pulses: any[] = [];
     try {
-      pulses = await this.persistence.query("SELECT id, timestamp FROM pulses ORDER BY timestamp DESC LIMIT 2");
+      // Only pulses that CARRY HISTORY can be compared. `watch --pulse` writes a pulses row per save
+      // (that is how a long-lived reader learns the vault moved) and no node_history, so "the two
+      // latest pulses" after one watched save were watcher rows, and drift answered "no symbols
+      // were comparable" over two analyze pulses that were (state-machine audit round 2, Q-07-3).
+      pulses = await this.persistence.query("SELECT id, timestamp FROM pulses WHERE id IN (SELECT DISTINCT pulseId FROM node_history) ORDER BY timestamp DESC LIMIT 2");
     } catch (err: any) {
+      // A vault that cannot be READ is not a vault short of history. This used to fall through with
+      // `pulses = []` and answer "Need at least 2 pulses", sending the user to analyze again over a
+      // storage failure (state-machine audit P-07-7 / P-09-13).
       logger.error(`[DriftEngine] Failed to fetch pulses: ${err.message}`);
+      return {
+        status: 'UNAVAILABLE',
+        message: `Drift could not be assessed: the pulse history could not be read (${err.message}). This is NOT a stable result.`,
+        deltas: [],
+        moves: []
+      };
     }
 
-    if (pulses.length < 2 && !prevPulseId) {
+    // A named previous pulse still needs a CURRENT one to compare it with. The guard used to skip on
+    // `prevPulseId` alone, and `pulses[0].id` then threw a TypeError on a vault with no pulses (P-07-8).
+    if (pulses.length === 0 || (pulses.length < 2 && !prevPulseId)) {
       return {
         status: 'INSUFFICIENT_DATA',
         message: 'Insufficient historical data for drift analysis (Need at least 2 pulses).',
@@ -226,7 +241,9 @@ export class DriftEngine {
 export interface DriftResult {
   // INSUFFICIENT_DATA = the comparison ran and had nothing to compare.
   // UNAVAILABLE       = the comparison could not run at all. Neither is a pass.
-  status: 'STABLE' | 'DECAYING' | 'IMPROVING' | 'INSUFFICIENT_DATA' | 'UNAVAILABLE';
+  // No IMPROVING: nothing ever assigned it, so a branch on it was dead code that type-checked.
+  // Improvement is counted in `summary.improvement_count` (state-machine audit round 2, Q-07-9).
+  status: 'STABLE' | 'DECAYING' | 'INSUFFICIENT_DATA' | 'UNAVAILABLE';
   message: string;
   deltas: Array<{
     id: string;

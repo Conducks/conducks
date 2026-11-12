@@ -41,8 +41,9 @@ export class AnalysisService {
   public setPersistence(persistence: SynapsePersistence) {
     this.persistence = persistence;
     this.query.setPersistence(persistence);
-    (this.orchestrator as any).persistence = persistence;
-    (this.graph as any).persistence = persistence;
+    // The orchestrator's own setter, not a cast. The graph got the same assignment and has no such
+    // field — nothing read it, so it looked like a re-anchor that did not exist (P-06-10).
+    this.orchestrator.setPersistence(persistence);
   }
 
   /**
@@ -50,11 +51,21 @@ export class AnalysisService {
    * Consolidates discovery, batch reflection, gravity resonance, and persistence.
    */
   public async analyze(options: { root?: string, staged?: boolean, verbose?: boolean, force?: boolean } = {}): Promise<{ success: boolean, files: number }> {
+    // Taken BEFORE discovery and before any file is stat'ed or read, and recorded as the pulse's time:
+    // a file saved after this point is newer than the pulse and so dirty next time, even if this run
+    // already read it. The end-of-pulse clock made a save that landed mid-pulse look clean (P-06-2).
+    const startedAt = Date.now();
     const projectRoot = chronicle.getProjectDir();
     const targetRoot = options.root ? path.resolve(options.root) : projectRoot;
 
     // Safeguard against indexing the root of the filesystem
     if (targetRoot === '/' || targetRoot === '\\') {
+      // Re-resolving to the working directory only helps when that is somewhere else. From `/` it
+      // recursed with the same root until the stack overflowed (state-machine audit P-06-8).
+      if (path.resolve(process.cwd()) === targetRoot) {
+        logger.warn(`Analysis root is the filesystem root (/). Nothing was analyzed — run it from, or pass, a project directory.`);
+        return { success: false, files: 0 };
+      }
       logger.warn(`Analysis root resolved to system root (/). Re-resolving to process.cwd()`);
       return this.analyze({ ...options, root: process.cwd() });
     }
@@ -79,8 +90,6 @@ export class AnalysisService {
     // at 100% resonance" over files whose symbols were never re-read, and the stale definitions sat
     // in the graph until someone happened to run `--force` for unrelated reasons. Pinned by
     // tests/integration/features/scoped-analyze.test.ts, whose second case is exactly that survival.
-    const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses WHERE scoped IS NOT TRUE ORDER BY timestamp DESC LIMIT 1");
-    const lastSyncTime = lastPulse.length > 0 ? Number(lastPulse[0].timestamp) : 0;
     const ignoreManager = (this.orchestrator as any).ignoreManager;
     
     let filteredFiles = files;
@@ -93,6 +102,20 @@ export class AnalysisService {
     }
 
     traceMemory(`after ignore filter (${filteredFiles.length} kept)`);
+    // NOTHING FOUND is checked BEFORE anything is deleted. It used to sit after the reconcile below,
+    // which purges every unit discovery no longer returns — and when discovery returns NOTHING (a
+    // wrong path, or a `.conducksignore` that matches everything) that is every unit in the vault.
+    // Measured: one ignore line took a file's rows from 5 to 0, and the run then reported failure
+    // over an empty vault (state-machine audit P-06-3).
+    if (filteredFiles.length === 0) {
+      logger.warn(`No analyzable source files found under ${targetRoot}. Nothing was analyzed — this is not a clean result. Check the path, or .conducksignore.`);
+      return { success: false, files: 0 };
+    }
+    // Read only now: the first query opens — and so CREATES — the vault, and a run that found nothing
+    // to analyze must not leave one behind for `list`, `setup` and `doctor` to read as an analyzed
+    // project (state-machine audit P-08-6).
+    const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses WHERE scoped IS NOT TRUE ORDER BY timestamp DESC LIMIT 1");
+    const lastSyncTime = lastPulse.length > 0 ? Number(lastPulse[0].timestamp) : 0;
     let dirtyFiles = filteredFiles;
     if (!options.staged && lastSyncTime > 0) {
       const statsPromises = filteredFiles.map(async f => {
@@ -156,6 +179,12 @@ export class AnalysisService {
     //
     // Skipped for `--staged`, where discovery returns ONLY the staged files: reconciling against that
     // subset would purge the entire rest of the project.
+    //
+    // DECIDED here, PURGED later: inside the pulse transaction when a pulse follows, so a pulse that
+    // fails rolls the purge back with everything else. It committed on its own before `beginPulse`, and
+    // a failed pulse left the vault neither the old graph nor the new one (round 2, Q-06-7). With
+    // nothing else to do — no dirty file — it is the whole run and commits alone, as before.
+    let vanishedUnits: string[] = [];
     if (!options.staged) {
       const discovered = new Set(filteredFiles.map(f => f.toLowerCase()));
       const known = await this.persistence.query<{ file: string }>(
@@ -169,7 +198,7 @@ export class AnalysisService {
 
       if (vanished.length > 0) {
         logger.info(`🛡️ [Persistence] Reconciling: purging ${vanished.length} unit(s) no longer discoverable.`);
-        await this.persistence.purgeUnits(vanished.map(f => `${f}::unit`));
+        vanishedUnits = vanished.map(f => `${f}::unit`);
       }
     }
 
@@ -179,19 +208,21 @@ export class AnalysisService {
     // resonance", a success message for a root holding no code at all (ADR 0124: nothing checked
     // must never read as clean). ADR 0021 grades a root that is too BIG; this is the same mistake
     // from the other end.
-    if (filteredFiles.length === 0) {
-      logger.warn(`No analyzable source files found under ${targetRoot}. Nothing was analyzed — this is not a clean result. Check the path, or .conducksignore.`);
-      return { success: false, files: 0 };
-    }
+    // (The empty-discovery gate moved above the reconcile — see "NOTHING FOUND" there.)
 
     if (dirtyFiles.length === 0 && !options.force) {
+      // No pulse follows: the reconcile is the whole run, so it commits on its own.
+      if (vanishedUnits.length > 0) await this.persistence.purgeUnits(vanishedUnits);
       logger.warn("No changes detected. Structural Synapse is already at 100% resonance.");
       return { success: true, files: 0 };
     }
 
     if (options.force) {
-      logger.info(`🛡️ [Force Resonance] Forcing re-induction of all ${filteredFiles.length} units.`);
-      dirtyFiles = filteredFiles;
+      // Every unit IN SCOPE. This took every discovered file, so a scoped `--force` re-parsed and
+      // rewrote the whole project while saving the pulse as scoped (state-machine audit P-06-9).
+      const inScope = filteredFiles.filter(f => f.startsWith(targetRoot));
+      logger.info(`🛡️ [Force Resonance] Forcing re-induction of all ${inScope.length} units.`);
+      dirtyFiles = inScope;
     }
 
     // Did this pulse re-stamp EVERY discoverable unit in scope, or only the changed ones?
@@ -234,15 +265,29 @@ export class AnalysisService {
     await this.persistence.beginPulse();
     try {
 
-    // 2.2 Conducks Purge: Remove old structural DNA for these units
-    logger.info(`🛡️ [Persistence] Purging structural DNA for ${dirtyFiles.length} units...`);
-    const unitIds = dirtyFiles.map(f => `${f.toLowerCase()}::unit`);
-    await this.persistence.purgeUnits(unitIds);
+    // 2.2 Conducks Purge: Remove old structural DNA for these units — and the vanished ones the
+    // reconcile above found, in this same transaction.
+    //
+    // Only the files that were READ. The reader drops a file it cannot read (permissions, a race with
+    // a delete), and purging every dirty file wiped that one's rows with nothing to write them back —
+    // and since its hash stayed recorded and its mtime is older than this pulse, no later run would
+    // ever look at it again. An unread file keeps its rows and loses its hash, so the never-seen rule
+    // re-reads it on the next run (state-machine audit round 2; measured with `chmod 000`).
+    const read = new Set(allUnits.map(u => u.path));
+    const readDirty = dirtyFiles.filter(f => read.has(f));
+    const unreadDirty = dirtyFiles.filter(f => !read.has(f));
+    logger.info(`🛡️ [Persistence] Purging structural DNA for ${readDirty.length} units...`);
+    const unitIds = readDirty.map(f => `${f.toLowerCase()}::unit`);
+    await this.persistence.purgeUnits([...vanishedUnits, ...unitIds]);
+    for (const f of unreadDirty) await this.persistence.forgetFileHash(f.toLowerCase());
 
 
-    // 2.5 Discover Sub-Repositories for Multi-Project Resonance
-    const bootstrapper = (this as any).registry?.bootstrapper || (this.orchestrator as any).registry?.bootstrapper;
-    const projectRoots = bootstrapper ? bootstrapper.discoverProjects(projectRoot) : [projectRoot];
+    // 2.5 One project root. This read `registry.bootstrapper` off this service and off the
+    // orchestrator to discover sub-repositories — neither has one (the orchestrator's `registry` is
+    // the provider registry), so the lookup was always undefined and the roots always this one. The
+    // dead branch is gone and the behaviour it never had is not switched on here: sub-repository
+    // roots would change the graph's shape, which is a feature, not a state fix (round 2, Q-06-6).
+    const projectRoots = [projectRoot];
 
     // Execute the core analysis wave with project context
     // `filteredFiles` — every discoverable file — not `dirtyFiles`. Import resolution searches this
@@ -472,8 +517,9 @@ export class AnalysisService {
 
     // A scoped run sweeps only its own subtree — otherwise it deletes every other service in the
     // workspace (ADR 0069). An INCREMENTAL run does not sweep at all: it re-stamped only the dirty
-    // units, so every untouched row would be "not in this pulse" and deleted (ADR 0101).
-    if (isFullPass) {
+    // units, so every untouched row would be "not in this pulse" and deleted (ADR 0101). Nor does a
+    // pass that could not read every file: the unread one keeps its rows from an earlier pulse.
+    if (isFullPass && unreadDirty.length === 0) {
       const swept = await this.persistence.sweepRowsNotInPulse(pulseId, targetRoot !== projectRoot ? targetRoot : undefined);
       if (swept.nodes > 0 || swept.edges > 0) {
         logger.info(`🛡️ [Conducks] Swept ${swept.nodes} node(s) and ${swept.edges} edge(s) left by earlier pulses.`);
@@ -495,7 +541,7 @@ export class AnalysisService {
     logger.info(`🛡️ [Conducks] Synapse Reflection: ${held.nodes} Nodes, ${held.edges} Edges in the vault.`);
 
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
-    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges, scoped: targetRoot !== projectRoot });
+    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges, scoped: targetRoot !== projectRoot, timestamp: startedAt });
 
     } catch (pulseErr) {
       // Any failure before the commit rolls the entire pulse back — no partial graph is left behind.

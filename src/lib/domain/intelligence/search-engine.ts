@@ -107,8 +107,10 @@ export class ConducksSearch {
         const node = this.graph.getNode(id);
         // Tag it, so a caller can tell "this is what you asked for" from "this is next to it".
         // Without this the two are indistinguishable in every output the CLI prints.
-        if (node) (node.properties as Record<string, unknown>).matchType = direct.has(id) ? 'direct' : 'echo';
-        return node;
+        // Tag a COPY: a shallow node is the graph's stored object, and tagging it in place left this
+        // search's verdict on the node for every later answer in a long-lived process (P-05-11).
+        if (!node) return undefined;
+        return { ...node, properties: { ...node.properties, matchType: direct.has(id) ? 'direct' : 'echo' } } as ConducksNode;
       })
       .filter((n): n is ConducksNode => n !== undefined);
   }

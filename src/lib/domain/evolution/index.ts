@@ -43,7 +43,7 @@ export class EvolutionService {
     (this.drift as any).persistence = persistence;
     (this.auditService as any).persistence = persistence;
     for (const watcher of this._watchers.values()) {
-      (watcher as any).options.persistence = persistence;
+      watcher.setPersistence(persistence);
     }
   }
 
@@ -87,6 +87,8 @@ export class EvolutionService {
   public async stopWatchers(): Promise<void> {
     const watchers = [...this._watchers.values()];
     this._watchers.clear();
+    // `stop()` never throws (a failed close is reported inside it, round 2 Q-07-4), so one watcher's
+    // failure cannot skip the rest of this loop.
     for (const watcher of watchers) await watcher.stop();
   }
 

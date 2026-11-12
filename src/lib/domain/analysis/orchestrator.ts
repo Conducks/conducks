@@ -192,6 +192,10 @@ export class AnalyzeOrchestrator {
     const CHUNK_SIZE = Number.isFinite(chunkOverride) && chunkOverride > 0 ? chunkOverride : 500;
     const totalBatches = Math.ceil(normalizedFiles.length / CHUNK_SIZE);
 
+    // Files whose parse FAILED this pulse. They are logged as missing from the graph, and they must not
+    // be hashed either: a recorded hash told the next `analyze` the file was already read, so it was
+    // never retried until it changed (state-machine audit P-06-1).
+    const unread = new Set<string>();
     for (let i = 0; i < normalizedFiles.length; i += CHUNK_SIZE) {
       const chunk = normalizedFiles.slice(i, i + CHUNK_SIZE);
       const batchNum = Math.floor(i / CHUNK_SIZE) + 1;
@@ -268,6 +272,7 @@ export class AnalyzeOrchestrator {
         // used to `continue` past a failure with no count anywhere, which is how a broken grammar or
         // a malformed query could cost a whole language and still print a healthy-looking pulse.
         const failures = inductionResults.filter((r: any) => !r.success && !r.skipped);
+        for (const f of failures) unread.add(String((f as any).path));
         if (failures.length > 0) {
           logger.error(`🛡️ [Conducks] ${failures.length} file(s) could NOT be read structurally — their symbols and edges are MISSING from this graph:`);
           for (const f of failures.slice(0, 10)) {
@@ -310,13 +315,14 @@ export class AnalyzeOrchestrator {
       // back — so there is no longer a committed-but-incomplete state for the hash gate to guard
       // against. The `incomplete` flag this used to carry was always false once that became true,
       // and a flag that cannot be set is worse than none: it reads as a check that ran.
-      await this.persistence.setFileHashBatch(normalizedFiles.map(file => ({
+      await this.persistence.setFileHashBatch(normalizedFiles.filter(file => !unread.has(file.path)).map(file => ({
         file: file.path,
         hash: FileHashGate.hash(file.source),
         sizeBytes: Buffer.byteLength(file.source),
       })));
 
-      await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
+      // (A `head` metadata row holding the pulse id was written here and read nowhere; the name read
+      // as a commit hash, which `lastAnalyzedCommit` is. Removed — state-machine audit P-06-14.)
 
       // Conducks Pulse Hardening: Ensure pulse record knows total count.
       //

@@ -49,7 +49,8 @@ export class TraceCommand implements ConducksCommand {
     // the reverse.
     const TRACE_MODES = ['reachability', 'execution', 'path'] as const;
     const modeAt = args.indexOf('--mode');
-    const mode = modeAt > -1 ? args[modeAt + 1] : undefined;
+    // `?? ''`: a trailing `--mode` with no value skipped the check and traced reachability (P-09-9).
+    const mode = modeAt > -1 ? (args[modeAt + 1] ?? '') : undefined;
     if (mode !== undefined && !TRACE_MODES.includes(mode as never)) {
       console.error(`Error: --mode must be one of: ${TRACE_MODES.join(', ')} — got "${mode ?? ''}".`);
       process.exit(1);
@@ -64,7 +65,13 @@ export class TraceCommand implements ConducksCommand {
     // is read, or `--limit` itself would be taken as the symbol to trace.
     const limitAt = args.indexOf('--limit');
     const limit = limitAt > -1 ? Number(args[limitAt + 1]) : TRACE_LIMIT;
-    const stepCap = Number.isFinite(limit) && limit > 0 ? limit : TRACE_LIMIT;
+    // A bound that does not parse is REFUSED, not replaced by the default: `--limit lots` and
+    // `--depth abc` ran at 10 with no notice (state-machine audit P-09-10).
+    if (!Number.isInteger(limit) || limit < 1) {
+      console.error(`Error: --limit needs a positive integer, got "${args[limitAt + 1] ?? ''}".`);
+      process.exit(1);
+    }
+    const stepCap = limit;
 
     // DEPTH IS A SECOND BOUND, and it was neither settable nor disclosed. `trace` walks a weighted
     // graph distance capped at 10, so on the scraper subject it returned 2,057 of 2,397 reachable
@@ -73,14 +80,18 @@ export class TraceCommand implements ConducksCommand {
     // the DEPTH limit had never been held to it (ADR 0174).
     const depthArg = args.indexOf('--depth');
     const depthVal = depthArg >= 0 ? Number(args[depthArg + 1]) : NaN;
-    const traceDepth = Number.isFinite(depthVal) && depthVal > 0 ? depthVal : undefined;
+    if (depthArg >= 0 && (!Number.isInteger(depthVal) || depthVal < 1)) {
+      console.error(`Error: --depth needs a positive integer, got "${args[depthArg + 1] ?? ''}".`);
+      process.exit(1);
+    }
+    const traceDepth = depthArg >= 0 ? depthVal : undefined;
     // `limitAt + 1` is only a real index when the flag is PRESENT — with no --limit, limitAt is -1
     // and that expression is 0, which dropped the symbol itself and printed the usage line.
     const valueAt = limitAt > -1 ? limitAt + 1 : -1;
     const useJson = args.includes('--json');
     // Every FLAG VALUE is skipped, not just --limit's. Without this, `trace alpha --target beta` reads
     // `beta` as a second positional and the wrong symbol can be traced.
-    const flagValues = new Set([valueAt, modeAt > -1 ? modeAt + 1 : -1, targetAt > -1 ? targetAt + 1 : -1]);
+    const flagValues = new Set([valueAt, modeAt > -1 ? modeAt + 1 : -1, targetAt > -1 ? targetAt + 1 : -1, depthArg > -1 ? depthArg + 1 : -1]);
     const symbolInput = args.filter((a, i) => !a.startsWith('--') && !flagValues.has(i))[0];
 
     if (!symbolInput) {

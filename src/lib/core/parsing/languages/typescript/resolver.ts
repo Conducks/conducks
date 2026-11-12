@@ -15,7 +15,9 @@ import { resolveThroughBuildLayout } from "@/lib/core/parsing/build-layout.js";
 
 export class TypeScriptResolver {
   // simple in-memory cache for tsconfig per projectRoot
-  private static tsconfigCache: Record<string, { mtime: number; config: any }> = {};
+  // Validated by mtime AND size: mtime alone kept serving the old `paths` after a rewrite within one
+  // timestamp tick, for the life of the process (state-machine audit P-04-7).
+  private static tsconfigCache: Record<string, { mtime: number; size: number; config: any }> = {};
 
   /**
    * A TypeScript specifier to a real file: tsconfig paths, then relative, then index resolution.
@@ -42,7 +44,7 @@ export class TypeScriptResolver {
         const stat = fs.statSync(tsconfigPath);
         const cached = TypeScriptResolver.tsconfigCache[tsconfigPath];
         let cfg: any;
-        if (cached && cached.mtime === stat.mtimeMs) {
+        if (cached && cached.mtime === stat.mtimeMs && cached.size === stat.size) {
           cfg = cached.config;
         } else {
           const raw = fs.readFileSync(tsconfigPath, 'utf8');
@@ -51,10 +53,13 @@ export class TypeScriptResolver {
             cfg = JSON.parse(raw) || {};
           } catch {
             const cleanJson = raw.replace(/\/\/[^\n]*/g, '').replace(/,(\s*[}\]])/g, '$1');
-            cfg = JSON.parse(cleanJson) || {};
+            // A file that does not parse is cached as NULL, on the same mtime + size: it was read and
+            // parsed again on every import, because only a success was ever cached (round 2, Q-04-3).
+            try { cfg = JSON.parse(cleanJson) || {}; } catch { cfg = null; }
           }
-          TypeScriptResolver.tsconfigCache[tsconfigPath] = { mtime: stat.mtimeMs, config: cfg };
+          TypeScriptResolver.tsconfigCache[tsconfigPath] = { mtime: stat.mtimeMs, size: stat.size, config: cfg };
         }
+        if (cfg === null) throw new Error(`unparseable ${tsconfigPath}`);   // basic resolution below
 
         const compilerOptions = cfg.compilerOptions || {};
         const baseUrl = compilerOptions.baseUrl ? path.resolve(projectRoot, compilerOptions.baseUrl) : projectRoot;
@@ -95,7 +100,9 @@ export class TypeScriptResolver {
     // 2. Bare Module / Package Resolution
     const rootDir = chronicle.getProjectDir() || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
     if (!cleanPath.startsWith('.')) {
-      const resolved = this.resolvePackageImport(cleanPath, rootDir, allFiles);
+      // The lower-cased index, like every other branch. The raw array made this one lookup
+      // case-sensitive, so `"main": "./Dist/Index.js"` missed `dist/index.js` (P-04-8).
+      const resolved = this.resolvePackageImport(cleanPath, rootDir, lowerToOriginal);
       if (resolved) return resolved;
       return undefined;
     }
@@ -167,7 +174,7 @@ export class TypeScriptResolver {
    * Resolve bare package imports by consulting node_modules/<pkg>/package.json
    * - honors `exports` (simple forms) and `main`, with extension-aware matching
    */
-  private resolvePackageImport(importPath: string, projectRoot: string, allFiles: string[]): string | undefined {
+  private resolvePackageImport(importPath: string, projectRoot: string, allFiles: Map<string, string>): string | undefined {
     // handle scoped packages
     const parts = importPath.split('/');
     let pkgName = parts[0];

@@ -58,6 +58,7 @@ export class SynapsePersistence {
 
   /** Open an atomic analyze pulse: every write until save()/abortPulse() is one transaction. */
   public async beginPulse(): Promise<void> {
+    this.pulseInterrupted = false;
     if (this.readOnly || this.inPulse) return;
     await this.ensureVaultOpen();
     await this.run("BEGIN TRANSACTION");
@@ -66,6 +67,7 @@ export class SynapsePersistence {
 
   /** Roll the pulse back (on error). A process kill mid-pulse auto-rolls-back on the next open. */
   public async abortPulse(): Promise<void> {
+    this.pulseInterrupted = false;
     if (!this.inPulse) return;
     this.inPulse = false;
     try { await this.run("ROLLBACK"); } catch { /* connection may already be gone */ }
@@ -167,6 +169,20 @@ export class SynapsePersistence {
    */
   private async ensureVaultOpen(): Promise<DuckDBConnection> {
     if (this.db) return this.db;
+    // SINGLE-FLIGHT. Callers that reach a closed handle together share one open. This was
+    // check-then-act: each saw `db === null` and created its own DuckDB instance, and every assignment
+    // after the first orphaned the one before — measured, three pipelined queries made three
+    // instances, two of them unreachable by `close()` (state-machine audit P-01-1). The MCP server
+    // closes the vault after every call, so pipelined calls reopen it exactly this way.
+    if (this.opening) return this.opening;
+    this.opening = this.openVault().finally(() => { this.opening = null; });
+    return this.opening;
+  }
+
+  /** The open in flight, joined by every caller that arrives while it runs. */
+  private opening: Promise<DuckDBConnection> | null = null;
+
+  private async openVault(): Promise<DuckDBConnection> {
 
     const vaultDir = path.resolve(this.vaultPath, '.conducks');
     // A READ never creates. It used to mkdir unconditionally, so running any read command outside a
@@ -858,8 +874,12 @@ export class SynapsePersistence {
       // unbounded churn against a store that never reclaims deleted row versions (ADR 0037), and the
       // graph meanwhile kept answering with 44 files that do not exist on disk.
       // The ids passed in ARE the unit ids (`<file>::unit`), so matching `id` too is exact.
-      const owns = `(unitId IN (${placeholders}) OR id IN (${placeholders}))`;
-      const both = [...lowered, ...lowered];
+      // `file` too: rows the watcher wrote before it passed a unit id carry `unitId = NULL` and match
+      // neither of the other two, so they outlived every later purge of their own file (state-machine
+      // audit P-02-3). Matching the unit's file heals vaults that already hold such rows.
+      const files = lowered.map(id => id.replace(/::unit$/, ''));
+      const owns = `(unitId IN (${placeholders}) OR id IN (${placeholders}) OR file IN (${placeholders}))`;
+      const both = [...lowered, ...lowered, ...files];
       await this.run(`DELETE FROM edges WHERE sourceId IN (SELECT id FROM nodes WHERE ${owns})`, both);
       // Drop the content hashes of the purged files BEFORE their nodes go, while the subquery can still
       // find them. Leaving a hash behind is the sharp edge of the hash gate (ADR 0030): the file would
@@ -881,7 +901,13 @@ export class SynapsePersistence {
   // comments described it as the switch that suppressed row writes, so the obvious fix for a
   // binder whose output vanished was to flip it — which would have changed nothing. save() writes
   // metadata and the pulse row and commits; it has never written node or edge rows in any mode.
-  public async save(graph: any, options: { nodeCount?: number, edgeCount?: number, scoped?: boolean } = {}): Promise<void> {
+  /**
+   * `timestamp` is when the pulse STARTED reading. It is the clock the incremental gate compares
+   * mtimes with, so it must not be later than any read: a file saved after it was read but before
+   * the pulse ended was otherwise clean forever (state-machine audit P-06-2). Defaults to now for
+   * callers that read nothing (the watcher writes one already-read file).
+   */
+  public async save(graph: any, options: { nodeCount?: number, edgeCount?: number, scoped?: boolean, timestamp?: number } = {}): Promise<void> {
     if (this.readOnly) return;
     const db = await this.ensureVaultOpen();
     const pulseId = graph.getMetadata('targetPulseId') || `pulse_${Date.now()}`;
@@ -908,7 +934,7 @@ export class SynapsePersistence {
         // died with "graph.nodeCount is not a function", got logged by the watcher's catch, and the
         // delta was never written to the vault. The two callers that pass counts explicitly never hit
         // this line, which is why it survived.
-        pulseId, Date.now(), headHash, branch, options.nodeCount ?? graph.stats?.nodeCount ?? 0, options.edgeCount ?? graph.stats?.edgeCount ?? 0, JSON.stringify(Object.fromEntries(metadata)), options.scoped === true
+        pulseId, options.timestamp ?? Date.now(), headHash, branch, options.nodeCount ?? graph.stats?.nodeCount ?? 0, options.edgeCount ?? graph.stats?.edgeCount ?? 0, JSON.stringify(Object.fromEntries(metadata)), options.scoped === true
       ]);
       await this.run(`COMMIT`);   // publishes the pulse (owned tx, or the big inPulse tx)
       this.inPulse = false;
@@ -923,6 +949,9 @@ export class SynapsePersistence {
   public async run(sql: string, params: unknown[] = []): Promise<void> {
     if (this.readOnly) {
       throw new Error(`🛡️ [Persistence] WRITE BLOCKED: Attempted to execute mutational SQL on a Read-Only vault connection.`);
+    }
+    if (this.pulseInterrupted) {
+      throw new Error(`🛡️ [Persistence] WRITE BLOCKED: the vault was closed in the middle of a pulse, so its transaction is gone. Abort the pulse and start again.`);
     }
     // `CONDUCKS_SQL_LOG=<file>` appends every write statement as one JSONL row, so a failing pulse
     // can be REPLAYED verbatim instead of reconstructed from a description of it. Exists because
@@ -1722,9 +1751,14 @@ export class SynapsePersistence {
        SELECT ?, id, gravity, complexity, fingerprint, shape_fingerprint FROM nodes`, [pulseId]);
     // Drop snapshots older than the retention window. Done here rather than as a chore because a
     // maintenance command nobody runs is a table nobody prunes (the reasoning of ADR 0037).
+    //
+    // The window counts pulses that HAVE history. It counted every pulses row, and `watch --pulse`
+    // writes one per save with no history — so twenty watched saves made the next analyze delete
+    // the history of every real pulse (state-machine audit round 2, Q-07-3).
     await this.run(
       `DELETE FROM node_history WHERE pulseId NOT IN (
-         SELECT id FROM pulses ORDER BY timestamp DESC LIMIT ${SynapsePersistence.KEEP_PULSES})`);
+         SELECT id FROM pulses WHERE id IN (SELECT DISTINCT pulseId FROM node_history)
+         ORDER BY timestamp DESC LIMIT ${SynapsePersistence.KEEP_PULSES})`);
   }
 
   /**
@@ -1859,6 +1893,10 @@ export class SynapsePersistence {
 
   /** Releases the connection and the lock. A held lock is what makes every other reader wait. */
   public async close(): Promise<void> {
+    // An open still IN FLIGHT is waited out and then closed. `db` and `instance` are both null until
+    // it finishes, so a close arriving in that window did nothing and the open then kept the file
+    // locked against every other process (state-machine audit round 2, Q-01-5).
+    if (this.opening) await this.opening.catch(() => { /* its caller reports it */ });
     // The snapshot exists so that readers survive THIS write session. Once the session is over the
     // vault is unlocked again and readers go straight to it, so keeping the copy would make ADR
     // 0040's "2x on disk for the duration of a pulse" into 2x on disk forever. Unlinking it does
@@ -1876,6 +1914,13 @@ export class SynapsePersistence {
     // the timer guarding it kept the event loop alive for the full 5s on every command that opened a
     // vault (`conducks query` answered at 451ms and exited at 5.5s). `closeSync` cannot hang, so both
     // the race and the bug it introduced are gone.
+    // A close inside a pulse discards its transaction. Left as it was, `inPulse` told every later
+    // write it was already inside one, so each AUTOCOMMITTED — rows of a half-finished pulse with no
+    // `pulses` row (state-machine audit P-01-7). Writes are refused until the pulse is aborted.
+    if (this.inPulse) {
+      this.inPulse = false;
+      this.pulseInterrupted = true;
+    }
     if (this.db) {
       this.db.closeSync();
       this.db = null;
@@ -1885,4 +1930,7 @@ export class SynapsePersistence {
       this.instance = null;
     }
   }
+
+  /** Set when the vault was closed inside a pulse; cleared by `abortPulse` or the next `beginPulse`. */
+  private pulseInterrupted = false;
 }

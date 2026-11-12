@@ -1268,9 +1268,11 @@ export class ConducksReflector {
 
           this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework(), currentMatchRow + 1);
 
+          // The scope chain is already the qualified name; prefixing it again (`setup.setup`) matched
+          // no node, so a route registered inside a function flagged nothing (state-machine audit
+          // P-03-2, the same defect as the debt markers in P-03-1).
           const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
-          const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
-          const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scopePrefix}${scope ? scope.toLowerCase() : 'unit'}`);
+          const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scope ? scope.toLowerCase() : 'unit'}`);
           if (targetNode) {
             targetNode.metadata.isEntryPoint = true;
           }
@@ -1383,9 +1385,11 @@ export class ConducksReflector {
         if (cName === CaptureTags.COMMENT && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
+            // The scope chain IS the qualified name (`widget.go`), the same suffix a definition's id
+            // carries. This used to prepend it a second time — `file::run.run` — so no node matched
+            // and every marker inside a body was dropped (state-machine audit P-03-1).
             const scopeName = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
-            const scopePrefix = scopeName ? `${scopeName.toLowerCase()}.` : '';
-            const targetId = `${file.path.toLowerCase()}::${scopePrefix}${scopeName ? scopeName.toLowerCase() : 'unit'}`;
+            const targetId = `${file.path.toLowerCase()}::${scopeName ? scopeName.toLowerCase() : 'unit'}`;
             const targetNode = nodeCache.get(targetId);
             if (targetNode) {
               if (!targetNode.metadata.debtMarkers) targetNode.metadata.debtMarkers = [];

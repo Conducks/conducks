@@ -64,34 +64,19 @@ export class MicroPulseService {
         allPaths
       );
 
-      // 5. Conducks Purge & Resurrection 🛡️
+      // 5. NO WRITE. The micro-pulse parses one file and reports what it found.
       //
-      // The success line used to sit OUTSIDE this branch, so a read-only handle — which is every
-      // CLI invocation except `analyze` and `clean` (cli/index.ts) — printed "resurrected (N
-      // nodes)" and returned success:true having written nothing. `conducks status --mode pulse`
-      // reported 19 nodes into a vault it had not touched. Whether the write happened is now the
-      // thing that decides what is reported.
-      const readOnly = !!(this.persistence as any).readOnly;
-      if (!readOnly) {
-        const unitId = `${absolutePath.toLowerCase()}::unit`;
-        await this.persistence.purgeUnits([unitId]);
-
-        // Flush spectrum nodes to vault directly
-        const nodes = spectrum.nodes.map((n: any) => ({
-          id: n.metadata?.id || `${absolutePath}::${n.name}`,
-          name: n.name,
-          label: n.canonicalKind || 'UNIT',
-          properties: { ...n.metadata, ...n }
-        }));
-        await this.persistence.saveNodes(nodes, `micro_${Date.now()}`);
-        logger.success(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} resurrected (${spectrum.nodes.length} nodes).`);
-      } else {
-        logger.warn(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} parsed (${spectrum.nodes.length} nodes) but NOT written — the vault is open read-only.`);
-      }
+      // It had a write branch — purge the unit, then save its nodes — that no caller could reach:
+      // `status --mode pulse` and the MCP synapse tool's `pulse` mode both hold a read-only vault, and
+      // both say so. It was also wrong if it ever ran: the purge committed on its own, it deleted the
+      // unit's outgoing edges and wrote none back, its node ids were not the ids `analyze` writes, and
+      // its rows had no `unitId`, so `purgeUnits` could never find them again (state-machine audit
+      // round 2, Q-06-1). Writing one file correctly is the watcher's `writeUnit`; this is a probe.
+      logger.warn(`🛡️ [Micro-Pulse] ${path.basename(absolutePath)} parsed (${spectrum.nodes.length} nodes); not written — run 'conducks analyze' to persist.`);
 
       return {
         success: true,
-        persisted: !readOnly,
+        persisted: false,
         nodes: spectrum.nodes.length
       };
     } catch (err: any) {

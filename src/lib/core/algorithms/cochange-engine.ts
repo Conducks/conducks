@@ -46,7 +46,9 @@ export class CoChangeEngine {
 
     // 2. Vectorized Analysis via DuckDB
     // We create a temporary table for this pulse's co-change analysis
-    await db.run("CREATE TEMPORARY TABLE IF NOT EXISTS commit_history (hash VARCHAR, filePath VARCHAR)");
+    // REPLACE, not IF NOT EXISTS: a second run on the same connection appended the history again and
+    // doubled every count (state-machine audit P-03-7).
+    await db.run("CREATE OR REPLACE TEMPORARY TABLE commit_history (hash VARCHAR, filePath VARCHAR)");
 
     // Batch insert (Simplified for this version)
     const stmt = await db.prepare("INSERT INTO commit_history VALUES (?, ?)");

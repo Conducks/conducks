@@ -68,4 +68,22 @@ describe('search — the "*" inventory', () => {
     // rank is 0 for everything until `resonate` runs — the order must still be stable and readable.
     expect(s.search('*').map(n => n.properties.name)).toEqual(['alpha', 'bravo', 'charlie']);
   });
+
+  it('a search does not leave its direct/echo tag on the graph, so a later inventory carries none', () => {
+    // State-machine audit P-05-11: the tag was written onto the STORED node, so in a long-lived
+    // process an earlier search's 'echo' showed on the same node in a later `*` answer. Only a node
+    // with no meat (a shallow load) hands out its stored object, so the fixture is shallow.
+    graph = new ConducksAdjacencyList();
+    search = new ConducksSearch(graph);
+    for (const [id, name, rank] of [['/repo/src/a.ts::heavy', 'heavyFn', 0.7], ['/repo/src/a.ts::light', 'lightFn', 0.1]] as const) {
+      graph.addNode({ id, label: 'behavior', isShallow: true, properties: { name, canonicalKind: 'BEHAVIOR', rank, filePath: '/repo/src/a.ts' } } as never);
+    }
+    graph.addEdge({ id: 'e', sourceId: '/repo/src/a.ts::light', targetId: '/repo/src/a.ts::heavy', type: 'CALLS', confidence: 1, properties: {} } as never);
+    const tagged = search.search('heavyFn');
+    expect(tagged.find(n => n.properties.name === 'heavyFn')!.properties.matchType).toBe('direct');
+
+    expect(graph.getNode('/repo/src/a.ts::heavy')!.properties.matchType).toBeUndefined();
+    expect(graph.getNode('/repo/src/a.ts::light')!.properties.matchType).toBeUndefined();
+    expect(search.search('*').map(n => n.properties.matchType)).toEqual([undefined, undefined]);
+  });
 });

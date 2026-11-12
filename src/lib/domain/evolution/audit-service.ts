@@ -20,8 +20,11 @@ export class AuditService {
     // 1. Unified Windowed Structural Trend Query
     const archeologicalQuery = `
       WITH pulse_history AS (
+        -- Pulses that carry history only: a watcher save writes a pulses row and no node_history,
+        -- and a window of those compared nothing (state-machine audit round 2, Q-07-3).
         SELECT id, timestamp
         FROM pulses
+        WHERE id IN (SELECT DISTINCT pulseId FROM node_history)
         ORDER BY timestamp DESC
         LIMIT ?
       ),
@@ -94,7 +97,9 @@ export class AuditService {
 }
 
 export interface AuditResult {
-  status: 'HEALTHY' | 'STABLE' | 'DECAYING' | 'INSUFFICIENT_DATA';
+  // No `HEALTHY`: `audit()` never produced it, and a declared state that cannot happen invites a
+  // branch for it (state-machine audit P-07-10).
+  status: 'STABLE' | 'DECAYING' | 'INSUFFICIENT_DATA';
   message: string;
   hotspots: Array<{
     id: string;

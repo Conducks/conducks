@@ -117,4 +117,31 @@ describe('Python import resolution', () => {
       expect(resolver.resolve('requests', 'tests/debug_x.py', ROOT_FILES)).toBeUndefined();
     });
   });
+
+  /**
+   * `from ..x import y` names the PARENT package's `x` (state-machine audit P-04-4).
+   *
+   * A relative specifier was first offered to the ABSOLUTE resolver, which turned every dot into a
+   * slash: `..x` became `//x`, and `path.join(dir, '//x')` is `dir/x` — the importer's OWN folder.
+   * So whenever the importer's folder held a module of the same name, the import bound to it, and the
+   * correct parent-level target was never tried. `...x` dropped two levels the same way.
+   */
+  it('binds a two-dot import to the parent package, not to a same-named sibling', () => {
+    const files = [
+      '/p/pkg/x.py', '/p/pkg/sub/x.py', '/p/pkg/sub/m.py', '/p/pkg/sub/__init__.py', '/p/pkg/__init__.py',
+      '/p/x.py', '/p/pkg/sub/deep/n.py', '/p/pkg/sub/deep/x.py',
+    ];
+    expect(resolver.resolve('..x', '/p/pkg/sub/m.py', files)).toBe('/p/pkg/x.py');
+    expect(resolver.resolve('...x', '/p/pkg/sub/deep/n.py', files)).toBe('/p/pkg/x.py');
+    expect(resolver.resolve('.x', '/p/pkg/sub/m.py', files)).toBe('/p/pkg/sub/x.py');
+    // `from .. import y` is the parent package itself, not the importer's own package.
+    expect(resolver.resolve('..', '/p/pkg/sub/m.py', files)).toBe('/p/pkg/__init__.py');
+  });
+
+  it('never lets a relative import fall back to an absolute match', () => {
+    // No `/p/pkg/sub/nothere.py`: the relative target does not exist, so the answer is nothing —
+    // not the top-level `/p/nothere.py` an absolute walk would find.
+    const files = ['/p/nothere.py', '/p/pkg/sub/m.py'];
+    expect(resolver.resolve('.nothere', '/p/pkg/sub/m.py', files)).toBeUndefined();
+  });
 });

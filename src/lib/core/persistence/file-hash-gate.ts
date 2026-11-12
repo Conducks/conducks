@@ -68,6 +68,16 @@ export class FileHashGate {
     }
   }
 
+  /**
+   * Records content that THIS PROCESS's graph holds but the vault does not — the cache only. A
+   * `watch --pulse` session after a branch switch keeps its in-memory graph current while writing
+   * nothing; storing the hash in the vault then claimed content the vault never received
+   * (state-machine audit round 2, Q-07-1).
+   */
+  public remember(absPath: string, source: string): void {
+    this.cache.set(absPath.toLowerCase(), FileHashGate.hash(source));
+  }
+
   /** Forgets a path so the next event re-parses it — for a delete, or a purge of its nodes. */
   public async forget(absPath: string): Promise<void> {
     const key = absPath.toLowerCase();

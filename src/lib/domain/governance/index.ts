@@ -7,9 +7,9 @@ import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import fs from "node:fs";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
-import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
+import { SOURCE_EXTENSIONS, realCasePath } from "@/contracts/index.js";
 import path from "node:path";
-import { loadSentinelRules, loadLayerContract } from "./sentinel-rules.js";
+import { loadSentinelRuleFile, loadLayerContract } from "./sentinel-rules.js";
 
 /**
  * The graph-level verdict, from the node count alone.
@@ -188,7 +188,10 @@ export class GovernanceService {
       const isPathLike = orphan.targetId.startsWith('/') || orphan.targetId.startsWith('./') || orphan.targetId.startsWith('../');
       
       // If it's path-like, is it within our project root?
-      const isInternalPath = isPathLike && (orphan.targetId.startsWith(projectRoot) || orphan.targetId.startsWith('@/'));
+      // Graph ids are LOWER-CASED (adjacency-list addEdge); the project root keeps its real spelling.
+      // Compared as-is, a root with any capital in it — `/srv/Work/app` — made every internal
+      // orphan read as an external one on a case-sensitive filesystem (found with P-07-9).
+      const isInternalPath = isPathLike && (orphan.targetId.startsWith(projectRoot.toLowerCase()) || orphan.targetId.startsWith('@/'));
 
       const isExternalId = isNodeBuiltin || !isInternalPath;
 
@@ -204,11 +207,17 @@ export class GovernanceService {
         // It's an internal orphan. 
         // We only flag it as a VIOLATION if the target ID doesn't seem to exist on disk.
         // If it DOES exist on disk but isn't in our graph, it's just a Missing Induction (Discovery).
-        let existsOnDisk = false;
-        try {
-           const potentialPath = orphan.targetId.split('::')[0];
-           existsOnDisk = path.isAbsolute(potentialPath) && require('fs').existsSync(potentialPath);
-        } catch {}
+        //
+        // `fs` is the module import. This was `require('fs')`, which does not exist in an ES module:
+        // the ReferenceError was swallowed by an empty catch, so the answer was "not on disk" for
+        // every edge and every such orphan failed the audit as a REFACTOR (state-machine audit
+        // P-07-9). The id is lower-cased, so the path is rebuilt on the root's REAL spelling and only
+        // the part inside the project is case-restored: a lower-cased root can name a different
+        // directory outright (`/srv/conducks` beside `/srv/CONDUCKS`).
+        const potentialPath = orphan.targetId.split('::')[0];
+        const lowerRoot = projectRoot.toLowerCase();
+        const onRoot = potentialPath.startsWith(lowerRoot) ? projectRoot + potentialPath.slice(lowerRoot.length) : potentialPath;
+        const existsOnDisk = path.isAbsolute(onRoot) && fs.existsSync(realCasePath(onRoot));
 
         if (existsOnDisk) {
           externalOrphans++; // Categorize as discovery
@@ -268,9 +277,14 @@ export class GovernanceService {
     violations: Array<{ id: string; ruleId: string; severity: 'error' | 'warning' | 'info'; message: string }>;
   } {
     const projectRoot = rootDir || chronicle.getProjectDir() || process.cwd();
-    const rules = loadSentinelRules(projectRoot);
+    const { rules, errors: ruleFileErrors } = loadSentinelRuleFile(projectRoot);
 
     const violations: Array<{ id: string; ruleId: string; severity: 'error' | 'warning' | 'info'; message: string }> = [];
+    // A rules file that could not be used fails the check by name (P-07-11): the defaults still run,
+    // but a verdict over rules the user did not write must not read as theirs.
+    for (const message of ruleFileErrors) {
+      violations.push({ id: '.conducks/sentinel.yml', ruleId: 'sentinel_config', severity: 'error', message });
+    }
 
     for (const rule of rules) {
       switch (rule.condition) {
@@ -637,7 +651,7 @@ export class GovernanceService {
  * them, the drift gate, and the advice a person reads. Every other domain area DESCRIBES the code;
  * this one JUDGES it.
  *
- * WHAT NO LONGER CROSSES: `RegressionGuard`, `loadSentinelRules`, `getDefaultRules`, the three
+ * WHAT NO LONGER CROSSES: `RegressionGuard`, `loadSentinelRuleFile`, `getDefaultRules`, the three
  * sentinel rule types, and `emptyOrReady`. Zero callers outside this folder each — the guard is
  * reached through `GovernanceService`, and the rules are loaded by the sentinel that uses them.
  * `RegressionGuard` was IMPORTED BY THE REGISTRY AND NEVER USED, which the tsc oracle had already

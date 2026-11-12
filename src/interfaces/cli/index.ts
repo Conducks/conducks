@@ -195,7 +195,11 @@ export async function main() {
   }
   // Only 'analyze' writes to the vault. 'clean' is a destructive wipe (also needs write access).
   // Every other command is strictly read-only.
-  const isReadCommand = !['analyze', 'clean'].includes(commandId);
+  // `guard --force` runs a full analysis first, so it writes too. Opened read-only, every write of that
+  // analysis returned early and the command still logged "Pulse recorded." (state-machine audit P-08-3).
+  const forcedGuard = commandId === 'guard' && cmdArgs.includes('--force');
+  const writesVault = ['analyze', 'clean'].includes(commandId) || forcedGuard;
+  const isReadCommand = !writesVault;
   const persistence = registry.infrastructure.createPersistence(targetPath, isReadCommand);
   
   // Named operation through composition: the CLI cannot reach `core` (ADR 0005), and the anchor is
@@ -277,7 +281,12 @@ export async function main() {
   }
 
   // Mirror is a live visualizer and should avoid forcing a full structural load.
-  const isStalenessBypass = STALENESS_BYPASS.has(commandId);
+  //
+  // `guard --force` re-analyzes before it judges, so it is handled like `analyze` itself: no branch
+  // refusal and no preload. The branch guard refused it whenever the vault came from another branch —
+  // the very state its pre-guard analysis exists to repair — and on a write handle that guard's query,
+  // like the preload, CREATED the vault in a project the analysis then found empty (round 2, Q-08-2/3).
+  const isStalenessBypass = STALENESS_BYPASS.has(commandId) || forcedGuard;
   // Commands that answer from markdown and the filesystem alone: skip the engine entirely (ADR 0033).
   const needsNoRegistry = NEEDS_NO_REGISTRY.has(commandId);
 
@@ -293,7 +302,7 @@ export async function main() {
       // rather than through `registry.infrastructure.graphEngine`, so the deferral guard (ADR 0038)
       // never fires on this path, and `analyze` is already in STALENESS_BYPASS so nothing loads the
       // graph to print a staleness banner either.
-      const deferGraph = isReadCommand || commandId === 'analyze';
+      const deferGraph = isReadCommand || commandId === 'analyze' || forcedGuard;
       if (!needsNoRegistry) await registry.initialize(isReadCommand, targetPath, deferGraph);
 
       if (!isStalenessBypass) {

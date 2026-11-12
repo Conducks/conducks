@@ -19,7 +19,7 @@ import path from "node:path";
  */
 export class RustResolver {
   /** Every `<crate src dir>` declaring each crate name as written in code, per file list. */
-  private cratesFor: { key: string; byName: Map<string, string[]> } | null = null;
+  private cratesFor: { key: string; list: string[]; byName: Map<string, string[]> } | null = null;
   /** Cargo.toml package name per crate dir; null when there is no manifest or no name. */
   private manifestName = new Map<string, string | null>();
   /** The nearest enclosing `[workspace]` root per directory; null when there is none. */
@@ -87,8 +87,17 @@ export class RustResolver {
    * a name the workspace still cannot tell apart is refused rather than guessed.
    */
   private crateSrcByName(name: string, currentFile: string, allFiles: string[], files: FileIndex): string | undefined {
-    const key = `${allFiles.length}:${allFiles[0]}:${allFiles[allFiles.length - 1]}`;
-    if (!this.cratesFor || this.cratesFor.key !== key) {
+    // The WHOLE list keys the index. `length:first:last` let two lists of one length and the same ends
+    // share an index, so a crate swapped in the middle was answered from the old list (state-machine
+    // audit P-04-1). Same array as last time is the fast path; otherwise one pass over the paths,
+    // the same order of work as the `index()` every resolve already does.
+    if (this.cratesFor?.list !== allFiles) {
+      const key = allFiles.join('\n');
+      if (this.cratesFor && this.cratesFor.key === key) this.cratesFor.list = allFiles;
+      else this.cratesFor = null;
+    }
+    if (!this.cratesFor) {
+      const key = allFiles.join('\n');
       const byName = new Map<string, string[]>();
       for (const f of files.all) {
         if (!/\/src\/(lib|main)\.rs$/i.test(f)) continue;
@@ -100,7 +109,7 @@ export class RustResolver {
         if (!list.includes(src)) list.push(src);   // lib.rs and main.rs share one src/
         byName.set(crate, list);
       }
-      this.cratesFor = { key, byName };
+      this.cratesFor = { key, list: allFiles, byName };
     }
     const candidates = this.cratesFor.byName.get(name.toLowerCase());
     if (!candidates?.length) return undefined;

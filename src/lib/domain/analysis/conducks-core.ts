@@ -4,7 +4,6 @@ import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { AnalyzeOrchestrator } from "@/lib/domain/analysis/orchestrator.js";
 import { PythonProvider } from "@/lib/core/parsing/index.js";
 import { TypeScriptProvider } from "@/lib/core/parsing/index.js";
-import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { ConducksSearch } from "@/lib/domain/intelligence/index.js";
 import { ConducksFlowEngine } from "@/lib/domain/kinetic/index.js";
@@ -15,9 +14,8 @@ import { DeadCodeAnalyzer } from "@/lib/domain/evolution/index.js";
 import { ConducksAdvisor } from "@/lib/domain/governance/index.js";
 import { CoChangeEngine } from "@/lib/core/algorithms/index.js";
 import { calculateShannonEntropy, normalizeEntropyRisk } from "@/lib/core/algorithms/index.js";
-import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
+import { chronicle } from "@/lib/core/git/index.js";
 import path from "node:path";
-import fs from "node:fs";
 import { fileURLToPath } from "url";
 import { RISK_WEIGHTS, conducksVersion } from "@/contracts/index.js";
 
@@ -59,71 +57,10 @@ export class Conducks {
     this.registry.registerProvider(".py", new PythonProvider());
   }
 
-  /**
-   * Orchestrates the Topological Structural Pulse (Conducks).
-   * 
-   * Parallelizes reflection by independent dependency batches to maximize 
-   * structural throughput.
-   */
-  public async pulse(files: Array<{ path: string, source: string }>): Promise<string> {
-    console.error("[Conducks] Initiating Conducks 'Structural Resonance' Pulse...");
-
-    console.error("[ConducksCore] Loading persistence...");
-    await this.persistence.load(this.graph.getGraph());
-    console.error("[ConducksCore] Persistence loaded.");
-
-    console.error("[ConducksCore] Initializing grammars...");
-    await grammars.init();
-    console.error("[ConducksCore] Grammars initialized.");
-    await grammars.loadLanguage("python");
-    console.error(`[ConducksCore] Grammar loaded.`);
-
-    // Conducks: Kinetic Root Alignment
-    if (files.length > 0) {
-      const firstFile = files[0].path;
-      
-      // Improved Heuristic: Find the root containing .git or .conducks
-      let currentDir = path.dirname(path.resolve(firstFile));
-      let projectRoot = currentDir;
-      
-      while (currentDir !== path.parse(currentDir).root) {
-        if (fs.existsSync(path.join(currentDir, '.git')) || fs.existsSync(path.join(currentDir, '.conducks'))) {
-          projectRoot = currentDir;
-          break;
-        }
-        currentDir = path.dirname(currentDir);
-      }
-
-      anchorChronicle(projectRoot);
-    }
-
-    console.error(`[ConducksCore] Calling Orchestrator with ${files.length} units.`);
-    const result = await this.orchestrator.analyze(files);
-    const framework = (this.orchestrator as any).context?.getFramework?.();
-    if (framework) {
-      this.graph.getGraph().setMetadata('framework', framework);
-    }
-    console.error(`[ConducksCore] Orchestrator call complete.`);
-
-    // Conducks: Align Test Coverage
-
-    // Conducks: Architectural Audit (Mark Anomalies)
-    this.advisor.analyze(this.graph.getGraph());
-
-    // Conducks: Final structural resonance (Reflects gravity and entry points)
-    await this.resonate();
-
-    // Conducks: Sync Staleness Sensor (Store HEAD hash)
-    const headHash = chronicle.getHeadHash();
-    if (headHash) {
-      console.error(`[ConducksCore] Capturing pulse snapshot at: ${headHash}`);
-      chronicle.setLastPulsedCommit(this.graph.getGraph(), headHash);
-      console.error(`[ConducksCore] Metadata set. Current metadata:`, Array.from(this.graph.getGraph().getAllMetadata().entries()));
-    }
-
-    await this.persistence.save(this.graph.getGraph(), { nodeCount: result.nodeCount, edgeCount: result.edgeCount });
-    return result.pulseId;
-  }
+  // `pulse(files)` lived here: a second analyze path that nothing called. It bound the vault before
+  // anchoring the chronicle and wrote without a pulse transaction, so reviving it would have written
+  // the wrong vault non-atomically. `AnalysisService.analyze` is the one analyze path (state-machine
+  // audit P-06-13).
 
   public query(query: string) {
     return this.search.search(query);

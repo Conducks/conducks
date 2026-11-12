@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Fixed — state that changes over time (two audits, 201 findings)
+- `watch`, `watch --pulse` and `mirror --live` no longer die when a README, `package.json` or other file no language reads is saved, or (for `--pulse`) when one changed since the last `analyze`.
+- `watch --pulse` writes the vault the way `analyze` does: a renamed or deleted symbol no longer stays behind as a ghost no later run removes, a deleted file's symbols leave the vault, and nothing is written after a branch switch stops auto-pulse. A watched session no longer leaves `drift`, `audit` and `guard` answering "not assessed", nor makes the next `analyze` drop the real pulses' history.
+- `watch` and `mirror --live` no longer hold the vault between reads, so `analyze` runs beside them. A Ctrl-C at any point of start-up stops them cleanly, with no "dead watcher" left behind.
+- `analyze`: a changed file it cannot read keeps its rows and is re-read on the next run (it lost them all and exited 0); a discovery that finds nothing deletes nothing and fails; a file that failed to parse is retried; a parse worker that cannot start fails the run instead of hanging; removing deleted files happens inside the pulse, so a failed pulse loses nothing.
+- MCP server: switching projects no longer closes the vault under another call or answers from the wrong project; the graph reloads after an outside `analyze`, including the first one; logs follow the current project.
+- Mirror: a failed reload no longer leaves an empty graph that answers "no dead code, no flows"; a failed search or fetch says so instead of "nothing found".
+- `guard --force` closes the vault, stops on a failed analysis, and works on another branch. `supply-chain` without a lockfile and an empty coverage baseline are no longer reported as clean.
+- `setup` replaces an MCP entry that points at another install; concurrent `setup` runs keep every project in the registry; an unreadable registry is not overwritten; `uninstall` removes the project from the registry and says when it could not.
+- TODO and FIXME markers reach the vault.
+
 ### Fixed
 - Go: an import of a package in the same module (`example.com/m/internal/store`) resolves, read from `go.mod`; before, every in-module import resolved to nothing. A package is its whole directory: its files see each other without imports, and importing it reaches every file. Separate `package main` programs no longer see each other. A function passed as a value (`Map(xs, double)`, `{"one": one}`, `registry[k] = two`) is a use; `init` is an entry point; a method reached through an interface is not reported dead (exported methods never, unexported ones when a project interface declares the name, as staticcheck does).
 - Swift: `import Store` resolves to the SPM target `Sources/Store/` (it matched any path containing the name), and a target's files see each other. A function passed as a value (`xs.map(double)`, `["one": one]`, `let f = twice`) is a use, and a member a project protocol declares is not reported dead.

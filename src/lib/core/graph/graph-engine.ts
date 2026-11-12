@@ -20,6 +20,7 @@ import { canonicalize } from "@/lib/core/utils/index.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import { PrismRequest } from "@/contracts/index.js";
 import { StructuralRanker } from "../../core/graph/algorithms/ranker.js";
+import { HttpServiceLinker } from "./http-service-linker.js";
 import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
 import { Worker } from "node:worker_threads";
 import os from "node:os";
@@ -82,7 +83,7 @@ export class ConducksGraph {
    * itself is what `MicroPulseService` already does for the same one-file case, and it keeps the
    * failure mode as "an import does not resolve" instead of "the file is not analyzed at all".
    */
-  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[]): Promise<void> {
+  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[], projectRoot?: string): Promise<void> {
     const unitCount = stream.length;
     this.logger.info(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
 
@@ -101,42 +102,77 @@ export class ConducksGraph {
 
       const p = new Promise<void>((resolve, reject) => {
         const worker = new Worker(workerScript, {
-          workerData: { units: chunk, allPaths: resolutionUniverse },
+          // `projectRoot` anchors the worker to the analysed project, not to its own cwd — see
+          // pulse-worker.ts (state-machine audit P-03-3).
+          workerData: { units: chunk, allPaths: resolutionUniverse, projectRoot },
           execArgv: isTs ? ["--import", "tsx"] : []
         });
 
+        // A throw in this handler is NOT this promise's rejection: it is an uncaught exception on the
+        // main thread, and it killed the process. Any failure is kept and reported when the worker exits.
+        let failure: Error | null = null;
         worker.on('message', (results: any[]) => {
           for (const res of results) {
             if (res.error) {
               this.logger.error(`[Conducks Synapse] Worker failure in ${res.path}: ${res.error}`);
               continue;
             }
-            // RE-STATE the file rather than adding to what it said last time. Without this a deleted
-            // call keeps its edge for the rest of the session — and once the watcher records the
-            // file's hash, the next `analyze` sees nothing dirty and never repairs it (todo67).
-            //
-            // Only after the parse SUCCEEDED: replacing first would empty the file on a parse error
-            // and leave the graph claiming the file declares nothing.
-            const canonical = canonicalize(res.path);
-            const declared = new Set<string>(res.spectrum.nodes.map((n: any) => spectrumNodeId(canonical, n)));
-            this.graph.replaceFile(canonical, declared);
-            this.ingestSpectrum(res.path, res.spectrum);
+            // A file no language provider reads (README.md, package.json, a config) comes back
+            // `{ skipped: true }` with no spectrum. The watcher pulses every changed file that is not
+            // ignored, so reading `res.spectrum.nodes` here killed `watch`, `watch --pulse` and
+            // `mirror --live` on the first such save (state-machine audit round 2, Q-02-1).
+            if (!res.spectrum) continue;
+            try {
+              // RE-STATE the file rather than adding to what it said last time. Without this a deleted
+              // call keeps its edge for the rest of the session — and once the watcher records the
+              // file's hash, the next `analyze` sees nothing dirty and never repairs it (todo67).
+              //
+              // Only after the parse SUCCEEDED: replacing first would empty the file on a parse error
+              // and leave the graph claiming the file declares nothing.
+              const canonical = canonicalize(res.path);
+              const declared = new Set<string>(res.spectrum.nodes.map((n: any) => spectrumNodeId(canonical, n)));
+              // The SAME unit and root ids `analyze` passes (reflection-pipeline.ts). Without them every
+              // symbol was written with `unitId = NULL`, and `purgeUnits` finds a file's rows BY unitId —
+              // so a symbol saved by the watcher outlived its own deletion in every later `analyze`
+              // (state-machine audit P-02-3/P-02-4; measured: a renamed function stayed as a ghost).
+              // The root is read from the file's unit node already in the graph, before it is replaced.
+              const unitId = `${canonical}::unit`;
+              const rootId = (this.graph.getNode(unitId)?.properties as any)?.rootId ?? undefined;
+              this.graph.replaceFile(canonical, declared);
+              this.ingestSpectrum(res.path, res.spectrum, false, unitId, rootId);
+            } catch (err) {
+              failure ??= err instanceof Error ? err : new Error(String(err));
+            }
           }
         });
 
         worker.on('error', reject);
         worker.on('exit', (code) => {
           if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+          else if (failure) reject(failure);
           else resolve();
         });
       });
       workerPromises.push(p);
     }
 
-    await Promise.all(workerPromises);
+    // EVERY worker is waited for, not the first to fail. `Promise.all` rejected on the first failure,
+    // while the other workers kept re-stating their files after it — and the relink and binders below
+    // never ran for those files, so their cross-service CALLS edges stayed lost (round 2, Q-02-2).
+    const settled = await Promise.allSettled(workerPromises);
+
+    // `replaceFile` above dropped each file's outgoing edges, its cross-service HTTP CALLS included,
+    // and only `analyze` ever created those. Re-link the files this pulse re-stated, or the first
+    // watched save of a file that calls another service by URL loses that caller until the next
+    // `analyze` (state-machine audit P-02-2).
+    new HttpServiceLinker(this.graph).link(stream.map(u => u.path));
 
     // Phase 2: Neural Binding (Universal Workspace Resolution)
     this.resonate();
+
+    // The pulse still FAILS when a worker did: the caller must not record those files as done.
+    const failed = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected');
+    if (failed) throw failed.reason;
     this.logger.info(`[Conducks Synapse] Pulse complete: ${this.graph.stats.nodeCount} Neurons active.`);
   }
 

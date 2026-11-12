@@ -15,7 +15,11 @@ export class LinkCommand implements ConducksCommand {
       console.error("Error: Please provide a path to the proprietary project to link.");
       process.exit(1);
     }
-    const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+    // The PROJECT, found the way every other command finds it — walking up from cwd. The link file was
+    // written in cwd verbatim, so `cd src && conducks link …` created `src/.conducks/`, and every later
+    // command run there took `src` for the project root (state-machine audit P-08-5, ADR 0116). Not the
+    // anchored root: the dispatcher anchors on the positional, which here is the project being linked.
+    const targetPath = process.env.CONDUCKS_WORKSPACE_ROOT || registry.infrastructure.discoverRoot(process.cwd());
     const linker = registry.federation.createLinker(targetPath);
     try {
       await linker.link(projectPath);

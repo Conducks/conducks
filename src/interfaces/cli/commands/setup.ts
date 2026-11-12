@@ -42,8 +42,19 @@ export class SetupCommand implements ConducksCommand {
     // Global ONLY (ADR 0029): the skills describe how to drive conducks itself, not this repo, so one
     // copy in ~/.claude/skills serves every project. A repo-local copy is not a pin, it is a second
     // copy Claude Code also discovers — every skill would load twice. Sync prunes one if it finds it.
+    // Every step's failure is RECORDED and the next step still runs; the end reports which ones failed
+    // and exits 1. Setup used to print "Setup complete." and exit 0 after a failed MCP registration,
+    // and a throwing skills sync aborted every later step (state-machine audit P-08-7).
+    const failed: string[] = [];
     const installer = registry.federation.createInstaller(process.cwd());
-    for (const report of await installer.sync()) {
+    let reports: Awaited<ReturnType<typeof installer.sync>> = [];
+    try {
+      reports = await installer.sync();
+    } catch (err) {
+      console.log(`❌ Skills sync failed: ${(err as Error).message}`);
+      failed.push('skills sync');
+    }
+    for (const report of reports) {
       const bits = [
         report.created.length ? `${report.created.length} added` : "",
         report.updated.length ? `${report.updated.length} updated` : "",
@@ -63,10 +74,14 @@ export class SetupCommand implements ConducksCommand {
     // every project runs first, so it is the only place that can know a project exists without asking.
     // Idempotent — a second setup refreshes the timestamp rather than adding a duplicate.
     const projects = registry.federation.createProjectRegistry();
-    const { added, total } = projects.register(process.cwd());
-    console.log(added
-      ? `📌 Project registered → ${projects.path} (${total} total). See: conducks monitor`
-      : `📌 Project already registered → ${projects.path} (${total} total)`);
+    const { added, total, written } = projects.register(process.cwd());
+    // Not written is said as such — it used to print "registered" over a write that never happened
+    // (state-machine audit P-05-8). Setup still goes on: the registry only serves `monitor`.
+    console.log(!written
+      ? `⚠️  Could not write ${projects.path} — this project is not registered for \`conducks monitor\`.`
+      : added
+        ? `📌 Project registered → ${projects.path} (${total} total). See: conducks monitor`
+        : `📌 Project already registered → ${projects.path} (${total} total)`);
 
     const configurator = registry.federation.createMCPConfigurator();
     // Resolve the CONDUCKS install root from this compiled file, NOT from process.cwd(): setup runs
@@ -77,8 +92,12 @@ export class SetupCommand implements ConducksCommand {
     const cliEntry = fileURLToPath(new URL("../index.js", import.meta.url));
     const mcpResult = await configurator.registerClaude(cliEntry);
     console.log(mcpResult.message);
+    if (!mcpResult.success) failed.push('Claude Desktop registration');
     // Every other MCP client that is installed here, so no config is edited by hand (todo82#P8).
-    for (const r of await configurator.registerDetected(cliEntry)) console.log(r.message);
+    for (const r of await configurator.registerDetected(cliEntry)) {
+      console.log(r.message);
+      if (!r.success) failed.push(`${r.client} registration`);
+    }
 
     // 3. Harden Environment (.conducksignore)
     console.log("\x1b[35m[Conducks Setup] Hardening Environment...\x1b[0m");
@@ -118,6 +137,12 @@ export class SetupCommand implements ConducksCommand {
       if (run.status !== 0) console.log("❌ analyze failed — run `conducks analyze` to see why. Setup itself is complete.");
     }
 
+    if (failed.length > 0) {
+      console.log(`\n\x1b[31m[Conducks] Setup incomplete — failed: ${failed.join(', ')}.\x1b[0m`);
+      console.log("  Fix the error printed for each, then run `conducks setup` again (every step is safe to repeat).");
+      process.exitCode = 1;
+      return;
+    }
     console.log("\n\x1b[32m[Conducks] Setup complete.\x1b[0m");
     console.log("  Restart your agent so it loads the conducks MCP server, or try: conducks status");
   }

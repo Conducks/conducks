@@ -1,13 +1,20 @@
 import { Tool } from "@/registry/tool-registry.js";
-import { registry } from "@/registry/index.js";
-import { acquireAnchor, releaseAnchor } from "@/interfaces/tools/shared/anchor.js";
+import { acquireAnchor, releaseAnchor, enterToolCall, leaveToolCall } from "@/interfaces/tools/shared/anchor.js";
 import path from "node:path";
 import fs from "fs-extra";
 import { fileURLToPath } from "node:url";
 
 
-/** Serialises tool calls — see the queue comment in the handler wrapper below. */
-let queue: Promise<void> = Promise.resolve();
+/**
+ * Marks a handler this registry already wrapped, keeping the original. The tool objects are module
+ * singletons, so a second `bootstrap()` in one process (tests build several servers) wrapped the
+ * wrapper and every call then anchored and released twice (state-machine audit P-10-9).
+ */
+const ORIGINAL = Symbol('conducks.originalHandler');
+
+// (A module-level `queue` lived here, documented as "serialises tool calls" and read by nothing:
+// ADR 0146's queue was removed in todo52. A reader trusting it would believe calls are serialised
+// — state-machine audit P-10-7. Removed; `enterToolCall` is what orders calls now.)
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,11 +66,11 @@ export class ConducksRegistry {
       }
 
       // Conducks Lazy Resonance: Wrap tool handler to ensure database connection yields
-      const originalHandler = tool.handler;
-      tool.handler = async (args: any) => {
-        // Conducks: Dynamic Root Discovery
-        // We prioritize the 'path' argument from the tool call, then the environment, then CWD.
-        const requestPath = args.path || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+      const originalHandler = (tool.handler as any)[ORIGINAL] ?? tool.handler;
+      const wrapped = async (rawArgs: any) => {
+        // A call may omit `arguments` entirely, and a tool with no required parameter is valid that
+        // way; `args.path` then threw a TypeError before anything ran (state-machine audit P-10-8).
+        const args = rawArgs ?? {};
         
         // CONCURRENT. Tool calls overlap again; ADR 0146's queue is gone (todo52).
         //
@@ -89,11 +96,15 @@ export class ConducksRegistry {
         // probe went from 2,135 ms serialised to ~500 ms.
         acquireAnchor();
         try {
-          // Conducks High-Fidelity Pivot: Re-anchor the structural synapse to the requested path.
-          // The RegistryBootstrapper ensures this is a no-op if we are already anchored correctly.
-          await registry.initialize(true, requestPath);
-          
-          return await originalHandler(args);
+          // Re-anchor to the requested project THROUGH THE GATE: the path is validated before
+          // anything changes (P-10-10), and a re-anchor waits for the calls still running on the
+          // current project instead of closing the vault under them (P-10-1). See `enterToolCall`.
+          await enterToolCall(args.path);
+          try {
+            return await originalHandler(args);
+          } finally {
+            leaveToolCall();
+          }
         } catch (err: any) {
           console.error(`[Conducks] Tool Handler Error: ${err.message}`);
           throw err;
@@ -103,6 +114,8 @@ export class ConducksRegistry {
           await releaseAnchor();
         }
       };
+      (wrapped as any)[ORIGINAL] = originalHandler;
+      tool.handler = wrapped;
     }
 
     // Return ONLY the static tools passed in. No dynamic additions.

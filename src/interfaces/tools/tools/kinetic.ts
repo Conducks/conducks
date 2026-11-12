@@ -239,11 +239,15 @@ Each step carries \`id\`, \`name\`, \`kind\`, \`file\` and \`line\` so it can be
         // A hard `.slice(0, 10)` with no `limit` param hid the same class of gap `conducks_impact`
         // had — the CLI's own default is 15 and `--limit <n>` can raise it; this tool had neither.
         const traceResults = await registry.kinetic.trace(resolvedId);
+        // The walk's OWN bound, read right after the walk, as the CLI does. A walk the depth cap cut
+        // short omitted reachable nodes and still said `truncated: false` whenever the steps it did
+        // find fitted the print cap (state-machine audit P-05-2).
+        const depthBounded = registry.kinetic.lastTraceWasDepthBounded?.() === true;
         const cap = limit ?? TRACE_LIMIT_DEFAULT;
         const steps = traceResults.slice(0, cap).map(describe);
         return mcpOk(
-          { steps, total: traceResults.length, indexStaleness: registry.audit.status().staleness.stale },
-          { nodeCount: steps.length, truncated: traceResults.length > cap }
+          { steps, total: traceResults.length, depthBounded, indexStaleness: registry.audit.status().staleness.stale },
+          { nodeCount: steps.length, truncated: traceResults.length > cap || depthBounded }
         );
       } catch (err: any) {
         // MCP3: structured error

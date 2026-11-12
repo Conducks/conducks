@@ -13,54 +13,90 @@ const logger = new Logger("GatewayService");
  * High-performance access layer for the Mirror visual dashboard.
  */
 export class GatewayService {
-  private watcher: fs.FSWatcher | null = null;
 
+  /**
+   * `rearm` drops the in-memory graph and re-arms the registry's deferred load (the bootstrapper's
+   * `reloadGraph`), so the next route that walks the graph loads it through `ensureGraphLoaded`,
+   * which retries after a failure. Used when a live reload fails (round 2, Q-10-1).
+   */
   constructor(
     private graph: ConducksGraph,
     private persistence: SynapsePersistence,
-    private projectRoot: string
+    private projectRoot: string,
+    private rearm?: () => void,
   ) {
   }
 
   /**
+   * ONE VAULT TURN AT A TIME, and the handle is closed at the end of every turn.
+   *
+   * The routes and the live-sync reload share one handle, and an open handle LOCKS the vault for every
+   * other process — measured: a DuckDB handle held in one process refuses a writer in another, so a
+   * `conducks analyze` run beside the mirror failed. The queue used to live in an Express middleware
+   * released on the response's `close`, which fires when the BROWSER aborts — so the next request
+   * ran beside a handler still using the handle (state-machine audit P-10-11); the reload timers ran
+   * outside it entirely and closed the handle under in-flight queries (P-10-12); and four routes
+   * never closed it at all (P-10-14). Every use now goes through here, ordered by the task itself.
+   */
+  private turn: Promise<unknown> = Promise.resolve();
+  public exclusive<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.turn.then(async () => {
+      try { return await task(); } finally { await this.persistence.close(); }
+    });
+    this.turn = run.catch(() => { /* the caller of `run` sees it */ });
+    return run;
+  }
+
+  /** Pending live-sync reload, so a burst of vault writes becomes ONE reload (P-10-12). */
+  private reloadTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchedPath: string | null = null;
+
+  /**
    * Starts watching the structural synapse (DuckDB vault) for changes.
    * When a change is detected, it triggers a PULSE to all connected mirrors.
+   *
+   * By POLLING the path's stat, not `fs.watch` on the file. `fs.watch` binds to the inode present
+   * when it starts, and a compaction renames a fresh file over the vault — after which no write was
+   * ever seen again; and it was armed only if the vault already existed (P-10-13). `watchFile` follows
+   * the path, whatever file is there and whenever it appears.
    */
   public watchSynapse(callback: (data: any) => void) {
     const dbPath = path.join(this.projectRoot, VAULT_DIR, VAULT_DB_FILENAME);
-    
-    if (this.watcher) this.watcher.close();
-
-    try {
-      if (fs.existsSync(dbPath)) {
-        // [Conducks Consistency Check] 🛡️
-        console.error("🛡️ [Conducks Graph] Re-initializing structural synapse...");
-        logger.info(`🛡️ [Synapse Watcher] Monitoring vault for structural heartbeats: ${dbPath}`);
-        this.watcher = fs.watch(dbPath, (eventType) => {
-          if (eventType === 'change') {
-            logger.info("🛡️ [Synapse Watcher] Vault heartbeat detected. Re-resonating graph...");
-            // [Conducks Consistency Check] v2.5.0
-            // [Conducks Consistency Check] v3.1.0 🛡️
-            // We increase the window to 1250ms to ensure large multi-stage write transactions 
-            // from 'analyze --force' are fully flushed and the file handle is cold.
-            setTimeout(async () => {
-              try {
-                logger.info("🛡️ [Synapse Pulse] Structural resonance captured. Generating visual wave...");
-                await this.persistence.load(this.graph.getGraph());
-                callback({ type: 'PULSE', timestamp: Date.now() });
-              } catch (err) {
-                logger.error("Failed to reload graph on vault pulse", err);
-              } finally {
-                // 🛡️ Lock Release: Crucial for non-blocking analysis cycles
-                await this.persistence.close();
-              }
-            }, 1250);
+    this.stop();
+    logger.info(`🛡️ [Synapse Watcher] Monitoring vault for structural heartbeats: ${dbPath}`);
+    this.watchedPath = dbPath;
+    fs.watchFile(dbPath, { interval: 500, persistent: false }, (cur, prev) => {
+      if (cur.mtimeMs === prev.mtimeMs && cur.ino === prev.ino && cur.size === prev.size) return;
+      // 1250 ms after the LAST change, so a multi-stage write from `analyze --force` is finished and
+      // the file is cold before anyone opens it.
+      if (this.reloadTimer) clearTimeout(this.reloadTimer);
+      this.reloadTimer = setTimeout(() => {
+        this.reloadTimer = null;
+        void this.exclusive(async () => {
+          logger.info("🛡️ [Synapse Pulse] Structural resonance captured. Generating visual wave...");
+          // A deferred graph is left deferred: its first reader loads the new pulse anyway. A loaded
+          // one is REPLACED, not loaded on top — on top kept every symbol the new pulse deleted.
+          const g = this.graph.getGraph();
+          if (g.isDeferred) return;
+          g.clear();
+          try {
+            await this.persistence.load(g);
+            g.markMaterialised();
+          } catch (err) {
+            // The graph is cleared, and the load failed — typically the vault is still locked by the
+            // `analyze` whose writes fired this reload. Left like that it was EMPTY and NOT deferred,
+            // and the routes that walk it answered "no dead code, no flows" with HTTP 200
+            // (state-machine audit round 2, Q-10-1). Deferred again instead: the next walk loads it,
+            // or fails loudly, and the PULSE below makes the page ask.
+            if (this.rearm) this.rearm(); else g.markDeferred();
+            logger.error("Failed to reload graph on vault pulse — deferred, the next request loads it", err);
           }
-        });
-      }
-    } catch (err) {
-      logger.warn("Could not start vault watcher. Live-sync disabled.", err);
-    }
+        }).then(
+          () => callback({ type: 'PULSE', timestamp: Date.now() }),
+          err => logger.error("Failed to reload graph on vault pulse", err),
+        );
+      }, 1250);
+    });
   }
 
   /**
@@ -83,6 +119,10 @@ export class GatewayService {
   public setWaveCap(limit: number): void { this.waveCap = limit; }
 
   public async getWave(layers?: number[], spread?: number, limit?: number) {
+    return this.exclusive(() => this.waveUnlocked(layers, spread, limit));
+  }
+
+  private async waveUnlocked(layers?: number[], spread?: number, limit?: number) {
     try {
       // The cap is OVERRIDABLE (todo48#P1). It exists because a force graph of ten thousand nodes is
       // unreadable, not because the rest is uninteresting — measured on a five-service monorepo the
@@ -104,7 +144,11 @@ export class GatewayService {
    * Hydrates a shallow node with deep structural DNA (complexity, entropy, resonance).
    */
   public async hydrateNode(nodeId: string) {
-    try {
+    return this.exclusive(() => this.hydrateNodeUnlocked(nodeId));
+  }
+
+  private async hydrateNodeUnlocked(nodeId: string) {
+    {
       const deep = await this.persistence.fetchNodeDeep(nodeId);
       if (!deep) return null;
       
@@ -115,9 +159,6 @@ export class GatewayService {
         ...deep,
         isShallow: false
       };
-    } finally {
-      // 🛡️ Lock Release
-      await this.persistence.close();
     }
   }
 
@@ -132,7 +173,11 @@ export class GatewayService {
    * depth, so one small answer serves every zoom level. Paths are relative to the root.
    */
   public async overview() {
-    try {
+    return this.exclusive(() => this.overviewUnlocked());
+  }
+
+  private async overviewUnlocked() {
+    {
       const root = this.rootPrefix();
       const rel = (f: string) => String(f).slice(root.length);
       const files = await this.persistence.query(
@@ -160,14 +205,16 @@ export class GatewayService {
         hotspots: hotspots.map((h: any) => ({ id: rel(h.id), name: h.name, file: rel(h.file), line: Number(h.line), risk: Number(h.risk), complexity: Number(h.complexity), kind: h.kind })),
         entries: entries.map((e: any) => ({ name: e.name, file: rel(e.file) })),
       };
-    } finally {
-      await this.persistence.close();
     }
   }
 
   /** One file: what it says it is for, and each function and type in it with how often it is used. */
   public async fileDetail(relPath: string) {
-    try {
+    return this.exclusive(() => this.fileDetailUnlocked(relPath));
+  }
+
+  private async fileDetailUnlocked(relPath: string) {
+    {
       const file = this.rootPrefix() + relPath.toLowerCase();
       const unit = await this.persistence.query(`SELECT doc, lineEnd AS lines FROM nodes WHERE canonicalKind = 'UNIT' AND file = ?`, [file]);
       if (!unit.length) return null;
@@ -180,14 +227,16 @@ export class GatewayService {
         path: relPath, doc: unit[0].doc ?? null, lines: Number(unit[0].lines) || 0,
         symbols: symbols.map((x: any) => ({ id: String(x.id).slice(root.length), name: x.name, kind: x.kind, line: Number(x.line), risk: Number(x.risk), complexity: Number(x.complexity), doc: x.doc ?? null, usedBy: Number(x.usedBy) })),
       };
-    } finally {
-      await this.persistence.close();
     }
   }
 
   /** One symbol with who uses it and what it uses, 40 each at most with the true totals beside them. */
   public async symbolDetail(relId: string) {
-    try {
+    return this.exclusive(() => this.symbolDetailUnlocked(relId));
+  }
+
+  private async symbolDetailUnlocked(relId: string) {
+    {
       const root = this.rootPrefix();
       const id = root + relId.toLowerCase();
       const self = await this.persistence.query(
@@ -209,29 +258,27 @@ export class GatewayService {
         risk: Number(x.risk), complexity: Number(x.complexity), doc: x.doc ?? null,
         usedBy: await side('targetId', 'sourceId'), uses: await side('sourceId', 'targetId'),
       };
-    } finally {
-      await this.persistence.close();
     }
   }
 
   /** Functions and types whose name contains the text, heaviest first. */
   public async search(text: string) {
-    try {
+    return this.exclusive(() => this.searchUnlocked(text));
+  }
+
+  private async searchUnlocked(text: string) {
+    {
       const root = this.rootPrefix();
       const rows = await this.persistence.query(
         `SELECT id, name, semantic_kind AS kind, file, lineStart AS line FROM nodes
           WHERE canonicalKind IN ('BEHAVIOR', 'STRUCTURE') AND starts_with(file, ?) AND contains(lower(name), ?)
           ORDER BY (lower(name) = ?) DESC, gravity DESC LIMIT 20`, [root, text.toLowerCase(), text.toLowerCase()]);
       return rows.map((r: any) => ({ id: String(r.id).slice(root.length), name: r.name, kind: r.kind, file: String(r.file).slice(root.length), line: Number(r.line) }));
-    } finally {
-      await this.persistence.close();
     }
   }
 
   public stop() {
-    if (this.watcher) {
-      this.watcher.close();
-      this.watcher = null;
-    }
+    if (this.watchedPath) { fs.unwatchFile(this.watchedPath); this.watchedPath = null; }
+    if (this.reloadTimer) { clearTimeout(this.reloadTimer); this.reloadTimer = null; }
   }
 }

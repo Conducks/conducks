@@ -131,6 +131,119 @@ describe('coverage commands refuse a file that is not a coverage report', () => 
   }, 120000);
 
   /**
+   * State-machine audit P-09-2 / P-09-3. A report from ANOTHER checkout binds nothing. Saved as a
+   * baseline it overwrote a good one with `{}` ("Saved coverage baseline for 0 functions", exit 0);
+   * compared against a baseline it printed "No regressions. ✓" and exited 0 — so a regression gate
+   * fed the wrong file passed, and the next one compared against an empty baseline.
+   */
+  it('refuses to save or compare a report that binds nothing, and keeps the baseline', () => {
+    const foreign = path.join(repo, 'foreign-coverage.json');
+    const elsewhere = '/somewhere/else/src/a.ts';
+    fs.writeFileSync(foreign, JSON.stringify({
+      [elsewhere]: {
+        path: elsewhere,
+        statementMap: { '0': { start: { line: 1, column: 0 }, end: { line: 1, column: 10 } } },
+        s: { '0': 1 }, branchMap: {}, b: {},
+      },
+    }));
+    runCli(['coverage', covPath, '--save-baseline'], { cwd: repo });
+    const bp = path.join(repo, '.conducks', 'coverage-baseline.json');
+    const good = fs.readFileSync(bp, 'utf8');
+
+    const saved = runCli(['coverage', foreign, '--save-baseline'], { cwd: repo, allowFail: true });
+    expect(saved.status).not.toBe(0);
+    expect(fs.readFileSync(bp, 'utf8')).toBe(good);
+
+    const compared = runCli(['coverage', foreign, '--vs-baseline'], { cwd: repo, allowFail: true });
+    expect(compared.status).not.toBe(0);
+    expect(compared.combined).not.toMatch(/No regressions/);
+  }, 120000);
+
+  /**
+   * State-machine audit P-09-4 / P-09-5. `coverage-view --watch` never closed its `fs.watch`, so
+   * Ctrl-C printed "Stopped watching." and the process stayed alive. And the watch was bound to the
+   * report's INODE: a writer that saves by write-then-rename produced one re-render and then
+   * silence for the rest of the session.
+   */
+  it('coverage-view --watch follows a report replaced by rename, and Ctrl-C ends it', async () => {
+    const { spawn } = await import('node:child_process');
+    const cli = path.resolve('build/src/interfaces/cli/index.js');
+    const live = path.join(repo, 'live-coverage.json');
+    fs.copyFileSync(covPath, live);
+    const proc = spawn('node', [cli, 'coverage-view', live, '--watch', '--out', path.join(repo, 'live.html')], { cwd: repo });
+    let out = '';
+    proc.stdout.on('data', d => { out += String(d); });
+    proc.stderr.on('data', d => { out += String(d); });
+    const exited = new Promise<number | null>(r => proc.on('exit', code => r(code)));
+    const until = async (test: () => boolean, ms = 30000) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) { if (test()) return true; await new Promise(r => setTimeout(r, 100)); }
+      return false;
+    };
+    const renders = () => (out.match(/re-rendered/g) ?? []).length;
+    const replace = () => {
+      const tmp = `${live}.tmp`;
+      fs.copyFileSync(covPath, tmp);
+      fs.renameSync(tmp, live);
+    };
+    try {
+      expect(await until(() => /Watching/.test(out))).toBe(true);
+      replace();
+      expect(await until(() => renders() >= 1)).toBe(true);
+      await new Promise(r => setTimeout(r, 400));
+      replace();
+      expect(await until(() => renders() >= 2)).toBe(true);
+      proc.kill('SIGINT');
+      const code = await Promise.race([exited, new Promise<string>(r => setTimeout(() => r('STILL RUNNING'), 8000))]);
+      expect(code).not.toBe('STILL RUNNING');
+    } finally {
+      proc.kill('SIGKILL');
+    }
+  }, 120000);
+
+  /**
+   * State-machine audit round 2, Q-09-2. The debounced re-render ran in a bare timer, so a write
+   * that failed (the output path became unwritable) threw an uncaught exception: the watch session
+   * died with a stack trace instead of saying what failed and watching on.
+   */
+  it('coverage-view --watch survives a re-render that cannot write, and renders again once it can', async () => {
+    const { spawn } = await import('node:child_process');
+    const cli = path.resolve('build/src/interfaces/cli/index.js');
+    const live = path.join(repo, 'live2-coverage.json');
+    const out2 = path.join(repo, 'live2.html');
+    fs.copyFileSync(covPath, live);
+    const proc = spawn('node', [cli, 'coverage-view', live, '--watch', '--out', out2], { cwd: repo });
+    let out = '';
+    let exited = false;
+    proc.stdout.on('data', d => { out += String(d); });
+    proc.stderr.on('data', d => { out += String(d); });
+    const done = new Promise<void>(r => proc.on('exit', () => { exited = true; r(); }));
+    const until = async (test: () => boolean, ms = 30000) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) { if (test()) return true; await new Promise(r => setTimeout(r, 100)); }
+      return false;
+    };
+    const renders = () => (out.match(/re-rendered/g) ?? []).length;
+    const touch = () => fs.writeFileSync(live, fs.readFileSync(covPath));
+    try {
+      expect(await until(() => /Watching/.test(out))).toBe(true);
+      fs.rmSync(out2, { force: true });
+      fs.mkdirSync(out2);                       // the output path is now a directory: the write fails
+      touch();
+      expect(await until(() => /EISDIR|could not|failed/i.test(out) || exited, 10000)).toBe(true);
+      await new Promise(r => setTimeout(r, 500));
+      expect(exited).toBe(false);
+      fs.rmdirSync(out2);
+      touch();
+      expect(await until(() => renders() >= 1)).toBe(true);
+    } finally {
+      proc.kill('SIGINT');
+      await Promise.race([done, new Promise(r => setTimeout(r, 8000))]);
+      proc.kill('SIGKILL');
+    }
+  }, 120000);
+
+  /**
    * The `not.toMatch(/Missing coverage file/)` is the point, and it was missing the first time.
    * This asserted only a non-zero exit — which it got, from the WRONG message: the `--out` skip
    * index was `outIdx + 1` with no guard for `indexOf` returning -1, so with no `--out` present the

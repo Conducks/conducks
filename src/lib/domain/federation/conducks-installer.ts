@@ -217,7 +217,12 @@ export class ConducksInstaller {
   private getDynamicSkillTemplates(): Record<string, string> {
     const skills: Record<string, string> = {};
     let files: string[] = [];
-    try { files = this.fileSystem.readdirSync(SKILLS_DIR).filter((f: string) => f.endsWith('.md')); } catch { return skills; }
+    // The package's OWN skills. Missing or unreadable means a broken install, and it used to read as
+    // "no skills": setup reported nothing to do and uninstall removed nothing, both without an error
+    // (state-machine audit P-05-12). That is a failure, said as one.
+    try { files = this.fileSystem.readdirSync(SKILLS_DIR).filter((f: string) => f.endsWith('.md')); }
+    catch (err) { throw new Error(`conducks cannot read its own skills at ${SKILLS_DIR} (${(err as Error).message}) — reinstall conducks.`); }
+    if (files.length === 0) throw new Error(`conducks ships no skills at ${SKILLS_DIR} — reinstall conducks.`);
 
     for (const file of files) {
       const name = file.replace(/\.md$/, '');

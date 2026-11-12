@@ -159,7 +159,10 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
       graph,
       persistence,
       ignoreManager,
-      federation,
+      federationFor: (root: string) => {
+        federation = new FederatedLinker(root, undefined, (path: string) => new SynapsePersistence(path, true));
+        return federation;
+      },
       updatePersistence: (p: SynapsePersistence) => { 
         persistence = p; 
         // Conducks Re-Anchoring 🏺 (Rule 11: Standardized Injection)
@@ -178,9 +181,8 @@ export async function initializeRegistry(readOnly: boolean = true, root?: string
     }
   );
 
-  // Sync Federation and Search after bootstrapper update
-  const effectiveRoot = chronicle.getProjectDir();
-  federation = new FederatedLinker(effectiveRoot, undefined, (path: string) => new SynapsePersistence(path, true));
+  // Search after the bootstrapper update. Federation is no longer rebuilt here: the bootstrapper
+  // builds it for the anchored root BEFORE the first load hydrates from it (P-01-5).
   search = new ConducksSearch(graph.getGraph());
   intelligence = new IntelligenceService(search, federation);
 }
@@ -343,6 +345,15 @@ export const registry = {
      * on may already be closed.
      */
     ensureGraphLoaded: () => bootstrapper.ensureGraphLoaded(persistence),
+    /** Whether `initialize(readOnly, root)` would re-anchor — asked before taking the handle away (P-10-1). */
+    wouldReanchor: (readOnly: boolean, root?: string) => {
+      const d = bootstrapper.anchorDecision(persistence, readOnly, root);
+      return d.rootChanged || d.modeChanged;
+    },
+    /** Whether the vault holds a newer pulse than the in-memory graph was loaded from (P-10-3). */
+    graphIsStale: () => bootstrapper.graphIsStale(persistence),
+    /** Drop the in-memory graph and defer a fresh load of the current root (P-10-3). */
+    reloadGraph: () => bootstrapper.reloadGraph(graph),
     // The project root the bootstrapper WILL choose, available before persistence is created. The
     // CLI anchored the vault at `cwd` verbatim and the bootstrapper walked up independently, so one
     // directory inside a project the two disagreed: the vault was opened at `src/.conducks` — which
@@ -397,12 +408,14 @@ export const registry = {
     // The wave is answered from SQL now (ADR 0054) and nothing called this facade member, so it is
     // gone with the engine rather than left as a second way to ask the same question.
     // Gateway is wired against the composition-owned graph + persistence singletons.
-    createGateway: (projectRoot: string) => new GatewayService(graph, persistence, projectRoot)
+    createGateway: (projectRoot: string) => new GatewayService(graph, persistence, projectRoot, () => bootstrapper.reloadGraph(graph))
   },
   evolution: {
     compare: (prevPulseId?: string) => evolution.compare(prevPulseId),
     audit: (window?: number) => evolution.audit(window),
-    get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); }
+    get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); },
+    /** Stops every watcher this session started, which removes their liveness markers (ADR 0036). */
+    stopWatchers: () => evolution.stopWatchers(),
   },
   initialize: initializeRegistry
 };

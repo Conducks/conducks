@@ -60,6 +60,9 @@ export class Logger {
    */
   public setLogFile(filePath: string): void {
     if (!filePath) return;
+    // The previous sink goes FIRST. A sink that then fails to set leaves none, not the old one: an
+    // MCP server re-anchored from A to B kept writing B's activity into A's log (round 2, Q-03-7).
+    this.logFilePath = null;
     try {
       const dir = path.dirname(filePath);
       if (!fs.existsSync(dir)) {
@@ -74,6 +77,11 @@ export class Logger {
     } catch (err) {
       process.stderr.write(`🛡️ [Logger] Failed to initialize log file: ${err}\n`);
     }
+  }
+
+  /** Stops writing to a file — for an anchor whose own sink is deliberately not set (Q-03-7). */
+  public clearLogFile(): void {
+    this.logFilePath = null;
   }
 
   /** Append one line to the persistent sink. Never throws — a log loop must not crash a pulse. */

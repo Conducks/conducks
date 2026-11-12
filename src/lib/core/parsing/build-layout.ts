@@ -51,7 +51,13 @@ interface Cached {
   mappings: BuildMapping[];
 }
 
-let cache: Cached | null = null;
+/**
+ * One entry per project root. A single slot thrashed on a workspace with several roots, re-reading
+ * the configs on every call (state-machine audit round 2, Q-03-2). Bounded: the oldest root goes
+ * once there are more than MAX_ROOTS.
+ */
+const cache = new Map<string, Cached>();
+const MAX_ROOTS = 32;
 
 /** `"./src"` → absolute, tolerating the leading `./` every tsconfig writes. */
 const abs = (root: string, rel: string) => path.resolve(root, rel);
@@ -101,8 +107,10 @@ const readViteSections = (file: string, root: string, mappings: BuildMapping[]):
 /**
  * Every declared source→output mapping for a project, most specific first.
  *
- * Cached on the paths and mtimes of the files it read, so an edited config is picked up while a
- * pulse over thousands of files does not re-read them once per import.
+ * Cached on the paths, mtimes and SIZES of the files it read, so an edited config is picked up while
+ * a pulse over thousands of files does not re-read them once per import. The size is there because
+ * an mtime alone missed a config fixed within the same tick, and kept the broken file's empty answer
+ * (round 2, Q-03-2).
  */
 export const buildMappings = (projectRoot: string): BuildMapping[] => {
   const root = path.resolve(projectRoot);
@@ -110,14 +118,22 @@ export const buildMappings = (projectRoot: string): BuildMapping[] => {
   const key = files
     .map(f => {
       try {
-        return `${f}:${fs.statSync(f).mtimeMs}`;
+        const s = fs.statSync(f);
+        return `${f}:${s.mtimeMs}:${s.size}`;
       } catch {
         return `${f}:absent`;
       }
     })
     .join("|");
 
-  if (cache && cache.key === key) return cache.mappings;
+  const hit = cache.get(root);
+  if (hit && hit.key === key) return hit.mappings;
+  const remember = (mappings: BuildMapping[]): BuildMapping[] => {
+    cache.delete(root);
+    cache.set(root, { key, mappings });
+    if (cache.size > MAX_ROOTS) cache.delete(cache.keys().next().value!);
+    return mappings;
+  };
 
   const mappings: BuildMapping[] = [];
   try {
@@ -138,14 +154,12 @@ export const buildMappings = (projectRoot: string): BuildMapping[] => {
     if (fs.existsSync(vite)) readViteSections(vite, root, mappings);
   } catch {
     // A malformed config is not a reason to answer wrongly. No mappings, old behaviour.
-    cache = { key, mappings: [] };
-    return cache.mappings;
+    return remember([]);
   }
 
   // Longest source path first, so `electron/main` wins over a mapping rooted at `electron`.
   mappings.sort((a, b) => b.sourceDir.length - a.sourceDir.length);
-  cache = { key, mappings };
-  return mappings;
+  return remember(mappings);
 };
 
 /** The mapping whose `sourceDir` contains `file`, or null. */

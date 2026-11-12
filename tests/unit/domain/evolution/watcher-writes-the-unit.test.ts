@@ -46,6 +46,8 @@ describe('the watcher re-states the unit in the vault', () => {
       getFileHash: async (f: string) => hashes.get(f.toLowerCase()),
       setFileHash: async (f: string, h: string) => { hashes.set(f.toLowerCase(), h); },
       forgetFileHash: async (f: string) => { hashes.delete(f.toLowerCase()); },
+      beginPulse: async () => { calls.push({ op: 'begin', ids: [] }); },
+      abortPulse: async () => { calls.push({ op: 'abort', ids: [] }); },
       purgeUnits: async (ids: string[]) => { calls.push({ op: 'purge', ids }); },
       saveNodes: async (n: any[]) => { calls.push({ op: 'saveNodes', ids: n.map(x => String(x.id)) }); },
       saveEdges: async (e: any[]) => { calls.push({ op: 'saveEdges', ids: e.map(x => String(x.id)) }); },
@@ -72,12 +74,18 @@ describe('the watcher re-states the unit in the vault', () => {
   };
 
   const handle = async (w: ConducksWatcher, file: string) => (w as any).handlePulseEvent('change', file);
+  /** The watcher writes only in auto-pulse mode (`watch --pulse`), which these tests are about. */
+  const pulsing = (file: string, p: any) => {
+    const w = new ConducksWatcher(path.dirname(file), graph, { persistence: p });
+    w.enableAutoPulse(true);
+    return w;
+  };
 
   it('purges the unit BEFORE writing it back', async () => {
     // Order is the whole point. Writing first and purging after deletes what was just written.
     const file = mkFile('export const a = 1;\n');
     seed(file);
-    const w = new ConducksWatcher(path.dirname(file), graph, { persistence: persistence() });
+    const w = pulsing(file, persistence());
 
     await handle(w, file);
 
@@ -89,7 +97,7 @@ describe('the watcher re-states the unit in the vault', () => {
   it('writes the file own nodes', async () => {
     const file = mkFile('export const a = 1;\n');
     seed(file);
-    const w = new ConducksWatcher(path.dirname(file), graph, { persistence: persistence() });
+    const w = pulsing(file, persistence());
 
     await handle(w, file);
 
@@ -103,7 +111,7 @@ describe('the watcher re-states the unit in the vault', () => {
     // treating it as this unit's would hand its lifetime to the wrong file.
     const file = mkFile('export const a = 1;\n');
     seed(file);
-    const w = new ConducksWatcher(path.dirname(file), graph, { persistence: persistence() });
+    const w = pulsing(file, persistence());
 
     await handle(w, file);
 
@@ -115,10 +123,35 @@ describe('the watcher re-states the unit in the vault', () => {
     const file = mkFile('export const a = 1;\n');
     seed(file);
     const ro = { ...persistence(), readOnly: true } as any;
-    const w = new ConducksWatcher(path.dirname(file), graph, { persistence: ro });
+    const w = pulsing(file, ro);
 
     await handle(w, file);
 
     expect(calls.filter(c => c.op !== 'save')).toEqual([]);
+  });
+
+  it('writes nothing when auto-pulse is off, as after a branch switch', async () => {
+    // State-machine audit P-08-1: `enableAutoPulse(false)` gated a log line, not the write, so
+    // `watch --pulse` printed "Auto-pulse stopped" and went on writing the new branch into the vault.
+    const file = mkFile('export const a = 1;\n');
+    seed(file);
+    const w = pulsing(file, persistence());
+    w.enableAutoPulse(false);
+
+    await handle(w, file);
+
+    expect(calls).toEqual([]);
+  });
+
+  it('purges and writes in ONE transaction, and rolls it back when a write fails', async () => {
+    // P-01-3 / P-06-6: the purge committed on its own, so a failed save left the file with no rows.
+    const file = mkFile('export const a = 1;\n');
+    seed(file);
+    const failing = { ...persistence(), saveNodes: async () => { throw new Error('disk full'); } };
+    const w = pulsing(file, failing);
+
+    await handle(w, file);
+
+    expect(calls.map(c => c.op)).toEqual(['begin', 'purge', 'abort']);
   });
 });

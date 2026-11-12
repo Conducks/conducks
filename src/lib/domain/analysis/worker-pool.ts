@@ -4,6 +4,7 @@ import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { grammars } from "@/lib/core/parsing/index.js";
 import { ConducksComponent } from "@/contracts/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
+import { logger } from "@/lib/core/utils/index.js";
 
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -69,7 +70,12 @@ export class WorkerPool {
     // One repo-wide `git log` for the whole run, instead of one per file (todo82#P1).
     const history = discoveryMode ? {} : chronicle.buildHistoryIndex();
 
-    const workerCount = parseInt(process.env.CONDUCKS_WORKERS ?? String(Math.max(1, os.cpus().length - 1)), 10);
+    // A setting that is not a number falls back to the default. `parseInt('abc')` is NaN, `NaN <= 0` is
+    // false, and the NaN chunk size spawned ONE worker on an empty slice (round 2, Q-06-4).
+    const defaultWorkers = Math.max(1, os.cpus().length - 1);
+    const requested = parseInt(process.env.CONDUCKS_WORKERS ?? String(defaultWorkers), 10);
+    if (Number.isNaN(requested)) logger.warn(`CONDUCKS_WORKERS=${process.env.CONDUCKS_WORKERS} is not a number; using ${defaultWorkers} worker(s).`);
+    const workerCount = Number.isNaN(requested) ? defaultWorkers : requested;
     // Only CONDUCKS_WORKERS<=0 opts out. The compiled binary used to be excluded here too
     // (`!isTs && tsxLoader === null`), which meant every shipped install parsed single-threaded —
     // todo21#P1. tsxLoader is only needed to run the .ts worker script under tsx; the compiled .js
@@ -94,15 +100,34 @@ export class WorkerPool {
       // resolving to `[]`. On the first failure, every still-running sibling process is killed so a
       // crash does not leave orphaned node processes racing a pulse that has already been aborted.
       const liveProcs = new Set<ReturnType<typeof spawn>>();
+      // Once one chunk has failed the pulse is lost: chunks not started yet are not started at all.
+      // They used to be — the dispatch loop is synchronous, so the chunks after a failed one were
+      // spawned AFTER the kill and ran to completion unkilled (round 2, Q-06-5).
+      let aborted = false;
 
       const spawnWorker = (chunk: Array<{ path: string, source: string }>): Promise<any[]> => {
         return new Promise<any[]>((resolve, reject) => {
+          if (aborted) {
+            reject(new Error(`[WorkerPool] Pulse already aborted; ${chunk.length} file(s) in this chunk were NOT analysed.`));
+            return;
+          }
           const tempInput = path.join(os.tmpdir(), `conducks_in_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
           const tempOutput = path.join(os.tmpdir(), `conducks_out_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
 
           const gitHistory: typeof history = {};
           for (const u of chunk) { const h = history[path.resolve(u.path)]; if (h) gitHistory[path.resolve(u.path)] = h; }
-          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages, gitHistory, isFork: true, tempOutputFile: tempOutput }));
+          try {
+            fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, projectRoot: chronicle.getProjectDir(), discoveryMode, globalSymbols, externalPackages, workspacePackages, gitHistory, isFork: true, tempOutputFile: tempOutput }));
+          } catch (err) {
+            // A chunk that cannot even be PREPARED aborts the pulse like one that crashed: the workers
+            // already started are killed. This throw rejected `Promise.all` and left them running to
+            // completion — racing a retry for up to ten minutes (round 2, Q-06-5).
+            try { fs.unlinkSync(tempInput); } catch { /* never written */ }
+            aborted = true;
+            for (const other of liveProcs) other.kill('SIGTERM');
+            reject(new Error(`[WorkerPool] Could not prepare a parse worker (${(err as Error).message}). ${chunk.length} file(s) were NOT analysed; the pulse is aborted.`));
+            return;
+          }
 
           const nodeArgs = isTs
             ? ['--no-warnings', '--import', tsxLoader!, workerScript, tempInput]
@@ -132,6 +157,7 @@ export class WorkerPool {
 
           const failChunk = (message: string) => {
             cleanup();
+            aborted = true;
             for (const other of liveProcs) other.kill('SIGTERM');
             reject(new Error(
               `[WorkerPool] Parse worker ${message}. ${chunk.length} file(s) in this chunk were NOT analysed, ` +
@@ -140,7 +166,14 @@ export class WorkerPool {
             ));
           };
 
-          proc.on('error', (err) => { spawnError = err; });
+          // A process that never STARTED emits `error` and `close` but no `exit` — so waiting for
+          // `exit` alone hung `analyze` forever when `node` was not on PATH (state-machine audit
+          // P-06-5). No pid means it never started: fail the chunk now. An error on a running
+          // process is still reported by its `exit`, as before.
+          proc.on('error', (err) => {
+            spawnError = err;
+            if (proc.pid === undefined) failChunk(`failed to start: ${err.message}`);
+          });
 
           proc.on('exit', (code, signal) => {
             if (spawnError || signal || (code !== null && code !== 0)) {
@@ -195,7 +228,10 @@ export class WorkerPool {
         }
 
         if (!provider) {
-          results.push({ success: false, path: file.path, error: `no language provider for ${ext || 'this file'}` });
+          // `skipped`, as the worker reports it (pulse-worker.ts): a file no grammar reads is not a
+          // parse failure. Without it every README and manifest counted as unread with workers off,
+          // was never hashed, and the next analyze re-read it as unseen (round 2, Q-06-3).
+          results.push({ success: false, skipped: true, path: file.path, reason: `no language provider for ${ext || 'this file'}` });
           continue;
         }
 

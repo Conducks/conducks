@@ -29,7 +29,7 @@ describe('ProjectRegistry', () => {
   it('registers a root and names it after its directory', () => {
     const result = registry.register('/repo/my-app');
 
-    expect(result).toEqual({ added: true, total: 1 });
+    expect(result).toEqual({ added: true, total: 1, written: true });
     expect(registry.list()[0]).toMatchObject({ root: '/repo/my-app', name: 'my-app' });
   });
 
@@ -39,7 +39,7 @@ describe('ProjectRegistry', () => {
 
     const second = registry.register('/repo/my-app');
 
-    expect(second).toEqual({ added: false, total: 1 });
+    expect(second).toEqual({ added: false, total: 1, written: true });
     expect(registry.list()).toHaveLength(1);
     expect(registry.list()[0].registeredAt).toBe(first);
     expect(registry.list()[0].lastSetupAt).toBeGreaterThanOrEqual(first);
@@ -79,9 +79,9 @@ describe('ProjectRegistry', () => {
   it('forgets a root, and reports when there was nothing to forget', () => {
     registry.register('/repo/a');
 
-    expect(registry.forget('/repo/a')).toBe(true);
+    expect(registry.forget('/repo/a')).toEqual({ removed: true, written: true });
     expect(registry.list()).toEqual([]);
-    expect(registry.forget('/repo/a')).toBe(false);
+    expect(registry.forget('/repo/a')).toEqual({ removed: false, written: false });
   });
 
   it('reports roots that no longer exist on disk without removing them', () => {
@@ -103,5 +103,26 @@ describe('ProjectRegistry', () => {
 
   it('defaults to the real ~/.conducks/projects.json', () => {
     expect(new ProjectRegistry().path).toBe(path.join(homedir(), '.conducks', 'projects.json'));
+  });
+
+  it('says so when the registry could not be written, instead of reporting it registered', () => {
+    // State-machine audit P-05-8: the write swallowed its error (deliberately — setup must not fail
+    // over it) and `register` still answered `added: true`, so setup printed "registered".
+    writeFileSync(path.join(home, '.conducks'), 'a FILE where the directory should be');
+
+    expect(registry.register('/repo/a')).toEqual({ added: true, total: 1, written: false });
+  });
+
+  it('backs up a malformed registry before replacing it', () => {
+    // P-05-9: a hand-edit with a syntax error read as "no projects", and the next register wrote
+    // over it — the user's list gone with no copy.
+    mkdirSync(path.join(home, '.conducks'), { recursive: true });
+    const file = path.join(home, '.conducks', 'projects.json');
+    writeFileSync(file, '{ "version": 1, "projects": [ { "root": "/repo/kept" }, ] }');
+
+    registry.register('/repo/new');
+
+    expect(readFileSync(`${file}.bak`, 'utf8')).toBe('{ "version": 1, "projects": [ { "root": "/repo/kept" }, ] }');
+    expect(registry.list().map(p => p.root)).toEqual(['/repo/new']);
   });
 });
