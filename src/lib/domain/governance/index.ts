@@ -9,7 +9,7 @@ import fs from "node:fs";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
 import { SOURCE_EXTENSIONS, realCasePath } from "@/contracts/index.js";
 import path from "node:path";
-import { loadSentinelRules, loadLayerContract } from "./sentinel-rules.js";
+import { loadSentinelRuleFile, loadLayerContract } from "./sentinel-rules.js";
 
 /**
  * The graph-level verdict, from the node count alone.
@@ -277,9 +277,14 @@ export class GovernanceService {
     violations: Array<{ id: string; ruleId: string; severity: 'error' | 'warning' | 'info'; message: string }>;
   } {
     const projectRoot = rootDir || chronicle.getProjectDir() || process.cwd();
-    const rules = loadSentinelRules(projectRoot);
+    const { rules, errors: ruleFileErrors } = loadSentinelRuleFile(projectRoot);
 
     const violations: Array<{ id: string; ruleId: string; severity: 'error' | 'warning' | 'info'; message: string }> = [];
+    // A rules file that could not be used fails the check by name (P-07-11): the defaults still run,
+    // but a verdict over rules the user did not write must not read as theirs.
+    for (const message of ruleFileErrors) {
+      violations.push({ id: '.conducks/sentinel.yml', ruleId: 'sentinel_config', severity: 'error', message });
+    }
 
     for (const rule of rules) {
       switch (rule.condition) {
@@ -646,7 +651,7 @@ export class GovernanceService {
  * them, the drift gate, and the advice a person reads. Every other domain area DESCRIBES the code;
  * this one JUDGES it.
  *
- * WHAT NO LONGER CROSSES: `RegressionGuard`, `loadSentinelRules`, `getDefaultRules`, the three
+ * WHAT NO LONGER CROSSES: `RegressionGuard`, `loadSentinelRuleFile`, `getDefaultRules`, the three
  * sentinel rule types, and `emptyOrReady`. Zero callers outside this folder each — the guard is
  * reached through `GovernanceService`, and the rules are loaded by the sentinel that uses them.
  * `RegressionGuard` was IMPORTED BY THE REGISTRY AND NEVER USED, which the tsc oracle had already
