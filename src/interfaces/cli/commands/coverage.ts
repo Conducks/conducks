@@ -71,6 +71,19 @@ export class CoverageCommand implements ConducksCommand {
       // `--vs-baseline` from the root found nothing and reported every function as NEW (ADR 0116).
       const projectRoot = registry.infrastructure.chronicle.getProjectDir() || process.cwd();
 
+      // A report that binds NOTHING examined nothing, and neither baseline mode may treat it as data.
+      // Saving it overwrote a good baseline with `{}`; comparing it printed "No regressions" and
+      // exited 0 — a gate fed the wrong file passed (state-machine audit P-09-2 / P-09-3, ADR 0124).
+      if ((saveBaselineFlag || vsBaseline) && bound.length === 0) {
+        console.error(chalk.red(
+          `The coverage report bound to none of this project's ${nodes.length} functions, so there is ` +
+          `nothing to ${saveBaselineFlag ? 'save as a baseline' : 'compare'}. The report is from another ` +
+          `checkout, or this vault is. The existing baseline was left untouched.`
+        ));
+        process.exitCode = 1;
+        return;
+      }
+
       if (saveBaselineFlag) {
         const baselinePath = registry.coverage.defaultBaselinePath(projectRoot);
         registry.coverage.saveBaseline(bound, baselinePath);

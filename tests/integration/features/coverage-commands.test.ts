@@ -131,6 +131,35 @@ describe('coverage commands refuse a file that is not a coverage report', () => 
   }, 120000);
 
   /**
+   * State-machine audit P-09-2 / P-09-3. A report from ANOTHER checkout binds nothing. Saved as a
+   * baseline it overwrote a good one with `{}` ("Saved coverage baseline for 0 functions", exit 0);
+   * compared against a baseline it printed "No regressions. ✓" and exited 0 — so a regression gate
+   * fed the wrong file passed, and the next one compared against an empty baseline.
+   */
+  it('refuses to save or compare a report that binds nothing, and keeps the baseline', () => {
+    const foreign = path.join(repo, 'foreign-coverage.json');
+    const elsewhere = '/somewhere/else/src/a.ts';
+    fs.writeFileSync(foreign, JSON.stringify({
+      [elsewhere]: {
+        path: elsewhere,
+        statementMap: { '0': { start: { line: 1, column: 0 }, end: { line: 1, column: 10 } } },
+        s: { '0': 1 }, branchMap: {}, b: {},
+      },
+    }));
+    runCli(['coverage', covPath, '--save-baseline'], { cwd: repo });
+    const bp = path.join(repo, '.conducks', 'coverage-baseline.json');
+    const good = fs.readFileSync(bp, 'utf8');
+
+    const saved = runCli(['coverage', foreign, '--save-baseline'], { cwd: repo, allowFail: true });
+    expect(saved.status).not.toBe(0);
+    expect(fs.readFileSync(bp, 'utf8')).toBe(good);
+
+    const compared = runCli(['coverage', foreign, '--vs-baseline'], { cwd: repo, allowFail: true });
+    expect(compared.status).not.toBe(0);
+    expect(compared.combined).not.toMatch(/No regressions/);
+  }, 120000);
+
+  /**
    * The `not.toMatch(/Missing coverage file/)` is the point, and it was missing the first time.
    * This asserted only a non-zero exit — which it got, from the WRONG message: the `--out` skip
    * index was `outIdx + 1` with no guard for `indexOf` returning -1, so with no `--out` present the
