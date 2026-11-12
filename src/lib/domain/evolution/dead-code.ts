@@ -77,6 +77,35 @@ export class DeadCodeAnalyzer {
     // See `isModuleScoped`: a declaration written inside an expression is that expression's business.
     const isNested = (n: any): boolean => (n?.properties as any)?.dna?.nestedInExpression === true;
 
+    // A TYPE WHOSE MEMBERS ARE USED IS USED. A call to a static member — `Strings.trimAll(...)`, a
+    // Python classmethod, a TypeScript static — lands on the MEMBER, so the type had no incoming edge
+    // and was reported ORPHAN while javac refused to build without it (Java oracle, 2026-11-12).
+    // Recorded per enclosing type, and read by ORPHAN only ("never referenced") — see UNUSED_EXPORT below.
+    const typeUse = new Map<string, { outside: boolean }>();
+    const ancestors = (id: string): string[] => {
+      const out: string[] = [];
+      let cur = graph.getNode(id) as any;
+      for (let hop = 0; cur && hop < 8; hop++) {
+        const parent = String(cur.properties?.parentId ?? '');
+        if (!parent) break;
+        out.push(parent.toLowerCase());
+        cur = graph.getNode(parent);
+      }
+      return out;
+    };
+    for (const e of allEdges) {
+      if (!DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type) || e.type === 'IMPORTS') continue;
+      const target = graph.getNode(e.targetId) as any;
+      if (!target) continue;
+      const sourceUp = new Set([String(e.sourceId).toLowerCase(), ...ancestors(e.sourceId)]);
+      for (const typeId of ancestors(e.targetId)) {
+        const holder = graph.getNode(typeId) as any;
+        if (!holder || !['STRUCTURE', 'INFRA'].includes(holder.label)) continue;
+        if (sourceUp.has(typeId)) continue;           // used from inside the type itself
+        typeUse.set(typeId, { outside: true });
+      }
+    }
+
     // Member names declared by Go INTERFACES and Swift PROTOCOLS, per language — see
     // `isImplicitConformance` below.
     const requirementNames = { go: new Set<string>(), swift: new Set<string>() };
@@ -284,6 +313,7 @@ export class DeadCodeAnalyzer {
         return !(usedNamesByFile.get(fileOfNode(e.sourceId))?.has(binding) === true);
       });
       const liveRefs = incomingRefs.filter((e: any) => !importOnlyRefs.includes(e));
+      const memberUse = typeUse.get(String(node.id).toLowerCase());
       const onlyImported = liveRefs.length === 0 && importOnlyRefs.length > 0;
       const ONLY_IMPORTED_MESSAGE = `Every reference to this symbol is an import that the importing file never uses. Either the import is stale and the symbol is dead, or the use is one the parser does not see — read the import site before deleting.`;
 
@@ -354,7 +384,7 @@ export class DeadCodeAnalyzer {
           && (/^[A-Z]/.test(memberName) || requirementNames.go.has(memberName)))
         || (memberFile.endsWith('.swift') && requirementNames.swift.has(memberName)
           && String((graph.getNode(String(node.properties.parentId ?? '')) as any)?.properties?.kind ?? '').toLowerCase() !== 'interface');
-      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && !isImplicitConformance && !isLiveGoTwin && this.isModuleScoped(node, graph, isNested) && liveRefs.length === 0 && !this.isEntryPoint(node)) {
+      if (isArchitectural && !isUntrackableType && !referencedByDanglingEdge && !isRegistered && !isTraitImpl && !isImplicitConformance && !isLiveGoTwin && this.isModuleScoped(node, graph, isNested) && liveRefs.length === 0 && !memberUse?.outside && !this.isEntryPoint(node)) {
         // NOTHING IMPORTS THE FILE — so the graph cannot say whether this symbol is dead. Report the
         // question instead of a verdict (oracle T28, ADR 0104). `orphan-module.ts` in the fixture is
         // exactly this: two functions in a file no one imports, previously reported as a confident
@@ -386,6 +416,9 @@ export class DeadCodeAnalyzer {
         // Find if any incoming edges are 'IMPORTS' from OTHER files or 'CALLS' from other files
         // liveRefs, not incomingRefs — an unused import from another file would otherwise read as
         // external consumption and launder the export exactly as it laundered the orphan above.
+        // Member use does NOT count here: UNUSED_EXPORT asks whether another module consumes the EXPORT,
+        // and calling methods on an instance a factory handed back does not name it (measured on
+        // orchestrator: `Session`, used only inside client.mjs, would have lost its true verdict).
         const externallyUsed = liveRefs.some((e: any) => {
           const source = graph.getNode(e.sourceId);
           return source && (source as any).properties.filePath !== (node as any).properties.filePath;
