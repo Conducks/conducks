@@ -319,6 +319,11 @@ export class ChronicleInterface {
               .map(f => path.resolve(root, f))
               .filter(f => !f.includes('/node_modules/') && !f.includes('/.git/'))
               .filter(f => !BINARY_EXTENSIONS.has(path.extname(f).toLowerCase()))
+              // A file deleted from disk but not yet from the index is gone. `ls-files --cached` keeps
+              // it until the deletion is staged, so it was discovered, never seen to vanish, and its
+              // symbols stayed in the vault for good (deep test 2026-11-12). Staged mode reads the
+              // index itself, so it keeps what the index holds.
+              .filter(f => stagedOnly || fsSync.existsSync(f))
               .forEach(f => allFiles.add(f));
           } catch { /* Silent fail for individual git commands */ }
         }
