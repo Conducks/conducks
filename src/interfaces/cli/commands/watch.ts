@@ -89,6 +89,40 @@ export class WatchCommand implements ConducksCommand {
     console.log('[Watch] Step 5: calling watcher.start()...');
     watcher.start();
 
+    // The signal handlers are armed HERE, the moment `start()` has written the liveness marker — not
+    // after start-up. They were registered only once the watcher was ready and the catch-up reconcile
+    // had finished, so a Ctrl-C in that window (seconds on a tree edited while nothing watched) took
+    // the default action: the process died, the marker stayed, and `monitor` reported a deliberate
+    // stop as a DEAD watcher, with a `--pulse` session's reader snapshot left behind too (round 2,
+    // Q-08-4). A signal during start-up lets the current step finish, then shuts down instead of
+    // carrying on; a second signal still ends the process at once, since each listener fires once.
+    //
+    // ONE shutdown. `once` removes only the listener that fired, so a SIGTERM arriving during a
+    // SIGINT shutdown ran it again — two `stop()`s, and two vault compactions sharing one temp file
+    // (state-machine audit P-08-9).
+    let stopping = false;
+    let stopBranchWatch: () => void = () => {};
+    let resolveStopped: () => void = () => {};
+    const stopped = new Promise<void>(resolve => { resolveStopped = resolve; });
+    const shutdown = async (signal: string) => {
+      if (stopping) return;
+      stopping = true;
+      console.log(`\n\x1b[33m[Conducks Watch] Received ${signal}. Shutting down watcher...\x1b[0m`);
+      try {
+        stopBranchWatch();
+        await watcher.stop();
+      } catch (err: any) {
+        console.error(`[Conducks Watch] Error during watcher shutdown: ${err?.message || err}`);
+      }
+      // Close the vault too. A `--pulse` session holds it for WRITE, which publishes a reader
+      // snapshot that only `close()` removes — a full copy of the vault outlived every session
+      // (P-08-8). After `stop()`, which still uses the handle to reclaim churn.
+      try { await registry.infrastructure.persistence.close(); } catch { /* shutting down anyway */ }
+      resolveStopped();
+    };
+    process.once('SIGINT', () => { void shutdown('SIGINT'); });
+    process.once('SIGTERM', () => { void shutdown('SIGTERM'); });
+
     // WAIT for the watcher to actually be watching before doing anything else.
     //
     // `start()` returns as soon as chokidar is constructed; with polling the baseline snapshot lands
@@ -98,6 +132,7 @@ export class WatchCommand implements ConducksCommand {
     // finished). Measured at ~1 miss in 3 in `blocking-commands.test.ts`, which writes the instant the
     // banner appears (todo55).
     await watcher.whenReady();
+    if (stopping) return stopped;
 
     // Catch up on everything edited while nothing was watching (ADR 0036, todo21#P3).
     //
@@ -110,6 +145,13 @@ export class WatchCommand implements ConducksCommand {
     const caught = await watcher.reconcileOnStart(discovered);
     if (caught.changed + caught.added > 0) {
       console.log(`[Watch] Caught up on ${caught.changed} changed and ${caught.added} new file(s) from while the watcher was off.`);
+    }
+    // Stopped during the catch-up: the pulses it queued after `stop()` reopened the vault, so close
+    // it again once they are done — and announce nothing.
+    if (stopping) {
+      await stopped;
+      try { await registry.infrastructure.persistence.close(); } catch { /* shutting down anyway */ }
+      return;
     }
 
     // The banner names the mode, because they differ in the only way a reader cares about: whether
@@ -131,7 +173,7 @@ export class WatchCommand implements ConducksCommand {
     // two trees in the vault with nothing recording where the boundary is. Stopping is recoverable;
     // a blended vault is not.
     const chronicle = registry.infrastructure.chronicle;
-    const stopBranchWatch = watchBranchSwitch(
+    stopBranchWatch = watchBranchSwitch(
       () => chronicle.getCurrentBranch(),
       (fromBranch, to) => {
         const from = fromBranch ?? 'a detached HEAD';
@@ -147,33 +189,7 @@ export class WatchCommand implements ConducksCommand {
       },
     );
 
-    // FIX 5: Keep the process alive until a termination signal is received.
-    // Use process.once() so each handler fires exactly once and is then
-    // removed — prevents listener accumulation across multiple invocations.
-    await new Promise<void>((resolve) => {
-      // ONE shutdown. `once` removes only the listener that fired, so a SIGTERM arriving during a
-      // SIGINT shutdown ran it again — two `stop()`s, and two vault compactions sharing one temp file
-      // (state-machine audit P-08-9).
-      let stopping = false;
-      const shutdown = async (signal: string) => {
-        if (stopping) return;
-        stopping = true;
-        console.log(`\n\x1b[33m[Conducks Watch] Received ${signal}. Shutting down watcher...\x1b[0m`);
-        try {
-          stopBranchWatch();
-          await watcher.stop();
-        } catch (err: any) {
-          console.error(`[Conducks Watch] Error during watcher shutdown: ${err?.message || err}`);
-        }
-        // Close the vault too. A `--pulse` session holds it for WRITE, which publishes a reader
-        // snapshot that only `close()` removes — a full copy of the vault outlived every session
-        // (P-08-8). After `stop()`, which still uses the handle to reclaim churn.
-        try { await registry.infrastructure.persistence.close(); } catch { /* shutting down anyway */ }
-        resolve();
-      };
-
-      process.once('SIGINT', () => shutdown('SIGINT'));
-      process.once('SIGTERM', () => shutdown('SIGTERM'));
-    });
+    // FIX 5: Keep the process alive until a termination signal is received (handlers armed above).
+    await stopped;
   }
 }
