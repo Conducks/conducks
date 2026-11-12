@@ -82,7 +82,7 @@ export class ConducksGraph {
    * itself is what `MicroPulseService` already does for the same one-file case, and it keeps the
    * failure mode as "an import does not resolve" instead of "the file is not analyzed at all".
    */
-  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[]): Promise<void> {
+  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[], projectRoot?: string): Promise<void> {
     const unitCount = stream.length;
     this.logger.info(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
 
@@ -101,7 +101,9 @@ export class ConducksGraph {
 
       const p = new Promise<void>((resolve, reject) => {
         const worker = new Worker(workerScript, {
-          workerData: { units: chunk, allPaths: resolutionUniverse },
+          // `projectRoot` anchors the worker to the analysed project, not to its own cwd — see
+          // pulse-worker.ts (state-machine audit P-03-3).
+          workerData: { units: chunk, allPaths: resolutionUniverse, projectRoot },
           execArgv: isTs ? ["--import", "tsx"] : []
         });
 

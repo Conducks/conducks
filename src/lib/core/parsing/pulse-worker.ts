@@ -38,6 +38,11 @@ async function runWorker(data: any, isFork: boolean = false, isSpawn: boolean = 
   // The parent ran one repo-wide `git log` and sent this chunk's share (todo82#P1). Lazy for the
   // same reason as the reflector above: it keeps this entry point free of a static import.
   if (gitHistory) (await import("@/lib/core/git/index.js")).chronicle.primeHistory(gitHistory);
+  // The parent's anchor, not this process's working directory. A worker builds its own anchor from
+  // `CONDUCKS_WORKSPACE_ROOT || process.cwd()`, and every fingerprint hashes the project-RELATIVE path:
+  // `analyze <repo>` run from another directory gave every symbol a different fingerprint than the same
+  // analyze run inside it (state-machine audit P-03-3 / P-04-5).
+  if (data.projectRoot) (await import("@/lib/core/git/index.js")).anchorChronicle(data.projectRoot);
   
   // Conducks: Sync discovery mode and global symbols from parent
   if (discoveryMode) context.setDiscoveryMode(true);

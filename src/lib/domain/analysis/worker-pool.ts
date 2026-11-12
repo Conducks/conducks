@@ -102,7 +102,7 @@ export class WorkerPool {
 
           const gitHistory: typeof history = {};
           for (const u of chunk) { const h = history[path.resolve(u.path)]; if (h) gitHistory[path.resolve(u.path)] = h; }
-          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, discoveryMode, globalSymbols, externalPackages, workspacePackages, gitHistory, isFork: true, tempOutputFile: tempOutput }));
+          fs.writeFileSync(tempInput, JSON.stringify({ units: chunk, allPaths, projectRoot: chronicle.getProjectDir(), discoveryMode, globalSymbols, externalPackages, workspacePackages, gitHistory, isFork: true, tempOutputFile: tempOutput }));
 
           const nodeArgs = isTs
             ? ['--no-warnings', '--import', tsxLoader!, workerScript, tempInput]
