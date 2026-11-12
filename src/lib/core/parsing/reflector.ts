@@ -1268,9 +1268,11 @@ export class ConducksReflector {
 
           this.flow.processRoute(pathReg, method, scopeName, spectrum, context.getFramework(), currentMatchRow + 1);
 
+          // The scope chain is already the qualified name; prefixing it again (`setup.setup`) matched
+          // no node, so a route registered inside a function flagged nothing (state-machine audit
+          // P-03-2, the same defect as the debt markers in P-03-1).
           const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
-          const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
-          const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scopePrefix}${scope ? scope.toLowerCase() : 'unit'}`);
+          const targetNode = nodeCache.get(`${file.path.toLowerCase()}::${scope ? scope.toLowerCase() : 'unit'}`);
           if (targetNode) {
             targetNode.metadata.isEntryPoint = true;
           }
