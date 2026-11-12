@@ -183,7 +183,7 @@ class MirrorServer {
     if (host !== '127.0.0.1' && host !== 'localhost') {
       logger.warn(`⚠️  [Conducks Gateway] Binding ${host} — these API routes have NO authentication. Anyone who can reach this port can read your codebase's full structure.`);
     }
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tryPort = (p: number) => {
         this.server = this.app.listen(p, host, () => {
           logger.info(`💎 [Conducks Gateway] Structural Resonance Active at http://${host}:${p}`);
@@ -193,7 +193,11 @@ class MirrorServer {
             logger.warn(`Port ${p} in use. Seeking next frequency...`);
             tryPort(p + 1);
           } else {
+            // Rejected, not only logged: the promise never settled, so `conducks mirror` with a host
+            // it cannot bind (EADDRNOTAVAIL, EACCES) hung silently (state-machine audit round 2, Q-10-8).
             logger.error("Failed to start gateway server.", err);
+            this.server = null;
+            reject(err);
           }
         });
       };
