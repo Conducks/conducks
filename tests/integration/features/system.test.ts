@@ -78,6 +78,28 @@ describe('System domain integration (conducks setup)', () => {
    * `success: false`, and setup printed the ❌ line, then "Setup complete." and exited 0 — a script or
    * an agent read a half-configured machine as a configured one.
    */
+  /**
+   * State-machine audit P-08-12: setup backed up C0 (the user's config) and wrote C1; uninstall then
+   * copied C1 over the backup — so after a round trip the only `.bak` held the conducks entry and the
+   * user's original config was gone.
+   */
+  it('setup then uninstall leaves the user original as the backup', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-bak-'));
+    try {
+      const cfg = path.join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+      fs.mkdirSync(path.dirname(cfg), { recursive: true });
+      fs.writeFileSync(cfg, JSON.stringify({ mcpServers: { mine: { command: 'x' } }, marker: 'original' }));
+      runCli(['setup', '--no-analyze'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      runCli(['uninstall'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      const bak = JSON.parse(fs.readFileSync(cfg + '.bak', 'utf8'));
+      expect(bak.mcpServers.conducks).toBeUndefined();
+      expect(bak.marker).toBe('original');
+      expect(fs.existsSync(cfg + '.tmp')).toBe(false);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('a failed MCP registration fails setup, naming the step', () => {
     const brokenHome = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-broken-'));
     try {

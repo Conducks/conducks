@@ -83,6 +83,21 @@ describe('registering conducks in Claude Desktop', () => {
     expect(backup.marker).toBe('original');
   }, 30000);
 
+  it('keeps the PRE-conducks backup when it re-registers over its own entry', async () => {
+    // State-machine audit P-08-12: every write copied the current file to `.bak`, so the second write
+    // replaced the user's original with a config conducks had already edited.
+    const home = mkHome();
+    fs.mkdirSync(path.dirname(configPath(home)), { recursive: true });
+    fs.writeFileSync(configPath(home), JSON.stringify({ mcpServers: {}, marker: 'original' }));
+
+    await make(home).registerClaude('/opt/conducks/a.js');
+    await make(home).registerClaude('/opt/conducks/b.js');
+
+    const backup = JSON.parse(fs.readFileSync(configPath(home) + '.bak', 'utf8'));
+    expect(backup.marker).toBe('original');
+    expect(backup.mcpServers.conducks).toBeUndefined();
+  }, 30000);
+
   it('re-registering is idempotent rather than additive', async () => {
     const home = mkHome();
     await make(home).registerClaude('/opt/conducks/a.js');
