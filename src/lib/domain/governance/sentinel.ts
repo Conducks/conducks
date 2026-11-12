@@ -98,10 +98,27 @@ export class ConducksSentinel {
       // `matchLabel` naming a language token instead of a canonical kind, and once with a
       // `matchSemanticKind` naming the vault's column instead of the in-memory field. The guard
       // below makes it impossible for a third variant to hide.
+      // Compiled ONCE per rule, and a pattern that does not compile is that rule's problem. It was
+      // compiled per node inside the loop, so an invalid one threw out of `validate` and no rule in
+      // the file was checked (state-machine audit round 2, Q-07-7).
+      let pathPattern: RegExp | null = null;
+      if (rule.matchPath) {
+        try { pathPattern = new RegExp(rule.matchPath); }
+        catch (err: any) {
+          report.success = false;
+          report.violations.push({
+            nodeId: 'global',
+            ruleId: rule.id,
+            message: `matchPath "${rule.matchPath}" is not a valid regular expression (${err?.message ?? err}), so this rule checked nothing.`,
+          });
+          continue;
+        }
+      }
+
       let matched = 0;
       for (const node of allNodes) {
         // Conducks: Regex path matching for structural scoping
-        if (rule.matchPath && !new RegExp(rule.matchPath).test(node.id)) continue;
+        if (pathPattern && !pathPattern.test(node.id)) continue;
         if (rule.matchLabel && node.label !== rule.matchLabel) continue;
         // `properties.kind` — the vault column is `semantic_kind`, the in-memory field is `kind`
         // (persistence.ts maps it on load). Reading the column name here matched zero nodes and the

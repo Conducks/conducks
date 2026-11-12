@@ -4,6 +4,13 @@ import { syncGraph } from "@/interfaces/cli/shared/context.js";
 import { displayId, nameLookupFrom } from "@/interfaces/cli/shared/display-path.js";
 
 /**
+ * Pulses that carry history, newest first. A `watch --pulse` save writes a pulses row and no
+ * node_history, so "the latest pulse" was a watcher row and the diff compared against nothing
+ * (state-machine audit round 2, Q-07-3).
+ */
+const HISTORY_PULSES = 'SELECT id FROM pulses WHERE id IN (SELECT DISTINCT pulseId FROM node_history) ORDER BY timestamp DESC';
+
+/**
  * Conducks — Diff Command (PR Risk Engine)
  * 
  * Maps Git hunks to architectural symbols and calculates 
@@ -139,7 +146,7 @@ export class DiffCommand implements ConducksCommand {
       (await db.query<{ n: number }>('SELECT count(*) AS n FROM node_history WHERE pulseId = ?', [id]))[0];
     const baseRows = Number((await known(baseId))?.n ?? 0);
     if (baseRows === 0) {
-      const recent = await db.query<{ id: string }>('SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 5');
+      const recent = await db.query<{ id: string }>(HISTORY_PULSES + ' LIMIT 5');
       console.error(`No history for pulse '${baseId}' — the vault does not hold it.`);
       if (recent.length > 0) console.error('Pulses it does hold: ' + recent.map(r => r.id).join(', '));
       process.exitCode = 1;
@@ -151,8 +158,7 @@ export class DiffCommand implements ConducksCommand {
       return;
     }
 
-    const headPulse = headId ?? (await db.query<{ id: string }>(
-      'SELECT id FROM pulses ORDER BY timestamp DESC LIMIT 1'))[0]?.id;
+    const headPulse = headId ?? (await db.query<{ id: string }>(HISTORY_PULSES + ' LIMIT 1'))[0]?.id;
 
     type Row = { nodeId: string; gravity: number; complexity: number; fingerprint: string };
     const rowsOf = (id: string) => db.query<Row>(

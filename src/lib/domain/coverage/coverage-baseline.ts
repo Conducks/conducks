@@ -70,10 +70,26 @@ export function saveBaseline(results: CoverageResult[], baselinePath: string = d
   writeFileSync(baselinePath, JSON.stringify(snapshot, null, 2), "utf8");
 }
 
-/** Loads a previously saved snapshot. Returns null if none exists yet. */
+/**
+ * Loads a previously saved snapshot. Returns null if none exists yet.
+ *
+ * A file that exists but is not a snapshot — cut short, hand-edited — is refused BY NAME. It went
+ * straight to `JSON.parse`, so `--vs-baseline` died on "Unexpected end of JSON input" naming neither
+ * the file nor the repair, and a parsed non-object was compared as if every function were NEW
+ * (state-machine audit round 2, Q-07-8).
+ */
 export function loadBaseline(baselinePath: string = defaultBaselinePath()): CoverageSnapshot | null {
   if (!existsSync(baselinePath)) return null;
-  return JSON.parse(readFileSync(baselinePath, "utf8"));
+  const refuse = (why: string) =>
+    new Error(`${baselinePath} is not a coverage baseline (${why}). Re-save it with \`coverage --save-baseline\`.`);
+  let parsed: unknown;
+  try { parsed = JSON.parse(readFileSync(baselinePath, "utf8")); }
+  catch (err: any) { throw refuse(err?.message ?? String(err)); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw refuse("not an object of file::name → percent");
+  for (const [key, pct] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof pct !== "number") throw refuse(`"${key}" holds ${JSON.stringify(pct)}, not a percent`);
+  }
+  return parsed as CoverageSnapshot;
 }
 
 /**
