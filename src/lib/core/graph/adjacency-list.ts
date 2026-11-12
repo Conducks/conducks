@@ -649,9 +649,12 @@ export class ConducksAdjacencyList {
 
       // 3. A node it no longer declares is removed. Incoming edges are NOT hunted down and deleted —
       //    they belong to other files, and leaving them unresolved is the truthful record.
+      //    Their INDEX stays too. Deleting it while the edge objects stayed in the callers' outgoing
+      //    sets made the two indexes disagree: a restored symbol had no callers upstream, and
+      //    `clearFile` — which finds other files' edges through this index — left them dangling
+      //    (state-machine audit P-02-1).
       const node = this.nodes.get(id);
       if (node) this.unindex(id, node);
-      this.inEdges.delete(id);
       this.nodes.delete(id);
       this.meatCache.delete(id);
     }
