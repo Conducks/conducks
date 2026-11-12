@@ -50,6 +50,13 @@ describe('watchBranchSwitch', () => {
     expect(await run(['alpha', null, null, 'alpha', 'alpha'])).toEqual([]);
   });
 
+  it('reports the first checkout when the watcher STARTED on a detached HEAD', async () => {
+    // State-machine audit P-08-11: the null guard also swallowed null -> branch, so a watcher started
+    // mid-rebase or on a CI checkout let the one switch it exists to catch pass silently, and
+    // auto-pulse kept writing the new branch into the graph of the detached tree.
+    expect(await run([null, null, 'feature', 'feature'])).toEqual([[null, 'feature']]);
+  });
+
   it('stops polling once stopped', async () => {
     let calls = 0;
     const stop = watchBranchSwitch(() => { calls++; return 'alpha'; }, () => {}, 5);

@@ -46,3 +46,36 @@ describe('parsing an npm audit report', () => {
     expect(got.get('mystery')?.severity).toBe('unknown');
   });
 });
+
+/**
+ * State-machine audit P-09-1, MEASURED: in a project with no lockfile `npm audit --json` prints
+ * `{"error":{"code":"ENOLOCK",…}}` and exits 0. `readAdvisories` took any exit-0 output, or any
+ * stdout starting with `{`, as a report — `available: true` with zero advisories — so the command
+ * printed "No advisory affects an imported package" for an audit that never ran.
+ */
+describe('reading advisories: only a real report counts as checked', () => {
+  const read = (dir: string) =>
+    (new SupplyChainCommand() as unknown as { readAdvisories: (d: string) => { available: boolean } }).readAdvisories(dir);
+
+  const isReport = (raw: string) =>
+    (new SupplyChainCommand() as unknown as { isAuditReport: (r: string) => boolean }).isAuditReport(raw);
+
+  it('a clean report is a report; an error object or non-JSON is not', () => {
+    expect(isReport(JSON.stringify({ auditReportVersion: 2, vulnerabilities: {} }))).toBe(true);
+    expect(isReport(JSON.stringify({ error: { code: 'ENOLOCK' } }))).toBe(false);
+    expect(isReport('npm ERR! something')).toBe(false);
+  });
+
+  it('a project with no lockfile is UNKNOWN, not clean', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-nolock-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'x', version: '1.0.0' }));
+      expect(read(dir).available).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }, 90000);
+});

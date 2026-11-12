@@ -115,3 +115,28 @@ describe('drift: Top Improving Symbols', () => {
     expect(parsed.truncated).toBe(true);
   });
 });
+
+/**
+ * State-machine audit P-09-7: the error path called `process.exit(1)`, which ends the process before
+ * the `finally` that closes the vault — the one path most likely to leave a handle open skipped the
+ * close. It now sets the exit code and lets the `finally` run.
+ */
+describe('drift: a failed comparison', () => {
+  afterEach(() => { jest.restoreAllMocks(); process.exitCode = undefined; });
+
+  it('exits non-zero AND closes the vault', async () => {
+    let closed = false;
+    const registry = {
+      evolution: { compare: async () => { throw new Error('boom'); } },
+      infrastructure: { persistence: { close: async () => { closed = true; } } },
+    } as any;
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => { throw new Error('process.exit called'); }) as any);
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await new DriftCommand().execute([], registry).catch(() => {});
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(closed).toBe(true);
+  });
+});

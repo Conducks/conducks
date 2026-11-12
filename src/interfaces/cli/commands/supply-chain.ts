@@ -96,7 +96,11 @@ export class SupplyChainCommand implements ConducksCommand {
       const [{ n }] = await persistence.query<{ n: number }>('SELECT count(*)::INT AS n FROM nodes');
       const analysed = Number(n) > 0;
       if (useJson) {
-        process.stdout.write(JSON.stringify({ origins: [], packages: [], analysed, advisories: { available: false } }, null, 2) + '\n');
+        // `available: false` means "vulnerability status UNKNOWN" everywhere else in this payload, and
+        // here nothing is unknown: with no third-party package there is nothing to audit. `needed`
+        // says so, so a machine reader can tell this answer from a failed audit (state-machine audit
+        // P-09-8). Only an analysed project can claim it.
+        process.stdout.write(JSON.stringify({ origins: [], packages: [], analysed, advisories: { available: false, needed: !analysed } }, null, 2) + '\n');
         return;
       }
       console.log(analysed
@@ -137,7 +141,7 @@ export class SupplyChainCommand implements ConducksCommand {
           version: resolveDeclaredVersion(p.pkg, versions, normalizedVersions) ?? null,
           advisory: byPackage.get(p.pkg) ?? null,
         })),
-        advisories: { available },
+        advisories: { available, needed: true },
       }, null, 2) + '\n');
       return;
     }
@@ -223,11 +227,28 @@ export class SupplyChainCommand implements ConducksCommand {
       // `npm audit` EXITS NON-ZERO when it finds vulnerabilities, which is the normal case here.
       // Treating that as failure is how this reports "no advisories" on a project that has them.
       }) as unknown as string;
-      return { byPackage: this.parseAudit(raw, byPackage), available: true };
+      return { byPackage: this.parseAudit(raw, byPackage), available: this.isAuditReport(raw) };
     } catch (err: any) {
       const raw = err?.stdout ? String(err.stdout) : '';
-      if (raw.trim().startsWith('{')) return { byPackage: this.parseAudit(raw, byPackage), available: true };
-      return { byPackage, available: false };
+      return { byPackage: this.parseAudit(raw, byPackage), available: this.isAuditReport(raw) };
+    }
+  }
+
+  /**
+   * Whether `npm audit --json` printed an actual REPORT, as opposed to an error object.
+   *
+   * Exit status and a leading `{` were both taken as proof, and neither is: with no lockfile npm
+   * prints `{"error":{"code":"ENOLOCK",…}}` and exits 0. That produced "No advisory affects an
+   * imported package" for an audit that never ran (state-machine audit P-09-1, measured). A report
+   * carries a `vulnerabilities` object (empty when clean) and no `error`.
+   */
+  private isAuditReport(raw: string): boolean {
+    try {
+      const report = JSON.parse(raw);
+      return !!report && typeof report === 'object' && !report.error
+        && !!report.vulnerabilities && typeof report.vulnerabilities === 'object';
+    } catch {
+      return false;
     }
   }
 

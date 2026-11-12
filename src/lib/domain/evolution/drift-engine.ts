@@ -33,10 +33,21 @@ export class DriftEngine {
     try {
       pulses = await this.persistence.query("SELECT id, timestamp FROM pulses ORDER BY timestamp DESC LIMIT 2");
     } catch (err: any) {
+      // A vault that cannot be READ is not a vault short of history. This used to fall through with
+      // `pulses = []` and answer "Need at least 2 pulses", sending the user to analyze again over a
+      // storage failure (state-machine audit P-07-7 / P-09-13).
       logger.error(`[DriftEngine] Failed to fetch pulses: ${err.message}`);
+      return {
+        status: 'UNAVAILABLE',
+        message: `Drift could not be assessed: the pulse history could not be read (${err.message}). This is NOT a stable result.`,
+        deltas: [],
+        moves: []
+      };
     }
 
-    if (pulses.length < 2 && !prevPulseId) {
+    // A named previous pulse still needs a CURRENT one to compare it with. The guard used to skip on
+    // `prevPulseId` alone, and `pulses[0].id` then threw a TypeError on a vault with no pulses (P-07-8).
+    if (pulses.length === 0 || (pulses.length < 2 && !prevPulseId)) {
       return {
         status: 'INSUFFICIENT_DATA',
         message: 'Insufficient historical data for drift analysis (Need at least 2 pulses).',

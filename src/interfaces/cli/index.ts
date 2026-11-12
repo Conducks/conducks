@@ -195,7 +195,10 @@ export async function main() {
   }
   // Only 'analyze' writes to the vault. 'clean' is a destructive wipe (also needs write access).
   // Every other command is strictly read-only.
-  const isReadCommand = !['analyze', 'clean'].includes(commandId);
+  // `guard --force` runs a full analysis first, so it writes too. Opened read-only, every write of that
+  // analysis returned early and the command still logged "Pulse recorded." (state-machine audit P-08-3).
+  const writesVault = ['analyze', 'clean'].includes(commandId) || (commandId === 'guard' && cmdArgs.includes('--force'));
+  const isReadCommand = !writesVault;
   const persistence = registry.infrastructure.createPersistence(targetPath, isReadCommand);
   
   // Named operation through composition: the CLI cannot reach `core` (ADR 0005), and the anchor is

@@ -37,6 +37,13 @@ export class DiffCommand implements ConducksCommand {
         process.exitCode = 1;
         return;
       }
+      // A `--head` with no value used to become `undefined` and compare against the latest pulse —
+      // a flag that read as obeyed and was not (state-machine audit P-09-9).
+      if (headIdx !== -1 && (!headPulseId || headPulseId.startsWith('-'))) {
+        console.error('--head needs a pulse id. Leave it out to compare against the current pulse.');
+        process.exitCode = 1;
+        return;
+      }
       await this.executeChronoscopicDiff(basePulseId, headPulseId, registry, useJson);
       return;
     }

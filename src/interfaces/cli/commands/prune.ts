@@ -23,7 +23,9 @@ export class PruneCommand implements ConducksCommand {
     // (todo53); retyping the list here would reintroduce exactly that.
     const ALLOWED = [...DEAD_CODE_TYPES, 'all'];
     const typeAt = args.indexOf('--type');
-    const filterType = typeAt > -1 ? args[typeAt + 1] : undefined;
+    // `?? ''`: a trailing `--type` with no value read as "no filter" and printed everything — a flag
+    // that reads as obeyed and is not (state-machine audit P-09-9). Empty is refused below.
+    const filterType = typeAt > -1 ? (args[typeAt + 1] ?? '') : undefined;
     if (filterType !== undefined && !ALLOWED.includes(filterType as never)) {
       console.error(`Error: --type must be one of: ${ALLOWED.join(', ')} — got "${filterType ?? ''}".`);
       process.exit(1);

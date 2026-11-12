@@ -36,6 +36,19 @@ describe('realCasePath recovers the on-disk spelling on a case-sensitive filesys
     expect(realCasePath(missing)).toBe(missing);
   });
 
+  /**
+   * State-machine audit P-09-11. Both the answer and every directory listing were cached for the
+   * life of the process, the unrepaired fallback included. In the long-running MCP server a file
+   * created after the first lookup in its folder — or a path asked about before it existed — kept the
+   * lower-cased, unopenable spelling until restart.
+   */
+  it('finds a file created after its folder, or its own path, was first looked up', () => {
+    const late = path.join(root, 'Renderer', 'src', 'LateComer.ts');
+    expect(realCasePath(late.toLowerCase())).toBe(late.toLowerCase());
+    fs.writeFileSync(late, '');
+    expect(realCasePath(late.toLowerCase())).toBe(late);
+  });
+
   it('leaves a synthesised location alone', () => {
     expect(realCasePath('external://global/fetch')).toBe('external://global/fetch');
   });

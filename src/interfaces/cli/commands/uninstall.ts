@@ -58,11 +58,18 @@ export class UninstallCommand implements ConducksCommand {
           delete config.mcpServers["conducks"];
           const tmpPath = claudeConfigPath + '.tmp';
           const bakPath = claudeConfigPath + '.bak';
-          fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8');
-          if (fs.existsSync(claudeConfigPath)) {
-            fs.copyFileSync(claudeConfigPath, bakPath);
+          // The `.bak` `setup` wrote is the user's config from BEFORE conducks. Copying the current
+          // file over it replaced that original with a config that still held the conducks entry, so
+          // after a setup/uninstall round trip the original was gone (state-machine audit P-08-12).
+          // A backup is written only when none exists; a failed write removes its `.tmp`.
+          try {
+            fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8');
+            if (!fs.existsSync(bakPath)) fs.copyFileSync(claudeConfigPath, bakPath);
+            fs.renameSync(tmpPath, claudeConfigPath);
+          } catch (err) {
+            try { fs.rmSync(tmpPath, { force: true }); } catch { /* best effort */ }
+            throw err;
           }
-          fs.renameSync(tmpPath, claudeConfigPath);
           console.log(`Removed conducks from: ${claudeConfigPath}`);
           removed++;
         } else {

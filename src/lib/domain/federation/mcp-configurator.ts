@@ -1,8 +1,28 @@
 import fs from "fs-extra";
-import { writeFileSync, renameSync, copyFileSync, existsSync } from "node:fs";
+import { writeFileSync, renameSync, copyFileSync, existsSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
+
+/**
+ * Writes a client config atomically, keeping `.bak` as the user's config from BEFORE conducks.
+ *
+ * Every write used to copy the current file to `.bak`, so a second write — re-registering, or
+ * `uninstall` after `setup` — replaced the user's original with a config conducks had already edited,
+ * and the original was gone (state-machine audit P-08-12). Only a file conducks has not touched is
+ * backed up now. A failed write removes its `.tmp` rather than leaving it behind.
+ */
+export function writeConfigWithBackup(file: string, config: unknown, backUp: boolean): void {
+  const tmpPath = file + '.tmp';
+  try {
+    writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8');
+    if (backUp && existsSync(file)) copyFileSync(file, file + '.bak');
+    renameSync(tmpPath, file);
+  } catch (err) {
+    try { if (existsSync(tmpPath)) unlinkSync(tmpPath); } catch { /* best effort */ }
+    throw err;
+  }
+}
 
 /** Runs a client's own CLI; throws on a non-zero exit. Injected so tests never run a real one. */
 type Exec = (cmd: string, args: string[]) => string;
@@ -49,6 +69,8 @@ export class MCPConfigurator {
   /** Adds or replaces `mcpServers.conducks` in one JSON config, keeping everything else; backs the old file up. */
   private async mergeJson(file: string, serverPath: string, extra: Record<string, unknown> = {}): Promise<void> {
     const config = (await this.fsMock.pathExists(file)) ? await this.fsMock.readJson(file) : {};
+    // Captured BEFORE the edit: a config that already holds a conducks entry is one this tool wrote.
+    const alreadyOurs = !!config?.mcpServers?.["conducks"];
     config.mcpServers = config.mcpServers || {};
     config.mcpServers["conducks"] = {
       command: "node",
@@ -57,10 +79,7 @@ export class MCPConfigurator {
       args: [serverPath, "mcp"],
       ...extra,
     };
-    const tmpPath = file + '.tmp';
-    writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8');
-    if (existsSync(file)) copyFileSync(file, file + '.bak');
-    renameSync(tmpPath, file);
+    writeConfigWithBackup(file, config, !alreadyOurs);
   }
 
   /**

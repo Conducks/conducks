@@ -36,9 +36,13 @@ export function realCasePath(storedPath: string): string {
   const hit = cache.get(storedPath);
   if (hit !== undefined) return hit;
 
-  let real = storedPath;
+  let real: string | null = null;
   try { real = fs.realpathSync.native(storedPath); }
-  catch { real = walkCaseInsensitive(storedPath) ?? storedPath; /* gone, or a case-sensitive filesystem */ }
+  catch { real = walkCaseInsensitive(storedPath); /* gone, or a case-sensitive filesystem */ }
+  // Only a RECOVERED spelling is cached. Caching the unrepaired fallback kept a path that did not
+  // exist yet unopenable for the life of the process — the MCP server's whole session
+  // (state-machine audit P-09-11). A miss costs one more walk next time; a stale answer cost a restart.
+  if (real === null) return storedPath;
   cache.set(storedPath, real);
   return real;
 }
@@ -54,23 +58,31 @@ const listings = new Map<string, string[] | null>();
  * MEASURED: on Linux, `prune` printed `src/useworkgraph.ts` for `src/useWorkGraph.ts`, and `impact`
  * printed "file unreadable" in place of every call-site line — three suites red that macOS passes.
  */
+function listing(dir: string, fresh: boolean): string[] | null {
+  let entries = fresh ? undefined : listings.get(dir);
+  if (entries === undefined) {
+    try { entries = fs.readdirSync(dir); } catch { entries = null; }
+    listings.set(dir, entries);
+  }
+  return entries;
+}
+
 function walkCaseInsensitive(storedPath: string): string | null {
   if (!storedPath.startsWith('/')) return null;
   let current = '/';
   for (const segment of storedPath.split('/').filter(Boolean)) {
-    let entries = listings.get(current);
-    if (entries === undefined) {
-      try { entries = fs.readdirSync(current); } catch { entries = null; }
-      listings.set(current, entries);
-    }
-    if (!entries) return null;
-    let next = entries.includes(segment) ? segment : null;
-    if (!next) {
-      const lower = segment.toLowerCase();
+    const lower = segment.toLowerCase();
+    const pick = (entries: string[] | null): string | null => {
+      if (!entries) return null;
+      if (entries.includes(segment)) return segment;
       const matches = entries.filter(e => e.toLowerCase() === lower);
-      if (matches.length !== 1) return null;
-      next = matches[0];
-    }
+      return matches.length === 1 ? matches[0] : null;
+    };
+    let next = pick(listing(current, false));
+    // A cached listing that does not hold the segment may simply predate it: a file created after its
+    // folder was first read stayed unfindable for the process's life (P-09-11). Re-read once.
+    if (!next) next = pick(listing(current, true));
+    if (!next) return null;
     current = current === '/' ? `/${next}` : `${current}/${next}`;
   }
   return current;
