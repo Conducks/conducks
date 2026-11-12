@@ -23,7 +23,14 @@ export class GuardCommand implements ConducksCommand {
       // 1. Optional Analysis Pulse (Directly via registry)
       if (force) {
         logger.info('🛡️ [Guard] Pre-guard synchronization started...');
-        await registry.analyze.full();
+        // The result decides what is said. It was ignored, so a run that analyzed nothing still logged
+        // "Pulse recorded." and went on to judge a vault nobody had filled (round 2, Q-08-2).
+        const pulse: any = await registry.analyze.full();
+        if (pulse && pulse.success === false) {
+          console.error('❌ [Guard] Pre-guard analysis failed — nothing was recorded, so nothing is judged.');
+          process.exitCode = 1;
+          return;
+        }
         logger.info('🛡️ [Guard] Pulse recorded.');
       }
 
@@ -66,13 +73,15 @@ export class GuardCommand implements ConducksCommand {
         console.error('\n❌ Layer contract NOT CHECKED — the declared contract is unusable:');
         for (const v of configErrors) console.error(`  - ${v.message}`);
         console.error(`\n${configErrors.length} problem(s) in .conducks/sentinel.yml. Nothing was examined. Blocked.`);
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
       if (breaches.length > 0) {
         console.error('\n❌ Layer contract violated (ADR 0005):');
         for (const v of breaches) console.error(`  - ${v.message}`);
         console.error(`\n${breaches.length} illegal cross-layer dependency(ies). Blocked.`);
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
       if (layerNotChecked.length > 0) {
         for (const v of layerNotChecked) console.log(`⚠️  ${v.message}`);
@@ -91,7 +100,8 @@ export class GuardCommand implements ConducksCommand {
           console.error(`- [REJECT] ${h.name} (${h.file}) -> Risk: ${h.velocity.toFixed(3)}`);
         });
         console.error('\n❌ Architectural regression detected. Blocked.');
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       } else {
         // Not blocking is not the same as passing. `shouldBlock` returns block:false both for a
         // clean comparison and for one it could not make (ADR 0044), and prefixing a green tick to
@@ -109,10 +119,13 @@ export class GuardCommand implements ConducksCommand {
         // ... this is not a pass" and then "structural resonance is within safe limits" in the same
         // breath. A verdict nobody computed is not a limit anything is within.
         if (assessed) console.log('🛡️  Structural resonance is within safe limits.');
-        process.exit(0);
+        return;
       }
     } finally {
-      // Ensure the DuckDB connection is ALWAYS closed
+      // Ensure the DuckDB connection is ALWAYS closed. Reached only because every outcome above sets
+      // `process.exitCode` and RETURNS: each used to call `process.exit()` inside the try, which skips
+      // this block — harmless while guard was read-only, but `guard --force` writes, and only
+      // `close()` removes the reader snapshot a write session publishes (round 2, Q-08-1).
       await closePersistence(registry);
     }
   }
