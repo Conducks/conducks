@@ -94,7 +94,9 @@ export class AuditService {
 }
 
 export interface AuditResult {
-  status: 'HEALTHY' | 'STABLE' | 'DECAYING' | 'INSUFFICIENT_DATA';
+  // No `HEALTHY`: `audit()` never produced it, and a declared state that cannot happen invites a
+  // branch for it (state-machine audit P-07-10).
+  status: 'STABLE' | 'DECAYING' | 'INSUFFICIENT_DATA';
   message: string;
   hotspots: Array<{
     id: string;
