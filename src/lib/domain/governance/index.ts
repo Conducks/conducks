@@ -189,7 +189,7 @@ export class GovernanceService {
       
       // If it's path-like, is it within our project root?
       // Graph ids are LOWER-CASED (adjacency-list addEdge); the project root keeps its real spelling.
-      // Compared as-is, a root with any capital in it — `/home/u/Work/app` — made every internal
+      // Compared as-is, a root with any capital in it — `/srv/Work/app` — made every internal
       // orphan read as an external one on a case-sensitive filesystem (found with P-07-9).
       const isInternalPath = isPathLike && (orphan.targetId.startsWith(projectRoot.toLowerCase()) || orphan.targetId.startsWith('@/'));
 

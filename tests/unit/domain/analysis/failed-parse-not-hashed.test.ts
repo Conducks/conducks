@@ -6,7 +6,7 @@ import { AnalyzeOrchestrator } from '@/lib/domain/analysis/orchestrator.js';
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapseRegistry } from "@/lib/core/registry/index.js";
 import { TypeScriptProvider, grammars } from "@/lib/core/parsing/index.js";
-import { SynapsePersistence } from '@/lib/core/persistence/persistence.js';
+import { SynapsePersistence } from '@/lib/core/persistence/index.js';
 import { ConducksComponent } from "@/contracts/index.js";
 
 /**

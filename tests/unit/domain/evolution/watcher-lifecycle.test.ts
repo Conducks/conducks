@@ -18,7 +18,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { ConducksWatcher } from '@/lib/domain/evolution/watcher.js';
 import { EvolutionService } from '@/lib/domain/evolution/index.js';
-import { FileHashGate } from '@/lib/core/persistence/file-hash-gate.js';
 import { ConducksAdjacencyList } from "@/lib/core/graph/index.js";
 
 const log: string[] = [];
@@ -136,6 +135,3 @@ describe('watcher event ordering and lifecycle', () => {
     await expect(w.whenReady()).rejects.toThrow(/before start/);
   });
 });
-
-// Keep the import used: the gate is what P-07-6 is about.
-void FileHashGate;
