@@ -7,7 +7,7 @@ import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle } from "@/lib/core/git/index.js";
 import fs from "node:fs";
 import { classifyFreshness, isStale } from "@/lib/core/persistence/index.js";
-import { SOURCE_EXTENSIONS } from "@/contracts/index.js";
+import { SOURCE_EXTENSIONS, realCasePath } from "@/contracts/index.js";
 import path from "node:path";
 import { loadSentinelRules, loadLayerContract } from "./sentinel-rules.js";
 
@@ -188,7 +188,10 @@ export class GovernanceService {
       const isPathLike = orphan.targetId.startsWith('/') || orphan.targetId.startsWith('./') || orphan.targetId.startsWith('../');
       
       // If it's path-like, is it within our project root?
-      const isInternalPath = isPathLike && (orphan.targetId.startsWith(projectRoot) || orphan.targetId.startsWith('@/'));
+      // Graph ids are LOWER-CASED (adjacency-list addEdge); the project root keeps its real spelling.
+      // Compared as-is, a root with any capital in it — `/home/u/Work/app` — made every internal
+      // orphan read as an external one on a case-sensitive filesystem (found with P-07-9).
+      const isInternalPath = isPathLike && (orphan.targetId.startsWith(projectRoot.toLowerCase()) || orphan.targetId.startsWith('@/'));
 
       const isExternalId = isNodeBuiltin || !isInternalPath;
 
@@ -204,11 +207,17 @@ export class GovernanceService {
         // It's an internal orphan. 
         // We only flag it as a VIOLATION if the target ID doesn't seem to exist on disk.
         // If it DOES exist on disk but isn't in our graph, it's just a Missing Induction (Discovery).
-        let existsOnDisk = false;
-        try {
-           const potentialPath = orphan.targetId.split('::')[0];
-           existsOnDisk = path.isAbsolute(potentialPath) && require('fs').existsSync(potentialPath);
-        } catch {}
+        //
+        // `fs` is the module import. This was `require('fs')`, which does not exist in an ES module:
+        // the ReferenceError was swallowed by an empty catch, so the answer was "not on disk" for
+        // every edge and every such orphan failed the audit as a REFACTOR (state-machine audit
+        // P-07-9). The id is lower-cased, so the path is rebuilt on the root's REAL spelling and only
+        // the part inside the project is case-restored: a lower-cased root can name a different
+        // directory outright (`/srv/conducks` beside `/srv/CONDUCKS`).
+        const potentialPath = orphan.targetId.split('::')[0];
+        const lowerRoot = projectRoot.toLowerCase();
+        const onRoot = potentialPath.startsWith(lowerRoot) ? projectRoot + potentialPath.slice(lowerRoot.length) : potentialPath;
+        const existsOnDisk = path.isAbsolute(onRoot) && fs.existsSync(realCasePath(onRoot));
 
         if (existsOnDisk) {
           externalOrphans++; // Categorize as discovery
