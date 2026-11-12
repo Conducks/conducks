@@ -38,7 +38,7 @@ describe('scoped analyze', () => {
    */
   const names = (): string[] => {
     const out = runCli(['query', '*', '--limit', '50', '--json'], { cwd: repo }).stdout;
-    const found = ['insideone', 'insidetwo', 'outsideone', 'outsidetwo']
+    const found = ['insideone', 'insidetwo', 'outsideone', 'outsidetwo', 'outsidethree']
       .filter(n => new RegExp(`"name"\\s*:\\s*"${n}"`, 'i').test(out));
     return found.sort();
   };
@@ -62,5 +62,16 @@ describe('scoped analyze', () => {
     runCli(['analyze', '--yes'], { cwd: repo });
 
     expect(names()).toContain('outsidetwo');
+  });
+
+  it('--force on a scope re-parses the scope, not the whole project', () => {
+    // State-machine audit P-06-9: the force branch replaced the scoped dirty set with EVERY
+    // discovered file, so `analyze src/inside --force` re-parsed and rewrote `src/outside` too —
+    // against the scope contract above — and saved the result as a scoped pulse.
+    writeFile(repo, 'src/outside/b.ts', 'export function outsideOne(): number { return 1; }\nexport function outsideThree(): number { return 3; }\n');
+
+    runCli(['analyze', 'src/inside', '--force', '--yes'], { cwd: repo });
+
+    expect(names()).not.toContain('outsidethree');
   });
 });

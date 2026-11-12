@@ -41,8 +41,9 @@ export class AnalysisService {
   public setPersistence(persistence: SynapsePersistence) {
     this.persistence = persistence;
     this.query.setPersistence(persistence);
-    (this.orchestrator as any).persistence = persistence;
-    (this.graph as any).persistence = persistence;
+    // The orchestrator's own setter, not a cast. The graph got the same assignment and has no such
+    // field — nothing read it, so it looked like a re-anchor that did not exist (P-06-10).
+    this.orchestrator.setPersistence(persistence);
   }
 
   /**
@@ -50,6 +51,10 @@ export class AnalysisService {
    * Consolidates discovery, batch reflection, gravity resonance, and persistence.
    */
   public async analyze(options: { root?: string, staged?: boolean, verbose?: boolean, force?: boolean } = {}): Promise<{ success: boolean, files: number }> {
+    // Taken BEFORE discovery and before any file is stat'ed or read, and recorded as the pulse's time:
+    // a file saved after this point is newer than the pulse and so dirty next time, even if this run
+    // already read it. The end-of-pulse clock made a save that landed mid-pulse look clean (P-06-2).
+    const startedAt = Date.now();
     const projectRoot = chronicle.getProjectDir();
     const targetRoot = options.root ? path.resolve(options.root) : projectRoot;
 
@@ -205,8 +210,11 @@ export class AnalysisService {
     }
 
     if (options.force) {
-      logger.info(`🛡️ [Force Resonance] Forcing re-induction of all ${filteredFiles.length} units.`);
-      dirtyFiles = filteredFiles;
+      // Every unit IN SCOPE. This took every discovered file, so a scoped `--force` re-parsed and
+      // rewrote the whole project while saving the pulse as scoped (state-machine audit P-06-9).
+      const inScope = filteredFiles.filter(f => f.startsWith(targetRoot));
+      logger.info(`🛡️ [Force Resonance] Forcing re-induction of all ${inScope.length} units.`);
+      dirtyFiles = inScope;
     }
 
     // Did this pulse re-stamp EVERY discoverable unit in scope, or only the changed ones?
@@ -510,7 +518,7 @@ export class AnalysisService {
     logger.info(`🛡️ [Conducks] Synapse Reflection: ${held.nodes} Nodes, ${held.edges} Edges in the vault.`);
 
     // save() writes the pulse record + metadata and COMMITs — atomically publishing the pulse.
-    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges, scoped: targetRoot !== projectRoot });
+    await this.persistence.save(this.graph.getGraph(), { nodeCount: held.nodes, edgeCount: held.edges, scoped: targetRoot !== projectRoot, timestamp: startedAt });
 
     } catch (pulseErr) {
       // Any failure before the commit rolls the entire pulse back — no partial graph is left behind.

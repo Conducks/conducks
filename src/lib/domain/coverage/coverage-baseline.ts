@@ -35,6 +35,22 @@ function snapshotKey(file: string, name: string): string {
   return `${file}::${name}`;
 }
 
+/**
+ * One key per result. A file can hold two functions of one name (two classes each with `get`), and
+ * `file::name` alone collapsed them: the snapshot kept the last, and both were then compared with it
+ * (state-machine audit P-07-12). The second and later repeats get `#2`, `#3`… in result order; the
+ * first keeps the plain key, so a baseline saved before this still matches every unique name.
+ */
+function snapshotKeys(results: CoverageResult[]): string[] {
+  const seen = new Map<string, number>();
+  return results.map(r => {
+    const base = snapshotKey(r.file, r.name);
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? base : `${base}#${n}`;
+  });
+}
+
 export function defaultBaselinePath(projectRoot: string = process.cwd()): string {
   return path.join(projectRoot, ".conducks", "coverage-baseline.json");
 }
@@ -42,9 +58,8 @@ export function defaultBaselinePath(projectRoot: string = process.cwd()): string
 /** Builds a snapshot object ("file::name" -> pct) from a set of coverage results. */
 function buildSnapshot(results: CoverageResult[]): CoverageSnapshot {
   const snapshot: CoverageSnapshot = {};
-  for (const r of results) {
-    snapshot[snapshotKey(r.file, r.name)] = r.pct;
-  }
+  const keys = snapshotKeys(results);
+  results.forEach((r, i) => { snapshot[keys[i]] = r.pct; });
   return snapshot;
 }
 
@@ -69,8 +84,9 @@ export function loadBaseline(baselinePath: string = defaultBaselinePath()): Cove
  *  - SAME: pct unchanged.
  */
 export function diffAgainstBaseline(results: CoverageResult[], baseline: CoverageSnapshot): DriftEntry[] {
-  return results.map(r => {
-    const key = snapshotKey(r.file, r.name);
+  const keys = snapshotKeys(results);
+  return results.map((r, i) => {
+    const key = keys[i];
     const baselinePct = baseline[key];
 
     if (baselinePct === undefined) {

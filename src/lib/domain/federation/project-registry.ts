@@ -146,9 +146,11 @@ export class ProjectRegistry {
    * twice must not produce two entries.
    *
    * Returns whether this was a new project, so the caller can say "registered" rather than
-   * "registered" every single time.
+   * "registered" every single time — and whether the file was actually WRITTEN. The write still never
+   * throws (setup must not fail over a read-only home), but `added: true` alone used to read as
+   * success when nothing reached the disk (state-machine audit P-05-8).
    */
-  public register(root: string, name?: string): { added: boolean; total: number } {
+  public register(root: string, name?: string): { added: boolean; total: number; written: boolean } {
     const absolute = path.resolve(root);
     const projects = this.list();
     const now = Date.now();
@@ -156,8 +158,7 @@ export class ProjectRegistry {
     const existing = projects.find(p => path.resolve(p.root) === absolute);
     if (existing) {
       existing.lastSetupAt = now;
-      this.write(projects);
-      return { added: false, total: projects.length };
+      return { added: false, total: projects.length, written: this.write(projects) };
     }
 
     projects.push({
@@ -166,11 +167,14 @@ export class ProjectRegistry {
       registeredAt: now,
       lastSetupAt: now,
     });
-    this.write(projects);
-    return { added: true, total: projects.length };
+    return { added: true, total: projects.length, written: this.write(projects) };
   }
 
-  /** Drops a root. Used by `uninstall`, and by the monitor when a root no longer exists on disk. */
+  /**
+   * Drops a root. Nothing calls it yet: `uninstall` removes the global install, not a project, and the
+   * monitor deliberately REPORTS a missing root rather than forgetting it (see `missingRoots`). The
+   * comment here used to claim both did (state-machine audit P-05-6).
+   */
   public forget(root: string): boolean {
     const absolute = path.resolve(root);
     const projects = this.list();
@@ -189,14 +193,32 @@ export class ProjectRegistry {
     return this.list().filter(p => !fs.existsSync(p.root));
   }
 
-  private write(projects: RegisteredProject[]): void {
+  /** True when the file was written. */
+  private write(projects: RegisteredProject[]): boolean {
     try {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+      this.backUpIfMalformed();
       const payload: RegistryFile = { version: 1, projects };
       fs.writeFileSync(this.filePath, JSON.stringify(payload, null, 2) + "\n");
+      return true;
     } catch {
       // A registry that cannot be written costs cross-project monitoring, nothing else. `setup` must
       // not fail because a home directory is read-only.
+      return false;
     }
+  }
+
+  /**
+   * A file that exists but does not parse is a hand-edit gone wrong, not an empty registry. `list()`
+   * reads it as no projects (nothing else may fail over it), so the next write would replace it —
+   * kept as `.bak` first, as the MCP configurator does for the files it rewrites (P-05-9).
+   */
+  private backUpIfMalformed(): void {
+    let raw: string;
+    try { raw = fs.readFileSync(this.filePath, "utf8"); } catch { return; }
+    try {
+      if (Array.isArray((JSON.parse(raw) as RegistryFile)?.projects)) return;
+    } catch { /* malformed: fall through */ }
+    fs.writeFileSync(`${this.filePath}.bak`, raw);
   }
 }

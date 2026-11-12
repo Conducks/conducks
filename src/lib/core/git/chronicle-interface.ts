@@ -420,7 +420,9 @@ export class ChronicleInterface {
       const repo = this.gitRootFor(filePath);
       const relativePath = this.toRepoRelative(filePath, repo);
 
-      return this.git(['show', `:0:${relativePath}`], { quiet: true });
+      // In the OWNING repository: the index is per repository, and run in the anchor directory this
+      // failed for every file of a nested repo, so `analyze --staged` dropped all of them (P-05-1).
+      return this.git(['show', `:0:${relativePath}`], { quiet: true, cwd: repo });
     } catch {
       return null;
     }

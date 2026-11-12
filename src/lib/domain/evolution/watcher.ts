@@ -61,8 +61,13 @@ export class ConducksWatcher {
   private ignoreManager: IgnoreManager;
   private isInitialized = false;
   private autoPulse = false;
-  /** Undefined when no persistence was injected — then every event is treated as a change. */
-  private hashGate?: FileHashGate;
+  /** Built for the persistence it was built with; see `hashGate` below. */
+  private gate?: { persistence: SynapsePersistence; gate: FileHashGate };
+  /**
+   * Every event's pulse, chained, so one file's saves are pulsed in the order they happened and
+   * `stop()` can wait for the last one (state-machine audit P-07-5, P-07-16).
+   */
+  private queue: Promise<void> = Promise.resolve();
   /** Saves dismissed by the hash gate, so `watch` can report what it did not do. */
   private skippedUnchanged = 0;
 
@@ -72,7 +77,24 @@ export class ConducksWatcher {
     private options: WatcherOptions = {}
   ) {
     this.ignoreManager = new IgnoreManager(this.rootDir);
-    if (this.options.persistence) this.hashGate = new FileHashGate(this.options.persistence);
+  }
+
+  /**
+   * The hash gate for the CURRENT persistence. Undefined when none was injected — then every event
+   * is treated as a change. Built per handle rather than once in the constructor: a re-anchor swaps
+   * `options.persistence` (EvolutionService.setPersistence), and a gate built once kept recording
+   * hashes through the old handle — read-only, so silently nowhere (state-machine audit P-07-6).
+   */
+  private get hashGate(): FileHashGate | undefined {
+    const persistence = this.options.persistence;
+    if (!persistence) return undefined;
+    if (this.gate?.persistence !== persistence) this.gate = { persistence, gate: new FileHashGate(persistence) };
+    return this.gate.gate;
+  }
+
+  /** Re-points the watcher at another vault handle — its writes and its hash records together. */
+  public setPersistence(persistence: SynapsePersistence | undefined): void {
+    this.options.persistence = persistence;
   }
 
   /** How many file events were dismissed as byte-identical since this watcher started. */
@@ -133,8 +155,9 @@ export class ConducksWatcher {
     // ~1-in-3 miss in `blocking-commands.test.ts`, which writes the moment the banner appears; a
     // one-second settle made it 5-for-5, which is what pinned the window rather than the mechanism
     // (todo55).
+    const watcher = this.watcher;
     this.readyPromise = new Promise<void>(resolve => { this.resolveReady = resolve; });
-    this.watcher.on("ready", () => { this.resolveReady?.(); });
+    watcher.on("ready", () => { this.resolveReady?.(); });
 
     this.watcher
       .on("add", (filePath: string) => { logger.debug(`watch add: ${filePath}`); this.handlePulseEvent("add", filePath); })
@@ -145,8 +168,19 @@ export class ConducksWatcher {
     // Publish liveness so a DEAD watcher stops looking like no watcher (todo21#P3). Both render as
     // drift in `monitor`, and they mean opposite things: nobody watching is a choice, a watcher that
     // fell over is an incident.
+    //
+    // If the marker cannot be written the start FAILS WHOLE: chokidar is closed and the state is reset.
+    // It used to throw with chokidar already running and `this.watcher` set, so the watcher ran with no
+    // heartbeat and every later `start()` returned early as though it were healthy (P-07-14).
     const startedAt = new Date().toISOString();
-    writeWatcherMarker(this.rootDir, startedAt, new Date());
+    try {
+      writeWatcherMarker(this.rootDir, startedAt, new Date());
+    } catch (err) {
+      this.watcher = null;
+      this.readyPromise = undefined;
+      void Promise.resolve(watcher.close()).catch(() => { /* failing start anyway */ });
+      throw err;
+    }
     this.heartbeat = setInterval(
       () => { try { writeWatcherMarker(this.rootDir, startedAt, new Date()); } catch { /* a diagnostic must not kill the watcher */ } },
       HEARTBEAT_INTERVAL_MS,
@@ -167,7 +201,9 @@ export class ConducksWatcher {
    * neither reported as an event nor caught by the sweep (todo55).
    */
   public whenReady(): Promise<void> {
-    return this.readyPromise ?? Promise.resolve();
+    // Before `start()` there is nothing to be ready. Resolving here reported a watcher that was not
+    // watching as live — the exact window todo55 closed — whenever a caller got the order wrong (P-07-15).
+    return this.readyPromise ?? Promise.reject(new Error('[Watcher] whenReady() called before start()'));
   }
 
   public async init(): Promise<void> {
@@ -182,6 +218,14 @@ export class ConducksWatcher {
    */
   public async stop(): Promise<void> {
     if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = null; }
+    // No new events first, then let the pulse in flight finish: reclaiming below rewrites the vault,
+    // and it used to run while a pulse was still writing (P-07-16).
+    if (this.watcher) {
+      await this.watcher.close();
+      this.watcher = null;
+    }
+    this.readyPromise = undefined;
+    await this.queue;
     // Removed on a CLEAN stop, so a deliberate shutdown reads as "none" rather than "dead".
     clearWatcherMarker(this.rootDir);
 
@@ -199,10 +243,6 @@ export class ConducksWatcher {
     // Never throws: a failed cleanup must not fail a shutdown, and the worst case is the churn
     // surviving until the next `analyze`, which is where it lived before this.
     try { await this.options.persistence?.reclaimIfBloated(3); } catch { /* churn waits for analyze */ }
-    if (this.watcher) {
-      await this.watcher.close();
-      this.watcher = null;
-    }
   }
 
   /**
@@ -254,7 +294,19 @@ export class ConducksWatcher {
     }
   }
 
-  private async handlePulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
+  /**
+   * Queues one event behind every earlier one. Saves of one file used to be pulsed concurrently: the
+   * first read v1, the second v2, and if the v1 pulse finished LAST the graph and the hash gate ended
+   * on v1 while disk held v2, with no further event to correct it (state-machine audit P-07-5).
+   * `pulseEvent` never throws, so one failed pulse does not stop the chain.
+   */
+  private handlePulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
+    const next = this.queue.then(() => this.pulseEvent(event, filePath));
+    this.queue = next;
+    return next;
+  }
+
+  private async pulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
     if (!filePath) return;
     if (event === "unlink") {
       // A deleted file's symbols leave the graph AND the vault. This used to forget the hash and

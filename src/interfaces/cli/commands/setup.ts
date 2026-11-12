@@ -74,10 +74,14 @@ export class SetupCommand implements ConducksCommand {
     // every project runs first, so it is the only place that can know a project exists without asking.
     // Idempotent — a second setup refreshes the timestamp rather than adding a duplicate.
     const projects = registry.federation.createProjectRegistry();
-    const { added, total } = projects.register(process.cwd());
-    console.log(added
-      ? `📌 Project registered → ${projects.path} (${total} total). See: conducks monitor`
-      : `📌 Project already registered → ${projects.path} (${total} total)`);
+    const { added, total, written } = projects.register(process.cwd());
+    // Not written is said as such — it used to print "registered" over a write that never happened
+    // (state-machine audit P-05-8). Setup still goes on: the registry only serves `monitor`.
+    console.log(!written
+      ? `⚠️  Could not write ${projects.path} — this project is not registered for \`conducks monitor\`.`
+      : added
+        ? `📌 Project registered → ${projects.path} (${total} total). See: conducks monitor`
+        : `📌 Project already registered → ${projects.path} (${total} total)`);
 
     const configurator = registry.federation.createMCPConfigurator();
     // Resolve the CONDUCKS install root from this compiled file, NOT from process.cwd(): setup runs
