@@ -52,6 +52,28 @@ export class AnalyzeOrchestrator {
   }
 
   /**
+   * Re-states ONE parsed file into `graph` the way a pulse does: the skeleton for that file (its unit
+   * node and its MEMBER_OF to the directory), then the reflection pipeline (symbols, and every
+   * IMPORTS / DEPENDS_ON the file declares).
+   *
+   * The watcher's live path used `ingestSpectrum` alone, which skips IMPORTS by design and never makes
+   * the unit → directory link. A watched save therefore dropped the file's imports, its dependency
+   * edges and its directory membership, and with the hash then recorded no later `analyze` restored
+   * them (deep test 2026-11-12: watch-vs-cold parity on scraper).
+   */
+  public restateUnit(graph: ConducksGraph, res: any, allPaths: string[], workspaceRoot: string, source = ''): void {
+    const projectMap = this.skeletonBuilder.build(graph, [{ path: res.path, source }], workspaceRoot, [workspaceRoot]);
+    if (res.spectrum) {
+      this.reflectionPipeline.apply({ ...res, success: true }, {
+        graph, context: new AnalyzeContext(), allPaths, projectMap, workspaceRoot, useShallowMode: false,
+      });
+    }
+    // No manifest step: `analyze` reads package.json into a graph it then replaces by reloading the
+    // vault, so its manifest dependencies never reach the vault (reported 2026-11-12). Parity means
+    // the watcher writes what `analyze` writes, not what it meant to.
+  }
+
+  /**
    * Conducks Re-Anchoring 🛡️
    * Re-wires the orchestrator to a new structural vault handle.
    */

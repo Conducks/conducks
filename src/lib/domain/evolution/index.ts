@@ -28,7 +28,11 @@ export class EvolutionService {
 
   constructor(
     private graph: any,
-    private persistence: any
+    private persistence: any,
+    /** Passed to every watcher: re-states a parsed file the way `analyze` does (see WatcherOptions.restate). */
+    private restate?: (graph: any, res: any, allPaths: string[], workspaceRoot: string, source: string) => void,
+    /** Passed to every watcher: virtual induction for a re-stated file's edges (WatcherOptions.induce). */
+    private induce?: (graph: any, edges: Iterable<any>) => any[],
   ) {
     this.drift = new DriftEngine(this.persistence);
     this.auditService = new AuditService(this.persistence);
@@ -68,7 +72,7 @@ export class EvolutionService {
     const key = path.resolve(projectRoot);
     let watcher = this._watchers.get(key);
     if (!watcher) {
-      watcher = new ConducksWatcher(projectRoot, this.graph, { persistence: this.persistence });
+      watcher = new ConducksWatcher(projectRoot, this.graph, { persistence: this.persistence, restate: this.restate, induce: this.induce });
       this._watchers.set(key, watcher);
     }
     return watcher;

@@ -1,4 +1,4 @@
-import { VAULT_DIR, VAULT_DB_FILENAME, isUniversalMemberCall, UNRESOLVED_CONFIDENCE } from "@/contracts/index.js";
+import { VAULT_DIR, VAULT_DB_FILENAME, isUniversalMemberCall, UNRESOLVED_CONFIDENCE, paramTypesFromDna } from "@/contracts/index.js";
 import { createHash } from "node:crypto";
 import { clusterOf } from "@/lib/core/graph/index.js";
 import fs from "node:fs";
@@ -806,7 +806,7 @@ export class SynapsePersistence {
           m.isEntryPoint || false, m.visibility || 'public', JSON.stringify(m.dna || {}), JSON.stringify(m.signature || {}), JSON.stringify(m.kinetic || {}),
           JSON.stringify({ ...m, id: n.id, name, range: m.range }),
           m.isRoute ?? null, m.isRequest ?? null, m.method ?? null, m.path ?? null, m.url ?? null, m.instanceOf ?? null, m.instanceOfCall ?? null, m.dna?.returns ?? null, m.objectPaths ? JSON.stringify(m.objectPaths) : null,
-          (() => { const ps = (m.dna?.params ?? []).filter((x: any) => x?.type); return ps.length ? JSON.stringify(Object.fromEntries(ps.map((x: any) => [String(x.name).toLowerCase(), String(x.type).toLowerCase()]))) : null; })(),
+          (() => { const pt = paramTypesFromDna(m.dna); return pt ? JSON.stringify(pt) : null; })(),
           m.memberTypes ? JSON.stringify(m.memberTypes) : null,
           m.shapeFingerprint ?? null
         ];
@@ -1201,9 +1201,14 @@ export class SynapsePersistence {
    * real reference the resolver could not place — a bug to investigate, not a row to delete — and it
    * survives. Only the band that already says "this was a guess" is swept.
    */
-  public async sweepUnresolvedGuesses(minConfidence: number = 0.6): Promise<{ deleted: number; kept: number; downgraded: number }> {
+  public async sweepUnresolvedGuesses(minConfidence: number = 0.6, files?: string[]): Promise<{ deleted: number; kept: number; downgraded: number }> {
     if (this.readOnly) return { deleted: 0, kept: 0, downgraded: 0 };
     await this.ensureVaultOpen();
+    // `files` limits the sweep to edges leaving those files' nodes: the watcher writes one file per save
+    // and must leave its edges as `analyze` would, without a whole-vault scan each time.
+    const scope = files && files.length
+      ? `AND sn.file IN (${files.map(f => `'${f.toLowerCase().replace(/'/g, "''")}'`).join(', ')})`
+      : '';
 
     // Decide by CAUSE, not by confidence (ADR 0096, todo35).
     //
@@ -1233,7 +1238,7 @@ export class SynapsePersistence {
        FROM edges e
        LEFT JOIN nodes n  ON e.targetId = n.id
        LEFT JOIN nodes sn ON sn.id = e.sourceId
-       WHERE n.id IS NULL`);
+       WHERE n.id IS NULL ${scope}`);
 
     const removable = dangling.filter(e => {
       const symbol = String(e.targetId).split('::').pop() ?? '';
@@ -1511,10 +1516,16 @@ export class SynapsePersistence {
    * the next swallowed symbol class visible in the analyze log instead of needing a hand-built
    * reproduction to find.
    */
-  public async pruneTaxonomy(): Promise<Record<string, number>> {
+  public async pruneTaxonomy(files?: string[]): Promise<Record<string, number>> {
     if (this.readOnly) return {};
     await this.ensureVaultOpen();
     const STRUCTURAL = `('MEMBER_OF','CONTAINS','HAS_METHOD','HAS_PROPERTY')`;
+    // `files` limits the drop set to those files' nodes — the watcher re-states one file per save and
+    // must prune what `analyze` would prune there, without scanning the whole vault each time. The
+    // reference test still reads EVERY edge, so a value another file uses is kept.
+    const scope = files && files.length
+      ? `AND n.file IN (${files.map(f => `'${f.toLowerCase().replace(/'/g, "''")}'`).join(', ')})`
+      : '';
 
     // 1. Freeze the drop set BEFORE mutating edges — the ATOM edge test reads the current edge set.
     //
@@ -1530,13 +1541,13 @@ export class SynapsePersistence {
     // non-exported local with no edges is still cut, which is the bulk of them.
     await this.run(`CREATE OR REPLACE TEMP TABLE _pruned AS
       SELECT id, parentId FROM nodes n
-      WHERE n.canonicalKind = 'DATA'
+      WHERE (n.canonicalKind = 'DATA'
          OR (n.canonicalKind = 'ATOM'
              AND COALESCE(n.dna->>'$.isExported', 'false') <> 'true'
              AND NOT EXISTS (
                SELECT 1 FROM edges e
                WHERE (e.sourceId = n.id OR e.targetId = n.id)
-                 AND e.type NOT IN ${STRUCTURAL}))`);
+                 AND e.type NOT IN ${STRUCTURAL}))) ${scope}`);
 
     // Counted by the node's SEMANTIC kind, not its canonical one: the canonical kinds here are DATA
     // and ATOM by construction, and "dropped 233 variable" vs "dropped 233 function" is exactly the

@@ -52,6 +52,11 @@ describe('the watcher re-states the unit in the vault', () => {
       saveNodes: async (n: any[]) => { calls.push({ op: 'saveNodes', ids: n.map(x => String(x.id)) }); },
       saveEdges: async (e: any[]) => { calls.push({ op: 'saveEdges', ids: e.map(x => String(x.id)) }); },
       save: async () => { calls.push({ op: 'save', ids: [] }); },
+      // What `analyze` also does for the file it writes (deep test 2026-11-12): prune its unreferenced
+      // value nodes, sweep its unresolved guesses, and look up which external targets are missing.
+      pruneTaxonomy: async () => { calls.push({ op: 'prune', ids: [] }); return {}; },
+      sweepUnresolvedGuesses: async () => { calls.push({ op: 'sweep', ids: [] }); return { deleted: 0, kept: 0, downgraded: 0 }; },
+      query: async () => [],
     } as any;
   };
 

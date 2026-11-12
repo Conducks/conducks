@@ -42,6 +42,17 @@ interface WatcherOptions {
    * forward pulses to the mirror dashboard.
    */
   onPulse?: (pulse: { event: string; filePath: string }) => void;
+  /**
+   * Writes one parsed file back into the graph the way `analyze` does (symbols, IMPORTS, DEPENDS_ON,
+   * the unit's directory link). Injected by the composition root; without it a watched save keeps the
+   * symbols but drops the file's unit edges (deep test 2026-11-12).
+   */
+  restate?: (graph: ConducksGraph, res: any, allPaths: string[], workspaceRoot: string, source: string) => void;
+  /**
+   * Virtual induction for a file's edges, as a pulse runs it over all of them: a dangling external
+   * target (`node:path::default`) becomes a library node instead of staying dangling. Injected.
+   */
+  induce?: (graph: any, edges: Iterable<any>) => any[];
 }
 
 
@@ -429,10 +440,12 @@ export class ConducksWatcher {
       // `analyze` and the startup reconcile do once, and repeating it per keystroke would put a
       // filesystem traversal on the edit path. The changed file is added because a file created
       // while the watcher runs has no unit node yet.
+      const restate = this.options.restate;
       await this.graph.pulseStructuralStream(
         [{ path: normalizedPath, source }],
         [...this.knownUnitPaths(), normalizedPath],
         this.rootDir,
+        restate ? (res, universe, src) => restate(this.graph, res, universe, this.rootDir, src) : undefined,
       );
 
       // 3b. INTRA-PROJECT RESOLUTION, which `analyze` runs and this path did not.
@@ -552,12 +565,51 @@ export class ConducksWatcher {
     const g = this.graph.getGraph();
     const ids = new Set(nodes.map(n => String(n.id)));
     const owned = g.getAllEdges().filter(e => ids.has(String(e.sourceId)));
+    this.options.induce?.(g, owned);
     const pulseId = `watch_${Date.now()}`;
     await persistence.beginPulse();
     try {
       await persistence.purgeUnits([`${normalizedPath.toLowerCase()}::unit`]);
       if (nodes.length > 0) await persistence.saveNodes(nodes, pulseId);
+      // An external node this file's edges are the first to need — `ecosystem::path` for a new
+      // `import path`, a module's default export — exists only in memory, and the edge to it was
+      // written dangling (then downgraded as unresolved). `analyze` writes every node of its graph.
+      // Only nodes OUTSIDE the project and missing from the vault: another file's rows are its own.
+      // The same for a containment node a NEW folder brings (`directory::…/docs`): it belongs to no
+      // file, so no unit write ever carries it — written when missing, with its own link upward.
+      const root = this.rootDir.toLowerCase();
+      const external = new Map<string, any>();
+      const containers = new Set<string>();
+      const queue = owned.map(e => String(e.targetId));
+      while (queue.length) {
+        const t = queue.pop()!;
+        if (ids.has(t) || external.has(t)) continue;
+        const n = g.getNode(t);
+        if (!n) continue;
+        const kind = String((n.properties as any)?.canonicalKind ?? '');
+        const file = String((n.properties as any)?.filePath ?? '').toLowerCase();
+        if (kind === 'DIRECTORY' || kind === 'REPOSITORY') {
+          external.set(t, n); containers.add(t);
+          for (const up of g.getNeighbors(t, 'downstream') as any[]) if (up.type === 'MEMBER_OF') queue.push(String(up.targetId));
+        } else if (!(file && file.startsWith(root))) external.set(t, n);
+      }
+      if (external.size > 0) {
+        const keys = [...external.keys()].map(k => k.toLowerCase());
+        const present = new Set((await persistence.query<{ id: string }>(
+          `SELECT id FROM nodes WHERE id IN (${keys.map(() => '?').join(',')})`, keys)).map(r => String(r.id)));
+        const missing = [...external.values()].filter(n => !present.has(String(n.id).toLowerCase()));
+        if (missing.length > 0) await persistence.saveNodes(missing, pulseId);
+        const newContainers = missing.filter(n => containers.has(String(n.id)));
+        const up = newContainers.flatMap(n => (g.getNeighbors(String(n.id), 'downstream') as any[]).filter(e => e.type === 'MEMBER_OF'));
+        if (up.length > 0) await persistence.saveEdges(up, pulseId);
+      }
       if (owned.length > 0) await persistence.saveEdges(owned as any[], pulseId);
+      // What `analyze` prunes for this file — an unreferenced value node (an unused parameter) — goes
+      // here too, or the watched vault keeps nodes the analyzed one never has (deep test 2026-11-12).
+      if (nodes.length > 0) await persistence.pruneTaxonomy([normalizedPath.toLowerCase()]);
+      // And its unresolved guesses: a universal member call on a local value (`userId.split`) is
+      // dropped, a dangling target that claims confidence is downgraded — as `analyze` does.
+      if (owned.length > 0) await persistence.sweepUnresolvedGuesses(undefined, [normalizedPath.toLowerCase()]);
       await persistence.save(g);
     } catch (err) {
       await persistence.abortPulse();

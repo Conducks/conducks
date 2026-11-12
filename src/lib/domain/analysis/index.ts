@@ -567,113 +567,9 @@ export class AnalysisService {
     // ecosystem symbols" while `SELECT count(*) FROM nodes WHERE id LIKE 'lib::%'` returned 0 on
     // every vault. Collected and written explicitly, the same way cross-service edges are
     // (todo22#P15) — same failure, same shape, same remedy.
-    const induced: any[] = [];
-    const externalPrefixes = ['global', 'npm', 'std', 'pip', 'gem', 'mvn', 'go', 'crates'];
-    
-    let inducedCount = 0;
+    const induced: any[] = induceVirtualTargets(graph, allEdges);
+    const inducedCount = induced.filter(n => n.label === 'LIBRARY_SYMBOL').length;
     let restampedCount = 0;
-
-    // The names this project actually depends on, taken from the ECOSYSTEM nodes the manifest
-    // parser produced: `path`, `fs`, `chalk`, `@jest/globals`, `duckdb`, and so on.
-    //
-    // This is the discriminator induction never had. A dotted target is only external when its
-    // RECEIVER is one of these — `path.resolve` is, `results.forEach` is not. Without it, induction
-    // materialised a "library symbol" for every unresolved method call on a local variable, because
-    // it cannot tell an external reference from an unresolved local one and defaults to the former
-    // (ADR 0053). 1,480 of 1,692 induced nodes on this repository were that mistake.
-    const externalModules = new Set<string>();
-    for (const n of graph.getAllNodes()) {
-      if (n.properties?.canonicalKind === 'ECOSYSTEM') {
-        const nm = String(n.properties?.name ?? '').toLowerCase();
-        if (nm) externalModules.add(nm);
-      }
-    }
-    const receiverIsExternal = (dotted: string): boolean => {
-      const head = dotted.split('.')[0];
-      // `node:fs` and `@scope/pkg` arrive with their prefix intact.
-      return externalModules.has(head) || externalModules.has(head.replace(/^node:/, ''));
-    };
-    const projectRoot = chronicle.getProjectDir().toLowerCase();
-
-    for (const edge of allEdges) {
-      const targetId = edge.targetId.toLowerCase();
-      
-      // A target the graph already holds needs no NODE created — but if it is a virtual node this
-      // pulse still depends on, it must be RE-STAMPED, or its row keeps the pulseId of whenever it
-      // was first induced. That is what made `nodes.pulseId` mean "first seen" for exactly this
-      // subset, and it is why a sweep keyed on pulseId would have deleted every still-valid external
-      // symbol. Re-collecting it costs one UPDATE and makes the column mean "last seen" for every
-      // row without adding a column (ADR 0050).
-      if (graph.hasNode(targetId)) continue;
-
-      // Identify External Ecosystem patterns: "namespace::symbol" or "naked_symbol"
-      const parts = targetId.split('::');
-      
-      let namespace = 'unresolved';
-      let symbol = targetId;
-      let isCandidate = false;
-
-      if (parts.length >= 2) {
-        namespace = parts[0];
-        symbol = parts[1];
-        // The exact-match list could never work, because a real specifier carries the PACKAGE as
-        // its namespace: `@jest/globals::jest.fn`, `minimatch::minimatch`, `node:fs::readdirsync`.
-        // Local ids are absolute paths, so the rule that actually separates them is whether the
-        // namespace looks like a path. Anything else is a module this project does not contain.
-        // The named prefixes stay because `global::` and friends are synthesised, not paths.
-        const namespaceIsLocalPath = namespace.startsWith('/') || namespace.startsWith('c:\\')
-          || namespace.startsWith('.') || namespace.includes('.ts') || namespace.includes('.js');
-        if (externalPrefixes.includes(namespace) || !namespaceIsLocalPath) isCandidate = true;
-      } else {
-        // A bare, unnamespaced target. It is external only when it reads as a member access on a
-        // module this project depends on. Anything else is a local symbol the resolver could not
-        // place, and inventing a node for it is how the vault filled with `results.foreach`.
-        if (!targetId.startsWith('/') && !targetId.startsWith('c:\\')) {
-          isCandidate = targetId.includes('.') ? receiverIsExternal(targetId) : false;
-        }
-      }
-
-      if (isCandidate) {
-        const libId = libraryNamespaceId(namespace);
-        
-        // 1. Induce Library Node (e.g. lib::unresolved or lib::npm)
-        if (!graph.hasNode(libId)) {
-          const libNode = {
-            id: libId,
-            label: 'LIBRARY',
-            properties: {
-              // Shape and parent from `external-nodes.ts`, the one definition of an external node
-              // (todo25#P12). `filePath` is overridden below because a library namespace has a
-              // meaningful `external://` path where a package boundary does not.
-              ...externalNodeProps({ name: namespace, canonicalKind: 'STRUCTURE', canonicalRank: CanonicalRank[CanonicalKind.STRUCTURE] }),
-              filePath: `external://${namespace}`,
-              isShallow: true
-            }
-          };
-          graph.addNode(libNode);
-          induced.push({ ...libNode, name: namespace });
-        }
-
-        // 2. Induce Symbol Node
-        const symbolNode = {
-          id: targetId,
-          label: 'LIBRARY_SYMBOL',
-          properties: {
-            // A symbol hangs off its NAMESPACE, not the external root — the one case where the
-            // parent is not the default, which is why the factory takes it as a parameter.
-            ...externalNodeProps({ name: symbol, canonicalKind: 'BEHAVIOR', canonicalRank: CanonicalRank[CanonicalKind.BEHAVIOR], parentId: libId }),
-            filePath: `external://${namespace}/${symbol}`,
-            isShallow: true
-          }
-        };
-        graph.addNode(symbolNode);
-        induced.push({ ...symbolNode, name: symbol });
-
-        // 3. Bind to Library (Conducks Rule: Columnar Hierarchy Only) 🏺
-        // We no longer persist MEMBER_OF edges; containment is in node.properties.parentId
-        inducedCount++;
-      }
-    }
 
     // The log line only claims what the vault received. Reporting the in-memory count was how this
     // reported success for every pulse it silently discarded.
@@ -739,6 +635,122 @@ export class AnalysisService {
       );
     }
   }
+}
+
+/**
+ * Virtual ecosystem induction for `edges`: a dangling target that names an external namespace
+ * (`node:path::default`, `@jest/globals::expect`) or a member of a module the project depends on gets a
+ * library symbol node, and its namespace a `lib::` node. Returns the nodes it added to `graph`.
+ *
+ * One rule for both writers. `analyze` runs it over every edge of the pulse; the watcher runs it over
+ * the edges of the file it re-states, so a watched save does not leave those targets dangling where a
+ * pulse would have made them nodes (deep test 2026-11-12: watch-vs-cold parity).
+ */
+export function induceVirtualTargets(graph: any, edges: Iterable<any>): any[] {
+  const allEdges = [...edges];
+  const induced: any[] = [];
+  const externalPrefixes = ['global', 'npm', 'std', 'pip', 'gem', 'mvn', 'go', 'crates'];
+
+  // The names this project actually depends on, taken from the ECOSYSTEM nodes the manifest
+  // parser produced: `path`, `fs`, `chalk`, `@jest/globals`, `duckdb`, and so on.
+  //
+  // This is the discriminator induction never had. A dotted target is only external when its
+  // RECEIVER is one of these — `path.resolve` is, `results.forEach` is not. Without it, induction
+  // materialised a "library symbol" for every unresolved method call on a local variable, because
+  // it cannot tell an external reference from an unresolved local one and defaults to the former
+  // (ADR 0053). 1,480 of 1,692 induced nodes on this repository were that mistake.
+  const externalModules = new Set<string>();
+  for (const n of graph.getAllNodes()) {
+    if (n.properties?.canonicalKind === 'ECOSYSTEM') {
+      const nm = String(n.properties?.name ?? '').toLowerCase();
+      if (nm) externalModules.add(nm);
+    }
+  }
+  const receiverIsExternal = (dotted: string): boolean => {
+    const head = dotted.split('.')[0];
+    // `node:fs` and `@scope/pkg` arrive with their prefix intact.
+    return externalModules.has(head) || externalModules.has(head.replace(/^node:/, ''));
+  };
+
+  for (const edge of allEdges) {
+    const targetId = edge.targetId.toLowerCase();
+    
+    // A target the graph already holds needs no NODE created — but if it is a virtual node this
+    // pulse still depends on, it must be RE-STAMPED, or its row keeps the pulseId of whenever it
+    // was first induced. That is what made `nodes.pulseId` mean "first seen" for exactly this
+    // subset, and it is why a sweep keyed on pulseId would have deleted every still-valid external
+    // symbol. Re-collecting it costs one UPDATE and makes the column mean "last seen" for every
+    // row without adding a column (ADR 0050).
+    if (graph.hasNode(targetId)) continue;
+
+    // Identify External Ecosystem patterns: "namespace::symbol" or "naked_symbol"
+    const parts = targetId.split('::');
+    
+    let namespace = 'unresolved';
+    let symbol = targetId;
+    let isCandidate = false;
+
+    if (parts.length >= 2) {
+      namespace = parts[0];
+      symbol = parts[1];
+      // The exact-match list could never work, because a real specifier carries the PACKAGE as
+      // its namespace: `@jest/globals::jest.fn`, `minimatch::minimatch`, `node:fs::readdirsync`.
+      // Local ids are absolute paths, so the rule that actually separates them is whether the
+      // namespace looks like a path. Anything else is a module this project does not contain.
+      // The named prefixes stay because `global::` and friends are synthesised, not paths.
+      const namespaceIsLocalPath = namespace.startsWith('/') || namespace.startsWith('c:\\')
+        || namespace.startsWith('.') || namespace.includes('.ts') || namespace.includes('.js');
+      if (externalPrefixes.includes(namespace) || !namespaceIsLocalPath) isCandidate = true;
+    } else {
+      // A bare, unnamespaced target. It is external only when it reads as a member access on a
+      // module this project depends on. Anything else is a local symbol the resolver could not
+      // place, and inventing a node for it is how the vault filled with `results.foreach`.
+      if (!targetId.startsWith('/') && !targetId.startsWith('c:\\')) {
+        isCandidate = targetId.includes('.') ? receiverIsExternal(targetId) : false;
+      }
+    }
+
+    if (isCandidate) {
+      const libId = libraryNamespaceId(namespace);
+      
+      // 1. Induce Library Node (e.g. lib::unresolved or lib::npm)
+      if (!graph.hasNode(libId)) {
+        const libNode = {
+          id: libId,
+          label: 'LIBRARY',
+          properties: {
+            // Shape and parent from `external-nodes.ts`, the one definition of an external node
+            // (todo25#P12). `filePath` is overridden below because a library namespace has a
+            // meaningful `external://` path where a package boundary does not.
+            ...externalNodeProps({ name: namespace, canonicalKind: 'STRUCTURE', canonicalRank: CanonicalRank[CanonicalKind.STRUCTURE] }),
+            filePath: `external://${namespace}`,
+            isShallow: true
+          }
+        };
+        graph.addNode(libNode);
+        induced.push({ ...libNode, name: namespace });
+      }
+
+      // 2. Induce Symbol Node
+      const symbolNode = {
+        id: targetId,
+        label: 'LIBRARY_SYMBOL',
+        properties: {
+          // A symbol hangs off its NAMESPACE, not the external root — the one case where the
+          // parent is not the default, which is why the factory takes it as a parameter.
+          ...externalNodeProps({ name: symbol, canonicalKind: 'BEHAVIOR', canonicalRank: CanonicalRank[CanonicalKind.BEHAVIOR], parentId: libId }),
+          filePath: `external://${namespace}/${symbol}`,
+          isShallow: true
+        }
+      };
+      graph.addNode(symbolNode);
+      induced.push({ ...symbolNode, name: symbol });
+
+      // 3. Bind to Library (Conducks Rule: Columnar Hierarchy Only) 🏺
+      // We no longer persist MEMBER_OF edges; containment is in node.properties.parentId
+    }
+  }
+  return induced;
 }
 
 /**

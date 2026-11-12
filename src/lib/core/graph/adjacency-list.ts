@@ -175,6 +175,7 @@ import { CycleDetector } from "./algorithms/cycle-detector.js";
 
 import { GraphTraversal } from "./algorithms/traversal.js";
 import zlib from "zlib";
+import { paramTypesFromDna } from "@/contracts/index.js";
 
 /**
  * High-performance graph storage optimized for intelligence analysis.
@@ -454,7 +455,8 @@ export class ConducksAdjacencyList {
         instanceOfCall: node.properties.instanceOfCall,
         declaredReturn: node.properties.declaredReturn ?? (node.properties.dna as any)?.returns,
         objectPaths: node.properties.objectPaths,
-        paramTypes: node.properties.paramTypes,
+        // From the parse too, not only from a vault load — the same fallback `declaredReturn` takes.
+        paramTypes: node.properties.paramTypes ?? paramTypesFromDna(node.properties.dna as any),
         memberTypes: node.properties.memberTypes,
         isRoute: node.properties.isRoute,
         isRequest: node.properties.isRequest,

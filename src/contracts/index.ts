@@ -50,6 +50,7 @@ export { decoratorCallee, isRegisteringDecorator, hasRegisteringDecorator } from
 // Read by BOTH interface surfaces — the CLI renders paths for a person, the MCP tools hand them to
 // an agent, and a path that differs between them is the drift the mirror rule forbids (ADR 0148).
 export { realCasePath } from './real-path.js';
+export { paramTypesFromDna } from './param-types.js';
 // Read by both interface surfaces for the same reason: a count captioned as project symbols must
 // not include the built-ins and unresolved targets the graph deliberately also holds.
 export { isProjectSymbolId, splitProjectSymbols } from './project-symbol.js';
