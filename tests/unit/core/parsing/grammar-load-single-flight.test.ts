@@ -7,7 +7,7 @@ import { GrammarRegistry } from '@/lib/core/parsing/grammar-registry.js';
  * attaching node-type info twice (state-machine audit round 2, Q-03-4). The in-flight load is now
  * shared.
  */
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => { jest.restoreAllMocks(); });
 
 describe('loadLanguage is single-flight', () => {
   it('two concurrent loads of one grammar induce it once', async () => {
