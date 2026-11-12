@@ -83,13 +83,21 @@ export class ConducksGraph {
    * itself is what `MicroPulseService` already does for the same one-file case, and it keeps the
    * failure mode as "an import does not resolve" instead of "the file is not analyzed at all".
    */
-  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[], projectRoot?: string): Promise<void> {
+  public async pulseStructuralStream(
+    stream: PrismRequest[], allPaths?: string[], projectRoot?: string,
+    // How a parsed file is written back after `replaceFile`. The default, `ingestSpectrum` alone, makes
+    // the symbols but skips IMPORTS and the unit's directory link — the analyze pipeline's job. The
+    // watcher passes the pipeline in (graph is core and cannot import it), so a watched save leaves the
+    // unit's edges as analyze writes them (deep test 2026-11-12).
+    restate?: (res: any, resolutionUniverse: string[], source: string) => void,
+  ): Promise<void> {
     const unitCount = stream.length;
     this.logger.info(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
 
     if (unitCount === 0) return;
 
     const resolutionUniverse = allPaths?.length ? allPaths : stream.map(u => u.path);
+    const sources = new Map(stream.map(u => [u.path, u.source] as const));
 
     const coreCount = Math.max(1, os.cpus().length - 1);
     const chunkSize = Math.ceil(unitCount / coreCount);
@@ -121,7 +129,17 @@ export class ConducksGraph {
             // `{ skipped: true }` with no spectrum. The watcher pulses every changed file that is not
             // ignored, so reading `res.spectrum.nodes` here killed `watch`, `watch --pulse` and
             // `mirror --live` on the first such save (state-machine audit round 2, Q-02-1).
-            if (!res.spectrum) continue;
+            if (!res.spectrum) {
+              // Still a file of the project: `analyze` gives it a unit, a directory link and — for a
+              // manifest — its dependency edges. The pipeline can, given the source; ingest alone cannot.
+              if (restate) {
+                try {
+                  this.graph.replaceFile(canonicalize(res.path), new Set());
+                  restate(res, resolutionUniverse, sources.get(res.path) ?? '');
+                } catch (err) { failure ??= err instanceof Error ? err : new Error(String(err)); }
+              }
+              continue;
+            }
             try {
               // RE-STATE the file rather than adding to what it said last time. Without this a deleted
               // call keeps its edge for the rest of the session — and once the watcher records the
@@ -139,7 +157,8 @@ export class ConducksGraph {
               const unitId = `${canonical}::unit`;
               const rootId = (this.graph.getNode(unitId)?.properties as any)?.rootId ?? undefined;
               this.graph.replaceFile(canonical, declared);
-              this.ingestSpectrum(res.path, res.spectrum, false, unitId, rootId);
+              if (restate) restate(res, resolutionUniverse, sources.get(res.path) ?? '');
+              else this.ingestSpectrum(res.path, res.spectrum, false, unitId, rootId);
             } catch (err) {
               failure ??= err instanceof Error ? err : new Error(String(err));
             }

@@ -4,14 +4,23 @@
  * It was archived, excluded from tsc and jest, and still passing against current source — so
  * it described live behaviour nothing else covered. Kept as it was, apart from its location.
  */
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import { ChronicleInterface } from '@/lib/core/git/chronicle-interface.js';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 describe('ChronicleInterface Unit Tests 📜', () => {
   let chronicle: ChronicleInterface;
   let mockExec: jest.Mock;
-  const mockProjectDir = '/mock/project';
+  // A REAL folder holding the files the mocked git lists: discovery keeps only files that exist on
+  // disk, because `ls-files --cached` still lists one deleted and not yet staged (deep test 2026-11-12).
+  const mockProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-chronicle-'));
+  for (const f of ['src/main.ts', 'src/utils.ts', 'docs/README.md', 'src/app.ts', 'node_modules/pkg/index.js', '.git/config']) {
+    fs.mkdirSync(path.dirname(path.join(mockProjectDir, f)), { recursive: true });
+    fs.writeFileSync(path.join(mockProjectDir, f), '');
+  }
+  afterAll(() => fs.rmSync(mockProjectDir, { recursive: true, force: true }));
 
   beforeEach(() => {
     mockExec = jest.fn();

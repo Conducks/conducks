@@ -1,7 +1,7 @@
 import { ConducksGraph } from "@/lib/core/graph/index.js";
 import { SynapsePersistence } from "@/lib/core/persistence/index.js";
 import { chronicle, anchorChronicle } from "@/lib/core/git/index.js";
-import { AnalysisService, AnalyzeOrchestrator, Conducks } from "@/lib/domain/analysis/index.js";
+import { AnalysisService, AnalyzeOrchestrator, Conducks, induceVirtualTargets } from "@/lib/domain/analysis/index.js";
 import { MicroPulseService } from "@/lib/domain/analysis/index.js";
 import { KineticService } from "@/lib/domain/kinetic/index.js";
 import { MetricsService } from "@/lib/domain/metrics/index.js";
@@ -138,7 +138,11 @@ let conducksCore = new Conducks();
 (conducksCore as any).persistence = persistence;
 let governance = new GovernanceService(graph.getGraph(), advisor, sentinel, persistence);
 let intelligence = new IntelligenceService(search, federation);
-let evolution = new EvolutionService(graph, persistence);
+// The watcher re-states a saved file through the SAME pipeline a pulse uses, so its unit keeps its
+// IMPORTS, DEPENDS_ON and directory link. Through the `orchestrator` binding, which a re-anchor replaces.
+let evolution = new EvolutionService(graph, persistence,
+  (g, res, allPaths, root, source) => orchestrator.restateUnit(g, res, allPaths, root, source),
+  induceVirtualTargets);
 
 /**
  * The one definition of the coverage overlay's node set: every BEHAVIOR node carrying a real line
