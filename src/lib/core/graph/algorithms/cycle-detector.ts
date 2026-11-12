@@ -89,8 +89,11 @@ export class CycleDetector {
         if (component.length > 1) {
           cycles.push(component);
         } else if (component.length === 1) {
+          // The SAME filter as the walk above. Without it a self edge the caller excluded (CALLS, on
+          // the import-cycle audit) still made a one-node cycle, and `describeCluster` — which does
+          // filter — then found no route for it (state-machine audit P-02-5).
           const selfEdges = graph.getNeighbors(component[0], 'downstream');
-          if (selfEdges.some(e => e.targetId === component[0])) {
+          if (selfEdges.some(e => e.targetId === component[0] && passesEdgeFilter(e, options))) {
             cycles.push(component);
           }
         }
@@ -183,8 +186,9 @@ export class CycleDetector {
           if (target === start) {
             totalCycles++;
             const closed = [...path, start];
-            recordEdgesOf(closed);
-            if (cycles.length < maxCyclesToKeep) cycles.push(closed);
+            // Counted over the KEPT cycles only — the shared edge is printed as "cuts N/<shown>", and
+            // counting every cycle found let it read "cuts 22/20" (state-machine audit P-02-8).
+            if (cycles.length < maxCyclesToKeep) { cycles.push(closed); recordEdgesOf(closed); }
             continue;
           }
           const targetIdx = indexOf.get(target);

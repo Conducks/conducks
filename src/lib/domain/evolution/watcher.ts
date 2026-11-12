@@ -335,6 +335,7 @@ export class ConducksWatcher {
       await this.graph.pulseStructuralStream(
         [{ path: normalizedPath, source }],
         [...this.knownUnitPaths(), normalizedPath],
+        this.rootDir,
       );
 
       // 3b. INTRA-PROJECT RESOLUTION, which `analyze` runs and this path did not.

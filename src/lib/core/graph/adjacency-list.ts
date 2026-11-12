@@ -439,6 +439,10 @@ export class ConducksAdjacencyList {
         // above, both of which cost a debugging session before they were added.
         doc: node.properties.doc,
         docFirstLine: node.properties.docFirstLine,
+        // TODO/FIXME markers, for the same reason as `doc`: harvested by the reflector, then dropped
+        // here because only the skeleton reaches `saveNodes` — not one marker was in the vault
+        // (state-machine audit P-03-1).
+        debtMarkers: node.properties.debtMarkers,
         // Cross-service HTTP binding reads these, and the skeleton is what survives a load — so
         // omitting them made `bindRouteCircuits` match nothing on any graph that came from the
         // vault rather than straight from a parse (todo22#P15).
@@ -489,6 +493,11 @@ export class ConducksAdjacencyList {
         this.pendingMeat.set(id, JSON.stringify(meat));
         this.scheduleCompaction();
       } catch (err) {
+        // The OLD meat goes too. A stringify that threw left the previous pending copy in place, and
+        // `getNode` merged it over the NEW skeleton — a node from two writes (state-machine audit
+        // P-02-10). No meat is the honest state after a failed write.
+        this.compressedMeat.delete(id);
+        this.pendingMeat.delete(id);
         console.error(`[Conducks VMC] Compression failed for node ${id}:`, err);
       }
     } else {
@@ -645,9 +654,12 @@ export class ConducksAdjacencyList {
 
       // 3. A node it no longer declares is removed. Incoming edges are NOT hunted down and deleted —
       //    they belong to other files, and leaving them unresolved is the truthful record.
+      //    Their INDEX stays too. Deleting it while the edge objects stayed in the callers' outgoing
+      //    sets made the two indexes disagree: a restored symbol had no callers upstream, and
+      //    `clearFile` — which finds other files' edges through this index — left them dangling
+      //    (state-machine audit P-02-1).
       const node = this.nodes.get(id);
       if (node) this.unindex(id, node);
-      this.inEdges.delete(id);
       this.nodes.delete(id);
       this.meatCache.delete(id);
     }
@@ -938,6 +950,9 @@ export class ConducksAdjacencyList {
   }
 
   public findNodesByName(name: string): ConducksNode[] {
+    // Guarded like `getAllNodes`: on a deferred graph this answered [] and a symbol read as "not
+    // found" instead of failing loudly (state-machine audit P-02-6).
+    this.assertMaterialised("findNodesByName");
     const query = name.toLowerCase();
     const results = new Map<NodeId, ConducksNode>();
 
@@ -1012,6 +1027,7 @@ export class ConducksAdjacencyList {
    * and reuses that single canonical value everywhere inside.
    */
   public findSymbolAtLine(filePath: string, line: number): ConducksNode | undefined {
+    this.assertMaterialised("findSymbolAtLine");   // P-02-6, as `findNodesByName`
     if (!filePath || typeof filePath !== 'string') return undefined;
     // FIX 4: Normalise once — all comparisons below use this canonical value.
     const targetPath = filePath.toLowerCase();

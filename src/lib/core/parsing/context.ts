@@ -9,7 +9,6 @@ export class AnalyzeContext {
   private importMap: Map<string, Set<string>> = new Map();
 
   /** Map of folder paths to their constituent files */
-  private folderMap: Map<string, Set<string>> = new Map();
 
   /** 
    * Global Symbol Registry (The "Discovery" Cache)
@@ -184,8 +183,13 @@ export class AnalyzeContext {
     // earlier. The module is the more specific fact and the one the call site needs.
     if (this.namespaceBindings.has(localName.toLowerCase())) return;
     this.localBindings.set(localName.toLowerCase(), sourcePath.toLowerCase());
+    // The original belongs to THIS binding: a rebind without one clears the previous binding's, or
+    // `from a import run as go` then `from b import go` sent `go()` to `b::run` (state-machine
+    // audit P-03-4).
     if (originalName && originalName.toLowerCase() !== localName.toLowerCase()) {
       this.bindingOriginals.set(localName.toLowerCase(), originalName.toLowerCase());
+    } else {
+      this.bindingOriginals.delete(localName.toLowerCase());
     }
   }
 
@@ -291,7 +295,6 @@ export class AnalyzeContext {
    */
   public reset(): void {
     this.importMap.clear();
-    this.folderMap.clear();
     this.registry.clear();
     this.externalPackages.clear();
     this.workspacePackages.clear();

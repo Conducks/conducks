@@ -24,28 +24,30 @@ describe('ConducksAdjacencyList — meat cache (todo22#P12)', () => {
     graph = new ConducksAdjacencyList();
   });
 
+  // `coveredBy` stands in for any MEAT-only field. These used `debtMarkers`, which moved to the
+  // skeleton because only the skeleton reaches the vault (state-machine audit P-03-1).
   it('does not serve stale decompressed meat after the same id is overwritten', () => {
     graph.addNode({
       id: 'src/a.ts::foo',
       label: 'function',
       isShallow: false,
-      properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['v1'], entropy: 0.1 },
+      properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['v1'], entropy: 0.1 },
     });
 
     // Populate the cache with the FIRST version's decompressed meat.
     const first = graph.getNode('src/a.ts::foo');
-    expect(first?.properties.debtMarkers).toEqual(['v1']);
+    expect(first?.properties.coveredBy).toEqual(['v1']);
 
     // A real re-pulse rewrites the same id with new meat while the process is alive.
     graph.addNode({
       id: 'src/a.ts::foo',
       label: 'function',
       isShallow: false,
-      properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['v2'], entropy: 0.9 },
+      properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['v2'], entropy: 0.9 },
     });
 
     const second = graph.getNode('src/a.ts::foo');
-    expect(second?.properties.debtMarkers).toEqual(['v2']);
+    expect(second?.properties.coveredBy).toEqual(['v2']);
     expect(second?.properties.entropy).toBe(0.9);
   });
 
@@ -54,20 +56,20 @@ describe('ConducksAdjacencyList — meat cache (todo22#P12)', () => {
       id: 'src/a.ts::foo',
       label: 'function',
       isShallow: false,
-      properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['v1'] },
+      properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['v1'] },
     });
     // Populate the cache.
-    expect(graph.getNode('src/a.ts::foo')?.properties.debtMarkers).toEqual(['v1']);
+    expect(graph.getNode('src/a.ts::foo')?.properties.coveredBy).toEqual(['v1']);
 
     // Re-added shallow: no new meat is compressed. The cache must not keep answering with v1.
     graph.addNode({
       id: 'src/a.ts::foo',
       label: 'function',
       isShallow: true,
-      properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['v1'] },
+      properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['v1'] },
     });
 
-    expect(graph.getNode('src/a.ts::foo')?.properties.debtMarkers).toBeUndefined();
+    expect(graph.getNode('src/a.ts::foo')?.properties.coveredBy).toBeUndefined();
   });
 
   it('returns identical decompressed content on repeat reads of an untouched node (cache hit path)', () => {
@@ -75,13 +77,13 @@ describe('ConducksAdjacencyList — meat cache (todo22#P12)', () => {
       id: 'src/a.ts::foo',
       label: 'function',
       isShallow: false,
-      properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['x', 'y'], entropy: 0.42 },
+      properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['x', 'y'], entropy: 0.42 },
     });
 
     const a = graph.getNode('src/a.ts::foo');
     const b = graph.getNode('src/a.ts::foo');
 
-    expect(b?.properties.debtMarkers).toEqual(a?.properties.debtMarkers);
+    expect(b?.properties.coveredBy).toEqual(a?.properties.coveredBy);
     expect(b?.properties.entropy).toBe(a?.properties.entropy);
   });
 
@@ -90,9 +92,9 @@ describe('ConducksAdjacencyList — meat cache (todo22#P12)', () => {
       id: 'src/a.ts::foo',
       label: 'function',
       isShallow: false,
-      properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['old-file'] },
+      properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['old-file'] },
     });
-    expect(graph.getNode('src/a.ts::foo')?.properties.debtMarkers).toEqual(['old-file']);
+    expect(graph.getNode('src/a.ts::foo')?.properties.coveredBy).toEqual(['old-file']);
 
     graph.clearFile('src/a.ts');
     expect(graph.hasNode('src/a.ts::foo')).toBe(false);
@@ -102,9 +104,9 @@ describe('ConducksAdjacencyList — meat cache (todo22#P12)', () => {
       id: 'src/a.ts::foo',
       label: 'function',
       isShallow: false,
-      properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['new-file'] },
+      properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['new-file'] },
     });
 
-    expect(graph.getNode('src/a.ts::foo')?.properties.debtMarkers).toEqual(['new-file']);
+    expect(graph.getNode('src/a.ts::foo')?.properties.coveredBy).toEqual(['new-file']);
   });
 });

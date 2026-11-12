@@ -15,7 +15,9 @@ import { resolveThroughBuildLayout } from "@/lib/core/parsing/build-layout.js";
 
 export class TypeScriptResolver {
   // simple in-memory cache for tsconfig per projectRoot
-  private static tsconfigCache: Record<string, { mtime: number; config: any }> = {};
+  // Validated by mtime AND size: mtime alone kept serving the old `paths` after a rewrite within one
+  // timestamp tick, for the life of the process (state-machine audit P-04-7).
+  private static tsconfigCache: Record<string, { mtime: number; size: number; config: any }> = {};
 
   /**
    * A TypeScript specifier to a real file: tsconfig paths, then relative, then index resolution.
@@ -42,7 +44,7 @@ export class TypeScriptResolver {
         const stat = fs.statSync(tsconfigPath);
         const cached = TypeScriptResolver.tsconfigCache[tsconfigPath];
         let cfg: any;
-        if (cached && cached.mtime === stat.mtimeMs) {
+        if (cached && cached.mtime === stat.mtimeMs && cached.size === stat.size) {
           cfg = cached.config;
         } else {
           const raw = fs.readFileSync(tsconfigPath, 'utf8');
@@ -53,7 +55,7 @@ export class TypeScriptResolver {
             const cleanJson = raw.replace(/\/\/[^\n]*/g, '').replace(/,(\s*[}\]])/g, '$1');
             cfg = JSON.parse(cleanJson) || {};
           }
-          TypeScriptResolver.tsconfigCache[tsconfigPath] = { mtime: stat.mtimeMs, config: cfg };
+          TypeScriptResolver.tsconfigCache[tsconfigPath] = { mtime: stat.mtimeMs, size: stat.size, config: cfg };
         }
 
         const compilerOptions = cfg.compilerOptions || {};
@@ -95,7 +97,9 @@ export class TypeScriptResolver {
     // 2. Bare Module / Package Resolution
     const rootDir = chronicle.getProjectDir() || process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
     if (!cleanPath.startsWith('.')) {
-      const resolved = this.resolvePackageImport(cleanPath, rootDir, allFiles);
+      // The lower-cased index, like every other branch. The raw array made this one lookup
+      // case-sensitive, so `"main": "./Dist/Index.js"` missed `dist/index.js` (P-04-8).
+      const resolved = this.resolvePackageImport(cleanPath, rootDir, lowerToOriginal);
       if (resolved) return resolved;
       return undefined;
     }
@@ -167,7 +171,7 @@ export class TypeScriptResolver {
    * Resolve bare package imports by consulting node_modules/<pkg>/package.json
    * - honors `exports` (simple forms) and `main`, with extension-aware matching
    */
-  private resolvePackageImport(importPath: string, projectRoot: string, allFiles: string[]): string | undefined {
+  private resolvePackageImport(importPath: string, projectRoot: string, allFiles: Map<string, string>): string | undefined {
     // handle scoped packages
     const parts = importPath.split('/');
     let pkgName = parts[0];

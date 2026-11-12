@@ -20,6 +20,7 @@ import { canonicalize } from "@/lib/core/utils/index.js";
 import { Logger } from "@/lib/core/utils/index.js";
 import { PrismRequest } from "@/contracts/index.js";
 import { StructuralRanker } from "../../core/graph/algorithms/ranker.js";
+import { HttpServiceLinker } from "./http-service-linker.js";
 import { CanonicalKind, CanonicalRank } from "@/contracts/index.js";
 import { Worker } from "node:worker_threads";
 import os from "node:os";
@@ -82,7 +83,7 @@ export class ConducksGraph {
    * itself is what `MicroPulseService` already does for the same one-file case, and it keeps the
    * failure mode as "an import does not resolve" instead of "the file is not analyzed at all".
    */
-  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[]): Promise<void> {
+  public async pulseStructuralStream(stream: PrismRequest[], allPaths?: string[], projectRoot?: string): Promise<void> {
     const unitCount = stream.length;
     this.logger.info(`[Conducks Synapse] Pushing Structural Stream (${unitCount} units)...`);
 
@@ -101,7 +102,9 @@ export class ConducksGraph {
 
       const p = new Promise<void>((resolve, reject) => {
         const worker = new Worker(workerScript, {
-          workerData: { units: chunk, allPaths: resolutionUniverse },
+          // `projectRoot` anchors the worker to the analysed project, not to its own cwd — see
+          // pulse-worker.ts (state-machine audit P-03-3).
+          workerData: { units: chunk, allPaths: resolutionUniverse, projectRoot },
           execArgv: isTs ? ["--import", "tsx"] : []
         });
 
@@ -141,6 +144,12 @@ export class ConducksGraph {
     }
 
     await Promise.all(workerPromises);
+
+    // `replaceFile` above dropped each file's outgoing edges, its cross-service HTTP CALLS included,
+    // and only `analyze` ever created those. Re-link the files this pulse re-stated, or the first
+    // watched save of a file that calls another service by URL loses that caller until the next
+    // `analyze` (state-machine audit P-02-2).
+    new HttpServiceLinker(this.graph).link(stream.map(u => u.path));
 
     // Phase 2: Neural Binding (Universal Workspace Resolution)
     this.resonate();

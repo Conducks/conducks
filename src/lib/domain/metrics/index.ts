@@ -119,11 +119,15 @@ export class MetricsService {
     return all > 0 ? shared / all : 0;
   }
 
-  /** How many distinct symbols reach each node. Rebuilt only when the graph's edge count changes. */
-  private freqCache: { size: number; map: Map<string, number> } | null = null;
+  /**
+   * How many distinct symbols reach each node, from the graph AS IT IS NOW.
+   *
+   * Not cached. It was, keyed on the edge count — and a re-pulse swaps one call for another without
+   * changing the count, so the weights went stale in any long-lived process (state-machine audit
+   * P-05-3). Building it is one pass over the edges, the same order of work as `getAllEdges` itself.
+   */
   private neighbourFrequency(g: any): Map<string, number> {
     const edges = g.getAllEdges();
-    if (this.freqCache && this.freqCache.size === edges.length) return this.freqCache.map;
     const seen = new Set<string>();
     const map = new Map<string, number>();
     for (const e of edges) {
@@ -133,7 +137,6 @@ export class MetricsService {
       const t = String(e.targetId);
       map.set(t, (map.get(t) ?? 0) + 1);
     }
-    this.freqCache = { size: edges.length, map };
     return map;
   }
 
