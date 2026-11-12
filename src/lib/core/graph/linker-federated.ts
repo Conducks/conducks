@@ -3,8 +3,22 @@ import path from 'node:path';
 import { ConducksAdjacencyList } from './adjacency-list.js';
 import { VAULT_DIR, VAULT_DB_FILENAME } from "@/contracts/index.js";
 
-/** Opens a neighbour's vault read-only. Injected, for the reason on the constructor. */
-export type OpenNeighbourVault = (path: string) => { load(graph: ConducksAdjacencyList): Promise<unknown> };
+/**
+ * Opens a neighbour's vault read-only. Injected, for the reason on the constructor.
+ *
+ * `close` is called once the load is over. An open handle in this process refuses a writer in
+ * another, and `hydrate` used to leave every neighbour open — measured: the neighbour's own `analyze`
+ * failed "Vault Locked" for as long as the hydrating MCP server or mirror lived (state-machine audit
+ * round 2, Q-02-6).
+ */
+export type OpenNeighbourVault = (path: string) => { load(graph: ConducksAdjacencyList): Promise<unknown>; close?(): Promise<unknown> };
+
+/**
+ * One queue per links FILE, for the whole module. It was an instance field, and the process builds
+ * several linkers over one project (the registry's, `createLinker`'s, `analyze`'s), so two of them
+ * linking at once still lost a link (state-machine audit round 2, Q-02-5).
+ */
+const linkQueues = new Map<string, Promise<void>>();
 
 /**
  * Conducks — Federated Linker
@@ -47,13 +61,16 @@ export class FederatedLinker {
   public link(projectPath: string): Promise<void> {
     // One read-modify-write at a time. Two links registered together each read the same list and
     // the second write dropped the first link (state-machine audit P-02-11). Serialised within the
-    // process; a second PROCESS can still race, which is accepted for a command a person runs by hand.
-    const run = this.linkQueue.then(() => this.linkOne(projectPath));
-    this.linkQueue = run.catch(() => {});
+    // process, across every linker over the same file; a second PROCESS can still race, which is
+    // accepted for a command a person runs by hand.
+    const key = path.resolve(this.configPath);
+    const run = (linkQueues.get(key) ?? Promise.resolve()).then(() => this.linkOne(projectPath));
+    const tail = run.catch(() => {});
+    linkQueues.set(key, tail);
+    // Dropped once idle, so the map does not keep one entry per project for the process lifetime.
+    void tail.then(() => { if (linkQueues.get(key) === tail) linkQueues.delete(key); });
     return run;
   }
-
-  private linkQueue: Promise<void> = Promise.resolve();
 
   private async linkOne(projectPath: string): Promise<void> {
     const links = await this.getLinks();
@@ -90,11 +107,16 @@ export class FederatedLinker {
       // `load` returning, not the node count growing — a neighbour whose nodes were all already
       // present was reported "Hydration failed" (P-02-13).
       const before = mainGraph.stats.nodeCount;
+      let vault: ReturnType<OpenNeighbourVault> | null = null;
       try {
-        await this.openVault(linkPath).load(mainGraph);
+        vault = this.openVault(linkPath);
+        await vault.load(mainGraph);
       } catch (err: any) {
         console.warn(`[Federated Linker] ⚠️  Hydration failed for ${linkPath}: ${err?.message ?? err}`);
         continue;
+      } finally {
+        // Released either way: an open handle here refuses the neighbour's own writer (Q-02-6).
+        try { await vault?.close?.(); } catch { /* already closed or never opened */ }
       }
       const added = mainGraph.stats.nodeCount - before;
       console.error(`[Federated Linker] Resonated with ${linkPath} (+${added} new nodes).`);
