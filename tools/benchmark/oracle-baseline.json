@@ -200,21 +200,24 @@
     "extra": 0
   },
   "fixture::java-dead": {
-    "defs": 65,
-    "dead": 2,
+    "defs": 82,
+    "dead": 6,
     "missed": 0,
+    "missedMethods": 0,
     "extra": 0
   },
   "spring-petclinic::java-dead": {
     "defs": 137,
     "dead": 0,
     "missed": 0,
+    "missedMethods": 0,
     "extra": 0
   },
   "gson::java-dead": {
     "defs": 1815,
     "dead": 1,
     "missed": 1,
+    "missedMethods": 0,
     "extra": 0
   }
 }

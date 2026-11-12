@@ -21,6 +21,9 @@ export const DEAD_CODE_TYPES = [
   'STALE_IMPORT',
   'UNIMPORTED_MODULE',
   'ONLY_IMPORTED',
+  // A method of a live type that nothing calls (2026-11-12). Judged only for languages whose oracle
+  // scores members against a compiler — see DeadCodeAnalyzer.MEMBER_JUDGED.
+  'UNUSED_MEMBER',
 ] as const;
 
 /** The union, derived from the list rather than restated — a second copy is how two went missing. */

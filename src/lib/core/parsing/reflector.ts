@@ -132,6 +132,28 @@ function isInTraitImpl(declNode: any): boolean {
   return false;
 }
 
+/**
+ * The access keyword a declaration's `modifiers` node states — `public`, `protected` or `private` —
+ * or null when it states none (Java's package-private, and every language without that node).
+ *
+ * WHY: a public method of a public Java type is a library's API, used by code this graph never sees.
+ * MEASURED on gson against javac: `JsonArray.contains`, `Gson.excluder` and 16 others have no caller
+ * inside the project and are not dead — they are what gson's users call. Dead-code reads this to keep
+ * its member verdicts to what the project alone can reach (dead-code.ts, findUnusedMembers).
+ */
+function visibilityOf(declNode: any): 'public' | 'protected' | 'private' | null {
+  if (!declNode || typeof declNode.childCount !== 'number') return null;
+  for (let i = 0; i < declNode.childCount; i++) {
+    const child = declNode.child(i);
+    if (child?.type !== 'modifiers') continue;
+    for (let j = 0; j < child.childCount; j++) {
+      const t = child.child(j)?.type;
+      if (t === 'public' || t === 'protected' || t === 'private') return t;
+    }
+  }
+  return null;
+}
+
 function decoratorsOf(declNode: any): string[] {
   if (!declNode) return [];
   const found: string[] = [];
@@ -426,7 +448,7 @@ export class ConducksReflector {
     // invert — producing `run.widget` instead of `widget.run`. That corrupts the node ID, and every
     // id-keyed consumer with it: the import edge pointed at `::widget` while the node was stored as
     // `::run.widget`, so prune could never resolve it and silently never reported the unused import.
-    type ScopeEntry = { name: string; startRow: number; startCol: number; endRow: number; endCol: number };
+    type ScopeEntry = { name: string; startRow: number; startCol: number; endRow: number; endCol: number; nameRow: number; nameCol: number };
     const scopeMap: ScopeEntry[] = [];
 
     for (const match of matches) {
@@ -449,7 +471,9 @@ export class ConducksReflector {
             startRow: rangeNode.startPosition.row,
             startCol: rangeNode.startPosition.column,
             endRow: rangeNode.endPosition.row,
-            endCol: rangeNode.endPosition.column
+            endCol: rangeNode.endPosition.column,
+            nameRow: nameCap.node.startPosition.row,
+            nameCol: nameCap.node.startPosition.column,
           });
         }
       }
@@ -474,10 +498,18 @@ export class ConducksReflector {
       excludeName?: string,
       self?: { startRow: number; startCol: number; endRow: number; endCol: number },
       col?: number,
+      nameAt?: { row: number; column: number },
     ): string => {
       // Find all scopes that organically encapsulate the row
       const enclosing = scopeMap.filter(s => {
-        if (excludeName && s.name === excludeName) return false;
+        // A same-named scope is excluded when it IS the declaration (or its wrapper): named by the
+        // very identifier being resolved. Not merely by an equal name — a Java/C# CONSTRUCTOR is named
+        // after the class around it, and excluding the class gave the constructor the class's own id,
+        // overwriting the class's kind (why Java dropped constructors, and why every C# class with a
+        // constructor was a `function`; measured 2026-11-12). Callers without the name's position
+        // (heritage, aliases) keep the name test.
+        if (excludeName && s.name === excludeName
+            && (!nameAt || (s.nameRow === nameAt.row && s.nameCol === nameAt.column))) return false;
         if (row < s.startRow || row > s.endRow) return false;
         // SIBLINGS ON ONE LINE ARE NOT NESTED. `{ debug() {}, info() {}, warn() {}, error() {} }`
         // puts four scopes on one row, so the row test alone lets every one of them "enclose" a
@@ -586,7 +618,7 @@ export class ConducksReflector {
           endRow: declRange.endPosition.row,
           endCol: declRange.endPosition.column,
         };
-        const scope = getScopeAt(currentMatchRow, name, declSpan);
+        const scope = getScopeAt(currentMatchRow, name, declSpan, undefined, matchNameCap.node.startPosition);
         const scopePrefix = scope ? `${scope.toLowerCase()}.` : '';
         const scopedId = `${file.path.toLowerCase()}::${scopePrefix}${name.toLowerCase()}`;
 
@@ -638,7 +670,7 @@ export class ConducksReflector {
             }
 
             const canonical = mapToCanonical(initialKind);
-            const parentScopeName = getScopeAt(currentMatchRow, name, declSpan);
+            const parentScopeName = getScopeAt(currentMatchRow, name, declSpan, undefined, matchNameCap.node.startPosition);
             const parentScopePrefix = parentScopeName ? `${parentScopeName.toLowerCase()}.` : '';
             const parentId = parentScopeName
               ? `${file.path.toLowerCase()}::${parentScopePrefix.toLowerCase()}`.slice(0, -1)
@@ -652,6 +684,7 @@ export class ConducksReflector {
               params: paramsOf(match),
               // What the source hands this symbol to before anything calls it (ADR: decorators.ts).
               decorators: decoratorsOf(rangeNode),
+              visibility: visibilityOf(rangeNode),
               // Written inside an object literal / call argument — a member, not a module symbol.
               nestedInExpression: isNestedInExpression(rangeNode),
               // Inside `impl Trait for X` (Rust): reached through the trait, never judged on its own.

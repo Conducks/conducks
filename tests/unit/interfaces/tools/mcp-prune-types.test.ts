@@ -64,7 +64,8 @@ describe('the finding types are one list — todo53', () => {
       // Restated by hand ON PURPOSE — that is what makes ADDING a type reach every summary and
       // every enum instead of landing silently, and it is also what made REMOVING one land here:
       // `UNREACHABLE_LOGIC` was declared and emitted by nothing (ADR 0172).
-      ['ONLY_IMPORTED', 'ORPHAN', 'STALE_IMPORT', 'UNIMPORTED_MODULE', 'UNUSED_EXPORT'],
+      // UNUSED_MEMBER added 2026-11-12: a method of a live Java type nothing calls, scored by javac.
+      ['ONLY_IMPORTED', 'ORPHAN', 'STALE_IMPORT', 'UNIMPORTED_MODULE', 'UNUSED_EXPORT', 'UNUSED_MEMBER'],
     );
   });
 

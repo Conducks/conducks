@@ -33,7 +33,8 @@ public class App {
         Object pair = new Pair<>(1, "b");          // diamond only
         Object[] cells = new Cell[2];             // array creation only
         try { s.area(); } catch (Boom e) { }      // catch only
-        System.out.println(read + pair + marked + tag + cells.length);
+        String flow = new Workflow().run();
+        System.out.println(flow + read + pair + marked + tag + cells.length);
         System.out.println(owner.getName() + p.x() + c + a + sq + up + t + b.template());
     }
 }

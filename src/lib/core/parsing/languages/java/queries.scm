@@ -25,12 +25,11 @@
   ;; grammar version (same finding as C#'s `returns`/`name` ordering, measured the same way).
   (method_declaration type: (_) @return_type name: (identifier) @name parameters: (formal_parameters) @params) @isFunction
 
-  ;; DROPPED: (constructor_declaration name: (identifier) @name) @isFunction
-  ;; In Java the constructor's name IS the class name, and the reflector's scoped id excludes a
-  ;; same-named enclosing scope — so the constructor and its class collapse onto the SAME node id
-  ;; and the constructor's @isFunction overwrote the class kind (struct -> function). Losing the
-  ;; class as a STRUCTURE is worse than losing the constructor, so the constructor is not extracted.
-  ;; Re-add only once the reflector can disambiguate a constructor from its owning type.
+  ;; CONSTRUCTORS. Named after their class, so they used to collapse onto the class's own id (the
+  ;; reflector excluded every same-named enclosing scope) and overwrite its kind — and were dropped.
+  ;; The reflector now excludes a same-named scope only when it WRAPS the declaration (ends where it
+  ;; ends), so `Owner(…)` inside `class Owner` is `owner.owner`, a BEHAVIOR of the class.
+  (constructor_declaration name: (identifier) @name parameters: (formal_parameters) @params) @isFunction
 
   (package_declaration (scoped_identifier) @name) @isPackage
 
@@ -119,6 +118,11 @@
   (field_access object: (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
   (method_reference . (identifier) @pulse_type_target (#match? @pulse_type_target "^[A-Z]"))
   (method_reference . (type_identifier) @pulse_type_target)
+  ;; …and the METHOD a reference names is called through it: `Strings::upper`, `this::go`,
+  ;; `super::x`. The last identifier child (`Foo::new` has none — `new` is a keyword, and its type is
+  ;; captured above). MEASURED (Java oracle, member verdicts): `Strings.upper`, used only as
+  ;; `map(Strings::upper)`, was reported UNUSED_MEMBER.
+  (method_reference (_) (identifier) @kinesis_target .)
   ;; Types the compiler requires in an expression or a clause, measured missing on the oracle
   ;; fixture (each one alone left its class ORPHAN): `x instanceof Marker`, `(Tagged) x`,
   ;; `catch (Boom e)`, `new Cell[2]`, and an array type `Cell[]` in any declaration.

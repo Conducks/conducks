@@ -257,7 +257,7 @@ Every language below is parsed with a native Tree-sitter grammar and a per-langu
 | C / C++                 | Partial       | structs/classes, functions, methods — no per-binding imports, no type-usage edges   |
 | C#                      | Partial       | namespaces, classes, methods — properties are not extracted                         |
 | Ruby                    | Partial       | classes and methods                                                                 |
-| Java                    | Partial       | classes, records, interfaces, enums, methods, fields, imports, **EXTENDS/IMPLEMENTS heritage**; no constructors (name-collision with the class), no annotations, no type-usage edges |
+| Java                    | Partial       | classes, records, interfaces, enums, methods, constructors, imports (class, static, wildcard, nested), a package is one module, **EXTENDS/IMPLEMENTS heritage** incl. generic supertypes, type-usage edges (declarations, generics, `X.class`, static qualifiers, method references, `instanceof`, casts, `catch`, arrays), annotations; dead code scored against javac (`npm run oracle:java-dead*`), including unused methods of a type in use — a public method of a public type is API and never judged; fields are captured but pruned when nothing binds to them, and a call binds by name, not by type |
 | PHP                     | Partial       | namespaces, classes, traits, interfaces, enums, methods, functions, typed properties, use-imports incl. aliases; no heritage edges, no constants or enum cases |
 | Swift                   | Partial       | classes, actors, structs, enums, extensions, protocols, funcs/init/deinit, properties, enum cases, typealiases, **conformance + superclass heritage**; a module is its SPM target, functions used as values, members reached through a protocol; no subscripts, no property wrappers, no async/visibility DNA |
 
@@ -267,8 +267,8 @@ Two limits apply to every language:
   co-capture the subject, which `reflector.ts:438` requires). TypeScript, TSX and Go still persist
   zero `EXTENDS`/`IMPLEMENTS`: their heritage patterns capture `@heritage` alone, so the reflector
   drops the match. The Java fix is the recipe (todo11).
-- **Type-usage edges only for TypeScript, TSX and Go.** Other languages have no type-position
-  capture, so type-only-import detection never fires for them.
+- **Type-usage edges only for TypeScript, TSX, Go, Rust and Java.** Other languages have no
+  type-position capture, so type-only-import detection never fires for them.
 
 **How the fallback works.** If a native grammar fails to load, a parse crashes, or a query fails to
 compile, Conducks does not error out — it degrades that file to the **Gnosis** path, which emits a

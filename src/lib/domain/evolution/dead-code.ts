@@ -452,8 +452,148 @@ export class DeadCodeAnalyzer {
     }
 
     findings.push(...this.findStaleImports(graph, allEdges, usedNamesByFile, fileOfNode));
+    findings.push(...this.findUnusedMembers(graph, nodes as ConducksNode[], danglingRefNames, isNested));
 
     return findings;
+  }
+
+  /**
+   * Languages whose class MEMBERS are judged — each one only once an oracle scores member verdicts
+   * against its compiler (Java: javac, `oracle-java-dead.mjs`). A language enters this list with its
+   * oracle, not before: the module-scope rule above exists because member verdicts made by name were
+   * "overwhelming false positives", and only a compiler can say which ones are.
+   */
+  private static readonly MEMBER_JUDGED = ['.java'];
+
+  /** Methods every Java object has, or that the runtime calls by name (serialization). */
+  private static readonly RUNTIME_CALLED_METHODS = new Set<string>([
+    'tostring', 'equals', 'hashcode', 'clone', 'finalize', 'compareto', 'close', 'iterator',
+    'readobject', 'writeobject', 'readresolve', 'writereplace', 'readobjectnodata', 'main',
+  ]);
+
+  /**
+   * UNUSED_MEMBER — a method of a LIVE type that nothing calls or references.
+   *
+   * Only members of a type IN USE are judged; a type nothing reaches is the type's own question
+   * (deleting it deletes them). What spares a method, each a way it is reached with no edge:
+   *   - any incoming reference, or a dangling call naming it (`x.foo()` the linker could not bind —
+   *     duck typing, a receiver of unknown type: under-reporting is the safe side);
+   *   - an annotation (`@Override`, `@GetMapping`, `@Test`, `@Bean` — a framework or the compiler
+   *     names it), or a registering decorator;
+   *   - its name declared by a supertype in the project (an override, reached through the base), or
+   *     its type having a supertype the project does not define (a library base class or interface
+   *     may declare it: `TypeAdapter.read`);
+   *   - a bean accessor (getX/isX/setX), reached by reflection from templates, JSON and JPA;
+   *   - a name the runtime calls (toString, equals, readObject…), and entry points.
+   */
+  private findUnusedMembers(
+    graph: ConducksAdjacencyList, nodes: ConducksNode[],
+    danglingRefNames: Set<string>, isNested: (n: any) => boolean,
+  ): Finding[] {
+    const judged = (f: string) => DeadCodeAnalyzer.MEMBER_JUDGED.some(ext => f.endsWith(ext));
+    const membersOf = new Map<string, Set<string>>();
+    const membersById = new Map<string, string[]>();
+    for (const n of nodes) {
+      const parent = String((n.properties as any)?.parentId ?? '').toLowerCase();
+      if (!parent || !n.properties?.name) continue;
+      (membersById.get(parent) ?? membersById.set(parent, []).get(parent)!).push(n.id);
+      const set = membersOf.get(parent) ?? new Set<string>();
+      set.add(String(n.properties.name).toLowerCase());
+      membersOf.set(parent, set);
+    }
+    // Names declared by every supertype in the project, and whether any supertype is NOT in it.
+    const inherited = new Map<string, { names: Set<string>; external: boolean }>();
+    const supertypesOf = (typeId: string) => graph.getNeighbors(typeId, 'downstream')
+      .filter((e: any) => e.type === 'EXTENDS' || e.type === 'IMPLEMENTS');
+    const inheritedOf = (typeId: string) => {
+      const key = typeId.toLowerCase();
+      const cached = inherited.get(key);
+      if (cached) return cached;
+      const out = { names: new Set<string>(), external: false };
+      const seen = new Set<string>([key]);
+      const todo = [typeId];
+      while (todo.length) {
+        for (const e of supertypesOf(todo.pop()!)) {
+          const target = graph.getNode(e.targetId) as any;
+          const filePath = String(target?.properties?.filePath ?? '');
+          if (!target || !filePath || filePath.startsWith('external://')) { out.external = true; continue; }
+          const id = String(target.id).toLowerCase();
+          if (seen.has(id)) continue;
+          seen.add(id);
+          for (const name of membersOf.get(id) ?? []) out.names.add(name);
+          todo.push(target.id);
+        }
+      }
+      inherited.set(key, out);
+      return out;
+    };
+    // A GUESSED CALL MAY BE ANY METHOD OF THAT NAME. With no types, `builder.serializeNulls()` is bound
+    // by name to ONE `serializeNulls` (`resolved: false`, confidence 0.85) and every other one reads
+    // as uncalled. MEASURED on gson against javac: 10 false UNUSED_MEMBER — GsonBuilder.serializeNulls
+    // (the call went to Gson.serializeNulls), JsonElement.deepCopy (to JsonArray.deepCopy),
+    // TypeAdapter.toJson (to Gson.toJson), BoundField.write … So a guessed call spares the NAME.
+    const guessedNames = new Set<string>();
+    for (const e of graph.getAllEdges() as ConducksEdge[]) {
+      if (!DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type) || e.type === 'IMPORTS') continue;
+      const p = (e as any).properties ?? {};
+      if (p.resolved !== false && !((e.confidence ?? 1) < 1)) continue;
+      const target = graph.getNode(e.targetId) as any;
+      if (target?.properties?.name) guessedNames.add(String(target.properties.name).toLowerCase());
+      if (p.original) guessedNames.add(String(p.original).split('.').pop()!.toLowerCase());
+    }
+
+    const fromOutside = (typeId: string) => (e: any) =>
+      DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type) && e.type !== 'IMPORTS'
+      && e.sourceId !== typeId && !String(e.sourceId).startsWith(`${typeId}.`);
+    const typeInUse = (typeId: string): boolean =>
+      graph.getNeighbors(typeId, 'upstream').some(fromOutside(typeId))
+      || [...(membersById.get(typeId.toLowerCase()) ?? [])].some(m => graph.getNeighbors(m, 'upstream').some(fromOutside(typeId)));
+
+    const out: Finding[] = [];
+    for (const node of nodes) {
+      const props = node.properties as any;
+      const file = String(props?.filePath ?? '');
+      if (node.label !== 'BEHAVIOR' || !props?.name || !judged(file.toLowerCase())) continue;
+      if (DeadCodeAnalyzer.isTestPath(file) || isNested(node)) continue;
+      const owner = graph.getNode(String(props.parentId ?? '')) as any;
+      if (!owner || owner.label !== 'STRUCTURE') continue;
+      // A MEMBER IS JUDGED ONLY WHEN ITS TYPE IS IN USE — referenced, or one of its members used, from
+      // outside the type. Not "is its file imported": a Java class used from its own package needs no
+      // import (measured on the oracle fixture: `Service`, constructed by `App`, sat in a file nothing
+      // imports and its dead method went unreported). A type nothing reaches is the TYPE's question —
+      // reported above, or unjudgeable — and its members go with it either way.
+      if (!typeInUse(String(owner.id))) continue;
+      const ownerKind = String(owner.properties?.kind ?? '').toLowerCase();
+      if (ownerKind === 'interface') continue;          // a requirement; its implementations are judged
+
+      const name = String(props.name);
+      const lower = name.toLowerCase();
+      if (DeadCodeAnalyzer.RUNTIME_CALLED_METHODS.has(lower) || this.isEntryPoint(node)) continue;
+      // A CONSTRUCTOR is reached by `new Owner(…)`, which names the TYPE — never the constructor node.
+      if (lower === String(owner.properties?.name ?? '').toLowerCase()) continue;
+      if (/^(get|is)[A-Z]/.test(name) || /^set[A-Z]/.test(name)) continue;
+      // A LIBRARY'S API IS USED OUTSIDE THE PROJECT. A public or protected method of a public type can
+      // be called by code this graph never sees (measured on gson: 18 such methods javac finds no
+      // caller for, every one of them gson's API). Package-private and private members, and any
+      // member of a non-public type, can only be reached from inside — those are judged.
+      const visible = (n: any) => ['public', 'protected'].includes(String(n?.properties?.dna?.visibility ?? ''));
+      if (visible(node) && visible(owner)) continue;
+      if (((props.dna?.decorators ?? []) as string[]).length > 0) continue;
+      if (danglingRefNames.has(lower) || guessedNames.has(lower)) continue;
+      const refs = graph.getNeighbors(node.id, 'upstream')
+        .filter((e: any) => DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type) && e.sourceId !== node.id);
+      if (refs.length > 0) continue;
+      const up = inheritedOf(owner.id);
+      if (up.external || up.names.has(lower)) continue;
+
+      out.push({
+        type: 'UNUSED_MEMBER',
+        symbol: `${owner.properties.name}.${name}`,
+        file,
+        message: `Method is never called or referenced (no callers, method references, or overridden declaration).`,
+      });
+    }
+    return out;
   }
 
   /**

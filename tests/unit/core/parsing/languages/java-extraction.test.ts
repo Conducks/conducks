@@ -76,7 +76,7 @@ enum Mode {
   console.log('__RESULT__' + JSON.stringify({
     grammarLoaded: !!lang,
     compileError,
-    nodes: s.nodes.map((n) => ({ name: n.name, kind: n.kind })),
+    nodes: s.nodes.map((n) => ({ parent: n.parentId ?? (n.metadata && n.metadata.parentId), name: n.name, kind: n.kind })),
     rels: s.relationships.map((r) => ({
       type: r.type,
       source: r.sourceName,
@@ -90,7 +90,7 @@ enum Mode {
   let result: {
     grammarLoaded: boolean;
     compileError: string | null;
-    nodes: Array<{ name: string; kind: string }>;
+    nodes: Array<{ parent?: string; name: string; kind: string }>;
     rels: Array<{ type: string; source: string; target: string; specifier?: string }>;
   };
 
@@ -129,6 +129,17 @@ enum Mode {
     ['com.example.app', 'package'],
   ])('extracts %s as a %s', (name, kind) => {
     expect(result.nodes.find((n) => n.name === name)?.kind).toBe(kind);
+  });
+
+  // A constructor is named after its class. The reflector excluded every same-named enclosing scope,
+  // so `HelloService(…)` took the class's own id and overwrote its kind (struct -> function) — which
+  // is why Java dropped constructors, and why every C# class with a constructor was a `function`
+  // (measured 2026-11-12). Only a scope that WRAPS the declaration is excluded now.
+  it('extracts a constructor as a function of its class, and the class stays a struct', () => {
+    const same = result.nodes.filter((n) => n.name === 'HelloService');
+    expect(same.map((n) => n.kind).sort()).toEqual(['function', 'struct']);
+    expect(same.find((n) => n.kind === 'struct')!.parent).toBe('/repo/helloservice.java::unit');
+    expect(same.find((n) => n.kind === 'function')!.parent).toBe('/repo/helloservice.java::helloservice');
   });
 
   it('records the import specifiers', () => {

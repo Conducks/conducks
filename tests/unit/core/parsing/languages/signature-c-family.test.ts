@@ -23,7 +23,16 @@ describe('c, cpp, csharp, java record the signatures they declare', () => {
     const context = new AnalyzeContext();
     const file = { path, source };
     const spectrum: any = await reflector.reflect(file, provider as any, context, [file.path]);
-    return spectrum.nodes.find((n: any) => String(n.name).toLowerCase() === name.toLowerCase())?.dna;
+    // A constructor shares its class's name and is now its own node (2026-11-12): the FUNCTION is
+    // the one whose signature is asked about, so it is preferred over the class of the same name.
+    const named = spectrum.nodes.filter((n: any) => String(n.name).toLowerCase() === name.toLowerCase());
+    return (named.find((n: any) => n.kind === 'function') ?? named[0])?.dna;
+  };
+
+  const kindsOf = async (provider: ConducksProvider, langId: string, path: string, source: string, name: string) => {
+    await grammars.loadLanguage(langId);
+    const spectrum: any = await reflector.reflect({ path, source }, provider as any, new AnalyzeContext(), [path]);
+    return spectrum.nodes.filter((n: any) => n.name === name).map((n: any) => n.kind).sort();
   };
 
   beforeAll(async () => {
@@ -141,6 +150,13 @@ describe('c, cpp, csharp, java record the signatures they declare', () => {
       const src = 'class Foo {\n  public Foo() {}\n}\n';
       const dna = await dnaOf(provider, 'csharp', '/repo/a.cs', src, 'Foo');
       expect(dna.returns).toBeNull();
+    });
+
+    // MEASURED 2026-11-12: the constructor took the class's id and overwrote its kind, so every C#
+    // class with a constructor was a `function` in the graph.
+    it('a class with a constructor stays a class; the constructor is its own function', async () => {
+      const src = 'class Foo {\n  public Foo() {}\n  public void Bar() {}\n}\n';
+      expect(await kindsOf(provider, 'csharp', '/repo/a.cs', src, 'Foo')).toEqual(['function', 'struct']);
     });
   });
 

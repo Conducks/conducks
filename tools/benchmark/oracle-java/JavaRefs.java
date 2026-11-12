@@ -30,7 +30,7 @@ public class JavaRefs {
       "java.lang.Deprecated", "java.lang.FunctionalInterface", "java.lang.SafeVarargs");
   static final class Def {
     String file, name, kind, owner; int line; long start, end;
-    boolean test, annotated, main, accessor, isPublic, enumConstant, topLevel;
+    boolean test, annotated, main, accessor, isPublic, enumConstant, topLevel, api;
     String override;      // "abstract:<owner>.<name>" (compile-required) | "concrete:<…>" | "unresolved"
     int refs, refsOtherFile, refsNonTest, importRefs, memberRefs; String firstMemberRef; String firstRef;
   }
@@ -80,6 +80,13 @@ public class JavaRefs {
           d.enumConstant = e.getKind() == ElementKind.ENUM_CONSTANT;
           d.isPublic = e.getModifiers().contains(Modifier.PUBLIC);
           d.topLevel = e.getEnclosingElement() != null && e.getEnclosingElement().getKind() == ElementKind.PACKAGE;
+          // API: reachable from outside the project — public/protected all the way up to the package.
+          d.api = true;
+          for (Element x = e; x != null && x.getKind() != ElementKind.PACKAGE; x = x.getEnclosingElement()) {
+            Set<Modifier> m = x.getModifiers();
+            boolean iface = x.getEnclosingElement() instanceof TypeElement te && te.getKind().isInterface();
+            if (!(m.contains(Modifier.PUBLIC) || m.contains(Modifier.PROTECTED) || iface)) { d.api = false; break; }
+          }
           defs.put(e, d);
         }
         @Override public Void visitClass(ClassTree t, Void v) {
@@ -174,7 +181,7 @@ public class JavaRefs {
       sb.append('{').append("\"file\":").append(q(d.file)).append(",\"line\":").append(d.line)
         .append(",\"name\":").append(q(d.name)).append(",\"kind\":").append(q(d.kind)).append(",\"owner\":").append(q(d.owner))
         .append(",\"test\":").append(d.test).append(",\"annotated\":").append(d.annotated).append(",\"main\":").append(d.main)
-        .append(",\"accessor\":").append(d.accessor).append(",\"enumConstant\":").append(d.enumConstant).append(",\"isPublic\":").append(d.isPublic).append(",\"topLevel\":").append(d.topLevel)
+        .append(",\"accessor\":").append(d.accessor).append(",\"enumConstant\":").append(d.enumConstant).append(",\"isPublic\":").append(d.isPublic).append(",\"topLevel\":").append(d.topLevel).append(",\"api\":").append(d.api)
         .append(",\"override\":").append(q(d.override)).append(",\"refs\":").append(d.refs)
         .append(",\"importRefs\":").append(d.importRefs).append(",\"memberRefs\":").append(d.memberRefs).append(",\"firstMemberRef\":").append(q(d.firstMemberRef)).append(",\"refsOtherFile\":").append(d.refsOtherFile).append(",\"refsNonTest\":").append(d.refsNonTest)
         .append(",\"firstRef\":").append(q(d.firstRef)).append('}');

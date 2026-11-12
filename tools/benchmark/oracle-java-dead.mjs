@@ -20,6 +20,8 @@
  * THE CLAIM BEING TESTED, as prune words it:
  *   ORPHAN / ONLY_IMPORTED — any reference outside the declaration contradicts it.
  *   UNUSED_EXPORT          — a reference from another file contradicts it.
+ *   UNUSED_MEMBER          — a method nothing calls: any reference outside it contradicts it, as does
+ *                            implementing an abstract method (compile-required).
  *   UNIMPORTED_MODULE      — a question about a file, not scored as EXTRA; counts as prune having spoken.
  *
  * JAVA'S IMPLICIT REACHABILITY, modelled:
@@ -35,8 +37,8 @@
  *     JPA, JSON binding): exempt from MISSED. Not exempt from EXTRA.
  *   - An ENUM CONSTANT is reachable through values()/valueOf(): exempt from MISSED.
  *   - A class holding `main` is an entry point, as `main` is.
- *   - SCOPE: prune judges module-scoped declarations, so MISSED counts top-level types only (as the
- *     Python and JS oracles count module-level definitions). Unreferenced members are listed, not charged.
+ *   - SCOPE: top-level types (ORPHAN …) and METHODS (UNUSED_MEMBER) are ratcheted separately. Fields
+ *     are listed, not charged: Java fields are not extracted as nodes, so prune cannot speak of them.
  *   - Test sources: references FROM them count; declarations IN them are not scored (prune exempts tests).
  *
  * WHAT IT CANNOT SEE: reflection by string (Class.forName, Spring by-name wiring), serialization hooks
@@ -119,7 +121,7 @@ const isTestPath = (p) => /(^|\/)src\/test\//.test(p) || /(^|\/)test\//.test(p);
 const compileRequired = (d) => typeof d.override === 'string' && d.override.startsWith('abstract:');
 const dispatchOnly = (d) => typeof d.override === 'string' && !compileRequired(d);
 
-const VERDICTS = new Set(['ORPHAN', 'ONLY_IMPORTED', 'UNUSED_EXPORT']);
+const VERDICTS = new Set(['ORPHAN', 'ONLY_IMPORTED', 'UNUSED_EXPORT', 'UNUSED_MEMBER']);
 function contradiction(d, verdict) {
   if (compileRequired(d)) return `implements ${d.override.slice('abstract:'.length)} — deleting it breaks the build`;
   if (verdict === 'UNUSED_EXPORT') return d.refsOtherFile > 0 ? `referenced from another file (first: ${d.firstRef}, ${d.refsOtherFile} ref(s))` : null;
@@ -162,6 +164,16 @@ const unreferenced = scored.filter(d => topLevel(d) && d.refs === 0 && d.memberR
 const framework = unreferenced.filter(d => d.annotated);
 const exempt = (d) => d.main || d.annotated || d.accessor || d.enumConstant || dispatchOnly(d);
 const missed = unreferenced.filter(d => !exempt(d) && !spoke.has(`${d.file.toLowerCase()}::${d.name.toLowerCase()}`));
+// Methods of a type that is itself in use: a member of a dead type goes with the type.
+const liveType = new Set(scored.filter(d => topLevel(d) && (d.refs > 0 || d.memberRefs > 0 || d.main)).map(d => `${d.file}::${d.name}`));
+// Called by the JVM by name (java.io.Serializable), never by code.
+const SERIALIZATION = new Set(['readObject', 'writeObject', 'readResolve', 'writeReplace', 'readObjectNoData']);
+const silentMethods = unreferencedMembers.filter(d => d.kind === 'method' && liveType.has(`${d.file}::${d.owner}`)
+  && !SERIALIZATION.has(d.name) && !spoke.has(`${d.file.toLowerCase()}::${d.name.toLowerCase()}`));
+// A public/protected method of a public type is API: code outside the project may call it, so no
+// caller inside is not death. Listed, not charged — prune deliberately does not judge it.
+const apiSilent = silentMethods.filter(d => d.api);
+const missedMembers = silentMethods.filter(d => !d.api);
 
 const label = (d) => (d.owner ? `${d.owner}.` : '') + d.name;
 console.log(`\n--- Java dead code vs javac (${path.basename(projectDir)}) ---`);
@@ -174,6 +186,10 @@ console.log(`  agreed (verdict, compiler sees no reference): ${agreed.length}`);
 console.log(`  MISSED (compiler sees no reference, conducks silent): ${missed.length}`);
 for (const m of missed.slice(0, 20)) console.log(`      ${label(m)}  ${m.file}:${m.line}  (${m.kind})`);
 if (missed.length > 20) console.log(`      … ${missed.length - 20} more`);
+console.log(`  public API methods no project code calls: ${apiSilent.length}  (reachable from outside; not charged)`);
+console.log(`  MISSED METHODS (non-API, of a live type, compiler sees no reference, conducks silent): ${missedMembers.length}`);
+for (const m of missedMembers.slice(0, 20)) console.log(`      ${label(m)}  ${m.file}:${m.line}`);
+if (missedMembers.length > 20) console.log(`      … ${missedMembers.length - 20} more`);
 console.log(`  EXTRA (conducks says dead, compiler finds a reference): ${extra.length}`);
 for (const e of extra) console.log(`      ${e.f.type} ${e.f.symbol}  ${e.where}\n          ← ${e.why}`);
 if (ambiguous.length) {
@@ -198,12 +214,13 @@ const prev = baseline[key];
 let failed = false;
 if (extra.length > 0) { console.error(`\n✖ ${extra.length} finding(s) javac contradicts.`); failed = true; }
 if (prev && missed.length > prev.missed) { console.error(`\n✖ RECALL WENT BACKWARDS: ${prev.missed} missed before, ${missed.length} now.`); failed = true; }
+if (prev && prev.missedMethods !== undefined && missedMembers.length > prev.missedMethods) { console.error(`\n✖ METHOD RECALL WENT BACKWARDS: ${prev.missedMethods} missed before, ${missedMembers.length} now.`); failed = true; }
 if (failed && process.argv.includes('--write-baseline')) {
   console.error(`\n  ⚠ recording a baseline over a FAILING ratchet, because --write-baseline was passed.`);
 } else if (failed) process.exit(1);
 
 if (process.argv.includes('--write-baseline')) {
-  baseline[key] = { defs: scored.length, dead: findings.length - unimported, missed: missed.length, extra: extra.length };
+  baseline[key] = { defs: scored.length, dead: findings.length - unimported, missed: missed.length, missedMethods: missedMembers.length, extra: extra.length };
   writeFileSync(BASELINE, JSON.stringify(baseline, null, 2) + '\n');
   console.log(`\n  baseline recorded for ${key}.\n`);
   process.exit(0);
