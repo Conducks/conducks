@@ -119,6 +119,28 @@ describe('System domain integration (conducks setup)', () => {
     }
   });
 
+  /**
+   * State-machine audit round 2, Q-08-6: a Claude config that could not be rewritten was logged as
+   * "Failed to update" and then ignored — exit 0, and the closing line said "Nothing to uninstall —
+   * conducks was not registered" about a config that still held the conducks entry.
+   */
+  it('a Claude config uninstall cannot rewrite fails the command, and is not called unregistered', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-ro-'));
+    const dir = path.join(home, 'Library', 'Application Support', 'Claude');
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'claude_desktop_config.json'), JSON.stringify({ mcpServers: { conducks: { command: 'node' } } }));
+      fs.chmodSync(dir, 0o555);   // the rewrite's temp file cannot be created
+      const { combined, status } = runCli(['uninstall'], { cwd: repo, env: { HOME: home }, allowFail: true });
+      expect(combined).toMatch(/Failed to update/);
+      expect(combined).not.toMatch(/Nothing to uninstall/);
+      expect(status).not.toBe(0);
+    } finally {
+      fs.chmodSync(dir, 0o755);
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('a failed MCP registration fails setup, naming the step', () => {
     const brokenHome = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-int-system-broken-'));
     try {
