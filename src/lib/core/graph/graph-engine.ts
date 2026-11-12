@@ -108,35 +108,48 @@ export class ConducksGraph {
           execArgv: isTs ? ["--import", "tsx"] : []
         });
 
+        // A throw in this handler is NOT this promise's rejection: it is an uncaught exception on the
+        // main thread, and it killed the process. Any failure is kept and reported when the worker exits.
+        let failure: Error | null = null;
         worker.on('message', (results: any[]) => {
           for (const res of results) {
             if (res.error) {
               this.logger.error(`[Conducks Synapse] Worker failure in ${res.path}: ${res.error}`);
               continue;
             }
-            // RE-STATE the file rather than adding to what it said last time. Without this a deleted
-            // call keeps its edge for the rest of the session — and once the watcher records the
-            // file's hash, the next `analyze` sees nothing dirty and never repairs it (todo67).
-            //
-            // Only after the parse SUCCEEDED: replacing first would empty the file on a parse error
-            // and leave the graph claiming the file declares nothing.
-            const canonical = canonicalize(res.path);
-            const declared = new Set<string>(res.spectrum.nodes.map((n: any) => spectrumNodeId(canonical, n)));
-            // The SAME unit and root ids `analyze` passes (reflection-pipeline.ts). Without them every
-            // symbol was written with `unitId = NULL`, and `purgeUnits` finds a file's rows BY unitId —
-            // so a symbol saved by the watcher outlived its own deletion in every later `analyze`
-            // (state-machine audit P-02-3/P-02-4; measured: a renamed function stayed as a ghost).
-            // The root is read from the file's unit node already in the graph, before it is replaced.
-            const unitId = `${canonical}::unit`;
-            const rootId = (this.graph.getNode(unitId)?.properties as any)?.rootId ?? undefined;
-            this.graph.replaceFile(canonical, declared);
-            this.ingestSpectrum(res.path, res.spectrum, false, unitId, rootId);
+            // A file no language provider reads (README.md, package.json, a config) comes back
+            // `{ skipped: true }` with no spectrum. The watcher pulses every changed file that is not
+            // ignored, so reading `res.spectrum.nodes` here killed `watch`, `watch --pulse` and
+            // `mirror --live` on the first such save (state-machine audit round 2, Q-02-1).
+            if (!res.spectrum) continue;
+            try {
+              // RE-STATE the file rather than adding to what it said last time. Without this a deleted
+              // call keeps its edge for the rest of the session — and once the watcher records the
+              // file's hash, the next `analyze` sees nothing dirty and never repairs it (todo67).
+              //
+              // Only after the parse SUCCEEDED: replacing first would empty the file on a parse error
+              // and leave the graph claiming the file declares nothing.
+              const canonical = canonicalize(res.path);
+              const declared = new Set<string>(res.spectrum.nodes.map((n: any) => spectrumNodeId(canonical, n)));
+              // The SAME unit and root ids `analyze` passes (reflection-pipeline.ts). Without them every
+              // symbol was written with `unitId = NULL`, and `purgeUnits` finds a file's rows BY unitId —
+              // so a symbol saved by the watcher outlived its own deletion in every later `analyze`
+              // (state-machine audit P-02-3/P-02-4; measured: a renamed function stayed as a ghost).
+              // The root is read from the file's unit node already in the graph, before it is replaced.
+              const unitId = `${canonical}::unit`;
+              const rootId = (this.graph.getNode(unitId)?.properties as any)?.rootId ?? undefined;
+              this.graph.replaceFile(canonical, declared);
+              this.ingestSpectrum(res.path, res.spectrum, false, unitId, rootId);
+            } catch (err) {
+              failure ??= err instanceof Error ? err : new Error(String(err));
+            }
           }
         });
 
         worker.on('error', reject);
         worker.on('exit', (code) => {
           if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+          else if (failure) reject(failure);
           else resolve();
         });
       });
