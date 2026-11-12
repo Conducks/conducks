@@ -78,7 +78,13 @@ export class MirrorCommand implements ConducksCommand {
       // another terminal for the whole session.
       await gateway.exclusive(() => registry.infrastructure.ensureGraphLoaded());
       if (stopping) return;   // stopped while loading: starting now would write a marker nothing removes
-      watcher.setVaultTurn(task => gateway.exclusive(task));
+      // Every turn first loads the graph if a failed live reload left it deferred (round 2, Q-10-1
+      // follow-up). The routes load it on their own turn; the watcher pulses into it directly, and
+      // its first vault read — the hash check — comes before the parse, so loading here is in time.
+      watcher.setVaultTurn(task => gateway.exclusive(async () => {
+        await registry.infrastructure.ensureGraphLoaded();
+        return task();
+      }));
       watcher.start();
       await watcher.whenReady();
     }
