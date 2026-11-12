@@ -234,16 +234,22 @@ export class ConducksWatcher {
    */
   public async stop(): Promise<void> {
     if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = null; }
+    // The state is released BEFORE the close is awaited, and a close that throws is reported, not
+    // propagated. Nulling `this.watcher` after `await close()` meant a throwing close left it set with
+    // no heartbeat and the marker behind — every later `start()` returned early as if running — and a
+    // `start()` during the close was swallowed the same way (state-machine audit round 2, Q-07-4/5).
+    const closing = this.watcher;
+    this.watcher = null;
+    this.readyPromise = undefined;
     // No new events first, then let the pulse in flight finish: reclaiming below rewrites the vault,
     // and it used to run while a pulse was still writing (P-07-16).
-    if (this.watcher) {
-      await this.watcher.close();
-      this.watcher = null;
+    if (closing) {
+      try { await closing.close(); } catch (err: any) { console.error(`[Watcher] close failed: ${err?.message || err}`); }
     }
-    this.readyPromise = undefined;
     await this.queue;
-    // Removed on a CLEAN stop, so a deliberate shutdown reads as "none" rather than "dead".
-    clearWatcherMarker(this.rootDir);
+    // Removed on a CLEAN stop, so a deliberate shutdown reads as "none" rather than "dead" — unless a
+    // `start()` arrived while this stop was closing: that watcher is live and owns the marker now.
+    if (!this.watcher) clearWatcherMarker(this.rootDir);
 
     // Reclaim the churn this session created, ON SHUTDOWN and nowhere else (todo21#P1).
     //
@@ -295,7 +301,11 @@ export class ConducksWatcher {
     const persistence = this.options.persistence;
     if (!persistence) return { changed: 0, added: 0 };
     try {
-      const stored = await this.readVault(() => persistence.getAllFileHashes());
+      // Read IN THE QUEUE, like every event's vault read. On a read-only handle each read closes the
+      // handle when it ends, so a save landing mid-reconcile closed it under this query, which threw
+      // into the catch below and the catch-up silently did not happen (round 2, Q-07-6). Only the read
+      // is queued: the pulses it triggers queue themselves and would wait on it forever.
+      const stored = await this.inQueue(() => this.readVault(() => persistence.getAllFileHashes()));
       const fresh = classifyFreshness(
         stored, onDisk, WATCHED_EXTENSIONS,
         abs => { try { return fs.readFileSync(abs, 'utf8'); } catch { return null; } },
@@ -317,8 +327,13 @@ export class ConducksWatcher {
    * `pulseEvent` never throws, so one failed pulse does not stop the chain.
    */
   private handlePulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
-    const next = this.queue.then(() => this.pulseEvent(event, filePath));
-    this.queue = next;
+    return this.inQueue(() => this.pulseEvent(event, filePath));
+  }
+
+  /** Runs `task` after everything queued before it; a task that throws does not stop the chain. */
+  private inQueue<T>(task: () => Promise<T>): Promise<T> {
+    const next = this.queue.then(task);
+    this.queue = next.then(() => undefined, () => undefined);
     return next;
   }
 
