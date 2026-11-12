@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { DuckDBInstance } from '@duckdb/node-api';
-import { CoChangeEngine } from '@/lib/core/algorithms/cochange-engine.js';
-import { ConducksAdjacencyList } from '@/lib/core/graph/adjacency-list.js';
+import { CoChangeEngine } from '@/lib/core/algorithms/index.js';
+import { ConducksAdjacencyList } from '@/lib/core/graph/index.js';
 
 /**
  * Two runs on one connection must give the same answer (state-machine audit P-03-7). The history went

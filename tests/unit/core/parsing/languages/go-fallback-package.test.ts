@@ -20,7 +20,7 @@ describe('Go resolution without a go.mod', () => {
   });
 
   it('matches a real path with upper-case letters', () => {
-    const files = ['/Users/Said/r/internal/store/a.go', '/Users/Said/r/cmd/main.go'];
-    expect(r.resolve('internal/store', '/Users/Said/r/cmd/main.go', files)).toBe('/Users/Said/r/internal/store/a.go');
+    const files = ['/Users/Dev/r/internal/store/a.go', '/Users/Dev/r/cmd/main.go'];
+    expect(r.resolve('internal/store', '/Users/Dev/r/cmd/main.go', files)).toBe('/Users/Dev/r/internal/store/a.go');
   });
 });
