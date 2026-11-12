@@ -1383,9 +1383,11 @@ export class ConducksReflector {
         if (cName === CaptureTags.COMMENT && provider.extractDebt) {
           const markers = provider.extractDebt(capture.node);
           if (markers.length > 0) {
+            // The scope chain IS the qualified name (`widget.go`), the same suffix a definition's id
+            // carries. This used to prepend it a second time — `file::run.run` — so no node matched
+            // and every marker inside a body was dropped (state-machine audit P-03-1).
             const scopeName = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
-            const scopePrefix = scopeName ? `${scopeName.toLowerCase()}.` : '';
-            const targetId = `${file.path.toLowerCase()}::${scopePrefix}${scopeName ? scopeName.toLowerCase() : 'unit'}`;
+            const targetId = `${file.path.toLowerCase()}::${scopeName ? scopeName.toLowerCase() : 'unit'}`;
             const targetNode = nodeCache.get(targetId);
             if (targetNode) {
               if (!targetNode.metadata.debtMarkers) targetNode.metadata.debtMarkers = [];

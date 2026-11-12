@@ -36,7 +36,8 @@ describe('ConducksAdjacencyList', () => {
         properties: {
           name: 'foo',
           filePath: 'src/a.ts',
-          debtMarkers: ['TODO: refactor'],
+          // A meat-only field (was `debtMarkers`, now on the skeleton — state-machine audit P-03-1).
+          coveredBy: ['TODO: refactor'],
           primaryAuthor: 'said',
           entropy: 0.42,
         },
@@ -45,7 +46,7 @@ describe('ConducksAdjacencyList', () => {
       const loaded = graph.getNode('src/a.ts::foo');
       expect(loaded?.isShallow).toBe(false);
       // "Meat" fields are not part of the skeleton allowlist — they only survive via VMC.
-      expect(loaded?.properties.debtMarkers).toEqual(['TODO: refactor']);
+      expect(loaded?.properties.coveredBy).toEqual(['TODO: refactor']);
       expect(loaded?.properties.primaryAuthor).toBe('said');
       expect(loaded?.properties.entropy).toBe(0.42);
       // Skeleton fields still present alongside the decompressed meat.
@@ -57,11 +58,11 @@ describe('ConducksAdjacencyList', () => {
         id: 'src/a.ts::foo',
         label: 'function',
         isShallow: true,
-        properties: { name: 'foo', filePath: 'src/a.ts', debtMarkers: ['x'] },
+        properties: { name: 'foo', filePath: 'src/a.ts', coveredBy: ['x'] },
       });
 
       const loaded = graph.getNode('src/a.ts::foo');
-      expect(loaded?.properties.debtMarkers).toBeUndefined();
+      expect(loaded?.properties.coveredBy).toBeUndefined();
     });
 
     it('overwrites an existing node on a second addNode with the same id', () => {

@@ -439,6 +439,10 @@ export class ConducksAdjacencyList {
         // above, both of which cost a debugging session before they were added.
         doc: node.properties.doc,
         docFirstLine: node.properties.docFirstLine,
+        // TODO/FIXME markers, for the same reason as `doc`: harvested by the reflector, then dropped
+        // here because only the skeleton reaches `saveNodes` — not one marker was in the vault
+        // (state-machine audit P-03-1).
+        debtMarkers: node.properties.debtMarkers,
         // Cross-service HTTP binding reads these, and the skeleton is what survives a load — so
         // omitting them made `bindRouteCircuits` match nothing on any graph that came from the
         // vault rather than straight from a parse (todo22#P15).
