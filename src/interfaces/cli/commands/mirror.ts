@@ -44,16 +44,27 @@ export class MirrorCommand implements ConducksCommand {
     const port = await server.start(3333, host);
     
     // 3. Start Watcher (Live Connection) - Optional (v1.12.6)
-    if (registry.evolution.watcher && (args.includes('--live') || args.includes('--watch'))) {
-      registry.evolution.watcher.start();
+    // `mirror` is a read command, so its graph is DEFERRED. The watcher walks the graph on every save,
+    // so it is loaded first — otherwise each save failed with "read a graph that is not materialised"
+    // until a dashboard request happened to load it (state-machine audit P-07-3). And the watcher is
+    // announced only once it is really watching, as `watch` does (P-08-10, todo55).
+    const watcher = registry.evolution.watcher;
+    const live = !!watcher && (args.includes('--live') || args.includes('--watch'));
+    if (live) {
+      await registry.infrastructure.ensureGraphLoaded();
+      watcher.start();
+      await watcher.whenReady();
     }
-    
+
     // This command runs until it is killed, and until now it handled no signal — so `stop()`
     // never ran, and the docs watcher's readiness probe was left behind in `docs/` every time.
     // `once` so a second Ctrl-C during shutdown still kills the process rather than re-entering.
+    // The file watcher is stopped too: exiting without `stop()` left its liveness marker behind, and
+    // `monitor` then read a deliberate Ctrl-C as a DEAD watcher (P-07-2).
     const shutdown = async () => {
       console.log("\n\x1b[90m[Conducks] Stopping mirror…\x1b[0m");
       try { await server.stop(); } catch { /* shutting down anyway */ }
+      if (live) { try { await registry.evolution.stopWatchers(); } catch { /* shutting down anyway */ } }
       process.exit(0);
     };
     process.once('SIGINT', shutdown);

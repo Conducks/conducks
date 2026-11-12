@@ -402,7 +402,9 @@ export const registry = {
   evolution: {
     compare: (prevPulseId?: string) => evolution.compare(prevPulseId),
     audit: (window?: number) => evolution.audit(window),
-    get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); }
+    get watcher() { return evolution.getWatcher(chronicle.getProjectDir()); },
+    /** Stops every watcher this session started, which removes their liveness markers (ADR 0036). */
+    stopWatchers: () => evolution.stopWatchers(),
   },
   initialize: initializeRegistry
 };

@@ -119,8 +119,15 @@ export class ConducksGraph {
             // and leave the graph claiming the file declares nothing.
             const canonical = canonicalize(res.path);
             const declared = new Set<string>(res.spectrum.nodes.map((n: any) => spectrumNodeId(canonical, n)));
+            // The SAME unit and root ids `analyze` passes (reflection-pipeline.ts). Without them every
+            // symbol was written with `unitId = NULL`, and `purgeUnits` finds a file's rows BY unitId —
+            // so a symbol saved by the watcher outlived its own deletion in every later `analyze`
+            // (state-machine audit P-02-3/P-02-4; measured: a renamed function stayed as a ghost).
+            // The root is read from the file's unit node already in the graph, before it is replaced.
+            const unitId = `${canonical}::unit`;
+            const rootId = (this.graph.getNode(unitId)?.properties as any)?.rootId ?? undefined;
             this.graph.replaceFile(canonical, declared);
-            this.ingestSpectrum(res.path, res.spectrum);
+            this.ingestSpectrum(res.path, res.spectrum, false, unitId, rootId);
           }
         });
 

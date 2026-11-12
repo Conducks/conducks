@@ -858,8 +858,12 @@ export class SynapsePersistence {
       // unbounded churn against a store that never reclaims deleted row versions (ADR 0037), and the
       // graph meanwhile kept answering with 44 files that do not exist on disk.
       // The ids passed in ARE the unit ids (`<file>::unit`), so matching `id` too is exact.
-      const owns = `(unitId IN (${placeholders}) OR id IN (${placeholders}))`;
-      const both = [...lowered, ...lowered];
+      // `file` too: rows the watcher wrote before it passed a unit id carry `unitId = NULL` and match
+      // neither of the other two, so they outlived every later purge of their own file (state-machine
+      // audit P-02-3). Matching the unit's file heals vaults that already hold such rows.
+      const files = lowered.map(id => id.replace(/::unit$/, ''));
+      const owns = `(unitId IN (${placeholders}) OR id IN (${placeholders}) OR file IN (${placeholders}))`;
+      const both = [...lowered, ...lowered, ...files];
       await this.run(`DELETE FROM edges WHERE sourceId IN (SELECT id FROM nodes WHERE ${owns})`, both);
       // Drop the content hashes of the purged files BEFORE their nodes go, while the subquery can still
       // find them. Leaving a hash behind is the sharp edge of the hash gate (ADR 0030): the file would

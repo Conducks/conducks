@@ -255,9 +255,21 @@ export class ConducksWatcher {
   }
 
   private async handlePulseEvent(event: "add" | "change" | "unlink", filePath: string): Promise<void> {
-    if (!filePath || event === "unlink") {
-      // Logic to prune stale synapse nodes would go here
-      if (filePath && event === "unlink") await this.hashGate?.forget(path.resolve(filePath));
+    if (!filePath) return;
+    if (event === "unlink") {
+      // A deleted file's symbols leave the graph AND the vault. This used to forget the hash and
+      // nothing else, so a file deleted under the watcher stayed in `impact`, `prune` and `drift`
+      // until the next full `analyze` (state-machine audit P-07-1).
+      const normalizedPath = path.resolve(filePath);
+      try {
+        this.graph.getGraph().replaceFile(normalizedPath.toLowerCase(), new Set());
+        await this.writeUnit(normalizedPath, []);
+        await this.hashGate?.forget(normalizedPath);
+        console.error(`[Watcher] Removed: ${path.relative(this.rootDir, filePath)}`);
+        this.options.onPulse?.({ event, filePath });
+      } catch (err: any) {
+        console.error(`[Watcher] Removal error for ${path.basename(filePath)}: ${err?.message || err}`);
+      }
       return;
     }
 
@@ -391,20 +403,9 @@ export class ConducksWatcher {
       // So the unit is re-stated in the vault the same way `replaceFile` re-states it in memory:
       // purge the unit's rows and the edges it OWNS, then write its current nodes and outgoing
       // edges back. Incoming edges belong to other units and are neither purged nor rewritten here.
-      if (this.options.persistence && !(this.options.persistence as any).readOnly) {
-        if (this.autoPulse) console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
-        const persistence = this.options.persistence;
-        const g = this.graph.getGraph();
-        const lowerPath = normalizedPath.toLowerCase();
-        const ids = new Set(g.getNodeIdsByFilePath(lowerPath));
-        const nodes = [...ids].map(id => g.getNode(id)).filter(Boolean);
-        const owned = g.getAllEdges().filter(e => ids.has(String(e.sourceId)));
-        const pulseId = `watch_${Date.now()}`;
-        await persistence.purgeUnits([`${lowerPath}::unit`]);
-        if (nodes.length > 0) await persistence.saveNodes(nodes as any[], pulseId);
-        if (owned.length > 0) await persistence.saveEdges(owned as any[], pulseId);
-        await persistence.save(g);
-      }
+      const g = this.graph.getGraph();
+      const ids = new Set(g.getNodeIdsByFilePath(normalizedPath.toLowerCase()));
+      await this.writeUnit(normalizedPath, [...ids].map(id => g.getNode(id)).filter(Boolean));
 
       // 6. Record the hash — AFTER the pulse and the save, never before. Recording first would make a
       // parse that threw look complete, and those nodes would stay missing until the file changed again.
@@ -413,7 +414,40 @@ export class ConducksWatcher {
       // 7. Notify pulse subscriber (web mirror wires this in — dependency inversion, no domain→web import)
       this.options.onPulse?.({ event, filePath });
     } catch (err: any) {
+      // The in-memory graph may already hold the new content while the vault or the hash gate does
+      // not. Forget the hash so the NEXT event for this file — including a revert to the old content —
+      // is pulsed instead of dismissed as unchanged (state-machine audit P-07-4).
+      try { await this.hashGate?.forget(path.resolve(filePath)); } catch { /* best effort */ }
       console.error(`[Watcher] Pulse error for ${path.basename(filePath)}: ${err?.message || err}`);
+    }
+  }
+
+  /**
+   * Re-states one file in the vault: purge its rows and the edges it owns, write `nodes` and their
+   * outgoing edges back, as ONE transaction.
+   *
+   * Only while auto-pulse is on. The flag used to gate a log line, not the write: after a branch
+   * switch `watch` printed "Auto-pulse stopped" and kept writing the new branch into the old graph
+   * (state-machine audit P-08-1). And only as one transaction: the purge used to commit on its own,
+   * so a failed save left the file with no rows at all (P-01-3, P-06-6).
+   */
+  private async writeUnit(normalizedPath: string, nodes: any[]): Promise<void> {
+    const persistence = this.options.persistence;
+    if (!this.autoPulse || !persistence || (persistence as any).readOnly) return;
+    console.error(`🛡️ [Conducks Watcher] Auto-Pulse: Persisting structural delta to vault...`);
+    const g = this.graph.getGraph();
+    const ids = new Set(nodes.map(n => String(n.id)));
+    const owned = g.getAllEdges().filter(e => ids.has(String(e.sourceId)));
+    const pulseId = `watch_${Date.now()}`;
+    await persistence.beginPulse();
+    try {
+      await persistence.purgeUnits([`${normalizedPath.toLowerCase()}::unit`]);
+      if (nodes.length > 0) await persistence.saveNodes(nodes, pulseId);
+      if (owned.length > 0) await persistence.saveEdges(owned as any[], pulseId);
+      await persistence.save(g);
+    } catch (err) {
+      await persistence.abortPulse();
+      throw err;
     }
   }
 }
