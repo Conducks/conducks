@@ -51,6 +51,7 @@ public class JavaRefs {
     DiagnosticCollector<JavaFileObject> diags = new DiagnosticCollector<>();
     StandardJavaFileManager fm = jc.getStandardFileManager(diags, null, StandardCharsets.UTF_8);
     Path out = Files.createTempDirectory("conducks-javarefs");
+    out.toFile().deleteOnExit();   // nothing is generated (analyze only), but the dir was left behind on every run
     JavacTask task = (JavacTask) jc.getTask(null, fm, diags,
         List.of("-proc:none", "-Xlint:none", "-Xmaxerrs", "1000000", "-implicit:none", "-d", out.toString()), null, fm.getJavaFileObjectsFromFiles(files));
     List<CompilationUnitTree> units = new ArrayList<>();
