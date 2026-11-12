@@ -493,6 +493,11 @@ export class ConducksAdjacencyList {
         this.pendingMeat.set(id, JSON.stringify(meat));
         this.scheduleCompaction();
       } catch (err) {
+        // The OLD meat goes too. A stringify that threw left the previous pending copy in place, and
+        // `getNode` merged it over the NEW skeleton — a node from two writes (state-machine audit
+        // P-02-10). No meat is the honest state after a failed write.
+        this.compressedMeat.delete(id);
+        this.pendingMeat.delete(id);
         console.error(`[Conducks VMC] Compression failed for node ${id}:`, err);
       }
     } else {

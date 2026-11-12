@@ -1182,14 +1182,17 @@ export class IntraLinker {
 
     const collapsed: Array<{ id: string; newTargetId: string }> = [];
     for (const edge of aliasEdges) {
-      const seen = new Set<string>([edge.sourceId]);
+      const seen = new Set<string>([edge.sourceId, edge.targetId]);
       let terminal = edge.targetId;
-      while (!seen.has(terminal)) {
-        seen.add(terminal);
+      for (;;) {
         const next = aliasTarget.get(terminal);
         // A bare next hop is one this pass could not resolve; stopping keeps the last REAL node
-        // rather than replacing it with a name that resolves to nothing.
-        if (!next || !graph.hasNode(next)) break;
+        // rather than replacing it with a name that resolves to nothing. A hop back to a node
+        // already walked is a cycle: stop HERE too. Stepping onto the repeat first landed a mutual
+        // pair (`a` aliases `b` aliases `a`) on the edge's own source — `a -> a` (state-machine
+        // audit P-02-7).
+        if (!next || !graph.hasNode(next) || seen.has(next)) break;
+        seen.add(next);
         terminal = next;
       }
       if (terminal !== edge.targetId) {
