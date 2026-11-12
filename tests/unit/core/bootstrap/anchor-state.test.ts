@@ -219,6 +219,32 @@ describe('the bootstrapper load state, round 2', () => {
     await current.close();
   }, 60000);
 
+  // Q-01-8: everything that can refuse a root is asked BEFORE anything is swapped. An unreadable
+  // `.conducksignore` threw after the handle, the chronicle and the federation linker had moved to the
+  // new root and the graph had been cleared — a half-switched registry, its graph empty and not deferred.
+  it('a root that cannot be anchored changes nothing (Q-01-8)', async () => {
+    const a = await vaultWith(['/a/a.ts::kept']);
+    const bad = await vaultWith(['/b/b.ts::other']);
+    fs.mkdirSync(path.join(bad, '.conducksignore'));   // unreadable as a file: EISDIR
+    const b = new RegistryBootstrapper();
+    const graph = new ConducksGraph();
+    let current = new SynapsePersistence(':memory:', true);
+    let swaps = 0;
+    let federations = 0;
+    const extra = {
+      updatePersistence: (p: SynapsePersistence) => { swaps++; current = p; },
+      federationFor: () => { federations++; return { hydrate: async () => {} } as never; },
+    };
+    await b.initialize({ readOnly: true, root: a, lazy: false }, ctx(graph, current, extra));
+    expect(graph.getGraph().getNode('/a/a.ts::kept')).toBeDefined();
+    const before = { swaps, federations };
+
+    await expect(b.initialize({ readOnly: true, root: bad, lazy: false }, ctx(graph, current, extra))).rejects.toThrow();
+    expect({ swaps, federations }).toEqual(before);
+    expect(graph.getGraph().getNode('/a/a.ts::kept')).toBeDefined();
+    await current.close();
+  }, 60000);
+
   it('records the pulse the load STARTED from, so a pulse landing mid-load reads as stale (Q-01-3)', async () => {
     const root = await vaultWith(['/p/a.ts::one']);
     const b = new RegistryBootstrapper();

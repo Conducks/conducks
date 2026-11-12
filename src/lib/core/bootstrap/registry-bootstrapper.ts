@@ -398,6 +398,12 @@ export class RegistryBootstrapper {
     // always sees `rootChanged` once (todo52).
     if (!rootChanged && !modeChanged) return;
 
+    // Built FIRST, before anything is closed, cleared or swapped: it reads `.conducksignore` and THROWS
+    // on one it cannot read. Built where it used to be — after the handle, the chronicle and the
+    // federation linker had moved and the graph was cleared — that throw left a half-switched registry
+    // whose graph was empty and not deferred (state-machine audit round 2, Q-01-8).
+    const newIgnoreManager = new IgnoreManager(effectiveRoot);
+
     // A CLOSED handle is not a reason to build a new one — only a changed root or mode is.
     //
     // `releaseAnchor()` closes the vault at the end of every tool call, deliberately, so the user can
@@ -439,8 +445,6 @@ export class RegistryBootstrapper {
     updatePersistence(newPersistence);
     anchorChronicle(effectiveRoot);
     const federation = federationFor(effectiveRoot);
-
-    const newIgnoreManager = new IgnoreManager(effectiveRoot);
     updateIgnoreManager(newIgnoreManager);
 
     // Round 2 (state-machine re-audit): the pulse is read BEFORE the rows, so a pulse an outside
