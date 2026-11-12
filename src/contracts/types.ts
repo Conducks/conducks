@@ -30,7 +30,9 @@ export interface ConducksComponent {
 export interface RegistryEntry<T extends ConducksComponent> {
   component: T;
   registeredAt: Date;
-  status: 'active' | 'deprecated' | 'error';
+  // No `'error'`: nothing ever set it, so a branch on it would test a state that cannot occur
+  // (state-machine audit P-09-12). `'deprecated'` is set by `deprecate()` and read by nothing yet.
+  status: 'active' | 'deprecated';
 }
 
 /**
