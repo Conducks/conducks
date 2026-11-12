@@ -86,12 +86,8 @@ export class WatchCommand implements ConducksCommand {
     console.log('[Watch] Step 4: calling watcher.init()...');
     await watcher.init();
 
-    console.log('[Watch] Step 5: calling watcher.start()...');
-    watcher.start();
-
-    // The signal handlers are armed HERE, the moment `start()` has written the liveness marker — not
-    // after start-up. They were registered only once the watcher was ready and the catch-up reconcile
-    // had finished, so a Ctrl-C in that window (seconds on a tree edited while nothing watched) took
+    // The signal handlers are armed BEFORE `start()`, not after start-up. They were registered only
+    // once the watcher was ready and the catch-up reconcile had finished, so a Ctrl-C in that window (seconds on a tree edited while nothing watched) took
     // the default action: the process died, the marker stayed, and `monitor` reported a deliberate
     // stop as a DEAD watcher, with a `--pulse` session's reader snapshot left behind too (round 2,
     // Q-08-4). A signal during start-up lets the current step finish, then shuts down instead of
@@ -122,6 +118,14 @@ export class WatchCommand implements ConducksCommand {
     };
     process.once('SIGINT', () => { void shutdown('SIGINT'); });
     process.once('SIGTERM', () => { void shutdown('SIGTERM'); });
+
+    // AFTER the handlers, not before. Until a listener exists the OS default applies, and it does not
+    // wait for JavaScript: a Ctrl-C landing while `start()` was building its poller (tens of ms, longer
+    // on a busy machine) killed the process mid-call, with the marker just written and never removed.
+    // Measured: the process ended by SIGINT 20 ms after the signal, output stopping at this line. With
+    // the listener in place the signal is handled after `start()` returns, and `stop()` clears the marker.
+    console.log('[Watch] Step 5: calling watcher.start()...');
+    watcher.start();
 
     // WAIT for the watcher to actually be watching before doing anything else.
     //
